@@ -1,5 +1,5 @@
 ZETTBOT CONTEXT: MODULE PERMOHONAN_ST
-Generated: 2026-09-17 22:55:21.033902
+Generated: 2026-09-19 21:14:04.446292
 
 ==================================================
 FILE: permohonan/st/js_cetak_plh.html
@@ -1294,7 +1294,7 @@ FILE: permohonan/st/template_cetak_plh.html
     /* Ubah nilai "margin-top" (saat ini 30px). 
        - Perkecil angka (misal 10px) untuk menaikkan blok tanda tangan.
        - Perbesar angka (misal 50px) untuk menurunkannya. */
-    .plh-ttd-box { float: right; width: 300px; margin-top: 20px; }
+    .plh-ttd-box { float: right; width: 300px; margin-top: 5px; }
     /* ⬆️ ================================================================== ⬆️ */
 
     .plh-ttd-table { width: 100%; border-collapse: collapse; }
@@ -1379,16 +1379,18 @@ FILE: permohonan/st/template_cetak_plh.html
            <td style="width: 10px;">:</td>
            <td>Indramayu</td>
          </tr>
-         <tr style="border-bottom: 1px solid black; display: inline-block;">
-           <td style="padding-bottom: 2px;">Pada tanggal</td>
-           <td style="padding-bottom: 2px;">:</td>
-           <td style="padding-bottom: 2px;">{{tanggal_cetak}}</td>
+         <!-- PERBAIKAN: Hapus display: inline-block; dan pindahkan border ke setiap sel <td> -->
+         <tr>
+           <td style="padding-bottom: 4px; border-bottom: 1px solid black;">Pada tanggal</td>
+           <td style="padding-bottom: 4px; border-bottom: 1px solid black;">:</td>
+           <td style="padding-bottom: 4px; border-bottom: 1px solid black;">{{tanggal_cetak}}</td>
+           
          </tr>
        </table>
-       <div style="margin-top: 3px;">{{jabatan_ttd_st}},</div>
+       <div style="margin-top: 5px;">{{jabatan_ttd_st}},</div>
        
-       <!-- Ruang untuk tanda tangan -->
-       <div style="height: 75px;"></div>
+       <!-- PERBAIKAN: Kurangi tinggi ruang tanda tangan (dari 75px menjadi 55px) -->
+       <div style="height: 55px;"></div>
        
        <div class="plh-bold">{{nama_ttd_st}}</div>
      </div>

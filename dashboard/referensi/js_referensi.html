@@ -1,0 +1,29 @@
+<!-- ZETTBOT TAHAP 5A: FUNGSI MODAL REFERENSI -->
+<script>
+  function openReferensiModal() {
+      // 1. Matikan pencarian jika sedang aktif
+      clearEmployeeSearch();
+      
+      const modal = document.getElementById('modalReferensiAbsensi');
+      if (modal) {
+          modal.classList.remove('hidden');
+          // 2. Transisi mulus Pop-up
+          setTimeout(() => {
+              modal.classList.remove('opacity-0');
+              modal.firstElementChild.classList.remove('scale-95');
+          }, 10);
+      }
+  }
+
+  function closeReferensiModal() {
+      const modal = document.getElementById('modalReferensiAbsensi');
+      if (modal) {
+          modal.classList.add('opacity-0');
+          modal.firstElementChild.classList.add('scale-95');
+          // Tunggu animasi selesai baru sembunyikan display block
+          setTimeout(() => {
+              modal.classList.add('hidden');
+          }, 300);
+      }
+  }
+</script>

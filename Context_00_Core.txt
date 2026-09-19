@@ -1,5 +1,5 @@
 ZETTBOT CONTEXT: CORE FILES (Root)
-Generated: 2026-09-17 22:55:21.009813
+Generated: 2026-09-19 21:14:04.428867
 
 ==================================================
 FILE: appsscript.json
@@ -191,7 +191,8 @@ function getBulkData(nip, clientToken) {
             tmt_knp: normalizeDateDB(uData[i][17]),
             bup: uData[i][18], status_kgb: uData[i][19] || '', tgl_selesai_kgb: uData[i][20] || '',
             status_knp: uData[i][21] || '', tgl_selesai_knp: uData[i][22] || '',
-            status_pensiun: uData[i][23] || '', tgl_selesai_pensiun: uData[i][24] || ''
+            status_pensiun: uData[i][23] || '', tgl_selesai_pensiun: uData[i][24] || '',
+            jenis_jabatan: uData[i][25] || 'Fungsional Umum' // Menarik Data Jenis Jabatan dari indeks ke-25
         };
           data.usersList.push(u);
           if (String(uData[i][0]) === String(nip)) data.user = u;
@@ -636,6 +637,8 @@ FILE: index.html
            <?!= include('pkp/PK_template'); ?>
            <?!= include('pkp/PCK_template'); ?>
            <?!= include('pkp/rekap_pkp_template'); ?>
+           <?!= include('dashboard/referensi/view_referensi'); ?>
+           <?!= include('dashboard/referensi/view_kode'); ?>
         </div>
      </main>
   </div>
@@ -654,6 +657,8 @@ FILE: index.html
   <?!= include('dashboard/js_dashboard'); ?>
   <?!= include('dashboard/js_dashboard_peringatan'); ?>
   <?!= include('dashboard/js_dashboard_grafik'); ?>
+  <?!= include('dashboard/referensi/js_referensi'); ?>
+  <?!= include('dashboard/referensi/js_kode'); ?>
   <?!= include('permohonan/js_permohonan_view'); ?>
   <?!= include('permohonan/js_permohonan_form'); ?>
   <?!= include('permohonan/js_permohonan_aksi'); ?>
@@ -912,6 +917,9 @@ FILE: javascript.html
                 if (cm === 'sop' && typeof renderSopView === 'function') renderSopView();
                 if (cm === 'jobdes' && typeof renderJobdesView === 'function') renderJobdesView();
                 if (cm === 'kinerja' && typeof renderKinerjaView === 'function') renderKinerjaView();
+                
+                // ZETTBOT FIX: Tambahkan baris ini agar menu Manajemen juga ikut ter-refresh
+                if (cm === 'manajemen' && typeof renderManajemenView === 'function') renderManajemenView();
             }
         })
         .withFailureHandler(function(err) {
@@ -1476,7 +1484,9 @@ function setupDatabase() {
           'NIP', 'Nama', 'Jabatan', 'Role', 'No_HP', 'Password', 
           'Sisa_Tahunan_2024', 'Sisa_Tahunan_2025', 'Sisa_Tahunan_2026', 'Sisa_Sakit', 
           'Sisa_Penting', 'Sisa_Besar', 'Sisa_Melahirkan', 'Sisa_CLTN',
-          'Pangkat', 'Alamat', 'TMT_KGB', 'TMT_KNP', 'BUP'
+          'Pangkat', 'Alamat', 'TMT_KGB', 'TMT_KNP', 'BUP',
+          'Status_KGB', 'Tgl_Selesai_KGB', 'Status_KNP', 'Tgl_Selesai_KNP', 
+          'Status_Pensiun', 'Tgl_Selesai_Pensiun', 'Jenis_Jabatan'
         ];
         userSheet.appendRow(userHeaders);
         userSheet.getRange(1, 1, 1, userHeaders.length).setFontWeight('bold').setBackground('#064e3b').setFontColor('#ffffff').setHorizontalAlignment('center');

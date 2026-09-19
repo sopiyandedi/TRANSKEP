@@ -1,5 +1,5 @@
 ZETTBOT CONTEXT: MODULE PEGAWAI
-Generated: 2026-09-17 22:55:21.022616
+Generated: 2026-09-19 21:14:04.439398
 
 ==================================================
 FILE: pegawai/js_manajemen_pegawai.html
@@ -11,16 +11,13 @@ FILE: pegawai/js_manajemen_pegawai.html
   // ---------------------------------------------------------
   function parseDateToHTML5(sheetDateStr) {
     if (!sheetDateStr) return "";
-    // Jika format sudah YYYY-MM-DD, kembalikan langsung
     if (sheetDateStr.includes('-') && sheetDateStr.split('-')[0].length === 4) return sheetDateStr;
     
-    // Konversi dari DD/MM/YY atau DD/MM/YYYY
     const parts = sheetDateStr.includes('/') ? sheetDateStr.split('/') : sheetDateStr.split('-');
     if (parts.length === 3) {
         let day = parts[0].padStart(2, '0');
         let month = parts[1].padStart(2, '0');
         let year = parts[2];
-        // Jika tahun cuma 2 digit (misal: 28), asumsikan tahun 2000-an (2028)
         if (year.length === 2) year = "20" + year;
         return `${year}-${month}-${day}`;
     }
@@ -36,12 +33,11 @@ FILE: pegawai/js_manajemen_pegawai.html
        return;
     }
     
-    // Format JSON agar Header di Excel rapi
     const dataExport = state.usersList.map(u => ({
         'NIP': u.nip, 'Nama': u.nama, 'Jabatan': u.jabatan, 'Role': u.role, 'No_HP': u.no_hp, 'Password': u.pass,
         'Sisa_Tahunan_2024': u.s_tahunan_2024, 'Sisa_Tahunan_2025': u.s_tahunan_2025, 'Sisa_Tahunan_2026': u.s_tahunan_2026,
         'Sisa_Sakit': u.s_sakit, 'Sisa_Penting': u.s_penting, 'Sisa_Besar': u.s_besar, 'Sisa_Melahirkan': u.s_melahirkan, 'Sisa_CLTN': u.s_cltn,
-        'Pangkat': u.pangkat, 'Alamat': u.alamat,
+        'Pangkat': u.pangkat, 'Jenis_Jabatan': (u.jenis_jabatan || 'Fungsional Umum'), 'Alamat': u.alamat,
         'TMT_KGB': u.tmt_kgb, 'TMT_KNP': u.tmt_knp, 'BUP': u.bup
     }));
 
@@ -73,46 +69,39 @@ FILE: pegawai/js_manajemen_pegawai.html
         try {
             const data = new Uint8Array(e.target.result);
             const workbook = XLSX.read(data, {type: 'array'});
-            
-            // Ambil sheet pertama saja
             const firstSheetName = workbook.SheetNames[0];
             const worksheet = workbook.Sheets[firstSheetName];
-            
-            // Konversi ke JSON
-            const json = XLSX.utils.sheet_to_json(worksheet, { defval: "" }); // defval mencegah undefined
+            const json = XLSX.utils.sheet_to_json(worksheet, { defval: "" }); 
             
             if (json.length === 0) {
                 showNotify('Import Gagal', 'File Excel yang diunggah kosong.', 'error');
                 return;
             }
 
-            // Validasi keberadaan Header Krusial (Mencegah salah upload file)
             if (!json[0].hasOwnProperty('NIP') || !json[0].hasOwnProperty('Nama')) {
-                showNotify('Import Ditolak', 'Format Excel tidak sesuai. Wajib menggunakan format hasil Backup (Memiliki header NIP & Nama).', 'error');
+                showNotify('Import Ditolak', 'Format Excel tidak sesuai. Wajib menggunakan format hasil Backup.', 'error');
                 return;
             }
 
-            // Tampilkan Konfirmasi via Custom Modal Zettbot
             showCustomConfirm(
                 "Konfirmasi Sinkronisasi", 
-                `Ditemukan ${json.length} data profil di dalam file. Sistem akan menambahkan yang baru dan memperbarui (menimpa) NIP yang sudah ada. Lanjutkan?`, 
+                "Ditemukan " + json.length + " data profil di dalam file. Sistem akan menimpa NIP yang sudah ada. Lanjutkan?", 
                 function() {
-                    // Eksekusi Import
                     showLoading("Memasukkan data ke database...");
                     google.script.run
                         .withSuccessHandler(res => {
                             hideLoading();
-                            document.getElementById('importPegawaiInput').value = ''; // Reset File Input
+                            document.getElementById('importPegawaiInput').value = ''; 
                             if(res.status === 'success') {
                                 showNotify('Import Selesai', res.message, 'success');
-                                syncAllServerData(); // Reload UI otomatis
+                                syncAllServerData(); 
                             } else {
                                 showNotify('Import Gagal', res.message, 'error');
                             }
                         })
                         .withFailureHandler(err => {
                             hideLoading();
-                            document.getElementById('importPegawaiInput').value = ''; // Reset File Input
+                            document.getElementById('importPegawaiInput').value = ''; 
                             showNotify('Error Sistem', err.toString(), 'error');
                         })
                         .importBulkUsers(json);
@@ -120,7 +109,7 @@ FILE: pegawai/js_manajemen_pegawai.html
             );
 
         } catch(error) {
-            document.getElementById('importPegawaiInput').value = ''; // Reset
+            document.getElementById('importPegawaiInput').value = ''; 
             showNotify('Import Gagal', 'Dokumen rusak atau tidak terbaca sebagai Excel murni.', 'error');
         }
     };
@@ -131,48 +120,31 @@ FILE: pegawai/js_manajemen_pegawai.html
   // INDEKS HIERARKI JABATAN & FUNGSI TOGGLE PASSWORD
   // ---------------------------------------------------------
   const hierarkiJabatan = [
-    "Ketua",
-    "Wakil Ketua",
-    "Hakim Utama Muda",
-    "Panitera",
-    "Sekretaris",
-    "Panitera Muda Gugatan",
-    "Panitera Muda Permohonan",
-    "Panitera Muda Hukum",
-    "Kepala Sub Bagian Umum dan Keuangan",
-    "Kepala Sub Bagian Kepegawaian, ORTALA",
-    "Kepala Sub Bagian Perencanaan, TI dan Pelaporan",
-    "Panitera Pengganti",
-    "Juru Sita",
-    "Juru Sita Pengganti",
-    "Pranata Komputer Ahli Pertama",
-    "Operator - Penata Layanan Operasional",
-    "Arsiparis Terampil",
-    "Klerek - Analis Perkara Peradilan",
-    "Klerek - Klerek - Pengelola Penanganan Perkara",
-    "Klerek - Pengolah Data dan Informasi",
-    "Penata Layanan Operasional",
-    "Pengelola Layanan Operasional",
-    "Operator Layanan Operasional"
+    "Ketua", "Wakil Ketua", "Hakim Utama Muda", "Panitera", "Sekretaris",
+    "Panitera Muda Gugatan", "Panitera Muda Permohonan", "Panitera Muda Hukum",
+    "Kepala Sub Bagian Umum dan Keuangan", "Kepala Sub Bagian Kepegawaian, ORTALA",
+    "Kepala Sub Bagian Perencanaan, TI dan Pelaporan", "Panitera Pengganti",
+    "Juru Sita", "Juru Sita Pengganti", "Pranata Komputer Ahli Pertama",
+    "Operator - Penata Layanan Operasional", "Arsiparis Terampil",
+    "Klerek - Analis Perkara Peradilan", "Klerek - Pengelola Penanganan Perkara",
+    "Klerek - Pengolah Data dan Informasi", "Penata Layanan Operasional",
+    "Pengelola Layanan Operasional", "Operator Layanan Operasional"
   ];
 
   function getBobotJabatan(jabatan) {
-    if (!jabatan) return 999; // Taruh di paling bawah jika tidak ada jabatan
+    if (!jabatan) return 999;
     const index = hierarkiJabatan.findIndex(j => j.toLowerCase() === jabatan.toLowerCase().trim());
-    return index !== -1 ? index : 999; // Jika tidak dikenali/typo, taruh di bawah
+    return index !== -1 ? index : 999;
   }
 
   function togglePassVisibility(nip, passLengkap) {
-    const mainTxt = document.getElementById(`pass-main-txt-${nip}`);
-    const mainIcon = document.getElementById(`pass-main-icon-${nip}`);
+    const mainTxt = document.getElementById('pass-main-txt-' + nip);
+    const mainIcon = document.getElementById('pass-main-icon-' + nip);
 
-    // ZETTBOT FIX: Gunakan classList.contains pada ikon untuk mengecek state saat ini
     if (mainIcon && mainIcon.classList.contains("fa-eye-slash")) {
-      // Tampilkan Sandi
       if(mainTxt) mainTxt.innerText = passLengkap;
       if(mainIcon) mainIcon.className = "fa-solid fa-eye text-xs text-indigo-400";
     } else {
-      // Sembunyikan Sandi
       if(mainTxt) mainTxt.innerText = "••••••••";
       if(mainIcon) mainIcon.className = "fa-solid fa-eye-slash text-xs text-slate-400";
     }
@@ -183,138 +155,121 @@ FILE: pegawai/js_manajemen_pegawai.html
   // ---------------------------------------------------------
   function renderManajemenView() {
     const tbody = document.getElementById('tblManajemenBody');
+    if(!tbody) return;
     tbody.innerHTML = "";
 
     if (state.usersList.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="7" class="text-center p-8 text-slate-600">Tidak ada data pegawai terdaftar.</td></tr>`;
+      tbody.innerHTML = '<tr><td colspan="7" class="text-center p-8 text-slate-600">Tidak ada data pegawai terdaftar.</td></tr>';
       return;
     }
 
-    // Mengurutkan data berdasarkan bobot Hierarki Jabatan
     let sortedUsers = [...state.usersList].sort((a, b) => {
        return getBobotJabatan(a.jabatan) - getBobotJabatan(b.jabatan);
     });
 
     sortedUsers.forEach((u, index) => {
       const tr = document.createElement('tr');
-      tr.id = `peg-main-row-${u.nip}`;
+      tr.id = 'peg-main-row-' + u.nip;
       tr.className = "border-b border-slate-900 hover:bg-slate-900/10 transition text-xs";
 
-      // Pewarnaan Badge untuk 5 Sistem Role Baru
-      let roleStyle = "text-slate-400 bg-slate-900 border-slate-800"; // Pegawai (Abu)
+      let roleStyle = "text-slate-400 bg-slate-900 border-slate-800"; 
       if (u.role === 'Admin') roleStyle = "text-indigo-400 bg-indigo-500/10 border-indigo-500/20";
       if (u.role === 'Pejabat Berwenang') roleStyle = "text-blue-400 bg-blue-500/10 border-blue-500/20";
       if (u.role === 'Atasan Langsung') roleStyle = "text-emerald-400 bg-emerald-500/10 border-emerald-500/20";
       if (u.role === 'Operator') roleStyle = "text-amber-400 bg-amber-500/10 border-amber-500/20";
 
-      // Melakukan Escape (pengamanan) pada sandi jika mengandung karakter khusus (tanda kutip)
       const safePass = String(u.pass || "").replace(/'/g, "\\'").replace(/"/g, "&quot;");
+      const safeNama = String(u.nama || "").replace(/'/g, "\\'").replace(/"/g, "&quot;");
 
-      tr.innerHTML = `
-        <td class="p-4 text-center font-mono text-slate-500 font-semibold">${index + 1}</td>
-        <td class="p-4">
-          <div class="font-bold text-slate-200">${u.nama}</div>
-          <div class="text-[10px] text-slate-500 mt-0.5 font-mono">NIP: ${u.nip}</div>
-        </td>
-        <td class="p-4 text-slate-300 font-semibold">${u.jabatan}</td>
-        <td class="p-4 text-slate-400">${u.pangkat || '-'}</td>
-        <td class="p-4">
-          <span class="inline-flex px-2 py-0.5 rounded text-[10px] font-bold border ${roleStyle}">${u.role}</span>
-        </td>
-        <td class="p-4">
-          <span class="flex items-center gap-2">
-            <span id="pass-main-txt-${u.nip}" class="font-mono text-slate-400 tracking-wider">••••••••</span>
-            <button onclick="togglePassVisibility('${u.nip}', '${safePass}')" class="text-indigo-400 hover:text-indigo-300 focus:outline-none" title="Lihat Sandi">
-              <i id="pass-main-icon-${u.nip}" class="fa-solid fa-eye-slash text-xs"></i>
-            </button>
-          </span>
-        </td>
-        <td class="p-4 text-center space-x-1.5 whitespace-nowrap">
-          <button onclick="togglePegDetail('${u.nip}')" class="p-1.5 bg-slate-900 hover:bg-indigo-600/20 border border-slate-800 rounded-lg transition text-slate-400 hover:text-indigo-400" title="Detail Jatah Cuti & Kontak">
-            <i id="chevron-peg-${u.nip}" class="fa-solid fa-chevron-down text-[10px] transition-transform duration-300"></i>
-          </button>
-          <button onclick="sendCredentialViaWA('${u.nip}')" class="text-emerald-500 hover:text-emerald-400 p-1.5 rounded-lg hover:bg-emerald-500/10 transition inline-block border border-transparent hover:border-emerald-500/20" title="Kirim Akses via WA">
-            <i class="fa-brands fa-whatsapp"></i>
-          </button>
-          <button onclick="openPegawaiModal('edit', '${u.nip}')" class="text-amber-500 hover:text-amber-400 p-1.5 rounded-lg hover:bg-amber-500/10 transition inline-block border border-transparent hover:border-amber-500/20" title="Edit Profil">
-            <i class="fa-solid fa-user-gear"></i>
-          </button>
-          <button onclick="deletePegawaiRecord('${u.nip}', '${u.nama}')" class="text-rose-500 hover:text-rose-400 p-1.5 rounded-lg hover:bg-rose-500/10 transition inline-block border border-transparent hover:border-rose-500/20" title="Hapus Pegawai">
-            <i class="fa-regular fa-trash-can"></i>
-          </button>
-        </td>
-      `;
+      tr.innerHTML = 
+        '<td class="p-4 text-center font-mono text-slate-500 font-semibold">' + (index + 1) + '</td>' +
+        '<td class="p-4">' +
+          '<div class="font-bold text-slate-200">' + u.nama + '</div>' +
+          '<div class="text-[10px] text-slate-500 mt-0.5 font-mono">NIP: ' + u.nip + '</div>' +
+        '</td>' +
+        '<td class="p-4 text-slate-300 font-semibold">' + u.jabatan + '</td>' +
+        '<td class="p-4 text-slate-400">' + (u.pangkat || '-') + '</td>' +
+        '<td class="p-4">' +
+          '<span class="inline-flex px-2 py-0.5 rounded text-[10px] font-bold border ' + roleStyle + '">' + u.role + '</span>' +
+        '</td>' +
+        '<td class="p-4">' +
+          '<span class="flex items-center gap-2">' +
+            '<span id="pass-main-txt-' + u.nip + '" class="font-mono text-slate-400 tracking-wider">••••••••</span>' +
+            '<button onclick="togglePassVisibility(\'' + u.nip + '\', \'' + safePass + '\')" class="text-indigo-400 hover:text-indigo-300 focus:outline-none" title="Lihat Sandi">' +
+              '<i id="pass-main-icon-' + u.nip + '" class="fa-solid fa-eye-slash text-xs"></i>' +
+            '</button>' +
+          '</span>' +
+        '</td>' +
+        '<td class="p-4 text-center space-x-1.5 whitespace-nowrap">' +
+          '<button onclick="togglePegDetail(\'' + u.nip + '\')" class="p-1.5 bg-slate-900 hover:bg-indigo-600/20 border border-slate-800 rounded-lg transition text-slate-400 hover:text-indigo-400" title="Detail Jatah Cuti & Kontak">' +
+            '<i id="chevron-peg-' + u.nip + '" class="fa-solid fa-chevron-down text-[10px] transition-transform duration-300"></i>' +
+          '</button>' +
+          '<button onclick="sendCredentialViaWA(\'' + u.nip + '\')" class="text-emerald-500 hover:text-emerald-400 p-1.5 rounded-lg hover:bg-emerald-500/10 transition inline-block border border-transparent hover:border-emerald-500/20" title="Kirim Akses via WA">' +
+            '<i class="fa-brands fa-whatsapp"></i>' +
+          '</button>' +
+          '<button onclick="openPegawaiModal(\'edit\', \'' + u.nip + '\')" class="text-amber-500 hover:text-amber-400 p-1.5 rounded-lg hover:bg-amber-500/10 transition inline-block border border-transparent hover:border-amber-500/20" title="Edit Profil">' +
+            '<i class="fa-solid fa-user-gear"></i>' +
+          '</button>' +
+          '<button onclick="deletePegawaiRecord(\'' + u.nip + '\', \'' + safeNama + '\')" class="text-rose-500 hover:text-rose-400 p-1.5 rounded-lg hover:bg-rose-500/10 transition inline-block border border-transparent hover:border-rose-500/20" title="Hapus Pegawai">' +
+            '<i class="fa-regular fa-trash-can"></i>' +
+          '</button>' +
+        '</td>';
       tbody.appendChild(tr);
 
-      // DRAWER BARIS DETAIL
       const detailTr = document.createElement('tr');
-      detailTr.id = `peg-detail-row-${u.nip}`;
+      detailTr.id = 'peg-detail-row-' + u.nip;
       detailTr.className = "hidden bg-slate-950/80 border-b border-slate-900";
       
-      detailTr.innerHTML = `
-        <td colspan="7" class="p-6">
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs leading-relaxed">
-            
-            <!-- ZETTBOT FIX: Update UI Drawer, Hapus Sandi Akun, Tambah Informasi Kepangkatan -->
-            <div class="space-y-3 bg-slate-900/40 p-4 rounded-2xl border border-slate-900">
-              <h4 class="font-bold text-slate-200 border-b border-slate-800 pb-1.5 flex items-center gap-2">
-                <i class="fa-solid fa-address-card text-indigo-400"></i> Kontak & Detail Kepangkatan
-              </h4>
-              <div class="grid grid-cols-3 gap-2"><span class="text-slate-500">Nomor WhatsApp:</span><span class="col-span-2 text-slate-300 font-mono font-medium">${u.no_hp || '-'}</span></div>
-              <div class="grid grid-cols-3 gap-2"><span class="text-slate-500">Alamat Rumah:</span><span class="col-span-2 text-slate-300 italic">${u.alamat || '-'}</span></div>
-              
-              <div class="grid grid-cols-3 gap-3 text-center mt-3 pt-3 border-t border-slate-800/50">
-                <div class="bg-slate-950/50 p-2 rounded-xl border border-slate-800/80">
-                  <div class="text-[9px] uppercase font-bold text-slate-500">TMT KGB</div>
-                  <div class="text-xs font-bold text-slate-300 mt-0.5">${u.tmt_kgb || '-'}</div>
-                </div>
-                <div class="bg-slate-950/50 p-2 rounded-xl border border-slate-800/80">
-                  <div class="text-[9px] uppercase font-bold text-slate-500">TMT KNP</div>
-                  <div class="text-xs font-bold text-slate-300 mt-0.5">${u.tmt_knp || '-'}</div>
-                </div>
-                <div class="bg-slate-950/50 p-2 rounded-xl border border-slate-800/80">
-                  <div class="text-[9px] uppercase font-bold text-slate-500">BUP</div>
-                  <div class="text-xs font-bold text-slate-300 mt-0.5">${u.bup ? u.bup + ' Thn' : '-'}</div>
-                </div>
-              </div>
-            </div>
+      let badgeJenis = "";
+      if (u.jenis_jabatan === 'Struktural') badgeJenis = '<span class="ml-2 px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-400 text-[9px] border border-indigo-500/30 uppercase">Struktural</span>';
+      else if (u.jenis_jabatan === 'Fungsional') badgeJenis = '<span class="ml-2 px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 text-[9px] border border-amber-500/30 uppercase">Fungsional</span>';
+      else badgeJenis = '<span class="ml-2 px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 text-[9px] border border-emerald-500/30 uppercase">Fungsional Umum</span>';
 
-            <div class="space-y-3 bg-slate-900/40 p-4 rounded-2xl border border-slate-900">
-              <h4 class="font-bold text-slate-200 border-b border-slate-800 pb-1.5 flex items-center gap-2">
-                <i class="fa-solid fa-circle-info text-indigo-400"></i> Alokasi Sisa Jatah Cuti (Hari Kerja)
-              </h4>
-              
-              <div class="grid grid-cols-3 gap-3 text-center mb-2">
-                <div class="bg-indigo-950/20 p-2.5 rounded-xl border border-indigo-500/20">
-                  <div class="text-[9px] uppercase font-bold text-indigo-400">Tahunan 2024</div>
-                  <div class="text-xs font-extrabold text-indigo-200 mt-0.5">${u.s_tahunan_2024} Hari</div>
-                </div>
-                <div class="bg-indigo-950/20 p-2.5 rounded-xl border border-indigo-500/20">
-                  <div class="text-[9px] uppercase font-bold text-indigo-400">Tahunan 2025</div>
-                  <div class="text-xs font-extrabold text-indigo-200 mt-0.5">${u.s_tahunan_2025} Hari</div>
-                </div>
-                <div class="bg-indigo-950/20 p-2.5 rounded-xl border border-indigo-500/20">
-                  <div class="text-[9px] uppercase font-bold text-indigo-400">Tahunan 2026</div>
-                  <div class="text-xs font-extrabold text-indigo-200 mt-0.5">${u.s_tahunan_2026} Hari</div>
-                </div>
-              </div>
-
-              <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
-                <div class="bg-slate-900/60 p-2.5 rounded-xl border border-slate-800/80"><div class="text-[9px] uppercase font-bold text-slate-500">Sakit</div><div class="text-xs font-extrabold text-rose-400 mt-0.5">${u.s_sakit} Hari</div></div>
-                <div class="bg-slate-900/60 p-2.5 rounded-xl border border-slate-800/80"><div class="text-[9px] uppercase font-bold text-slate-500">Penting</div><div class="text-xs font-extrabold text-amber-400 mt-0.5">${u.s_penting} Hari</div></div>
-                <div class="bg-slate-900/60 p-2.5 rounded-xl border border-slate-800/80"><div class="text-[9px] uppercase font-bold text-slate-500">Besar</div><div class="text-xs font-extrabold text-blue-400 mt-0.5">${u.s_besar} Hari</div></div>
-                <div class="bg-slate-900/60 p-2.5 rounded-xl border border-slate-800/80"><div class="text-[9px] uppercase font-bold text-slate-500">Melahirkan</div><div class="text-xs font-extrabold text-purple-400 mt-0.5">${u.s_melahirkan} Hari</div></div>
-              </div>
-
-              <div class="flex items-center justify-between text-[11px] bg-slate-950/40 p-2 px-3.5 rounded-xl border border-slate-900 mt-2">
-                <span class="text-slate-500">Cuti di Luar Tanggungan Negara (CLTN):</span>
-                <span class="font-bold text-slate-300 font-mono">${u.s_cltn} Hari</span>
-              </div>
-            </div>
-
-          </div>
-        </td>
-      `;
+      detailTr.innerHTML = 
+        '<td colspan="7" class="p-6">' +
+          '<div class="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs leading-relaxed">' +
+            '<div class="space-y-3 bg-slate-900/40 p-4 rounded-2xl border border-slate-900">' +
+              '<h4 class="font-bold text-slate-200 border-b border-slate-800 pb-1.5 flex items-center">' +
+                '<i class="fa-solid fa-address-card text-indigo-400 mr-2"></i> Kontak & Detail Kepangkatan' + badgeJenis +
+              '</h4>' +
+              '<div class="grid grid-cols-3 gap-2"><span class="text-slate-500">Nomor WhatsApp:</span><span class="col-span-2 text-slate-300 font-mono font-medium">' + (u.no_hp || '-') + '</span></div>' +
+              '<div class="grid grid-cols-3 gap-2"><span class="text-slate-500">Alamat Rumah:</span><span class="col-span-2 text-slate-300 italic">' + (u.alamat || '-') + '</span></div>' +
+              '<div class="grid grid-cols-3 gap-3 text-center mt-3 pt-3 border-t border-slate-800/50">' +
+                '<div class="bg-slate-950/50 p-2 rounded-xl border border-slate-800/80">' +
+                  '<div class="text-[9px] uppercase font-bold text-slate-500">TMT KGB</div>' +
+                  '<div class="text-xs font-bold text-slate-300 mt-0.5">' + (u.tmt_kgb || '-') + '</div>' +
+                '</div>' +
+                '<div class="bg-slate-950/50 p-2 rounded-xl border border-slate-800/80">' +
+                  '<div class="text-[9px] uppercase font-bold text-slate-500">TMT KNP</div>' +
+                  '<div class="text-xs font-bold text-slate-300 mt-0.5">' + (u.tmt_knp || '-') + '</div>' +
+                '</div>' +
+                '<div class="bg-slate-950/50 p-2 rounded-xl border border-slate-800/80">' +
+                  '<div class="text-[9px] uppercase font-bold text-slate-500">BUP</div>' +
+                  '<div class="text-xs font-bold text-slate-300 mt-0.5">' + (u.bup ? u.bup + ' Thn' : '-') + '</div>' +
+                '</div>' +
+              '</div>' +
+            '</div>' +
+            '<div class="space-y-3 bg-slate-900/40 p-4 rounded-2xl border border-slate-900">' +
+              '<h4 class="font-bold text-slate-200 border-b border-slate-800 pb-1.5 flex items-center gap-2">' +
+                '<i class="fa-solid fa-circle-info text-indigo-400"></i> Alokasi Sisa Jatah Cuti (Hari Kerja)' +
+              '</h4>' +
+              '<div class="grid grid-cols-3 gap-3 text-center mb-2">' +
+                '<div class="bg-indigo-950/20 p-2.5 rounded-xl border border-indigo-500/20"><div class="text-[9px] uppercase font-bold text-indigo-400">Tahunan 2024</div><div class="text-xs font-extrabold text-indigo-200 mt-0.5">' + u.s_tahunan_2024 + ' Hari</div></div>' +
+                '<div class="bg-indigo-950/20 p-2.5 rounded-xl border border-indigo-500/20"><div class="text-[9px] uppercase font-bold text-indigo-400">Tahunan 2025</div><div class="text-xs font-extrabold text-indigo-200 mt-0.5">' + u.s_tahunan_2025 + ' Hari</div></div>' +
+                '<div class="bg-indigo-950/20 p-2.5 rounded-xl border border-indigo-500/20"><div class="text-[9px] uppercase font-bold text-indigo-400">Tahunan 2026</div><div class="text-xs font-extrabold text-indigo-200 mt-0.5">' + u.s_tahunan_2026 + ' Hari</div></div>' +
+              '</div>' +
+              '<div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">' +
+                '<div class="bg-slate-900/60 p-2.5 rounded-xl border border-slate-800/80"><div class="text-[9px] uppercase font-bold text-slate-500">Sakit</div><div class="text-xs font-extrabold text-rose-400 mt-0.5">' + u.s_sakit + ' Hari</div></div>' +
+                '<div class="bg-slate-900/60 p-2.5 rounded-xl border border-slate-800/80"><div class="text-[9px] uppercase font-bold text-slate-500">Penting</div><div class="text-xs font-extrabold text-amber-400 mt-0.5">' + u.s_penting + ' Hari</div></div>' +
+                '<div class="bg-slate-900/60 p-2.5 rounded-xl border border-slate-800/80"><div class="text-[9px] uppercase font-bold text-slate-500">Besar</div><div class="text-xs font-extrabold text-blue-400 mt-0.5">' + u.s_besar + ' Hari</div></div>' +
+                '<div class="bg-slate-900/60 p-2.5 rounded-xl border border-slate-800/80"><div class="text-[9px] uppercase font-bold text-slate-500">Melahirkan</div><div class="text-xs font-extrabold text-purple-400 mt-0.5">' + u.s_melahirkan + ' Hari</div></div>' +
+              '</div>' +
+              '<div class="flex items-center justify-between text-[11px] bg-slate-950/40 p-2 px-3.5 rounded-xl border border-slate-900 mt-2">' +
+                '<span class="text-slate-500">Cuti di Luar Tanggungan Negara (CLTN):</span><span class="font-bold text-slate-300 font-mono">' + u.s_cltn + ' Hari</span>' +
+              '</div>' +
+            '</div>' +
+          '</div>' +
+        '</td>';
       tbody.appendChild(detailTr);
     });
 
@@ -328,8 +283,6 @@ FILE: pegawai/js_manajemen_pegawai.html
     if (!tbody) return;
     
     const rows = tbody.getElementsByTagName('tr');
-    if (rows.length === 1 && rows[0].cells.length === 1) return;
-
     for (let i = 0; i < rows.length; i += 2) {
       const mainRow = rows[i];
       const detailRow = rows[i + 1];
@@ -339,8 +292,8 @@ FILE: pegawai/js_manajemen_pegawai.html
       const jabatanCell = mainRow.cells[2];
 
       if (nameCell || jabatanCell) {
-        const nameText = nameCell ? nameCell.textContent || nameCell.innerText : "";
-        const jabatanText = jabatanCell ? jabatanCell.textContent || jabatanCell.innerText : "";
+        const nameText = nameCell.textContent || nameCell.innerText;
+        const jabatanText = jabatanCell.textContent || jabatanCell.innerText;
         
         if (nameText.toLowerCase().indexOf(filter) > -1 || jabatanText.toLowerCase().indexOf(filter) > -1) {
           mainRow.style.display = "";
@@ -348,12 +301,10 @@ FILE: pegawai/js_manajemen_pegawai.html
           mainRow.style.display = "none";
           if (detailRow) {
             detailRow.style.display = "none";
-            const nip = mainRow.id ? mainRow.id.replace('peg-main-row-', '') : '';
-            if (nip) {
-              const chevron = document.getElementById(`chevron-peg-${nip}`);
-              if (chevron) chevron.classList.remove('rotate-180');
-              detailRow.classList.add('hidden');
-            }
+            const nip = mainRow.id.replace('peg-main-row-', '');
+            const chevron = document.getElementById('chevron-peg-' + nip);
+            if (chevron) chevron.classList.remove('rotate-180');
+            detailRow.classList.add('hidden');
           }
         }
       }
@@ -361,8 +312,8 @@ FILE: pegawai/js_manajemen_pegawai.html
   }
 
   function togglePegDetail(nip) {
-    const row = document.getElementById(`peg-detail-row-${nip}`);
-    const chevron = document.getElementById(`chevron-peg-${nip}`);
+    const row = document.getElementById('peg-detail-row-' + nip);
+    const chevron = document.getElementById('chevron-peg-' + nip);
     
     if (row && chevron) {
       const isHidden = row.classList.contains('hidden');
@@ -372,10 +323,8 @@ FILE: pegawai/js_manajemen_pegawai.html
       } else {
         row.classList.add('hidden');
         chevron.classList.remove('rotate-180');
-        
-        const passMainTxt = document.getElementById(`pass-main-txt-${nip}`);
-        const passMainIcon = document.getElementById(`pass-main-icon-${nip}`);
-
+        const passMainTxt = document.getElementById('pass-main-txt-' + nip);
+        const passMainIcon = document.getElementById('pass-main-icon-' + nip);
         if (passMainTxt && passMainIcon) { passMainTxt.innerText = "••••••••"; passMainIcon.className = "fa-solid fa-eye-slash text-xs text-slate-400"; }
       }
     }
@@ -389,7 +338,7 @@ FILE: pegawai/js_manajemen_pegawai.html
     const nipInput = document.getElementById('pegNip');
 
     if (mode === 'add') {
-      title.innerHTML = `<i class="fa-solid fa-user-plus text-indigo-400 mr-2"></i> Tambah Pegawai Baru`;
+      title.innerHTML = '<i class="fa-solid fa-user-plus text-indigo-400 mr-2"></i> Tambah Pegawai Baru';
       nipInput.removeAttribute('readonly');
       document.getElementById('pegCuti2024').value = 0;
       document.getElementById('pegCuti2025').value = 0;
@@ -399,12 +348,14 @@ FILE: pegawai/js_manajemen_pegawai.html
       document.getElementById('pegBesar').value = 90;
       document.getElementById('pegMelahirkan').value = 90;
       document.getElementById('pegCltn').value = 0;
-      
       document.getElementById('pegTmtKgb').value = "";
       document.getElementById('pegTmtKnp').value = "";
       document.getElementById('pegBup').value = "58";
+      
+      // ZETTBOT: Default UI Slider saat ditambah
+      setJenisJabatan('Fungsional Umum');
     } else {
-      title.innerHTML = `<i class="fa-solid fa-user-pen text-indigo-400 mr-2"></i> Perbarui Profil Pegawai`;
+      title.innerHTML = '<i class="fa-solid fa-user-pen text-indigo-400 mr-2"></i> Perbarui Profil Pegawai';
       nipInput.setAttribute('readonly', 'true');
 
       const u = state.usersList.find(usr => usr.nip === nip);
@@ -418,7 +369,6 @@ FILE: pegawai/js_manajemen_pegawai.html
         document.getElementById('pegNoHp').value = u.no_hp;
         document.getElementById('pegPass').value = u.pass;
         document.getElementById('pegAlamat').value = u.alamat || "";
-
         document.getElementById('pegCuti2024').value = u.s_tahunan_2024;
         document.getElementById('pegCuti2025').value = u.s_tahunan_2025;
         document.getElementById('pegCuti2026').value = u.s_tahunan_2026;
@@ -427,11 +377,12 @@ FILE: pegawai/js_manajemen_pegawai.html
         document.getElementById('pegBesar').value = u.s_besar;
         document.getElementById('pegMelahirkan').value = u.s_melahirkan;
         document.getElementById('pegCltn').value = u.s_cltn;
-        
-        // ZETTBOT FIX: Gunakan helper converter (parseDateToHTML5) agar tanggal Excel bisa terbaca oleh Input Date
         document.getElementById('pegTmtKgb').value = parseDateToHTML5(u.tmt_kgb);
         document.getElementById('pegTmtKnp').value = parseDateToHTML5(u.tmt_knp);
         document.getElementById('pegBup').value = u.bup || "58";
+        
+        // ZETTBOT: Sesuaikan UI Slider saat diedit
+        setJenisJabatan(u.jenis_jabatan || 'Fungsional Umum');
       }
     }
 
@@ -465,6 +416,7 @@ FILE: pegawai/js_manajemen_pegawai.html
       tmt_kgb: document.getElementById('pegTmtKgb').value,
       tmt_knp: document.getElementById('pegTmtKnp').value,
       bup: Number(document.getElementById('pegBup').value),
+      jenis_jabatan: document.getElementById('pegJenisJabatan').value, // ZETTBOT: Tambahan Payload Slider
       originalNip: document.getElementById('pegOriginalNip').value
     };
 
@@ -510,7 +462,7 @@ FILE: pegawai/js_manajemen_pegawai.html
   }
 
   function deletePegawaiRecord(nip, nama) {
-    showCustomConfirm("Hapus Data Pegawai", `Hapus permanen akun PNS atas nama ${nama} (NIP: ${nip})? Tindakan ini tidak dapat dibatalkan.`, function() {
+    showCustomConfirm("Hapus Data Pegawai", "Hapus permanen akun PNS atas nama " + nama + " (NIP: " + nip + ")? Tindakan ini tidak dapat dibatalkan.", function() {
       showLoading("Mengeksekusi penghapusan pegawai...");
       google.script.run
         .withSuccessHandler(function(res) {
@@ -531,7 +483,38 @@ FILE: pegawai/js_manajemen_pegawai.html
   }
 
   // ---------------------------------------------------------
-  // ZETTBOT: FUNGSI KIRIM KREDENSIAL VIA WA CLIENT-SIDE
+  // ZETTBOT: FUNGSI INTERAKTIF SLIDER JENIS JABATAN
+  // ---------------------------------------------------------
+  function setJenisJabatan(jenis) {
+      document.getElementById('pegJenisJabatan').value = jenis;
+      const slider = document.getElementById('jabatanSlider');
+      
+      const btnS = document.getElementById('btnStruktural');
+      const btnFU = document.getElementById('btnFungsionalUmum');
+      const btnF = document.getElementById('btnFungsional');
+
+      if (btnS) { btnS.classList.remove('text-white'); btnS.classList.add('text-slate-400'); }
+      if (btnFU) { btnFU.classList.remove('text-white'); btnFU.classList.add('text-slate-400'); }
+      if (btnF) { btnF.classList.remove('text-white'); btnF.classList.add('text-slate-400'); }
+
+      if (jenis === 'Struktural') {
+          slider.style.left = '4px';
+          slider.className = 'absolute top-1 bottom-1 w-[32.5%] bg-indigo-600 rounded-lg transition-all duration-300 ease-in-out shadow';
+          if (btnS) { btnS.classList.remove('text-slate-400'); btnS.classList.add('text-white'); }
+      } else if (jenis === 'Fungsional') {
+          slider.style.left = 'calc(67.5% - 4px)';
+          slider.className = 'absolute top-1 bottom-1 w-[32.5%] bg-amber-600 rounded-lg transition-all duration-300 ease-in-out shadow';
+          if (btnF) { btnF.classList.remove('text-slate-400'); btnF.classList.add('text-white'); }
+      } else {
+          // Default Fungsional Umum (Tengah)
+          slider.style.left = '33.7%';
+          slider.className = 'absolute top-1 bottom-1 w-[32.5%] bg-emerald-600 rounded-lg transition-all duration-300 ease-in-out shadow';
+          if (btnFU) { btnFU.classList.remove('text-slate-400'); btnFU.classList.add('text-white'); }
+      }
+  }
+
+  // ---------------------------------------------------------
+  // ZETTBOT: FUNGSI KIRIM KREDENSIAL VIA WA
   // ---------------------------------------------------------
   function getSapaanGender(nip) {
       let sapaan = "Bapak/Ibu";
@@ -546,30 +529,13 @@ FILE: pegawai/js_manajemen_pegawai.html
 
   function sendCredentialViaWA(nip) {
     const user = state.usersList.find(u => u.nip === nip);
-    if (!user) {
-      showNotify("Data Tidak Ditemukan", "Terjadi kesalahan saat menarik data pegawai.", "error");
-      return;
-    }
-
-    let rawPhone = user.no_hp || "";
-    let phone = rawPhone.replace(/[^0-9]/g, ''); 
-    
-    if (phone.startsWith('0')) {
-      phone = '62' + phone.substring(1);
-    }
-
-    if (!phone || phone.length < 9) {
-      showNotify("Gagal Mengirim", `Pegawai ${user.nama} tidak memiliki nomor WhatsApp yang valid. Silakan Edit Profil terlebih dahulu.`, "error");
-      return;
-    }
-
-    const sapaan = getSapaanGender(user.nip);
+    if (!user) { showNotify("Data Tidak Ditemukan", "Terjadi kesalahan saat menarik data pegawai.", "error"); return; }
+    let rawPhone = user.no_hp || ""; let phone = rawPhone.replace(/[^0-9]/g, ''); 
+    if (phone.startsWith('0')) phone = '62' + phone.substring(1);
+    if (!phone || phone.length < 9) { showNotify("Gagal Mengirim", "Pegawai tidak memiliki nomor WA.", "error"); return; }
     const appUrl = "https://sites.google.com/view/transkepv2/transkep-v2-1";
-
-    const message = `*INFORMASI AKUN TRANSKEP* 🏢\nHalo ${sapaan} *${user.nama}*,\n\nBerikut adalah detail login Anda untuk mengakses Sistem Transparansi Kepegawaian (TRANSKEP):\n\n👤 *NIP / Username:* ${user.nip}\n🔑 *Kata Sandi:* ${user.pass}\n\n🔗 *Link Login:*\n${appUrl}\n\n_Mohon jaga kerahasiaan kata sandi Anda. Anda dapat mengubah kata sandi ini setelah berhasil masuk ke dalam sistem._`;
-
-    const encodedMessage = encodeURIComponent(message);
-    window.open(`https://api.whatsapp.com/send?phone=${phone}&text=${encodedMessage}`, '_blank');
+    const msg = "*INFORMASI AKUN TRANSKEP* 🏢\nHalo " + getSapaanGender(user.nip) + " *" + user.nama + "*,\n\nBerikut kredensial login Anda:\n\n👤 *NIP / Username:* " + user.nip + "\n🔑 *Kata Sandi:* " + user.pass + "\n\n🔗 *Link Login:*\n" + appUrl;
+    window.open("https://api.whatsapp.com/send?phone=" + phone + "&text=" + encodeURIComponent(msg), '_blank');
   }
 
   // ---------------------------------------------------------
@@ -578,100 +544,64 @@ FILE: pegawai/js_manajemen_pegawai.html
   function fetchResetQueue(isOpenModal = false) {
     if (isOpenModal) {
        const container = document.getElementById('queuePassContainer');
-       if(container) container.innerHTML = `<div class="text-center p-8 text-slate-500 text-xs"><i class="fa-solid fa-circle-notch fa-spin text-rose-500 mb-3 text-2xl"></i><br>Menyinkronkan data antrean...</div>`;
+       if(container) container.innerHTML = '<div class="text-center p-8 text-slate-500 text-xs"><i class="fa-solid fa-circle-notch fa-spin text-rose-500 mb-3 text-2xl"></i><br>Menyinkronkan data antrean...</div>';
        document.getElementById('modalAntreanPass').classList.remove('hidden');
     }
-
     google.script.run
       .withSuccessHandler(function(queue) {
          window.currentResetQueue = queue;
          const badge = document.getElementById('badgeQueuePass');
          if (badge) {
-             if (queue && queue.length > 0) {
-                 badge.innerText = queue.length;
-                 badge.classList.remove('hidden');
-             } else {
-                 badge.classList.add('hidden');
-             }
+             if (queue && queue.length > 0) { badge.innerText = queue.length; badge.classList.remove('hidden'); } 
+             else { badge.classList.add('hidden'); }
          }
-         
          const modal = document.getElementById('modalAntreanPass');
-         if (modal && !modal.classList.contains('hidden')) {
-             renderResetQueue();
-         }
-      })
-      .withFailureHandler(function(err) {
-         console.error("Gagal menarik antrean:", err);
-         const modal = document.getElementById('modalAntreanPass');
-         if (modal && !modal.classList.contains('hidden')) {
-             document.getElementById('queuePassContainer').innerHTML = `<div class="text-center p-8 text-rose-500 text-xs font-bold"><i class="fa-solid fa-triangle-exclamation text-xl mb-2"></i><br>Gagal Terhubung ke Database:<br>${err.message}</div>`;
-         }
+         if (modal && !modal.classList.contains('hidden')) renderResetQueue();
       })
       .getResetPasswordQueue();
   }
 
-  function openQueueModal() {
-     fetchResetQueue(true);
-  }
-
-  function closeQueueModal() {
-     document.getElementById('modalAntreanPass').classList.add('hidden');
-  }
+  function openQueueModal() { fetchResetQueue(true); }
+  function closeQueueModal() { document.getElementById('modalAntreanPass').classList.add('hidden'); }
 
   function renderResetQueue() {
       const container = document.getElementById('queuePassContainer');
       const queue = window.currentResetQueue || [];
-      
-      if (queue.length === 0) {
-          container.innerHTML = `<div class="text-center p-8 text-slate-500 text-xs">Belum ada permintaan reset password saat ini. Antrean kosong.</div>`;
-          return;
-      }
-
+      if (queue.length === 0) { container.innerHTML = '<div class="text-center p-8 text-slate-500 text-xs">Antrean kosong.</div>'; return; }
       let html = '';
       queue.forEach(q => {
-          html += `
-          <div class="bg-slate-900/60 border border-slate-800 p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-             <div>
-                <div class="font-bold text-slate-200 text-sm mb-0.5">${q.nama}</div>
-                <div class="text-[10px] text-slate-400 font-mono">NIP: ${q.nip} • WA: ${q.no_wa}</div>
-                <div class="text-[9px] text-slate-500 mt-1"><i class="fa-regular fa-clock"></i> Diminta: ${q.waktu}</div>
-             </div>
-             <button onclick="processManualWAReset('${q.id}', '${q.nip}', '${q.nama}', '${q.no_wa}', '${q.pass}')" class="shrink-0 px-4 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold rounded-xl transition flex items-center justify-center gap-2 text-xs shadow-lg shadow-emerald-500/20">
-                 Kirim & Selesai <i class="fa-brands fa-whatsapp text-sm"></i>
-             </button>
-          </div>
-          `;
+          const safeNama = String(q.nama || "").replace(/'/g, "\\'").replace(/"/g, "&quot;");
+          const safePass = String(q.pass || "").replace(/'/g, "\\'").replace(/"/g, "&quot;");
+          html += 
+          '<div class="bg-slate-900/60 border border-slate-800 p-4 rounded-2xl flex flex-col sm:flex-row justify-between gap-4">' +
+             '<div>' +
+                '<div class="font-bold text-slate-200 text-sm mb-0.5">' + q.nama + '</div>' +
+                '<div class="text-[10px] text-slate-400 font-mono">NIP: ' + q.nip + ' • WA: ' + q.no_wa + '</div>' +
+             '</div>' +
+             '<button onclick="processManualWAReset(\'' + q.id + '\', \'' + q.nip + '\', \'' + safeNama + '\', \'' + q.no_wa + '\', \'' + safePass + '\')" class="shrink-0 px-4 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold rounded-xl text-xs">Kirim WA</button>' +
+          '</div>';
       });
       container.innerHTML = html;
   }
 
   function processManualWAReset(reqId, nip, name, phone, pass) {
-      const sapaan = getSapaanGender(nip);
       const appUrl = "https://sites.google.com/view/transkepv2/transkep-v2-1";
-      const msg = `*INFORMASI RESET AKUN TRANSKEP* 🏢\nHalo ${sapaan} *${name}*,\n\nIni adalah respon atas permintaan reset kata sandi Anda:\n\n👤 *NIP / Username:* ${nip}\n🔑 *Kata Sandi:* ${pass}\n\n🔗 *Link Login:*\n${appUrl}\n\n_Pesan ini di-generate otomatis oleh Sistem TRANSKEP. Harap segera mengubah kata sandi Anda setelah berhasil masuk._`;
-      const encodedMsg = encodeURIComponent(msg);
-
+      const msg = "*RESET AKUN TRANSKEP* 🏢\nHalo *" + name + "*,\n\nIni kredensial baru Anda:\n👤 *NIP:* " + nip + "\n🔑 *Sandi:* " + pass + "\n\n🔗 *Link Login:*\n" + appUrl;
       const runProcess = () => {
-          if (typeof showLoading === 'function') showLoading("Menandai selesai...");
+          if (typeof showLoading === 'function') showLoading("Memproses...");
           google.script.run
              .withSuccessHandler(res => {
                  if (typeof hideLoading === 'function') hideLoading();
                  if(res.status === 'success') {
-                     if (typeof showNotify === 'function') showNotify("Selesai", "Antrean berhasil diproses dan dihapus dari daftar.", "success");
+                     showNotify("Selesai", "Berhasil diproses.", "success");
                      fetchResetQueue(); 
-                     window.open(`https://api.whatsapp.com/send?phone=${phone}&text=${encodedMsg}`, '_blank');
-                 } else {
-                     if (typeof showNotify === 'function') showNotify("Gagal Memproses", res.message, "error");
+                     window.open("https://api.whatsapp.com/send?phone=" + phone + "&text=" + encodeURIComponent(msg), '_blank');
                  }
              })
              .markResetAsDone(reqId);
       };
-
-      if (typeof showCustomConfirm === 'function') {
-          showCustomConfirm("Proses Antrean?", `Sistem akan membuka WhatsApp dan menandai permintaan Bapak/Ibu ${name} sebagai Selesai. Lanjutkan?`, runProcess);
-      } else {
-          if(confirm("Kirim kredensial dan selesaikan antrean?")) runProcess();
-      }
+      if (typeof showCustomConfirm === 'function') showCustomConfirm("Proses Antrean?", "Lanjutkan?", runProcess);
+      else if(confirm("Kirim kredensial?")) runProcess();
   }
 
   setTimeout(fetchResetQueue, 1500);
@@ -704,7 +634,9 @@ function addUser(payload) {
       payload.nip, payload.nama, payload.jabatan, payload.role, payload.no_hp, payload.pass,
       payload.s_tahunan_2024, payload.s_tahunan_2025, payload.s_tahunan_2026,
       payload.s_sakit, payload.s_penting, payload.s_besar, payload.s_melahirkan, payload.s_cltn,
-      payload.pangkat, payload.alamat, payload.tmt_kgb, payload.tmt_knp, payload.bup
+      payload.pangkat, payload.alamat, payload.tmt_kgb, payload.tmt_knp, payload.bup,
+      "", "", "", "", "", "", // Kolom 20-25 dikosongkan agar aman untuk sistem KNP/KGB
+      payload.jenis_jabatan || "Fungsional Umum" // Kolom 26: Parameter Baru Jenis Jabatan
     ];
     
     sheet.appendRow(newRow);
@@ -743,6 +675,9 @@ function updateUser(payload) {
     
     sheet.getRange(rowIndex, 1, 1, 19).setValues(rowData);
     sheet.getRange(rowIndex, 1).setNumberFormat('@');
+    
+    // ZETTBOT FIX: Update kolom ke-26 secara spesifik tanpa menyentuh kolom 20-25
+    sheet.getRange(rowIndex, 26).setValue(payload.jenis_jabatan || "Fungsional Umum");
     
     SpreadsheetApp.flush();
     return { status: 'success', message: 'Data profil pegawai berhasil diperbarui.' };
@@ -789,6 +724,8 @@ function importBulkUsers(jsonArray) {
     
     jsonArray.forEach(payload => {
        const nipStr = String(payload['NIP']);
+       const jenis = payload['Jenis_Jabatan'] || 'Fungsional Umum';
+       
        const rowData = [
           nipStr, payload['Nama'], payload['Jabatan']||'', payload['Role']||'Pegawai', payload['No_HP']||'', payload['Password']||'123456',
           Number(payload['Sisa_Tahunan_2024'])||0, Number(payload['Sisa_Tahunan_2025'])||0, Number(payload['Sisa_Tahunan_2026'])||0,
@@ -800,8 +737,11 @@ function importBulkUsers(jsonArray) {
        if (existingMap[nipStr]) {
           sheet.getRange(existingMap[nipStr], 1, 1, 19).setValues([rowData]);
           sheet.getRange(existingMap[nipStr], 1).setNumberFormat('@');
+          sheet.getRange(existingMap[nipStr], 26).setValue(jenis); // Set Kolom 26
        } else {
-          sheet.appendRow(rowData);
+          // Buat data baru dan padding string kosong dari kolom 20 hingga 25
+          const newRow = [...rowData, "", "", "", "", "", "", jenis];
+          sheet.appendRow(newRow);
           sheet.getRange(sheet.getLastRow(), 1).setNumberFormat('@');
        }
     });
@@ -910,7 +850,6 @@ FILE: pegawai/view_manajemen_pegawai.html
         <div class="grid grid-cols-2 gap-4">
           <div>
             <label class="block font-semibold text-slate-400 uppercase mb-1">Jabatan Dinas</label>
-            <!-- ZETTBOT FIX: Mengubah Input Datalist menjadi Select Dropdown -->
             <select id="pegJabatan" required class="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 appearance-none">
               <option value="" disabled selected>-- Pilih Jabatan --</option>
               <option value="Ketua">Ketua</option>
@@ -993,7 +932,6 @@ FILE: pegawai/view_manajemen_pegawai.html
           </div>
         </div>
 
-        <!-- ZETTBOT FIX: Baris ini disisakan SATU SAJA. Duplikat dihapus -->
         <div class="grid grid-cols-3 gap-4">
           <div>
             <label class="block font-semibold text-slate-400 uppercase mb-1">Sistem Role</label>
@@ -1013,7 +951,6 @@ FILE: pegawai/view_manajemen_pegawai.html
             <label class="block font-semibold text-slate-400 uppercase mb-1">Kata Sandi Akun</label>
             <div class="relative">
               <input type="password" id="pegPass" required placeholder="Masukkan Sandi Baru" class="w-full pl-3.5 pr-10 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500">
-              <!-- Ikon mata yang sudah berfungsi normal karena duplikat DOM dihapus -->
               <button type="button" onclick="const p = document.getElementById('pegPass'); const i = document.getElementById('pegPassIcon'); if (p.type === 'password') { p.type = 'text'; i.classList.replace('fa-eye-slash', 'fa-eye'); } else { p.type = 'password'; i.classList.replace('fa-eye', 'fa-eye-slash'); }" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-indigo-400 focus:outline-none">
                 <i id="pegPassIcon" class="fa-solid fa-eye-slash text-sm"></i>
               </button>
@@ -1070,7 +1007,22 @@ FILE: pegawai/view_manajemen_pegawai.html
           </div>
         </div>
 
-        <!-- ZETTBOT: Tambahan 3 Kolom Kepangkatan (Sesuai Opsi B) -->
+        <!-- ZETTBOT: Tambahan Kategori Jenis Jabatan (Segmented Control) -->
+        <div class="border-t border-slate-800 pt-4 mt-2">
+          <h4 class="font-bold text-indigo-400 uppercase mb-3 tracking-wider">Kategori Jenis Jabatan</h4>
+          <input type="hidden" id="pegJenisJabatan" value="Fungsional Umum">
+          
+          <div class="relative flex bg-slate-900 border border-slate-800 rounded-xl p-1 overflow-hidden h-10 items-center">
+            <!-- Slider Background Aktif -->
+            <div id="jabatanSlider" class="absolute top-1 bottom-1 w-[32.5%] bg-emerald-600 rounded-lg transition-all duration-300 ease-in-out shadow" style="left: 33.7%;"></div>
+            
+            <!-- Tombol Pilihan -->
+            <button type="button" id="btnStruktural" onclick="setJenisJabatan('Struktural')" class="relative z-10 flex-1 py-1 text-xs font-bold text-slate-400 transition-colors duration-300 focus:outline-none">Struktural</button>
+            <button type="button" id="btnFungsionalUmum" onclick="setJenisJabatan('Fungsional Umum')" class="relative z-10 flex-1 py-1 text-xs font-bold text-white transition-colors duration-300 focus:outline-none">Fungsional Umum</button>
+            <button type="button" id="btnFungsional" onclick="setJenisJabatan('Fungsional')" class="relative z-10 flex-1 py-1 text-xs font-bold text-slate-400 transition-colors duration-300 focus:outline-none">Fungsional</button>
+          </div>
+        </div>
+
         <div class="border-t border-slate-800 pt-4 mt-2">
           <h4 class="font-bold text-indigo-400 uppercase mb-3 tracking-wider">Informasi Kepangkatan & Pensiun</h4>
           <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -1100,7 +1052,7 @@ FILE: pegawai/view_manajemen_pegawai.html
     </div>
   </div>
 
-  <!-- ZETTBOT: MODAL DAFTAR ANTREAN LUPA PASSWORD -->
+  <!-- MODAL DAFTAR ANTREAN LUPA PASSWORD -->
   <div id="modalAntreanPass" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-[60] flex items-center justify-center p-4 hidden">
     <div class="w-full max-w-2xl glass border border-slate-800 p-6 rounded-3xl shadow-2xl h-[70vh] flex flex-col scale-95 transition-all">
       <div class="flex items-center justify-between pb-4 border-b border-slate-800 shrink-0">

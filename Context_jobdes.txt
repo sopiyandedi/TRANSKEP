@@ -1,5 +1,5 @@
 ZETTBOT CONTEXT: MODULE JOBDES
-Generated: 2026-09-17 22:55:21.018446
+Generated: 2026-09-19 21:14:04.433659
 
 ==================================================
 FILE: jobdes/jobdes.js

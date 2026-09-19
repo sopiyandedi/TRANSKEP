@@ -1,0 +1,407 @@
+ZETTBOT CONTEXT: MODULE DASHBOARD_REFERENSI
+Generated: 2026-09-19 21:14:04.431670
+
+==================================================
+FILE: dashboard/referensi/js_kode.html
+==================================================
+
+<!-- ZETTBOT TAHAP 5B: FUNGSI & DATABASE LOKAL KODE SURAT -->
+<script>
+  // 1. DATABASE LOKAL (DI-EKSTRAK DARI PDF)
+  // Data ini di-hardcode agar pencarian 100% instan (0 detik)
+  const kodeSuratDB = [
+      // Kategori Hukum (HK)
+      { kode: "HK", desk: "Perumusan peraturan perundang-undangan dan pertimbangan hukum" },
+      { kode: "HK1.1.1", desk: "Undang-undang / Peraturan Pemerintah Pengganti Undang-undang (PERPU)" },
+      { kode: "HK1.1.2", desk: "Peraturan Pemerintah" },
+      { kode: "HK1.1.3", desk: "Peraturan Presiden" },
+      { kode: "HK1.2.1", desk: "Peraturan Mahkamah Agung" },
+      { kode: "HK1.2.3", desk: "Surat Edaran" },
+      { kode: "HK1.2.5", desk: "Keputusan" },
+      { kode: "HK1.3.1", desk: "Surat Perjanjian / Nota Kesepahaman Dalam Negeri" },
+      { kode: "HK2.1", desk: "Penyelesaian Perkara Pidana Umum" },
+      { kode: "HK2.4", desk: "Penyelesaian Perkara Perdata Umum" },
+      { kode: "HK2.6", desk: "Penyelesaian Perkara Perdata Agama" },
+      
+      // Kategori Humas dan Protokol (HM)
+      { kode: "HM1.1.1", desk: "Penerangan dan publikasi (Pengumuman, Wawancara, Konferensi Pers)" },
+      { kode: "HM1.2", desk: "Dokumentasi dan peliputan acara resmi" },
+      { kode: "HM2.1.1", desk: "Hubungan dengan Lembaga Pemerintah (BAKOHUMAS, Audiensi)" },
+      { kode: "HM2.1.4", desk: "Hubungan dengan Perguruan Tinggi (PKL, Orientasi lapangan)" },
+      { kode: "HM3.1.1", desk: "Upacara / Acara Kedinasan (Pelantikan, Serah Terima)" },
+      { kode: "HM3.1.2", desk: "Kunjungan Dinas" },
+      
+      // Kategori Kearsipan (KA)
+      { kode: "KA1.1", desk: "Pengendalian Dan Pengurusan Arsip (Surat Masuk / Surat Keluar)" },
+      { kode: "KA1.2", desk: "Layanan Penggunaan Arsip (Peminjaman, Penggandaan, Legalisasi)" },
+      { kode: "KA2.2.2", desk: "Pemusnahan Arsip (Berita Acara, Keputusan KMA)" },
+      
+      // Kategori Kepegawaian (KP) - Paling Sering Digunakan
+      { kode: "KP1.1.6", desk: "Perencanaan dan Seleksi Pengadaan PNS / PPPK" },
+      { kode: "KP2.1.1", desk: "Kenaikan pangkat / golongan" },
+      { kode: "KP2.1.2", desk: "Kenaikan gaji berkala (KGB)" },
+      { kode: "KP3.3.1", desk: "Tugas Belajar" },
+      { kode: "KP3.3.2", desk: "Izin Belajar" },
+      { kode: "KP3.4.1", desk: "Perencanaan dan Pelaksanaan Kinerja Pegawai (SKP, IKU, IKI)" },
+      { kode: "KP3.4.3", desk: "Evaluasi Kinerja Pegawai (DP3, Penilaian Prestasi Kinerja)" },
+      { kode: "KP4.1.3", desk: "Mutasi, Promosi, dan Demosi (Pindah Tugas, Pelantikan)" },
+      { kode: "KP5.3", desk: "Cuti dan izin bepergian ke Luar Negeri di luar Kedinasan (Cuti Tahunan, Sakit, Alasan Penting, Bersalin)" },
+      { kode: "KP6.1", desk: "Pemberhentian Pegawai dengan Hak Pensiun (BUP, Meninggal Dunia)" },
+      { kode: "KP7.1", desk: "Pelaksanaan Tugas Dalam Jabatan (Surat Tugas, Perjalanan Dinas / SPPD)" },
+      { kode: "KP7.2", desk: "Dokumentasi Identitas Pegawai (Karpeg, Karis, Karsu, KP4)" },
+      { kode: "KP7.4", desk: "Surat Penunjukan Pelaksana Tugas (Plt.) dan Pelaksana Harian (Plh.)" },
+      { kode: "KP8.2", desk: "Sanksi / Hukuman Disiplin Pegawai (Teguran Tertulis, Penundaan Gaji)" },
+      
+      // Kategori Perlengkapan (PL)
+      { kode: "PL1.1.1", desk: "Pengadaan Barang Persediaan (ATK, BAST, Kuitansi, SPK)" },
+      { kode: "PL1.1.2", desk: "Pengadaan Barang Inventaris" },
+      { kode: "PL1.2.1", desk: "Perencanaan Barang Milik Negara (RKBMN)" },
+      { kode: "PL1.2.3", desk: "Penghapusan dan Pemusnahan BMN" },
+      
+      // Kategori Pengawasan (PW)
+      { kode: "PW1.1.1", desk: "Pengawasan/Pemantauan yang Memerlukan Tindak Lanjut (LHP, KKP)" },
+      
+      // Kategori Rumah Tangga (RT)
+      { kode: "RT1.1.1", desk: "Pemeliharaan Bangunan Gedung dan Lingkungan (Fasilitas Kantor, Rumah Dinas)" },
+      { kode: "RT1.1.2", desk: "Pemeliharaan Peralatan Operasional (Kendaraan Dinas)" },
+      { kode: "RT1.1.4", desk: "Ketertiban dan keamanan (Buku Tamu, Izin Keluar, Piket)" },
+      
+      // Kategori Teknologi Informasi (TI)
+      { kode: "TI1.1.1", desk: "Sistem Informasi / Aplikasi Umum (Perencanaan, Pengembangan)" },
+      { kode: "TI1.2.1", desk: "Jaringan Internet dan Ekstranet" },
+      
+      // Kategori Perencanaan Anggaran (RA)
+      { kode: "RA1.5", desk: "Rencana Kerja (RENJA)" },
+      { kode: "RA1.9", desk: "Rencana Kinerja Tahunan (RKT)" },
+      { kode: "RA1.10", desk: "Perjanjian Kinerja Tahunan (PKT)" },
+      
+      // Kategori Organisasi Tatalaksana (OT)
+      { kode: "OT1.2", desk: "Tatalaksana / Mekanisme Kerja (SOP, Proses Bisnis)" }
+  ];
+
+  // 2. FUNGSI BUKA/TUTUP MODAL
+  function openKodeSuratModal() {
+      const modal = document.getElementById('modalKodeSurat');
+      if (modal) {
+          modal.classList.remove('hidden');
+          setTimeout(() => {
+              modal.classList.remove('opacity-0');
+              modal.firstElementChild.classList.remove('scale-95');
+              document.getElementById('inputSearchKode').focus();
+          }, 10);
+      }
+  }
+
+  function closeKodeSuratModal() {
+      const modal = document.getElementById('modalKodeSurat');
+      if (modal) {
+          modal.classList.add('opacity-0');
+          modal.firstElementChild.classList.add('scale-95');
+          setTimeout(() => {
+              modal.classList.add('hidden');
+              clearKodeSearch();
+          }, 300);
+      }
+  }
+
+  // 3. FUNGSI PENCARIAN REAL-TIME
+  function handleKodeSearch(val) {
+      const resultContainer = document.getElementById('kodeResultContainer');
+      const btnClear = document.getElementById('btnClearKode');
+      
+      val = val.toLowerCase().trim();
+      
+      if (val === '') { 
+          btnClear.classList.add('hidden'); 
+          resultContainer.innerHTML = 
+             '<div class="flex flex-col items-center justify-center h-full text-center p-10 opacity-70">' +
+                '<div class="w-20 h-20 bg-slate-800/50 rounded-full flex items-center justify-center mb-4 border border-slate-700/50">' +
+                    '<i class="fa-solid fa-folder-tree text-3xl text-slate-500"></i>' +
+                '</div>' +
+                '<h4 class="text-slate-300 font-bold text-sm tracking-wide">Pangkalan Data Klasifikasi Arsip</h4>' +
+                '<p class="text-slate-500 text-xs mt-2 leading-relaxed max-w-sm">Ketikkan jenis urusan atau dokumen pada kolom pencarian di atas untuk mendapatkan kode surat secara instan.</p>' +
+            '</div>';
+          return; 
+      }
+      
+      btnClear.classList.remove('hidden');
+      
+      // Lakukan filter pada JSON Array
+      const results = kodeSuratDB.filter(item => {
+          let kodeMatch = item.kode.toLowerCase().includes(val);
+          let deskMatch = item.desk.toLowerCase().includes(val);
+          
+          // ZETTBOT FEATURE: Anti-Typo ringan (Jika ngetik 'citu' akan deteksi 'cuti')
+          let typoMatch = false;
+          if (val === 'citu' && item.desk.toLowerCase().includes('cuti')) typoMatch = true;
+          if (val === 'gaji' && item.desk.toLowerCase().includes('berkala')) typoMatch = true;
+          if (val === 'sppd' && item.desk.toLowerCase().includes('perjalanan dinas')) typoMatch = true;
+          if (val === 'atk' && item.desk.toLowerCase().includes('persediaan')) typoMatch = true;
+          
+          return kodeMatch || deskMatch || typoMatch;
+      });
+      
+      if (results.length === 0) { 
+          resultContainer.innerHTML = '<div class="p-8 text-center text-slate-500 text-sm">Kode atau kata kunci "'+val+'" tidak ditemukan dalam database.</div>'; 
+          return; 
+      }
+      
+      let html = '';
+      results.forEach(item => {
+          html += 
+          '<div class="p-4 bg-slate-900/60 border border-slate-800/80 hover:bg-slate-800 hover:border-emerald-500/30 transition rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4 group">' +
+             '<div class="flex-1">' +
+                 '<div class="flex items-center gap-3 mb-1">' +
+                     '<span class="px-2.5 py-1 bg-emerald-500/10 text-emerald-400 font-black text-sm rounded-lg border border-emerald-500/30 font-mono tracking-wide shadow-inner">' + item.kode + '</span>' +
+                 '</div>' +
+                 '<p class="text-sm text-slate-300 leading-relaxed">' + item.desk + '</p>' +
+             '</div>' +
+             '<button onclick="copyKodeToClipboard(\'' + item.kode + '\')" class="shrink-0 md:opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 px-4 py-2 bg-slate-800 hover:bg-emerald-600 text-slate-300 hover:text-white text-xs font-bold rounded-xl border border-slate-700 hover:border-emerald-500 w-full md:w-auto">' +
+                 '<i class="fa-regular fa-copy"></i> Salin Kode' +
+             '</button>' +
+          '</div>';
+      });
+      resultContainer.innerHTML = html;
+  }
+
+  function clearKodeSearch() {
+      const input = document.getElementById('inputSearchKode');
+      if (input) {
+          input.value = '';
+          handleKodeSearch(''); // Reset tampilan
+          input.focus();
+      }
+  }
+
+  function copyKodeToClipboard(kodeText) {
+      try {
+          const el = document.createElement('textarea');
+          el.value = kodeText;
+          document.body.appendChild(el);
+          el.select();
+          document.execCommand('copy');
+          document.body.removeChild(el);
+          
+          if (typeof showNotify === 'function') {
+              showNotify('Kode Disalin', 'Kode klasifikasi ' + kodeText + ' berhasil disalin ke clipboard.', 'success');
+          }
+      } catch (err) {
+          navigator.clipboard.writeText(kodeText).then(() => {
+              if (typeof showNotify === 'function') showNotify('Kode Disalin', 'Kode klasifikasi ' + kodeText + ' berhasil disalin.', 'success');
+          });
+      }
+  }
+</script>
+
+==================================================
+FILE: dashboard/referensi/js_referensi.html
+==================================================
+
+<!-- ZETTBOT TAHAP 5A: FUNGSI MODAL REFERENSI -->
+<script>
+  function openReferensiModal() {
+      // 1. Matikan pencarian jika sedang aktif
+      clearEmployeeSearch();
+      
+      const modal = document.getElementById('modalReferensiAbsensi');
+      if (modal) {
+          modal.classList.remove('hidden');
+          // 2. Transisi mulus Pop-up
+          setTimeout(() => {
+              modal.classList.remove('opacity-0');
+              modal.firstElementChild.classList.remove('scale-95');
+          }, 10);
+      }
+  }
+
+  function closeReferensiModal() {
+      const modal = document.getElementById('modalReferensiAbsensi');
+      if (modal) {
+          modal.classList.add('opacity-0');
+          modal.firstElementChild.classList.add('scale-95');
+          // Tunggu animasi selesai baru sembunyikan display block
+          setTimeout(() => {
+              modal.classList.add('hidden');
+          }, 300);
+      }
+  }
+</script>
+
+==================================================
+FILE: dashboard/referensi/view_kode.html
+==================================================
+
+<!-- ZETTBOT TAHAP 5B: MODAL KAMUS KODE KLASIFIKASI SURAT -->
+<div id="modalKodeSurat" class="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm transition-opacity opacity-0 hidden">
+  <div class="glass border border-slate-800 bg-slate-900/95 rounded-3xl w-full max-w-4xl flex flex-col shadow-2xl transform transition-transform duration-300 scale-95 mx-4 overflow-hidden h-[85vh] md:h-[90vh]">
+     
+     <!-- Modal Header -->
+     <div class="p-5 border-b border-slate-800/60 bg-slate-900/80 flex items-center justify-between shrink-0">
+        <h3 class="text-base font-bold text-white flex items-center gap-3">
+            <div class="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center border border-emerald-500/30">
+                <i class="fa-solid fa-book-bookmark"></i>
+            </div>
+            Kamus Kode Klasifikasi Surat
+        </h3>
+        <button type="button" onclick="closeKodeSuratModal()" class="text-slate-400 hover:text-emerald-400 transition w-8 h-8 flex items-center justify-center bg-slate-800/50 hover:bg-emerald-500/10 rounded-lg">
+           <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+     </div>
+     
+     <!-- Search Bar Area (Sticky) -->
+     <div class="p-5 border-b border-slate-800/50 bg-slate-950/50 shrink-0">
+         <div class="relative group">
+            <i class="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-emerald-400 transition-colors"></i>
+            <input type="text" id="inputSearchKode" oninput="handleKodeSearch(this.value)" autocomplete="off" placeholder="Ketik kata kunci (Misal: 'Cuti', 'Gaji', 'Tugas', 'Hukum')..." class="w-full pl-11 pr-10 py-3.5 bg-slate-900 border border-slate-700/80 focus:border-emerald-500/50 focus:bg-slate-950 rounded-xl text-sm outline-none transition-all text-slate-200 placeholder:text-slate-500 shadow-inner">
+            <button id="btnClearKode" onclick="clearKodeSearch()" class="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-rose-400 hidden transition-colors"><i class="fa-solid fa-xmark"></i></button>
+         </div>
+     </div>
+
+     <!-- Modal Body (Daftar Hasil Pencarian) -->
+     <div class="p-5 overflow-y-auto custom-scrollbar flex-1 bg-slate-950/20">
+        <div id="kodeResultContainer" class="space-y-2">
+            <!-- Tampilan Awal Sebelum Pencarian -->
+            <div class="flex flex-col items-center justify-center h-full text-center p-10 opacity-70">
+                <div class="w-20 h-20 bg-slate-800/50 rounded-full flex items-center justify-center mb-4 border border-slate-700/50">
+                    <i class="fa-solid fa-folder-tree text-3xl text-slate-500"></i>
+                </div>
+                <h4 class="text-slate-300 font-bold text-sm tracking-wide">Pangkalan Data Klasifikasi Arsip</h4>
+                <p class="text-slate-500 text-xs mt-2 leading-relaxed max-w-sm">Ketikkan jenis urusan atau dokumen pada kolom pencarian di atas untuk mendapatkan kode surat secara instan.</p>
+            </div>
+        </div>
+     </div>
+     
+     <!-- Modal Footer -->
+     <div class="p-3 border-t border-slate-800/60 bg-slate-900/80 text-center shrink-0">
+         <p class="text-[9px] text-slate-500 font-medium uppercase tracking-widest"><i class="fa-solid fa-circle-check text-emerald-500 mr-1"></i> Referensi: SK SEKMA No. 627/SEK/SK/VII/2023</p>
+     </div>
+
+  </div>
+</div>
+
+==================================================
+FILE: dashboard/referensi/view_referensi.html
+==================================================
+
+<!-- ZETTBOT TAHAP 5A: MODAL INFOGRAFIS REFERENSI ABSENSI -->
+<div id="modalReferensiAbsensi" class="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm transition-opacity opacity-0 hidden">
+  <div class="glass border border-slate-800 bg-slate-900/95 rounded-3xl w-full max-w-3xl flex flex-col shadow-2xl transform transition-transform duration-300 scale-95 mx-4 overflow-hidden h-[85vh] md:h-auto">
+     
+     <!-- Modal Header -->
+     <div class="p-5 border-b border-slate-800/60 bg-slate-900/80 flex items-center justify-between shrink-0">
+        <h3 class="text-base font-bold text-white flex items-center gap-3">
+            <div class="w-8 h-8 rounded-lg bg-rose-500/20 text-rose-400 flex items-center justify-center border border-rose-500/30">
+                <i class="fa-solid fa-user-clock"></i>
+            </div>
+            Referensi Pemotongan Tunjangan Kinerja
+        </h3>
+        <button type="button" onclick="closeReferensiModal()" class="text-slate-400 hover:text-rose-400 transition w-8 h-8 flex items-center justify-center bg-slate-800/50 hover:bg-rose-500/10 rounded-lg">
+           <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+     </div>
+     
+     <!-- Modal Body (Infografis Kartu) -->
+     <div class="p-6 overflow-y-auto custom-scrollbar flex-1 space-y-6">
+        
+        <div class="bg-indigo-500/10 border border-indigo-500/20 rounded-xl p-4 flex items-start gap-4">
+            <i class="fa-solid fa-circle-info text-indigo-400 mt-0.5 text-lg"></i>
+            <p class="text-xs text-indigo-200/80 leading-relaxed font-medium">Data di bawah ini merupakan referensi persentase pemotongan Tunjangan Kinerja (Tukin) atas pelanggaran jam kerja sesuai dengan ketentuan Kedisiplinan ASN yang berlaku.</p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            
+            <!-- KARTU KETERLAMBATAN (TL) -->
+            <div class="bg-slate-950/60 border border-slate-800 rounded-2xl p-5 shadow-inner relative overflow-hidden">
+                <div class="absolute top-0 right-0 w-16 h-16 bg-amber-500/10 rounded-bl-full blur-xl pointer-events-none"></div>
+                <h4 class="text-sm font-bold text-slate-200 mb-4 flex items-center gap-2"><i class="fa-solid fa-person-running text-amber-400"></i> Keterlambatan Tiba (TL)</h4>
+                
+                <div class="space-y-3">
+                    <div class="flex items-center justify-between p-3 rounded-xl border border-slate-800/60 bg-slate-900/40 hover:border-amber-500/30 transition group">
+                        <div>
+                            <div class="text-[10px] font-bold text-amber-500 uppercase tracking-widest mb-0.5">TL 1</div>
+                            <div class="text-xs text-slate-300">1 s.d 30 Menit</div>
+                        </div>
+                        <div class="bg-amber-500/10 text-amber-400 px-3 py-1.5 rounded-lg border border-amber-500/20 font-black text-sm group-hover:bg-amber-500/20 transition">0.5%</div>
+                    </div>
+                    <div class="flex items-center justify-between p-3 rounded-xl border border-slate-800/60 bg-slate-900/40 hover:border-amber-500/30 transition group">
+                        <div>
+                            <div class="text-[10px] font-bold text-amber-500 uppercase tracking-widest mb-0.5">TL 2</div>
+                            <div class="text-xs text-slate-300">31 s.d 60 Menit</div>
+                        </div>
+                        <div class="bg-amber-500/10 text-amber-400 px-3 py-1.5 rounded-lg border border-amber-500/20 font-black text-sm group-hover:bg-amber-500/20 transition">1%</div>
+                    </div>
+                    <div class="flex items-center justify-between p-3 rounded-xl border border-slate-800/60 bg-slate-900/40 hover:border-amber-500/30 transition group">
+                        <div>
+                            <div class="text-[10px] font-bold text-amber-500 uppercase tracking-widest mb-0.5">TL 3</div>
+                            <div class="text-xs text-slate-300">61 s.d 90 Menit</div>
+                        </div>
+                        <div class="bg-amber-500/10 text-amber-400 px-3 py-1.5 rounded-lg border border-amber-500/20 font-black text-sm group-hover:bg-amber-500/20 transition">1.25%</div>
+                    </div>
+                    <div class="flex items-center justify-between p-3 rounded-xl border border-amber-500/30 bg-amber-500/5 hover:bg-amber-500/10 transition group">
+                        <div>
+                            <div class="text-[10px] font-bold text-rose-500 uppercase tracking-widest mb-0.5">TL 4</div>
+                            <div class="text-xs font-bold text-slate-200">Lebih dari 90 Menit</div>
+                        </div>
+                        <div class="bg-rose-500/20 text-rose-400 px-3 py-1.5 rounded-lg border border-rose-500/30 font-black text-sm group-hover:scale-105 transition">1.5%</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- KARTU PULANG SEBELUM WAKTU (PSW) -->
+            <div class="bg-slate-950/60 border border-slate-800 rounded-2xl p-5 shadow-inner relative overflow-hidden">
+                <div class="absolute top-0 right-0 w-16 h-16 bg-blue-500/10 rounded-bl-full blur-xl pointer-events-none"></div>
+                <h4 class="text-sm font-bold text-slate-200 mb-4 flex items-center gap-2"><i class="fa-solid fa-person-walking-arrow-right text-blue-400"></i> Pulang Sebelum Waktu (PSW)</h4>
+                
+                <div class="space-y-3">
+                    <div class="flex items-center justify-between p-3 rounded-xl border border-slate-800/60 bg-slate-900/40 hover:border-blue-500/30 transition group">
+                        <div>
+                            <div class="text-[10px] font-bold text-blue-500 uppercase tracking-widest mb-0.5">PSW 1</div>
+                            <div class="text-xs text-slate-300">1 s.d 30 Menit</div>
+                        </div>
+                        <div class="bg-blue-500/10 text-blue-400 px-3 py-1.5 rounded-lg border border-blue-500/20 font-black text-sm group-hover:bg-blue-500/20 transition">0.5%</div>
+                    </div>
+                    <div class="flex items-center justify-between p-3 rounded-xl border border-slate-800/60 bg-slate-900/40 hover:border-blue-500/30 transition group">
+                        <div>
+                            <div class="text-[10px] font-bold text-blue-500 uppercase tracking-widest mb-0.5">PSW 2</div>
+                            <div class="text-xs text-slate-300">31 s.d 60 Menit</div>
+                        </div>
+                        <div class="bg-blue-500/10 text-blue-400 px-3 py-1.5 rounded-lg border border-blue-500/20 font-black text-sm group-hover:bg-blue-500/20 transition">1%</div>
+                    </div>
+                    <div class="flex items-center justify-between p-3 rounded-xl border border-slate-800/60 bg-slate-900/40 hover:border-blue-500/30 transition group">
+                        <div>
+                            <div class="text-[10px] font-bold text-blue-500 uppercase tracking-widest mb-0.5">PSW 3</div>
+                            <div class="text-xs text-slate-300">61 s.d 90 Menit</div>
+                        </div>
+                        <div class="bg-blue-500/10 text-blue-400 px-3 py-1.5 rounded-lg border border-blue-500/20 font-black text-sm group-hover:bg-blue-500/20 transition">1.25%</div>
+                    </div>
+                    <div class="flex items-center justify-between p-3 rounded-xl border border-blue-500/30 bg-blue-500/5 hover:bg-blue-500/10 transition group">
+                        <div>
+                            <div class="text-[10px] font-bold text-rose-500 uppercase tracking-widest mb-0.5">PSW 4</div>
+                            <div class="text-xs font-bold text-slate-200">Lebih dari 90 Menit</div>
+                        </div>
+                        <div class="bg-rose-500/20 text-rose-400 px-3 py-1.5 rounded-lg border border-rose-500/30 font-black text-sm group-hover:scale-105 transition">1.5%</div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- KARTU MANGKIR (TIDAK HADIR) -->
+        <div class="bg-rose-500/5 border border-rose-500/20 rounded-2xl p-5 shadow-inner relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-4">
+            <div class="absolute inset-0 bg-gradient-to-r from-rose-500/5 to-transparent pointer-events-none"></div>
+            <div class="relative z-10 text-center md:text-left">
+                <div class="text-[10px] font-bold text-rose-500 uppercase tracking-widest mb-1 flex items-center justify-center md:justify-start gap-2">
+                    <i class="fa-solid fa-triangle-exclamation"></i> Kategori Berat
+                </div>
+                <h4 class="text-base font-bold text-rose-200">Tidak Hadir (Mangkir)</h4>
+                <p class="text-xs text-rose-200/60 mt-1">Tanpa keterangan yang sah atau menolak tugas.</p>
+            </div>
+            <div class="relative z-10 bg-rose-500/20 text-rose-400 px-5 py-3 rounded-xl border border-rose-500/40 font-black text-xl shadow-[0_0_20px_rgba(244,63,94,0.2)]">
+                3.0% <span class="text-xs font-bold text-rose-500/80 uppercase">/ Hari</span>
+            </div>
+        </div>
+
+     </div>
+  </div>
+</div>
+
