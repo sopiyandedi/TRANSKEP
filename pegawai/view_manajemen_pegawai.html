@@ -1,0 +1,309 @@
+<!-- LIBRARY PEMROSES EXCEL (CLIENT-SIDE) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+<div id="section-manajemen" class="menu-section space-y-6 hidden">
+  
+  <div class="glass border border-slate-900 rounded-3xl p-6 flex flex-col h-[580px]">
+    <div class="flex flex-col xl:flex-row items-start xl:items-center justify-between gap-4 mb-4">
+      <div>
+        <h3 class="text-lg font-bold text-slate-200"><i class="fa-solid fa-users-gear text-indigo-400 mr-2"></i> Direktori Pegawai Aktif</h3>
+        <p class="text-slate-500 text-xs mt-1">Sistem sinkronisasi, tambah, dan manipulasi profil PNS.</p>
+      </div>
+      
+      <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full xl:w-auto shrink-0">
+        <div class="relative flex-1 sm:w-56">
+          <span class="absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-500">
+            <i class="fa-solid fa-magnifying-glass text-xs"></i>
+          </span>
+          <input type="text" id="pegSearchInput" onkeyup="filterPegawaiTable()" placeholder="Cari Nama, NIP..." 
+            class="w-full pl-9 pr-4 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition duration-150">
+        </div>
+        
+        <!-- TOMBOL BACKUP & IMPORT EXCEL -->
+        <div class="flex gap-2">
+            <!-- ZETTBOT: Tambahan Notifikasi Lonceng (Antrean Password) -->
+            <button onclick="openQueueModal()" class="relative flex-1 sm:flex-none px-3 py-2.5 bg-rose-500/10 hover:bg-rose-600 border border-rose-500/20 hover:border-rose-500 text-rose-400 hover:text-white font-bold rounded-xl transition flex items-center justify-center shadow-lg shadow-rose-900/20" title="Antrean Permintaan Password">
+              <i class="fa-solid fa-bell"></i>
+              <span id="badgeQueuePass" class="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-[9px] text-white font-bold hidden shadow">0</span>
+            </button>
+            
+            <button onclick="exportPegawaiToExcel()" class="flex-1 sm:flex-none px-3 py-2.5 bg-emerald-500/10 hover:bg-emerald-600 border border-emerald-500/20 hover:border-emerald-500 text-emerald-400 hover:text-white font-bold rounded-xl transition flex items-center justify-center gap-1.5 text-xs shadow-lg shadow-emerald-900/20" title="Unduh Backup Excel">
+              <i class="fa-solid fa-download"></i> <span class="hidden sm:inline">Backup</span>
+            </button>
+            <button onclick="document.getElementById('importPegawaiInput').click()" class="flex-1 sm:flex-none px-3 py-2.5 bg-amber-500/10 hover:bg-amber-500 border border-amber-500/20 hover:border-amber-500 text-amber-400 hover:text-white font-bold rounded-xl transition flex items-center justify-center gap-1.5 text-xs shadow-lg shadow-amber-900/20" title="Unggah File Excel">
+              <i class="fa-solid fa-upload"></i> <span class="hidden sm:inline">Import</span>
+            </button>
+            <input type="file" id="importPegawaiInput" accept=".xlsx, .xls" class="hidden" onchange="handleImportPegawai(event)">
+        </div>
+
+        <button onclick="openPegawaiModal('add')" class="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl shadow-lg shadow-indigo-600/20 transition flex items-center justify-center gap-1.5 text-xs uppercase tracking-wider">
+          <i class="fa-solid fa-user-plus text-xs"></i> Tambah Baru
+        </button>
+      </div>
+    </div>
+
+    <!-- TABEL UTAMA DIREKTORI -->
+    <div class="flex-1 overflow-auto border border-slate-900 rounded-2xl bg-slate-950/40">
+      <table class="w-full text-left text-xs border-collapse">
+        <thead>
+          <tr class="border-b border-slate-900 bg-slate-900 text-slate-400 font-semibold sticky top-0 z-10">
+            <th class="p-4 w-12 text-center">No</th>
+            <th class="p-4">Identitas PNS</th>
+            <th class="p-4">Jabatan Terdaftar</th>
+            <th class="p-4">Pangkat / Ruang</th>
+            <th class="p-4">Peran Sistem</th>
+            <th class="p-4">Kata Sandi</th>
+            <th class="p-4 text-center">Aksi Operasi</th>
+          </tr>
+        </thead>
+        <tbody id="tblManajemenBody">
+          <!-- Dinamis via JS -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- MODAL EDIT/TAMBAH PEGAWAI -->
+  <div id="modalPegawai" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-[60] flex items-center justify-center p-4 hidden">
+    <div class="w-full max-w-2xl glass border border-slate-800 p-6 rounded-3xl shadow-2xl h-[90vh] flex flex-col scale-95 transition-all">
+      <div class="flex items-center justify-between pb-4 border-b border-slate-800 shrink-0">
+        <h3 id="pegModalTitle" class="text-lg font-bold text-white"><i class="fa-solid fa-user-pen text-indigo-400 mr-2"></i> Tambah Pegawai Baru</h3>
+        <button onclick="closePegawaiModal()" class="text-slate-400 hover:text-slate-100"><i class="fa-solid fa-xmark text-lg"></i></button>
+      </div>
+
+      <form id="formPegawai" onsubmit="submitPegawai(event)" class="flex-1 overflow-y-auto py-4 space-y-4 text-xs pr-2">
+        <input type="hidden" id="pegMode">
+        <input type="hidden" id="pegOriginalNip">
+
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block font-semibold text-slate-400 uppercase mb-1">NIP Pegawai</label>
+            <input type="text" id="pegNip" required placeholder="Contoh: 19851010..."
+              class="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-400 uppercase mb-1">Nama Lengkap & Gelar</label>
+            <input type="text" id="pegNama" required placeholder="Masukkan Nama Lengkap"
+              class="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block font-semibold text-slate-400 uppercase mb-1">Jabatan Dinas</label>
+            <select id="pegJabatan" required class="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 appearance-none">
+              <option value="" disabled selected>-- Pilih Jabatan --</option>
+              <option value="Ketua">Ketua</option>
+              <option value="Wakil Ketua">Wakil Ketua</option>
+              <option value="Hakim Utama Muda">Hakim Utama Muda</option>
+              <option value="Panitera">Panitera</option>
+              <option value="Sekretaris">Sekretaris</option>
+              <option value="Panitera Muda Gugatan">Panitera Muda Gugatan</option>
+              <option value="Panitera Muda Permohonan">Panitera Muda Permohonan</option>
+              <option value="Panitera Muda Hukum">Panitera Muda Hukum</option>
+              <option value="Kepala Sub Bagian Umum dan Keuangan">Kepala Sub Bagian Umum dan Keuangan</option>
+              <option value="Kepala Sub Bagian Kepegawaian, ORTALA">Kepala Sub Bagian Kepegawaian, ORTALA</option>
+              <option value="Kepala Sub Bagian Perencanaan, TI dan Pelaporan">Kepala Sub Bagian Perencanaan, TI dan Pelaporan</option>
+              <option value="Panitera Pengganti">Panitera Pengganti</option>
+              <option value="Juru Sita">Juru Sita</option>
+              <option value="Juru Sita Pengganti">Juru Sita Pengganti</option>
+              <option value="Pranata Komputer Ahli Pertama">Pranata Komputer Ahli Pertama</option>
+              <option value="Operator - Penata Layanan Operasional">Operator - Penata Layanan Operasional</option>
+              <option value="Arsiparis Terampil">Arsiparis Terampil</option>
+              <option value="Klerek - Analis Perkara Peradilan">Klerek - Analis Perkara Peradilan</option>
+              <option value="Klerek - Pengelola Penanganan Perkara">Klerek - Pengelola Penanganan Perkara</option>
+              <option value="Klerek - Pengolah Data dan Informasi">Klerek - Pengolah Data dan Informasi</option>
+              <option value="Penata Layanan Operasional">Penata Layanan Operasional</option>
+              <option value="Pengelola Layanan Operasional">Pengelola Layanan Operasional</option>
+              <option value="Operator Layanan Operasional">Operator Layanan Operasional</option>
+            </select>
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-400 uppercase mb-1">Pangkat / Ruang Golongan</label>
+            <select id="pegPangkat" required class="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 appearance-none">
+              <option value="" disabled selected>-- Pilih Golongan --</option>
+              <optgroup label="Golongan IV">
+                <option value="Pembina Utama (IV/e)">Pembina Utama (IV/e)</option>
+                <option value="Pembina Utama Madya (IV/d)">Pembina Utama Madya (IV/d)</option>
+                <option value="Pembina Utama Muda (IV/c)">Pembina Utama Muda (IV/c)</option>
+                <option value="Pembina Tingkat I (IV/b)">Pembina Tingkat I (IV/b)</option>
+                <option value="Pembina (IV/a)">Pembina (IV/a)</option>
+              </optgroup>
+              <optgroup label="Golongan III">
+                <option value="Penata Tingkat I (III/d)">Penata Tingkat I (III/d)</option>
+                <option value="Penata (III/c)">Penata (III/c)</option>
+                <option value="Penata Muda Tingkat I (III/b)">Penata Muda Tingkat I (III/b)</option>
+                <option value="Penata Muda (III/a)">Penata Muda (III/a)</option>
+              </optgroup>
+              <optgroup label="Golongan II">
+                <option value="Pengatur Tingkat I (II/d)">Pengatur Tingkat I (II/d)</option>
+                <option value="Pengatur (II/c)">Pengatur (II/c)</option>
+                <option value="Pengatur Muda Tingkat I (II/b)">Pengatur Muda Tingkat I (II/b)</option>
+                <option value="Pengatur Muda (II/a)">Pengatur Muda (II/a)</option>
+              </optgroup>
+              <optgroup label="Golongan I">
+                <option value="Juru Tingkat I (I/d)">Juru Tingkat I (I/d)</option>
+                <option value="Juru (I/c)">Juru (I/c)</option>
+                <option value="Juru Muda Tingkat I (I/b)">Juru Muda Tingkat I (I/b)</option>
+                <option value="Juru Muda (I/a)">Juru Muda (I/a)</option>
+              </optgroup>
+              <optgroup label="Pegawai Pemerintah dengan Perjanjian Kerja (PPPK)">
+                <option value="PPPK Golongan XVII">XVII</option>
+                <option value="PPPK Golongan XVI">XVI</option>
+                <option value="PPPK Golongan XV">XV</option>
+                <option value="PPPK Golongan XIV">XIV</option>
+                <option value="PPPK Golongan XIII">XIII</option>
+                <option value="PPPK Golongan XII">XII</option>
+                <option value="PPPK Golongan XI">XI</option>
+                <option value="PPPK Golongan X">X</option>
+                <option value="PPPK Golongan IX">IX</option>
+                <option value="PPPK Golongan VIII">VIII</option>
+                <option value="PPPK Golongan VII">VII</option>
+                <option value="PPPK Golongan VI">VI</option>
+                <option value="PPPK Golongan V">V</option>
+                <option value="PPPK Golongan IV">IV</option>
+                <option value="PPPK Golongan III">III</option>
+                <option value="PPPK Golongan II">II</option>
+                <option value="PPPK Golongan I">I</option>
+              </optgroup>
+              <optgroup label="Lainnya">
+                <option value="Non-ASN">Non-ASN</option>
+              </optgroup>
+            </select>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-3 gap-4">
+          <div>
+            <label class="block font-semibold text-slate-400 uppercase mb-1">Sistem Role</label>
+            <select id="pegRole" required class="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 appearance-none">
+              <option value="Pegawai">Pegawai</option>
+              <option value="Atasan Langsung">Atasan Langsung</option>
+              <option value="Pejabat Berwenang">Pejabat Berwenang</option>
+              <option value="Operator">Operator</option>
+              <option value="Admin">Admin</option>
+            </select>
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-400 uppercase mb-1">Nomor WhatsApp Aktif</label>
+            <input type="text" id="pegNoHp" required placeholder="Contoh: 0812345..." class="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-400 uppercase mb-1">Kata Sandi Akun</label>
+            <div class="relative">
+              <input type="password" id="pegPass" required placeholder="Masukkan Sandi Baru" class="w-full pl-3.5 pr-10 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+              <button type="button" onclick="const p = document.getElementById('pegPass'); const i = document.getElementById('pegPassIcon'); if (p.type === 'password') { p.type = 'text'; i.classList.replace('fa-eye-slash', 'fa-eye'); } else { p.type = 'password'; i.classList.replace('fa-eye', 'fa-eye-slash'); }" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-indigo-400 focus:outline-none">
+                <i id="pegPassIcon" class="fa-solid fa-eye-slash text-sm"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <label class="block font-semibold text-slate-400 uppercase mb-1">Alamat Domisili Lengkap</label>
+          <textarea id="pegAlamat" required rows="2" placeholder="Tulis alamat rumah lengkap saat ini..." class="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
+        </div>
+
+        <!-- MANIPULASI HAK JATAH CUTI BAWAAN -->
+        <div class="border-t border-slate-800 pt-4">
+          <h4 class="font-bold text-indigo-400 uppercase mb-3 tracking-wider">Inisialisasi Jatah Sisa Cuti (Hari Kerja)</h4>
+          
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+            <div>
+              <label class="block font-semibold text-slate-500 uppercase mb-1">Tahunan 2024</label>
+              <input type="number" id="pegCuti2024" required min="0" max="30" class="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-500 uppercase mb-1">Tahunan 2025</label>
+              <input type="number" id="pegCuti2025" required min="0" max="30" class="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-500 uppercase mb-1">Tahunan 2026</label>
+              <input type="number" id="pegCuti2026" required min="0" max="30" class="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <div>
+              <label class="block font-semibold text-slate-500 uppercase mb-1">Sakit (Maks)</label>
+              <input type="number" id="pegSakit" required min="0" class="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-500 uppercase mb-1">Alasan Penting</label>
+              <input type="number" id="pegPenting" required min="0" class="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-500 uppercase mb-1">Besar</label>
+              <input type="number" id="pegBesar" required min="0" class="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-500 uppercase mb-1">Melahirkan</label>
+              <input type="number" id="pegMelahirkan" required min="0" class="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            </div>
+          </div>
+
+          <div class="mt-4 w-1/4">
+            <label class="block font-semibold text-slate-500 uppercase mb-1">CLTN</label>
+            <input type="number" id="pegCltn" required min="0" class="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          </div>
+        </div>
+
+        <!-- ZETTBOT: Tambahan Kategori Jenis Jabatan (Segmented Control) -->
+        <div class="border-t border-slate-800 pt-4 mt-2">
+          <h4 class="font-bold text-indigo-400 uppercase mb-3 tracking-wider">Kategori Jenis Jabatan</h4>
+          <input type="hidden" id="pegJenisJabatan" value="Fungsional Umum">
+          
+          <div class="relative flex bg-slate-900 border border-slate-800 rounded-xl p-1 overflow-hidden h-10 items-center">
+            <!-- Slider Background Aktif -->
+            <div id="jabatanSlider" class="absolute top-1 bottom-1 w-[32.5%] bg-emerald-600 rounded-lg transition-all duration-300 ease-in-out shadow" style="left: 33.7%;"></div>
+            
+            <!-- Tombol Pilihan -->
+            <button type="button" id="btnStruktural" onclick="setJenisJabatan('Struktural')" class="relative z-10 flex-1 py-1 text-xs font-bold text-slate-400 transition-colors duration-300 focus:outline-none">Struktural</button>
+            <button type="button" id="btnFungsionalUmum" onclick="setJenisJabatan('Fungsional Umum')" class="relative z-10 flex-1 py-1 text-xs font-bold text-white transition-colors duration-300 focus:outline-none">Fungsional Umum</button>
+            <button type="button" id="btnFungsional" onclick="setJenisJabatan('Fungsional')" class="relative z-10 flex-1 py-1 text-xs font-bold text-slate-400 transition-colors duration-300 focus:outline-none">Fungsional</button>
+          </div>
+        </div>
+
+        <div class="border-t border-slate-800 pt-4 mt-2">
+          <h4 class="font-bold text-indigo-400 uppercase mb-3 tracking-wider">Informasi Kepangkatan & Pensiun</h4>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+              <label class="block font-semibold text-slate-500 uppercase mb-1">TMT KGB Terakhir</label>
+              <input type="date" id="pegTmtKgb" class="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 appearance-none">
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-500 uppercase mb-1">TMT Pangkat Terakhir</label>
+              <input type="date" id="pegTmtKnp" class="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 appearance-none">
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-500 uppercase mb-1">Batas Usia Pensiun</label>
+              <select id="pegBup" required class="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 appearance-none">
+                <option value="58">58 Tahun</option>
+                <option value="60">60 Tahun</option>
+                <option value="65">65 Tahun</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <button type="submit" class="w-full py-3.5 mt-4 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl shadow-lg transition">
+          Simpan Data Master PNS <i class="fa-solid fa-circle-check ml-1 text-xs"></i>
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL DAFTAR ANTREAN LUPA PASSWORD -->
+  <div id="modalAntreanPass" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-[60] flex items-center justify-center p-4 hidden">
+    <div class="w-full max-w-2xl glass border border-slate-800 p-6 rounded-3xl shadow-2xl h-[70vh] flex flex-col scale-95 transition-all">
+      <div class="flex items-center justify-between pb-4 border-b border-slate-800 shrink-0">
+        <h3 class="text-lg font-bold text-white"><i class="fa-solid fa-bell-concierge text-rose-400 mr-2"></i> Permintaan Reset Sandi</h3>
+        <button onclick="closeQueueModal()" class="text-slate-400 hover:text-slate-100"><i class="fa-solid fa-xmark text-lg"></i></button>
+      </div>
+      <div class="flex-1 overflow-y-auto py-4 space-y-3 pr-2" id="queuePassContainer">
+         <!-- List Data Dimuat Otomatis via JS -->
+      </div>
+    </div>
+  </div>
+
+</div>

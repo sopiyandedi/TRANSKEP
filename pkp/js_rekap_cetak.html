@@ -1,0 +1,105 @@
+<script>
+/**
+ * ========================================================
+ * KONTROLER CETAK DOKUMEN: REKAPITULASI GLOBAL
+ * File: js_rekap_cetak.html
+ * ========================================================
+ */
+
+function cetakRekapPCKBulanan() {
+    try {
+        var thn = document.getElementById("filterTahunPCK").value;
+        var blnSelect = document.getElementById("filterBulanPCK");
+        var bln = blnSelect.value;
+
+        if (bln === "0") {
+            showNotify("Bulan Belum Dipilih", "Silakan pilih bulan spesifik (misal: Januari) di dropdown untuk mencetak rekapitulasi.", "warning");
+            return;
+        }
+
+        showLoading("Mempersiapkan Dokumen Cetak...");
+
+        // 1. Filter hanya data yang bulan dan tahunnya cocok, DAN statusnya sudah sah/final
+        var dataToPrint = (state.pckDokumen || []).filter(function(item) {
+            return String(item.tahun).trim() === String(thn).trim() &&
+                   String(item.bulan).trim().toLowerCase() === String(bln).trim().toLowerCase() &&
+                   (item.status === "Disetujui" || item.status === "Final");
+        });
+
+        if (dataToPrint.length === 0) {
+            hideLoading();
+            showNotify("Data Kosong", "Belum ada dokumen PCK yang sudah disetujui / final pada bulan " + bln + " " + thn + ".", "error");
+            return;
+        }
+
+        // 2. Suntik Data ke Tabel Template
+        var tbody = document.getElementById("rekap-pck-tbody");
+        var html = "";
+        
+        for (var i = 0; i < dataToPrint.length; i++) {
+            var row = dataToPrint[i];
+            
+            // Cari data user lengkap dari state.usersList berdasarkan NIP
+            var userDetail = state.usersList.find(function(u) { return String(u.nip).replace(/'/g, "").trim() === String(row.nip).replace(/'/g, "").trim(); });
+            
+            var namaPegawai = userDetail ? userDetail.nama : "Tidak Ditemukan";
+            var nipPegawai = userDetail ? userDetail.nip : row.nip;
+            var jabatanPegawai = userDetail ? userDetail.jabatan : "-";
+            
+            var nilai = parseFloat(row.nilai_akhir || 0);
+
+            // Logika Predikat (Standard BKN)
+            var predikat = "Kurang";
+            if (nilai >= 91) predikat = "Sangat Baik";
+            else if (nilai >= 76) predikat = "Baik";
+            else if (nilai >= 61) predikat = "Cukup";
+            else if (nilai >= 51) predikat = "Kurang";
+            else if (nilai <= 50) predikat = "Buruk";
+
+            html += "<tr>" +
+                "<td class='text-center'>" + (i+1) + "</td>" +
+                "<td><div class='font-bold' style='margin-bottom: 2px;'>" + namaPegawai + "</div><div>NIP. " + nipPegawai + "</div></td>" +
+                "<td class='text-center'>-</td>" + // Kolom AK (Angka Kredit) dikosongkan secara default
+                "<td>" + jabatanPegawai + "</td>" +
+                "<td class='text-center'>" +
+                    "<div class='font-bold'>" + predikat + "</div>" +
+                    "<div style='font-size: 8.5pt;'>(" + nilai.toFixed(2) + ")</div>" +
+                "</td>" +
+                "<td></td>" + // Kolom Keterangan selalu kosong agar bisa ditulis tangan
+            "</tr>";
+        }
+        
+        tbody.innerHTML = html;
+
+        // 3. Suntik Header & Footer Template
+        document.getElementById("rekap-pck-print-bulan").innerText = bln.toUpperCase() + " TAHUN " + thn;
+
+        var tglFull = new Date();
+        var blnArray = ["Januari","Februari","Maret","April","Mei","Juni","Juli","Agustus","September","Oktober","November","Desember"];
+        document.getElementById("rekap-pck-print-tanggal").innerText = "Indramayu, ..... " + blnArray[tglFull.getMonth()] + " " + tglFull.getFullYear();
+
+        // Default Pimpinan Unit Kerja (Ketua Pengadilan Agama)
+        // Jika pimpinan berganti, admin cukup mengganti string di bawah ini
+        document.getElementById("rekap-pck-print-pejabat-nama").innerText = "Drs. Sudirman, M.Si.";
+        document.getElementById("rekap-pck-print-pejabat-nip").innerText = "NIP. 19850505002";
+
+        // 4. Eksekusi Print
+        var container = document.getElementById("template-rekap-pck-bkn");
+        document.body.appendChild(container); // Pindahkan ke luar agar tidak kena overflow hidden
+        
+        document.body.classList.add("print-mode-rekap");
+        
+        hideLoading();
+        
+        setTimeout(function() {
+            window.print();
+            document.body.classList.remove("print-mode-rekap");
+        }, 800);
+
+    } catch (e) {
+        hideLoading();
+        console.error("Error Cetak Rekap PCK:", e);
+        showNotify("Error Sistem", "Terjadi kesalahan saat memproses data cetak.", "error");
+    }
+}
+</script>

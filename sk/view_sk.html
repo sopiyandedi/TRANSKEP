@@ -1,0 +1,211 @@
+<div id="section-sk" class="menu-section space-y-6 hidden">
+  
+  <!-- HEADER & TABULASI FILTER PJ -->
+  <div class="glass border border-slate-900 rounded-3xl p-5 no-print relative z-10 flex flex-col xl:flex-row justify-between items-center gap-4">
+    
+    <div class="w-full xl:w-auto overflow-x-auto custom-scrollbar pb-1 xl:pb-0">
+      <div class="flex gap-2 p-1.5 bg-slate-950/50 rounded-xl border border-slate-800/80 min-w-max" id="skTabContainer">
+         <button onclick="filterSkTab('all')" id="tab-sk-all" class="px-4 py-2 rounded-lg text-xs font-bold transition-all bg-indigo-600 text-white shadow-md">Semua SK</button>
+         <button onclick="filterSkTab('PJ. Manajemen')" id="tab-sk-manajemen" class="px-4 py-2 rounded-lg text-xs font-bold transition-all text-slate-400 hover:text-slate-200 hover:bg-slate-800/50">PJ. Manajemen</button>
+         <button onclick="filterSkTab('PJ. Kepaniteraan')" id="tab-sk-kepaniteraan" class="px-4 py-2 rounded-lg text-xs font-bold transition-all text-slate-400 hover:text-slate-200 hover:bg-slate-800/50">PJ. Kepaniteraan</button>
+         <button onclick="filterSkTab('PJ. Kesekretariatan')" id="tab-sk-kesekretariatan" class="px-4 py-2 rounded-lg text-xs font-bold transition-all text-slate-400 hover:text-slate-200 hover:bg-slate-800/50">PJ. Kesekretariatan</button>
+         
+         <!-- ZETTBOT FIX: Tambahan Tab Baru -->
+         <div class="w-px h-6 bg-slate-800 mx-1 self-center"></div>
+         <button onclick="filterSkTab('Pegawai')" id="tab-sk-pegawai" class="px-4 py-2 rounded-lg text-xs font-bold transition-all text-indigo-300 hover:text-indigo-200 hover:bg-indigo-500/20 border border-transparent hover:border-indigo-500/30">
+           <i class="fa-solid fa-users-rectangle mr-1"></i> Rekap per Pegawai
+         </button>
+      </div>
+    </div>
+
+    <div class="w-full xl:w-auto flex shrink-0">
+      <button id="btnTambahSk" onclick="openSkFormModal('add')" class="w-full px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl shadow-lg shadow-indigo-600/20 transition flex items-center justify-center gap-2 text-xs uppercase tracking-wider hidden">
+        <i class="fa-solid fa-square-plus"></i> Daftarkan SK Baru
+      </button>
+    </div>
+  </div>
+
+  <!-- AREA TABEL KOLEKSI SK (FULL WIDTH) -->
+  <div class="glass border border-slate-900 rounded-3xl p-6 flex flex-col min-h-[580px]">
+    <div class="flex flex-col xl:flex-row items-start xl:items-center justify-between gap-4 mb-4">
+      <div>
+        <h3 class="text-lg font-bold text-slate-200"><i class="fa-solid fa-folder-open text-indigo-400 mr-2"></i> Pusat Manajemen Dokumen SK</h3>
+        <p class="text-slate-500 text-xs mt-1">Daftar Dokumen SK Keputusan Resmi Pengadilan Agama Indramayu.</p>
+      </div>
+      
+      <!-- ZETTBOT FIX: Penambahan Search Bar di Posisi Merah (Konsisten dengan Kelola Pegawai) -->
+      <div class="relative w-full xl:w-72 shrink-0">
+        <span class="absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-500">
+          <i class="fa-solid fa-magnifying-glass text-xs"></i>
+        </span>
+        <input type="text" id="skSearchInput" onkeyup="filterSkData()" placeholder="Cari SK atau Nama Pegawai..." 
+          class="w-full pl-9 pr-4 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition duration-150">
+      </div>
+    </div>
+
+    <!-- MODE TABEL 1: SK-CENTRIC (DEFAULT) -->
+    <div id="skModeSk" class="flex-1 overflow-auto border border-slate-900 rounded-2xl bg-slate-950/40">
+      <table class="w-full text-left text-xs border-collapse">
+        <thead>
+          <tr class="border-b border-slate-900 bg-slate-900 text-slate-400 font-semibold sticky top-0 z-10 whitespace-nowrap">
+            <th class="p-4 w-12 text-center">No</th>
+            <th class="p-4">Judul Dokumen SK</th>
+            <th class="p-4">Penanggung Jawab</th>
+            <th class="p-4">Nomor SK</th>
+            <th class="p-4">Tanggal SK</th>
+            <th class="p-4 text-center hidden">Tgl Input</th>
+            <th class="p-4 text-center">Unduh</th>
+            <th class="p-4 text-center">Aksi Operasi</th>
+          </tr>
+        </thead>
+        <tbody id="tblSkBody">
+          <!-- Dinamis via JS -->
+        </tbody>
+      </table>
+    </div>
+
+    <!-- ZETTBOT FIX: MODE TABEL 2: PEGAWAI-CENTRIC (REKAP PEGAWAI) -->
+    <div id="skModePegawai" class="flex-1 overflow-auto border border-slate-900 rounded-2xl bg-slate-950/40 hidden">
+      <table class="w-full text-left text-xs border-collapse">
+        <thead>
+          <tr class="border-b border-slate-900 bg-slate-900 text-slate-400 font-semibold sticky top-0 z-10 whitespace-nowrap">
+            <th class="p-4 w-12 text-center">No</th>
+            <th class="p-4">Identitas Pegawai Terkait</th>
+            <th class="p-4 text-center">Total Keikutsertaan SK</th>
+            <th class="p-4 text-center">Aksi Operasi</th>
+          </tr>
+        </thead>
+        <tbody id="tblSkPegawaiBody">
+          <!-- Dinamis via JS -->
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+
+  <!-- MODAL FORMULIR SK (ADD/EDIT) -->
+  <div id="modalSkForm" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-[200] flex items-center justify-center p-4 hidden">
+    <div class="w-full max-w-3xl glass border border-slate-800 p-6 rounded-3xl shadow-2xl h-[95vh] flex flex-col scale-95 transition-all">
+      <div class="flex items-center justify-between pb-4 border-b border-slate-800 shrink-0">
+        <h3 id="skModalTitle" class="text-lg font-bold text-white"><i class="fa-solid fa-file-signature text-indigo-400 mr-2"></i> Daftarkan SK Baru</h3>
+        <button onclick="closeSkFormModal()" class="text-slate-400 hover:text-slate-100"><i class="fa-solid fa-xmark text-lg"></i></button>
+      </div>
+
+      <form id="formSk" onsubmit="submitSk(event)" class="flex-1 overflow-y-auto py-4 space-y-5 text-xs pr-2 custom-scrollbar">
+        <input type="hidden" id="skIdInput">
+        <input type="hidden" id="skTglInput">
+        
+        <div>
+          <label class="block text-xs font-semibold text-slate-400 uppercase mb-1.5">Judul Keputusan (SK)</label>
+          <input type="text" id="skJudul" required placeholder="Contoh: SK Pembangunan Zona Integritas PA Indramayu 2026"
+            class="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-200">
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-semibold text-slate-400 uppercase mb-1.5">Penanggung Jawab SK (PJ)</label>
+            <select id="skPj" required class="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-200">
+              <option value="PJ. Manajemen">PJ. Manajemen</option>
+              <option value="PJ. Kepaniteraan">PJ. Kepaniteraan</option>
+              <option value="PJ. Kesekretariatan">PJ. Kesekretariatan</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-400 uppercase mb-1.5">Tautan Google Drive (Berkas PDF SK)</label>
+            <input type="url" id="skLink" required placeholder="https://drive.google.com/..."
+              class="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-200">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-semibold text-slate-400 uppercase mb-1.5">Nomor SK</label>
+            <input type="text" id="skNo" required placeholder="Contoh: 013/Kpa.W10-A2/Sk.Kp7.1/I/2026"
+              class="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-200">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-400 uppercase mb-1.5">Tanggal SK</label>
+            <input type="date" id="skTglDate" required 
+              class="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-200 appearance-none">
+          </div>
+        </div>
+
+        <!-- SECTION ANGGOTA TIM -->
+        <div class="border-t border-slate-800/80 pt-5 mt-2">
+          <label class="block text-xs font-bold text-indigo-400 uppercase mb-3 tracking-wider">Susunan Anggota Tim & Peran</label>
+          
+          <div class="flex items-center gap-3 mb-4 bg-slate-900/50 p-3 rounded-xl border border-slate-800">
+            <div class="relative flex-1">
+              <input type="text" id="skSearchMember" list="skListDatalist" onchange="handleAddMemberChange()" placeholder="Cari nama pegawai untuk ditambahkan..." 
+                class="w-full pl-3.5 pr-4 py-2 bg-slate-950 border border-slate-700 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-200">
+              <datalist id="skListDatalist">
+                <!-- Dipopulasi JS -->
+              </datalist>
+            </div>
+            <span class="text-[10px] text-slate-500 italic shrink-0 hidden sm:block">Pilih dari daftar untuk memasukkan anggota</span>
+          </div>
+
+          <!-- CONTAINER ANGGOTA TERPILIH -->
+          <div id="skSelectedMembersContainer" class="space-y-2">
+             <!-- Baris dinamis JS -->
+          </div>
+          <div id="skEmptyMemberState" class="text-center p-6 border border-dashed border-slate-700 rounded-xl text-slate-500 bg-slate-900/20">
+             Belum ada anggota tim yang ditambahkan.
+          </div>
+        </div>
+
+        <button type="submit" class="w-full py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl shadow-lg transition tracking-wider mt-4">
+          <i class="fa-solid fa-floppy-disk mr-1"></i> Simpan Data Surat Keputusan
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL KIRIM WA MANUAL (SK-CENTRIC) -->
+  <div id="modalWaSk" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-[250] flex items-center justify-center p-4 hidden">
+    <div class="w-full max-w-2xl glass border border-slate-800 p-6 rounded-3xl shadow-2xl scale-95 transition-all flex flex-col max-h-[80vh]">
+      <div class="flex items-center justify-between pb-4 border-b border-slate-800 shrink-0 mb-4">
+        <div>
+           <h3 class="text-lg font-bold text-emerald-400"><i class="fa-brands fa-whatsapp mr-2"></i> Kirim Notifikasi WA Secara Manual</h3>
+           <p id="waModalTitleSk" class="text-[10px] text-slate-400 mt-1 truncate max-w-[300px]">-</p>
+        </div>
+        <button onclick="closeWaModal()" class="text-slate-400 hover:text-slate-100"><i class="fa-solid fa-xmark text-lg"></i></button>
+      </div>
+      
+      <p class="text-xs text-slate-400 mb-4 leading-relaxed">
+        Untuk menghindari blokir browser pada fitur "Kirim Berantai", silakan klik tombol WA di sebelah kanan setiap nama secara manual. Sistem sudah membuatkan pesan dan menyisipkan tautan PDF-nya!
+      </p>
+
+      <div id="waCheckboxContainer" class="flex-1 overflow-y-auto space-y-2 custom-scrollbar pr-1 mb-4">
+         <!-- Dipopulasi JS -->
+      </div>
+    </div>
+  </div>
+
+  <!-- ZETTBOT FIX: MODAL KIRIM WA REKAP PEGAWAI (PEGAWAI-CENTRIC) -->
+  <div id="modalWaPegawaiSk" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-[260] flex items-center justify-center p-4 hidden">
+    <div class="w-full max-w-xl glass border border-slate-800 p-6 rounded-3xl shadow-2xl scale-95 transition-all flex flex-col max-h-[80vh]">
+      <div class="flex items-center justify-between pb-4 border-b border-slate-800 shrink-0 mb-4">
+        <div>
+           <h3 class="text-lg font-bold text-emerald-400"><i class="fa-brands fa-whatsapp mr-2"></i> Kirim Rekap SK Pegawai (Bulk)</h3>
+           <p id="waModalTitlePegawai" class="text-[10px] font-bold text-slate-300 mt-1 truncate max-w-[300px] uppercase">-</p>
+        </div>
+        <button onclick="closeWaPegawaiModal()" class="text-slate-400 hover:text-slate-100"><i class="fa-solid fa-xmark text-lg"></i></button>
+      </div>
+
+      <div class="flex justify-between items-center bg-slate-900/50 p-3 rounded-lg border border-slate-800 mb-3 shrink-0">
+         <span class="text-xs font-semibold text-slate-300">Pilih SK yang ingin dibundel dalam pesan:</span>
+         <button onclick="toggleWaPegawaiCheckAll()" id="btnWaPegawaiCheckAll" class="text-[10px] font-bold text-indigo-400 hover:text-indigo-300 px-3 py-1.5 bg-indigo-500/10 rounded-md transition">Pilih Semua</button>
+      </div>
+
+      <div id="waPegawaiCheckboxContainer" class="flex-1 overflow-y-auto space-y-1.5 custom-scrollbar pr-1 mb-4">
+         <!-- Dipopulasi JS -->
+      </div>
+
+      <button onclick="executeWaPegawai()" class="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl shadow-lg shadow-emerald-600/20 transition flex items-center justify-center gap-2 tracking-wider shrink-0 uppercase text-xs">
+         Rakit & Buka Pesan WhatsApp <i class="fa-solid fa-paper-plane ml-1"></i>
+      </button>
+    </div>
+  </div>
+
+</div>

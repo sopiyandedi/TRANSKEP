@@ -1,0 +1,344 @@
+<script>
+  // ==========================================
+  // File: js_dashboard.html
+  // ZETTBOT: Core Operasional & Mesin Waktu Absensi Sempurna
+  // ==========================================
+
+  window.allWarningsData = [];
+
+  function formatYMD(dateObj) {
+      let d = new Date(dateObj), month = '' + (d.getMonth() + 1), day = '' + d.getDate(), year = d.getFullYear();
+      if (month.length < 2) month = '0' + month;
+      if (day.length < 2) day = '0' + day;
+      return [year, month, day].join('-');
+  }
+
+  function parseTanggalLokal(tglStr) {
+      if (!tglStr) return null;
+      tglStr = String(tglStr).trim();
+      
+      if (!/[a-zA-Z]/.test(tglStr)) {
+          let parts = tglStr.split(/[\/\-]/);
+          if (parts.length === 3) {
+              let p0 = parseInt(parts[0], 10);
+              let p1 = parseInt(parts[1], 10);
+              let p2 = parseInt(parts[2], 10);
+              
+              if (!isNaN(p0) && !isNaN(p1) && !isNaN(p2)) {
+                  if (p2 > 1000) { 
+                      return new Date(p2, p1 - 1, p0); 
+                  } else if (p0 > 1000) { 
+                      return new Date(p0, p1 - 1, p2); 
+                  }
+              }
+          }
+      }
+
+      let cleanStr = tglStr.replace(/-/g, ' ');
+      let d = new Date(cleanStr);
+      if (!isNaN(d.getTime())) return d;
+      
+      return null; 
+  }
+
+  function formatTanggalIndoDashboard(dateObj) {
+      if (!dateObj || isNaN(dateObj.getTime())) return '-';
+      const months = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+      return `${dateObj.getDate()} ${months[dateObj.getMonth()]} ${dateObj.getFullYear()}`;
+  }
+
+  function calculateAge(nip) {
+      let nipClean = String(nip).replace(/[^0-9]/g, '');
+      if(nipClean.length >= 15) {
+          let birthYear = parseInt(nipClean.substring(0,4));
+          let currentYear = new Date().getFullYear();
+          return currentYear - birthYear;
+      }
+      return 0;
+  }
+  
+  function autoForwardTMT(nip, type, newDateStr) {
+      google.script.run
+          .withSuccessHandler(res => { if(res.status==='success') console.log(`Auto-Forward ${type} sukses`); })
+          .forwardTmtDateByFrontend(nip, type, newDateStr);
+  }
+
+  function renderAbsensiHariIni() {
+      const today = new Date();
+      today.setHours(0,0,0,0);
+      const todayTime = today.getTime();
+
+      const badgeTgl = document.getElementById('dateTodayBadge');
+      if(badgeTgl) badgeTgl.innerText = formatTanggalIndoDashboard(new Date());
+
+      // ZETTBOT FIX: CEK STATUS BACKGROUND SYNC (Mencegah "Fake Empty State")
+      if (!state.isBgSyncDone) {
+          let htmlLoading = `
+              <div class="flex flex-col items-center justify-center h-full text-center p-6 mt-12 animate-pulse">
+                  <div class="w-16 h-16 bg-slate-800/50 rounded-full flex items-center justify-center mb-4 border border-slate-700/50">
+                      <i class="fa-solid fa-satellite-dish text-2xl text-indigo-400 opacity-80"></i>
+                  </div>
+                  <h4 class="text-indigo-400 font-bold text-sm tracking-wide">Memindai Radar...</h4>
+                  <p class="text-slate-500 text-[10px] mt-2 leading-relaxed max-w-[200px]">Menarik data kehadiran terbaru di latar belakang.</p>
+              </div>`;
+          const adminContainer = document.getElementById('adminAbsensiList');
+          if(adminContainer) adminContainer.innerHTML = htmlLoading;
+          const pegawaiContainer = document.getElementById('pegawaiAbsensiList');
+          if(pegawaiContainer) pegawaiContainer.innerHTML = htmlLoading;
+          return; // Hentikan fungsi sampai background sync mengubah state.isBgSyncDone menjadi true
+      }
+      
+      let absentees = [];
+      
+      const safeNip = (nipData) => {
+          if (nipData === null || nipData === undefined) return '';
+          return String(nipData).replace(/['"\s]/g, "").trim();
+      };
+      
+      function isTodayInRange(tglMulai, tglSelesai) {
+          let start = parseTanggalLokal(tglMulai);
+          let end = parseTanggalLokal(tglSelesai ? tglSelesai : tglMulai); 
+          
+          if (!start) return false; 
+          if (!end) end = start; 
+          
+          start.setHours(0,0,0,0);
+          end.setHours(23,59,59,999); 
+          
+          return (todayTime >= start.getTime() && todayTime <= end.getTime());
+      }
+
+      if (state.cutiLogs) {
+          state.cutiLogs.forEach(c => {
+              let sStatus = String(c.status || '').trim().toUpperCase();
+              if(sStatus === 'DISETUJUI' && isTodayInRange(c.tgl_mulai, c.tgl_selesai)) {
+                  let user = state.usersList.find(u => safeNip(u.nip) === safeNip(c.nip));
+                  if(user) absentees.push({ user: user, type: 'Cuti', badgeColor: 'text-rose-400 bg-rose-500/10 border-rose-500/30', end: c.tgl_selesai, plh: '' });
+              }
+          });
+      }
+      
+      if (state.stList) {
+          state.stList.forEach(st => {
+              if(st.status !== 'DIBATALKAN' && isTodayInRange(st.tgl_mulai, st.tgl_selesai)) {
+                  let parsedPeserta = [];
+                  try {
+                      let parsed = JSON.parse(st.peserta);
+                      if (!Array.isArray(parsed)) parsed = [parsed];
+                      parsedPeserta = parsed;
+                  } catch(e) {
+                      parsedPeserta = [{ nip: safeNip(st.peserta) }]; 
+                  }
+
+                  parsedPeserta.forEach(pObj => {
+                      let pNip = safeNip(pObj.nip || pObj.NIP || pObj.id || (typeof pObj === 'string' ? pObj : ''));
+                      let user = state.usersList.find(u => safeNip(u.nip) === pNip);
+                      
+                      if(user) {
+                          let plhText = '';
+                          let plhNip = pObj.plh_nip || pObj.nip_plh || pObj.plh || '';
+                          let plhNama = pObj.plh_nama || pObj.nama_plh || '';
+                          
+                          if (!plhNip && !plhNama) {
+                              let ekstraData = {};
+                              try { ekstraData = JSON.parse(st.data_ekstra || '{}'); } catch(e) {}
+                              plhNip = ekstraData.plh_nip || ekstraData.nip_plh || ekstraData.plh || '';
+                              plhNama = ekstraData.nama_plh || ekstraData.plh_nama || '';
+                          }
+                          
+                          if (plhNip && String(plhNip).trim() !== '') {
+                              let plhUser = state.usersList.find(u => safeNip(u.nip) === safeNip(plhNip));
+                              if (plhUser) plhText = formatNamaBersih(plhUser.nama);
+                          }
+                          if (!plhText && plhNama && String(plhNama).trim() !== '') {
+                              plhText = formatNamaBersih(plhNama);
+                          }
+                          
+                          let infoTempat = st.tempat ? st.tempat : (st.tujuan ? st.tujuan : '');
+                          if (infoTempat.length > 35) infoTempat = infoTempat.substring(0, 35) + '...'; 
+                          
+                          absentees.push({ 
+                              user: user, 
+                              type: 'Dinas Luar', 
+                              badgeColor: 'text-purple-400 bg-purple-500/10 border-purple-500/30', 
+                              end: st.tgl_selesai, 
+                              plh: plhText,
+                              tempat: infoTempat 
+                          });
+                      }
+                  });
+              }
+          });
+      }
+      
+      if (state.ipLogs) {
+          state.ipLogs.forEach(ip => {
+              let sStatus = String(ip.status || '').trim().toUpperCase();
+              if(sStatus === 'DISETUJUI' && isTodayInRange(ip.tgl_mulai, ip.tgl_selesai)) {
+                  let user = state.usersList.find(u => safeNip(u.nip) === safeNip(ip.nip));
+                  if(user) absentees.push({ user: user, type: 'Izin', badgeColor: 'text-amber-400 bg-amber-500/10 border-amber-500/30', end: ip.tgl_selesai, plh: '' });
+              }
+          });
+      }
+      
+      if (state.ikLogs) {
+          state.ikLogs.forEach(ik => {
+              let sStatus = String(ik.status || '').trim().toUpperCase();
+              if(sStatus === 'DISETUJUI' && isTodayInRange(ik.tanggal, ik.tanggal)) {
+                  let user = state.usersList.find(u => safeNip(u.nip) === safeNip(ik.nip));
+                  if(user) absentees.push({ user: user, type: 'Izin Keluar', badgeColor: 'text-orange-400 bg-orange-500/10 border-orange-500/30', end: ik.tanggal, plh: '' });
+              }
+          });
+      }
+      
+      if (state.wfhLogs) {
+          state.wfhLogs.forEach(w => {
+              let sStatus = String(w.status_rencana || '').trim().toUpperCase();
+              if(sStatus === 'DISETUJUI' && isTodayInRange(w.tanggal, w.tanggal)) {
+                  let user = state.usersList.find(u => safeNip(u.nip) === safeNip(w.nip));
+                  if(user) absentees.push({ user: user, type: 'WFH', badgeColor: 'text-teal-400 bg-teal-500/10 border-teal-500/30', end: w.tanggal, plh: '' });
+              }
+          });
+      }
+      
+      let uniqueAbsentees = []; 
+      let trackedNips = new Set();
+      absentees.forEach(a => { 
+          if(!trackedNips.has(a.user.nip)) { 
+              trackedNips.add(a.user.nip); 
+              uniqueAbsentees.push(a); 
+          } 
+      });
+      
+      let html = '';
+      if(uniqueAbsentees.length === 0) {
+          html = `
+              <div class="flex flex-col items-center justify-center h-full text-center p-6 mt-12 animate-fade-in">
+                  <div class="w-20 h-20 bg-emerald-500/10 rounded-full flex items-center justify-center mb-4 border border-emerald-500/30 shadow-[0_0_30px_rgba(16,185,129,0.2)] relative">
+                      <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-20"></span>
+                      <i class="fa-solid fa-trophy text-3xl text-emerald-400 relative z-10"></i>
+                  </div>
+                  <h4 class="text-emerald-400 font-bold text-base tracking-wide">Luar Biasa!</h4>
+                  <p class="text-slate-400 text-xs mt-2 leading-relaxed max-w-[200px]">100% Personel Hadir dan Siap Bertugas Hari Ini.</p>
+              </div>`;
+      } else {
+          uniqueAbsentees.forEach(item => {
+              let plhHtml = item.plh ? `<div class="text-[9px] font-bold text-rose-400 bg-rose-500/10 border border-rose-500/20 px-2 py-0.5 rounded flex w-fit items-center gap-1 animate-pulse mt-1.5 shadow-[0_0_8px_rgba(244,63,94,0.3)]"><i class="fa-solid fa-user-shield"></i> Plh: ${item.plh}</div>` : '';
+              let tempatHtml = item.tempat ? `<div class="text-[9px] text-slate-400 mt-1 truncate" title="${item.tempat}"><i class="fa-solid fa-location-dot text-slate-500 mr-1"></i>${item.tempat}</div>` : '';
+              
+              html += `
+              <div class="flex items-center justify-between p-3 rounded-2xl border border-slate-800/60 bg-slate-900/40 hover:bg-slate-800/80 transition gap-3 mb-2 animate-fade-in">
+                <div class="flex items-center gap-3 overflow-hidden">
+                   <div class="w-10 h-10 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-center shrink-0 shadow-inner">
+                      <span class="text-sm font-black text-slate-300 uppercase">${item.user.nama.charAt(0)}</span>
+                   </div>
+                   <div class="flex flex-col min-w-0">
+                      <h4 class="text-xs font-bold text-slate-200 truncate" title="${item.user.nama}">${formatNamaBersih(item.user.nama)}</h4>
+                      <p class="text-[9px] text-slate-500 mt-0.5 truncate" title="${item.user.jabatan}">${item.user.jabatan}</p>
+                      ${tempatHtml}
+                      ${plhHtml}
+                   </div>
+                </div>
+                <div class="text-right shrink-0 pl-2">
+                   <div class="text-[9px] font-bold px-2.5 py-1 rounded-lg border uppercase tracking-widest mb-1 inline-block ${item.badgeColor}">${item.type}</div>
+                   <div class="text-[8px] text-slate-500 font-medium">s.d ${formatTanggalIndoDashboard(new Date(item.end))}</div>
+                </div>
+              </div>`;
+          });
+      }
+      
+      const adminContainer = document.getElementById('adminAbsensiList');
+      if(adminContainer) adminContainer.innerHTML = html;
+      const pegawaiContainer = document.getElementById('pegawaiAbsensiList');
+      if(pegawaiContainer) pegawaiContainer.innerHTML = html;
+  }
+
+  function renderDashboardView() {
+      if (!state.user) return;
+      const welcomeEl = document.getElementById('dashWelcomeText');
+      if (welcomeEl) welcomeEl.innerText = `Selamat datang di Sistem Kepegawaian TRANSKEP.`;
+      
+      if (typeof generateWarningsData === 'function') generateWarningsData();
+      
+      renderAbsensiHariIni();
+      
+      if(typeof renderAllCharts === 'function') renderAllCharts();
+
+      const isAdmin = (state.user.role === 'Admin' || state.user.role === 'Operator');
+      if (isAdmin) {
+          const vAdmin = document.getElementById('dashAdminView');
+          const vPegawai = document.getElementById('dashPegawaiView');
+          if (vAdmin) vAdmin.classList.remove('hidden');
+          if (vPegawai) vPegawai.classList.add('hidden');
+          
+          if(typeof applyAdminFilters === 'function') applyAdminFilters(); 
+      } else {
+          const vAdmin = document.getElementById('dashAdminView');
+          const vPegawai = document.getElementById('dashPegawaiView');
+          if (vAdmin) vAdmin.classList.add('hidden');
+          if (vPegawai) vPegawai.classList.remove('hidden');
+          
+          if (window.allWarningsData) {
+              const myWarnings = window.allWarningsData.filter(item => String(item.user.nip) === String(state.user.nip));
+              if(typeof renderWarningList === 'function') renderWarningList(myWarnings, 'pegawaiWarningList');
+          }
+      }
+  }
+
+  function handleEmployeeSearch(val) {
+      const resultPanel = document.getElementById('searchResultPanel');
+      const resultList = document.getElementById('searchResultContent');
+      const btnClear = document.getElementById('btnClearSearch');
+      if (!resultPanel || !resultList || !btnClear) return;
+      
+      val = val.toLowerCase().trim();
+      if (val === '') { resultPanel.classList.add('hidden'); btnClear.classList.add('hidden'); return; }
+      
+      btnClear.classList.remove('hidden'); resultPanel.classList.remove('hidden');
+      
+      const results = state.usersList.filter(u => {
+          let nameMatch = u.nama.toLowerCase().includes(val);
+          let nipMatch = String(u.nip).includes(val);
+          let jabMatch = (u.jabatan || '').toLowerCase().includes(val);
+          let pangkatMatch = (u.pangkat || '').toLowerCase().includes(val);
+          let usiaMatch = false;
+          if(val.includes('-')) {
+             let age = calculateAge(u.nip);
+             if(val === '21-30' && age >= 21 && age <= 30) usiaMatch = true;
+             else if(val === '31-35' && age >= 31 && age <= 35) usiaMatch = true;
+             else if(val === '36-40' && age >= 36 && age <= 40) usiaMatch = true;
+             else if(val === '41-45' && age >= 41 && age <= 45) usiaMatch = true;
+             else if(val === '46-50' && age >= 46 && age <= 50) usiaMatch = true;
+             else if(val === '51-55' && age >= 51 && age <= 55) usiaMatch = true;
+             else if(val === '56-60' && age >= 56 && age <= 60) usiaMatch = true;
+             else if(val === '61-70' && age >= 61 && age <= 70) usiaMatch = true;
+          }
+          return nameMatch || nipMatch || jabMatch || pangkatMatch || usiaMatch;
+      });
+      
+      if (results.length === 0) { resultList.innerHTML = `<div class="p-4 text-center text-slate-500 text-xs">Pencarian untuk "${val}" tidak ditemukan.</div>`; return; }
+      
+      let html = '';
+      results.forEach(u => {
+          let pangkatGol = u.pangkat ? `<span class="px-1.5 py-0.5 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded mr-1">${u.pangkat}</span>` : '';
+          html += `
+          <div class="p-3 border-b border-slate-800/50 hover:bg-slate-800/80 transition rounded-lg flex items-center justify-between gap-3 group cursor-pointer">
+             <div>
+                 <div class="font-bold text-slate-200 text-sm">${u.nama}</div>
+                 <div class="text-[10px] text-slate-400 mt-1">${pangkatGol}<span class="font-mono text-indigo-400">${u.nip}</span> • ${u.jabatan}</div>
+             </div>
+             <button onclick="navigator.clipboard.writeText('${u.nip}'); showNotify('NIP Disalin','NIP disalin','success')" class="p-2 text-slate-500 hover:text-indigo-400 hover:bg-slate-900 rounded-lg transition opacity-0 group-hover:opacity-100 focus:opacity-100"><i class="fa-regular fa-copy"></i></button>
+          </div>`;
+      });
+      resultList.innerHTML = html;
+  }
+
+  function clearEmployeeSearch() {
+      const input = document.getElementById('globalEmployeeSearch');
+      if (input) input.value = '';
+      const pnl = document.getElementById('searchResultPanel');
+      if (pnl) pnl.classList.add('hidden');
+      const btn = document.getElementById('btnClearSearch');
+      if (btn) btn.classList.add('hidden');
+  }
+</script>

@@ -1,0 +1,603 @@
+<script>
+  window.selectedJdNip = "";
+  
+  window.jobdesConfigSk = {
+     dasar: "Lampiran II Surat Keputusan Ketua Pengadilan Agama Indramayu",
+     nomor: "013/Kpa.W10-A2/Sk.Kp7.1/I/2025",
+     tanggal: "2 Januari 2025"
+  };
+
+  window.zettbosAlert = function(msg, type) {
+      type = type || 'info';
+      var toast = document.createElement('div');
+      var icon = '<i class="fa-solid fa-circle-info text-indigo-400"></i>';
+      if(type === 'success') icon = '<i class="fa-solid fa-circle-check text-emerald-400"></i>';
+      if(type === 'error') icon = '<i class="fa-solid fa-triangle-exclamation text-rose-400"></i>';
+      
+      toast.className = 'fixed bottom-5 right-5 bg-slate-800 border border-slate-700 text-white px-5 py-3.5 rounded-xl shadow-2xl z-[99999] flex items-center gap-3 transition-all duration-300 transform translate-y-10 opacity-0 text-sm font-medium';
+      toast.innerHTML = icon + ' <span>' + msg + '</span>';
+      document.body.appendChild(toast);
+      
+      setTimeout(function() { toast.classList.remove('translate-y-10', 'opacity-0'); }, 50);
+      setTimeout(function() {
+          toast.classList.add('translate-y-10', 'opacity-0');
+          setTimeout(function() { toast.remove(); }, 300);
+      }, 3500);
+  };
+
+  window.renderJobdesView = function() {
+    var userRole = "";
+    if (typeof state !== 'undefined' && state && state.user && typeof state.user.role === 'string') {
+        userRole = state.user.role.toLowerCase();
+    }
+    
+    var hasAdminAccess = userRole === "" || userRole.indexOf('admin') > -1 || userRole.indexOf('operator') > -1 || userRole.indexOf('super') > -1;
+    var hasAtasanAccess = userRole.indexOf('atasan') > -1 || userRole.indexOf('pejabat') > -1 || userRole.indexOf('ketua') > -1 || hasAdminAccess;
+    
+    var btnDasarSk = document.getElementById('btnJobdesDasarSk');
+    var searchContainer = document.getElementById('jdSearchContainer');
+    var btnNotif = document.getElementById('btnNotifUsulan');
+    
+    if(hasAdminAccess) {
+       if(btnDasarSk) { btnDasarSk.classList.remove('hidden'); btnDasarSk.classList.add('flex'); }
+       if(searchContainer) { searchContainer.classList.remove('hidden'); }
+       if(btnNotif) { btnNotif.classList.remove('hidden'); btnNotif.classList.add('flex'); window.fetchNotifikasiAdmin(); }
+    } else {
+       if(btnDasarSk) { btnDasarSk.classList.remove('flex'); btnDasarSk.classList.add('hidden'); }
+       if(searchContainer) { searchContainer.classList.add('hidden'); }
+       if(btnNotif) { btnNotif.classList.remove('flex'); btnNotif.classList.add('hidden'); }
+       
+       if (typeof state !== 'undefined' && state && state.user && state.user.nip) {
+           window.selectedJdNip = state.user.nip;
+       }
+    }
+
+    if (window.selectedJdNip) {
+      window.showJobdesPreview(window.selectedJdNip);
+    } else {
+      var emptyState = document.getElementById('jobdesEmptyState');
+      var docContent = document.getElementById('jobdesDocContent');
+      var actionBtns = document.getElementById('jobdesActionButtons');
+      
+      if(emptyState) emptyState.classList.remove('hidden');
+      if(docContent) docContent.classList.add('hidden');
+      if(actionBtns) actionBtns.classList.add('opacity-50', 'pointer-events-none');
+    }
+  };
+
+  window.handleJobdesSearch = function(searchTerm) {
+      var dropdown = document.getElementById('jdDropdownList');
+      var btnClear = document.getElementById('btnClearJdSearch');
+      if (!dropdown) return;
+
+      searchTerm = searchTerm.toLowerCase().trim();
+      dropdown.innerHTML = ""; 
+      
+      if(btnClear) {
+          if(searchTerm.length > 0) {
+              btnClear.classList.remove('hidden');
+              btnClear.classList.add('flex');
+          } else {
+              btnClear.classList.remove('flex');
+              btnClear.classList.add('hidden');
+          }
+      }
+
+      if (searchTerm.length === 0) {
+          dropdown.classList.add('hidden');
+          return;
+      }
+
+      var usersList = (typeof state !== 'undefined' && state && state.usersList) ? state.usersList : [];
+      var filteredUsers = usersList.filter(function(u) {
+          return (u.nama && u.nama.toLowerCase().indexOf(searchTerm) > -1) || 
+                 (u.jabatan && u.jabatan.toLowerCase().indexOf(searchTerm) > -1) ||
+                 (u.nip && u.nip.indexOf(searchTerm) > -1);
+      });
+
+      if (filteredUsers.length > 0) {
+          dropdown.classList.remove('hidden');
+          var htmlStr = '';
+          filteredUsers.forEach(function(u) {
+              var iconCheck = (window.selectedJdNip === u.nip) ? '<i class="fa-solid fa-circle-check text-indigo-400 text-xs"></i>' : '';
+              htmlStr += '<div class="w-full text-left px-4 py-2 hover:bg-indigo-600/30 border-b border-slate-700/50 transition cursor-pointer flex items-center justify-between" onclick="window.klikPegawaiJobdes(\'' + u.nip + '\')">' +
+                            '<div>' +
+                                '<div class="font-bold text-xs text-slate-200">' + u.nama + '</div>' +
+                                '<div class="text-[10px] text-slate-400 mt-0.5 truncate max-w-[200px]">' + u.jabatan + ' | NIP: ' + u.nip + '</div>' +
+                            '</div>' +
+                            iconCheck +
+                         '</div>';
+          });
+          dropdown.innerHTML = htmlStr;
+      } else {
+          dropdown.classList.remove('hidden');
+          dropdown.innerHTML = '<div class="p-3 text-center text-xs text-slate-500 italic">Pegawai tidak ditemukan.</div>';
+      }
+  };
+
+  window.hideJobdesDropdown = function() {
+      setTimeout(function() { 
+          var dd = document.getElementById('jdDropdownList'); 
+          if(dd) dd.classList.add('hidden'); 
+      }, 250);
+  };
+
+  window.clearJobdesSearch = function() {
+      var input = document.getElementById('jdSearchInput');
+      if(input) {
+          input.value = "";
+          window.handleJobdesSearch("");
+          input.focus();
+      }
+  };
+
+  window.klikPegawaiJobdes = function(nip) {
+      var usersList = (typeof state !== 'undefined' && state && state.usersList) ? state.usersList : [];
+      var user = usersList.filter(function(u) { return u.nip === nip; })[0];
+      var nama = user ? user.nama : "";
+
+      var input = document.getElementById('jdSearchInput');
+      if (input) input.value = nama;
+      
+      var dropdown = document.getElementById('jdDropdownList');
+      if (dropdown) dropdown.classList.add('hidden');
+      
+      window.selectJobdesPegawai(nip);
+  };
+
+  window.selectJobdesPegawai = function(nip) {
+    window.selectedJdNip = nip;
+    window.showJobdesPreview(window.selectedJdNip);
+  };
+
+  window.showJobdesPreview = function(nip) {
+    var usersList = (typeof state !== 'undefined' && state && state.usersList) ? state.usersList : [];
+    var jobdesList = (typeof state !== 'undefined' && state && state.jobdesList) ? state.jobdesList : [];
+
+    var u = usersList.filter(function(usr) { return usr.nip === nip; })[0];
+    if (!u) return;
+
+    var jd = jobdesList.filter(function(j) { return j.nip === nip; })[0];
+    if (!jd) {
+      jd = {
+        ikhtisar_jabatan: 'Deskripsi ikhtisar tugas belum diatur.',
+        tugas_pokok: '- Belum diisi.',
+        tugas_tambahan: '-',
+        tanggung_jawab: '-',
+        hasil_kerja: '-',
+        atasan_nip: ''
+      };
+    }
+
+    var atasan = usersList.filter(function(usr) { return usr.nip === jd.atasan_nip; })[0] || { nama: '-' };
+
+    document.getElementById('jdPrevNamaJabatan').innerText = u.jabatan;
+    document.getElementById('jdPrevNama').innerText = u.nama;
+    document.getElementById('jdPrevNip').innerText = u.nip;
+    document.getElementById('jdPrevPangkat').innerText = u.pangkat || "-";
+    document.getElementById('jdPrevAtasan').innerText = atasan.nama;
+    document.getElementById('jdPrevDasarVisual').innerText = window.jobdesConfigSk.dasar + "\nNomor: " + window.jobdesConfigSk.nomor + "\nTanggal: " + window.jobdesConfigSk.tanggal;
+
+    document.getElementById('jdPrevIkhtisar').innerHTML = window.formatListJobdes(jd.ikhtisar_jabatan);
+    document.getElementById('jdPrevPokok').innerHTML = window.formatListJobdes(jd.tugas_pokok);
+    document.getElementById('jdPrevTambahan').innerHTML = window.formatListJobdes(jd.tugas_tambahan);
+    document.getElementById('jdPrevTanggung').innerHTML = window.formatListJobdes(jd.tanggung_jawab);
+    document.getElementById('jdPrevHasil').innerHTML = window.formatListJobdes(jd.hasil_kerja);
+
+    document.getElementById('jobdesEmptyState').classList.add('hidden');
+    document.getElementById('jobdesDocContent').classList.remove('hidden');
+    document.getElementById('jobdesActionButtons').classList.remove('opacity-50', 'pointer-events-none');
+
+    var userRole = "";
+    if (typeof state !== 'undefined' && state && state.user && typeof state.user.role === 'string') {
+        userRole = state.user.role.toLowerCase();
+    }
+    var hasAdminAccess = userRole === "" || userRole.indexOf('admin') > -1 || userRole.indexOf('operator') > -1 || userRole.indexOf('super') > -1;
+    var hasAtasanAccess = userRole.indexOf('atasan') > -1 || userRole.indexOf('pejabat') > -1 || userRole.indexOf('ketua') > -1 || hasAdminAccess;
+    
+    var btnEdit = document.getElementById('btnJobdesEdit');
+    var btnWa = document.getElementById('btnJobdesWa');
+    var btnUsul = document.getElementById('btnUsulReposisi');
+    
+    if (hasAdminAccess) {
+      if (btnEdit) { btnEdit.classList.remove('hidden'); btnEdit.classList.add('flex'); }
+      if (btnWa) { btnWa.classList.remove('hidden'); btnWa.classList.add('flex'); }
+    } else {
+      if (btnEdit) { btnEdit.classList.remove('flex'); btnEdit.classList.add('hidden'); }
+      if (btnWa) { btnWa.classList.remove('flex'); btnWa.classList.add('hidden'); }
+    }
+
+    if(hasAtasanAccess) {
+      if (btnUsul) { btnUsul.classList.remove('hidden'); btnUsul.classList.add('flex'); }
+    } else {
+      if (btnUsul) { btnUsul.classList.remove('flex'); btnUsul.classList.add('hidden'); }
+    }
+  };
+
+  window.sendJobdesWa = function() {
+    var nama = document.getElementById('jdPrevNama').innerText;
+    if (nama === '-' || !nama) { window.zettbosAlert("Silakan pilih pegawai terlebih dahulu.", "error"); return; }
+    
+    var usersList = (typeof state !== 'undefined' && state && state.usersList) ? state.usersList : [];
+    var usr = usersList.filter(function(u) { return u.nip === window.selectedJdNip; })[0];
+    
+    var noWaRaw = usr ? (usr.no_wa || usr.no_hp || usr.nohp || usr.wa || usr.whatsapp || "") : "";
+    var noWaClean = "";
+    
+    if (noWaRaw) {
+        noWaClean = String(noWaRaw).replace(/\D/g, ''); 
+        if (noWaClean.startsWith('0')) {
+            noWaClean = '62' + noWaClean.substring(1); 
+        }
+    }
+
+    var template = document.getElementById('templateCetakJobdes');
+    if (!template) { window.zettbosAlert("Error: Template cetak tidak ditemukan.", "error"); return; }
+
+    var tempNode = template.cloneNode(true);
+    tempNode.querySelector('#prtJudulSk').innerText = window.jobdesConfigSk.dasar;
+    tempNode.querySelector('#prtNoSk').innerText = window.jobdesConfigSk.nomor;
+    tempNode.querySelector('#prtTglSk').innerText = window.jobdesConfigSk.tanggal;
+    tempNode.querySelector('#prtJabatan').innerText = document.getElementById('jdPrevNamaJabatan').innerText;
+    tempNode.querySelector('#prtAtasan').innerText = document.getElementById('jdPrevAtasan').innerText;
+    tempNode.querySelector('#prtNama').innerText = nama;
+    tempNode.querySelector('#prtNip').innerText = document.getElementById('jdPrevNip').innerText;
+    tempNode.querySelector('#prtPangkat').innerText = document.getElementById('jdPrevPangkat').innerText;
+    
+    tempNode.querySelector('#prtIkhtisar').innerHTML = document.getElementById('jdPrevIkhtisar').innerHTML;
+    tempNode.querySelector('#prtPokok').innerHTML = document.getElementById('jdPrevPokok').innerHTML;
+    tempNode.querySelector('#prtTambahan').innerHTML = document.getElementById('jdPrevTambahan').innerHTML;
+    tempNode.querySelector('#prtTanggung').innerHTML = document.getElementById('jdPrevTanggung').innerHTML;
+    tempNode.querySelector('#prtHasil').innerHTML = document.getElementById('jdPrevHasil').innerHTML;
+
+    var printHTML = '<!DOCTYPE html><html lang="id"><head><meta charset="UTF-8">' + document.getElementById('styleCetakJobdes').outerHTML + '</head><body>' + tempNode.querySelector('#contentCetakJobdes').outerHTML + '</body></html>';
+    var fileName = "Uraian_Tugas_" + nama.replace(/[^a-zA-Z0-9]/g, "_");
+
+    var btnWa = document.getElementById('btnJobdesWa');
+    var originalHtml = btnWa.innerHTML;
+    btnWa.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-sm"></i> Memproses PDF...';
+    btnWa.classList.add('opacity-70', 'pointer-events-none');
+
+    google.script.run.withSuccessHandler(function(res) {
+        btnWa.innerHTML = originalHtml;
+        btnWa.classList.remove('opacity-70', 'pointer-events-none');
+        if(res.status === 'success') {
+            var pesanWa = "Yth. Bapak/Ibu *" + nama + "*,\n\nBerikut kami sampaikan dokumen *Uraian Tugas / Job Description* resmi Anda.\n\nUnduh dokumen PDF: " + res.url + "\n\nTerima Kasih.\n_Sistem Kepegawaian TRANSKEP_";
+            
+            var waLink = "https://api.whatsapp.com/send?text=" + encodeURIComponent(pesanWa);
+            if (noWaClean) {
+                waLink = "https://api.whatsapp.com/send?phone=" + noWaClean + "&text=" + encodeURIComponent(pesanWa);
+            }
+            
+            window.open(waLink, "_blank");
+        } else {
+            window.zettbosAlert("Gagal: " + res.message, "error");
+        }
+    }).withFailureHandler(function(err) {
+        btnWa.innerHTML = originalHtml;
+        btnWa.classList.remove('opacity-70', 'pointer-events-none');
+        window.zettbosAlert("Error Koneksi Jaringan", "error");
+    }).createPdfJobdes(printHTML, fileName);
+  };
+
+  window.openDasarSkModal = function() {
+     document.getElementById('cfgDasarText').value = window.jobdesConfigSk.dasar;
+     document.getElementById('cfgDasarNo').value = window.jobdesConfigSk.nomor;
+     document.getElementById('cfgDasarTgl').value = window.jobdesConfigSk.tanggal;
+     
+     var modal = document.getElementById('modalDasarSk');
+     if (modal.parentElement !== document.body) document.body.appendChild(modal); 
+     
+     modal.classList.remove('hidden');
+     setTimeout(function() { if(modal.firstElementChild) modal.firstElementChild.classList.remove('scale-95'); }, 10);
+  };
+
+  window.closeDasarSkModal = function() {
+     var modal = document.getElementById('modalDasarSk');
+     if(modal.firstElementChild) modal.firstElementChild.classList.add('scale-95');
+     setTimeout(function() { modal.classList.add('hidden'); }, 200);
+  };
+
+  window.saveDasarSkConfig = function(e) {
+     e.preventDefault();
+     window.jobdesConfigSk.dasar = document.getElementById('cfgDasarText').value;
+     window.jobdesConfigSk.nomor = document.getElementById('cfgDasarNo').value;
+     window.jobdesConfigSk.tanggal = document.getElementById('cfgDasarTgl').value;
+     window.closeDasarSkModal();
+     if (window.selectedJdNip) window.showJobdesPreview(window.selectedJdNip);
+     window.zettbosAlert("Kop Dasar SK diperbarui.", "success");
+  };
+
+  window.openJobdesEdit = function() {
+    if (!window.selectedJdNip) return;
+    var usersList = (typeof state !== 'undefined' && state && state.usersList) ? state.usersList : [];
+    var jobdesList = (typeof state !== 'undefined' && state && state.jobdesList) ? state.jobdesList : [];
+
+    var u = usersList.filter(function(usr) { return usr.nip === window.selectedJdNip; })[0];
+    if (!u) return;
+
+    var jd = jobdesList.filter(function(j) { return j.nip === window.selectedJdNip; })[0] || {};
+
+    document.getElementById('jdEditNip').value = window.selectedJdNip;
+    document.getElementById('jdEditNamaLabel').value = u.nama;
+    document.getElementById('jdEditIkhtisar').value = jd.ikhtisar_jabatan || "";
+    document.getElementById('jdEditPokok').value = jd.tugas_pokok || "";
+    document.getElementById('jdEditTambahan').value = jd.tugas_tambahan || "";
+    document.getElementById('jdEditTanggung').value = jd.tanggung_jawab || "";
+    document.getElementById('jdEditHasil').value = jd.hasil_kerja || "";
+
+    var selectAtasan = document.getElementById('jdEditAtasan');
+    selectAtasan.innerHTML = "";
+    
+    var superiors = usersList.filter(function(usr) {
+       var uRole = usr.role ? usr.role.toLowerCase() : "";
+       return uRole.indexOf('atasan') > -1 || uRole.indexOf('pejabat') > -1 || uRole.indexOf('admin') > -1 || uRole.indexOf('super') > -1;
+    });
+    
+    superiors.forEach(function(sup) {
+          var opt = document.createElement('option');
+          opt.value = sup.nip;
+          opt.innerText = sup.nama + " (" + sup.jabatan + ")";
+          if (jd.atasan_nip === sup.nip) opt.selected = true;
+          selectAtasan.appendChild(opt);
+    });
+
+    var modal = document.getElementById('modalJobdesEdit');
+    if (modal.parentElement !== document.body) document.body.appendChild(modal);
+
+    modal.classList.remove('hidden');
+    setTimeout(function() { 
+        if(modal.firstElementChild) modal.firstElementChild.classList.remove('scale-95'); 
+        window.resizeSemuaTextarea();
+    }, 10);
+  };
+
+  window.closeJobdesModal = function() {
+    var modal = document.getElementById('modalJobdesEdit');
+    if(modal.firstElementChild) modal.firstElementChild.classList.add('scale-95');
+    setTimeout(function() { modal.classList.add('hidden'); }, 200);
+  };
+
+  window.submitJobdes = function(e) {
+    e.preventDefault();
+    var payload = {
+      nip: document.getElementById('jdEditNip').value,
+      atasan_nip: document.getElementById('jdEditAtasan').value,
+      dasar_lampiran: document.getElementById('jdEditDasar').value, 
+      ikhtisar_jabatan: document.getElementById('jdEditIkhtisar').value,
+      tugas_pokok: document.getElementById('jdEditPokok').value,
+      tugas_tambahan: document.getElementById('jdEditTambahan').value,
+      tanggung_jawab: document.getElementById('jdEditTanggung').value,
+      hasil_kerja: document.getElementById('jdEditHasil').value
+    };
+
+    var btn = e.target.querySelector('button[type="submit"]');
+    var oriText = btn.innerHTML;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Menyimpan...';
+    btn.disabled = true;
+
+    google.script.run.withSuccessHandler(function(res) {
+        btn.innerHTML = oriText;
+        btn.disabled = false;
+        window.closeJobdesModal();
+        if (res.status === 'success') {
+          window.zettbosAlert(res.message, "success");
+          
+          // ZETTBOT FIX: Optimistic UI Update (Update Real-time tanpa Refresh!)
+          if (typeof state !== 'undefined' && state && state.jobdesList) {
+              var existingIdx = state.jobdesList.findIndex(function(j) { return j.nip === payload.nip; });
+              if (existingIdx > -1) {
+                  state.jobdesList[existingIdx] = payload;
+              } else {
+                  state.jobdesList.push(payload);
+              }
+          }
+          // Langsung render ulang tampilan preview secara instan
+          if (window.selectedJdNip === payload.nip) {
+              window.showJobdesPreview(payload.nip);
+          }
+          
+        } else {
+          window.zettbosAlert("Gagal: " + res.message, "error");
+        }
+      }).withFailureHandler(function(err) {
+        btn.innerHTML = oriText;
+        btn.disabled = false;
+        window.closeJobdesModal();
+        window.zettbosAlert("Error Jaringan", "error");
+      }).saveJobdes(payload);
+  };
+
+  window.openModalUsulReposisi = function() {
+      var nama = document.getElementById('jdPrevNama').innerText;
+      if(nama === '-' || !nama) { window.zettbosAlert("Pilih pegawai dulu.", "error"); return; }
+      
+      document.getElementById('usulNamaPegawai').value = nama;
+      document.getElementById('usulIsiTeks').value = "";
+      
+      var modal = document.getElementById('modalUsulanReposisi');
+      if (modal.parentElement !== document.body) document.body.appendChild(modal);
+      modal.classList.remove('hidden');
+      setTimeout(function() { if(modal.firstElementChild) modal.firstElementChild.classList.remove('scale-95'); }, 10);
+  };
+
+  window.closeModalUsulReposisi = function() {
+      var modal = document.getElementById('modalUsulanReposisi');
+      if(modal.firstElementChild) modal.firstElementChild.classList.add('scale-95');
+      setTimeout(function() { modal.classList.add('hidden'); }, 200);
+  };
+
+  window.submitUsulanReposisi = function(e) {
+      e.preventDefault();
+      var payload = {
+          nip_pegawai: window.selectedJdNip,
+          nama_pegawai: document.getElementById('usulNamaPegawai').value,
+          nama_pengusul: (typeof state !== 'undefined' && state && state.user) ? state.user.nama : 'Unknown',
+          isi_usulan: document.getElementById('usulIsiTeks').value
+      };
+      
+      var btn = e.target.querySelector('button[type="submit"]');
+      var oriText = btn.innerHTML;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Mengirim...';
+      btn.disabled = true;
+      
+      google.script.run.withSuccessHandler(function(res) {
+          btn.innerHTML = oriText; btn.disabled = false;
+          window.closeModalUsulReposisi();
+          if(res.status === 'success') window.zettbosAlert(res.message, "success");
+          else window.zettbosAlert("Gagal kirim usulan.", "error");
+      }).withFailureHandler(function(e) {
+          btn.innerHTML = oriText; btn.disabled = false;
+          window.closeModalUsulReposisi(); window.zettbosAlert("Error koneksi.", "error");
+      }).saveUsulanReposisi(payload);
+  };
+
+  window.fetchNotifikasiAdmin = function() {
+      google.script.run.withSuccessHandler(function(usulanArr) {
+          var badge = document.getElementById('badgeUsulan');
+          if(!badge) return;
+          if(usulanArr.length > 0) {
+              badge.innerText = usulanArr.length;
+              badge.classList.remove('hidden');
+          } else {
+              badge.classList.add('hidden');
+          }
+          window.cacheUsulanAdmin = usulanArr;
+      }).getUsulanMenunggu();
+  };
+
+  window.openModalNotifAdmin = function() {
+      var modal = document.getElementById('modalNotifAdmin');
+      var listContainer = document.getElementById('listNotifUsulan');
+      
+      listContainer.innerHTML = '<div class="text-center p-4 text-slate-500"><i class="fa-solid fa-spinner fa-spin text-2xl mb-2"></i><br>Memuat data...</div>';
+      
+      if (modal.parentElement !== document.body) document.body.appendChild(modal);
+      modal.classList.remove('hidden');
+      setTimeout(function() { if(modal.firstElementChild) modal.firstElementChild.classList.remove('scale-95'); }, 10);
+      
+      var arr = window.cacheUsulanAdmin || [];
+      if(arr.length === 0) {
+          listContainer.innerHTML = '<div class="text-center p-6 text-slate-500"><i class="fa-solid fa-inbox text-4xl mb-3 opacity-50"></i><br>Tidak ada usulan yang menunggu.</div>';
+          return;
+      }
+      
+      var htmlStr = '';
+      arr.forEach(function(u) {
+          htmlStr += '<div class="bg-slate-900/50 p-4 rounded-xl border border-slate-700/50" id="cardUsulan_' + u.id + '">' +
+                        '<div class="flex justify-between items-start mb-2">' +
+                           '<div>' +
+                               '<div class="text-[10px] font-bold text-purple-400 uppercase tracking-wider mb-1">Dari: ' + u.pengusul + '</div>' +
+                               '<div class="text-sm font-bold text-slate-200">Usulan untuk: ' + u.nama + '</div>' +
+                           '</div>' +
+                           '<button onclick="window.prosesSelesaiUsulan(\'' + u.id + '\')" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold rounded-lg transition shadow-md whitespace-nowrap"><i class="fa-solid fa-check mr-1"></i> Selesai</button>' +
+                        '</div>' +
+                        '<div class="text-xs text-slate-400 bg-slate-950 p-3 rounded-lg border border-slate-800 whitespace-pre-line">' + u.isi + '</div>' +
+                     '</div>';
+      });
+      listContainer.innerHTML = htmlStr;
+  };
+
+  window.closeModalNotifAdmin = function() {
+      var modal = document.getElementById('modalNotifAdmin');
+      if(modal.firstElementChild) modal.firstElementChild.classList.add('scale-95');
+      setTimeout(function() { modal.classList.add('hidden'); }, 200);
+  };
+
+  window.prosesSelesaiUsulan = function(id) {
+      var card = document.getElementById('cardUsulan_'+id);
+      if(card) card.style.opacity = '0.5';
+      
+      google.script.run.withSuccessHandler(function(res) {
+          if(res.status === 'success') {
+              if(card) card.remove();
+              window.fetchNotifikasiAdmin();
+              window.zettbosAlert("Usulan ditandai selesai.", "success");
+          }
+      }).tandaiUsulanSelesai(id);
+  };
+
+  // =========================================================================
+  // ZETTBOT UPDATE: SMART HTML PARSER (Invisible Table / Flexbox Approach)
+  // Menjamin angka tidak akan diubah paksa browser, dan hanging indent 100% lurus
+  // =========================================================================
+  window.formatListJobdes = function(text) {
+      if (!text) return '-';
+      var lines = text.split('\n');
+      var htmlResult = '';
+
+      lines.forEach(function(line) {
+          var trimmed = line.trim();
+          if (!trimmed) return;
+
+          // Deteksi Pola: (Angka/Huruf/Bullet) + Titik (opsional) + Spasi (opsional)
+          // Contoh tertangkap: "23.Melakukan", "24. Melakukan", "a. Evaluasi", "- Tugas"
+          var match = trimmed.match(/^(\d+\.|[a-zA-Z]\.|[-*])\s*(.*)/);
+
+          if (match) {
+              var bullet = match[1]; // Menangkap "23." atau "a."
+              var content = match[2]; // Menangkap sisa teksnya
+
+              // Menggunakan Flexbox layaknya tabel 2 kolom (Kiri: Bullet, Kanan: Teks)
+              // Padding/Margin disesuaikan agar cocok untuk layar & template PDF
+              var isSubList = /^[a-zA-Z]\./.test(bullet); // Deteksi jika huruf (a., b.)
+              var paddingKiri = isSubList ? 'padding-left: 20px;' : ''; // Geser ke dalam jika sub-list
+
+              htmlResult += '<div style="display: flex; margin-bottom: 6px; line-height: 1.5; text-align: justify; ' + paddingKiri + '">' +
+                              '<div style="flex-shrink: 0; min-width: 24px; font-weight: 500;">' + bullet + '</div>' +
+                              '<div style="flex-grow: 1;">' + content + '</div>' +
+                            '</div>';
+          } 
+          else {
+              // Jika tidak terdeteksi list (Teks Paragraf Biasa)
+              htmlResult += '<div style="text-align: justify; margin-bottom: 6px; line-height: 1.5;">' + trimmed + '</div>';
+          }
+      });
+
+      return htmlResult;
+  };
+  // =========================================================================
+
+  window.autoResize = function(textarea) {
+      textarea.style.height = 'auto'; 
+      textarea.style.height = textarea.scrollHeight + 'px'; 
+  };
+
+  window.resizeSemuaTextarea = function() {
+      var textareas = document.querySelectorAll('textarea');
+      textareas.forEach(function(ta) {
+         if(ta.value.length > 0) window.autoResize(ta);
+      });
+  };
+
+  // ZETTBOT FIX: Fluid Fullscreen Anti-Freeze
+  window.toggleFullscreenJobdes = function() {
+    var container = document.getElementById('jobdesEditContainer');
+    var icon = document.getElementById('iconExpandJobdes');
+    if (!container || !icon) return;
+    
+    if (container.classList.contains('w-[95vw]')) {
+        // Mode Layar Penuh (Lepas batasan, jadikan 100% ukuran layar aman)
+        container.classList.remove('w-[95vw]', 'max-w-7xl', 'h-[90vh]', 'rounded-3xl');
+        container.classList.add('w-full', 'h-full', 'max-w-none', 'rounded-none');
+        icon.classList.replace('fa-expand', 'fa-compress');
+    } else {
+        // Mode Kotak (Kembalikan seperti semula)
+        container.classList.add('w-[95vw]', 'max-w-7xl', 'h-[90vh]', 'rounded-3xl');
+        container.classList.remove('w-full', 'h-full', 'max-w-none', 'rounded-none');
+        icon.classList.replace('fa-compress', 'fa-expand');
+    }
+  };
+  
+  // ZETTBOT FIX: Tutup modal pakai tombol ESC keyboard (Anti-Kaku)
+  document.addEventListener('keydown', function(event) {
+      if (event.key === "Escape") {
+          var modal = document.getElementById('modalJobdesEdit');
+          if (modal && !modal.classList.contains('hidden')) {
+              window.closeJobdesModal();
+          }
+      }
+  });
+
+  console.log("ZETTBOT LOG: Modul Jobdes Berhasil Diload 100% Tanpa Error Sintaks!");
+</script>

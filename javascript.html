@@ -1,0 +1,734 @@
+<script>
+  console.log("🚀 ZETTBOT: Menginisialisasi sistem javascript...");
+
+  // 1. GLOBAL STATE
+  // ZETTBOT FIX: Tambahan variabel 'isBgSyncDone' untuk melacak pemuatan di latar belakang
+  let state = {
+    user: null, usersList: [], cutiLogs: [], jobdesList: [], skList: [], kinerjaList: [], sopList: [], sopAckList: [], stList: [], masterKinerjaList: [], ikLogs: [], ipLogs: [], wfhLogs: [], currentMenu: 'dashboard', rendered: {}, pendingPkpCount: 0,
+    isBgSyncDone: false 
+  };
+  const isGoogleEnv = (typeof google !== 'undefined' && google.script);
+
+  // 2. INISIALISASI
+  document.addEventListener("DOMContentLoaded", () => {
+    console.log("🚀 ZETTBOT: Halaman berhasil dimuat (DOMContentLoaded).");
+
+    document.body.style.display = ''; 
+    document.body.classList.remove('hidden');
+    try {
+      const activeNip = localStorage.getItem('transkep_active_nip');
+      if (activeNip) {
+        toggleAppVisibility(true);
+        syncAllServerData();
+      } else {
+        toggleAppVisibility(false);
+      }
+    } catch (e) {
+      console.error("❌ ZETTBOT Error Inisialisasi:", e);
+      toggleAppVisibility(false);
+    }
+  });
+
+  // 3. PENGATUR VISUALISASI LAYAR 
+  function toggleAppVisibility(isLoggedIn) {
+    let loginSec = document.getElementById('login-section');
+    let appCont = document.getElementById('app-container');
+    const loader = document.getElementById('global-loader');
+    
+    if (loader) {
+        loader.classList.add('hidden');
+        loader.style.display = 'none';
+    }
+
+    if (!loginSec) {
+        const passInput = document.querySelector('input[type="password"]');
+        if (passInput) loginSec = passInput.closest('div.min-h-screen') || passInput.closest('form').parentElement.parentElement;
+    }
+    if (!appCont) {
+         appCont = document.getElementById('main-content') || document.querySelector('main');
+         if (appCont && appCont.tagName === 'MAIN') appCont = appCont.parentElement;
+    }
+
+    if (isLoggedIn) {
+      if (loginSec) { loginSec.classList.add('hidden'); loginSec.style.display = 'none'; }
+      if (appCont) { appCont.classList.remove('hidden'); appCont.style.display = ''; }
+    } else {
+      if (loginSec) { loginSec.classList.remove('hidden'); loginSec.style.display = ''; }
+      if (appCont) { appCont.classList.add('hidden'); appCont.style.display = 'none'; }
+    }
+  }
+
+  // 4. LOGIN & LOGOUT
+  function handleLogin(event) {
+    if (event) event.preventDefault();
+    
+    let nipInput = document.getElementById('loginNip'); 
+    let passInput = document.getElementById('loginPass');
+    if (!nipInput || !passInput) {
+      nipInput = document.querySelector('input[type="text"], input[type="number"]');
+      passInput = document.querySelector('input[type="password"]');
+    }
+    if (!nipInput || !passInput) return;
+
+    const nip = nipInput.value.trim();
+    const pass = passInput.value.trim();
+
+    if (!nip || !pass) {
+      showNotify("Perhatian", "NIP dan Kata Sandi wajib diisi!", "error");
+      return;
+    }
+
+    showLoading("Memverifikasi Kredensial...");
+    
+    if (isGoogleEnv) {
+      google.script.run
+        .withSuccessHandler(function(response) {
+          if (response && response.status === 'success') {
+            localStorage.setItem('transkep_active_nip', response.data.nip);
+            localStorage.setItem('transkep_session_token', response.token);
+            
+            toggleAppVisibility(true);
+            syncAllServerData();
+            showNotify("Login Berhasil", `Selamat datang kembali, ${response.data.nama}`, "success");
+          } else {
+            hideLoading();
+            showNotify("Akses Ditolak", response ? response.message : "Tidak ada respon server", "error");
+          }
+        })
+        .withFailureHandler(function(error) {
+          hideLoading();
+          showNotify("Error Server", error.message, "error");
+        })
+        .verifyLogin(nip, pass);
+    }
+  }
+
+  function handleLogout() {
+    localStorage.removeItem('transkep_active_nip');
+    localStorage.removeItem('transkep_last_menu');
+    localStorage.removeItem('transkep_session_token'); 
+    
+    state.currentMenu = 'dashboard';
+    state.user = null; 
+    state.rendered = {};
+    state.isBgSyncDone = false;
+    
+    toggleAppVisibility(false);
+    showNotify("Sesi Berakhir", "Anda telah berhasil keluar dari sistem.", "success");
+  }
+
+  // 5. PENARIK DATA KESELURUHAN
+  function syncAllServerData() {
+    showLoading("Menyinkronkan profil & data inti...");
+    const loginNip = localStorage.getItem('transkep_active_nip');
+    const sessionToken = localStorage.getItem('transkep_session_token'); 
+
+    if (!loginNip || !sessionToken) {
+      handleLogout();
+      return;
+    }
+
+    if (isGoogleEnv) {
+      google.script.run
+        .withSuccessHandler(function(response) {
+          hideLoading();
+          if (response && response.status === 'success') {
+            state.user = response.data.user;
+            state.usersList = response.data.usersList;
+            state.pendingPkpCount = response.data.pendingPkpCount || 0;
+            state.isBgSyncDone = false; // Reset flag saat login awal
+
+            state.cutiLogs = [];
+            state.jobdesList = [];
+            state.skList = [];
+            state.skAckList = [];
+            state.kinerjaList = [];
+            state.sopList = [];
+            state.sopAckList = [];
+            state.stList = [];
+            state.masterKinerjaList = [];
+            state.ikLogs = [];
+            state.ipLogs = [];
+            state.wfhLogs = [];
+
+           if (typeof renderGlobalHeader === 'function') {
+                renderGlobalHeader(); 
+            }
+            
+            initNavigationAccess();
+            
+            const lastMenu = localStorage.getItem('transkep_last_menu') || 'dashboard';
+            switchMenu(lastMenu);
+            
+            updateSidebarBadges();
+
+            // Panggil sisa data berat di belakang layar
+            syncBackgroundData();
+
+          } else {
+            showNotify("Gagal Sinkronisasi", response ? response.message : "Data bermasalah", "error");
+            handleLogout();
+          }
+        })
+        .withFailureHandler(function(error) {
+          hideLoading();
+          showNotify("Terputus dari Server", error.message, "error");
+          handleLogout();
+        })
+        .getBulkData(loginNip, sessionToken);
+    }
+  }
+
+  // Fungsi Siluman Penarik Data Background
+  function syncBackgroundData() {
+     const loginNip = localStorage.getItem('transkep_active_nip');
+     const sessionToken = localStorage.getItem('transkep_session_token');
+     if (!loginNip || !sessionToken) return;
+
+     google.script.run
+        .withSuccessHandler(function(res) {
+            if (res && res.status === 'success') {
+                // Suntikkan semua data berat ke State UI
+                state.cutiLogs = res.data.cutiLogs || [];
+                state.stList = res.data.stList || [];
+                state.ikLogs = res.data.ikLogs || [];
+                state.ipLogs = res.data.ipLogs || [];
+                state.wfhLogs = res.data.wfhLogs || [];
+                state.jobdesList = res.data.jobdesList || [];
+                state.skList = res.data.skList || [];
+                state.skAckList = res.data.skAckList || [];
+                state.kinerjaList = res.data.kinerjaList || [];
+                state.sopList = res.data.sopList || [];
+                state.sopAckList = res.data.sopAckList || [];
+                state.masterKinerjaList = res.data.masterKinerjaList || [];
+                
+                // ZETTBOT FIX: Tandai background sync selesai agar UI bisa memunculkan data
+                state.isBgSyncDone = true;
+
+                updateSidebarBadges();
+                if (typeof updateBadgePermohonan === 'function') updateBadgePermohonan();
+                
+                // Re-render menu yang sedang aktif
+                const cm = state.currentMenu;
+                if (cm === 'dashboard' && typeof renderDashboardView === 'function') renderDashboardView();
+                if (cm === 'permohonan' && typeof renderPermohonanView === 'function') renderPermohonanView();
+                if (cm === 'persetujuan' && typeof renderPersetujuanView === 'function') renderPersetujuanView();
+                if (cm === 'rekapitulasi' && typeof renderRekapitulasiView === 'function') renderRekapitulasiView();
+                if (cm === 'sk' && typeof renderSkView === 'function') renderSkView();
+                if (cm === 'sop' && typeof renderSopView === 'function') renderSopView();
+                if (cm === 'jobdes' && typeof renderJobdesView === 'function') renderJobdesView();
+                if (cm === 'kinerja' && typeof renderKinerjaView === 'function') renderKinerjaView();
+                
+                // ZETTBOT FIX: Tambahkan baris ini agar menu Manajemen juga ikut ter-refresh
+                if (cm === 'manajemen' && typeof renderManajemenView === 'function') renderManajemenView();
+            }
+        })
+        .withFailureHandler(function(err) {
+            console.warn("Background Sync Gagal: " + err.message);
+            // Tetap buka blokiran UI meskipun gagal agar user tidak stuck
+            state.isBgSyncDone = true;
+            if (state.currentMenu === 'dashboard' && typeof renderDashboardView === 'function') renderDashboardView();
+        })
+        .getBackgroundData(loginNip, sessionToken);
+  }
+
+  // 6. ROUTING MENU (DENGAN UI CACHING)
+  function switchMenu(menuId) {
+     try {
+        if (state.user) {
+           const role = state.user.role;
+           if (menuId === 'persetujuan' && role !== 'Admin' && role !== 'Atasan Langsung' && role !== 'Pejabat Berwenang') {
+              menuId = 'dashboard';
+           }
+        }
+
+        state.currentMenu = menuId;
+        localStorage.setItem('transkep_last_menu', menuId);
+
+        document.querySelectorAll('.menu-section').forEach(function(el) {
+           el.classList.add('hidden');
+           el.classList.remove('block');
+        });
+        
+        var activeSection = document.getElementById('section-' + menuId);
+        if (activeSection) {
+           activeSection.classList.remove('hidden');
+           activeSection.classList.add('block');
+        }
+
+        const navButtons = document.querySelectorAll('button[id^="nav-"]');
+        navButtons.forEach(btn => {
+            btn.classList.remove('w-[calc(100%+1rem)]', 'rounded-r-none', 'bg-gradient-to-r', 'from-transparent', 'to-cyan-500/10', 'text-white', 'border-r-4', 'border-cyan-400', 'border-r-cyan-400', 'shadow-[-8px_0_20px_rgba(34,211,238,0.15)]');
+            btn.classList.remove('-mr-4', 'to-cyan-500/20', 'shadow-[-8px_0_20px_rgba(34,211,238,0.2)]');
+            btn.classList.add('w-full', 'text-slate-400', 'hover:bg-slate-800/50', 'hover:text-slate-200', 'border-transparent', 'transition-all', 'duration-300', 'ease-out');
+            
+            const icon = btn.querySelector('i');
+            if(icon) icon.classList.remove('drop-shadow-[0_0_8px_rgba(34,211,238,0.8)]', 'text-cyan-400');
+        });
+        
+        const activeNav = document.getElementById('nav-' + menuId);
+        if (activeNav) {
+            activeNav.classList.remove('w-full', 'text-slate-400', 'hover:bg-slate-800/50', 'hover:text-slate-200');
+            activeNav.classList.add('w-[calc(100%+1rem)]', 'rounded-r-none', 'bg-gradient-to-r', 'from-transparent', 'to-cyan-500/10', 'text-white', 'border-r-4', 'border-r-cyan-400', 'shadow-[-8px_0_20px_rgba(34,211,238,0.15)]');
+            
+            const activeIcon = activeNav.querySelector('i');
+            if(activeIcon) activeIcon.classList.add('drop-shadow-[0_0_8px_rgba(34,211,238,0.8)]', 'text-cyan-400');
+        }
+
+        if (!state.rendered[menuId]) {
+            if (menuId === 'dashboard' && typeof renderDashboardView === 'function') renderDashboardView();
+            else if (menuId === 'permohonan' && typeof renderPermohonanView === 'function') renderPermohonanView();
+            else if (menuId === 'persetujuan' && typeof renderPersetujuanView === 'function') renderPersetujuanView();
+            else if (menuId === 'rekapitulasi' && typeof renderRekapitulasiView === 'function') renderRekapitulasiView();
+            else if (menuId === 'jobdes' && typeof renderJobdesView === 'function') renderJobdesView();
+            else if (menuId === 'pkp' && typeof initPkpModule === 'function') initPkpModule();
+            else if (menuId === 'sk' && typeof renderSkView === 'function') renderSkView();
+            else if (menuId === 'sop' && typeof renderSopView === 'function') renderSopView();
+            else if (menuId === 'kinerja' && typeof renderKinerjaView === 'function') renderKinerjaView();
+            else if (menuId === 'manajemen' && typeof renderManajemenView === 'function') renderManajemenView();
+
+            state.rendered[menuId] = true;
+        }
+
+        if (typeof closeMobileSidebar === 'function' && window.innerWidth < 1024) {
+            closeMobileSidebar();
+        }
+
+     } catch (e) {
+        console.error("Routing Error: ", e);
+     }
+  }
+
+  function updateSidebarBadges() {
+      try {
+          if (!state.user) return;
+          
+          const userNip = String(state.user.nip).replace(/'/g, "").trim(); 
+          let unreadSopCount = 0;
+          
+          const ackSop = state.sopAckList || [];
+          if (state.sopList) {
+              const involvedSops = state.sopList.filter(sop => {
+                  try {
+                      const arr = JSON.parse(sop.pelaksana_json || '[]');
+                      return arr.some(p => String(p.nip).replace(/'/g, "").trim() === userNip);
+                  } catch(e) { return false; }
+              });
+
+              involvedSops.forEach(sop => {
+                  const isAck = ackSop.some(a => String(a.sop_id).replace(/'/g, "").trim() === String(sop.id).replace(/'/g, "").trim() && String(a.nip).replace(/'/g, "").trim() === userNip);
+                  if (!isAck) unreadSopCount++;
+              });
+          }
+          
+          const badgeSop = document.getElementById('badge-sop-nav');
+          if (badgeSop) {
+              if (unreadSopCount > 0) {
+                  badgeSop.innerText = unreadSopCount > 99 ? '99+' : unreadSopCount;
+                  badgeSop.classList.remove('hidden');
+              } else {
+                  badgeSop.classList.add('hidden');
+              }
+          }
+          
+          let unreadSkCount = 0;
+          const ackSk = state.skAckList || [];
+          
+          if (state.skList) {
+              const involvedSks = state.skList.filter(sk => String(sk.nip).replace(/'/g, "").trim() === userNip);
+              
+              involvedSks.forEach(sk => {
+                  const baseSkId = String(sk.id).replace(/'/g, "").trim().split('-').slice(0, 2).join('-');
+                  const isAck = ackSk.some(a => {
+                      const aBaseSkId = String(a.sk_id).replace(/'/g, "").trim().split('-').slice(0, 2).join('-');
+                      return aBaseSkId === baseSkId && String(a.nip).replace(/'/g, "").trim() === userNip;
+                  });
+                  if (!isAck) unreadSkCount++;
+              });
+          }
+
+          const badgeSk = document.getElementById('badge-sk-nav');
+          if (badgeSk) {
+              if (unreadSkCount > 0) {
+                  badgeSk.innerText = unreadSkCount > 99 ? '99+' : unreadSkCount;
+                  badgeSk.classList.remove('hidden');
+              } else {
+                  badgeSk.classList.add('hidden');
+              }
+          }
+
+          const badgePkp = document.getElementById('badge-pkp-nav');
+          if (badgePkp) {
+              const pkpCount = state.pendingPkpCount || 0;
+              if (pkpCount > 0) {
+                  badgePkp.innerText = pkpCount > 99 ? '99+' : pkpCount;
+                  badgePkp.classList.remove('hidden');
+              } else {
+                  badgePkp.classList.add('hidden');
+              }
+          }
+
+          if (typeof updateBadgePermohonan === 'function') updateBadgePermohonan();
+
+      } catch(e) {
+          console.error("Error updating badges:", e);
+      }
+  }
+
+  /// 8. UTILITY GLOBALS
+  function formatNamaBersih(namaLengkap) {
+      if (!namaLengkap) return "-";
+      let nama = namaLengkap.split(',')[0].trim();
+      nama = nama.replace(/^(H\.|Hj\.|Drs\.|Dra\.|Ir\.|Prof\.|Dr\.)\s*/i, '').trim();
+      return nama;
+  }
+    
+  function showLoading(msg) {
+    const loader = document.getElementById('global-loader');
+    if (loader) {
+      const span = loader.querySelector('span');
+      if (span) span.innerText = msg;
+      loader.classList.remove('hidden');
+      loader.style.display = 'flex';
+    }
+  }
+
+  function hideLoading() {
+    const loader = document.getElementById('global-loader');
+    if (loader) {
+      loader.classList.add('hidden');
+      loader.style.display = 'none';
+    }
+  }
+
+  function showNotify(title, message, type = 'success') {
+    let toastContainer = document.getElementById('toast-container');
+    if (!toastContainer) {
+      toastContainer = document.createElement('div');
+      toastContainer.id = 'toast-container';
+      toastContainer.className = 'fixed top-5 right-5 z-[9999] flex flex-col gap-3 pointer-events-none';
+      document.body.appendChild(toastContainer);
+    }
+
+    const toast = document.createElement('div');
+    const isSuccess = type === 'success';
+    const isWarning = type === 'warning';
+    
+    let borderColor = isSuccess ? 'border-emerald-500/30' : 'border-rose-500/30';
+    let iconColor = isSuccess ? 'text-emerald-400' : 'text-rose-400';
+    let iconClass = isSuccess ? 'fa-circle-check' : 'fa-circle-xmark';
+    let bgColor = isSuccess ? 'bg-emerald-500/10' : 'bg-rose-500/10';
+
+    if (isWarning) {
+       borderColor = 'border-amber-500/30';
+       iconColor = 'text-amber-400';
+       iconClass = 'fa-triangle-exclamation';
+       bgColor = 'bg-amber-500/10';
+    }
+
+    toast.className = `glass p-4 rounded-2xl border ${borderColor} bg-slate-900/90 shadow-2xl flex items-start gap-3 w-80 transform transition-all duration-300 translate-x-full opacity-0 pointer-events-auto`;
+    
+    toast.innerHTML = `
+      <div class="mt-0.5 ${iconColor} ${bgColor} p-1.5 rounded-lg shrink-0">
+        <i class="fa-solid ${iconClass} text-lg"></i>
+      </div>
+      <div>
+        <h4 class="text-sm font-bold text-slate-200">${title}</h4>
+        <p class="text-xs text-slate-400 mt-1 leading-relaxed">${message}</p>
+      </div>
+    `;
+
+    toastContainer.appendChild(toast);
+
+    setTimeout(() => {
+      toast.classList.remove('translate-x-full', 'opacity-0');
+      toast.classList.add('translate-x-0', 'opacity-100');
+    }, 10);
+
+    setTimeout(() => {
+      toast.classList.remove('translate-x-0', 'opacity-100');
+      toast.classList.add('translate-x-full', 'opacity-0');
+      
+      setTimeout(() => {
+        if (toast.parentNode) toast.remove();
+      }, 300);
+    }, 3500);
+  }
+
+  function showCustomConfirm(title, message, onConfirm) {
+    let overlay = document.getElementById('custom-confirm-overlay');
+    if (overlay) overlay.remove();
+
+    overlay = document.createElement('div');
+    overlay.id = 'custom-confirm-overlay';
+    overlay.className = 'fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm transition-opacity opacity-0';
+    
+    overlay.innerHTML = `
+      <div class="glass p-6 rounded-3xl border border-slate-800 bg-slate-900/95 max-w-sm w-full mx-4 shadow-2xl transform transition-all scale-95 flex flex-col gap-4">
+        <div class="flex items-center gap-3 text-rose-400">
+          <div class="p-2 bg-rose-500/10 rounded-xl shrink-0"><i class="fa-solid fa-triangle-exclamation text-xl"></i></div>
+          <h3 class="text-lg font-bold">${title}</h3>
+        </div>
+        <p class="text-sm text-slate-300 leading-relaxed">${message}</p>
+        <div class="flex justify-end gap-3 mt-4">
+          <button id="btn-confirm-cancel" class="px-4 py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-white hover:bg-slate-800 transition">Batal</button>
+          <button id="btn-confirm-yes" class="px-4 py-2 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white shadow-lg shadow-rose-600/20 transition">Ya, Lanjutkan</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    setTimeout(() => {
+      overlay.classList.remove('opacity-0');
+      overlay.firstElementChild.classList.remove('scale-95');
+    }, 10);
+
+    document.getElementById('btn-confirm-cancel').onclick = () => {
+       overlay.classList.add('opacity-0');
+       overlay.firstElementChild.classList.add('scale-95');
+       setTimeout(() => overlay.remove(), 300);
+    };
+
+    document.getElementById('btn-confirm-yes').onclick = () => {
+       if (typeof onConfirm === 'function') onConfirm(); 
+       
+       overlay.classList.add('opacity-0');
+       overlay.firstElementChild.classList.add('scale-95');
+       setTimeout(() => {
+          overlay.remove();
+       }, 300);
+    };
+  }
+
+  function initNavigationAccess() {
+    try {
+      const role = state.user ? state.user.role : '';
+      const menuManajemen = document.getElementById('nav-manajemen');
+      const menuPersetujuan = document.getElementById('nav-persetujuan');
+      
+      if (menuManajemen) {
+        if (role === 'Admin') { menuManajemen.classList.remove('hidden'); menuManajemen.style.display = ''; }
+        else { menuManajemen.classList.add('hidden'); menuManajemen.style.display = 'none'; }
+      }
+      if (menuPersetujuan) {
+        if (role === 'Admin' || role === 'Atasan Langsung' || role === 'Pejabat Berwenang') { menuPersetujuan.classList.remove('hidden'); menuPersetujuan.style.display = ''; }
+        else { menuPersetujuan.classList.add('hidden'); menuPersetujuan.style.display = 'none'; }
+      }
+    } catch (e) {}
+  }
+
+  function openModalSisaCuti() {
+    if (!state || !state.user) {
+        showNotify("Data Belum Siap", "Silakan tunggu hingga data selesai dimuat.", "warning");
+        return;
+    }
+
+    const u = state.user;
+    
+    let existingModal = document.getElementById('modalSisaCutiDinamic');
+    if (existingModal) existingModal.remove();
+
+    const modalHTML = `
+      <div id="modalSisaCutiDinamic" class="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-sm transition-opacity">
+        <div class="glass border border-slate-800 bg-slate-900/95 rounded-2xl w-full max-w-lg flex flex-col shadow-2xl transform transition-transform duration-300 scale-95 mx-4">
+          
+          <div class="flex items-center justify-between p-5 border-b border-slate-800/60 bg-slate-900/80">
+            <h3 class="text-lg font-bold text-white flex items-center gap-2"><i class="fa-solid fa-scale-balanced text-indigo-400"></i> Informasi Sisa Cuti</h3>
+            <button type="button" onclick="document.getElementById('modalSisaCutiDinamic').remove()" class="text-slate-400 hover:text-rose-400 transition w-8 h-8 flex items-center justify-center bg-slate-800/50 hover:bg-rose-500/10 rounded-lg">
+              <i class="fa-solid fa-xmark text-xl"></i>
+            </button>
+          </div>
+          
+          <div class="p-6 space-y-4">
+             <div class="flex items-center gap-4 mb-2">
+                 <div class="w-12 h-12 bg-indigo-500/10 text-indigo-400 rounded-xl flex items-center justify-center text-xl border border-indigo-500/20"><i class="fa-solid fa-user-tie"></i></div>
+                 <div>
+                     <p class="text-xs text-slate-400 font-bold uppercase tracking-wider">Sisa Kuota Cuti Untuk</p>
+                     <p class="text-sm font-bold text-slate-200 mt-0.5">${u.nama}</p>
+                 </div>
+             </div>
+             
+             <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+                <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 shadow-inner">
+                   <p class="text-[9px] text-slate-500 font-bold uppercase tracking-wider mb-1">Tahunan 2024</p>
+                   <p class="text-2xl font-black text-slate-300">${u.s_tahunan_2024 || 0} <span class="text-[10px] font-bold uppercase text-slate-500">Hari</span></p>
+                </div>
+                <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 shadow-inner">
+                   <p class="text-[9px] text-slate-500 font-bold uppercase tracking-wider mb-1">Tahunan 2025</p>
+                   <p class="text-2xl font-black text-slate-300">${u.s_tahunan_2025 || 0} <span class="text-[10px] font-bold uppercase text-slate-500">Hari</span></p>
+                </div>
+                <div class="bg-slate-950 p-4 rounded-xl border border-indigo-500/30 shadow-inner bg-indigo-500/5 relative overflow-hidden">
+                   <div class="absolute top-0 right-0 w-8 h-8 bg-indigo-500/20 rounded-bl-full"></div>
+                   <p class="text-[9px] text-indigo-400 font-bold uppercase tracking-wider mb-1">Tahunan 2026</p>
+                   <p class="text-2xl font-black text-indigo-400">${u.s_tahunan_2026 || 0} <span class="text-[10px] font-bold uppercase text-indigo-500/50">Hari</span></p>
+                </div>
+                
+                <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 shadow-inner">
+                   <p class="text-[9px] text-slate-500 font-bold uppercase tracking-wider mb-1">Cuti Penting</p>
+                   <p class="text-xl font-black text-amber-400">${u.s_penting || 0} <span class="text-[10px] font-bold uppercase text-slate-500">Hari</span></p>
+                </div>
+                <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 shadow-inner">
+                   <p class="text-[9px] text-slate-500 font-bold uppercase tracking-wider mb-1">Cuti Sakit</p>
+                   <p class="text-xl font-black text-rose-400">${u.s_sakit || 0} <span class="text-[10px] font-bold uppercase text-slate-500">Hari</span></p>
+                </div>
+                 <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 shadow-inner">
+                   <p class="text-[9px] text-slate-500 font-bold uppercase tracking-wider mb-1">Cuti Besar</p>
+                   <p class="text-xl font-black text-purple-400">${u.s_besar || 0} <span class="text-[10px] font-bold uppercase text-slate-500">Hari</span></p>
+                </div>
+             </div>
+             
+             <div class="mt-2 bg-emerald-500/10 border border-emerald-500/20 p-3 rounded-xl flex items-center gap-3">
+                <i class="fa-solid fa-circle-info text-emerald-400"></i>
+                <p class="text-[10px] text-emerald-400/80 leading-relaxed font-medium">Data sisa cuti ini otomatis terupdate setiap kali pengajuan cuti Anda disetujui (atau dipotong di awal untuk Cuti Tahunan).</p>
+             </div>
+          </div>
+        </div>
+      </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+    
+    setTimeout(() => {
+       const m = document.getElementById('modalSisaCutiDinamic');
+       if(m && m.firstElementChild) m.firstElementChild.classList.remove('scale-95');
+    }, 10);
+  }
+
+  function openChangePasswordModal() {
+    let existingModal = document.getElementById('modalChangePassword');
+    if (existingModal) existingModal.remove();
+
+    const modalHTML = `
+      <div id="modalChangePassword" class="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm transition-opacity opacity-0">
+        <div class="glass border border-slate-800 bg-slate-900/95 rounded-3xl w-full max-w-sm flex flex-col shadow-2xl transform transition-transform duration-300 scale-95 mx-4 overflow-hidden">
+          
+          <div class="bg-purple-600 p-6 text-center relative overflow-hidden">
+             <div class="absolute inset-0 bg-gradient-to-t from-slate-900/90 to-transparent"></div>
+             <i class="fa-solid fa-shield-halved text-4xl text-purple-200 mb-2 relative z-10 drop-shadow-md"></i>
+             <h3 class="text-lg font-bold text-white relative z-10 tracking-wide">Pembaruan Keamanan</h3>
+             <p class="text-xs text-purple-200/70 relative z-10 mt-1">Lindungi akun Anda dengan sandi kuat.</p>
+          </div>
+          
+          <form onsubmit="submitChangePassword(event)" class="p-6 space-y-4">
+            
+            <div>
+               <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Kata Sandi Lama</label>
+               <div class="relative">
+                  <input type="password" id="oldPassInput" required placeholder="Masukkan Sandi Saat Ini" class="w-full pl-4 pr-10 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-purple-500">
+                  <button type="button" onclick="const p = document.getElementById('oldPassInput'); if(p.type==='password'){p.type='text'; this.children[0].classList.replace('fa-eye-slash','fa-eye');} else {p.type='password'; this.children[0].classList.replace('fa-eye','fa-eye-slash');}" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-purple-400 focus:outline-none">
+                     <i class="fa-solid fa-eye-slash text-xs"></i>
+                  </button>
+               </div>
+            </div>
+
+            <div class="pt-2 border-t border-slate-800">
+               <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 text-purple-400">Kata Sandi Baru</label>
+               <div class="relative">
+                  <input type="password" id="newPassInput" required placeholder="Buat Sandi Baru" class="w-full pl-4 pr-10 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-purple-500">
+                  <button type="button" onclick="const p = document.getElementById('newPassInput'); if(p.type==='password'){p.type='text'; this.children[0].classList.replace('fa-eye-slash','fa-eye');} else {p.type='password'; this.children[0].classList.replace('fa-eye','fa-eye-slash');}" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-purple-400 focus:outline-none">
+                     <i class="fa-solid fa-eye-slash text-xs"></i>
+                  </button>
+               </div>
+            </div>
+
+            <div>
+               <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Konfirmasi Sandi Baru</label>
+               <div class="relative">
+                  <input type="password" id="confirmPassInput" required placeholder="Ketik Ulang Sandi Baru" class="w-full pl-4 pr-10 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-purple-500">
+                  <button type="button" onclick="const p = document.getElementById('confirmPassInput'); if(p.type==='password'){p.type='text'; this.children[0].classList.replace('fa-eye-slash','fa-eye');} else {p.type='password'; this.children[0].classList.replace('fa-eye','fa-eye-slash');}" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-purple-400 focus:outline-none">
+                     <i class="fa-solid fa-eye-slash text-xs"></i>
+                  </button>
+               </div>
+            </div>
+            
+            <div class="flex gap-3 pt-4">
+               <button type="button" onclick="closeChangePasswordModal()" class="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-xl transition">Batal</button>
+               <button type="submit" class="flex-1 py-3 bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-purple-600/20 transition flex items-center justify-center gap-2">
+                  Simpan <i class="fa-solid fa-check"></i>
+               </button>
+            </div>
+          </form>
+
+        </div>
+      </div>
+    `;
+
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+    const m = document.getElementById('modalChangePassword');
+    
+    setTimeout(() => {
+       m.classList.remove('opacity-0');
+       m.firstElementChild.classList.remove('scale-95');
+    }, 10);
+  }
+
+  function closeChangePasswordModal() {
+    const m = document.getElementById('modalChangePassword');
+    if (m) {
+       m.classList.add('opacity-0');
+       m.firstElementChild.classList.add('scale-95');
+       setTimeout(() => m.remove(), 300);
+    }
+  }
+
+  function submitChangePassword(event) {
+    event.preventDefault(); 
+    
+    const oldPass = document.getElementById('oldPassInput').value;
+    const newPass = document.getElementById('newPassInput').value;
+    const confirmPass = document.getElementById('confirmPassInput').value;
+
+    if (newPass !== confirmPass) {
+       showNotify("Validasi Gagal", "Konfirmasi sandi baru tidak sama. Silakan cek kembali.", "error");
+       return;
+    }
+    
+    if (newPass.length < 5) {
+       showNotify("Sandi Terlalu Pendek", "Gunakan minimal 5 karakter untuk keamanan yang lebih baik.", "warning");
+       return;
+    }
+
+    if (oldPass === newPass) {
+       showNotify("Perhatian", "Sandi baru tidak boleh sama persis dengan sandi lama.", "warning");
+       return;
+    }
+
+    showLoading("Mencocokkan kredensial di database...");
+
+    const nip = state.user.nip; 
+
+    google.script.run
+      .withSuccessHandler(function(res) {
+         hideLoading();
+         if (res.status === 'success') {
+            state.user.pass = newPass; 
+            const listIndex = state.usersList.findIndex(u => String(u.nip) === String(nip));
+            if (listIndex !== -1) state.usersList[listIndex].pass = newPass;
+
+            closeChangePasswordModal();
+            showNotify("Keamanan Diperbarui", "Sandi Anda telah sukses diubah. Ingat sandi baru Anda untuk sesi berikutnya.", "success");
+         } else {
+            showNotify("Ditolak Server", res.message, "error");
+         }
+      })
+      .withFailureHandler(function(err) {
+         hideLoading();
+         showNotify("Error Jaringan", "Tidak dapat terhubung ke server. " + err.message, "error");
+      })
+      .changeMyPassword(nip, oldPass, newPass);
+  }
+
+  function toggleThemeMode() {
+      const body = document.body;
+      body.classList.toggle('light-mode');
+      
+      if (body.classList.contains('light-mode')) {
+          localStorage.setItem('transkep_theme', 'light');
+          showNotify("Mode Terang Aktif", "Tampilan Light Glass yang segar telah diterapkan!", "success");
+      } else {
+          localStorage.setItem('transkep_theme', 'dark');
+          showNotify("Mode Gelap Aktif", "Tampilan Dark Glass yang elegan telah diterapkan!", "success");
+      }
+  }
+
+</script>

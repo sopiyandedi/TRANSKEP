@@ -1,0 +1,87 @@
+<div id="template-pck-container" class="print-only" style="display:none;">
+  <style>
+    @media print {
+      @page { size: A4 landscape; margin: 0; }
+      html, body { display: block !important; width: 100% !important; height: 100% !important; overflow: visible !important; background: white !important; color: black !important; margin: 0 !important; padding: 0 !important; }
+      body.print-mode > * { display: none !important; }
+      
+      /* ZETTBOT: Padding Buatan Kertas */
+      body.print-mode > #template-pck-container { display: block !important; position: relative; width: 100%; box-sizing: border-box; padding: 12mm 15mm !important; font-family: 'Arial', sans-serif; font-size: 8.5pt; }
+
+      .table-data { width: 100%; border-collapse: collapse; margin-bottom: 25px; border: 1px solid black; }
+      .table-data th, .table-data td { border: 1px solid black; padding: 5px; vertical-align: middle; }
+      .table-data th { text-align: center; font-weight: normal; }
+      
+      .text-center { text-align: center; } .text-right { text-align: right; } .font-bold { font-weight: bold; }
+
+      /* ZETTBOT: Pemisah Halaman (Page Break) */
+      .page-break { page-break-before: always; }
+      
+      .sig-space { height: 70px; }
+    }
+  </style>
+
+  <!-- ============================================== -->
+  <!-- HALAMAN 1: IDENTITAS & RINCIAN TARGET -->
+  <!-- ============================================== -->
+  <div class="text-center font-bold uppercase" style="font-size: 11pt; margin-bottom: 5px;">
+    FORMULIR PENILAIAN CAPAIAN KINERJA BULANAN<br>PEGAWAI NEGERI SIPIL*
+  </div>
+  
+  <!-- ZETTBOT FIX: Teks Bulan Rata Tengah -->
+  <div class="text-center" style="font-size: 10pt; margin-bottom: 20px;">
+    Bulan : <span id="pck-print-bulan-header-center" class="uppercase"></span>
+  </div>
+
+  <!-- ZETTBOT FIX: Tabel Identitas Berkotak -->
+  <table class="table-data" style="width: 60%; font-size: 9pt; margin-bottom: 25px;">
+    <tr><td width="5%" class="text-center">1</td><td width="35%">Nama</td><td id="pck-print-pegawai-nama"></td></tr>
+    <tr><td class="text-center">2</td><td>NIP</td><td id="pck-print-pegawai-nip"></td></tr>
+    <tr><td class="text-center">3</td><td>Pangkat/ Gol.Ruang</td><td id="pck-print-pegawai-pangkat"></td></tr>
+    <tr><td class="text-center">4</td><td>Jabatan</td><td id="pck-print-pegawai-jabatan"></td></tr>
+    <tr><td class="text-center">5</td><td>Unit Kerja</td><td>Pengadilan Agama Indramayu</td></tr>
+  </table>
+
+  <!-- Kontainer Kosong: Tabel Rincian Akan Di-Generate Otomatis oleh JS -->
+  <div id="pck-print-tables-container"></div>
+
+
+  <!-- ============================================== -->
+  <!-- HALAMAN 2: REKAPITULASI & TANDA TANGAN -->
+  <!-- ============================================== -->
+  <div class="page-break"></div>
+
+  <div style="font-weight: bold; font-size: 10pt; margin-bottom: 10px; text-transform: uppercase;">
+    REKAPITULASI PENILAIAN CAPAIAN KINERJA BULAN <span id="pck-print-bulan-judul"></span>
+  </div>
+
+  <table class="table-data" style="width: 100%;">
+    <thead>
+      <tr>
+        <th width="5%" class="font-bold">NO</th>
+        <th width="45%" class="font-bold">KEGIATAN TUGAS JABATAN</th>
+        <th width="25%">PENGHITUNGAN<br>(KUALITAS TARGET + KUALITAS REALISASI)</th>
+        <th width="25%">NILAI CAPAIAN KINERJA<br>(PENGHITUNGAN DIBAGI DUA)</th>
+      </tr>
+    </thead>
+    <tbody id="pck-print-tbody-2"></tbody>
+  </table>
+
+  <!-- ZETTBOT FIX: Tabel Transparan Pembungkus Tanda Tangan (Blok Kanan, Teks Rata Kiri) -->
+  <table style="width: 100%; border: none; margin-top: 30px; page-break-inside: avoid;">
+    <tr>
+      <!-- Kolom Pendorong (Kosong) -->
+      <td style="width: 70%; border: none;"></td>
+      
+      <!-- Kolom Tanda Tangan (Rata Kiri) -->
+      <td style="width: 30%; text-align: left; border: none; padding: 0;">
+        <div id="pck-print-tanggal"></div>
+        <div>Pejabat Penilai,</div>
+        <div class="sig-space"></div>
+        <div class="font-bold" id="pck-print-penilai-nama" style="text-decoration: underline;">-</div>
+        <div id="pck-print-penilai-nip">-</div>
+      </td>
+    </tr>
+  </table>
+
+</div>

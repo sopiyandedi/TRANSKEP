@@ -1,0 +1,56 @@
+<!-- =========================================================================
+     ZETTBOS MODULAR UI: TEMPLATE CETAK RENCANA WFH
+========================================================================== -->
+<div id="printAreaRencanaWFH" class="hidden print-only bg-white text-black p-8 max-w-4xl mx-auto min-h-screen">
+    <!-- Kop Surat (Disesuaikan dengan format TRANSKEP) -->
+    <div class="text-center border-b-2 border-black pb-4 mb-6">
+        <h2 class="text-xl font-bold uppercase">Mahkamah Agung Republik Indonesia</h2>
+        <h3 class="text-lg font-bold uppercase tracking-wide">Pengadilan Agama Indramayu Kelas IA</h3>
+        <p class="text-xs text-slate-800 mt-1">Jl. Raya Indramayu No. 100, Indramayu, Jawa Barat — Telp (0231) 12345</p>
+    </div>
+    
+    <div class="text-center mb-8">
+        <h4 class="text-lg font-bold uppercase underline">Formulir Rencana Kerja (WFH)</h4>
+        <p class="text-sm mt-1">Nomor: <span id="cetakWfhRencanaId" class="font-mono">-</span></p>
+    </div>
+    
+    <div class="space-y-4 text-sm mb-6">
+        <table class="w-full ml-4">
+            <tr><td class="w-40 py-1">Nama Pegawai</td><td class="w-4 py-1">:</td><td id="cetakWfhRencanaNama" class="py-1 font-bold">-</td></tr>
+            <tr><td class="w-40 py-1">NIP</td><td class="w-4 py-1">:</td><td id="cetakWfhRencanaNip" class="py-1">-</td></tr>
+            <tr><td class="w-40 py-1">Jabatan</td><td class="w-4 py-1">:</td><td id="cetakWfhRencanaJabatan" class="py-1">-</td></tr>
+            <tr><td class="w-40 py-1">Tanggal Pelaksanaan</td><td class="w-4 py-1">:</td><td id="cetakWfhRencanaTanggal" class="py-1 font-semibold">-</td></tr>
+        </table>
+    </div>
+
+    <!-- Tabel Dinamis Target Kinerja -->
+    <div class="mb-12">
+        <p class="font-bold mb-3 ml-4">Daftar Rencana Target Kinerja:</p>
+        <table class="w-full text-left border-collapse border border-black text-sm">
+            <thead>
+                <tr class="bg-gray-100">
+                    <th class="border border-black p-2 w-12 text-center font-bold">No</th>
+                    <th class="border border-black p-2 font-bold">Deskripsi Target Pekerjaan</th>
+                    <th class="border border-black p-2 w-48 text-center font-bold">Kuantitas / Output</th>
+                </tr>
+            </thead>
+            <tbody id="cetakWfhRencanaTabelBody">
+                <!-- Dinamis via JS -->
+            </tbody>
+        </table>
+    </div>
+    
+    <!-- Area Tanda Tangan -->
+    <div class="flex justify-between mt-16 text-sm">
+        <div class="text-center w-64">
+            <p class="mb-20">Mengetahui/Menyetujui,<br>Atasan Langsung</p>
+            <p id="cetakWfhRencanaNamaAtasan" class="font-bold underline">-</p>
+            <p>NIP. <span id="cetakWfhRencanaNipAtasan">-</span></p>
+        </div>
+        <div class="text-center w-64">
+            <p class="mb-20">Indramayu, <span id="cetakWfhRencanaTanggalBuat">-</span><br>Pegawai Pemohon</p>
+            <p id="cetakWfhRencanaNamaPemohon" class="font-bold underline">-</p>
+            <p>NIP. <span id="cetakWfhRencanaNipPemohon">-</span></p>
+        </div>
+    </div>
+</div>

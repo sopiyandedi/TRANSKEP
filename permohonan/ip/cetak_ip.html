@@ -1,0 +1,48 @@
+<!-- =========================================================================
+     ZETTBOS MODULAR UI: TEMPLATE CETAK IZIN PRIBADI
+========================================================================== -->
+<div id="printAreaIP" class="hidden print-only bg-white text-black p-8 max-w-4xl mx-auto min-h-screen">
+    <!-- Kop Surat (Disesuaikan dengan format TRANSKEP) -->
+    <div class="text-center border-b-2 border-black pb-4 mb-6">
+        <h2 class="text-xl font-bold uppercase">Mahkamah Agung Republik Indonesia</h2>
+        <h3 class="text-lg font-bold uppercase tracking-wide">Pengadilan Agama Indramayu Kelas IA</h3>
+        <p class="text-xs text-slate-800 mt-1">Jl. Raya Indramayu No. 100, Indramayu, Jawa Barat — Telp (0231) 12345</p>
+    </div>
+    
+    <div class="text-center mb-8">
+        <h4 class="text-lg font-bold uppercase underline">Formulir Izin Pribadi</h4>
+        <p class="text-sm mt-1">Nomor: <span id="cetakIpId" class="font-mono">-</span></p>
+    </div>
+    
+    <div class="space-y-4 text-sm mb-12">
+        <p>Yang bertanda tangan di bawah ini:</p>
+        <table class="w-full ml-4">
+            <tr><td class="w-40 py-1">Nama</td><td class="w-4 py-1">:</td><td id="cetakIpNama" class="py-1 font-bold">-</td></tr>
+            <tr><td class="w-40 py-1">NIP</td><td class="w-4 py-1">:</td><td id="cetakIpNip" class="py-1">-</td></tr>
+            <tr><td class="w-40 py-1">Jabatan</td><td class="w-4 py-1">:</td><td id="cetakIpJabatan" class="py-1">-</td></tr>
+        </table>
+        
+        <p class="mt-4">Mengajukan izin pribadi untuk tidak berada di tempat tugas / meninggalkan kantor pada:</p>
+        <table class="w-full ml-4">
+            <tr><td class="w-40 py-1">Tanggal Mulai</td><td class="w-4 py-1">:</td><td id="cetakIpMulai" class="py-1 font-semibold">-</td></tr>
+            <tr><td class="w-40 py-1">Tanggal Selesai</td><td class="w-4 py-1">:</td><td id="cetakIpSelesai" class="py-1 font-semibold">-</td></tr>
+            <tr><td class="w-40 py-1 align-top">Keperluan / Alasan</td><td class="w-4 py-1 align-top">:</td><td id="cetakIpAlasan" class="py-1 text-justify">-</td></tr>
+        </table>
+        
+        <p class="mt-4">Demikian permohonan ini disampaikan untuk dapat dipertimbangkan sebagaimana mestinya.</p>
+    </div>
+    
+    <!-- Area Tanda Tangan -->
+    <div class="flex justify-between mt-16 text-sm">
+        <div class="text-center w-64">
+            <p class="mb-20">Mengetahui/Menyetujui,<br>Atasan Langsung</p>
+            <p id="cetakIpNamaAtasan" class="font-bold underline">-</p>
+            <p>NIP. <span id="cetakIpNipAtasan">-</span></p>
+        </div>
+        <div class="text-center w-64">
+            <p class="mb-20">Indramayu, <span id="cetakIpTanggalBuat">-</span><br>Pegawai Pemohon</p>
+            <p id="cetakIpNamaPemohon" class="font-bold underline">-</p>
+            <p>NIP. <span id="cetakIpNipPemohon">-</span></p>
+        </div>
+    </div>
+</div>

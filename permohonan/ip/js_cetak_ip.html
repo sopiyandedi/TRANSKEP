@@ -1,0 +1,101 @@
+<!-- =========================================================================
+     ZETTBOS MODULAR UI: JAVASCRIPT CETAK IZIN PRIBADI
+========================================================================== -->
+<script>
+    function cetakIzinPribadi(id) {
+        if (window.isGlobalPrinting) {
+            showNotify("Proses Sibuk", "Sistem sedang menyiapkan dokumen. Harap tunggu.", "warning");
+            return; 
+        }
+
+        if (!state || !state.user) {
+            showNotify("Sistem Memuat", "Data belum siap.", "warning");
+            return;
+        }
+        
+        window.isGlobalPrinting = true;
+        showLoading("Menyiapkan dokumen Izin Pribadi...");
+        
+        if (typeof google !== 'undefined') {
+            google.script.run
+                .withSuccessHandler(function(res) {
+                    if (res.status === 'success') {
+                        renderTemplateCetakIP(res.data);
+                    } else {
+                        hideLoading();
+                        window.isGlobalPrinting = false;
+                        showNotify("Gagal", res.message, "error");
+                    }
+                })
+                .withFailureHandler(function(err) {
+                    hideLoading();
+                    window.isGlobalPrinting = false;
+                    showNotify("Error Koneksi", err.toString(), "error");
+                })
+                .getIzinPribadiById(id);
+        } else {
+            setTimeout(() => {
+                hideLoading();
+                window.isGlobalPrinting = false;
+                alert("[CANVAS MODE] Simulasi cetak untuk ID: " + id);
+            }, 1000);
+        }
+    }
+    
+    function renderTemplateCetakIP(data) {
+        try {
+            const pemohon = state.usersList.find(u => String(u.nip) === String(data.nip)) || { nama: 'Tidak Diketahui', jabatan: '-' };
+            const atasan = state.usersList.find(u => String(u.nip) === String(data.atasan_nip)) || { nama: 'Tidak Diketahui', jabatan: '-' };
+            
+            document.getElementById('cetakIpId').innerText = data.id;
+            document.getElementById('cetakIpNama').innerText = pemohon.nama;
+            document.getElementById('cetakIpNip').innerText = data.nip;
+            document.getElementById('cetakIpJabatan').innerText = pemohon.jabatan;
+            
+            document.getElementById('cetakIpMulai').innerText = formatDateIndoRekap(data.tgl_mulai);
+            document.getElementById('cetakIpSelesai').innerText = formatDateIndoRekap(data.tgl_selesai);
+            document.getElementById('cetakIpAlasan').innerText = data.alasan;
+            
+            const tglBuat = data.waktu ? data.waktu.split(' ')[0] : '-';
+            document.getElementById('cetakIpTanggalBuat').innerText = formatDateIndoRekap(tglBuat);
+            
+            document.getElementById('cetakIpNamaPemohon').innerText = pemohon.nama;
+            document.getElementById('cetakIpNipPemohon').innerText = data.nip;
+            
+            document.getElementById('cetakIpNamaAtasan').innerText = atasan.nama;
+            document.getElementById('cetakIpNipAtasan').innerText = data.atasan_nip;
+            
+            const printArea = document.getElementById('printAreaIP');
+            
+            document.querySelectorAll('.print-only').forEach(el => {
+                el.classList.add('hidden');
+                el.style.display = 'none';
+            });
+
+            if(printArea) {
+                printArea.classList.remove('hidden');
+                printArea.style.display = 'none';
+            }
+            
+            setTimeout(() => {
+                hideLoading();
+                window.focus();
+                window.print();
+                
+                setTimeout(() => {
+                    if(printArea) {
+                        printArea.classList.add('hidden');
+                        printArea.style.display = '';
+                    }
+                    window.isGlobalPrinting = false;
+                }, 1500);
+            }, 800);
+            
+        } catch(e) {
+            hideLoading();
+            window.isGlobalPrinting = false;
+            showNotify("Error Render", "Terjadi kesalahan saat memuat template cetak.", "error");
+            console.error(e);
+        }
+    }
+</script>

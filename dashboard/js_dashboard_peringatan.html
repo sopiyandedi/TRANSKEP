@@ -1,0 +1,228 @@
+<script>
+  // ==========================================
+  // File: js_dashboard_peringatan.html
+  // ZETTBOT: Modul Khusus Peringatan Dini (KGB, KP, Pensiun) & Modal Status
+  // ==========================================
+
+  // --- MODUL 2: PERINGATAN DINI BERKAS ---
+  function generateWarningsData() {
+      let warnings = [];
+      const today = new Date(); today.setHours(0,0,0,0); 
+      
+      state.usersList.forEach(u => {
+          if (u.role === 'Admin' || u.role === 'Operator') return;
+
+          let knpDate = parseTanggalLokal(u.tmt_knp);
+          if (knpDate) {
+              // ZETTBOT FIX: Logika Kenaikan Pangkat (Fungsional = 2 Tahun, Struktural/FU = 4 Tahun)
+              let jenis = String(u.jenis_jabatan || '').toUpperCase();
+              let tambahanTahun = (jenis === 'FUNGSIONAL') ? 2 : 4;
+              
+              knpDate.setFullYear(knpDate.getFullYear() + tambahanTahun);
+              
+              if (u.status_knp && u.status_knp.toUpperCase() === 'SELESAI' && u.tgl_selesai_knp) {
+                  let diff = (today.getTime() - new Date(u.tgl_selesai_knp).getTime()) / (1000 * 3600 * 24);
+                  if (diff >= 30) { autoForwardTMT(u.nip, 'Pangkat', formatYMD(knpDate)); return; }
+              }
+              warnings.push(createWarningObj(u, 'Pangkat', knpDate, today, u.status_knp));
+          }
+          
+          let kgbDate = parseTanggalLokal(u.tmt_kgb);
+          if (kgbDate) {
+              kgbDate.setFullYear(kgbDate.getFullYear() + 2);
+              if (u.status_kgb && u.status_kgb.toUpperCase() === 'SELESAI' && u.tgl_selesai_kgb) {
+                  let diff = (today.getTime() - new Date(u.tgl_selesai_kgb).getTime()) / (1000 * 3600 * 24);
+                  if (diff >= 30) { autoForwardTMT(u.nip, 'KGB', formatYMD(kgbDate)); return; }
+              }
+              warnings.push(createWarningObj(u, 'KGB', kgbDate, today, u.status_kgb));
+          }
+          
+          let nipClean = String(u.nip).replace(/[^0-9]/g, '');
+          if (nipClean.length >= 15) {
+              let y = parseInt(nipClean.substring(0,4)), m = parseInt(nipClean.substring(4,6)) - 1, d = parseInt(nipClean.substring(6,8));
+              let birthDate = new Date(y, m, d);
+              let bup = parseInt(u.bup) || 58;
+              birthDate.setFullYear(birthDate.getFullYear() + bup);
+              birthDate.setMonth(birthDate.getMonth() + 1, 1);
+              warnings.push(createWarningObj(u, 'Pensiun', birthDate, today, u.status_pensiun));
+          }
+      });
+      warnings.sort((a,b) => a.rawDate - b.rawDate);
+      window.allWarningsData = warnings;
+  }
+
+  function createWarningObj(user, type, targetDate, today, dbStatus) {
+      let diffTime = targetDate.getTime() - today.getTime();
+      let diffDays = Math.ceil(diffTime / (1000 * 3600 * 24));
+      
+      let status = 'Menunggu', statusClass = 'text-amber-400 border-amber-500/30 bg-amber-500/10', targetText = '', isCompletedOrProcessing = false, targetClass = 'text-indigo-400'; 
+      let checkStatus = (dbStatus || '').toUpperCase();
+
+      if (checkStatus === 'PROSES') {
+          status = 'Sedang Diproses'; statusClass = 'text-blue-400 border-blue-500/30 bg-blue-500/10 shadow-[0_0_10px_rgba(59,130,246,0.2)] font-bold'; isCompletedOrProcessing = true; targetText = 'Berkas Terkirim'; targetClass = 'text-blue-400';
+      } else if (checkStatus === 'SELESAI') {
+          status = 'Selesai'; statusClass = 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10 shadow-[0_0_10px_rgba(16,185,129,0.2)] font-bold'; isCompletedOrProcessing = true; targetText = 'Berkas Diterima'; targetClass = 'text-emerald-400';
+      } else {
+          if (diffDays < 0) { status = 'Terlewat'; statusClass = 'text-rose-400 border-rose-500/50 bg-rose-500/10 shadow-[0_0_10px_rgba(244,63,94,0.2)] font-bold'; targetClass = 'text-rose-400'; } 
+          else if (diffDays <= 90) { status = 'Segera'; statusClass = 'text-orange-400 border-orange-500/50 bg-orange-500/10 font-bold'; }
+      }
+      
+      if (!isCompletedOrProcessing) {
+          if (diffDays < 0) targetText = 'OVERDUE';
+          else {
+              let diffY = Math.floor(diffDays / 365), diffM = Math.floor((diffDays % 365) / 30);
+              if (diffY > 0) targetText += diffY + ' Thn ';
+              if (diffM > 0) targetText += diffM + ' Bln';
+              if (!targetText) targetText = diffDays + ' Hari';
+          }
+      }
+      return { user: user, type: type, rawDate: targetDate, dateStr: formatTanggalIndoDashboard(targetDate), status: status, statusClass: statusClass, targetText: targetText, targetClass: targetClass, month: targetDate.getMonth(), year: targetDate.getFullYear(), dbStatus: dbStatus || '' };
+  }
+
+  function renderWarningList(data, containerId) {
+      const container = document.getElementById(containerId);
+      if (!container) return; 
+      
+      container.innerHTML = '';
+      if (data.length === 0) { 
+          container.innerHTML = `<div class="text-center p-8 text-slate-500 text-xs italic border border-dashed border-slate-700/50 rounded-xl mt-4">Tidak ada jadwal pemberkasan.</div>`; 
+          return; 
+      }
+
+      const isAdmin = state.user && (state.user.role === 'Admin' || state.user.role === 'Operator');
+
+      data.forEach(item => {
+          let icon = item.type === 'Pensiun' ? "fa-person-walking-luggage text-purple-400" : (item.type === 'KGB' ? "fa-money-bill-trend-up text-blue-400" : "fa-angles-up text-emerald-400");
+          let borderWrapper = item.status === 'Terlewat' ? 'border-rose-500/30 bg-rose-950/20' : 'border-slate-800/60 bg-slate-900/40';
+          let statusBadge = "";
+          
+          if (isAdmin) {
+             statusBadge = `
+             <button onclick="openStatusUpdateModal('${item.user.nip}', '${item.type}', '${item.dbStatus}', '${item.user.nama}')" class="px-2 py-1.5 rounded-lg text-[9px] font-bold border uppercase tracking-wider hover:scale-105 transition w-full flex items-center justify-between gap-1 group ${item.statusClass}" title="Klik untuk Ubah Status Berkas">
+                <span class="truncate">${item.status}</span>
+                <i class="fa-solid fa-chevron-down text-[8px] opacity-50 group-hover:opacity-100 transition-opacity"></i>
+             </button>`;
+          } else {
+             statusBadge = `<div class="px-2 py-1.5 rounded-lg text-[9px] font-bold border uppercase tracking-wider ${item.statusClass} flex justify-center">${item.status}</div>`;
+          }
+
+          const html = `
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-2xl border ${borderWrapper} hover:bg-slate-800/80 transition gap-4 mb-3">
+              <div class="flex items-center gap-3 overflow-hidden">
+                 <div class="w-10 h-10 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-center shrink-0 shadow-inner">
+                    <i class="fa-solid ${icon}"></i>
+                 </div>
+                 <div class="flex flex-col min-w-0">
+                    <h4 class="text-xs font-bold text-slate-200 truncate" title="${item.user.nama}">${item.user.nama}</h4>
+                    <p class="text-[9px] text-slate-400 mt-0.5">${item.type} • TMT: <span class="font-bold text-slate-300">${item.dateStr}</span></p>
+                 </div>
+              </div>
+              <div class="flex items-center gap-4 shrink-0 sm:justify-end border-t sm:border-t-0 border-slate-800 pt-2 sm:pt-0 pl-2">
+                 <div class="text-right">
+                    <div class="text-[8px] uppercase font-bold text-slate-500 mb-0.5">Target</div>
+                    <div class="text-[10px] font-bold ${item.targetClass || 'text-indigo-400'}">${item.targetText}</div>
+                 </div>
+                 <div class="w-28 text-center flex flex-col justify-center">
+                    <div class="text-[8px] uppercase font-bold text-slate-500 mb-0.5">Status</div>
+                    ${statusBadge}
+                 </div>
+              </div>
+            </div>`;
+          container.insertAdjacentHTML('beforeend', html);
+      });
+  }
+
+  function applyAdminFilters() {
+      const elSearch = document.getElementById('adminFilterName');
+      const elType = document.getElementById('adminFilterJenis');
+      const elBulan = document.getElementById('adminFilterBulan');
+      const elTahun = document.getElementById('adminFilterTahun');
+      
+      const searchName = elSearch ? elSearch.value.toLowerCase().trim() : '';
+      const filterType = elType ? elType.value : '';
+      const filterBulan = elBulan ? elBulan.value : '';
+      const filterTahun = elTahun ? elTahun.value : '';
+      
+      let filtered = window.allWarningsData.filter(item => {
+          let matchName = item.user.nama.toLowerCase().includes(searchName) || String(item.user.nip).includes(searchName);
+          let matchType = filterType === "" || item.type === filterType;
+          let matchBulan = filterBulan === "" || String(item.month) === filterBulan;
+          let matchTahun = filterTahun === "" || String(item.year) === filterTahun;
+          return matchName && matchType && matchBulan && matchTahun;
+      });
+      renderWarningList(filtered, 'adminWarningList');
+  }
+
+  // --- MODAL STATUS PERINGATAN DINI ---
+  function openStatusUpdateModal(nip, type, currentStatus, nama) {
+      let modal = document.getElementById('modalStatusTMT');
+      if (!modal) {
+          const html = `
+          <div id="modalStatusTMT" class="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm transition-opacity opacity-0 hidden">
+             <div class="glass border border-slate-800 bg-slate-900/95 rounded-3xl w-full max-w-sm flex flex-col shadow-2xl transform transition-transform duration-300 scale-95 mx-4 overflow-hidden">
+                <div class="p-5 border-b border-slate-800/60 bg-slate-900/80 flex items-center justify-between">
+                   <h3 class="text-base font-bold text-white flex items-center gap-2"><i class="fa-solid fa-list-check text-indigo-400"></i> Update Status Berkas</h3>
+                   <button type="button" onclick="closeStatusUpdateModal()" class="text-slate-400 hover:text-rose-400 transition"><i class="fa-solid fa-xmark text-lg"></i></button>
+                </div>
+                <div class="p-6 space-y-4">
+                   <div class="text-center mb-2">
+                       <p class="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Atas Nama</p>
+                       <p id="statusModalNama" class="text-sm font-bold text-slate-200 mt-0.5">-</p>
+                       <p id="statusModalJenis" class="text-xs text-indigo-400 font-bold mt-1 bg-indigo-500/10 inline-block px-2 py-0.5 rounded border border-indigo-500/20">-</p>
+                   </div>
+                   <input type="hidden" id="statusModalNip">
+                   <div class="grid grid-cols-1 gap-2">
+                      <button onclick="submitTmtStatus('Menunggu')" class="py-3 px-4 rounded-xl text-xs font-bold transition flex items-center justify-between group border border-slate-700 bg-slate-800 text-slate-300 hover:bg-slate-700">
+                         <span class="flex items-center gap-2"><i class="fa-regular fa-clock text-slate-400"></i> Reset Status (Tarik Kembali)</span>
+                      </button>
+                      <button onclick="submitTmtStatus('Proses')" class="py-3 px-4 rounded-xl text-xs font-bold transition flex items-center justify-between group border border-blue-500/30 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 shadow-lg shadow-blue-500/5">
+                         <span class="flex items-center gap-2"><i class="fa-solid fa-gears text-blue-400 group-hover:animate-spin"></i> Tandai Sedang Diproses</span>
+                      </button>
+                      <button onclick="submitTmtStatus('Selesai')" class="py-3 px-4 rounded-xl text-xs font-bold transition flex items-center justify-between group border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 shadow-lg shadow-emerald-500/5">
+                         <span class="flex items-center gap-2"><i class="fa-solid fa-check-double text-emerald-400"></i> Tandai Selesai / Terbit</span>
+                         <span class="text-[9px] text-emerald-500/60 font-normal">Auto-maju stlh 1 bln</span>
+                      </button>
+                   </div>
+                </div>
+             </div>
+          </div>`;
+          document.body.insertAdjacentHTML('beforeend', html);
+          modal = document.getElementById('modalStatusTMT');
+      }
+      
+      document.getElementById('statusModalNip').value = nip;
+      document.getElementById('statusModalNama').innerText = nama;
+      document.getElementById('statusModalJenis').innerText = "Berkas " + type;
+      
+      modal.classList.remove('hidden');
+      setTimeout(() => { modal.classList.remove('opacity-0'); modal.firstElementChild.classList.remove('scale-95'); }, 10);
+  }
+
+  function closeStatusUpdateModal() {
+      const modal = document.getElementById('modalStatusTMT');
+      if (modal) { modal.classList.add('opacity-0'); modal.firstElementChild.classList.add('scale-95'); setTimeout(() => modal.classList.add('hidden'), 300); }
+  }
+
+  function submitTmtStatus(newStatus) {
+      const nip = document.getElementById('statusModalNip').value;
+      const typeStr = document.getElementById('statusModalJenis').innerText.replace("Berkas ", "");
+      
+      showLoading("Menyimpan status berkas...");
+      google.script.run
+        .withSuccessHandler(function(res) {
+            hideLoading(); closeStatusUpdateModal();
+            if (res.status === 'success') {
+                showNotify("Berhasil Disimpan", "Status berkas diperbarui.", "success");
+                let userRef = state.usersList.find(u => String(u.nip) === nip);
+                if (userRef) {
+                    if (typeStr === 'KGB') { userRef.status_kgb = (newStatus === 'Menunggu') ? '' : newStatus; if(newStatus === 'Selesai') userRef.tgl_selesai_kgb = formatYMD(new Date()); else userRef.tgl_selesai_kgb = ''; }
+                    if (typeStr === 'Pangkat') { userRef.status_knp = (newStatus === 'Menunggu') ? '' : newStatus; if(newStatus === 'Selesai') userRef.tgl_selesai_knp = formatYMD(new Date()); else userRef.tgl_selesai_knp = ''; }
+                    if (typeStr === 'Pensiun') { userRef.status_pensiun = (newStatus === 'Menunggu') ? '' : newStatus; if(newStatus === 'Selesai') userRef.tgl_selesai_pensiun = formatYMD(new Date()); else userRef.tgl_selesai_pensiun = ''; }
+                }
+                renderDashboardView();
+            } else showNotify("Gagal", res.message, "error");
+        })
+        .withFailureHandler(function(err) { hideLoading(); closeStatusUpdateModal(); showNotify("Error Sistem", err.toString(), "error"); })
+        .updateTmtStatus(nip, typeStr, newStatus);
+  }
+</script>

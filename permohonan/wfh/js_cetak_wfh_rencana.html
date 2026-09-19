@@ -1,0 +1,124 @@
+<!-- =========================================================================
+     ZETTBOS MODULAR UI: JAVASCRIPT CETAK RENCANA WFH
+========================================================================== -->
+<script>
+    function cetakRencanaWFH(id) {
+        if (window.isGlobalPrinting) {
+            showNotify("Proses Sibuk", "Sistem sedang menyiapkan dokumen. Harap tunggu.", "warning");
+            return; 
+        }
+        
+        if (!state || !state.user) {
+            showNotify("Sistem Memuat", "Data belum siap.", "warning");
+            return;
+        }
+        
+        window.isGlobalPrinting = true;
+        showLoading("Menyiapkan dokumen Rencana WFH...");
+        
+        if (typeof google !== 'undefined') {
+            google.script.run
+                .withSuccessHandler(function(res) {
+                    if (res.status === 'success') {
+                        renderTemplateCetakRencanaWFH(res.data);
+                    } else {
+                        hideLoading();
+                        window.isGlobalPrinting = false;
+                        showNotify("Gagal", res.message, "error");
+                    }
+                })
+                .withFailureHandler(function(err) {
+                    hideLoading();
+                    window.isGlobalPrinting = false;
+                    showNotify("Error Koneksi", err.toString(), "error");
+                })
+                .getRencanaWFHById(id);
+        } else {
+            setTimeout(() => {
+                hideLoading();
+                window.isGlobalPrinting = false;
+                alert("[CANVAS MODE] Simulasi cetak Rencana WFH untuk ID: " + id);
+            }, 1000);
+        }
+    }
+    
+    function renderTemplateCetakRencanaWFH(data) {
+        try {
+            const pemohon = state.usersList.find(u => String(u.nip) === String(data?.nip)) || { nama: '[Data Kosong]', jabatan: '-' };
+            const atasan = state.usersList.find(u => String(u.nip) === String(data?.atasan_nip)) || { nama: '[Data Kosong]', jabatan: '-' };
+            
+            document.getElementById('cetakWfhRencanaId').innerText = data?.id || '-';
+            document.getElementById('cetakWfhRencanaNama').innerText = pemohon.nama;
+            document.getElementById('cetakWfhRencanaNip').innerText = data?.nip || '-';
+            document.getElementById('cetakWfhRencanaJabatan').innerText = pemohon.jabatan;
+            
+            let tglMulai = data?.tanggal ? formatDateIndoRekap(data.tanggal) : '-';
+            document.getElementById('cetakWfhRencanaTanggal').innerText = tglMulai;
+            
+            const tglBuat = data?.waktu ? data.waktu.split(' ')[0] : '-';
+            document.getElementById('cetakWfhRencanaTanggalBuat').innerText = formatDateIndoRekap(tglBuat);
+            
+            document.getElementById('cetakWfhRencanaNamaPemohon').innerText = pemohon.nama;
+            document.getElementById('cetakWfhRencanaNipPemohon').innerText = data?.nip || '-';
+            
+            document.getElementById('cetakWfhRencanaNamaAtasan').innerText = atasan.nama;
+            document.getElementById('cetakWfhRencanaNipAtasan').innerText = data?.atasan_nip || '-';
+            
+            const tbody = document.getElementById('cetakWfhRencanaTabelBody');
+            tbody.innerHTML = '';
+            
+            try {
+                const targetList = JSON.parse(data?.rencana_json || '[]');
+                if (targetList.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="3" class="border border-black p-2 text-center italic text-slate-500">Tidak ada rincian target kerja yang ditemukan.</td></tr>';
+                } else {
+                    targetList.forEach((item, idx) => {
+                        tbody.innerHTML += `
+                            <tr>
+                                <td class="border border-black p-2 text-center">${idx + 1}</td>
+                                <td class="border border-black p-2">${item.deskripsi || '-'}</td>
+                                <td class="border border-black p-2 text-center">${item.kuantitas || '-'}</td>
+                            </tr>
+                        `;
+                    });
+                }
+            } catch (e) {
+                tbody.innerHTML = '<tr><td colspan="3" class="border border-black p-2 text-center text-red-500 font-bold">Error membaca data target dari sistem.</td></tr>';
+            }
+            
+            const printArea = document.getElementById('printAreaRencanaWFH');
+            
+            // ZETTBOT FIX: Pastikan form cetak lenyap dari layar aplikasi (disembunyikan via CSS inline)
+            document.querySelectorAll('.print-only').forEach(el => {
+                el.classList.add('hidden');
+                el.style.display = 'none';
+            });
+            
+            if(printArea) {
+                printArea.classList.remove('hidden');
+                printArea.style.display = 'none'; // Sembunyi di layar, tapi CSS Print akan memaksanya muncul di PDF
+            }
+            
+            setTimeout(() => {
+                hideLoading();
+                window.focus(); 
+                window.print();
+                
+                setTimeout(() => {
+                    if(printArea) {
+                        printArea.classList.add('hidden');
+                        printArea.style.display = '';
+                    }
+                    window.isGlobalPrinting = false;
+                }, 1500); 
+
+            }, 800);
+            
+        } catch(e) {
+            hideLoading();
+            window.isGlobalPrinting = false;
+            showNotify("Error Render", "Terjadi kesalahan saat memuat template cetak Rencana WFH.", "error");
+            console.error(e);
+        }
+    }
+</script>

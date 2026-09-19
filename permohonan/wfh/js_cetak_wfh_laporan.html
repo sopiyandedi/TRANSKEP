@@ -1,0 +1,131 @@
+<!-- =========================================================================
+     ZETTBOS MODULAR UI: JAVASCRIPT CETAK LAPORAN WFH
+========================================================================== -->
+<script>
+    function cetakLaporanWFH(id) {
+        if (window.isGlobalPrinting) {
+            showNotify("Proses Sibuk", "Sistem sedang menyiapkan dokumen. Harap tunggu.", "warning");
+            return; 
+        }
+        
+        if (!state || !state.user) {
+            showNotify("Sistem Memuat", "Data belum siap.", "warning");
+            return;
+        }
+        
+        window.isGlobalPrinting = true;
+        showLoading("Menyiapkan dokumen Laporan WFH...");
+        
+        if (typeof google !== 'undefined') {
+            google.script.run
+                .withSuccessHandler(function(res) {
+                    if (res.status === 'success') {
+                        renderTemplateCetakLaporanWFH(res.data);
+                    } else {
+                        hideLoading();
+                        window.isGlobalPrinting = false;
+                        showNotify("Gagal", res.message, "error");
+                    }
+                })
+                .withFailureHandler(function(err) {
+                    hideLoading();
+                    window.isGlobalPrinting = false;
+                    showNotify("Error Koneksi", err.toString(), "error");
+                })
+                .getRencanaWFHById(id);
+        } else {
+            setTimeout(() => {
+                hideLoading();
+                window.isGlobalPrinting = false;
+                alert("[CANVAS MODE] Simulasi cetak Laporan WFH untuk ID: " + id);
+            }, 1000);
+        }
+    }
+    
+    function renderTemplateCetakLaporanWFH(data) {
+        try {
+            const pemohon = state.usersList.find(u => String(u.nip) === String(data?.nip)) || { nama: '[Data Kosong]', jabatan: '-' };
+            const atasan = state.usersList.find(u => String(u.nip) === String(data?.atasan_nip)) || { nama: '[Data Kosong]', jabatan: '-' };
+            
+            document.getElementById('cetakWfhLaporanId').innerText = data?.id || '-';
+            document.getElementById('cetakWfhLaporanNama').innerText = pemohon.nama;
+            document.getElementById('cetakWfhLaporanNip').innerText = data?.nip || '-';
+            document.getElementById('cetakWfhLaporanJabatan').innerText = pemohon.jabatan;
+            
+            let tglMulai = data?.tanggal ? formatDateIndoRekap(data.tanggal) : '-';
+            document.getElementById('cetakWfhLaporanTanggal').innerText = tglMulai;
+            
+            const tglBuat = data?.waktu ? data.waktu.split(' ')[0] : '-';
+            document.getElementById('cetakWfhLaporanTanggalBuat').innerText = formatDateIndoRekap(tglBuat);
+            
+            document.getElementById('cetakWfhLaporanNamaPemohon').innerText = pemohon.nama;
+            document.getElementById('cetakWfhLaporanNipPemohon').innerText = data?.nip || '-';
+            
+            document.getElementById('cetakWfhLaporanNamaAtasan').innerText = atasan.nama;
+            document.getElementById('cetakWfhLaporanNipAtasan').innerText = data?.atasan_nip || '-';
+            
+            const tbody = document.getElementById('cetakWfhLaporanTabelBody');
+            tbody.innerHTML = '';
+            
+            try {
+                const hasilList = JSON.parse(data?.laporan_json || '[]');
+                if (hasilList.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="4" class="border border-black p-2 text-center italic text-slate-500">Laporan belum disusun atau data kosong.</td></tr>';
+                } else {
+                    hasilList.forEach((item, idx) => {
+                        let statusHtml = item.status_capaian || '-';
+                        if(statusHtml === "Selesai (Tercapai)") statusHtml = `<b>${statusHtml}</b>`;
+                        
+                        tbody.innerHTML += `
+                            <tr>
+                                <td class="border border-black p-2 text-center align-top">${idx + 1}</td>
+                                <td class="border border-black p-2 align-top">
+                                    <div class="font-bold">${item.deskripsi || '-'}</div>
+                                    <div class="text-xs text-slate-600 mt-1">Qty Target: ${item.kuantitas || '-'}</div>
+                                </td>
+                                <td class="border border-black p-2 align-top">${item.realisasi || '-'}</td>
+                                <td class="border border-black p-2 text-center align-top">${statusHtml}</td>
+                            </tr>
+                        `;
+                    });
+                }
+            } catch (e) {
+                tbody.innerHTML = '<tr><td colspan="4" class="border border-black p-2 text-center text-red-500 font-bold">Error membaca data laporan dari sistem.</td></tr>';
+            }
+            
+            const printArea = document.getElementById('printAreaLaporanWFH');
+            
+            // ZETTBOT FIX: Pastikan form cetak lenyap dari layar aplikasi (disembunyikan via CSS inline)
+            document.querySelectorAll('.print-only').forEach(el => {
+                el.classList.add('hidden');
+                el.style.display = 'none';
+            });
+            
+            if(printArea) {
+                printArea.classList.remove('hidden');
+                printArea.style.display = 'none'; 
+            }
+            
+            setTimeout(() => {
+                hideLoading(); 
+                window.focus(); 
+                window.print();
+                
+                setTimeout(() => {
+                    if(printArea) {
+                        printArea.classList.add('hidden');
+                        printArea.style.display = '';
+                    }
+                    window.isGlobalPrinting = false;
+                }, 1500); 
+
+            }, 800);
+            
+        } catch(e) {
+            hideLoading();
+            window.isGlobalPrinting = false;
+            showNotify("Error Render", "Terjadi kesalahan saat memuat template cetak Laporan WFH.", "error");
+            console.error(e);
+        }
+    }
+</script>

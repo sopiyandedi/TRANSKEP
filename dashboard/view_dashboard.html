@@ -1,0 +1,197 @@
+<div id="section-dashboard" class="menu-section space-y-6 animate-fade-in">
+  
+  <!-- LOAD CHART.JS UNTUK GRAFIK -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- HEADER DASHBOARD -->
+  <div class="glass border border-slate-900 rounded-3xl p-6 relative z-[60] flex flex-col md:flex-row justify-between items-start md:items-center gap-6 shadow-lg">
+    
+    <div class="shrink-0">
+      <h2 class="text-2xl font-bold text-white tracking-wide"><i class="fa-solid fa-house-chimney text-indigo-500 mr-2"></i>Dashboard</h2>
+      <p class="text-slate-400 text-sm mt-1" id="dashWelcomeText">Selamat datang di Sistem Kepegawaian TRANSKEP.</p>
+    </div>
+    
+    <!-- FITUR CARI PEGAWAI INSTAN -->
+    <div class="w-full md:max-w-2xl relative group shrink-0">
+      <div class="relative">
+        <i class="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-400 transition-colors"></i>
+        <input type="text" id="globalEmployeeSearch" oninput="handleEmployeeSearch(this.value)" autocomplete="off" placeholder="Cari berdasarkan Nama, NIP, Jabatan, atau Usia (Contoh: 31-35)..." class="w-full pl-11 pr-10 py-2.5 bg-slate-950/50 border border-slate-700/50 focus:border-indigo-500/50 focus:bg-slate-900 rounded-xl text-sm outline-none transition-all text-slate-200 placeholder:text-slate-500 shadow-inner">
+        <!-- ZETTBOT FIX: Tombol X untuk Global Search -->
+        <button id="btnClearSearch" onclick="clearEmployeeSearch()" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-rose-400 hidden transition-colors"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      
+      <!-- PANEL HASIL PENCARIAN -->
+      <div id="searchResultPanel" class="absolute left-0 right-0 top-full mt-2 glass border border-slate-700/50 rounded-xl shadow-2xl overflow-hidden hidden max-h-[400px] overflow-y-auto custom-scrollbar flex flex-col z-[70] bg-slate-900/95 backdrop-blur-xl">
+          <div id="searchResultContent" class="p-2 space-y-1">
+              <!-- Hasil render via JS -->
+          </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ========================================== -->
+  <!-- TAMPILAN KHUSUS ADMIN / ATASAN -->
+  <!-- ========================================== -->
+  <div id="dashAdminView" class="hidden space-y-6">
+    
+    <!-- BARIS 1: DATA OPERASIONAL (ABSENSI & PERINGATAN DINI) -->
+    <!-- ZETTBOT FIX: Mengubah rasio pembagian layar 45:55 (Grid 12 Kolom) -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+       
+       <!-- KARTU ABSENSI HARI INI -->
+       <div class="glass border border-slate-800 rounded-3xl p-6 relative z-10 flex flex-col h-[450px] lg:col-span-5">
+          <div class="flex justify-between items-end mb-4 border-b border-slate-800 pb-2 shrink-0">
+             <h3 class="text-sm font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+               <i class="fa-solid fa-calendar-check text-emerald-400"></i> Ketidakhadiran Hari Ini
+               <!-- ZETTBOT FIX: Indikator Live (Pulse) -->
+               <span class="relative flex h-2.5 w-2.5" title="Data dipantau Real-Time">
+                 <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                 <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]"></span>
+               </span>
+             </h3>
+             <span id="dateTodayBadge" class="text-[10px] bg-emerald-500/10 text-emerald-400 px-2 py-1 rounded font-bold border border-emerald-500/20">-</span>
+          </div>
+          <div class="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-3" id="adminAbsensiList">
+             <div class="text-center text-slate-500 text-xs italic mt-10">Menganalisa data absensi...</div>
+          </div>
+       </div>
+
+       <!-- KARTU PERINGATAN DINI (ADMIN) -->
+       <div class="glass border border-slate-800 rounded-3xl p-6 relative z-10 flex flex-col h-[450px] lg:col-span-7">
+          <div class="flex justify-between items-end mb-4 border-b border-slate-800 pb-2 shrink-0">
+            <h3 class="text-sm font-bold text-slate-300 uppercase tracking-wider">
+              <i class="fa-solid fa-bell text-amber-400 mr-2"></i> Peringatan Dini (KGB, KP & Pensiun)
+            </h3>
+            <span class="text-[10px] bg-indigo-500/20 text-indigo-300 px-2 py-1 rounded font-bold border border-indigo-500/30 hidden md:block">Target: Deadline Berkas</span>
+          </div>
+          
+          <!-- ZETTBOT FIX: Teks TMT pada Bulan dan Tahun Dihilangkan -->
+          <div class="flex flex-col md:flex-row gap-2 mb-3 shrink-0">
+            <div class="relative flex-1 group min-w-[150px]">
+               <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs"></i>
+               <input type="text" id="adminFilterName" oninput="applyAdminFilters(); document.getElementById('btnClearAdminFilter').classList.toggle('hidden', this.value === '')" placeholder="Cari Nama..." class="w-full pl-8 pr-8 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs focus:ring-1 focus:ring-indigo-500 outline-none transition text-slate-300 placeholder:text-slate-600">
+               <button id="btnClearAdminFilter" onclick="document.getElementById('adminFilterName').value=''; applyAdminFilters(); this.classList.add('hidden')" class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-rose-400 hidden transition-colors"><i class="fa-solid fa-xmark text-xs"></i></button>
+            </div>
+            <select id="adminFilterJenis" onchange="applyAdminFilters()" class="py-1.5 px-2 bg-slate-900 border border-slate-700 rounded-lg text-xs focus:ring-1 focus:ring-indigo-500 outline-none text-slate-300 w-full md:w-auto shrink-0">
+               <option value="">Semua Kategori</option>
+               <option value="KGB">Berkala (KGB)</option>
+               <option value="Pangkat">Pangkat (KP)</option>
+               <option value="Pensiun">Pensiun</option>
+            </select>
+            <!-- ZETTBOT FIX: Menyederhanakan Teks Filter Bulan dan Tahun -->
+            <select id="adminFilterBulan" onchange="applyAdminFilters()" class="py-1.5 px-2 bg-slate-900 border border-slate-700 rounded-lg text-xs focus:ring-1 focus:ring-indigo-500 outline-none text-slate-300 w-full md:w-auto shrink-0">
+               <option value="">Semua Bulan</option>
+               <option value="0">Januari</option><option value="1">Februari</option>
+               <option value="2">Maret</option><option value="3">April</option>
+               <option value="4">Mei</option><option value="5">Juni</option>
+               <option value="6">Juli</option><option value="7">Agustus</option>
+               <option value="8">September</option><option value="9">Oktober</option>
+               <option value="10">November</option><option value="11">Desember</option>
+            </select>
+            <select id="adminFilterTahun" onchange="applyAdminFilters()" class="py-1.5 px-2 bg-slate-900 border border-slate-700 rounded-lg text-xs focus:ring-1 focus:ring-indigo-500 outline-none text-slate-300 w-full md:w-auto shrink-0">
+               <option value="">Semua Tahun</option>
+               <option value="2024">2024</option><option value="2025">2025</option>
+               <option value="2026">2026</option><option value="2027">2027</option>
+               <option value="2028">2028</option><option value="2029">2029</option>
+               <option value="2030">2030</option>
+            </select>
+          </div>
+
+          <div class="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-3" id="adminWarningList">
+             <div class="text-center text-slate-500 text-xs italic mt-10">Menganalisa data pegawai...</div>
+          </div>
+       </div>
+
+    </div>
+  </div>
+
+
+  <!-- ========================================== -->
+  <!-- TAMPILAN KHUSUS PEGAWAI BIASA -->
+  <!-- ========================================== -->
+  <div id="dashPegawaiView" class="hidden space-y-6">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      
+       <!-- KARTU ABSENSI HARI INI (DI-MIRROR AGAR PEGAWAI JUGA BISA LIHAT) -->
+       <div class="glass border border-slate-800 rounded-3xl p-6 relative z-10 flex flex-col h-[450px]">
+          <div class="flex justify-between items-end mb-4 border-b border-slate-800 pb-2 shrink-0">
+             <h3 class="text-sm font-bold text-slate-300 uppercase tracking-wider">
+               <i class="fa-solid fa-calendar-check text-emerald-400 mr-2"></i> Ketidakhadiran Hari Ini
+             </h3>
+          </div>
+          <div class="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-3" id="pegawaiAbsensiList">
+             <!-- Render sama persis dengan Admin -->
+          </div>
+       </div>
+
+      <!-- KARTU PERINGATAN DINI PERSONAL -->
+      <div class="glass border border-slate-800 rounded-3xl p-6 relative z-10 flex flex-col h-[450px]">
+        <div class="flex justify-between items-end mb-4 border-b border-slate-800 pb-2 shrink-0">
+          <h3 class="text-sm font-bold text-slate-300 uppercase tracking-wider">
+            <i class="fa-solid fa-bell text-amber-400 mr-2"></i> Jadwal Pemberkasan Anda
+          </h3>
+          <span class="text-[10px] bg-indigo-500/20 text-indigo-300 px-2 py-1 rounded font-bold border border-indigo-500/30">Target: Deadline</span>
+        </div>
+        
+        <div class="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-3" id="pegawaiWarningList">
+           <div class="text-center text-slate-500 text-xs italic mt-10">Memuat jadwal pemberkasan Anda...</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+  
+  
+  <!-- ========================================== -->
+  <!-- ZETTBOT FIX: TAMPILAN GRAFIK GLOBAL UNTUK SEMUA ROLE -->
+  <!-- ========================================== -->
+  <!-- BARIS 2: DATA ANALITIK & GRAFIK -->
+  <!-- Formasi Grid 2x2 agar grafik memanjang bebas -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+       
+    <!-- 1. GRAFIK KOMPOSISI GENDER -->
+    <div class="glass border border-slate-800 rounded-3xl p-5 flex flex-col h-[360px] transition hover:border-indigo-500/30">
+       <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider mb-2 text-center"><i class="fa-solid fa-venus-mars text-indigo-400 mr-1"></i> Jenis Kelamin</h3>
+       <div class="flex-1 flex items-center justify-center relative w-full h-full">
+         <canvas id="genderChartAdmin"></canvas>
+         <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+           <span class="text-3xl font-bold text-slate-200" id="chartTotalUserAdmin">0</span>
+           <span class="text-[9px] text-slate-500 font-bold uppercase">Total</span>
+         </div>
+       </div>
+    </div>
+
+    <!-- 2. GRAFIK TINGKAT GOLONGAN -->
+    <div class="glass border border-slate-800 rounded-3xl p-5 flex flex-col h-[360px] transition hover:border-emerald-500/30">
+       <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider mb-2 text-center"><i class="fa-solid fa-ranking-star text-emerald-400 mr-1"></i> Pangkat & Gol.</h3>
+       <div class="flex-1 relative w-full h-full pb-4 overflow-y-auto custom-scrollbar">
+         <!-- ZETTBOT FIX: Tambah min-h agar batang bisa discroll jika perlu -->
+         <div class="min-h-[300px] relative w-full"><canvas id="golonganChart"></canvas></div>
+       </div>
+       <!-- ZETTBOT FIX: Teks Info Total Data -->
+       <div id="totalPangkatText" class="text-center text-[10px] text-slate-400 font-medium mt-1"></div>
+    </div>
+
+    <!-- 3. GRAFIK JABATAN -->
+    <div class="glass border border-slate-800 rounded-3xl p-5 flex flex-col h-[360px] transition hover:border-amber-500/30">
+       <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider mb-2 text-center"><i class="fa-solid fa-briefcase text-amber-400 mr-1"></i> Posisi Jabatan</h3>
+       <div class="flex-1 relative w-full h-full pb-4 overflow-y-auto custom-scrollbar">
+         <!-- ZETTBOT: Tambah tinggi statis min-h agar batang baris jabatan yg banyak bisa di-scroll -->
+         <div class="min-h-[300px] relative w-full"><canvas id="jabatanChart"></canvas></div>
+       </div>
+       <div id="totalJabatanText" class="text-center text-[10px] text-slate-400 font-medium mt-1"></div>
+    </div>
+
+    <!-- 4. GRAFIK STATISTIK USIA -->
+    <div class="glass border border-slate-800 rounded-3xl p-5 flex flex-col h-[360px] transition hover:border-rose-500/30">
+       <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider mb-2 text-center"><i class="fa-solid fa-cake-candles text-rose-400 mr-1"></i> Statistik Usia</h3>
+       <div class="flex-1 relative w-full h-full pb-4">
+         <canvas id="usiaChart"></canvas>
+       </div>
+       <div id="totalUsiaText" class="text-center text-[10px] text-slate-400 font-medium mt-1"></div>
+    </div>
+
+ </div>
+
+</div>

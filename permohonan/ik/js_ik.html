@@ -1,0 +1,230 @@
+<!-- =========================================================================
+     ZETTBOS MODULAR UI: JAVASCRIPT IZIN KELUAR KANTOR
+========================================================================== -->
+<script>
+    // 1. FUNGSI MEMBUKA MODAL
+    let currentEditIdIK = null; 
+
+    function openModalIK(editId = null) {
+        if (!state || !state.user) {
+            showNotify("Sistem Memuat", "Silakan tunggu, data sistem belum siap.", "error");
+            return;
+        }
+        
+        currentEditIdIK = editId;
+        document.getElementById('formIK').reset();
+        
+        document.getElementById('ikTanggal').valueAsDate = new Date();
+        
+        const selAtasan = document.getElementById('ikAtasan');
+        const alertPlh = document.getElementById('alertPlhIK');
+        selAtasan.innerHTML = '<option value="">-- Pilih Penanggung Jawab --</option>';
+        
+        let atasanOpts = [];
+        let adaPlh = false;
+        const j = state.user.jabatan.toLowerCase();
+
+        function getPegawai(keyword) {
+            return state.usersList.filter(x => String(x.nip) !== String(state.user.nip) && x.jabatan.toLowerCase().includes(keyword));
+        }
+
+        if (j.includes("hakim") || j.includes("wakil ketua") || j === "ketua") {
+            let ketua = getPegawai("ketua").find(x => x.jabatan.toLowerCase() === "ketua");
+            if (ketua && typeof isPegawaiAbsent === 'function' && !isPegawaiAbsent(ketua.nip)) {
+                atasanOpts.push(ketua);
+            } else {
+                adaPlh = true;
+                let wakil = getPegawai("wakil ketua").find(x => x.jabatan.toLowerCase() === "wakil ketua");
+                if (wakil && typeof isPegawaiAbsent === 'function' && !isPegawaiAbsent(wakil.nip)) atasanOpts.push(wakil);
+                else { 
+                    let hakims = getPegawai("hakim").filter(x => typeof isPegawaiAbsent === 'function' ? !isPegawaiAbsent(x.nip) : true); 
+                    atasanOpts.push(...hakims); 
+                }
+            }
+        }
+        else if (j.includes("panitera muda") || j.includes("panitera pengganti") || j.includes("jurusita") || j.includes("juru sita")) {
+            let panitera = getPegawai("panitera").find(x => x.jabatan.toLowerCase() === "panitera");
+            if (panitera && typeof isPegawaiAbsent === 'function' && !isPegawaiAbsent(panitera.nip)) {
+                atasanOpts.push(panitera);
+            } else {
+                adaPlh = true;
+                let panmuds = getPegawai("panitera muda").filter(x => typeof isPegawaiAbsent === 'function' ? !isPegawaiAbsent(x.nip) : true);
+                atasanOpts.push(...panmuds);
+            }
+        }
+        else if (j.includes("kepala sub bagian") || j.includes("kasubbag")) {
+            let sekretaris = getPegawai("sekretaris").find(x => x.jabatan.toLowerCase() === "sekretaris");
+            if (sekretaris && typeof isPegawaiAbsent === 'function' && !isPegawaiAbsent(sekretaris.nip)) {
+                atasanOpts.push(sekretaris);
+            } else {
+                adaPlh = true;
+                let kasubbags = getPegawai("kepala sub bagian").filter(x => typeof isPegawaiAbsent === 'function' ? !isPegawaiAbsent(x.nip) : true);
+                if(kasubbags.length === 0) kasubbags = getPegawai("kasubbag").filter(x => typeof isPegawaiAbsent === 'function' ? !isPegawaiAbsent(x.nip) : true);
+                atasanOpts.push(...kasubbags);
+            }
+        }
+        else {
+            let ketua = getPegawai("ketua").find(x => x.jabatan.toLowerCase() === "ketua");
+            if (ketua && typeof isPegawaiAbsent === 'function' && !isPegawaiAbsent(ketua.nip)) atasanOpts.push(ketua);
+            else {
+                adaPlh = true;
+                let wakil = getPegawai("wakil ketua").find(x => x.jabatan.toLowerCase() === "wakil ketua");
+                if (wakil && typeof isPegawaiAbsent === 'function' && !isPegawaiAbsent(wakil.nip)) atasanOpts.push(wakil);
+                else { let hakims = getPegawai("hakim").filter(x => typeof isPegawaiAbsent === 'function' ? !isPegawaiAbsent(x.nip) : true); atasanOpts.push(...hakims); }
+            }
+            let panitera = getPegawai("panitera").find(x => x.jabatan.toLowerCase() === "panitera");
+            if (panitera && typeof isPegawaiAbsent === 'function' && !isPegawaiAbsent(panitera.nip)) atasanOpts.push(panitera);
+            else {
+                adaPlh = true;
+                let panmuds = getPegawai("panitera muda").filter(x => typeof isPegawaiAbsent === 'function' ? !isPegawaiAbsent(x.nip) : true);
+                atasanOpts.push(...panmuds);
+            }
+            let sekretaris = getPegawai("sekretaris").find(x => x.jabatan.toLowerCase() === "sekretaris");
+            if (sekretaris && typeof isPegawaiAbsent === 'function' && !isPegawaiAbsent(sekretaris.nip)) atasanOpts.push(sekretaris);
+            else {
+                adaPlh = true;
+                let kasubbags = getPegawai("kepala sub bagian").filter(x => typeof isPegawaiAbsent === 'function' ? !isPegawaiAbsent(x.nip) : true);
+                if(kasubbags.length === 0) kasubbags = getPegawai("kasubbag").filter(x => typeof isPegawaiAbsent === 'function' ? !isPegawaiAbsent(x.nip) : true);
+                atasanOpts.push(...kasubbags);
+            }
+        }
+
+        atasanOpts = [...new Map(atasanOpts.map(item => [item.nip, item])).values()];
+
+        if (adaPlh && alertPlh) alertPlh.classList.remove('hidden');
+        else if (alertPlh) alertPlh.classList.add('hidden');
+
+        atasanOpts.forEach(o => { 
+            selAtasan.innerHTML += `<option value="${o.nip}">${o.nama} (${o.jabatan})</option>`; 
+        });
+
+        if (atasanOpts.length === 1) selAtasan.value = atasanOpts[0].nip;
+
+        if (currentEditIdIK) {
+            const log = state.ikLogs.find(l => String(l.id) === String(currentEditIdIK));
+            if (log) {
+                document.getElementById('ikTanggal').value = log.tanggal;
+                document.getElementById('ikJamKeluar').value = log.jam_keluar;
+                document.getElementById('ikJamKembali').value = log.jam_kembali === "-" ? "" : log.jam_kembali;
+                document.getElementById('ikAlasan').value = log.alasan;
+                document.getElementById('ikAtasan').value = log.atasan_nip;
+            }
+        }
+
+        const modal = document.getElementById('modalFormIK');
+        if (modal.parentNode !== document.body) {
+            document.body.appendChild(modal); 
+        }
+        
+        modal.classList.remove('hidden');
+        setTimeout(() => { 
+            if(modal.firstElementChild) modal.firstElementChild.classList.remove('scale-95'); 
+        }, 10);
+    }
+
+    // 2. FUNGSI MENUTUP MODAL
+    function closeModalIK() {
+        const modal = document.getElementById('modalFormIK');
+        if(modal && modal.firstElementChild) {
+            modal.firstElementChild.classList.add('scale-95');
+            setTimeout(() => { modal.classList.add('hidden'); }, 200);
+        }
+    }
+
+    // 3. FUNGSI SUBMIT KE BACKEND
+    function submitFormIK(e) {
+        e.preventDefault();
+        
+        if(!state.user) {
+            showNotify("Sesi Berakhir", "Harap login ulang.", "error");
+            return;
+        }
+        
+        const payload = {
+            id: currentEditIdIK, 
+            nip: state.user.nip,
+            tanggal: document.getElementById('ikTanggal').value,
+            jam_keluar: document.getElementById('ikJamKeluar').value,
+            jam_kembali: document.getElementById('ikJamKembali').value || "-", 
+            alasan: document.getElementById('ikAlasan').value,
+            atasan_nip: document.getElementById('ikAtasan').value
+        };
+        
+        // ZETTBOT FIX: Validasi Kata "Dinas"
+        if (!payload.alasan.toLowerCase().includes('dinas')) {
+            showNotify("Keperluan Tidak Valid", "Anda harus menyertakan kata 'dinas' di dalam alasan pengajuan Izin Keluar.", "error");
+            return;
+        }
+
+        // Validasi Jam 
+        if (payload.jam_kembali !== "-" && payload.jam_kembali < payload.jam_keluar) {
+            showNotify("Jam Invalid", "Jam kembali tidak boleh sebelum jam keluar kantor.", "error");
+            return;
+        }
+
+        showLoading(currentEditIdIK ? "Memperbarui Izin Keluar..." : "Mengirimkan Izin Keluar...");
+        
+        if (typeof google !== 'undefined') {
+            const runner = google.script.run
+              .withSuccessHandler(function(res) {
+                 hideLoading();
+                 if(res.status === 'success') {
+                    closeModalIK();
+                    showNotify("Berhasil Disimpan", res.message, "success");
+                    
+                    if (currentEditIdIK) {
+                        const idx = state.ikLogs.findIndex(l => String(l.id) === String(currentEditIdIK));
+                        if (idx !== -1) {
+                            state.ikLogs[idx].tanggal = payload.tanggal;
+                            state.ikLogs[idx].jam_keluar = payload.jam_keluar;
+                            state.ikLogs[idx].jam_kembali = payload.jam_kembali;
+                            state.ikLogs[idx].alasan = payload.alasan;
+                            state.ikLogs[idx].atasan_nip = payload.atasan_nip;
+                            state.ikLogs[idx].status = 'Menunggu';
+                        }
+                    } else {
+                        const virtualLog = {
+                            id: (res.data && res.data.id) ? res.data.id : "IK-VIRTUAL-" + Date.now(),
+                            tgl_pengajuan: new Date().toLocaleDateString('id-ID'),
+                            nip: payload.nip,
+                            tanggal: payload.tanggal,
+                            jam_keluar: payload.jam_keluar,
+                            jam_kembali: payload.jam_kembali,
+                            alasan: payload.alasan,
+                            atasan_nip: payload.atasan_nip,
+                            status: 'Menunggu',
+                            catatan: '',
+                            z_type: 'IK',
+                            z_sort: Date.now()
+                        };
+                        if (state && state.ikLogs) {
+                            state.ikLogs.unshift(virtualLog);
+                        }
+                    }
+
+                    if (typeof renderPermohonanView === 'function') {
+                        renderPermohonanView();
+                    }
+                 } else {
+                    showNotify("Gagal", res.message, "error");
+                 }
+              })
+              .withFailureHandler(function(err) {
+                 hideLoading();
+                 showNotify("Error Jaringan", err.toString(), "error");
+              });
+              
+            if (currentEditIdIK) {
+                runner.updateIzinKeluarLog(payload);
+            } else {
+                runner.submitIzinKeluar(payload);
+            }
+        } else {
+            setTimeout(() => {
+                hideLoading();
+                closeModalIK();
+                alert("[CANVAS MODE] Simulasi berhasil! Izin Keluar diproses.\n" + JSON.stringify(payload));
+            }, 1000);
+        }
+    }
+</script>

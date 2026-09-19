@@ -1,0 +1,506 @@
+<script>
+/**
+ * ========================================================
+ * KONTROLER MODUL PKP (CORE & BACKEND CONNECTOR)
+ * File: js_pkp_core.html
+ * ========================================================
+ */
+
+function initPkpModule() {
+    try {
+        console.log("🚀 ZETTBOT: Menjalankan initPkpModule()...");
+        
+        var role = state.user ? state.user.role : '';
+        var cleanUserNip = state.user ? String(state.user.nip).replace(/'/g, "").trim() : "";
+
+        // ZETTBOT FIX: Hak Akses Ketat Tab Lapis 1 (Riwayat, Verifikasi, Rekap)
+        var btnVerifikasi = document.getElementById("btn-pkp-verifikasi");
+        var btnRekap = document.getElementById("btn-pkp-rekap");
+        var btnRiwayat = document.getElementById("btn-pkp-riwayat");
+        var tabLapis1Container = btnRiwayat ? btnRiwayat.parentElement : null;
+        
+        // 1. Reset (Sembunyikan semua secara default agar container hilang untuk Pegawai)
+        if(btnVerifikasi) btnVerifikasi.classList.add("hidden");
+        if(btnRekap) btnRekap.classList.add("hidden");
+        if(tabLapis1Container) tabLapis1Container.classList.add("hidden");
+
+        // 2. Munculkan kembali HANYA JIKA rolenya memenuhi syarat
+        if (role === 'Admin' || role === 'Operator' || role === 'Atasan Langsung' || role === 'Pejabat Berwenang') {
+            if(tabLapis1Container) tabLapis1Container.classList.remove("hidden");
+            if(btnVerifikasi) btnVerifikasi.classList.remove("hidden");
+        }
+        if (role === 'Admin' || role === 'Operator') {
+            if(btnRekap) btnRekap.classList.remove("hidden");
+        }
+        
+        var filterTahun = document.getElementById("filterTahunPCK");
+        if (filterTahun && filterTahun.options.length === 0) {
+            var currentYear = new Date().getFullYear();
+            filterTahun.innerHTML = "<option value='" + (currentYear + 1) + "'>Tahun " + (currentYear + 1) + "</option>" +
+                                    "<option value='" + currentYear + "' selected>Tahun " + currentYear + "</option>" +
+                                    "<option value='" + (currentYear - 1) + "'>Tahun " + (currentYear - 1) + "</option>";
+        }
+
+        showLoading("Sinkronisasi Modul PKP...");
+        if (typeof google !== 'undefined' && google.script) {
+            google.script.run
+                .withSuccessHandler(function(resPK) {
+                    state.pkpDokumen = resPK || [];
+                    
+                    google.script.run
+                        .withSuccessHandler(function(resPCK) {
+                            hideLoading();
+                            state.pckDokumen = resPCK || [];
+                            
+                            switchMainTabPKP('PK'); 
+                            if (typeof updateBadgeVerifikasiPKP === 'function') updateBadgeVerifikasiPKP();
+                        })
+                        .withFailureHandler(function(e) {
+                            hideLoading();
+                            showNotify("Gagal Tarik PCK", e.message, "error");
+                        })
+                        .getDataDokumenPCK(cleanUserNip, role);
+                })
+                .withFailureHandler(function(e) {
+                    hideLoading();
+                    showNotify("Gagal Tarik PKP", e.message, "error");
+                })
+                .getDataDokumenPKP(cleanUserNip, role);
+        } else {
+            setTimeout(function() {
+                hideLoading();
+                switchMainTabPKP('PK'); 
+            }, 500);
+        }
+    } catch (e) {
+        console.error("Error di initPkpModule:", e);
+    }
+}
+
+function switchMainTabPKP(tipe) {
+    state.activeMainTab = tipe;
+    
+    // ZETTBOT FIX: Simpan Status Tab Utama Lapisan 1 agar logikanya menyambung
+    var activeLapis1 = state.activeLapis1 || 'riwayat';
+    var vPkRiwayat = document.getElementById("viewListPK-riwayat");
+    var vPckRiwayat = document.getElementById("viewListPCK-riwayat");
+    var vPkVerif = document.getElementById("viewListPK-verifikasi");
+    var vPckVerif = document.getElementById("viewListPCK-verifikasi");
+    var vPkRekap = document.getElementById("viewListPK-rekap");
+    var vPckRekap = document.getElementById("viewListPCK-rekap");
+    
+    var btnPk = document.getElementById("btnMainTabPK");
+    var btnPck = document.getElementById("btnMainTabPCK");
+    var btnAction = document.getElementById("btnActionPKP");
+    
+    // ZETTBOT FIX: Mengambil elemen Filter Bulan & Tombol Cetak Rekap
+    var filterBulan = document.getElementById("filterBulanPCK");
+    var btnCetakRekap = document.getElementById("btnCetakRekapPCK");
+
+    // ZETTBOT FIX: Mengubah class menjadi warna tombol solid menyala (Aktif) dan Outline Indigo (Inaktif) Disamakan dengan Lapis 1
+    var activeClassArray = ["bg-indigo-600", "hover:bg-indigo-500", "text-white", "shadow-lg", "shadow-indigo-600/20"];
+    var inactiveClassArray = ["text-slate-400", "hover:text-slate-200", "hover:bg-slate-800"];
+    
+    function toggleMainClasses(btn, makeActive) {
+        if(!btn) return;
+        if(makeActive) {
+            btn.classList.remove(...inactiveClassArray);
+            btn.classList.add(...activeClassArray);
+        } else {
+            btn.classList.remove(...activeClassArray);
+            btn.classList.add(...inactiveClassArray);
+        }
+    }
+
+    if (tipe === "PK") {
+        if(vPkRiwayat) vPkRiwayat.classList.remove("hidden"); 
+        if(vPkVerif) vPkVerif.classList.remove("hidden");
+        if(vPkRekap) vPkRekap.classList.remove("hidden");
+        if(vPckRiwayat) vPckRiwayat.classList.add("hidden"); 
+        if(vPckVerif) vPckVerif.classList.add("hidden");
+        if(vPckRekap) vPckRekap.classList.add("hidden");
+
+        toggleMainClasses(btnPk, true);
+        toggleMainClasses(btnPck, false);
+        
+        // ZETTBOT FIX: Sembunyikan Elemen Cetak PCK di Tab PK
+        if(filterBulan) filterBulan.classList.add("hidden");
+        if(btnCetakRekap) btnCetakRekap.classList.add("hidden");
+
+        if(btnAction) {
+            btnAction.className = "shrink-0 bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 px-4 rounded-xl shadow-lg shadow-indigo-600/20 transition-all flex justify-center items-center gap-2 text-sm whitespace-nowrap";
+            btnAction.innerHTML = "<i class='fa-solid fa-plus'></i> Buat Target PK Baru";
+            btnAction.setAttribute("onclick", "openModalPK(false)");
+        }
+        
+        if (typeof renderListPK === 'function') renderListPK();
+        if (typeof renderRekapPK === 'function') renderRekapPK();
+    } else {
+        if(vPkRiwayat) vPkRiwayat.classList.add("hidden"); 
+        if(vPkVerif) vPkVerif.classList.add("hidden");
+        if(vPkRekap) vPkRekap.classList.add("hidden");
+        if(vPckRiwayat) vPckRiwayat.classList.remove("hidden"); 
+        if(vPckVerif) vPckVerif.classList.remove("hidden");
+        if(vPckRekap) vPckRekap.classList.remove("hidden");
+        
+        toggleMainClasses(btnPk, false);
+        toggleMainClasses(btnPck, true);
+
+        // ZETTBOT FIX: Munculkan Elemen Cetak HANYA JIKA posisi di Tab Rekap
+        if (activeLapis1 === 'rekap') {
+            if(filterBulan) filterBulan.classList.remove("hidden");
+            if(btnCetakRekap) btnCetakRekap.classList.remove("hidden");
+        }
+
+        if(btnAction) {
+            btnAction.className = "shrink-0 bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 px-4 rounded-xl shadow-lg shadow-indigo-600/20 transition-all flex justify-center items-center gap-2 text-sm whitespace-nowrap";
+            btnAction.innerHTML = "<i class='fa-solid fa-plus'></i> Lapor PCK Bulan Baru";
+            btnAction.setAttribute("onclick", "openModalPCK(false)");
+        }
+        
+        if (typeof renderListPCK === 'function') renderListPCK();
+        if (typeof renderRekapPCK === 'function') renderRekapPCK();
+    }
+}
+
+function switchTabLapis1PKP(tabName) {
+    // ZETTBOT FIX: Simpan Status Tab Utama Lapisan 1 secara global
+    state.activeLapis1 = tabName;
+    var areaRiwayat = document.getElementById("pkp-area-riwayat");
+    var areaVerifikasi = document.getElementById("pkp-area-verifikasi");
+    var areaRekap = document.getElementById("pkp-area-rekap");
+    var btnRiwayat = document.getElementById("btn-pkp-riwayat");
+    var btnVerifikasi = document.getElementById("btn-pkp-verifikasi");
+    var btnRekap = document.getElementById("btn-pkp-rekap");
+
+    // ZETTBOT FIX: Mengubah class tab lapis 1 menjadi warna solid menyala
+    var activeClasses = ["bg-indigo-600", "hover:bg-indigo-500", "text-white", "shadow-lg", "shadow-indigo-600/20"];
+    var inactiveClasses = ["text-slate-400", "hover:text-slate-200", "hover:bg-slate-800"];
+
+    // ZETTBOT FIX: Mengambil elemen Filter Bulan & Tombol Cetak Rekap
+    var filterBulan = document.getElementById("filterBulanPCK");
+    var btnCetakRekap = document.getElementById("btnCetakRekapPCK");
+
+
+    function toggleClasses(btn, makeActive) {
+        if(!btn) return;
+        if(makeActive) {
+            btn.classList.remove(...inactiveClasses);
+            btn.classList.add(...activeClasses);
+        } else {
+            btn.classList.remove(...activeClasses);
+            btn.classList.add(...inactiveClasses);
+        }
+    }
+
+    areaRiwayat.classList.add("hidden"); areaVerifikasi.classList.add("hidden"); areaRekap.classList.add("hidden");
+    
+    toggleClasses(btnRiwayat, false);
+    toggleClasses(btnVerifikasi, false);
+    toggleClasses(btnRekap, false);
+
+    if (tabName === 'riwayat') {
+        areaRiwayat.classList.remove("hidden");
+        toggleClasses(btnRiwayat, true);
+        document.getElementById("btnActionPKP").style.display = ""; 
+
+        // Sembunyikan Cetak Rekap
+        if(filterBulan) filterBulan.classList.add("hidden");
+        if(btnCetakRekap) btnCetakRekap.classList.add("hidden");
+
+    } else if (tabName === 'verifikasi') {
+        areaVerifikasi.classList.remove("hidden");
+        toggleClasses(btnVerifikasi, true);
+        document.getElementById("btnActionPKP").style.display = "none";
+
+        // Sembunyikan Cetak Rekap
+        if(filterBulan) filterBulan.classList.add("hidden");
+        if(btnCetakRekap) btnCetakRekap.classList.add("hidden");
+
+        // ZETTBOT FIX: Me-render ulang tabel secara paksa saat tab Kotak Verifikasi diklik
+        if(typeof renderAllTabelPKP === 'function') renderAllTabelPKP();
+    } else if (tabName === 'rekap') {
+        areaRekap.classList.remove("hidden");
+        toggleClasses(btnRekap, true);
+        document.getElementById("btnActionPKP").style.display = "none";
+
+        // ZETTBOT FIX: Munculkan Cetak Rekap HANYA JIKA Main Tab yang aktif adalah PCK
+        if (state.activeMainTab === 'PCK') {
+            if(filterBulan) filterBulan.classList.remove("hidden");
+            if(btnCetakRekap) btnCetakRekap.classList.remove("hidden");
+        }
+
+        if(typeof renderRekapPK === 'function') renderRekapPK();
+        if(typeof renderRekapPCK === 'function') renderRekapPCK();
+    }
+}
+
+function hapusDokumenPK(idPKP) {
+    showCustomConfirm("Hapus Dokumen PK", "Anda yakin ingin menghapus Permanen dokumen ini?", function() {
+        if (typeof google !== 'undefined' && google.script) { google.script.run.aksiDokumenPKP(idPKP, "Hapus"); }
+        state.pkpDokumen = state.pkpDokumen.filter(function(item) { return String(item.id_pkp) !== String(idPKP); });
+        if(typeof renderListPK === 'function') renderListPK();
+        showNotify("Dihapus", "Dokumen PK berhasil dihapus.", "success");
+    });
+}
+
+function hapusDokumenPCK(idPCK) {
+    showCustomConfirm("Hapus Laporan PCK", "Anda yakin ingin menghapus Laporan bulan ini?", function() {
+        if (typeof google !== 'undefined' && google.script) { google.script.run.aksiDokumenPCK(idPCK, "Hapus"); }
+        state.pckDokumen = state.pckDokumen.filter(function(item) { return String(item.id_pck) !== String(idPCK); });
+        if(typeof renderListPCK === 'function') renderListPCK();
+        showNotify("Dihapus", "Laporan PCK berhasil dihapus.", "success");
+    });
+}
+
+function kirimDokumenPK(idPKP) {
+    showCustomConfirm("Kirim Dokumen PK", "Kirim ke Atasan Penilai? Setelah dikirim, Anda tidak bisa mengedit dokumen ini lagi.", function() {
+        if (typeof google !== 'undefined' && google.script) { google.script.run.aksiDokumenPKP(idPKP, "Kirim"); }
+        for(var i=0; i<state.pkpDokumen.length; i++) {
+            // ZETTBOT FIX: Status berubah langsung ke Menunggu Penilai sesuai Hierarki PK
+            if(String(state.pkpDokumen[i].id_pkp) === String(idPKP)) state.pkpDokumen[i].status = "Menunggu Penilai";
+        }
+        if(typeof renderListPK === 'function') renderListPK();
+        showNotify("Terkirim", "Dokumen PK berhasil diserahkan ke Atasan Penilai.", "success");
+    });
+}
+
+function kirimDokumenPCK(idPCK) {
+    showCustomConfirm("Kirim Laporan PCK", "Kirim laporan ini ke Atasan? Data akan terkunci.", function() {
+        if (typeof google !== 'undefined' && google.script) { google.script.run.aksiDokumenPCK(idPCK, "Kirim"); }
+        for(var i=0; i<state.pckDokumen.length; i++) {
+            // ZETTBOT FIX: Status berubah langsung ke Menunggu Penilai sesuai Hierarki PCK
+            if(String(state.pckDokumen[i].id_pck) === String(idPCK)) state.pckDokumen[i].status = "Menunggu Penilai";
+        }
+        if(typeof renderListPCK === 'function') renderListPCK();
+        showNotify("Terkirim", "Laporan PCK bulan ini telah diserahkan.", "success");
+    });
+}
+
+function cetakDokumen(jenis, id) {
+    if (jenis === 'PK') {
+        showNotify("Persiapan Cetak PK", "Mengkompilasi data Target Tahunan...", "success");
+        if (typeof google !== 'undefined' && google.script) {
+            google.script.run
+                .withSuccessHandler(function(res) {
+                    if (res && res.success) renderPrintTemplatePK(res);
+                    else showNotify("Gagal Cetak", "Detail dokumen tidak ditemukan.", "error");
+                })
+                .getDetailPKP(id);
+        }
+    } else if (jenis === 'PCK') {
+        showNotify("Persiapan Cetak PCK", "Mengkompilasi Laporan Capaian Bulanan...", "success");
+        if (typeof google !== 'undefined' && google.script) {
+            google.script.run
+                .withSuccessHandler(function(res) {
+                    if (res && res.success) renderPrintTemplatePCK(res);
+                    else showNotify("Gagal Cetak", "Data PCK belum lengkap.", "error");
+                })
+                .getDetailPrintPCK(id);
+        }
+    }
+}
+
+// =======================================================
+// Fungsi renderPrintTemplatePK() & renderPrintTemplatePCK()
+// tetap utuh karena Anda tidak meminta perubahan desain cetak.
+// =======================================================
+function renderPrintTemplatePK(data) {
+    try {
+        var container = document.getElementById("template-pk-container");
+        if (!container) return;
+        document.body.appendChild(container);
+        
+        var pegawaiNama = state.user.nama;
+        var pegawaiJabatan = state.user.jabatan;
+        var penilaiNama = "-", penilaiNip = "-";
+        var atasanPejabatNama = "-", atasanPejabatNip = "-";
+        
+        if (state.usersList) {
+            state.usersList.forEach(function(u) {
+                if (u.nip === data.header.penilai) { penilaiNama = u.nama; penilaiNip = u.nip; }
+                if (u.nip === data.header.atasan_pejabat) { atasanPejabatNama = u.nama; atasanPejabatNip = u.nip; }
+            });
+        }
+
+        var elJabatan = document.getElementById("pk-print-jabatan");
+        if(elJabatan) elJabatan.innerText = pegawaiJabatan.toUpperCase();
+        
+        var tbody = document.getElementById("pk-print-tbody");
+        var html = "";
+        
+        var groups = {};
+        data.items.forEach(function(item) {
+            if(!groups[item.sasaran]) groups[item.sasaran] = [];
+            groups[item.sasaran].push(item);
+        });
+
+        var numSasaran = 1;
+        for (var sasaran in groups) {
+            var kgiatans = groups[sasaran];
+            var rowCount = kgiatans.length;
+            
+            for (var idx = 0; idx < rowCount; idx++) {
+                var kg = kgiatans[idx];
+                var wktArr = kg.waktu ? kg.waktu.split(",") : [];
+                
+                html += "<tr>";
+                if (idx === 0) {
+                    html += "<td rowspan='" + rowCount + "' class='text-center'>" + numSasaran + "</td>";
+                    html += "<td rowspan='" + rowCount + "'>" + sasaran + "</td>";
+                }
+                
+                html += "<td class='text-center'>" + (idx + 1) + "</td>";
+                html += "<td>" + kg.indikator + "</td>";
+                html += "<td class='text-center'>" + kg.mutu + "</td>";
+                html += "<td class='text-center'>" + kg.kuantitas + "</td>";
+                html += "<td class='text-center'>" + kg.satuan + "</td>";
+                
+                for (var bln = 1; bln <= 12; bln++) {
+                    var cek = wktArr.includes(String(bln)) ? "√" : "";
+                    html += "<td class='text-center font-bold'>" + cek + "</td>";
+                }
+                
+                var paguFmt = "-";
+                if (kg.pagu && kg.pagu !== "0") {
+                    paguFmt = parseInt(kg.pagu).toLocaleString('id-ID');
+                }
+                html += "<td>IDR <span style='float:right'>" + paguFmt + "</span></td>";
+                html += "</tr>";
+            }
+            numSasaran++;
+        }
+        
+        if(tbody) tbody.innerHTML = html;
+        
+        var elAtasanNama = document.getElementById("pk-print-atasan-nama");
+        var elAtasanNip = document.getElementById("pk-print-atasan-nip");
+        var elTgl = document.getElementById("pk-print-tanggal");
+        var elPenilaiNama = document.getElementById("pk-print-penilai-nama");
+        var elPenilaiNip = document.getElementById("pk-print-penilai-nip");
+        
+        if(elAtasanNama) elAtasanNama.innerText = atasanPejabatNama;
+        if(elAtasanNip) elAtasanNip.innerText = "NIP. " + atasanPejabatNip;
+        if(elTgl) elTgl.innerText = "Indramayu, 2 Januari " + data.header.tahun; 
+        if(elPenilaiNama) elPenilaiNama.innerText = penilaiNama;
+        if(elPenilaiNip) elPenilaiNip.innerText = "NIP. " + penilaiNip;
+
+        document.body.classList.add("print-mode");
+        setTimeout(function() { window.print(); document.body.classList.remove("print-mode"); }, 800);
+    } catch (e) { console.error("Error di renderPrintTemplatePK:", e); }
+}
+
+function renderPrintTemplatePCK(data) {
+    try {
+        var container = document.getElementById("template-pck-container");
+        if (!container) return;
+        document.body.appendChild(container);
+        
+        var tglFull = new Date(); var blnArray = ["Januari","Februari","Maret","April","Mei","Juni","Juli","Agustus","September","Oktober","November","Desember"];
+        var bulanStr = data.header.bulan.toUpperCase();
+        
+        var headerBulanCenter = document.getElementById("pck-print-bulan-header-center");
+        if(headerBulanCenter) headerBulanCenter.innerText = bulanStr;
+
+        var judulEl = document.getElementById("pck-print-bulan-judul");
+        if(judulEl) judulEl.innerText = bulanStr;
+        
+        document.getElementById("pck-print-tanggal").innerText = "Indramayu, 2 " + blnArray[tglFull.getMonth()] + " " + tglFull.getFullYear();
+        
+        var penilaiNama = "-", penilaiNip = "-";
+        if (state.usersList) {
+            state.usersList.forEach(function(u) {
+                if (u.nip === data.penilai_nip) { penilaiNama = u.nama; penilaiNip = u.nip; }
+            });
+        }
+        document.getElementById("pck-print-pegawai-nama").innerText = state.user.nama;
+        document.getElementById("pck-print-pegawai-nip").innerText = "NIP. " + state.user.nip;
+        
+        var elPangkat = document.getElementById("pck-print-pegawai-pangkat");
+        if(elPangkat) elPangkat.innerText = state.user.pangkat || "-";
+        
+        document.getElementById("pck-print-pegawai-jabatan").innerText = state.user.jabatan;
+        document.getElementById("pck-print-penilai-nama").innerText = penilaiNama;
+        document.getElementById("pck-print-penilai-nip").innerText = "NIP. " + penilaiNip;
+
+        var groups = {};
+        data.items.forEach(function(item) {
+            if(!groups[item.sasaran]) groups[item.sasaran] = [];
+            groups[item.sasaran].push(item);
+        });
+
+        var containerTables = document.getElementById("pck-print-tables-container");
+        var tbody2 = document.getElementById("pck-print-tbody-2");
+        var html1 = ""; var html2 = "";
+        
+        var num = 1; var totalRecapCap = 0; var totalRecapHitung = 0; var countRecap = 0;
+        
+        var tableHeader = "<table class='table-data'><thead>" +
+          "<tr><th rowspan='2' width='4%'>NO</th><th rowspan='2' width='26%'>KEGIATAN TUGAS JABATAN</th><th rowspan='2' width='4%'>AK</th><th colspan='2'>TARGET</th><th rowspan='2' width='4%'>AK</th><th colspan='2'>REALISASI</th><th rowspan='2' width='12%'>PENGHITUNGAN<br>(KUALITAS TARGET + KUALITAS REALISASI)</th><th rowspan='2' width='12%'>NILAI CAPAIAN KINERJA</th></tr>" +
+          "<tr><th width='8%'>KUANT /<br>OUTPUT</th><th width='8%'>KUAL /<br>MUTU</th><th width='8%'>KUANT /<br>OUTPUT</th><th width='8%'>KUAL /<br>MUTU</th></tr>" +
+          "<tr style='background-color: #f8f9fa;'><th class='font-bold'>(1)</th><th class='font-bold'>(2)</th><th class='font-bold'>(3)</th><th class='font-bold'>(4)</th><th class='font-bold'>(5)</th><th class='font-bold'>(6)</th><th class='font-bold'>(7)</th><th class='font-bold'>(8)</th><th class='font-bold'>(9)</th><th class='font-bold'>(10)</th></tr>" +
+          "</thead><tbody>";
+
+        for (var sasaran in groups) {
+            var kgs = groups[sasaran];
+            var hitungGrup = 0; var capaianGrup = 0;
+            
+            html1 += "<div style='font-weight: bold; font-size: 9.5pt; margin-bottom: 5px; margin-top: 15px; text-transform: uppercase;'>INDIKATOR KINERJA : " + sasaran + "</div>";
+            html1 += tableHeader;
+            
+            kgs.forEach(function(kg, idx) {
+                var hitung = parseFloat(kg.mutu) + (kg.real_mutu ? parseFloat(kg.real_mutu) : 0);
+                var cap = (kg.capaian) ? parseFloat(kg.capaian) : 0;
+                hitungGrup += hitung; capaianGrup += cap;
+                
+                html1 += "<tr>" +
+                    "<td class='text-center'>" + (idx+1) + "</td>" +
+                    "<td>" + kg.indikator + "</td>" +
+                    "<td class='text-center'>0</td>" +
+                    "<td class='text-center'>" + kg.kuantitas + "</td>" +
+                    "<td class='text-center'>" + kg.mutu + "</td>" +
+                    "<td class='text-center'>0</td>" +
+                    "<td class='text-center'>" + (kg.real_kuantitas || 0) + "</td>" +
+                    "<td class='text-center'>" + (kg.real_mutu || 0) + "</td>" +
+                    "<td class='text-center font-bold'>" + hitung + "</td>" +
+                    "<td class='text-center font-bold'>" + cap.toFixed(2) + "</td>" +
+                "</tr>";
+            });
+            
+            var avgCap = capaianGrup / kgs.length;
+            var avgHitung = hitungGrup / kgs.length; 
+            totalRecapCap += avgCap; totalRecapHitung += avgHitung; countRecap++;
+            
+            html1 += "<tr><td colspan='8' class='text-right font-bold' style='background:#f9fafb;'>NILAI CAPAIAN KINERJA</td><td class='text-center font-bold' style='background:#f9fafb;'>" + avgHitung.toFixed(2) + "</td><td class='text-center font-bold' style='background:#f9fafb;'>" + avgCap.toFixed(2) + "</td></tr>";
+            html1 += "</tbody></table>";
+            
+            html2 += "<tr>" +
+                "<td class='text-center'>" + num + "</td>" +
+                "<td>" + sasaran + "</td>" +
+                "<td class='text-center font-bold'>" + avgHitung.toFixed(2) + "</td>" +
+                "<td class='text-center font-bold'>" + avgCap.toFixed(2) + "</td>" +
+            "</tr>";
+            num++;
+        }
+        
+        var avgFinalCap = countRecap > 0 ? (totalRecapCap / countRecap).toFixed(2) : 0;
+        var avgFinalHitung = countRecap > 0 ? (totalRecapHitung / countRecap).toFixed(2) : 0;
+        var predikatStr = "(Kurang)";
+        var valAvg = parseFloat(avgFinalCap);
+        
+        if (valAvg >= 91) predikatStr = "(Sangat Baik)";
+        else if (valAvg >= 76) predikatStr = "(Baik)";
+        else if (valAvg >= 61) predikatStr = "(Cukup)";
+        else if (valAvg >= 51) predikatStr = "(Kurang)";
+        else if (valAvg <= 50) predikatStr = "(Buruk)";
+
+        html2 += "<tr><td colspan='2' class='text-right font-bold' style='background:#f9fafb;'>Hasil Capaian Kinerja Bulan " + bulanStr + "</td><td class='text-center font-bold' style='background:#f9fafb;'>" + avgFinalHitung + "</td><td class='text-center font-bold' style='background:#f9fafb; font-size:11pt;'>" + avgFinalCap + " " + predikatStr + "</td></tr>";
+        
+        if(containerTables) containerTables.innerHTML = html1;
+        if(tbody2) tbody2.innerHTML = html2;
+
+        document.body.classList.add("print-mode");
+        setTimeout(function() { window.print(); document.body.classList.remove("print-mode"); }, 800);
+    } catch(e) { console.error(e); }
+}
+</script>

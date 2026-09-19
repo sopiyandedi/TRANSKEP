@@ -1,0 +1,682 @@
+ZETTBOT CONTEXT: MODULE FRONT_VIEW
+Generated: 2026-09-17 22:55:21.015832
+
+==================================================
+FILE: front_view/js_global_header.html
+==================================================
+
+<script>
+  // =========================================================
+  // KOMPONEN: GLOBAL HEADER PROFIL
+  // File ini khusus mengatur tampilan UI Header di bagian atas
+  // =========================================================
+  
+  function renderGlobalHeader() {
+    if(!state.user) return;
+    const viewContainer = document.getElementById('view-container');
+    if(!viewContainer) return;
+    
+    // LOGIKA PEMBUAT INISIAL NAMA
+    // 1. Buang gelar di belakang koma (misal: S.H., S.Ag.)
+    let cleanName = state.user.nama.split(',')[0];
+    // 2. Buang gelar di depan (Drs, Dr, H, Hj)
+    cleanName = cleanName.replace(/\b(Drs|Dr|H|Hj)\b\.?\s*/gi, '').trim();
+    // 3. Ambil 2 huruf pertama dari 2 kata terdepan
+    let words = cleanName.split(' ');
+    let userInitials = "";
+    if (words.length > 0) userInitials += words[0].charAt(0).toUpperCase();
+    if (words.length > 1) userInitials += words[1].charAt(0).toUpperCase();
+    if (!userInitials) userInitials = "ID"; // Fallback jika kosong
+
+    let headerDiv = document.getElementById('global-profile-header');
+    if (!headerDiv) {
+        headerDiv = document.createElement('div');
+        headerDiv.id = 'global-profile-header';
+        headerDiv.className = 'w-full mb-6 no-print';
+        viewContainer.insertBefore(headerDiv, viewContainer.firstChild);
+    }
+    
+    headerDiv.innerHTML = `
+      <div class="glass p-6 rounded-[24px] border border-slate-800/60 bg-slate-900/50 flex flex-col md:flex-row items-center justify-between gap-4 shadow-xl relative overflow-hidden">
+         <div class="absolute inset-0 bg-gradient-to-r from-indigo-500/5 to-transparent pointer-events-none"></div>
+         <div class="flex items-center gap-5 w-full md:w-auto relative z-10">
+            
+            <!-- AVATAR INISIAL & GRADIENT ANIMATION -->
+            <div class="w-16 h-16 rounded-2xl flex items-center justify-center text-white text-2xl font-black shadow-lg shadow-indigo-500/30 shrink-0 border border-indigo-400/30 bg-gradient-to-br from-indigo-500 to-purple-600 relative overflow-hidden group">
+               <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+               <span class="relative z-10 drop-shadow-md tracking-wider">${userInitials}</span>
+            </div>
+
+            <div class="flex-1">
+               <h2 class="text-xl md:text-2xl font-bold text-white tracking-wide">${state.user.nama}</h2>
+               <p class="text-slate-400 text-xs md:text-sm mb-2 font-medium">${state.user.jabatan}</p>
+               <div class="flex flex-wrap items-center gap-3 mt-1">
+                  <!-- ZETTBOT: Efek Transparan Senada dengan Tombol Aksi -->
+                  <span class="px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-[11px] font-mono font-medium text-white tracking-wide shadow-sm shadow-emerald-500/5">NIP: ${state.user.nip}</span>
+                  <span class="px-3 py-1.5 bg-purple-500/10 border border-purple-500/20 rounded-xl text-[11px] font-medium text-white tracking-wide shadow-sm shadow-purple-500/5">${state.user.pangkat || '-'}</span>
+               </div>
+            </div>
+         </div>
+         <div class="flex items-center gap-5 w-full md:w-auto justify-end border-t md:border-t-0 border-slate-800/60 pt-4 md:pt-0 relative z-10">
+            <div class="flex items-center gap-2">
+               
+               <!-- ZETTBOT FIX: Tombol Menu Mobile (Hamburger - Tampil hanya di HP) -->
+                   <button onclick="openMobileSidebar()" title="Buka Menu" class="lg:hidden w-12 h-12 shrink-0 flex items-center justify-center bg-indigo-500/10 hover:bg-indigo-500 border border-indigo-500/20 hover:border-indigo-500 text-indigo-400 hover:text-white rounded-xl transition-all duration-300 shadow-lg shadow-indigo-500/10">
+                      <i class="fa-solid fa-bars-staggered text-lg"></i>
+                   </button>
+
+
+               <!-- ZETTBOT: Tombol Aksi Kanan -->
+               <button onclick="openChangePasswordModal()" title="Ganti Kata Sandi" class="w-12 h-12 shrink-0 flex items-center justify-center bg-purple-500/10 hover:bg-purple-500 border border-purple-500/20 hover:border-purple-500 text-purple-400 hover:text-white rounded-xl transition-all duration-300 shadow-lg shadow-purple-500/10">
+                  <i class="fa-solid fa-key text-lg"></i>
+               </button>
+               <button onclick="handleLogout()" title="Keluar Sistem" class="w-12 h-12 shrink-0 flex items-center justify-center bg-rose-500/10 hover:bg-rose-500 border border-rose-500/20 hover:border-rose-500 text-rose-400 hover:text-white rounded-xl transition-all duration-300 shadow-lg shadow-rose-500/10">
+                  <i class="fa-solid fa-power-off text-lg"></i>
+               </button>
+            </div>
+         </div>
+      </div>
+    `;
+  }
+</script>
+
+==================================================
+FILE: front_view/js_login.html
+==================================================
+
+<script>
+  // ==========================================
+  // ZETTBOT: LOGIKA MODAL LUPA PASSWORD (Frontend)
+  // ==========================================
+  
+  let cooldownResetPass = false; // Flag anti-spam spam click
+
+  function openLupaPassword() {
+      const modal = document.getElementById('modalLupaPassword');
+      const content = document.getElementById('modalLupaPasswordContent');
+      document.getElementById('waLupaPassword').value = '';
+      
+      modal.classList.remove('hidden');
+      // Trigger reflow untuk animasi smooth
+      void modal.offsetWidth; 
+      modal.classList.remove('opacity-0');
+      content.classList.remove('scale-95');
+  }
+
+  function closeLupaPassword() {
+      const modal = document.getElementById('modalLupaPassword');
+      const content = document.getElementById('modalLupaPasswordContent');
+      
+      modal.classList.add('opacity-0');
+      content.classList.add('scale-95');
+      setTimeout(() => {
+          modal.classList.add('hidden');
+      }, 300); // Cocok dengan class duration-300 Tailwind
+  }
+
+  function submitLupaPassword(e) {
+      e.preventDefault();
+      
+      if (cooldownResetPass) {
+          if (typeof showNotify === 'function') {
+              showNotify("Tunggu Sebentar", "Sistem sedang memproses antrean sebelumnya. Silakan tunggu sekitar 60 detik sebelum mengirim permintaan baru.", "warning");
+          } else {
+              alert("Tunggu 60 detik sebelum mengirim permintaan baru.");
+          }
+          return;
+      }
+
+      const no_wa = document.getElementById('waLupaPassword').value;
+      if (!no_wa || no_wa.length < 9) {
+          if(typeof showNotify === 'function') showNotify("Input Tidak Valid", "Masukkan nomor WhatsApp yang valid (minimal 9 angka).", "error");
+          return;
+      }
+
+      const btn = document.getElementById('btnSubmitLupa');
+      const originalBtnHtml = btn.innerHTML;
+      btn.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> Memproses...`;
+      btn.disabled = true;
+
+      google.script.run
+          .withSuccessHandler(function(res) {
+              btn.innerHTML = originalBtnHtml;
+              btn.disabled = false;
+              
+              if (res.status === 'success') {
+                  closeLupaPassword();
+                  if(typeof showNotify === 'function') showNotify("Permintaan Terkirim", res.message, "success");
+                  
+                  // Aktifkan Cooldown 60 detik agar tidak spam klik ke sistem backend
+                  cooldownResetPass = true;
+                  setTimeout(() => {
+                      cooldownResetPass = false;
+                  }, 60000);
+
+              } else {
+                  if(typeof showNotify === 'function') showNotify("Gagal Memproses", res.message, "error");
+              }
+          })
+          .withFailureHandler(function(err) {
+              btn.innerHTML = originalBtnHtml;
+              btn.disabled = false;
+              if(typeof showNotify === 'function') showNotify("Kesalahan Jaringan", "Terjadi kesalahan saat menghubungi server Google. Muat ulang halaman.", "error");
+          })
+          .requestPasswordReset(no_wa);
+  }
+</script>
+
+==================================================
+FILE: front_view/js_particles.html
+==================================================
+
+<!-- KANVAS BACKGROUND ANIMASI -->
+<canvas id="loginParticleCanvas" class="fixed inset-0 w-full h-full z-0 pointer-events-none opacity-40"></canvas>
+
+<script>
+  // ==========================================
+  // ZETTBOT: PARTICLE NETWORK BACKGROUND ENGINE
+  // ==========================================
+  document.addEventListener("DOMContentLoaded", function() {
+    initLoginParticles();
+  });
+
+  function initLoginParticles() {
+    const canvas = document.getElementById("loginParticleCanvas");
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    
+    let particlesArray = [];
+    let animationFrameId;
+    
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    // Radius interaksi mouse
+    let mouse = {
+      x: null,
+      y: null,
+      radius: (canvas.height/80) * (canvas.width/80)
+    };
+
+    window.addEventListener("mousemove", function(event) {
+      mouse.x = event.x;
+      mouse.y = event.y;
+    });
+
+    window.addEventListener("mouseout", function() {
+      mouse.x = undefined;
+      mouse.y = undefined;
+    });
+
+    window.addEventListener("resize", function() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      mouse.radius = (canvas.height/80) * (canvas.width/80);
+      init();
+    });
+
+    class Particle {
+      constructor(x, y, directionX, directionY, size, color) {
+        this.x = x;
+        this.y = y;
+        this.directionX = directionX;
+        this.directionY = directionY;
+        this.size = size;
+        this.color = color;
+      }
+
+      draw() {
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2, false);
+        ctx.fillStyle = this.color;
+        ctx.fill();
+      }
+
+      update() {
+        // Pantulkan jika menyentuh pinggir layar
+        if (this.x > canvas.width || this.x < 0) {
+          this.directionX = -this.directionX;
+        }
+        if (this.y > canvas.height || this.y < 0) {
+          this.directionY = -this.directionY;
+        }
+
+        let dx = mouse.x - this.x;
+        let dy = mouse.y - this.y;
+        let distance = Math.sqrt(dx * dx + dy * dy);
+
+        // Efek Interaksi: Menghindar saat didekati kursor mouse
+        if (distance < mouse.radius + this.size) {
+          if (mouse.x < this.x && this.x < canvas.width - this.size * 10) { this.x += 1.5; }
+          if (mouse.x > this.x && this.x > this.size * 10) { this.x -= 1.5; }
+          if (mouse.y < this.y && this.y < canvas.height - this.size * 10) { this.y += 1.5; }
+          if (mouse.y > this.y && this.y > this.size * 10) { this.y -= 1.5; }
+        }
+
+        this.x += this.directionX;
+        this.y += this.directionY;
+        this.draw();
+      }
+    }
+
+    function init() {
+      particlesArray = [];
+      // Mengatur kepadatan partikel berdasarkan ukuran layar (Responsive)
+      let numberOfParticles = (canvas.height * canvas.width) / 12000;
+      for (let i = 0; i < numberOfParticles; i++) {
+        let size = (Math.random() * 2) + 1;
+        let x = (Math.random() * ((innerWidth - size * 2) - (size * 2)) + size * 2);
+        let y = (Math.random() * ((innerHeight - size * 2) - (size * 2)) + size * 2);
+        let directionX = (Math.random() * 1.5) - 0.75;
+        let directionY = (Math.random() * 1.5) - 0.75;
+        let color = '#6366f1'; // Warna titik (Indigo-500 khas TRANSKEP)
+        particlesArray.push(new Particle(x, y, directionX, directionY, size, color));
+      }
+    }
+
+    function animate() {
+      animationFrameId = requestAnimationFrame(animate);
+      ctx.clearRect(0, 0, innerWidth, innerHeight);
+
+      for (let i = 0; i < particlesArray.length; i++) {
+        particlesArray[i].update();
+      }
+      connect();
+    }
+
+    // Fungsi menggambar garis penghubung antar titik
+    function connect() {
+      let opacityValue = 1;
+      for (let a = 0; a < particlesArray.length; a++) {
+        for (let b = a; b < particlesArray.length; b++) {
+          let distance = ((particlesArray[a].x - particlesArray[b].x) * (particlesArray[a].x - particlesArray[b].x)) +
+                         ((particlesArray[a].y - particlesArray[b].y) * (particlesArray[a].y - particlesArray[b].y));
+          
+          if (distance < (canvas.width / 7) * (canvas.height / 7)) {
+            opacityValue = 1 - (distance / 15000);
+            ctx.strokeStyle = 'rgba(99, 102, 241,' + opacityValue + ')'; // Warna garis (Indigo-500)
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(particlesArray[a].x, particlesArray[a].y);
+            ctx.lineTo(particlesArray[b].x, particlesArray[b].y);
+            ctx.stroke();
+          }
+        }
+      }
+    }
+
+    init();
+    animate();
+  }
+</script><!-- KANVAS BACKGROUND ANIMASI -->
+<canvas id="loginParticleCanvas" class="fixed inset-0 w-full h-full z-0 pointer-events-none opacity-40"></canvas>
+
+<script>
+  // ==========================================
+  // ZETTBOT: PARTICLE NETWORK BACKGROUND ENGINE
+  // ==========================================
+  document.addEventListener("DOMContentLoaded", function() {
+    initLoginParticles();
+  });
+
+  function initLoginParticles() {
+    const canvas = document.getElementById("loginParticleCanvas");
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    
+    let particlesArray = [];
+    let animationFrameId;
+    
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    // Radius interaksi mouse
+    let mouse = {
+      x: null,
+      y: null,
+      radius: (canvas.height/80) * (canvas.width/80)
+    };
+
+    window.addEventListener("mousemove", function(event) {
+      mouse.x = event.x;
+      mouse.y = event.y;
+    });
+
+    window.addEventListener("mouseout", function() {
+      mouse.x = undefined;
+      mouse.y = undefined;
+    });
+
+    window.addEventListener("resize", function() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      mouse.radius = (canvas.height/80) * (canvas.width/80);
+      init();
+    });
+
+    class Particle {
+      constructor(x, y, directionX, directionY, size, color) {
+        this.x = x;
+        this.y = y;
+        this.directionX = directionX;
+        this.directionY = directionY;
+        this.size = size;
+        this.color = color;
+      }
+
+      draw() {
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2, false);
+        ctx.fillStyle = this.color;
+        ctx.fill();
+      }
+
+      update() {
+        // Pantulkan jika menyentuh pinggir layar
+        if (this.x > canvas.width || this.x < 0) {
+          this.directionX = -this.directionX;
+        }
+        if (this.y > canvas.height || this.y < 0) {
+          this.directionY = -this.directionY;
+        }
+
+        let dx = mouse.x - this.x;
+        let dy = mouse.y - this.y;
+        let distance = Math.sqrt(dx * dx + dy * dy);
+
+        // Efek Interaksi: Menghindar saat didekati kursor mouse
+        if (distance < mouse.radius + this.size) {
+          if (mouse.x < this.x && this.x < canvas.width - this.size * 10) { this.x += 1.5; }
+          if (mouse.x > this.x && this.x > this.size * 10) { this.x -= 1.5; }
+          if (mouse.y < this.y && this.y < canvas.height - this.size * 10) { this.y += 1.5; }
+          if (mouse.y > this.y && this.y > this.size * 10) { this.y -= 1.5; }
+        }
+
+        this.x += this.directionX;
+        this.y += this.directionY;
+        this.draw();
+      }
+    }
+
+    function init() {
+      particlesArray = [];
+      // Mengatur kepadatan partikel berdasarkan ukuran layar (Responsive)
+      let numberOfParticles = (canvas.height * canvas.width) / 12000;
+      for (let i = 0; i < numberOfParticles; i++) {
+        let size = (Math.random() * 2) + 1;
+        let x = (Math.random() * ((innerWidth - size * 2) - (size * 2)) + size * 2);
+        let y = (Math.random() * ((innerHeight - size * 2) - (size * 2)) + size * 2);
+        let directionX = (Math.random() * 1.5) - 0.75;
+        let directionY = (Math.random() * 1.5) - 0.75;
+        let color = '#6366f1'; // Warna titik (Indigo-500 khas TRANSKEP)
+        particlesArray.push(new Particle(x, y, directionX, directionY, size, color));
+      }
+    }
+
+    function animate() {
+      animationFrameId = requestAnimationFrame(animate);
+      ctx.clearRect(0, 0, innerWidth, innerHeight);
+
+      for (let i = 0; i < particlesArray.length; i++) {
+        particlesArray[i].update();
+      }
+      connect();
+    }
+
+    // Fungsi menggambar garis penghubung antar titik
+    function connect() {
+      let opacityValue = 1;
+      for (let a = 0; a < particlesArray.length; a++) {
+        for (let b = a; b < particlesArray.length; b++) {
+          let distance = ((particlesArray[a].x - particlesArray[b].x) * (particlesArray[a].x - particlesArray[b].x)) +
+                         ((particlesArray[a].y - particlesArray[b].y) * (particlesArray[a].y - particlesArray[b].y));
+          
+          if (distance < (canvas.width / 7) * (canvas.height / 7)) {
+            opacityValue = 1 - (distance / 15000);
+            ctx.strokeStyle = 'rgba(99, 102, 241,' + opacityValue + ')'; // Warna garis (Indigo-500)
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(particlesArray[a].x, particlesArray[a].y);
+            ctx.lineTo(particlesArray[b].x, particlesArray[b].y);
+            ctx.stroke();
+          }
+        }
+      }
+    }
+
+    init();
+    animate();
+  }
+</script>
+
+==================================================
+FILE: front_view/js_sidebar.html
+==================================================
+
+  <script>
+    // =========================================================
+    // KOMPONEN: JS SIDEBAR
+    // Fungsi: Menangani Animasi Collapse Sidebar & Mobile Overlay
+    // =========================================================
+
+    let isSidebarCollapsed = false;
+
+    // 1. Fungsi Collapse Desktop (SIKEP Style - Ikon Saja)
+    function toggleDesktopSidebar() {
+        const sidebar = document.getElementById('main-sidebar');
+        const texts = document.querySelectorAll('.sidebar-text');
+        const tooltips = document.querySelectorAll('.sidebar-tooltip');
+        const textContainer = document.getElementById('sidebar-text-container');
+        const btnToggleDesktop = document.getElementById('btn-toggle-desktop');
+        const headerBox = document.getElementById('sidebar-header-box');
+        const logoWrapper = document.getElementById('sidebar-logo-wrapper');
+        const sectionHeaders = document.querySelectorAll('.sidebar-section-header');
+        const navButtons = sidebar.querySelectorAll('button[id^="nav-"]');
+
+        isSidebarCollapsed = !isSidebarCollapsed;
+
+        if (isSidebarCollapsed) {
+            // Perkecil Sidebar
+            sidebar.classList.remove('w-72');
+            sidebar.classList.add('w-[84px]'); 
+            
+            // Hapus semua padding horizontal agar container benar-benar netral
+            headerBox.classList.remove('pl-5', 'pr-1', 'justify-between');
+            headerBox.classList.add('px-0', 'justify-center');
+            
+            // Hilangkan gap dan paksakan logoWrapper ke tengah
+            logoWrapper.classList.remove('gap-3');
+            logoWrapper.classList.add('w-full', 'justify-center');
+            
+            // ZETTBOT BUG FIX: Paksa 'display: none' untuk mengalahkan 'lg:flex' milik Tailwind 
+            // yang sebelumnya diam-diam memakan wujud fisik tombol strip 3
+            textContainer.style.display = 'none';
+            btnToggleDesktop.style.display = 'none';
+            
+            // Kosongkan opacity untuk transisi kembalinya nanti
+            textContainer.style.opacity = '0';
+            btnToggleDesktop.style.opacity = '0';
+
+            // Sembunyikan Header Kategori
+            sectionHeaders.forEach(el => { el.style.opacity = '0'; setTimeout(() => el.style.display = 'none', 300); });
+            
+            // Sembunyikan Teks Menu
+            texts.forEach(el => { el.style.opacity = '0'; setTimeout(() => el.style.display = 'none', 300); });
+            
+            // Pusatkan Ikon & Aktifkan Tooltip
+            navButtons.forEach(btn => btn.classList.add('justify-center', 'px-0'));
+            tooltips.forEach(el => el.classList.remove('hidden'));
+
+        } else {
+            // Lebarkan Sidebar
+            sidebar.classList.add('w-72');
+            sidebar.classList.remove('w-[84px]');
+            
+            // Kembalikan Posisi Header Normal (pl-5 dan pr-1)
+            headerBox.classList.remove('px-0', 'justify-center');
+            headerBox.classList.add('pl-5', 'pr-1', 'justify-between');
+
+            // Kembalikan gap teks dan logo
+            logoWrapper.classList.add('gap-3');
+            logoWrapper.classList.remove('w-full', 'justify-center');
+
+            // Munculkan kembali wujud fisik Teks & Tombol Strip 3
+            textContainer.style.display = '';
+            btnToggleDesktop.style.display = '';
+            
+            // Beri sedikit jeda agar transisi opacity bekerja mulus
+            setTimeout(() => {
+              textContainer.style.opacity = '1';
+              btnToggleDesktop.style.opacity = '1';
+            }, 10);
+
+            sectionHeaders.forEach(el => { el.style.display = ''; setTimeout(() => el.style.opacity = '1', 10); });
+            
+            texts.forEach(el => { el.style.display = ''; setTimeout(() => el.style.opacity = '1', 10); });
+            
+            // Kembalikan Posisi Normal Ikon & Matikan Tooltip
+            navButtons.forEach(btn => btn.classList.remove('justify-center', 'px-0'));
+            tooltips.forEach(el => el.classList.add('hidden'));
+        }
+    }
+
+    // 2. Fungsi Buka Sidebar Mobile (SI-ASN Style - Offcanvas)
+    function openMobileSidebar() {
+        const sidebar = document.getElementById('main-sidebar');
+        const overlay = document.getElementById('sidebar-overlay');
+        
+        sidebar.classList.remove('-translate-x-full');
+        overlay.classList.remove('hidden');
+        setTimeout(() => overlay.classList.remove('opacity-0'), 10);
+    }
+
+    // 3. Fungsi Tutup Sidebar Mobile
+    function closeMobileSidebar() {
+        const sidebar = document.getElementById('main-sidebar');
+        const overlay = document.getElementById('sidebar-overlay');
+        
+        sidebar.classList.add('-translate-x-full');
+        overlay.classList.add('opacity-0');
+        setTimeout(() => overlay.classList.add('hidden'), 300);
+    }
+  </script>
+
+==================================================
+FILE: front_view/view_sidebar.html
+==================================================
+
+<!-- =========================================================
+     KOMPONEN: VIEW SIDEBAR
+     Fungsi: Menampilkan Navigasi Menu Kiri (Mendukung Collapse & Mobile Off-canvas)
+     ========================================================= -->
+
+<!-- Mobile Overlay -->
+<div id="sidebar-overlay" onclick="closeMobileSidebar()" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-[90] hidden lg:hidden transition-opacity duration-300 opacity-0"></div>
+
+<!-- Sidebar Main -->
+<nav id="main-sidebar" class="w-72 border-r border-slate-800/50 bg-slate-900/95 backdrop-blur-xl flex flex-col h-full shrink-0 z-[100] transition-all duration-300 transform absolute lg:relative -translate-x-full lg:translate-x-0 shadow-2xl lg:shadow-none">
+   
+   <!-- Header/Logo Area -->
+   <div id="sidebar-header-box" class="pl-5 pr-1 py-6 pb-2 flex items-center justify-between h-28 shrink-0 border-b border-slate-800/30 lg:border-none transition-all duration-300">
+      
+      <div id="sidebar-logo-wrapper" class="flex items-center gap-3 overflow-hidden transition-all duration-300">
+         <!-- Fitur Buka Sidebar via Logo -->
+         <img src="https://drive.google.com/thumbnail?id=1xbfVM1yO_o0sn5XV6fIsqFK2GIC6k95J&sz=w400" id="sidebar-logo-img" alt="Logo" class="w-16 h-auto shrink-0 transition-all duration-300 cursor-pointer hover:scale-105" onclick="if(typeof isSidebarCollapsed !== 'undefined' && isSidebarCollapsed) toggleDesktopSidebar()" title="Klik untuk melebarkan menu">
+         
+         <div id="sidebar-text-container" class="transition-all duration-300 flex-1 whitespace-nowrap">
+            <h2 class="text-[26px] font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-emerald-400 tracking-wider drop-shadow-[0_0_15px_rgba(99,102,241,0.5)] leading-tight">TRANSKEP</h2>
+            <p class="text-[10px] text-slate-500 uppercase tracking-widest font-bold mt-0.5">Sistem Kepegawaian</p>
+         </div>
+      </div>
+      
+      <!-- Toggle Desktop (Shrink) -->
+      <button id="btn-toggle-desktop" onclick="toggleDesktopSidebar()" class="hidden lg:flex text-slate-400 hover:text-white transition w-8 h-8 items-center justify-center rounded-lg hover:bg-slate-800 shrink-0 transition-opacity duration-300" title="Lipat Menu">
+         <i class="fa-solid fa-bars-staggered"></i>
+      </button>
+      
+      <!-- Toggle Mobile (Close) -->
+      <button onclick="closeMobileSidebar()" class="lg:hidden text-slate-400 hover:text-rose-400 transition w-8 h-8 items-center justify-center rounded-lg hover:bg-slate-800 shrink-0">
+         <i class="fa-solid fa-xmark text-xl"></i>
+      </button>
+   </div>
+
+   <!-- Menu Container -->
+   <div class="flex-1 overflow-y-auto overflow-x-hidden px-4 py-4 space-y-8 custom-scrollbar pb-10">
+      
+      <!-- MENU UTAMA -->
+      <div>
+         <h3 class="sidebar-section-header px-2 text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3 whitespace-nowrap transition-opacity duration-300">Menu Utama</h3>
+         <div class="space-y-1">
+            
+            <button id="nav-dashboard" onclick="switchMenu('dashboard')" class="w-full flex items-center px-4 py-3 rounded-xl text-sm font-medium transition text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 border border-transparent relative group">
+               <div class="w-5 flex items-center justify-center shrink-0"><i class="fa-solid fa-house"></i></div>
+               <span class="sidebar-text ml-3 whitespace-nowrap transition-opacity duration-300">Dashboard</span>
+               <!-- Tooltip Collapse -->
+               <div class="sidebar-tooltip hidden absolute left-full ml-4 px-3 py-2 bg-slate-800 text-white text-[11px] font-bold rounded-lg shadow-xl whitespace-nowrap z-50 border border-slate-700 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity">Dashboard</div>
+            </button>
+            
+            <button id="nav-permohonan" onclick="switchMenu('permohonan')" class="w-full flex items-center px-4 py-3 rounded-xl text-sm font-medium transition text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 border border-transparent relative group">
+               <div class="w-5 flex items-center justify-center shrink-0"><i class="fa-solid fa-file-signature"></i></div>
+               <span class="sidebar-text ml-3 whitespace-nowrap transition-opacity duration-300">Permohonan Cuti</span>
+               <div class="sidebar-tooltip hidden absolute left-full ml-4 px-3 py-2 bg-slate-800 text-white text-[11px] font-bold rounded-lg shadow-xl whitespace-nowrap z-50 border border-slate-700 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity">Permohonan Cuti</div>
+            </button>
+
+         </div>
+      </div>
+
+      <!-- KEARSIPAN & DOKUMEN -->
+      <div>
+         <h3 class="sidebar-section-header px-2 text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3 whitespace-nowrap transition-opacity duration-300">Kearsipan & Dokumen</h3>
+         <div class="space-y-1">
+            
+            <!-- ZETTBOT FIX: Memperbaiki posisi badge agar melayang (absolute) layaknya badge SK -->
+            <button id="nav-pkp" onclick="switchMenu('pkp')" class="w-full flex items-center px-4 py-3 rounded-xl text-sm font-medium transition text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 border border-transparent relative group">
+               <div class="relative flex items-center justify-center w-5 shrink-0">
+                  <i class="fa-solid fa-file-invoice"></i>
+                  <span id="badge-pkp-nav" class="absolute -top-1.5 -right-2 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-rose-500 text-[8px] text-white font-bold shadow-[0_0_10px_rgba(244,63,94,0.5)] border border-slate-900 hidden transition-all animate-pulse">0</span>
+               </div>
+               <span class="sidebar-text ml-3 whitespace-nowrap transition-opacity duration-300">Penilaian Kinerja (PKP)</span>
+               <div class="sidebar-tooltip hidden absolute left-full ml-4 px-3 py-2 bg-slate-800 text-white text-[11px] font-bold rounded-lg shadow-xl whitespace-nowrap z-50 border border-slate-700 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity">Penilaian Kinerja (PKP)</div>
+            </button>
+
+            <button id="nav-jobdes" onclick="switchMenu('jobdes')" class="w-full flex items-center px-4 py-3 rounded-xl text-sm font-medium transition text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 border border-transparent relative group">
+               <div class="w-5 flex items-center justify-center shrink-0"><i class="fa-solid fa-briefcase"></i></div>
+               <span class="sidebar-text ml-3 whitespace-nowrap transition-opacity duration-300">Uraian Tugas</span>
+               <div class="sidebar-tooltip hidden absolute left-full ml-4 px-3 py-2 bg-slate-800 text-white text-[11px] font-bold rounded-lg shadow-xl whitespace-nowrap z-50 border border-slate-700 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity">Uraian Tugas</div>
+            </button>
+            
+            <button id="nav-sk" onclick="switchMenu('sk')" class="w-full flex items-center px-4 py-3 rounded-xl text-sm font-medium transition text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 border border-transparent relative group">
+               <div class="relative flex items-center justify-center w-5 shrink-0">
+                  <i class="fa-solid fa-folder-open"></i>
+                  <span id="badge-sk-nav" class="absolute -top-1.5 -right-2 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-rose-500 text-[8px] text-white font-bold shadow-[0_0_10px_rgba(244,63,94,0.5)] border border-slate-900 hidden transition-all">0</span>
+               </div>
+               <span class="sidebar-text ml-3 whitespace-nowrap transition-opacity duration-300">Surat Keputusan (SK)</span>
+               <div class="sidebar-tooltip hidden absolute left-full ml-4 px-3 py-2 bg-slate-800 text-white text-[11px] font-bold rounded-lg shadow-xl whitespace-nowrap z-50 border border-slate-700 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity">Surat Keputusan (SK)</div>
+            </button>
+            
+            <button id="nav-sop" onclick="switchMenu('sop')" class="w-full flex items-center px-4 py-3 rounded-xl text-sm font-medium transition text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 border border-transparent relative group">
+               <div class="relative flex items-center justify-center w-5 shrink-0">
+                  <i class="fa-solid fa-book-bookmark"></i>
+                  <span id="badge-sop-nav" class="absolute -top-1.5 -right-2 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-rose-500 text-[8px] text-white font-bold shadow-[0_0_10px_rgba(244,63,94,0.5)] border border-slate-900 hidden transition-all">0</span>
+               </div>
+               <span class="sidebar-text ml-3 whitespace-nowrap transition-opacity duration-300">Manajemen SOP</span>
+               <div class="sidebar-tooltip hidden absolute left-full ml-4 px-3 py-2 bg-slate-800 text-white text-[11px] font-bold rounded-lg shadow-xl whitespace-nowrap z-50 border border-slate-700 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity">Manajemen SOP</div>
+            </button>
+            
+            <button id="nav-kinerja" onclick="switchMenu('kinerja')" class="w-full flex items-center px-4 py-3 rounded-xl text-sm font-medium transition text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 border border-transparent relative group">
+               <div class="w-5 flex items-center justify-center shrink-0"><i class="fa-solid fa-file-contract"></i></div>
+               <span class="sidebar-text ml-3 whitespace-nowrap transition-opacity duration-300">E-Kinerja (SKP)</span>
+               <div class="sidebar-tooltip hidden absolute left-full ml-4 px-3 py-2 bg-slate-800 text-white text-[11px] font-bold rounded-lg shadow-xl whitespace-nowrap z-50 border border-slate-700 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity">E-Kinerja (SKP)</div>
+            </button>
+
+            <button id="nav-manajemen" onclick="switchMenu('manajemen')" class="w-full flex items-center px-4 py-3 rounded-xl text-sm font-medium transition text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 border border-transparent relative group hidden">
+               <div class="w-5 flex items-center justify-center shrink-0"><i class="fa-solid fa-users-gear"></i></div>
+               <span class="sidebar-text ml-3 whitespace-nowrap transition-opacity duration-300">Kelola Pegawai</span>
+               <div class="sidebar-tooltip hidden absolute left-full ml-4 px-3 py-2 bg-slate-800 text-white text-[11px] font-bold rounded-lg shadow-xl whitespace-nowrap z-50 border border-slate-700 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity">Kelola Pegawai</div>
+            </button>
+
+         </div>
+      </div>
+   </div>
+</nav>
+

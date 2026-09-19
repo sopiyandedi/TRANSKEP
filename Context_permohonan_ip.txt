@@ -1,0 +1,558 @@
+ZETTBOT CONTEXT: MODULE PERMOHONAN_IP
+Generated: 2026-09-17 22:55:21.032553
+
+==================================================
+FILE: permohonan/ip/cetak_ip.html
+==================================================
+
+<!-- =========================================================================
+     ZETTBOS MODULAR UI: TEMPLATE CETAK IZIN PRIBADI
+========================================================================== -->
+<div id="printAreaIP" class="hidden print-only bg-white text-black p-8 max-w-4xl mx-auto min-h-screen">
+    <!-- Kop Surat (Disesuaikan dengan format TRANSKEP) -->
+    <div class="text-center border-b-2 border-black pb-4 mb-6">
+        <h2 class="text-xl font-bold uppercase">Mahkamah Agung Republik Indonesia</h2>
+        <h3 class="text-lg font-bold uppercase tracking-wide">Pengadilan Agama Indramayu Kelas IA</h3>
+        <p class="text-xs text-slate-800 mt-1">Jl. Raya Indramayu No. 100, Indramayu, Jawa Barat — Telp (0231) 12345</p>
+    </div>
+    
+    <div class="text-center mb-8">
+        <h4 class="text-lg font-bold uppercase underline">Formulir Izin Pribadi</h4>
+        <p class="text-sm mt-1">Nomor: <span id="cetakIpId" class="font-mono">-</span></p>
+    </div>
+    
+    <div class="space-y-4 text-sm mb-12">
+        <p>Yang bertanda tangan di bawah ini:</p>
+        <table class="w-full ml-4">
+            <tr><td class="w-40 py-1">Nama</td><td class="w-4 py-1">:</td><td id="cetakIpNama" class="py-1 font-bold">-</td></tr>
+            <tr><td class="w-40 py-1">NIP</td><td class="w-4 py-1">:</td><td id="cetakIpNip" class="py-1">-</td></tr>
+            <tr><td class="w-40 py-1">Jabatan</td><td class="w-4 py-1">:</td><td id="cetakIpJabatan" class="py-1">-</td></tr>
+        </table>
+        
+        <p class="mt-4">Mengajukan izin pribadi untuk tidak berada di tempat tugas / meninggalkan kantor pada:</p>
+        <table class="w-full ml-4">
+            <tr><td class="w-40 py-1">Tanggal Mulai</td><td class="w-4 py-1">:</td><td id="cetakIpMulai" class="py-1 font-semibold">-</td></tr>
+            <tr><td class="w-40 py-1">Tanggal Selesai</td><td class="w-4 py-1">:</td><td id="cetakIpSelesai" class="py-1 font-semibold">-</td></tr>
+            <tr><td class="w-40 py-1 align-top">Keperluan / Alasan</td><td class="w-4 py-1 align-top">:</td><td id="cetakIpAlasan" class="py-1 text-justify">-</td></tr>
+        </table>
+        
+        <p class="mt-4">Demikian permohonan ini disampaikan untuk dapat dipertimbangkan sebagaimana mestinya.</p>
+    </div>
+    
+    <!-- Area Tanda Tangan -->
+    <div class="flex justify-between mt-16 text-sm">
+        <div class="text-center w-64">
+            <p class="mb-20">Mengetahui/Menyetujui,<br>Atasan Langsung</p>
+            <p id="cetakIpNamaAtasan" class="font-bold underline">-</p>
+            <p>NIP. <span id="cetakIpNipAtasan">-</span></p>
+        </div>
+        <div class="text-center w-64">
+            <p class="mb-20">Indramayu, <span id="cetakIpTanggalBuat">-</span><br>Pegawai Pemohon</p>
+            <p id="cetakIpNamaPemohon" class="font-bold underline">-</p>
+            <p>NIP. <span id="cetakIpNipPemohon">-</span></p>
+        </div>
+    </div>
+</div>
+
+==================================================
+FILE: permohonan/ip/ip.js
+==================================================
+
+// =========================================================================
+// ZETTBOS BACKEND MODULE: IZIN PRIBADI (ip.gs)
+// Fungsi backend murni untuk Modul Izin Pribadi.
+// =========================================================================
+
+function submitIzinPribadi(payload) {
+  try {
+    const ss = SpreadsheetApp.openById(PropertiesService.getScriptProperties().getProperty("TRANSKEP_DB_ID"));
+    let sheetIP = ss.getSheetByName('izin_pribadi_log');
+    
+    // ZettBOT Feature: Lazy-Initialization (Auto-Create jika sheet belum ada)
+    if(!sheetIP) {
+        sheetIP = ss.insertSheet('izin_pribadi_log');
+        const headers = ['ID', 'Waktu_Pengajuan', 'NIP', 'Tgl_Mulai', 'Tgl_Selesai', 'Alasan', 'Atasan_NIP', 'Status', 'Catatan_Atasan'];
+        sheetIP.appendRow(headers);
+        sheetIP.getRange("A1:I1").setFontWeight("bold").setBackground("#064e3b").setFontColor("#ffffff");
+        sheetIP.setFrozenRows(1);
+    }
+    
+    // Format Waktu & ID Unik
+    const timestamp = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'dd/MM/yyyy HH:mm:ss');
+    const newId = "IP-" + new Date().getTime() + Math.floor(Math.random() * 1000);
+    
+    // Batch Insert 1 baris
+    sheetIP.appendRow([
+        newId,
+        timestamp,
+        payload.nip,
+        payload.tgl_mulai,
+        payload.tgl_selesai,
+        payload.alasan,
+        payload.atasan_nip,
+        'Menunggu',
+        ''
+    ]);
+    
+    SpreadsheetApp.flush();
+    return { status: 'success', message: 'Izin Pribadi berhasil diajukan dan sedang menunggu persetujuan.', data: { id: newId } };
+    
+  } catch (err) { 
+    return { status: 'error', message: err.toString() }; 
+  }
+}
+
+function getIzinPribadiById(id) {
+  try {
+    const ss = SpreadsheetApp.openById(PropertiesService.getScriptProperties().getProperty("TRANSKEP_DB_ID"));
+    const sheetIP = ss.getSheetByName('izin_pribadi_log');
+    if (!sheetIP) throw new Error("Data Izin Pribadi belum tersedia.");
+    
+    const data = sheetIP.getDataRange().getDisplayValues();
+    for (let i = 1; i < data.length; i++) {
+      if (String(data[i][0]) === String(id)) {
+        return {
+          status: 'success',
+          data: {
+            id: data[i][0],
+            waktu: data[i][1],
+            nip: data[i][2],
+            tgl_mulai: data[i][3],
+            tgl_selesai: data[i][4],
+            alasan: data[i][5],
+            atasan_nip: data[i][6],
+            status: data[i][7],
+            catatan: data[i][8]
+          }
+        };
+      }
+    }
+    throw new Error("Data Izin Pribadi tidak ditemukan.");
+  } catch (err) {
+    return { status: 'error', message: err.toString() };
+  }
+}
+
+function updateIpStatus(id, decision, notes, userNip, bypassMode = null) {
+  try {
+    const ss = SpreadsheetApp.openById(PropertiesService.getScriptProperties().getProperty("TRANSKEP_DB_ID"));
+    const sheet = ss.getSheetByName('izin_pribadi_log');
+    const data = sheet.getDataRange().getValues();
+    
+    let rowIndex = -1;
+    for (let i = 1; i < data.length; i++) {
+      if (String(data[i][0]) === String(id)) { rowIndex = i + 1; break; }
+    }
+    if (rowIndex === -1) throw new Error("Data Izin Pribadi tidak ditemukan di sistem.");
+    
+    let finalNotes = notes;
+    if (bypassMode) finalNotes += "\n\n*(Disetujui via Bypass Atasan)*";
+    
+    sheet.getRange(rowIndex, 8).setValue(decision); // Set Kolom Status (H)
+    sheet.getRange(rowIndex, 9).setValue(finalNotes); // Set Kolom Catatan (I)
+    
+    SpreadsheetApp.flush();
+    return { status: 'success', message: 'Usulan Izin Pribadi berhasil diproses.' };
+  } catch(e) { 
+    return { status: 'error', message: e.toString() }; 
+  }
+}
+
+// ZETTBOT FIX: Fungsi Delete/Tarik Data Izin Pribadi
+function deleteIzinPribadiLog(id, forceDelete = false) {
+  try {
+    const ss = SpreadsheetApp.openById(PropertiesService.getScriptProperties().getProperty("TRANSKEP_DB_ID"));
+    const sheet = ss.getSheetByName('izin_pribadi_log');
+    const data = sheet.getDataRange().getValues();
+    
+    let rowIndex = -1;
+    for (let i = 1; i < data.length; i++) {
+      if (String(data[i][0]) === String(id)) { 
+        if (!forceDelete && data[i][7] !== 'Menunggu') throw new Error("Akses Ditolak: Hanya usulan berstatus Menunggu yang dapat ditarik/dihapus.");
+        rowIndex = i + 1; 
+        break; 
+      }
+    }
+    if (rowIndex === -1) throw new Error("Data tidak ditemukan di sistem.");
+    
+    sheet.deleteRow(rowIndex);
+    SpreadsheetApp.flush();
+    return { status: 'success', message: 'Pengajuan Izin Pribadi berhasil ditarik dan dihapus.' };
+  } catch (err) { return { status: 'error', message: err.toString() }; }
+}
+
+// ZETTBOT FIX: Fungsi Soft Edit / Update Data IP
+function updateIzinPribadiLog(payload) {
+  try {
+    const ss = SpreadsheetApp.openById(PropertiesService.getScriptProperties().getProperty("TRANSKEP_DB_ID"));
+    const sheet = ss.getSheetByName('izin_pribadi_log');
+    const data = sheet.getDataRange().getValues();
+    
+    let rowIndex = -1;
+    for (let i = 1; i < data.length; i++) {
+      if (String(data[i][0]) === String(payload.id)) { rowIndex = i + 1; break; }
+    }
+    if (rowIndex === -1) throw new Error("Data tidak ditemukan.");
+    
+    // Cek Keamanan
+    if (data[rowIndex-1][7] !== 'Menunggu' && data[rowIndex-1][7] !== 'Ditolak') {
+        throw new Error("Akses Ditolak: Hanya data berstatus Menunggu atau Ditolak yang bisa diubah.");
+    }
+    
+    sheet.getRange(rowIndex, 4).setValue(payload.tgl_mulai);
+    sheet.getRange(rowIndex, 5).setValue(payload.tgl_selesai);
+    sheet.getRange(rowIndex, 6).setValue(payload.alasan);
+    sheet.getRange(rowIndex, 7).setValue(payload.atasan_nip);
+    sheet.getRange(rowIndex, 8).setValue('Menunggu'); // Reset Status
+    sheet.getRange(rowIndex, 9).setValue(''); // Reset Catatan
+    
+    SpreadsheetApp.flush();
+    return { status: 'success', message: 'Izin Pribadi berhasil diperbarui.' };
+  } catch (err) { return { status: 'error', message: err.toString() }; }
+}
+
+==================================================
+FILE: permohonan/ip/js_cetak_ip.html
+==================================================
+
+<!-- =========================================================================
+     ZETTBOS MODULAR UI: JAVASCRIPT CETAK IZIN PRIBADI
+========================================================================== -->
+<script>
+    function cetakIzinPribadi(id) {
+        if (window.isGlobalPrinting) {
+            showNotify("Proses Sibuk", "Sistem sedang menyiapkan dokumen. Harap tunggu.", "warning");
+            return; 
+        }
+
+        if (!state || !state.user) {
+            showNotify("Sistem Memuat", "Data belum siap.", "warning");
+            return;
+        }
+        
+        window.isGlobalPrinting = true;
+        showLoading("Menyiapkan dokumen Izin Pribadi...");
+        
+        if (typeof google !== 'undefined') {
+            google.script.run
+                .withSuccessHandler(function(res) {
+                    if (res.status === 'success') {
+                        renderTemplateCetakIP(res.data);
+                    } else {
+                        hideLoading();
+                        window.isGlobalPrinting = false;
+                        showNotify("Gagal", res.message, "error");
+                    }
+                })
+                .withFailureHandler(function(err) {
+                    hideLoading();
+                    window.isGlobalPrinting = false;
+                    showNotify("Error Koneksi", err.toString(), "error");
+                })
+                .getIzinPribadiById(id);
+        } else {
+            setTimeout(() => {
+                hideLoading();
+                window.isGlobalPrinting = false;
+                alert("[CANVAS MODE] Simulasi cetak untuk ID: " + id);
+            }, 1000);
+        }
+    }
+    
+    function renderTemplateCetakIP(data) {
+        try {
+            const pemohon = state.usersList.find(u => String(u.nip) === String(data.nip)) || { nama: 'Tidak Diketahui', jabatan: '-' };
+            const atasan = state.usersList.find(u => String(u.nip) === String(data.atasan_nip)) || { nama: 'Tidak Diketahui', jabatan: '-' };
+            
+            document.getElementById('cetakIpId').innerText = data.id;
+            document.getElementById('cetakIpNama').innerText = pemohon.nama;
+            document.getElementById('cetakIpNip').innerText = data.nip;
+            document.getElementById('cetakIpJabatan').innerText = pemohon.jabatan;
+            
+            document.getElementById('cetakIpMulai').innerText = formatDateIndoRekap(data.tgl_mulai);
+            document.getElementById('cetakIpSelesai').innerText = formatDateIndoRekap(data.tgl_selesai);
+            document.getElementById('cetakIpAlasan').innerText = data.alasan;
+            
+            const tglBuat = data.waktu ? data.waktu.split(' ')[0] : '-';
+            document.getElementById('cetakIpTanggalBuat').innerText = formatDateIndoRekap(tglBuat);
+            
+            document.getElementById('cetakIpNamaPemohon').innerText = pemohon.nama;
+            document.getElementById('cetakIpNipPemohon').innerText = data.nip;
+            
+            document.getElementById('cetakIpNamaAtasan').innerText = atasan.nama;
+            document.getElementById('cetakIpNipAtasan').innerText = data.atasan_nip;
+            
+            const printArea = document.getElementById('printAreaIP');
+            
+            document.querySelectorAll('.print-only').forEach(el => {
+                el.classList.add('hidden');
+                el.style.display = 'none';
+            });
+
+            if(printArea) {
+                printArea.classList.remove('hidden');
+                printArea.style.display = 'none';
+            }
+            
+            setTimeout(() => {
+                hideLoading();
+                window.focus();
+                window.print();
+                
+                setTimeout(() => {
+                    if(printArea) {
+                        printArea.classList.add('hidden');
+                        printArea.style.display = '';
+                    }
+                    window.isGlobalPrinting = false;
+                }, 1500);
+            }, 800);
+            
+        } catch(e) {
+            hideLoading();
+            window.isGlobalPrinting = false;
+            showNotify("Error Render", "Terjadi kesalahan saat memuat template cetak.", "error");
+            console.error(e);
+        }
+    }
+</script>
+
+==================================================
+FILE: permohonan/ip/js_ip.html
+==================================================
+
+<!-- =========================================================================
+     ZETTBOS MODULAR UI: JAVASCRIPT IZIN PRIBADI
+========================================================================== -->
+<script>
+    // 1. FUNGSI MEMBUKA MODAL
+    let currentEditIdIP = null; 
+
+    function openModalIP(editId = null) {
+        if (!state || !state.user) {
+            showNotify("Sistem Memuat", "Silakan tunggu, data sistem belum siap.", "error");
+            return;
+        }
+        
+        currentEditIdIP = editId;
+        document.getElementById('formIP').reset();
+        
+        const selAtasan = document.getElementById('ipAtasan');
+        const alertPlh = document.getElementById('alertPlhIP');
+        selAtasan.innerHTML = '<option value="">-- Pilih Pejabat --</option>';
+        
+        let pejabatOpts = [];
+        let adaPlh = false;
+        
+        let ketua = state.usersList.find(x => x.jabatan.toLowerCase() === "ketua");
+        
+        if (ketua && typeof isPegawaiAbsent === 'function' && !isPegawaiAbsent(ketua.nip)) {
+            pejabatOpts.push(ketua);
+        } else {
+            adaPlh = true;
+            let wakil = state.usersList.find(x => x.jabatan.toLowerCase() === "wakil ketua");
+            if (wakil && typeof isPegawaiAbsent === 'function' && !isPegawaiAbsent(wakil.nip)) {
+                pejabatOpts.push(wakil); 
+            } else { 
+                let hakims = state.usersList.filter(x => x.jabatan.toLowerCase().includes("hakim") && (typeof isPegawaiAbsent === 'function' ? !isPegawaiAbsent(x.nip) : true)); 
+                pejabatOpts.push(...hakims); 
+            }
+        }
+        
+        if (adaPlh && alertPlh) alertPlh.classList.remove('hidden');
+        else if (alertPlh) alertPlh.classList.add('hidden');
+        
+        pejabatOpts.forEach(o => { 
+            selAtasan.innerHTML += `<option value="${o.nip}">${o.nama} (${o.jabatan})</option>`; 
+        });
+        
+        if (pejabatOpts.length === 1) selAtasan.value = pejabatOpts[0].nip;
+
+        if (currentEditIdIP) {
+            const log = state.ipLogs.find(l => String(l.id) === String(currentEditIdIP));
+            if (log) {
+                document.getElementById('ipMulai').value = log.tgl_mulai;
+                document.getElementById('ipSelesai').value = log.tgl_selesai;
+                document.getElementById('ipAlasan').value = log.alasan;
+                document.getElementById('ipAtasan').value = log.atasan_nip;
+            }
+        }
+
+        const modal = document.getElementById('modalFormIP');
+        if (modal.parentNode !== document.body) {
+            document.body.appendChild(modal); 
+        }
+        
+        modal.classList.remove('hidden');
+        setTimeout(() => { 
+            if(modal.firstElementChild) modal.firstElementChild.classList.remove('scale-95'); 
+        }, 10);
+    }
+
+    // 2. FUNGSI MENUTUP MODAL
+    function closeModalIP() {
+        const modal = document.getElementById('modalFormIP');
+        if(modal && modal.firstElementChild) {
+            modal.firstElementChild.classList.add('scale-95');
+            setTimeout(() => { modal.classList.add('hidden'); }, 200);
+        }
+    }
+
+    // 3. FUNGSI SUBMIT KE BACKEND
+    function submitFormIP(e) {
+        e.preventDefault();
+        
+        if(!state.user) {
+            showNotify("Sesi Berakhir", "Harap login ulang.", "error");
+            return;
+        }
+        
+        // ZETTBOT FIX: Validasi Hirarki Saldo Cuti Tahunan
+        let totalTahunan = Number(state.user.s_tahunan_2024 || 0) + Number(state.user.s_tahunan_2025 || 0) + Number(state.user.s_tahunan_2026 || 0);
+        if (totalTahunan > 0) {
+            showNotify("Pengajuan Ditolak", "Izin Pribadi hanya bisa dipakai jika Saldo Cuti Tahunan Anda sudah benar-benar habis. Sisa cuti tahunan Anda: " + totalTahunan + " Hari.", "warning");
+            return;
+        }
+
+        const payload = {
+            id: currentEditIdIP, 
+            nip: state.user.nip,
+            tgl_mulai: document.getElementById('ipMulai').value,
+            tgl_selesai: document.getElementById('ipSelesai').value,
+            alasan: document.getElementById('ipAlasan').value,
+            atasan_nip: document.getElementById('ipAtasan').value
+        };
+        
+        if (new Date(payload.tgl_selesai) < new Date(payload.tgl_mulai)) {
+            showNotify("Tanggal Invalid", "Selesai pelaksanaan tidak boleh sebelum tanggal mulai.", "error");
+            return;
+        }
+
+        showLoading(currentEditIdIP ? "Memperbarui Izin Pribadi..." : "Mengirimkan Izin Pribadi...");
+        
+        if (typeof google !== 'undefined') {
+            const runner = google.script.run
+              .withSuccessHandler(function(res) {
+                 hideLoading();
+                 if(res.status === 'success') {
+                    closeModalIP();
+                    showNotify("Berhasil Disimpan", res.message, "success");
+                    
+                    if (currentEditIdIP) {
+                        const idx = state.ipLogs.findIndex(l => String(l.id) === String(currentEditIdIP));
+                        if (idx !== -1) {
+                            state.ipLogs[idx].tgl_mulai = payload.tgl_mulai;
+                            state.ipLogs[idx].tgl_selesai = payload.tgl_selesai;
+                            state.ipLogs[idx].alasan = payload.alasan;
+                            state.ipLogs[idx].atasan_nip = payload.atasan_nip;
+                            state.ipLogs[idx].status = 'Menunggu';
+                        }
+                    } else {
+                        const virtualLog = {
+                            id: (res.data && res.data.id) ? res.data.id : "IP-VIRTUAL-" + Date.now(),
+                            tgl_pengajuan: new Date().toLocaleDateString('id-ID'),
+                            nip: payload.nip,
+                            tgl_mulai: payload.tgl_mulai,
+                            tgl_selesai: payload.tgl_selesai,
+                            alasan: payload.alasan,
+                            atasan_nip: payload.atasan_nip,
+                            status: 'Menunggu',
+                            catatan: '',
+                            z_type: 'IP',
+                            z_sort: Date.now()
+                        };
+                        if (state && state.ipLogs) {
+                            state.ipLogs.unshift(virtualLog);
+                        }
+                    }
+                    
+                    if (typeof renderPermohonanView === 'function') {
+                        renderPermohonanView();
+                    }
+                 } else {
+                    showNotify("Gagal", res.message, "error");
+                 }
+              })
+              .withFailureHandler(function(err) {
+                 hideLoading();
+                 showNotify("Error Jaringan", err.toString(), "error");
+              });
+              
+            if (currentEditIdIP) {
+                runner.updateIzinPribadiLog(payload);
+            } else {
+                runner.submitIzinPribadi(payload);
+            }
+        } else {
+            setTimeout(() => {
+                hideLoading();
+                closeModalIP();
+                alert("[CANVAS MODE] Simulasi berhasil! Izin Pribadi diproses.\n" + JSON.stringify(payload));
+            }, 1000);
+        }
+    }
+</script>
+
+==================================================
+FILE: permohonan/ip/view_ip.html
+==================================================
+
+<!-- =========================================================================
+     ZETTBOS MODULAR UI: MODAL FORM IZIN PRIBADI
+========================================================================== -->
+<div id="modalFormIP" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-[70] flex items-center justify-center p-4 hidden">
+    <div class="w-full max-w-lg glass border border-emerald-500/30 p-6 rounded-3xl shadow-2xl flex flex-col scale-95 transition-all duration-300">
+      
+      <!-- Header Modal -->
+      <div class="flex items-center justify-between pb-4 border-b border-slate-800 shrink-0">
+        <h3 class="text-lg font-bold text-white"><i class="fa-solid fa-user-clock text-emerald-400 mr-2"></i> Formulir Izin Pribadi</h3>
+        <button onclick="closeModalIP()" class="text-slate-400 hover:text-rose-400 transition-colors w-8 h-8 flex items-center justify-center bg-slate-800/50 hover:bg-rose-500/10 rounded-lg">
+           <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <!-- Body Form -->
+      <form id="formIP" onsubmit="submitFormIP(event)" class="mt-4 space-y-4 text-xs">
+         
+         <div class="bg-emerald-500/10 border border-emerald-500/20 p-3 rounded-xl flex items-start gap-3 mb-2">
+           <i class="fa-solid fa-circle-info text-emerald-400 mt-0.5"></i>
+           <p class="text-[10px] text-emerald-400/90 leading-relaxed font-medium">
+              Izin Pribadi digunakan untuk keperluan mendesak (seperti izin terlambat, pulang awal, atau absen singkat). Pengajuan ini memerlukan persetujuan Atasan Langsung.
+           </p>
+         </div>
+         
+         <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-slate-400 uppercase font-bold mb-1">Tanggal Mulai</label>
+            <input type="date" id="ipMulai" required class="w-full px-3.5 py-3 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+          </div>
+          <div>
+            <label class="block text-slate-400 uppercase font-bold mb-1">Tanggal Selesai</label>
+            <input type="date" id="ipSelesai" required class="w-full px-3.5 py-3 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-slate-400 uppercase font-bold mb-1">Keperluan / Alasan Izin</label>
+          <textarea id="ipAlasan" required rows="2" placeholder="Jelaskan alasan izin pribadi Anda secara ringkas..." class="w-full px-3.5 py-3 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500"></textarea>
+        </div>
+
+        <div id="alertPlhIP" class="hidden bg-amber-500/10 border border-amber-500/20 p-3 rounded-xl flex items-start gap-3 mb-2 mt-4">
+           <i class="fa-solid fa-triangle-exclamation text-amber-400 mt-0.5"></i>
+           <p class="text-[10px] text-amber-400/90 leading-relaxed font-medium">Sistem mendeteksi Pejabat Definitif sedang tidak berada di tempat hari ini. Pilihan dialihkan ke Pelaksana Harian (Plh).</p>
+        </div>
+
+        <div>
+            <label class="block text-emerald-400 uppercase font-bold mb-1">Pejabat Berwenang</label>
+            <select id="ipAtasan" required class="w-full px-3.5 py-3 bg-slate-950 border border-emerald-500/50 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-bold">
+              <option value="">-- Pilih Pejabat --</option>
+            </select>
+        </div>
+
+        <button type="submit" class="w-full py-4 mt-4 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl shadow-[0_4px_15px_rgba(16,185,129,0.2)] transition uppercase tracking-wider flex items-center justify-center gap-2">
+          Kirim Izin Pribadi <i class="fa-solid fa-paper-plane"></i>
+        </button>
+      </form>
+    </div>
+</div>
+

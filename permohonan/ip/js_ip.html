@@ -1,0 +1,171 @@
+<!-- =========================================================================
+     ZETTBOS MODULAR UI: JAVASCRIPT IZIN PRIBADI
+========================================================================== -->
+<script>
+    // 1. FUNGSI MEMBUKA MODAL
+    let currentEditIdIP = null; 
+
+    function openModalIP(editId = null) {
+        if (!state || !state.user) {
+            showNotify("Sistem Memuat", "Silakan tunggu, data sistem belum siap.", "error");
+            return;
+        }
+        
+        currentEditIdIP = editId;
+        document.getElementById('formIP').reset();
+        
+        const selAtasan = document.getElementById('ipAtasan');
+        const alertPlh = document.getElementById('alertPlhIP');
+        selAtasan.innerHTML = '<option value="">-- Pilih Pejabat --</option>';
+        
+        let pejabatOpts = [];
+        let adaPlh = false;
+        
+        let ketua = state.usersList.find(x => x.jabatan.toLowerCase() === "ketua");
+        
+        if (ketua && typeof isPegawaiAbsent === 'function' && !isPegawaiAbsent(ketua.nip)) {
+            pejabatOpts.push(ketua);
+        } else {
+            adaPlh = true;
+            let wakil = state.usersList.find(x => x.jabatan.toLowerCase() === "wakil ketua");
+            if (wakil && typeof isPegawaiAbsent === 'function' && !isPegawaiAbsent(wakil.nip)) {
+                pejabatOpts.push(wakil); 
+            } else { 
+                let hakims = state.usersList.filter(x => x.jabatan.toLowerCase().includes("hakim") && (typeof isPegawaiAbsent === 'function' ? !isPegawaiAbsent(x.nip) : true)); 
+                pejabatOpts.push(...hakims); 
+            }
+        }
+        
+        if (adaPlh && alertPlh) alertPlh.classList.remove('hidden');
+        else if (alertPlh) alertPlh.classList.add('hidden');
+        
+        pejabatOpts.forEach(o => { 
+            selAtasan.innerHTML += `<option value="${o.nip}">${o.nama} (${o.jabatan})</option>`; 
+        });
+        
+        if (pejabatOpts.length === 1) selAtasan.value = pejabatOpts[0].nip;
+
+        if (currentEditIdIP) {
+            const log = state.ipLogs.find(l => String(l.id) === String(currentEditIdIP));
+            if (log) {
+                document.getElementById('ipMulai').value = log.tgl_mulai;
+                document.getElementById('ipSelesai').value = log.tgl_selesai;
+                document.getElementById('ipAlasan').value = log.alasan;
+                document.getElementById('ipAtasan').value = log.atasan_nip;
+            }
+        }
+
+        const modal = document.getElementById('modalFormIP');
+        if (modal.parentNode !== document.body) {
+            document.body.appendChild(modal); 
+        }
+        
+        modal.classList.remove('hidden');
+        setTimeout(() => { 
+            if(modal.firstElementChild) modal.firstElementChild.classList.remove('scale-95'); 
+        }, 10);
+    }
+
+    // 2. FUNGSI MENUTUP MODAL
+    function closeModalIP() {
+        const modal = document.getElementById('modalFormIP');
+        if(modal && modal.firstElementChild) {
+            modal.firstElementChild.classList.add('scale-95');
+            setTimeout(() => { modal.classList.add('hidden'); }, 200);
+        }
+    }
+
+    // 3. FUNGSI SUBMIT KE BACKEND
+    function submitFormIP(e) {
+        e.preventDefault();
+        
+        if(!state.user) {
+            showNotify("Sesi Berakhir", "Harap login ulang.", "error");
+            return;
+        }
+        
+        // ZETTBOT FIX: Validasi Hirarki Saldo Cuti Tahunan
+        let totalTahunan = Number(state.user.s_tahunan_2024 || 0) + Number(state.user.s_tahunan_2025 || 0) + Number(state.user.s_tahunan_2026 || 0);
+        if (totalTahunan > 0) {
+            showNotify("Pengajuan Ditolak", "Izin Pribadi hanya bisa dipakai jika Saldo Cuti Tahunan Anda sudah benar-benar habis. Sisa cuti tahunan Anda: " + totalTahunan + " Hari.", "warning");
+            return;
+        }
+
+        const payload = {
+            id: currentEditIdIP, 
+            nip: state.user.nip,
+            tgl_mulai: document.getElementById('ipMulai').value,
+            tgl_selesai: document.getElementById('ipSelesai').value,
+            alasan: document.getElementById('ipAlasan').value,
+            atasan_nip: document.getElementById('ipAtasan').value
+        };
+        
+        if (new Date(payload.tgl_selesai) < new Date(payload.tgl_mulai)) {
+            showNotify("Tanggal Invalid", "Selesai pelaksanaan tidak boleh sebelum tanggal mulai.", "error");
+            return;
+        }
+
+        showLoading(currentEditIdIP ? "Memperbarui Izin Pribadi..." : "Mengirimkan Izin Pribadi...");
+        
+        if (typeof google !== 'undefined') {
+            const runner = google.script.run
+              .withSuccessHandler(function(res) {
+                 hideLoading();
+                 if(res.status === 'success') {
+                    closeModalIP();
+                    showNotify("Berhasil Disimpan", res.message, "success");
+                    
+                    if (currentEditIdIP) {
+                        const idx = state.ipLogs.findIndex(l => String(l.id) === String(currentEditIdIP));
+                        if (idx !== -1) {
+                            state.ipLogs[idx].tgl_mulai = payload.tgl_mulai;
+                            state.ipLogs[idx].tgl_selesai = payload.tgl_selesai;
+                            state.ipLogs[idx].alasan = payload.alasan;
+                            state.ipLogs[idx].atasan_nip = payload.atasan_nip;
+                            state.ipLogs[idx].status = 'Menunggu';
+                        }
+                    } else {
+                        const virtualLog = {
+                            id: (res.data && res.data.id) ? res.data.id : "IP-VIRTUAL-" + Date.now(),
+                            tgl_pengajuan: new Date().toLocaleDateString('id-ID'),
+                            nip: payload.nip,
+                            tgl_mulai: payload.tgl_mulai,
+                            tgl_selesai: payload.tgl_selesai,
+                            alasan: payload.alasan,
+                            atasan_nip: payload.atasan_nip,
+                            status: 'Menunggu',
+                            catatan: '',
+                            z_type: 'IP',
+                            z_sort: Date.now()
+                        };
+                        if (state && state.ipLogs) {
+                            state.ipLogs.unshift(virtualLog);
+                        }
+                    }
+                    
+                    if (typeof renderPermohonanView === 'function') {
+                        renderPermohonanView();
+                    }
+                 } else {
+                    showNotify("Gagal", res.message, "error");
+                 }
+              })
+              .withFailureHandler(function(err) {
+                 hideLoading();
+                 showNotify("Error Jaringan", err.toString(), "error");
+              });
+              
+            if (currentEditIdIP) {
+                runner.updateIzinPribadiLog(payload);
+            } else {
+                runner.submitIzinPribadi(payload);
+            }
+        } else {
+            setTimeout(() => {
+                hideLoading();
+                closeModalIP();
+                alert("[CANVAS MODE] Simulasi berhasil! Izin Pribadi diproses.\n" + JSON.stringify(payload));
+            }, 1000);
+        }
+    }
+</script>

@@ -1,0 +1,74 @@
+<script>
+  // =========================================================
+  // KOMPONEN: GLOBAL HEADER PROFIL
+  // File ini khusus mengatur tampilan UI Header di bagian atas
+  // =========================================================
+  
+  function renderGlobalHeader() {
+    if(!state.user) return;
+    const viewContainer = document.getElementById('view-container');
+    if(!viewContainer) return;
+    
+    // LOGIKA PEMBUAT INISIAL NAMA
+    // 1. Buang gelar di belakang koma (misal: S.H., S.Ag.)
+    let cleanName = state.user.nama.split(',')[0];
+    // 2. Buang gelar di depan (Drs, Dr, H, Hj)
+    cleanName = cleanName.replace(/\b(Drs|Dr|H|Hj)\b\.?\s*/gi, '').trim();
+    // 3. Ambil 2 huruf pertama dari 2 kata terdepan
+    let words = cleanName.split(' ');
+    let userInitials = "";
+    if (words.length > 0) userInitials += words[0].charAt(0).toUpperCase();
+    if (words.length > 1) userInitials += words[1].charAt(0).toUpperCase();
+    if (!userInitials) userInitials = "ID"; // Fallback jika kosong
+
+    let headerDiv = document.getElementById('global-profile-header');
+    if (!headerDiv) {
+        headerDiv = document.createElement('div');
+        headerDiv.id = 'global-profile-header';
+        headerDiv.className = 'w-full mb-6 no-print';
+        viewContainer.insertBefore(headerDiv, viewContainer.firstChild);
+    }
+    
+    headerDiv.innerHTML = `
+      <div class="glass p-6 rounded-[24px] border border-slate-800/60 bg-slate-900/50 flex flex-col md:flex-row items-center justify-between gap-4 shadow-xl relative overflow-hidden">
+         <div class="absolute inset-0 bg-gradient-to-r from-indigo-500/5 to-transparent pointer-events-none"></div>
+         <div class="flex items-center gap-5 w-full md:w-auto relative z-10">
+            
+            <!-- AVATAR INISIAL & GRADIENT ANIMATION -->
+            <div class="w-16 h-16 rounded-2xl flex items-center justify-center text-white text-2xl font-black shadow-lg shadow-indigo-500/30 shrink-0 border border-indigo-400/30 bg-gradient-to-br from-indigo-500 to-purple-600 relative overflow-hidden group">
+               <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+               <span class="relative z-10 drop-shadow-md tracking-wider">${userInitials}</span>
+            </div>
+
+            <div class="flex-1">
+               <h2 class="text-xl md:text-2xl font-bold text-white tracking-wide">${state.user.nama}</h2>
+               <p class="text-slate-400 text-xs md:text-sm mb-2 font-medium">${state.user.jabatan}</p>
+               <div class="flex flex-wrap items-center gap-3 mt-1">
+                  <!-- ZETTBOT: Efek Transparan Senada dengan Tombol Aksi -->
+                  <span class="px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-[11px] font-mono font-medium text-white tracking-wide shadow-sm shadow-emerald-500/5">NIP: ${state.user.nip}</span>
+                  <span class="px-3 py-1.5 bg-purple-500/10 border border-purple-500/20 rounded-xl text-[11px] font-medium text-white tracking-wide shadow-sm shadow-purple-500/5">${state.user.pangkat || '-'}</span>
+               </div>
+            </div>
+         </div>
+         <div class="flex items-center gap-5 w-full md:w-auto justify-end border-t md:border-t-0 border-slate-800/60 pt-4 md:pt-0 relative z-10">
+            <div class="flex items-center gap-2">
+               
+               <!-- ZETTBOT FIX: Tombol Menu Mobile (Hamburger - Tampil hanya di HP) -->
+                   <button onclick="openMobileSidebar()" title="Buka Menu" class="lg:hidden w-12 h-12 shrink-0 flex items-center justify-center bg-indigo-500/10 hover:bg-indigo-500 border border-indigo-500/20 hover:border-indigo-500 text-indigo-400 hover:text-white rounded-xl transition-all duration-300 shadow-lg shadow-indigo-500/10">
+                      <i class="fa-solid fa-bars-staggered text-lg"></i>
+                   </button>
+
+
+               <!-- ZETTBOT: Tombol Aksi Kanan -->
+               <button onclick="openChangePasswordModal()" title="Ganti Kata Sandi" class="w-12 h-12 shrink-0 flex items-center justify-center bg-purple-500/10 hover:bg-purple-500 border border-purple-500/20 hover:border-purple-500 text-purple-400 hover:text-white rounded-xl transition-all duration-300 shadow-lg shadow-purple-500/10">
+                  <i class="fa-solid fa-key text-lg"></i>
+               </button>
+               <button onclick="handleLogout()" title="Keluar Sistem" class="w-12 h-12 shrink-0 flex items-center justify-center bg-rose-500/10 hover:bg-rose-500 border border-rose-500/20 hover:border-rose-500 text-rose-400 hover:text-white rounded-xl transition-all duration-300 shadow-lg shadow-rose-500/10">
+                  <i class="fa-solid fa-power-off text-lg"></i>
+               </button>
+            </div>
+         </div>
+      </div>
+    `;
+  }
+</script>

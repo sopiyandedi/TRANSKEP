@@ -1,0 +1,876 @@
+<script>
+  let currentSopFilter = 'Semua SOP';
+  let sopPelaksanaTerpilih = []; // [{nip, peran}]
+
+  // ==========================================
+  // RENDER UTAMA
+  // ==========================================
+  function renderSopView() {
+     initSopAccess();
+     setSopFilter(currentSopFilter);
+     populateSopPegawaiDropdown();
+  }
+
+  function initSopAccess() {
+     const role = state.user ? state.user.role : '';
+     const btnTambah = document.getElementById('btnTambahSopMaster');
+     if(btnTambah) {
+         if(role === 'Admin' || role === 'Atasan Langsung' || role === 'Pejabat Berwenang') {
+             btnTambah.classList.remove('hidden');
+         } else {
+             btnTambah.classList.add('hidden');
+         }
+     }
+  }
+
+  function setSopFilter(filter) {
+     currentSopFilter = filter;
+     
+     document.querySelectorAll('.sop-filter-btn').forEach(btn => {
+         btn.className = "sop-filter-btn px-4 py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-slate-200 transition-all whitespace-nowrap";
+     });
+     
+     let activeBtnId = '';
+     if (filter === 'Semua SOP') activeBtnId = 'btnSop-semua';
+     else if (filter === 'PJ. Manajemen') activeBtnId = 'btnSop-manajemen';
+     else if (filter === 'PJ. Kepaniteraan') activeBtnId = 'btnSop-kepaniteraan';
+     else if (filter === 'PJ. Kesekretariatan') activeBtnId = 'btnSop-kesekretariatan';
+     else if (filter === 'Rekap per Pegawai') activeBtnId = 'btnSop-rekap';
+
+     if (activeBtnId) {
+         const btn = document.getElementById(activeBtnId);
+         if(btn) btn.className = "sop-filter-btn px-4 py-2 rounded-xl text-xs font-bold transition-all bg-indigo-600 text-white shadow-lg shadow-indigo-500/20 whitespace-nowrap flex items-center gap-2";
+     }
+
+     const containerTable = document.getElementById('sopListContainer');
+     const containerRekap = document.getElementById('sopRekapContainer');
+     const searchBox = document.getElementById('sopSearchContainer');
+
+     if (filter === 'Rekap per Pegawai') {
+         containerTable.classList.add('hidden');
+         searchBox.classList.remove('hidden'); 
+         containerRekap.classList.remove('hidden');
+         renderSopRekap();
+     } else {
+         containerTable.classList.remove('hidden');
+         searchBox.classList.remove('hidden');
+         containerRekap.classList.add('hidden');
+         renderSopTable();
+     }
+  }
+
+  // ==========================================
+  // TABEL LIST SOP (TAMPILAN 1)
+  // ==========================================
+  function renderSopTable() {
+     const tbody = document.getElementById('sopTableBody');
+     const emptyState = document.getElementById('sopEmptyState');
+     const searchInput = document.getElementById('searchInputSop');
+     tbody.innerHTML = '';
+     
+     if (!state.sopList || state.sopList.length === 0) {
+         tbody.closest('table').classList.add('hidden');
+         emptyState.classList.remove('hidden');
+         emptyState.style.display = 'flex';
+         return;
+     }
+
+     let filtered = state.sopList;
+     if (currentSopFilter !== 'Semua SOP') {
+         filtered = filtered.filter(s => s.kategori_pj === currentSopFilter);
+     }
+
+     const keyword = searchInput ? searchInput.value.toLowerCase() : '';
+     if (keyword) {
+         filtered = filtered.filter(s => {
+             const j = s.judul_sop.toLowerCase();
+             const n = s.nomor_sop.toLowerCase();
+             let pelaksanaStr = '';
+             try {
+                const arr = JSON.parse(s.pelaksana_json || '[]');
+                pelaksanaStr = arr.map(p => getUserNameSop(p.nip)).join(' ').toLowerCase();
+             } catch(e) {}
+             return j.includes(keyword) || n.includes(keyword) || pelaksanaStr.includes(keyword);
+         });
+     }
+
+     if (filtered.length === 0) {
+         tbody.closest('table').classList.add('hidden');
+         emptyState.classList.remove('hidden');
+         emptyState.style.display = 'flex';
+         return;
+     }
+
+     tbody.closest('table').classList.remove('hidden');
+     emptyState.classList.add('hidden');
+     emptyState.style.display = 'none';
+
+     filtered.forEach((sop, idx) => {
+        let countPelaksana = 0;
+        let pelaksanaArr = [];
+        try {
+            pelaksanaArr = JSON.parse(sop.pelaksana_json || '[]');
+            countPelaksana = pelaksanaArr.length;
+        } catch(e) {}
+
+        const tr = document.createElement('tr');
+        tr.className = "hover:bg-slate-900/50 transition-colors group border-b border-slate-800/30";
+        
+        // ZETTBOT FIX: Warna Badge Dinamis menyesuaikan kategori PJ persis seperti menu SK
+        let pjColor = "text-slate-400 bg-slate-800 border-slate-700";
+        if(sop.kategori_pj === 'PJ. Manajemen') pjColor = "text-blue-400 bg-blue-500/10 border-blue-500/20";
+        if(sop.kategori_pj === 'PJ. Kepaniteraan') pjColor = "text-emerald-400 bg-emerald-500/10 border-emerald-500/20";
+        if(sop.kategori_pj === 'PJ. Kesekretariatan') pjColor = "text-amber-400 bg-amber-500/10 border-amber-500/20";
+
+        let waBtnHtml = '';
+        if (state.user.role === 'Admin' || state.user.role === 'Operator') {
+            waBtnHtml = `
+              <button onclick="openWaSopBlast('${sop.id}')" class="text-emerald-500 hover:text-emerald-400 p-1.5 hover:bg-emerald-500/10 rounded-lg transition border border-transparent" title="Notifikasi via WhatsApp">
+                 <i class="fa-brands fa-whatsapp"></i>
+              </button>
+            `;
+        }
+
+        let actions = `
+           <div class="flex items-center justify-center gap-1.5 whitespace-nowrap">
+              <button onclick="toggleSopDetailTable('${sop.id}')" class="p-1.5 bg-slate-900 hover:bg-indigo-600/20 border border-slate-800 rounded-lg transition text-slate-400 hover:text-indigo-400" title="Lihat Detail Pelaksana">
+                 <i id="icon-sop-detail-${sop.id}" class="fa-solid fa-chevron-down text-[10px] transition-transform duration-300"></i>
+              </button>
+              ${waBtnHtml}
+              <button onclick="editSop('${sop.id}')" class="text-amber-500 hover:text-amber-400 p-1.5 hover:bg-amber-500/10 rounded-lg transition border border-transparent" title="Edit SOP">
+                 <i class="fa-solid fa-pen-to-square"></i>
+              </button>
+              <button onclick="deleteSopConfirm('${sop.id}')" class="text-rose-500 hover:text-rose-400 p-1.5 hover:bg-rose-500/10 rounded-lg transition border border-transparent" title="Hapus SOP">
+                 <i class="fa-solid fa-trash"></i>
+              </button>
+           </div>
+        `;
+        if(state.user.role !== 'Admin' && state.user.role !== 'Atasan Langsung') {
+            actions = `
+               <div class="flex items-center justify-center gap-1.5 whitespace-nowrap">
+                  <button onclick="toggleSopDetailTable('${sop.id}')" class="p-1.5 bg-slate-900 hover:bg-indigo-600/20 border border-slate-800 rounded-lg transition text-slate-400 hover:text-indigo-400" title="Lihat Detail Pelaksana">
+                     <i id="icon-sop-detail-${sop.id}" class="fa-solid fa-chevron-down text-[10px] transition-transform duration-300"></i>
+                  </button>
+               </div>
+            `;
+        }
+
+        tr.innerHTML = `
+           <td class="p-4 pl-6 text-center font-mono text-slate-500">${idx + 1}</td>
+           <td class="p-4 max-w-[200px]">
+              <div class="font-bold text-slate-200 truncate" title="${sop.judul_sop}">${sop.judul_sop}</div>
+              <div class="text-slate-500 text-[10px] mt-1"><i class="fa-solid fa-users mr-1"></i> ${countPelaksana} Pelaksana Terkait</div>
+           </td>
+           <td class="p-4"><span class="inline-flex px-2.5 py-1 rounded-md text-[10px] font-bold border ${pjColor} tracking-wider">${sop.kategori_pj}</span></td>
+           <td class="p-4 text-slate-300 font-mono text-xs truncate max-w-[150px]" title="${sop.nomor_sop}">${sop.nomor_sop}</td>
+           <td class="p-4 text-slate-400 text-xs">${formatTgl(sop.tanggal_efektif)}</td>
+           <td class="p-4 text-center font-mono text-slate-400 text-[10px]">${formatTgl(sop.tgl_input)}</td>
+           <td class="p-4 text-center">
+              <a href="${sop.link_drive}" target="_blank" class="text-indigo-400 hover:text-indigo-300 p-2 hover:bg-indigo-500/10 rounded-xl inline-block transition" title="Unduh PDF">
+                 <i class="fa-solid fa-file-pdf text-lg"></i>
+              </a>
+           </td>
+           <td class="p-4 pr-6 text-center space-x-1">${actions}</td>
+        `;
+        tbody.appendChild(tr);
+
+        // Expanded Row (Detail Tim)
+        const trDetail = document.createElement('tr');
+        trDetail.id = `detail-sop-${sop.id}`;
+        trDetail.className = "hidden bg-slate-900/30 border-b border-slate-800";
+        
+        let detailHtml = `<div class="p-4 pl-16 flex flex-wrap gap-3">`;
+        if(pelaksanaArr.length === 0) {
+            detailHtml += `<span class="text-xs text-slate-500 italic">Belum ada pelaksana yang terdaftar pada SOP ini.</span>`;
+        } else {
+            pelaksanaArr.forEach(p => {
+               // ZETTBOT FIX: Penyeragaman Tipografi Detail SOP dengan Detail SK
+               detailHtml += `
+                  <div class="flex items-center gap-2 bg-slate-950 border border-slate-800 px-3 py-1.5 rounded-lg">
+                     <div class="w-6 h-6 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-400 text-[10px]"><i class="fa-solid fa-user"></i></div>
+                     <div>
+                        <p class="text-xs font-semibold text-slate-200 leading-none">${getUserNameSop(p.nip)}</p>
+                        <p class="text-[10px] text-slate-500 font-mono mt-0.5">Peran: ${p.peran || '-'}</p>
+                     </div>
+                  </div>
+               `;
+            });
+        }
+        detailHtml += `</div>`;
+        trDetail.innerHTML = `<td colspan="8" class="p-0">${detailHtml}</td>`;
+        tbody.appendChild(trDetail);
+     });
+  }
+
+  function filterTableSop() {
+     const searchInput = document.getElementById('searchInputSop');
+     const keyword = searchInput ? searchInput.value.toLowerCase() : '';
+
+     if (currentSopFilter === 'Rekap per Pegawai') {
+         const container = document.getElementById('sopRekapBody');
+         if(!container) return;
+         const items = container.children;
+         for(let i = 0; i < items.length; i++) {
+             const text = items[i].textContent.toLowerCase();
+             if(text.includes(keyword)) {
+                 items[i].style.display = "";
+             } else {
+                 items[i].style.display = "none";
+             }
+         }
+     } else {
+         renderSopTable();
+     }
+  }
+
+  function toggleSopDetailTable(id) {
+     const row = document.getElementById(`detail-sop-${id}`);
+     const icon = document.getElementById(`icon-sop-detail-${id}`);
+     if(row.classList.contains('hidden')) {
+         row.classList.remove('hidden');
+         icon.classList.add('rotate-180');
+     } else {
+         row.classList.add('hidden');
+         icon.classList.remove('rotate-180');
+     }
+  }
+
+
+  // ==========================================
+  // REKAP PER PEGAWAI (TAMPILAN ACCORDION)
+  // ==========================================
+  function renderSopRekap() {
+      const tbody = document.getElementById('sopRekapBody');
+      tbody.innerHTML = '';
+
+      if (!state.usersList || !state.sopList) return;
+
+      // ZETTBOT FIX: Identifikasi Role
+      const role = state.user && state.user.role ? state.user.role : '';
+      const isAdminOrOperator = (role === 'Admin' || role === 'Operator');
+
+      let userMapping = state.usersList.map(u => {
+          let terlibatSops = state.sopList.filter(sop => {
+              try {
+                  const arr = JSON.parse(sop.pelaksana_json || '[]');
+                  return arr.some(p => String(p.nip) === String(u.nip));
+              } catch(e) { return false; }
+          });
+          return { user: u, sopList: terlibatSops, count: terlibatSops.length };
+      });
+
+      // Filter: Hanya tampilkan pegawai yang jumlah keterlibatan SOP nya > 0
+      userMapping = userMapping.filter(item => item.count > 0);
+
+      // ZETTBOT FIX: Jika bukan Admin/Operator, batasi hanya melihat rekapan dirinya sendiri
+      if (!isAdminOrOperator) {
+          userMapping = userMapping.filter(item => String(item.user.nip) === String(state.user.nip));
+      }
+
+      if (userMapping.length === 0) {
+          tbody.innerHTML = `<div class="p-16 text-center text-slate-500 italic"><i class="fa-solid fa-users-slash text-3xl mb-3 block text-slate-700"></i>Belum ada data keikutsertaan SOP yang terdaftar untuk Anda.</div>`;
+          return;
+      }
+
+      userMapping.sort((a, b) => {
+          if (b.count !== a.count) return b.count - a.count;
+          return a.user.nama.localeCompare(b.user.nama);
+      });
+
+      userMapping.forEach((item, idx) => {
+          const u = item.user;
+          const sops = item.sopList;
+          
+          const div = document.createElement('div');
+          div.className = "border-b border-slate-900 transition-all group";
+          div.id = 'accSop-' + u.nip;
+          
+          const header = document.createElement('div');
+          header.className = "p-4 flex items-center justify-between cursor-pointer hover:bg-slate-900/10 transition-colors";
+          header.onclick = () => toggleAccordionSop(div.id);
+
+          let btnColor = sops.length > 0 ? 'border-indigo-500/20 bg-indigo-500/10 text-indigo-300' : 'border-slate-700 bg-slate-800 text-slate-500';
+
+          const readCount = sops.filter(sop => state.sopAckList.some(a => String(a.sop_id) === String(sop.id) && String(a.nip) === String(u.nip))).length;
+          const progressPercent = sops.length > 0 ? Math.round((readCount / sops.length) * 100) : 0;
+          let progressColor = progressPercent === 100 ? 'bg-emerald-500' : (progressPercent > 0 ? 'bg-amber-500' : 'bg-rose-500');
+          let textProgressColor = progressPercent === 100 ? 'text-emerald-400' : 'text-slate-500';
+          
+          const unreadCount = sops.length - readCount;
+          let tooltipText = unreadCount > 0 ? `Kekurangan: ${unreadCount} Dokumen SOP belum dibaca` : `Sempurna! Semua Dokumen SOP telah dibaca`;
+
+          let waRekapBtnHtml = '';
+          if (isAdminOrOperator) {
+              waRekapBtnHtml = `
+                <button type="button" onclick="event.stopPropagation(); openWaRekapSopBlast('${u.nip}')" class="text-emerald-500 hover:text-emerald-400 p-1.5 hover:bg-emerald-500/10 rounded-lg transition border border-transparent" title="Kirim Rekap WA">
+                   <i class="fa-brands fa-whatsapp text-sm"></i>
+                </button>
+              `;
+          }
+
+          // ZETTBOT FIX: Penyeragaman tata letak sm:flex-row dan sm:gap-6 yang 100% identik dengan menu Rekap SK
+          header.innerHTML = `
+              <div class="flex items-center w-full">
+                 <div class="w-16 text-center text-slate-500 font-mono text-xs shrink-0">${idx + 1}</div>
+                 
+                 <div class="flex-1 min-w-0 pr-4">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-6">
+                        <div class="flex-1 min-w-0">
+                            <div class="text-xs font-bold text-slate-200 truncate">${u.nama}</div>
+                            <div class="text-slate-500 text-[10px] mt-0.5 font-mono truncate">NIP: ${u.nip} <span class="text-slate-700 mx-1">|</span> ${u.jabatan}</div>
+                        </div>
+                        
+                        <div class="w-full sm:w-[180px] shrink-0 group/bar relative cursor-help" title="${tooltipText}">
+                            <div class="flex items-center justify-between mb-1.5 px-0.5">
+                                <span class="text-[9px] font-bold ${textProgressColor} tracking-wider">${readCount} / ${sops.length} DIBACA</span>
+                                <span class="text-[9px] font-bold ${textProgressColor}">${progressPercent}%</span>
+                            </div>
+                            <div class="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden shadow-inner border border-slate-900/50">
+                                <div class="h-full ${progressColor} transition-all duration-500" style="width: ${progressPercent}%"></div>
+                            </div>
+                        </div>
+                    </div>
+                 </div>
+                 
+                 <div class="w-48 text-center shrink-0 hidden sm:block">
+                    <span class="inline-flex items-center px-3 py-1 rounded-lg text-xs font-bold border ${btnColor}">
+                       <i class="fa-solid fa-book-bookmark mr-1.5 opacity-70"></i> Terlibat di ${sops.length} SOP
+                    </span>
+                 </div>
+                 <div class="w-32 flex items-center justify-end gap-1.5 pr-4 shrink-0">
+                    <button type="button" onclick="event.stopPropagation(); toggleAccordionSop('${div.id}')" class="p-1.5 bg-slate-900 hover:bg-indigo-600/20 border border-slate-800 rounded-lg transition text-slate-400 hover:text-indigo-400 acc-icon">
+                       <i class="fa-solid fa-chevron-down text-sm transition-transform duration-300"></i>
+                    </button>
+                    ${waRekapBtnHtml}
+                 </div>
+              </div>
+          `;
+          
+          const body = document.createElement('div');
+          body.className = "hidden bg-slate-950/80 border-t border-slate-900 p-0";
+          
+          let listHtml = '';
+          sops.forEach((sop, sIdx) => {
+              let peranDetail = '-';
+              try {
+                  const arr = JSON.parse(sop.pelaksana_json || '[]');
+                  const found = arr.find(p => String(p.nip) === String(u.nip));
+                  if (found && found.peran) peranDetail = found.peran;
+              } catch(e) {}
+
+              const isAck = state.sopAckList.some(a => String(a.sop_id) === String(sop.id) && String(a.nip) === String(u.nip));
+              
+              let ackHtml = '';
+              if (String(state.user.nip) === String(u.nip)) {
+                 if (isAck) {
+                     const ackData = state.sopAckList.find(a => String(a.sop_id) === String(sop.id) && String(a.nip) === String(u.nip));
+                     const tglBacaOnly = ackData.tanggal_baca ? ackData.tanggal_baca.split(' ')[0] : '-';
+                     ackHtml = `<div class="text-[10px] text-emerald-400 font-medium flex items-center justify-center gap-1.5 w-full whitespace-nowrap"><i class="fa-solid fa-check-double"></i> Dibaca: ${tglBacaOnly}</div>`;
+                 } else {
+                     ackHtml = `<button onclick="doAcknowledgeSop('${sop.id}', '${u.nip}')" class="text-[10px] font-bold text-white bg-emerald-600 hover:bg-emerald-500 px-3 py-1.5 rounded-lg shadow-lg shadow-emerald-500/20 transition flex items-center justify-center gap-1.5 w-full whitespace-nowrap"><i class="fa-regular fa-handshake"></i> Tandai Telah Dibaca</button>`;
+                 }
+              } else {
+                 if (isAck) {
+                     const ackData = state.sopAckList.find(a => String(a.sop_id) === String(sop.id) && String(a.nip) === String(u.nip));
+                     const tglBacaOnly = ackData.tanggal_baca ? ackData.tanggal_baca.split(' ')[0] : '-';
+                     ackHtml = `<div class="text-[10px] text-emerald-500 font-medium flex items-center justify-center gap-1 w-full whitespace-nowrap"><i class="fa-solid fa-check-double"></i> Dibaca: ${tglBacaOnly}</div>`;
+                 } else {
+                     ackHtml = `<div class="text-[10px] text-rose-400 font-medium flex items-center justify-center gap-1 w-full whitespace-nowrap"><i class="fa-solid fa-circle-exclamation"></i> Belum membaca SOP ini.</div>`;
+                 }
+              }
+
+              listHtml += `
+                 <div class="flex items-center justify-between p-3 border-b border-slate-800/50 hover:bg-slate-800/20 transition last:border-0 rounded-lg mx-4 my-2">
+                     <div class="flex-1 pr-4 min-w-0">
+                        <div class="text-slate-200 font-bold text-xs truncate">${sIdx + 1}. ${sop.judul_sop}</div>
+                        <div class="text-slate-500 text-[10px] mt-1 truncate">Peran Anda: <span class="text-indigo-300 font-bold">${peranDetail}</span> | No: <span class="font-mono text-slate-400">${sop.nomor_sop} (${formatTgl(sop.tanggal_efektif)})</span></div>
+                     </div>
+                     <div class="flex-1 flex items-center justify-center shrink-0 px-4">
+                        ${ackHtml}
+                     </div>
+                     <div class="shrink-0 pl-2 text-right">
+                        <a href="${sop.link_drive}" target="_blank" class="px-3 py-1.5 bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500 hover:text-white border border-indigo-500/20 rounded-md text-[10px] font-bold transition whitespace-nowrap"><i class="fa-solid fa-file-pdf mr-1"></i> Buka PDF</a>
+                     </div>
+                 </div>
+              `;
+          });
+
+          body.innerHTML = `
+              <div class="p-4 bg-slate-900/40 rounded-b-xl shadow-inner">
+                  <div class="border border-slate-800 bg-slate-950/50 rounded-xl p-2 max-w-4xl mx-auto">
+                      ${listHtml}
+                  </div>
+              </div>
+          `;
+
+          div.appendChild(header);
+          div.appendChild(body);
+          tbody.appendChild(div);
+      });
+  }
+
+  function toggleAccordionSop(divId) {
+      const div = document.getElementById(divId);
+      const body = div.children[1];
+      const icon = div.querySelector('.acc-icon i');
+
+      if (body.classList.contains('hidden')) {
+          body.classList.remove('hidden');
+          icon.classList.replace('fa-chevron-down', 'fa-chevron-up');
+      } else {
+          body.classList.add('hidden');
+          icon.classList.replace('fa-chevron-up', 'fa-chevron-down');
+      }
+  }
+
+
+  // ==========================================
+  // LOGIKA MODAL FORM (CRUD)
+  // ==========================================
+  function openModalSop(isEdit = false, sopData = null) {
+      const m = document.getElementById('modalSop');
+      const title = document.getElementById('modalSopTitle');
+      document.getElementById('formSop').reset();
+      sopPelaksanaTerpilih = []; 
+      
+      if(isEdit && sopData) {
+         title.innerHTML = `<div class="p-1.5 bg-amber-500/20 text-amber-400 rounded-lg"><i class="fa-solid fa-pen text-sm"></i></div> Edit SOP`;
+         document.getElementById('sopId').value = sopData.id;
+         document.getElementById('sopJudul').value = sopData.judul_sop;
+         document.getElementById('sopKategori').value = sopData.kategori_pj;
+         document.getElementById('sopNomor').value = sopData.nomor_sop;
+         document.getElementById('sopLink').value = sopData.link_drive;
+         document.getElementById('sopTglPembuatan').value = formatDateForInput(sopData.tanggal_pembuatan);
+         document.getElementById('sopTglRevisi').value = formatDateForInput(sopData.tanggal_revisi !== '-' ? sopData.tanggal_revisi : '');
+         document.getElementById('sopTglEfektif').value = formatDateForInput(sopData.tanggal_efektif);
+
+         try {
+             sopPelaksanaTerpilih = JSON.parse(sopData.pelaksana_json || '[]');
+         } catch(e) {}
+      } else {
+         title.innerHTML = `<div class="p-1.5 bg-indigo-500/20 text-indigo-400 rounded-lg"><i class="fa-solid fa-plus text-sm"></i></div> Daftarkan SOP Baru`;
+         document.getElementById('sopId').value = '';
+      }
+      
+      renderSopPelaksanaList();
+      
+      m.classList.remove('hidden');
+      setTimeout(() => {
+          m.classList.remove('opacity-0');
+          m.firstElementChild.classList.remove('scale-95');
+      }, 10);
+  }
+
+  function closeModalSop() {
+      const m = document.getElementById('modalSop');
+      m.classList.add('opacity-0');
+      m.firstElementChild.classList.add('scale-95');
+      setTimeout(() => m.classList.add('hidden'), 300);
+      document.getElementById('sopPegawaiDropdown').classList.add('hidden');
+  }
+
+  function editSop(id) {
+     const sop = state.sopList.find(s => s.id === id);
+     if(sop) openModalSop(true, sop);
+  }
+
+  function deleteSopConfirm(id) {
+     showCustomConfirm(
+        "Hapus Dokumen SOP?", 
+        "Tindakan ini tidak bisa dibatalkan. Riwayat persetujuan/baca dari pegawai untuk SOP ini juga akan dihapus.",
+        () => {
+           showLoading("Menghapus Data SOP...");
+           google.script.run
+              .withSuccessHandler(res => {
+                 if(res.status === 'success') {
+                    state.sopList = state.sopList.filter(s => s.id !== id);
+                    state.sopAckList = state.sopAckList.filter(a => a.sop_id !== id);
+                    renderSopTable();
+                    showNotify("Berhasil", res.message, "success");
+                 } else showNotify("Gagal", res.message, "error");
+                 hideLoading();
+              })
+              .withFailureHandler(err => { hideLoading(); showNotify("Error", err.message, "error"); })
+              .deleteSopData(id);
+        }
+     );
+  }
+
+  function saveSopSubmit(e) {
+      e.preventDefault();
+      
+      const payload = {
+          id: document.getElementById('sopId').value,
+          judul_sop: document.getElementById('sopJudul').value,
+          kategori_pj: document.getElementById('sopKategori').value,
+          nomor_sop: document.getElementById('sopNomor').value,
+          tanggal_pembuatan: document.getElementById('sopTglPembuatan').value,
+          tanggal_revisi: document.getElementById('sopTglRevisi').value,
+          tanggal_efektif: document.getElementById('sopTglEfektif').value,
+          link_drive: document.getElementById('sopLink').value,
+          pelaksana: sopPelaksanaTerpilih
+      };
+
+      showLoading("Menyimpan SOP...");
+      google.script.run
+          .withSuccessHandler(res => {
+              if(res.status === 'success') {
+                  closeModalSop();
+                  showNotify("Berhasil Disimpan", res.message, "success");
+                  syncAllServerData(); 
+              } else {
+                  hideLoading();
+                  showNotify("Gagal", res.message, "error");
+              }
+          })
+          .withFailureHandler(err => { hideLoading(); showNotify("Error Jaringan", err.message, "error"); })
+          .saveSopData(payload);
+  }
+
+  // ==========================================
+  // DYNAMIC PELAKSANA (AUTO-ADD & EDITABLE ROLE)
+  // ==========================================
+  function populateSopPegawaiDropdown() {
+      const drop = document.getElementById('sopPegawaiDropdown');
+      drop.innerHTML = '';
+      state.usersList.forEach(u => {
+          if (u.role !== 'Admin') {
+              const div = document.createElement('div');
+              div.className = "px-4 py-2 hover:bg-indigo-600 cursor-pointer border-b border-slate-700/50 last:border-0 transition-colors flex flex-col";
+              div.innerHTML = `<span class="text-sm font-bold text-white">${u.nama}</span><span class="text-[10px] text-indigo-200 font-mono">${u.nip}</span>`;
+              div.onclick = () => {
+                  addPegawaiToSopListDirect(u.nip);
+                  drop.classList.add('hidden');
+                  document.getElementById('sopPegawaiSearch').value = ''; 
+              };
+              drop.appendChild(div);
+          }
+      });
+  }
+
+  function filterSopPegawaiDropdown() {
+      const val = document.getElementById('sopPegawaiSearch').value.toLowerCase();
+      const drop = document.getElementById('sopPegawaiDropdown');
+      const items = drop.children;
+      let hasVisible = false;
+      
+      for(let i=0; i<items.length; i++) {
+          const txt = items[i].textContent.toLowerCase();
+          if(txt.includes(val)) {
+              items[i].style.display = "flex";
+              hasVisible = true;
+          } else {
+              items[i].style.display = "none";
+          }
+      }
+      
+      if(hasVisible && val !== '') drop.classList.remove('hidden');
+      else drop.classList.add('hidden');
+  }
+
+  document.addEventListener('click', function(e) {
+      const pSearch = document.getElementById('sopPegawaiSearch');
+      const drop = document.getElementById('sopPegawaiDropdown');
+      if (pSearch && drop && !pSearch.contains(e.target) && !drop.contains(e.target)) {
+          drop.classList.add('hidden');
+      }
+  });
+
+  function addPegawaiToSopListDirect(nip) {
+      const inputPeran = document.getElementById('sopPeranInput');
+      
+      if (sopPelaksanaTerpilih.some(p => String(p.nip) === String(nip))) {
+          showNotify("Duplikat", "Pegawai tersebut sudah ada dalam daftar pelaksana.", "warning");
+          return;
+      }
+
+      sopPelaksanaTerpilih.push({
+          nip: String(nip),
+          peran: inputPeran.value.trim() || ''
+      });
+      
+      renderSopPelaksanaList();
+  }
+
+  function updatePeranSop(nip, val) {
+      const pIndex = sopPelaksanaTerpilih.findIndex(x => String(x.nip) === String(nip));
+      if (pIndex !== -1) {
+          sopPelaksanaTerpilih[pIndex].peran = val;
+      }
+  }
+
+  function removePegawaiFromSop(nipToRemove) {
+      sopPelaksanaTerpilih = sopPelaksanaTerpilih.filter(p => String(p.nip) !== String(nipToRemove));
+      renderSopPelaksanaList();
+  }
+
+  function renderSopPelaksanaList() {
+      const wrapper = document.getElementById('sopPelaksanaListWrapper');
+      const empty = document.getElementById('sopEmptyPelaksana');
+      
+      wrapper.innerHTML = '';
+      
+      if (sopPelaksanaTerpilih.length === 0) {
+          wrapper.classList.add('hidden');
+          empty.classList.remove('hidden');
+          return;
+      }
+
+      wrapper.classList.remove('hidden');
+      empty.classList.add('hidden');
+
+      sopPelaksanaTerpilih.forEach((p, idx) => {
+          const uName = getUserNameSop(p.nip);
+          const div = document.createElement('div');
+          div.className = "flex items-center justify-between bg-slate-900 border border-slate-700/80 p-2.5 rounded-xl hover:bg-slate-800/80 transition-colors";
+          div.innerHTML = `
+              <div class="flex items-center gap-3 w-full pr-4 overflow-hidden">
+                 <div class="w-6 h-6 rounded bg-indigo-500/20 text-indigo-400 flex items-center justify-center text-xs font-bold shrink-0">${idx+1}</div>
+                 
+                 <div class="flex flex-col md:flex-row md:items-center justify-between w-full gap-2 md:gap-4 overflow-hidden">
+                    <p class="text-sm font-bold text-slate-200 leading-none truncate md:w-1/2">${uName}</p>
+                    
+                    <div class="flex items-center gap-2 w-full md:w-1/2">
+                       <span class="text-[10px] text-slate-500 shrink-0">Peran:</span>
+                       <input type="text" value="${p.peran}" placeholder="Bisa ketik peran..." onchange="updatePeranSop('${p.nip}', this.value)" class="flex-1 bg-slate-950 border border-slate-700 text-indigo-300 font-bold text-[10px] px-2 py-1.5 rounded focus:outline-none focus:border-indigo-500 transition-colors">
+                    </div>
+                 </div>
+              </div>
+              <button type="button" onclick="removePegawaiFromSop('${p.nip}')" class="w-7 h-7 rounded bg-slate-800 hover:bg-rose-500/20 text-slate-500 hover:text-rose-400 transition flex items-center justify-center shrink-0">
+                 <i class="fa-solid fa-xmark"></i>
+              </button>
+          `;
+          wrapper.appendChild(div);
+      });
+  }
+
+  // ==========================================
+  // WA BLAST PER ITEM SOP (Tabel Utama)
+  // ==========================================
+  function openWaSopBlast(sopId) {
+      const sop = state.sopList.find(s => String(s.id) === String(sopId));
+      if(!sop) return;
+      
+      let pelaksanaArr = [];
+      try { pelaksanaArr = JSON.parse(sop.pelaksana_json || '[]'); } catch(e) {}
+      
+      const container = document.getElementById('waSopListContainer');
+      document.getElementById('waSopTitleTarget').innerText = `Notifikasi Dokumen: ${sop.judul_sop}`;
+      container.innerHTML = '';
+      
+      if(pelaksanaArr.length === 0) {
+          container.innerHTML = `<div class="p-4 text-center text-slate-500 text-xs italic">Belum ada pelaksana yang terdaftar untuk menerima notifikasi.</div>`;
+      } else {
+          pelaksanaArr.forEach(p => {
+              const u = state.usersList.find(x => String(x.nip) === String(p.nip));
+              if(u) {
+                  let phone = String(u.no_hp || '').replace(/[^0-9]/g, '');
+                  if(phone.startsWith('0')) phone = '62' + phone.substring(1);
+                  
+                  const rawMsg = `Halo *${u.nama}*, terdapat pembaharuan Dokumen SOP baru:\n\n*${sop.judul_sop}*\nNomor: ${sop.nomor_sop}\nPeran Anda: ${p.peran || '-'}\n\nHarap buka portal *TRANSKEP* untuk membaca dan mengkonfirmasi pemahaman Anda (Acknowledgment). Terima kasih.`;
+                  const encMsg = encodeURIComponent(rawMsg);
+                  const waLink = phone.length > 8 ? `https://wa.me/${phone}?text=${encMsg}` : '#';
+                  
+                  const btnHtml = phone.length > 8 
+                     ? `<a href="${waLink}" target="_blank" class="px-3 py-1.5 rounded-lg text-[10px] font-bold bg-emerald-600 hover:bg-emerald-500 text-white transition flex items-center gap-1"><i class="fa-solid fa-paper-plane"></i> Kirim WA</a>`
+                     : `<button disabled class="px-3 py-1.5 rounded-lg text-[10px] font-bold bg-slate-800 text-slate-500 cursor-not-allowed">No WA Kosong</button>`;
+
+                  container.innerHTML += `
+                     <div class="flex items-center justify-between p-3 bg-slate-900 rounded-lg hover:bg-slate-800 transition">
+                        <div>
+                           <p class="text-xs font-bold text-slate-200">${u.nama}</p>
+                           <p class="text-[10px] text-slate-500 font-mono mt-0.5">${u.no_hp || 'Tidak ada nomor'}</p>
+                        </div>
+                        ${btnHtml}
+                     </div>
+                  `;
+              }
+          });
+      }
+
+      const m = document.getElementById('modalWaSop');
+      m.classList.remove('hidden');
+      setTimeout(() => {
+          m.classList.remove('opacity-0');
+          m.firstElementChild.classList.remove('scale-95');
+      }, 10);
+  }
+
+  function closeModalWaSop() {
+      const m = document.getElementById('modalWaSop');
+      m.classList.add('opacity-0');
+      m.firstElementChild.classList.add('scale-95');
+      setTimeout(() => m.classList.add('hidden'), 300);
+  }
+
+
+  // ==========================================
+  // WA BLAST BULK REKAP PEGAWAI (ZETTBOT)
+  // ==========================================
+  function openWaRekapSopBlast(nip) {
+      const u = state.usersList.find(x => String(x.nip) === String(nip));
+      if(!u) return;
+
+      const sops = state.sopList.filter(sop => {
+          try {
+              const arr = JSON.parse(sop.pelaksana_json || '[]');
+              return arr.some(p => String(p.nip) === String(nip));
+          } catch(e) { return false; }
+      });
+
+      document.getElementById('waRekapSopUserName').innerText = u.nama.toUpperCase();
+      document.getElementById('waRekapSopTargetNip').value = u.nip; 
+
+      const container = document.getElementById('waRekapSopListContainer');
+      container.innerHTML = '';
+
+      sops.forEach(sop => {
+          let peranDetail = '-';
+          try {
+              const arr = JSON.parse(sop.pelaksana_json || '[]');
+              const found = arr.find(p => String(p.nip) === String(nip));
+              if(found && found.peran) peranDetail = found.peran;
+          } catch(e) {}
+
+          container.innerHTML += `
+              <label class="flex items-start gap-3 p-3 bg-slate-900 border border-slate-800 rounded-xl cursor-pointer hover:bg-slate-800 transition">
+                  <input type="checkbox" value="${sop.id}" class="wa-rekap-sop-checkbox mt-1 w-4 h-4 rounded border-slate-700 text-emerald-500 focus:ring-emerald-500 bg-slate-950">
+                  <div>
+                      <p class="text-sm font-bold text-slate-200 leading-tight">${sop.judul_sop}</p>
+                      <p class="text-[10px] text-slate-500 mt-1">Sebagai: <span class="text-indigo-400 font-bold">${peranDetail}</span></p>
+                  </div>
+              </label>
+          `;
+      });
+
+      const m = document.getElementById('modalWaRekapSop');
+      m.classList.remove('hidden');
+      setTimeout(() => {
+          m.classList.remove('opacity-0');
+          m.firstElementChild.classList.remove('scale-95');
+      }, 10);
+  }
+
+  function closeWaRekapSopBlast() {
+      const m = document.getElementById('modalWaRekapSop');
+      m.classList.add('opacity-0');
+      m.firstElementChild.classList.add('scale-95');
+      setTimeout(() => m.classList.add('hidden'), 300);
+  }
+
+  function toggleAllWaRekapSop() {
+      const checkboxes = document.querySelectorAll('.wa-rekap-sop-checkbox');
+      let allChecked = true;
+      checkboxes.forEach(cb => { if(!cb.checked) allChecked = false; });
+      checkboxes.forEach(cb => cb.checked = !allChecked);
+  }
+
+  function sendBulkWaRekapSop() {
+      const nip = document.getElementById('waRekapSopTargetNip').value;
+      const u = state.usersList.find(x => String(x.nip) === String(nip));
+      if(!u) return;
+
+      let phone = String(u.no_hp || '').replace(/[^0-9]/g, '');
+      if(phone.startsWith('0')) phone = '62' + phone.substring(1);
+
+      if(phone.length < 9) {
+          showNotify("Gagal Membuka WA", "Pegawai ini tidak memiliki nomor WhatsApp yang valid.", "error");
+          return;
+      }
+
+      const checkboxes = document.querySelectorAll('.wa-rekap-sop-checkbox:checked');
+      if(checkboxes.length === 0) {
+          showNotify("Pilih SOP", "Silakan centang minimal 1 SOP untuk dirakit ke dalam pesan.", "warning");
+          return;
+      }
+
+      let msg = `Halo *${u.nama}*, berikut adalah daftar Standar Operasional Prosedur (SOP) yang memuat Anda sebagai tim pelaksana:\n\n`;
+
+      checkboxes.forEach((cb, idx) => {
+          const sop = state.sopList.find(s => String(s.id) === String(cb.value));
+          if(sop) {
+              let peranDetail = '-';
+              try {
+                  const arr = JSON.parse(sop.pelaksana_json || '[]');
+                  const found = arr.find(p => String(p.nip) === String(nip));
+                  if(found && found.peran) peranDetail = found.peran;
+              } catch(e) {}
+              msg += `${idx + 1}. *${sop.judul_sop}*\n   Nomor: ${sop.nomor_sop}\n   Peran: ${peranDetail}\n\n`;
+          }
+      });
+
+      msg += `Harap segera membuka portal *TRANSKEP* untuk mengunduh PDF dan menekan tombol *Telah Dibaca & Dipahami* sebagai bukti kepatuhan (Acknowledgment). Terima kasih.`;
+
+      const encMsg = encodeURIComponent(msg);
+      const waLink = `https://wa.me/${phone}?text=${encMsg}`;
+
+      window.open(waLink, '_blank');
+  }
+
+
+  // ==========================================
+  // ACKNOWLEDGMENT (TANDA TERIMA) LOGIC
+  // ==========================================
+  function doAcknowledgeSop(sopId, nip) {
+      showCustomConfirm("Tandai Sudah Dibaca?", "Dengan menekan YA, Anda menyatakan telah membaca dan memahami isi dari Standar Operasional Prosedur ini.", () => {
+          const nowRaw = new Date();
+          const nowString = (("0"+nowRaw.getDate()).slice(-2)) + '/' + (("0"+(nowRaw.getMonth()+1)).slice(-2)) + '/' + nowRaw.getFullYear() + ' ' + nowRaw.toLocaleTimeString('en-GB');
+
+          if(!state.sopAckList) state.sopAckList = [];
+          state.sopAckList.push({
+              id: 'ACK-TEMP', sop_id: sopId, nip: nip, 
+              tanggal_baca: nowString
+          });
+          
+          renderSopRekap(); 
+          if (typeof updateSidebarBadges === 'function') updateSidebarBadges(); 
+
+          google.script.run
+              .withSuccessHandler(res => {
+                  if(res.status === 'success') {
+                      showNotify("Tercatat", res.message, "success");
+                  } else {
+                      state.sopAckList = state.sopAckList.filter(a => !(a.sop_id === sopId && a.nip === nip));
+                      renderSopRekap();
+                      if (typeof updateSidebarBadges === 'function') updateSidebarBadges();
+                      showNotify("Gagal", res.message, "error");
+                  }
+              })
+              .withFailureHandler(err => { 
+                  state.sopAckList = state.sopAckList.filter(a => !(a.sop_id === sopId && a.nip === nip));
+                  renderSopRekap();
+                  if (typeof updateSidebarBadges === 'function') updateSidebarBadges();
+                  showNotify("Error", err.message, "error"); 
+              })
+              .acknowledgeSop(sopId, nip);
+      });
+  }
+
+
+  // ==========================================
+  // UTILS KHUSUS SOP
+  // ==========================================
+  function getUserNameSop(nip) {
+      const u = state.usersList.find(x => String(x.nip) === String(nip));
+      return u ? u.nama : 'Unknown User';
+  }
+
+  function formatTgl(dateStr) {
+      if (!dateStr || dateStr === '-') return '-';
+      try {
+          const d = new Date(dateStr);
+          if(isNaN(d)) return dateStr; 
+          return d.toLocaleDateString('id-ID', {day: '2-digit', month: 'long', year: 'numeric'});
+      } catch(e) { return dateStr; }
+  }
+  
+  function formatDateForInput(dateStr) {
+      if (!dateStr || dateStr === '-') return '';
+      try {
+          const d = new Date(dateStr);
+          if (isNaN(d.getTime())) return dateStr;
+          return d.toISOString().split('T')[0];
+      } catch(e) { return ''; }
+  }
+
+</script>

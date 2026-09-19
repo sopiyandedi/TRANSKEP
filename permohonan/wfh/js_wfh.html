@@ -1,0 +1,465 @@
+<!-- =========================================================================
+     ZETTBOS MODULAR UI: JAVASCRIPT RENCANA WFH
+========================================================================== -->
+<script>
+    let currentEditIdWFH = null; // ZETTBOT FIX: State Edit ID
+
+    function openModalWFH(editId = null) {
+        if (!state || !state.user) {
+            showNotify("Sistem Memuat", "Silakan tunggu, data sistem belum siap.", "error");
+            return;
+        }
+        
+        currentEditIdWFH = editId;
+        document.getElementById('formWFH').reset();
+        document.getElementById('wfhTanggal').valueAsDate = new Date();
+        
+        // ZETTBOT FIX: Evaluasi Routing Role-Based & Alert Plh
+        const selAtasan = document.getElementById('wfhAtasan');
+        const alertPlh = document.getElementById('alertPlhWFH');
+        selAtasan.innerHTML = '<option value="">-- Pilih Penanggung Jawab --</option>';
+        
+        let atasanOpts = [];
+        let adaPlh = false;
+        const j = state.user.jabatan.toLowerCase();
+
+        function getPegawai(keyword) {
+            return state.usersList.filter(x => String(x.nip) !== String(state.user.nip) && x.jabatan.toLowerCase().includes(keyword));
+        }
+
+        // LOGIKA A: Hakim, Wakil Ketua, Ketua -> ke Ketua
+        if (j.includes("hakim") || j.includes("wakil ketua") || j === "ketua") {
+            let ketua = getPegawai("ketua").find(x => x.jabatan.toLowerCase() === "ketua");
+            if (ketua && typeof isPegawaiAbsent === 'function' && !isPegawaiAbsent(ketua.nip)) {
+                atasanOpts.push(ketua);
+            } else {
+                adaPlh = true;
+                let wakil = getPegawai("wakil ketua").find(x => x.jabatan.toLowerCase() === "wakil ketua");
+                if (wakil && typeof isPegawaiAbsent === 'function' && !isPegawaiAbsent(wakil.nip)) atasanOpts.push(wakil);
+                else { 
+                    let hakims = getPegawai("hakim").filter(x => typeof isPegawaiAbsent === 'function' ? !isPegawaiAbsent(x.nip) : true); 
+                    atasanOpts.push(...hakims); 
+                }
+            }
+        }
+        // LOGIKA B: Kepaniteraan (Panmud/PP/Jurusita) -> ke Panitera
+        else if (j.includes("panitera muda") || j.includes("panitera pengganti") || j.includes("jurusita") || j.includes("juru sita")) {
+            let panitera = getPegawai("panitera").find(x => x.jabatan.toLowerCase() === "panitera");
+            if (panitera && typeof isPegawaiAbsent === 'function' && !isPegawaiAbsent(panitera.nip)) {
+                atasanOpts.push(panitera);
+            } else {
+                adaPlh = true;
+                let panmuds = getPegawai("panitera muda").filter(x => typeof isPegawaiAbsent === 'function' ? !isPegawaiAbsent(x.nip) : true);
+                atasanOpts.push(...panmuds);
+            }
+        }
+        // LOGIKA C: Kesekretariatan (Kasubbag) -> ke Sekretaris
+        else if (j.includes("kepala sub bagian") || j.includes("kasubbag")) {
+            let sekretaris = getPegawai("sekretaris").find(x => x.jabatan.toLowerCase() === "sekretaris");
+            if (sekretaris && typeof isPegawaiAbsent === 'function' && !isPegawaiAbsent(sekretaris.nip)) {
+                atasanOpts.push(sekretaris);
+            } else {
+                adaPlh = true;
+                let kasubbags = getPegawai("kepala sub bagian").filter(x => typeof isPegawaiAbsent === 'function' ? !isPegawaiAbsent(x.nip) : true);
+                if(kasubbags.length === 0) kasubbags = getPegawai("kasubbag").filter(x => typeof isPegawaiAbsent === 'function' ? !isPegawaiAbsent(x.nip) : true);
+                atasanOpts.push(...kasubbags);
+            }
+        }
+        // LOGIKA D: Selainnya (Tampilkan Ketiganya + Plh)
+        else {
+            let ketua = getPegawai("ketua").find(x => x.jabatan.toLowerCase() === "ketua");
+            if (ketua && typeof isPegawaiAbsent === 'function' && !isPegawaiAbsent(ketua.nip)) atasanOpts.push(ketua);
+            else {
+                adaPlh = true;
+                let wakil = getPegawai("wakil ketua").find(x => x.jabatan.toLowerCase() === "wakil ketua");
+                if (wakil && typeof isPegawaiAbsent === 'function' && !isPegawaiAbsent(wakil.nip)) atasanOpts.push(wakil);
+                else { let hakims = getPegawai("hakim").filter(x => typeof isPegawaiAbsent === 'function' ? !isPegawaiAbsent(x.nip) : true); atasanOpts.push(...hakims); }
+            }
+            let panitera = getPegawai("panitera").find(x => x.jabatan.toLowerCase() === "panitera");
+            if (panitera && typeof isPegawaiAbsent === 'function' && !isPegawaiAbsent(panitera.nip)) atasanOpts.push(panitera);
+            else {
+                adaPlh = true;
+                let panmuds = getPegawai("panitera muda").filter(x => typeof isPegawaiAbsent === 'function' ? !isPegawaiAbsent(x.nip) : true);
+                atasanOpts.push(...panmuds);
+            }
+            let sekretaris = getPegawai("sekretaris").find(x => x.jabatan.toLowerCase() === "sekretaris");
+            if (sekretaris && typeof isPegawaiAbsent === 'function' && !isPegawaiAbsent(sekretaris.nip)) atasanOpts.push(sekretaris);
+            else {
+                adaPlh = true;
+                let kasubbags = getPegawai("kepala sub bagian").filter(x => typeof isPegawaiAbsent === 'function' ? !isPegawaiAbsent(x.nip) : true);
+                if(kasubbags.length === 0) kasubbags = getPegawai("kasubbag").filter(x => typeof isPegawaiAbsent === 'function' ? !isPegawaiAbsent(x.nip) : true);
+                atasanOpts.push(...kasubbags);
+            }
+        }
+
+        atasanOpts = [...new Map(atasanOpts.map(item => [item.nip, item])).values()];
+        if (adaPlh && alertPlh) alertPlh.classList.remove('hidden');
+        else if (alertPlh) alertPlh.classList.add('hidden');
+
+        atasanOpts.forEach(o => { 
+            selAtasan.innerHTML += `<option value="${o.nip}">${o.nama} (${o.jabatan})</option>`; 
+        });
+        if (atasanOpts.length === 1) selAtasan.value = atasanOpts[0].nip;
+
+        document.getElementById('wfhTabelBody').innerHTML = '';
+
+        if (currentEditIdWFH) {
+            const log = state.wfhLogs.find(l => String(l.id) === String(currentEditIdWFH));
+            if (log) {
+                document.getElementById('wfhTanggal').value = log.tanggal;
+                document.getElementById('wfhAtasan').value = log.atasan_nip;
+                
+                try {
+                    const targetList = JSON.parse(log.rencana_json || '[]');
+                    if (targetList.length > 0) {
+                        targetList.forEach(t => addBarisWFHDenganData(t.deskripsi, t.kuantitas));
+                    } else { addBarisWFH(); }
+                } catch(e) { addBarisWFH(); }
+            }
+        } else {
+            addBarisWFH();
+        }
+
+        const modal = document.getElementById('modalFormWFH');
+        if (modal.parentNode !== document.body) document.body.appendChild(modal); 
+        
+        modal.classList.remove('hidden');
+        setTimeout(() => { if(modal.firstElementChild) modal.firstElementChild.classList.remove('scale-95'); }, 10);
+    }
+
+    function closeModalWFH() {
+        const modal = document.getElementById('modalFormWFH');
+        if(modal && modal.firstElementChild) {
+            modal.firstElementChild.classList.add('scale-95');
+            setTimeout(() => { modal.classList.add('hidden'); }, 200);
+        }
+    }
+
+    function addBarisWFH() {
+        const tbody = document.getElementById('wfhTabelBody');
+        const rowCount = tbody.children.length + 1;
+        const tr = document.createElement('tr');
+        tr.className = 'border-b border-slate-800/50 group target-row';
+        tr.innerHTML = `
+            <td class="py-3 text-center text-slate-500 font-mono text-[10px] row-number align-top pt-5">${rowCount}</td>
+            <td class="py-3 px-2 align-top">
+                <textarea required rows="2" placeholder="Cth: Menyusun draf laporan..." class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 text-xs focus:outline-none focus:border-amber-500 target-deskripsi transition resize-none custom-scrollbar"></textarea>
+            </td>
+            <td class="py-3 px-2 align-top">
+                <input type="text" required placeholder="Cth: 1 Dokumen" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 text-xs focus:outline-none focus:border-amber-500 target-kuantitas transition">
+            </td>
+            <td class="py-3 text-center align-top pt-4">
+                <button type="button" onclick="removeBarisWFH(this)" class="text-slate-500 hover:text-rose-500 transition w-7 h-7 flex items-center justify-center rounded-md hover:bg-rose-500/10 mx-auto opacity-50 group-hover:opacity-100" title="Hapus Baris">
+                    <i class="fa-solid fa-trash-can text-xs"></i>
+                </button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+        updateNomorUrutWFH();
+    }
+
+    function removeBarisWFH(btn) {
+        const tbody = document.getElementById('wfhTabelBody');
+        if (tbody.children.length <= 1) {
+            showNotify("Peringatan", "Minimal harus ada 1 target kerja yang direncanakan.", "warning");
+            return;
+        }
+        const tr = btn.closest('tr');
+        tr.remove();
+        updateNomorUrutWFH();
+    }
+
+    function addBarisWFHDenganData(desk, qty) {
+        const tbody = document.getElementById('wfhTabelBody');
+        const rowCount = tbody.children.length + 1;
+        const tr = document.createElement('tr');
+        tr.className = 'border-b border-slate-800/50 group target-row';
+        tr.innerHTML = `
+            <td class="py-3 text-center text-slate-500 font-mono text-[10px] row-number align-top pt-5">${rowCount}</td>
+            <td class="py-3 px-2 align-top">
+                <textarea required rows="2" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 text-xs focus:outline-none focus:border-amber-500 target-deskripsi transition resize-none custom-scrollbar">${desk}</textarea>
+            </td>
+            <td class="py-3 px-2 align-top">
+                <input type="text" required value="${qty}" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 text-xs focus:outline-none focus:border-amber-500 target-kuantitas transition">
+            </td>
+            <td class="py-3 text-center align-top pt-4">
+                <button type="button" onclick="removeBarisWFH(this)" class="text-slate-500 hover:text-rose-500 transition w-7 h-7 flex items-center justify-center rounded-md hover:bg-rose-500/10 mx-auto opacity-50 group-hover:opacity-100" title="Hapus Baris">
+                    <i class="fa-solid fa-trash-can text-xs"></i>
+                </button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    }
+
+    function updateNomorUrutWFH() {
+        const rows = document.querySelectorAll('#wfhTabelBody tr');
+        rows.forEach((row, index) => {
+            const cell = row.querySelector('.row-number');
+            if(cell) cell.innerText = index + 1;
+        });
+    }
+
+    function submitFormWFH(e) {
+        e.preventDefault();
+        
+        if(!state.user) {
+            showNotify("Sesi Berakhir", "Harap login ulang.", "error");
+            return;
+        }
+
+        const tglPilih = document.getElementById('wfhTanggal').value;
+        
+        if (new Date(tglPilih).getDay() !== 5) {
+            showNotify("Tanggal Ditolak", "Sesuai aturan, pelaksanaan WFH hanya diizinkan pada hari Jumat.", "warning");
+            return;
+        }
+
+        let targetList = [];
+        const rows = document.querySelectorAll('.target-row');
+        rows.forEach(row => {
+            const desk = row.querySelector('.target-deskripsi').value;
+            const qty = row.querySelector('.target-kuantitas').value;
+            if(desk.trim() !== '' && qty.trim() !== '') {
+                targetList.push({ deskripsi: desk, kuantitas: qty, realisasi: '', status_capaian: '' });
+            }
+        });
+
+        if(targetList.length === 0) {
+            showNotify("Validasi Gagal", "Target kerja tidak boleh kosong.", "error");
+            return;
+        }
+        
+        const payload = {
+            id: currentEditIdWFH,
+            nip: state.user.nip,
+            tanggal: tglPilih,
+            atasan_nip: document.getElementById('wfhAtasan').value,
+            rencana_json: JSON.stringify(targetList),
+        };
+        
+        showLoading(currentEditIdWFH ? "Memperbarui Rencana WFH..." : "Mengirimkan Rencana WFH...");
+        
+        if (typeof google !== 'undefined') {
+            // ZETTBOT FIX: Simpan handler ke variabel runner
+            const runner = google.script.run
+              .withSuccessHandler(function(res) {
+                 hideLoading();
+                 if(res.status === 'success') {
+                    closeModalWFH();
+                    showNotify("Berhasil Disimpan", res.message, "success");
+                    
+                    if (currentEditIdWFH) {
+                        const idx = state.wfhLogs.findIndex(l => String(l.id) === String(currentEditIdWFH));
+                        if (idx !== -1) {
+                            state.wfhLogs[idx].tanggal = payload.tanggal;
+                            state.wfhLogs[idx].atasan_nip = payload.atasan_nip;
+                            state.wfhLogs[idx].rencana_json = payload.rencana_json;
+                            state.wfhLogs[idx].status_rencana = 'Menunggu';
+                        }
+                    } else {
+                        const virtualLog = {
+                            id: (res.data && res.data.id) ? res.data.id : "WFH-VIRTUAL-" + Date.now(),
+                            tgl_pengajuan: new Date().toLocaleDateString('id-ID'), 
+                            nip: payload.nip,
+                            tanggal: payload.tanggal,
+                            rencana_json: payload.rencana_json,
+                            laporan_json: "",
+                            atasan_nip: payload.atasan_nip,
+                            status_rencana: 'Menunggu',
+                            status_laporan: 'Belum Lapor',
+                            z_type: 'WFH',
+                            z_sort: Date.now() 
+                        };
+                        
+                        if (state && state.wfhLogs) {
+                            state.wfhLogs.unshift(virtualLog);
+                        }
+                    }
+
+                    if (typeof renderPermohonanView === 'function') {
+                        renderPermohonanView();
+                    }
+                 } else {
+                    showNotify("Gagal", res.message, "error");
+                 }
+              })
+              .withFailureHandler(function(err) {
+                 hideLoading();
+                 showNotify("Error Jaringan", err.toString(), "error");
+              });
+              
+            // ZETTBOT FIX: Eksekusi runner sesuai kondisi
+            if (currentEditIdWFH) {
+                runner.updateRencanaWfhLog(payload);
+            } else {
+                runner.submitRencanaWFH(payload);
+            }
+        } else {
+            setTimeout(() => {
+                hideLoading();
+                closeModalWFH();
+                alert("[CANVAS MODE] Simulasi berhasil!");
+            }, 1000);
+        }
+    }
+    
+    // =========================================================
+    // FUNGSI LAPORAN WFH (TAHAP 4 / AUTO-FILL)
+    // =========================================================
+    
+    function openModalLaporanWFH(id) {
+        if (!state || !state.user) {
+            showNotify("Sistem Memuat", "Silakan tunggu, data sistem belum siap.", "error");
+            return;
+        }
+        
+        showLoading("Menarik data rencana...");
+        if (typeof google !== 'undefined') {
+            google.script.run
+                .withSuccessHandler(function(res) {
+                    hideLoading();
+                    if(res.status === 'success') {
+                        renderFormLaporan(res.data);
+                    } else {
+                        showNotify("Gagal", res.message, "error");
+                    }
+                })
+                .withFailureHandler(function(err) {
+                    hideLoading();
+                    showNotify("Error Jaringan", err.toString(), "error");
+                })
+                .getRencanaWFHById(id);
+        } else {
+            hideLoading();
+            alert("[CANVAS MODE] Simulasi tarik data ID: " + id);
+        }
+    }
+    
+    function renderFormLaporan(data) {
+        document.getElementById('formLaporanWFH').reset();
+        document.getElementById('laporanWfhId').value = data.id;
+        
+        const tbody = document.getElementById('laporanWfhTabelBody');
+        tbody.innerHTML = '';
+        
+        try {
+            const targetList = JSON.parse(data.rencana_json || '[]');
+            
+            // ZETTBOT FIX: Baca data Laporan lama jika ini mode Soft Edit
+            let laporanList = [];
+            try { laporanList = JSON.parse(data.laporan_json || '[]'); } catch(e) {}
+
+            if(targetList.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" class="py-4 text-center text-rose-500 font-bold">Data rencana kosong atau tidak valid!</td></tr>';
+            } else {
+                targetList.forEach((item, idx) => {
+                    // Cek apakah ada data realisasi sebelumnya di index yang sama
+                    let realisasiLama = "";
+                    let statusLama = "";
+                    if (laporanList[idx]) {
+                        realisasiLama = laporanList[idx].realisasi || "";
+                        statusLama = laporanList[idx].status_capaian || "";
+                    }
+
+                    const tr = document.createElement('tr');
+                    tr.className = 'border-b border-slate-800/50 laporan-row';
+                    tr.innerHTML = `
+                        <td class="py-3 text-center text-slate-500 font-mono text-[10px] align-top mt-2 block">${idx + 1}</td>
+                        <td class="py-3 px-2 align-top">
+                            <div class="bg-slate-900/50 border border-slate-800 p-2 rounded-lg text-slate-400 text-xs h-full min-h-[60px] flex flex-col justify-center">
+                                <div class="font-bold mb-1">${item.deskripsi}</div>
+                                <div class="text-[9px] text-amber-400/80 mt-auto">Target Qty: ${item.kuantitas}</div>
+                            </div>
+                            <input type="hidden" class="laporan-deskripsi" value="${item.deskripsi.replace(/"/g, '&quot;')}">
+                            <input type="hidden" class="laporan-kuantitas" value="${item.kuantitas.replace(/"/g, '&quot;')}">
+                        </td>
+                        <td class="py-3 px-2 align-top">
+                            <textarea required placeholder="Jelaskan hasil capaian..." class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 text-xs focus:outline-none focus:border-emerald-500 laporan-realisasi transition min-h-[60px] resize-none custom-scrollbar">${realisasiLama}</textarea>
+                        </td>
+                        <td class="py-3 px-2 align-top">
+                            <select required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 text-xs focus:outline-none focus:border-emerald-500 laporan-status transition h-full min-h-[60px]">
+                                <option value="">-- Pilih --</option>
+                                <option value="Selesai (Tercapai)" ${statusLama === 'Selesai (Tercapai)' ? 'selected' : ''}>Selesai (Tercapai)</option>
+                                <option value="Belum Selesai (Proses)" ${statusLama === 'Belum Selesai (Proses)' ? 'selected' : ''}>Belum Selesai (Proses)</option>
+                                <option value="Terkendala" ${statusLama === 'Terkendala' ? 'selected' : ''}>Terkendala</option>
+                            </select>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
+        } catch(e) {
+            tbody.innerHTML = '<tr><td colspan="4" class="py-4 text-center text-rose-500 font-bold">Error membaca JSON Rencana!</td></tr>';
+        }
+        
+        const modal = document.getElementById('modalFormLaporanWFH');
+        if (modal.parentNode !== document.body) document.body.appendChild(modal); 
+        modal.classList.remove('hidden');
+        setTimeout(() => { if(modal.firstElementChild) modal.firstElementChild.classList.remove('scale-95'); }, 10);
+    }
+    
+    function closeModalLaporanWFH() {
+        const modal = document.getElementById('modalFormLaporanWFH');
+        if(modal && modal.firstElementChild) {
+            modal.firstElementChild.classList.add('scale-95');
+            setTimeout(() => { modal.classList.add('hidden'); }, 200);
+        }
+    }
+    
+    function submitFormLaporanWFH(e) {
+        e.preventDefault();
+        if(!state.user) { showNotify("Sesi Berakhir", "Harap login ulang.", "error"); return; }
+        
+        const id = document.getElementById('laporanWfhId').value;
+        let hasilList = [];
+        const rows = document.querySelectorAll('.laporan-row');
+        
+        rows.forEach(row => {
+            const desk = row.querySelector('.laporan-deskripsi').value;
+            const qty = row.querySelector('.laporan-kuantitas').value;
+            const real = row.querySelector('.laporan-realisasi').value;
+            const stat = row.querySelector('.laporan-status').value;
+            
+            hasilList.push({ deskripsi: desk, kuantitas: qty, realisasi: real, status_capaian: stat });
+        });
+        
+        if(hasilList.length === 0) {
+            showNotify("Validasi Gagal", "Data target kosong.", "error"); return;
+        }
+        
+        const payload = { id: id, laporan_json: JSON.stringify(hasilList) };
+        
+        showLoading("Mengirimkan Laporan WFH...");
+        if (typeof google !== 'undefined') {
+            google.script.run
+              .withSuccessHandler(function(res) {
+                 hideLoading();
+                 if(res.status === 'success') {
+                    closeModalLaporanWFH();
+                    showNotify("Laporan Terkirim", res.message, "success");
+                    
+                    // Optimistic UI Update untuk Laporan WFH
+                    const idx = state.wfhLogs.findIndex(l => String(l.id) === String(id));
+                    if (idx !== -1) {
+                        state.wfhLogs[idx].laporan_json = payload.laporan_json;
+                        state.wfhLogs[idx].status_laporan = 'Menunggu';
+                        if (typeof renderPermohonanView === 'function') renderPermohonanView();
+                    }
+                 } else {
+                    showNotify("Gagal", res.message, "error");
+                 }
+              })
+              .withFailureHandler(function(err) {
+                 hideLoading();
+                 showNotify("Error Jaringan", err.toString(), "error");
+              })
+              .submitLaporanWFH(payload);
+        } else {
+            setTimeout(() => {
+                hideLoading();
+                closeModalLaporanWFH();
+                alert("[CANVAS MODE] Laporan Terkirim!");
+            }, 1000);
+        }
+    }
+</script>

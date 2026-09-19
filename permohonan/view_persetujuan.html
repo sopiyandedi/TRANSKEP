@@ -1,0 +1,145 @@
+<div class="glass border border-slate-900 rounded-3xl p-6 flex flex-col h-[580px] relative overflow-hidden">
+  <div class="mb-4 flex flex-col md:flex-row md:items-end justify-between gap-4">
+    <div>
+      <h3 class="text-lg font-bold text-slate-200"><i class="fa-solid fa-list-check text-indigo-400 mr-2"></i> Kotak Masuk Verifikasi</h3>
+      <p class="text-slate-500 text-xs mt-1">Daftar berkas pengajuan dan usulan pembatalan yang membutuhkan verifikasi Anda.</p>
+    </div>
+    
+    <div id="bypassToggleContainer" class="hidden flex-col sm:flex-row items-start sm:items-center gap-2 bg-slate-900/50 p-1.5 rounded-xl border border-slate-800">
+       <span class="text-[10px] font-bold text-slate-500 uppercase px-2"><i class="fa-solid fa-key text-indigo-400 mr-1"></i> Mode Bypass:</span>
+       <div class="flex gap-2 w-full sm:w-auto">
+         <button id="btnBypassAtasan" onclick="toggleBypassMode('atasan')" class="flex-1 sm:flex-none px-4 py-2 rounded-lg text-xs font-bold transition border border-transparent text-slate-400 hover:bg-slate-800">
+            Atasan Langsung
+         </button>
+         <button id="btnBypassPejabat" onclick="toggleBypassMode('pejabat')" class="flex-1 sm:flex-none px-4 py-2 rounded-lg text-xs font-bold transition border border-transparent text-slate-400 hover:bg-slate-800">
+            Pejabat Berwenang
+         </button>
+       </div>
+    </div>
+  </div>
+
+  <div class="flex-1 overflow-auto border border-slate-900 rounded-2xl bg-slate-950/40 pb-20">
+    <table class="w-full text-left text-xs border-collapse">
+      <thead>
+        <tr class="border-b border-slate-900 bg-slate-900/40 text-slate-400 font-semibold sticky top-0 z-10">
+          <th class="p-4 w-12 text-center">
+             <!-- ZETTBOT FIX: Master Checkbox -->
+             <input type="checkbox" id="chkMasterBulk" onclick="toggleAllBulk(this)" class="w-4 h-4 rounded border-slate-600 bg-slate-900 focus:ring-indigo-500 cursor-pointer accent-indigo-600">
+          </th>
+          <th class="p-4">Identitas Pegawai</th>
+          <th class="p-4">Jenis & Alasan</th>
+          <th class="p-4">Durasi Tanggal</th>
+          <th class="p-4">Posisi Peninjauan Anda</th>
+          <th class="p-4">Status Transaksi</th>
+          <th class="p-4 text-center">Aksi Keputusan</th>
+        </tr>
+      </thead>
+      <tbody id="tblApprovalBody">
+        <!-- Dinamis via JS -->
+      </tbody>
+    </table>
+  </div>
+
+  <!-- FLOATING BULK ACTION BAR (Melayang di bawah tabel) -->
+  <div id="bulkActionBar" class="absolute bottom-6 left-1/2 transform -translate-x-1/2 bg-slate-800 border border-indigo-500/50 shadow-[0_10px_40px_rgba(99,102,241,0.3)] rounded-full px-6 py-3 flex items-center gap-6 z-[40] transition-all duration-500 translate-y-32 opacity-0 pointer-events-none">
+     <div class="border-r border-slate-600 pr-6 text-sm font-bold text-slate-200 flex items-center gap-2">
+         <div class="w-6 h-6 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center text-xs" id="bulkCountTxt">0</div>
+         <span class="hidden sm:inline">Berkas Terpilih</span>
+     </div>
+     <div class="flex gap-3">
+         <button onclick="openBulkModal('Ditolak')" class="px-4 py-2 bg-rose-500/10 hover:bg-rose-500 text-rose-400 hover:text-white rounded-xl text-xs font-bold border border-rose-500/20 transition flex items-center gap-2">
+             <i class="fa-solid fa-xmark"></i> Tolak
+         </button>
+         <button onclick="openBulkModal('Disetujui')" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-emerald-600/20 transition flex items-center gap-2">
+             <i class="fa-solid fa-check-double"></i> Setujui Masal
+         </button>
+     </div>
+  </div>
+</div>
+
+<!-- MODAL VERIFIKASI TUNGGAL (Asli) -->
+<div id="modalApproval" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-[80] flex items-center justify-center p-4 hidden">
+  <div class="w-full max-w-lg glass border border-slate-800 p-6 rounded-3xl shadow-2xl scale-95 transition-all">
+    <div class="flex items-center justify-between pb-4 border-b border-slate-800 mb-6">
+      <h3 class="text-lg font-bold text-white"><i class="fa-solid fa-gavel text-indigo-400 mr-2"></i> Verifikasi Berkas</h3>
+      <button onclick="closeApprovalModal()" class="text-slate-400 hover:text-slate-100"><i class="fa-solid fa-xmark text-lg"></i></button>
+    </div>
+
+    <div class="space-y-4 mb-6 text-sm">
+      <input type="hidden" id="appTargetId">
+      
+      <div id="appModalBatalInfo" class="hidden bg-purple-500/10 border border-purple-500/20 p-4 rounded-xl flex items-start gap-3">
+         <i class="fa-solid fa-file-circle-xmark text-purple-400 mt-1 text-lg"></i>
+         <div>
+            <h4 class="text-purple-300 text-xs font-bold uppercase tracking-wider mb-1">Usulan Pembatalan Cuti</h4>
+            <p id="teksAlasanBatal" class="text-purple-200/80 text-sm italic font-medium leading-relaxed"></p>
+         </div>
+      </div>
+
+      <div class="grid grid-cols-2 gap-4 bg-slate-900/40 border border-slate-800 p-4 rounded-2xl">
+        <div>
+          <span class="text-xs text-slate-500 font-medium">Nama Pegawai:</span>
+          <div id="appModalNama" class="font-bold text-slate-200 mt-0.5">-</div>
+        </div>
+        <div>
+          <span class="text-xs text-slate-500 font-medium">NIP Pegawai:</span>
+          <div id="appModalNip" class="font-mono text-slate-300 mt-0.5">-</div>
+        </div>
+        <div class="col-span-2 border-t border-slate-800/60 pt-3">
+          <span class="text-xs text-slate-500 font-medium">Jenis / Alasan Cuti Asli:</span>
+          <div class="text-slate-300 mt-0.5 font-semibold"><span id="appModalJenis">-</span> - <span id="appModalAlasan" class="text-slate-400 font-normal italic">-</span></div>
+        </div>
+        
+        <div id="appModalBuktiContainer" class="col-span-2 border-t border-slate-800/60 pt-3 hidden">
+          <span class="text-xs text-slate-500 font-medium">Lampiran Bukti Dukung:</span>
+          <div class="mt-1.5">
+            <a id="appModalBuktiLink" href="#" target="_blank" class="inline-flex items-center gap-2 px-3 py-2 bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500 hover:text-white border border-indigo-500/20 rounded-xl text-xs font-bold transition">
+              <i class="fa-solid fa-file-arrow-down text-sm"></i> Lihat Dokumen Bukti
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <label class="block text-xs font-semibold text-slate-400 uppercase mb-1.5">Catatan Pendapat / Tanggapan Dinas</label>
+        <textarea id="appModalCatatan" required rows="3" placeholder="Tulis catatan pertimbangan dinas Anda..."
+          class="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-200"></textarea>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-2 gap-3">
+      <button onclick="submitApprovalDecision('Ditolak')" class="py-3 bg-rose-500/10 hover:bg-rose-500 border border-rose-500/20 hover:border-rose-500 text-rose-400 hover:text-white font-semibold rounded-xl transition duration-200">
+        <i class="fa-solid fa-circle-xmark mr-2"></i> Tolak Usulan
+      </button>
+      <button onclick="submitApprovalDecision('Disetujui')" class="py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-xl shadow-lg shadow-emerald-600/20 transition duration-200">
+        <i class="fa-solid fa-circle-check mr-2"></i> Setujui Berkas
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL VERIFIKASI MAJEMUK (BULK) -->
+<div id="modalBulkApproval" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-[100] flex items-center justify-center p-4 hidden">
+  <div class="w-full max-w-sm glass border border-indigo-500/30 p-6 rounded-3xl shadow-2xl scale-95 transition-all">
+    <div class="text-center mb-6">
+        <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-indigo-500/10 text-indigo-400 mb-3 border border-indigo-500/20 shadow-[0_0_15px_rgba(99,102,241,0.2)]">
+            <i class="fa-solid fa-layer-group text-2xl"></i>
+        </div>
+        <h3 class="text-lg font-bold text-white tracking-wide">Persetujuan Majemuk</h3>
+        <p class="text-xs text-slate-400 mt-1 leading-relaxed">Anda akan menerapkan keputusan <span id="bulkDecisionBadge" class="font-bold">...</span> untuk <span id="bulkCountBadge" class="font-bold text-white bg-slate-800 px-1.5 py-0.5 rounded">0</span> berkas secara serentak.</p>
+    </div>
+
+    <div class="mb-6 text-left">
+        <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 pl-1">Satu Catatan Untuk Semua (Opsional)</label>
+        <textarea id="bulkModalCatatan" required rows="3" placeholder="Contoh: ACC, laksanakan dengan baik..."
+          class="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-200 resize-none">ACC</textarea>
+    </div>
+
+    <div class="flex gap-3">
+      <button onclick="closeBulkModal()" class="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-xl transition border border-slate-700">Batal</button>
+      <button onclick="submitBulkApproval()" class="flex-1 py-3 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-indigo-600/20 transition flex items-center justify-center gap-2">
+        <i class="fa-solid fa-bolt"></i> Eksekusi Bulk
+      </button>
+    </div>
+  </div>
+</div>

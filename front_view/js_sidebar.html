@@ -1,0 +1,107 @@
+  <script>
+    // =========================================================
+    // KOMPONEN: JS SIDEBAR
+    // Fungsi: Menangani Animasi Collapse Sidebar & Mobile Overlay
+    // =========================================================
+
+    let isSidebarCollapsed = false;
+
+    // 1. Fungsi Collapse Desktop (SIKEP Style - Ikon Saja)
+    function toggleDesktopSidebar() {
+        const sidebar = document.getElementById('main-sidebar');
+        const texts = document.querySelectorAll('.sidebar-text');
+        const tooltips = document.querySelectorAll('.sidebar-tooltip');
+        const textContainer = document.getElementById('sidebar-text-container');
+        const btnToggleDesktop = document.getElementById('btn-toggle-desktop');
+        const headerBox = document.getElementById('sidebar-header-box');
+        const logoWrapper = document.getElementById('sidebar-logo-wrapper');
+        const sectionHeaders = document.querySelectorAll('.sidebar-section-header');
+        const navButtons = sidebar.querySelectorAll('button[id^="nav-"]');
+
+        isSidebarCollapsed = !isSidebarCollapsed;
+
+        if (isSidebarCollapsed) {
+            // Perkecil Sidebar
+            sidebar.classList.remove('w-72');
+            sidebar.classList.add('w-[84px]'); 
+            
+            // Hapus semua padding horizontal agar container benar-benar netral
+            headerBox.classList.remove('pl-5', 'pr-1', 'justify-between');
+            headerBox.classList.add('px-0', 'justify-center');
+            
+            // Hilangkan gap dan paksakan logoWrapper ke tengah
+            logoWrapper.classList.remove('gap-3');
+            logoWrapper.classList.add('w-full', 'justify-center');
+            
+            // ZETTBOT BUG FIX: Paksa 'display: none' untuk mengalahkan 'lg:flex' milik Tailwind 
+            // yang sebelumnya diam-diam memakan wujud fisik tombol strip 3
+            textContainer.style.display = 'none';
+            btnToggleDesktop.style.display = 'none';
+            
+            // Kosongkan opacity untuk transisi kembalinya nanti
+            textContainer.style.opacity = '0';
+            btnToggleDesktop.style.opacity = '0';
+
+            // Sembunyikan Header Kategori
+            sectionHeaders.forEach(el => { el.style.opacity = '0'; setTimeout(() => el.style.display = 'none', 300); });
+            
+            // Sembunyikan Teks Menu
+            texts.forEach(el => { el.style.opacity = '0'; setTimeout(() => el.style.display = 'none', 300); });
+            
+            // Pusatkan Ikon & Aktifkan Tooltip
+            navButtons.forEach(btn => btn.classList.add('justify-center', 'px-0'));
+            tooltips.forEach(el => el.classList.remove('hidden'));
+
+        } else {
+            // Lebarkan Sidebar
+            sidebar.classList.add('w-72');
+            sidebar.classList.remove('w-[84px]');
+            
+            // Kembalikan Posisi Header Normal (pl-5 dan pr-1)
+            headerBox.classList.remove('px-0', 'justify-center');
+            headerBox.classList.add('pl-5', 'pr-1', 'justify-between');
+
+            // Kembalikan gap teks dan logo
+            logoWrapper.classList.add('gap-3');
+            logoWrapper.classList.remove('w-full', 'justify-center');
+
+            // Munculkan kembali wujud fisik Teks & Tombol Strip 3
+            textContainer.style.display = '';
+            btnToggleDesktop.style.display = '';
+            
+            // Beri sedikit jeda agar transisi opacity bekerja mulus
+            setTimeout(() => {
+              textContainer.style.opacity = '1';
+              btnToggleDesktop.style.opacity = '1';
+            }, 10);
+
+            sectionHeaders.forEach(el => { el.style.display = ''; setTimeout(() => el.style.opacity = '1', 10); });
+            
+            texts.forEach(el => { el.style.display = ''; setTimeout(() => el.style.opacity = '1', 10); });
+            
+            // Kembalikan Posisi Normal Ikon & Matikan Tooltip
+            navButtons.forEach(btn => btn.classList.remove('justify-center', 'px-0'));
+            tooltips.forEach(el => el.classList.add('hidden'));
+        }
+    }
+
+    // 2. Fungsi Buka Sidebar Mobile (SI-ASN Style - Offcanvas)
+    function openMobileSidebar() {
+        const sidebar = document.getElementById('main-sidebar');
+        const overlay = document.getElementById('sidebar-overlay');
+        
+        sidebar.classList.remove('-translate-x-full');
+        overlay.classList.remove('hidden');
+        setTimeout(() => overlay.classList.remove('opacity-0'), 10);
+    }
+
+    // 3. Fungsi Tutup Sidebar Mobile
+    function closeMobileSidebar() {
+        const sidebar = document.getElementById('main-sidebar');
+        const overlay = document.getElementById('sidebar-overlay');
+        
+        sidebar.classList.add('-translate-x-full');
+        overlay.classList.add('opacity-0');
+        setTimeout(() => overlay.classList.add('hidden'), 300);
+    }
+  </script>

@@ -1,0 +1,417 @@
+<!-- ==========================================
+     FILE: template_cetak_spd.html (Template Kertas SPD 2 Halaman)
+     ========================================== -->
+<!-- ZETTBOT FIX NUKLIR: Ganti ID jadi super unik agar tidak narik file backup -->
+<div id="spd-nuklir-2026" style="display: none;" class="hidden no-print">
+  <style>
+    /* ==========================================
+       ZETTBOT FIX: SETTING KERTAS & MARGIN
+       ========================================== */
+    @media print {
+      @page { 
+          size: A4 portrait; 
+          margin: 0mm !important; 
+      }
+      html, body { 
+          background-color: white !important; 
+          color: black !important; 
+          font-family: 'Bookman Old Style', 'Times New Roman', serif !important; 
+          font-size: 11pt !important; 
+          line-height: 1.15 !important; 
+          margin: 0 !important;
+          padding: 0 !important;
+      }
+      .no-print { display: none !important; }
+      .page-break { page-break-before: always; }
+    }
+    
+    /* ⬇️ TAG 8: LEBAR KERTAS (KANAN & KIRI) ⬇️ */
+    .spd-wrapper { 
+        width: 100%; 
+        max-width: 210mm;
+        margin: 0 auto; 
+        /* ZETTBOT FIX TAHAP 1: Padding disesuaikan agar layout melebar proporsional */
+        padding: 10mm 10mm 10mm 11mm; /* Atas, Kanan, Bawah, Kiri */
+        box-sizing: border-box; 
+        font-family: 'Bookman Old Style', 'Times New Roman', serif; 
+        font-size: 11pt; 
+        color: black; 
+        line-height: 1.15; 
+    }
+    /* ⬆️ ========================================================= ⬆️ */
+    
+    .spd-header-table { width: 100%; border: none; margin-bottom: 20px; font-size: 11pt; }
+    .spd-header-table td { padding: 1px 0; vertical-align: top; }
+    
+    .spd-title { text-align: center; margin-bottom: 15px; }
+    .spd-title h4 { margin: 0; font-size: 12pt; font-weight: bold; text-decoration: underline; letter-spacing: 1px; }
+    
+    .spd-main-table { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
+    
+    /* ⬇️ TAG 1: TINGGI/SPASI "NAPAS" KOLOM TABEL HALAMAN 1 ⬇️ */
+    .spd-main-table th, .spd-main-table td { border: 1px solid black; padding: 6px 8px; vertical-align: top; }
+    /* ⬆️ ========================================================= ⬆️ */
+
+    /* ⬇️ TAG 2: GESER GARIS TENGAH HALAMAN 1 ⬇️ */
+    .col-num { width: 4%; text-align: center; }
+    .col-label { width: 50%; } 
+    .col-value { width: 46%; } 
+    /* ⬆️ ========================================================= ⬆️ */
+
+    .td-no-pad { padding: 0 !important; }
+
+    .list-table { width: 100%; border-collapse: collapse; border: none; }
+    .list-table td { border: none !important; padding: 3px 4px !important; vertical-align: top; }
+    .list-table .l-num { width: 20px; }
+
+    /* ==========================================
+       HALAMAN 2: VISUM PRESISI TINGGI
+       ========================================== */
+    .spd-visum-table { width: 100%; border-collapse: collapse; margin-bottom: 10px; font-size: 11pt; table-layout: fixed; }
+    
+    /* ==========================================
+      /* ==========================================
+       HALAMAN 2: VISUM PRESISI TINGGI
+       ========================================== */
+    .spd-visum-table { width: 100%; border-collapse: collapse; margin-bottom: 10px; font-size: 11pt; table-layout: fixed; }
+    
+    /* ⬇️ TAG 4: TINGGI KOTAK VISUM (HALAMAN 2) ⬇️ */
+    .visum-cell { 
+        border: 1px solid black; 
+        padding: 8px; 
+        vertical-align: top; 
+        width: 50%; 
+        /* ZETTBOT FIX: Tinggi dinaikkan dari 160px jadi 200px agar lega */
+        height: 200px; 
+        position: relative; 
+    }
+    .visum-cell-tall { 
+        border: 1px solid black; 
+        padding: 8px; 
+        vertical-align: top; 
+        width: 50%; 
+        /* ZETTBOT FIX: Tinggi dinaikkan dari 220px jadi 260px */
+        height: 260px; 
+        position: relative; 
+    }
+    /* ⬆️ ========================================================= ⬆️ */
+
+    .visum-inner { width: 100%; border: none; }
+    .visum-inner td { padding: 1px 0; vertical-align: top; border: none !important; }
+    .v-num { width: 25px; }
+    .v-lbl { width: 130px; white-space: nowrap; } 
+    .v-cln { width: 10px; text-align: center; }
+  </style>
+
+
+  <!-- ================= HALAMAN 1 ================= -->
+  <div class="spd-wrapper">
+    <table class="spd-header-table">
+      <tr>
+        <!-- ⬇️ TAG 9: LEBAR KOLOM HEADER (Kiri & Kanan) ⬇️ -->
+        <!-- ZETTBOT FIX: Diberi padding-left agar terdorong pas ke garis kuning -->
+        <td style="width: 46%; padding-right: 14;">
+            MAHKAMAH AGUNG<br>
+            PENGADILAN AGAMA INDRAMAYU
+        </td>
+        <td style="width: 50%; padding-left: 0;">
+            <table style="width: 100%; border: none; table-layout: fixed;">
+                <tr><td style="width: 90px; white-space: nowrap;">Lembar ke</td><td style="width: 15px;">:</td><td></td></tr>
+                <tr><td style="white-space: nowrap;">Kode No</td><td>:</td><td></td></tr>
+                <tr><td style="white-space: nowrap;">Nomor</td><td>:</td><td style="white-space: nowrap; font-size: 10.5pt;">{{nomor_spd_pakem}}</td></tr>
+            </table>
+        </td>
+        <!-- ⬆️ ========================================================= ⬆️ -->
+      </tr>
+    </table>
+
+    <div class="spd-title" style="margin-top: 45px; margin-bottom: 25px;">
+      <h4>SURAT PERJALANAN DINAS</h4>
+    </div>
+
+    <table class="spd-main-table">
+      <tr>
+        <td class="col-num">1</td>
+        <td class="col-label">Pejabat Pembuat Komitmen</td>
+        <td class="col-value"><strong>{{ppk_nama}}</strong></td>
+      </tr>
+      <tr>
+        <td class="col-num">2</td>
+        <td class="col-label">Nama/NIP Pegawai yang diperintahkan</td>
+        <td class="col-value">
+            <strong>{{peserta_nama}}</strong><br>
+            NIP. {{peserta_nip}}
+        </td>
+      </tr>
+      
+      <tr>
+        <td class="col-num">3</td>
+        <td class="td-no-pad">
+           <table class="list-table">
+             <tr><td class="l-num">a.</td><td>Pangkat dan Golongan Ruang Gaji</td></tr>
+             <tr><td class="l-num">b.</td><td>Jabatan / Instansi</td></tr>
+             <tr><td class="l-num">c.</td><td>Tingkat Menurut Peraturan Perjalanan Dinas</td></tr>
+           </table>
+        </td>
+        <td class="td-no-pad">
+           <table class="list-table">
+             <tr><td class="l-num">a.</td><td>{{peserta_pangkat}}</td></tr>
+             <tr><td class="l-num">b.</td><td>{{peserta_jabatan}}</td></tr>
+             <tr><td class="l-num">c.</td><td>{{tingkat_spd}}</td></tr>
+           </table>
+        </td>
+      </tr>
+      
+      <tr>
+        <td class="col-num">4.</td>
+        <td class="col-label">Maksud Perjalanan Dinas</td>
+        <td class="col-value" style="text-align: justify;">{{maksud_tujuan}}</td>
+      </tr>
+      <tr>
+        <td class="col-num">5</td>
+        <td class="col-label">Alat Angkutan Yang Digunakan</td>
+        <td class="col-value">{{alat_angkut}}</td>
+      </tr>
+      
+      <tr>
+        <td class="col-num">6</td>
+        <td class="td-no-pad">
+           <table class="list-table">
+             <tr><td class="l-num">a.</td><td>Tempat Berangkat</td></tr>
+             <tr><td class="l-num">b.</td><td>Tempat Tujuan</td></tr>
+           </table>
+        </td>
+        <td class="td-no-pad">
+           <table class="list-table">
+             <tr><td class="l-num">a.</td><td>Indramayu</td></tr>
+             <tr><td class="l-num">b.</td><td>{{tempat_tujuan_spd}}</td></tr>
+           </table>
+        </td>
+      </tr>
+      
+      <tr>
+        <td class="col-num">7</td>
+        <td class="td-no-pad">
+           <table class="list-table">
+             <tr><td class="l-num">a.</td><td>Lamanya Perjalanan Dinas</td></tr>
+             <tr><td class="l-num">b.</td><td>Tanggal Berangkat</td></tr>
+             <tr><td class="l-num">c.</td><td>Tanggal Harus Kembali/tiba ditempat</td></tr>
+           </table>
+        </td>
+        <td class="td-no-pad">
+           <table class="list-table">
+             <tr><td class="l-num">a.</td><td>{{lama_hari}} ({{lama_hari_teks}}) hari</td></tr>
+             <tr><td class="l-num">b.</td><td>{{tgl_berangkat}}</td></tr>
+             <tr><td class="l-num">c.</td><td>{{tgl_kembali}}</td></tr>
+           </table>
+        </td>
+      </tr>
+      
+      <!-- ========================================================= 
+           ZETTBOT FIX NUKLIR: ROW 8 PENGIKUT 
+           DIPISAH JADI DUA TD AGAR GARIS TENGAH 100% LURUS
+           ========================================================= -->
+      <tr>
+        <td class="col-num">8</td>
+        <td class="td-no-pad" style="border-right: 1px solid black;">
+             <table style="width: 100%; border-collapse: collapse; border: none; margin: 0; padding: 0;">
+                <tr>
+                   <td style="width: 40%; border-right: 1px solid black !important; border-bottom: 1px solid black !important; border-top: none !important; border-left: none !important; padding: 6px 8px;">Pengikut</td>
+                   <td style="width: 60%; border-right: none !important; border-bottom: 1px solid black !important; border-top: none !important; border-left: none !important; padding: 6px 8px; text-align: center;">Nama</td>
+                </tr>
+                <tr>
+                   <td style="border-right: 1px solid black !important; border-bottom: none !important; border-top: none !important; border-left: none !important; min-height: 35px; height: 35px;"></td>
+                   <td style="border-right: none !important; border-bottom: none !important; border-top: none !important; border-left: none !important;"></td>
+                </tr>
+             </table>
+        </td>
+        <td class="td-no-pad">
+             <table style="width: 100%; border-collapse: collapse; border: none; margin: 0; padding: 0;">
+                <tr>
+                   <td style="width: 50%; border-right: 1px solid black !important; border-bottom: 1px solid black !important; border-top: none !important; border-left: none !important; padding: 6px 8px; text-align: center;">Tanggal Lahir</td>
+                   <td style="width: 50%; border-right: none !important; border-bottom: 1px solid black !important; border-top: none !important; border-left: none !important; padding: 6px 8px; text-align: center;">Keterangan</td>
+                </tr>
+                <tr>
+                   <td style="border-right: 1px solid black !important; border-bottom: none !important; border-top: none !important; border-left: none !important; min-height: 35px; height: 35px;"></td>
+                   <td style="border-right: none !important; border-bottom: none !important; border-top: none !important; border-left: none !important;"></td>
+                </tr>
+             </table>
+        </td>
+      </tr>
+
+      <tr>
+        <td class="col-num">9</td>
+        <td class="td-no-pad">
+           <div style="padding: 6px 8px 0px 8px;">Pembebanan Anggaran</div>
+           <table class="list-table">
+             <tr><td class="l-num">a.</td><td>Instansi</td></tr>
+             <tr><td class="l-num">b.</td><td>Mata Anggaran</td></tr>
+           </table>
+        </td>
+        <td class="td-no-pad">
+            <div style="padding-top: 24px;"></div>
+           <table class="list-table">
+             <tr><td class="l-num">a.</td><td>{{instansi}}</td></tr>
+             <tr><td class="l-num">b.</td><td>{{mata_anggaran}}</td></tr>
+           </table>
+        </td>
+      </tr>
+      <tr>
+        <td class="col-num">10</td>
+        <td class="col-label">Keterangan Lain</td>
+        <td class="col-value">{{keterangan_lain}}</td>
+      </tr>
+    </table>
+
+    <!-- ZETTBOT FIX: MENGGESER TANDA TANGAN HALAMAN 1 KE POSISI YANG PAS (Sesuai Garis Kuning) -->
+    <table style="width: 100%; border: none; margin-top: 25px;">
+      <tr>
+        <!-- ZETTBOT FIX: Menggunakan rasio 54% : 46% agar persis lurus dengan kop tabel bagian atas -->
+        <td style="width: 54%;"></td>
+        <td style="width: 46%;">
+          <table style="width: 100%; border: none; font-size: 11pt; padding:0; margin:0; border-spacing:0;">
+              <tr><td style="width: 90px; white-space: nowrap; padding:0;">Dikeluarkan di</td><td style="width: 15px; padding:0;">:</td><td style="padding:0;">Indramayu</td></tr>
+              <tr><td style="white-space: nowrap; padding:0;">Tanggal</td><td style="padding:0;">:</td><td style="padding:0;">{{tanggal_cetak}}</td></tr>
+          </table>
+
+          <!-- ⬇️ TAG 24: GARIS BAWAH TIPIS 1PX DI BAWAH TANGGAL ⬇️ -->
+          <div style="border-bottom: 1px solid black; margin-bottom: 5px; width: 220px;"></div>
+          <!-- ⬆️ ================================================ ⬆️ -->
+
+          <div style="margin-top: 5px;">Pejabat Pembuat Komitmen</div>
+          
+          <!-- ⬇️ TAG 5: JARAK TANDA TANGAN PPK (HALAMAN 1) ⬇️ -->
+          <div style="height: 70px;"></div>
+          <!-- ⬆️ ======================================================== ⬆️ -->
+          
+          <div style="font-weight: bold; text-decoration: underline;">{{ppk_nama}}</div>
+          <div>NIP. {{ppk_nip}}</div>
+        </td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- ================= HALAMAN 2 (PAGE BREAK) ================= -->
+ <div class="spd-wrapper page-break">
+    <table class="spd-visum-table">
+        <tbody>
+            <!-- BARIS I -->
+            <tr>
+                <td class="visum-cell">
+                    Yang Melaksanakan Tugas
+                </td>
+                <td class="visum-cell">
+                    <table class="visum-inner">
+                        <tr><td class="v-num">I.</td><td class="v-lbl">Berangkat dari</td><td class="v-cln">:</td><td>Indramayu</td></tr>
+                        <tr><td></td><td>Ke</td><td>:</td><td>{{tempat_tujuan_spd}}</td></tr>
+                        <tr><td></td><td>Pada Tanggal</td><td>:</td><td>{{tgl_berangkat}}</td></tr>
+                    </table>
+                    
+                    <!-- ZETTBOT FIX: Mode Air Mengalir (Tanpa Absolute) & Geser 155px -->
+                    <div style="margin-top: 10px; margin-left: 25px; margin-bottom: 2px;">
+                        <div>{{jabatan_ttd_st}},</div>
+                        
+                        <!-- ⬇️ TAG 15: JARAK TINGGI KOSONG TANDA TANGAN KETUA (HAL 2) ⬇️ -->
+                        <!-- Sekarang kalau height ditambah, kolom otomatis memanjang tanpa nabrak! -->
+                        <div style="height: 65px;"></div>
+                        <!-- ⬆️ ========================================================== ⬆️ -->
+                        
+                        <div style="font-weight: bold;">{{nama_ttd_st}}</div>
+                        <div>NIP. {{nip_ttd_st}}</div>
+                    </div>
+                </td>
+            </tr>
+
+            <!-- BARIS II -->
+            <tr>
+                <td class="visum-cell">
+                    <table class="visum-inner">
+                        <tr><td class="v-num">II</td><td class="v-lbl">Tiba di</td><td class="v-cln">:</td><td>{{tempat_tujuan_spd}}</td></tr>
+                        <tr><td></td><td>Pada Tanggal</td><td>:</td><td>{{tgl_berangkat}}</td></tr>
+                    </table>
+                    <!-- ⬇️ TAG 21: PENDORONG TITIK KIRI (Angka lebih besar agar sejajar Kanan) ⬇️ -->
+                    <div style="margin-top: 110px; margin-bottom: 10px; margin-left: 25px; margin-right: 8px; border-bottom: 1px dotted black;"></div>
+                    <!-- ⬆️ ==================================================================== ⬆️ -->
+                </td>
+                <td class="visum-cell">
+                    <table class="visum-inner">
+                        <tr><td class="v-num"></td><td class="v-lbl">Berangkat dari</td><td class="v-cln">:</td><td>{{tempat_tujuan_spd}}</td></tr>
+                        <tr><td></td><td>Ke</td><td>:</td><td>Indramayu</td></tr>
+                        <tr><td></td><td>Pada Tanggal</td><td>:</td><td>{{tgl_kembali}}</td></tr>
+                    </table>
+                    <!-- ⬇️ TAG 22: PENDORONG TITIK KANAN ⬇️ -->
+                    <div style="margin-top: 90px; margin-bottom: 10px; margin-left: 8px; margin-right: 8px; border-bottom: 1px dotted black;"></div>
+                    <!-- ⬆️ =============================== ⬆️ -->
+                </td>
+            </tr>
+
+            <!-- BARIS III -->
+            <tr>
+                <td class="visum-cell">
+                    <table class="visum-inner">
+                        <tr><td class="v-num">III</td><td class="v-lbl">Tiba di</td><td class="v-cln">:</td><td></td></tr>
+                        <tr><td></td><td>Pada Tanggal</td><td>:</td><td></td></tr>
+                    </table>
+                    <!-- ⬇️ TAG 21: PENDORONG TITIK KIRI (Angka lebih besar agar sejajar Kanan) ⬇️ -->
+                    <div style="margin-top: 110px; margin-bottom: 10px; margin-left: 25px; margin-right: 8px; border-bottom: 1px dotted black;"></div>
+                    <!-- ⬆️ ==================================================================== ⬆️ -->
+                </td>
+                <td class="visum-cell">
+                     <table class="visum-inner">
+                        <tr><td class="v-num"></td><td class="v-lbl">Berangkat dari</td><td class="v-cln">:</td><td></td></tr>
+                        <tr><td></td><td>Ke</td><td>:</td><td></td></tr>
+                        <tr><td></td><td>Pada Tanggal</td><td>:</td><td></td></tr>
+                    </table>
+                    <!-- ⬇️ TAG 22: PENDORONG TITIK KANAN ⬇️ -->
+                    <div style="margin-top: 90px; margin-bottom: 10px; margin-left: 8px; margin-right: 8px; border-bottom: 1px dotted black;"></div>
+                    <!-- ⬆️ =============================== ⬆️ -->
+                </td>
+            </tr>
+
+            <!-- BARIS IV -->
+            <tr>
+                <td class="visum-cell-tall">
+                    <table class="visum-inner">
+                        <tr><td class="v-num">IV</td><td class="v-lbl">Tiba Kembali di</td><td class="v-cln">:</td><td>Indramayu</td></tr>
+                        <tr><td></td><td>Pada Tanggal</td><td>:</td><td>{{tgl_kembali}}</td></tr>
+                    </table>
+                    
+                    <!-- ZETTBOT FIX: Mode Air Mengalir KIRI (Tanpa Absolute) -->
+                    <!-- ⬇️ TAG 19: PENDORONG TTD KIRI AGAR SEJAJAR DENGAN KANAN ⬇️ -->
+                    <div style="margin-top: 68px; margin-left: 33px; margin-bottom: 2px;">
+                    <div>Pejabat Pembuat Komitmen</div>
+                        
+                        <!-- ⬇️ TAG 6: JARAK TANDA TANGAN PPK (HALAMAN 2 KIRI) ⬇️ -->
+                        <div style="height: 85px;"></div>
+                        <!-- ⬆️ ======================================================== ⬆️ -->
+                        
+                        <div style="font-weight: bold; text-decoration: underline;">{{ppk_nama}}</div>
+                        <div>NIP. {{ppk_nip}}</div>
+                    </div>
+                </td>
+                <td class="visum-cell-tall">
+                    <div style="text-align: justify; margin-left: 25px; margin-right: 2px;">
+                        Telah diperiksa dengan keterangan bahwa perjalanan tersebut diatas benar dilakukan atas perintahnya dan semata-mata untuk kepentingan jabatan dalam waktu yang sesingkat-singkatnya.
+                    </div>
+                <!-- ZETTBOT FIX: Mode Air Mengalir KANAN (Tanpa Absolute) & Geser 155px -->
+                <div style="margin-top: 30px; margin-left: 33px; margin-bottom: 2px;">
+                    <div>Pejabat Pembuat Komitmen</div>
+                    
+                    <!-- ⬇️ TAG 7: JARAK TANDA TANGAN PPK (HALAMAN 2 KANAN) ⬇️ -->
+                    <div style="height: 85px;"></div>
+                    <!-- ⬆️ ======================================================== ⬆️ -->
+                    
+                    <div style="font-weight: bold; text-decoration: underline;">{{ppk_nama}}</div>
+                    <div>NIP. {{ppk_nip}}</div>
+                </div>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+
+    <div style="margin-top: 8px; font-size: 11pt;">V. PERHATIAN</div>
+    <div style="text-align: justify; font-size: 11pt; line-height: 1.15;">
+        Pejabat yang berwenang memberikan SPPD, pegawai yang melakukan perjalanan dinas, para pejabat yang mengesahkan tanggal berangkat/tiba serta bendaharawan bertanggungjawab berdasarkan peraturan-peraturan keuangan negara apabila negara menderita rugi akibat kesalahan. Kelalaian dan kealpaannya (angka 8 lampiran Surat Edaran Menteri Keuangan).
+    </div>
+  </div>
+</div>

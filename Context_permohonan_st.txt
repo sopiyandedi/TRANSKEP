@@ -1,0 +1,2488 @@
+ZETTBOT CONTEXT: MODULE PERMOHONAN_ST
+Generated: 2026-09-17 22:55:21.033902
+
+==================================================
+FILE: permohonan/st/js_cetak_plh.html
+==================================================
+
+<!-- ==========================================
+     FILE: js_cetak_plh.html (Logic Print Plh)
+     ========================================== -->
+<script>
+  // Fungsi Helper Tanggal (Lokal - Backup if global is missed)
+  function formatTglPlh(dateStr) {
+      if (!dateStr) return "-";
+      
+      let d, m, y;
+      
+      if (dateStr.includes('/')) {
+          // Format Database: DD/MM/YYYY (Contoh: 14/09/2026)
+          const parts = dateStr.split('/');
+          d = parseInt(parts[0], 10);
+          m = parseInt(parts[1], 10) - 1; // Array bulan dimulai dari 0
+          y = parseInt(parts[2], 10);
+      } else if (dateStr.includes('-')) {
+          // Format Input Form Date: YYYY-MM-DD (Contoh: 2026-09-14)
+          const parts = dateStr.split('-');
+          y = parseInt(parts[0], 10);
+          m = parseInt(parts[1], 10) - 1;
+          d = parseInt(parts[2], 10);
+      } else {
+          // Jika format kacau/tidak dikenali, kembalikan teks aslinya
+          return dateStr;
+      }
+
+      // Validasi jika hasil belahan bukan angka
+      if (isNaN(d) || isNaN(m) || isNaN(y)) return dateStr;
+
+      const months = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+      
+      return `${d} ${months[m]} ${y}`;
+  }
+
+  function printSuratPlh(idST, nipPejabatCuti) {
+      if (!state.stList) { showNotify("Gagal", "Data ST belum dimuat", "error"); return; }
+      const stDataObj = state.stList.find(st => String(st.id) === String(idST));
+      if (!stDataObj) { showNotify("Gagal", "Data ST tidak ditemukan", "error"); return; }
+
+      const template = document.getElementById('template-cetak-plh-container');
+      if (!template) { showNotify("Gagal", "Template Surat Plh belum dimuat", "error"); return; }
+
+      showLoading("Menyiapkan dokumen Penunjukan Plh...");
+
+      // 1. Ekstrak Data Ekstra & Peserta
+      let dataEkstra = {};
+      try { dataEkstra = JSON.parse(stDataObj.data_ekstra || '{}'); } catch(e) {}
+      
+      let pesertaArr = [];
+      try { pesertaArr = JSON.parse(stDataObj.peserta); } catch (e) {
+          showNotify("Error", "Data peserta rusak", "error"); hideLoading(); return;
+      }
+
+      // 2. Cari Identitas Pejabat yang Pergi Dinas (Definitif)
+      const pejabatTarget = pesertaArr.find(p => String(p.nip) === String(nipPejabatCuti));
+      if (!pejabatTarget || !pejabatTarget.plh_nip) {
+          showNotify("Ditolak", "Pegawai ini tidak memiliki pengaturan penunjukan Plh.", "warning"); 
+          hideLoading(); return;
+      }
+
+      // 3. Cari Identitas Pejabat Pengganti dari Master Data Users
+      const plhTarget = state.usersList.find(u => String(u.nip) === String(pejabatTarget.plh_nip));
+      if (!plhTarget) {
+          showNotify("Error", "Data pegawai Plh tidak ditemukan di sistem.", "error"); 
+          hideLoading(); return;
+      }
+
+      // 4. Cari Identitas Pejabat yang Menandatangani ST (Biasanya Ketua/Wakil)
+      const ttdST = state.usersList.find(u => String(u.nip) === String(stDataObj.pejabat_ttd)) || {nama: '-', nip: '-', jabatan: '-'};
+
+      let htmlContent = template.innerHTML;
+      
+      const tglBerangkat = stDataObj.tgl_mulai;
+      const tglKembali = stDataObj.tgl_selesai;
+      const diffTime = Math.abs(new Date(tglKembali) - new Date(tglBerangkat));
+      const lamaHari = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+
+      // ZETTBOT FIX: Logika 1 Hari atau Lebih untuk Penulisan Tanggal
+      let tanggalTugasStr = "";
+      if (lamaHari === 1 || tglBerangkat === tglKembali) {
+          tanggalTugasStr = `tanggal ${formatTglPlh(tglBerangkat)}`;
+      } else {
+          tanggalTugasStr = `tanggal ${formatTglPlh(tglBerangkat)} s.d ${formatTglPlh(tglKembali)}`;
+      }
+
+      // ZETTBOT FIX: Membersihkan Gelar untuk Tanda Tangan
+      let namaTtdBersih = "-";
+      if (typeof formatNamaBersih === 'function') {
+          namaTtdBersih = formatNamaBersih(ttdST.nama);
+      } else {
+          // Fallback regex jika fungsi global belum termuat
+          namaTtdBersih = ttdST.nama ? ttdST.nama.split(',')[0].replace(/^(H\.|Hj\.|Drs\.|Dra\.|Ir\.|Prof\.|Dr\.)\s*/i, '').trim() : "-";
+      }
+
+      const replacements = {
+          "{{nomor_plh}}": dataEkstra.nomor_plh || "- (Belum diinput)",
+          "{{nomor_st}}": stDataObj.nomor,
+          "{{tgl_st_dibuat}}": formatTglPlh(stDataObj.waktu.split(' ')[0]),
+          "{{maksud_tujuan}}": stDataObj.tujuan,
+          
+          "{{plh_nama}}": plhTarget.nama,
+          "{{plh_nip}}": plhTarget.nip,
+          "{{plh_pangkat}}": plhTarget.pangkat || "-",
+          "{{plh_jabatan}}": plhTarget.jabatan || "-",
+          
+          "{{pejabat_jabatan}}": pejabatTarget.jabatan || "-",
+          "{{pejabat_nama}}": pejabatTarget.nama,
+          "{{pejabat_nip}}": pejabatTarget.nip,
+          
+          "{{lama_hari}}": lamaHari,
+          "{{tanggal_tugas_plh}}": tanggalTugasStr,
+          
+          "{{jabatan_ttd_st}}": ttdST.jabatan,
+          "{{nama_ttd_st}}": namaTtdBersih,
+          "{{nip_ttd_st}}": ttdST.nip,
+          "{{tanggal_cetak}}": formatTglPlh(stDataObj.waktu.split(' ')[0])
+      };
+
+      for (let key in replacements) {
+          htmlContent = htmlContent.split(key).join(replacements[key]);
+      }
+
+      let finalHTML = "<!DOCTYPE html><html><head><meta charset='UTF-8'><title>Cetak Plh</title></head><body>" + htmlContent + "</body></html>";
+
+      const iframe = document.createElement('iframe');
+      iframe.style.position = 'fixed'; iframe.style.right = '0'; iframe.style.bottom = '0';
+      iframe.style.width = '0'; iframe.style.height = '0'; iframe.style.border = 'none';
+      document.body.appendChild(iframe);
+
+      const doc = iframe.contentWindow.document;
+      doc.open(); doc.write(finalHTML); doc.close();
+
+      setTimeout(function() {
+          hideLoading();
+          iframe.contentWindow.focus(); iframe.contentWindow.print();
+          setTimeout(function() { if (document.body.contains(iframe)) document.body.removeChild(iframe); }, 3000);
+      }, 1500);
+  }
+</script>
+
+==================================================
+FILE: permohonan/st/js_cetak_spd.html
+==================================================
+
+<!-- ==========================================
+     FILE: js_cetak_spd.html
+     ========================================== -->
+<script>
+  function printSuratPerjalananDinas(idST, nipPesertaTarget) {
+      if (!state.stList) { showNotify("Gagal", "Data ST belum dimuat", "error"); return; }
+      const stDataObj = state.stList.find(st => String(st.id) === String(idST));
+      if (!stDataObj) { showNotify("Gagal", "Data ST tidak ditemukan", "error"); return; }
+
+      // ZETTBOT FIX NUKLIR: Target ID yang super aman dari bentrokan file backup
+      const template = document.getElementById('spd-nuklir-2026');
+      if (!template) { showNotify("Gagal", "Template SPD belum dimuat atau ID salah", "error"); return; }
+
+      showLoading("Menyiapkan dokumen SPD...");
+      
+      let dataEkstra = {};
+      try { dataEkstra = JSON.parse(stDataObj.data_ekstra || '{}'); } catch(e) {}
+      
+      let pesertaList = [];
+      try { pesertaList = JSON.parse(stDataObj.peserta || '[]'); } catch(e) {}
+
+      const pesertaSpd = pesertaList.filter(p => p.get_spd === true);
+      if (pesertaSpd.length === 0) {
+          hideLoading();
+          showNotify("Tidak Ada SPD", "Tidak ada pegawai yang disetujui menerima fasilitas SPD pada tugas ini.", "warning");
+          return;
+      }
+
+      let targetList = [];
+      if (nipPesertaTarget) {
+          const p = pesertaSpd.find(x => String(x.nip) === String(nipPesertaTarget));
+          if (p) targetList.push(p);
+          else {
+              hideLoading(); showNotify("Gagal", "Pegawai tersebut tidak memiliki fasilitas SPD", "error"); return;
+          }
+      } else {
+          targetList = pesertaSpd;
+      }
+
+      let finalHtml = "";
+      const tglBerangkat = stDataObj.tgl_mulai;
+      const tglKembali = stDataObj.tgl_selesai;
+      const diffTime = Math.abs(new Date(tglKembali) - new Date(tglBerangkat));
+      const lamaHari = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+
+      // ZETTBOT FIX: Konversi angka hari ke huruf (1 -> satu, 2 -> dua)
+      const hurufAngka = ["", "satu", "dua", "tiga", "empat", "lima", "enam", "tujuh", "delapan", "sembilan", "sepuluh", "sebelas"];
+      const getTerbilang = (n) => {
+          if (n < 12) return hurufAngka[n];
+          if (n < 20) return hurufAngka[n - 10] + " belas";
+          if (n < 100) return hurufAngka[Math.floor(n / 10)] + " puluh " + (n % 10 !== 0 ? " " + hurufAngka[n % 10] : "");
+          return n;
+      };
+
+      // ZETTBOT FIX: Mengambil data pimpinan penandatangan untuk Lembar Visum (Halaman 2)
+      const ttdST = state.usersList.find(u => String(u.nip) === String(stDataObj.pejabat_ttd)) || {};
+
+      targetList.forEach((pesertaTarget) => {
+          let htmlString = template.innerHTML;
+
+          const replacements = {
+              "{{tanggal_cetak}}": formatTglPlh(stDataObj.waktu.split(' ')[0]),
+              "{{nomor_spd_pakem}}": dataEkstra.nomor_spd || "- (Belum diinput)",
+              "{{ppk_nama}}": dataEkstra.ppk_nama || "-",
+              "{{ppk_nip}}": dataEkstra.ppk_nip || "-",
+              "{{peserta_nama}}": pesertaTarget.nama,
+              "{{peserta_nip}}": pesertaTarget.nip,
+              "{{peserta_pangkat}}": pesertaTarget.pangkat || "-",
+              "{{peserta_jabatan}}": typeof formatJabatanSingkat === 'function' ? formatJabatanSingkat(pesertaTarget.jabatan) : pesertaTarget.jabatan,
+              "{{tingkat_spd}}": dataEkstra.tingkat_spd || "-",
+              "{{maksud_tujuan}}": stDataObj.tujuan,
+              "{{alat_angkut}}": dataEkstra.alat_angkut || "-",
+              "{{tempat_tujuan_spd}}": dataEkstra.tempat_tujuan_spd || "-",
+              "{{lama_hari}}": lamaHari,
+              "{{lama_hari_teks}}": getTerbilang(lamaHari),
+              "{{tgl_berangkat}}": formatTglPlh(tglBerangkat),
+              "{{tgl_kembali}}": formatTglPlh(tglKembali),
+              "{{instansi}}": dataEkstra.instansi || "-",
+              "{{mata_anggaran}}": dataEkstra.mata_anggaran || "-",
+              "{{keterangan_lain}}": "<div style='min-height: 55px;'>-</div>",
+              
+              // ZETTBOT FIX: Menyuntikkan nama ttd (Full dengan Gelar) ke Halaman 2
+              "{{jabatan_ttd_st}}": ttdST.jabatan || "-",
+              "{{nama_ttd_st}}": ttdST.nama || "-",
+              "{{nip_ttd_st}}": ttdST.nip || "-"
+          };
+
+          // ZETTBOT FIX: INI BARIS AJAIB YANG KEMAREN TERHAPUS!
+          for (let key in replacements) {
+              const regex = new RegExp(key, 'g');
+              htmlString = htmlString.replace(regex, replacements[key]);
+          }
+
+          // Proses baris Pengikut
+          const barisPengikut = pesertaList.filter(p => String(p.nip) !== String(pesertaTarget.nip));
+          
+          if (barisPengikut.length > 0) {
+              let strPengikutHtml = `<table style="width: 100%; border-collapse: collapse; border: none; margin: 0; padding: 0;">`;
+              strPengikutHtml += `
+                <tr>
+                   <td style="width: 20%; border-right: 1px solid black !important; border-bottom: 1px solid black !important; border-top: none !important; border-left: none !important; padding: 6px 8px;">Pengikut</td>
+                   <td style="width: 32.1%; border-right: 1px solid black !important; border-bottom: 1px solid black !important; border-top: none !important; border-left: none !important; padding: 6px 8px; text-align: center;">Nama</td>
+                   <td style="width: 24%; border-right: 1px solid black !important; border-bottom: 1px solid black !important; border-top: none !important; border-left: none !important; padding: 6px 8px; text-align: center;">Tanggal Lahir</td>
+                   <td style="width: 23.9%; border-right: none !important; border-bottom: 1px solid black !important; border-top: none !important; border-left: none !important; padding: 6px 8px; text-align: center;">Keterangan</td>
+                </tr>
+              `;
+              
+              barisPengikut.forEach((pengikut, idx) => {
+                  const isLast = idx === barisPengikut.length - 1;
+                  const btmBorder = isLast ? "border-bottom: none !important;" : "border-bottom: 1px solid black !important;";
+                  strPengikutHtml += `
+                    <tr>
+                       <td style="border-right: 1px solid black !important; border-top: none !important; border-left: none !important; padding: 6px 8px; text-align: center; ${btmBorder}">${idx + 1}.</td>
+                       <td style="border-right: 1px solid black !important; border-top: none !important; border-left: none !important; padding: 6px 8px; ${btmBorder}">${pengikut.nama}</td>
+                       <td style="border-right: 1px solid black !important; border-top: none !important; border-left: none !important; padding: 6px 8px; text-align: center; ${btmBorder}">-</td>
+                       <td style="border-right: none !important; border-top: none !important; border-left: none !important; padding: 6px 8px; text-align: center; ${btmBorder}">-</td>
+                    </tr>
+                  `;
+              });
+              strPengikutHtml += `</table>`;
+              
+              const cariTabelKosong = /<table style="width: 100%; border-collapse: collapse; border: none; margin: 0; padding: 0;">\s*<tr>\s*<td.*?Pengikut[\s\S]*?<\/table>/;
+              htmlString = htmlString.replace(cariTabelKosong, strPengikutHtml);
+          }
+
+          finalHtml += htmlString;
+      });
+
+      let printFrame = document.getElementById('printFrameSPD');
+      if (!printFrame) {
+          printFrame = document.createElement('iframe');
+          printFrame.id = 'printFrameSPD';
+          printFrame.style.position = 'fixed';
+          printFrame.style.right = '0';
+          printFrame.style.bottom = '0';
+          printFrame.style.width = '0';
+          printFrame.style.height = '0';
+          printFrame.style.border = '0';
+          document.body.appendChild(printFrame);
+      }
+
+      const printDoc = printFrame.contentWindow.document;
+      printDoc.open();
+      printDoc.write(`
+        <html>
+          <head>
+            <title>Cetak SPD</title>
+          </head>
+          <body>${finalHtml}</body>
+        </html>
+      `);
+      printDoc.close();
+
+      setTimeout(() => {
+          hideLoading();
+          printFrame.contentWindow.focus();
+          printFrame.contentWindow.print();
+      }, 500);
+  }
+</script>
+
+==================================================
+FILE: permohonan/st/js_cetak_st.html
+==================================================
+
+<!-- ==========================================
+      FILE: js_cetak_st.html (Logic Print ST)
+      ========================================== -->
+  <script>
+    function formatTanggalRentang(start, end) {
+        if (start === end) return formatDateIndoCetak(start);
+        return formatDateIndoCetak(start) + " s.d. " + formatDateIndoCetak(end);
+    }
+
+    // ZETTBOT FIX TAHAP 2: Perombakan fungsi format teks menggunakan Table Borderless
+    // agar tulisan baris kedua rata menggantung persis seperti Microsoft Word.
+    function formatTeksRapi(text) {
+        if (!text) return "-";
+        var lines = text.split('\n');
+        var html = '<table style="width: 100%; border: none; font-size: 11pt; border-spacing: 0; padding: 0; margin: 0;">';
+        
+        for (var i = 0; i < lines.length; i++) {
+            var line = lines[i].trim();
+            if (line) {
+                // Deteksi jika awal baris memiliki angka/huruf dan titik/kurung tutup (misal: 1. atau a.)
+                var match = line.match(/^([0-9a-zA-Z]+[\.\)])\s+(.*)/);
+                if (match) {
+                    html += '<tr>' +
+                               '<td style="width: 22px; vertical-align: top; padding: 0 0 2px 0; border: none;">' + match[1] + '</td>' +
+                               '<td style="vertical-align: top; text-align: justify; padding: 0 0 2px 0; border: none;">' + match[2] + '</td>' +
+                            '</tr>';
+                } else {
+                    html += '<tr>' +
+                               '<td colspan="2" style="vertical-align: top; text-align: justify; padding: 0 0 2px 0; border: none;">' + line + '</td>' +
+                            '</tr>';
+                }
+            }
+        }
+        html += '</table>';
+        return html;
+    }
+
+    function printSuratTugas(idST, stDataObj) {
+        if (!stDataObj) { showNotify("Gagal", "Data ST tidak ditemukan", "error"); return; }
+        
+        var template = document.getElementById('template-cetak-st-container');
+        if (!template) { showNotify("Gagal", "Template belum dimuat", "error"); return; }
+
+        showLoading("Menyiapkan dokumen Surat Tugas...");
+
+        var listPeserta = [];
+        try {
+            listPeserta = JSON.parse(stDataObj.peserta);
+        } catch (e) {
+            showNotify("Format Data Rusak", "Data peserta tidak bisa dibaca", "error");
+            hideLoading(); return;
+        }
+
+        // =========================================================================
+        // ZETTBOT FIX: SAKLAR DUMMY UNTUK CANVAS / TESTING
+        // Ubah TEST_MODE menjadi true untuk mensimulasikan hasil print tanpa data asli.
+        // =========================================================================
+        var TEST_MODE = false; // <-- GANTI KE TRUE JIKA INGIN TES
+        var JUMLAH_DUMMY = 4;  // <-- GANTI ANGKA UNTUK TES LAYOUT SINGLE, DOUBLE, ATAU CHUNKING
+        
+        if (TEST_MODE) {
+            listPeserta = [];
+            for (var d = 1; d <= JUMLAH_DUMMY; d++) {
+                listPeserta.push({
+                    nama: "Pegawai Tester " + d + ", S.Kom.",
+                    nip: "19800101200003100" + d,
+                    pangkat: "Penata Muda (III/a)",
+                    jabatan: "Fungsional Pranata Komputer"
+                });
+            }
+        }
+        
+        var totalPeserta = listPeserta.length;
+        
+        // ZETTBOT FIX: Penentuan Class Layout Dinamis untuk Spacing CSS A4
+        var layoutClass = "st-layout-normal";
+        if (totalPeserta === 1) layoutClass = "st-layout-single";
+        else if (totalPeserta === 2) layoutClass = "st-layout-double";
+
+        // ZETTBOT FIX: Logika Chunking (Pemecahan array per 3 orang) & Page Break Dinamis
+        // Merakit HTML murni dengan String Concatenation klasik anti-error
+        var trHTML = "";
+        var chunks = [];
+        for (var i = 0; i < totalPeserta; i += 3) {
+            chunks.push(listPeserta.slice(i, i + 3));
+        }
+
+        for (var c = 0; c < chunks.length; c++) {
+            var isLastChunk = (c === chunks.length - 1);
+            var pageBreakStyle = isLastChunk ? "" : "page-break-after: always; padding-bottom: 20px;";
+            
+            trHTML += '<div class="chunk-container" style="' + pageBreakStyle + '">';
+            
+            for (var j = 0; j < chunks[c].length; j++) {
+                var p = chunks[c][j];
+                var globalIndex = (c * 3) + j;
+                
+                // Jika total pegawai > 1, maka buat kolom nomor urut. Jika 1, sembunyikan.
+                var colNumTag = (totalPeserta > 1) ? '<td class="p-col-num">' + (globalIndex + 1) + '.</td>' : '';
+                var colEmptyTag = (totalPeserta > 1) ? '<td class="p-col-num"></td>' : '';
+                var paddingNama = (totalPeserta === 1) ? ' style="width: 25%;"' : '';
+                
+                trHTML += '<div class="peserta-item">' +
+                             '<table class="peserta-table">' +
+                                '<tr>' +
+                                   colNumTag +
+                                   '<td class="p-col-label"' + paddingNama + '>N a m a</td>' +
+                                   '<td class="p-col-colon">:</td>' +
+                                   '<td class="p-col-value"><b>' + p.nama + '</b></td>' +
+                                '</tr>' +
+                                '<tr>' +
+                                   colEmptyTag +
+                                   '<td class="p-col-label">N I P</td>' +
+                                   '<td class="p-col-colon">:</td>' +
+                                   '<td class="p-col-value">' + p.nip + '</td>' +
+                                '</tr>' +
+                                '<tr>' +
+                                   colEmptyTag +
+                                   '<td class="p-col-label">Pangkat/Golongan</td>' +
+                                   '<td class="p-col-colon">:</td>' +
+                                   '<td class="p-col-value">' + (p.pangkat || '-') + '</td>' +
+                                '</tr>' +
+                                '<tr>' +
+                                   colEmptyTag +
+                                   '<td class="p-col-label">J a b a t a n</td>' +
+                                   '<td class="p-col-colon">:</td>' +
+                                   '<td class="p-col-value">' + (p.jabatan || '-') + '</td>' +
+                                '</tr>' +
+                             '</table>' +
+                          '</div>';
+            }
+            
+            trHTML += '</div>';
+        }
+
+        var pejabat = state.usersList.find(function(u) { return u.nip === stDataObj.pejabat_ttd; }) || {nama: '-', nip: '-', jabatan: '-'};
+        var namaTtdBersih = formatNamaBersih(pejabat.nama);
+        var jabatanKop = pejabat.jabatan ? (pejabat.jabatan.toUpperCase() + " PENGADILAN AGAMA INDRAMAYU") : "PENGADILAN AGAMA INDRAMAYU";
+
+        var dMulai = new Date(stDataObj.tgl_mulai);
+        var hariArr = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+        var hariKegiatan = isNaN(dMulai) ? "-" : hariArr[dMulai.getDay()];
+
+        var ekstra = {};
+        try { ekstra = JSON.parse(stDataObj.data_ekstra || '{}'); } catch(e) {}
+        
+        var bebanAnggaranHtml = ekstra.paragraf_biaya ? '<p style="text-align: justify; margin-top: 5px; margin-bottom: 2px;">' + ekstra.paragraf_biaya + '</p>' : '';
+
+        var htmlContent = template.innerHTML;
+        
+        // Ganti class layout dinamis
+        htmlContent = htmlContent.replace(/\{\{layout_class\}\}/g, layoutClass);
+
+        var replacements = {
+            "{{nomor_surat}}": stDataObj.nomor,
+            "{{jabatan_kop}}": jabatanKop,
+            "{{menimbang}}": formatTeksRapi(stDataObj.menimbang),
+            "{{dasar}}": formatTeksRapi(stDataObj.dasar),
+            "{{baris_peserta_html}}": trHTML,
+            "{{tujuan}}": stDataObj.tujuan.replace(/\n/g, "<br>"),
+            "{{hari_kegiatan}}": hariKegiatan,
+            "{{tanggal_kegiatan}}": formatTanggalRentang(stDataObj.tgl_mulai, stDataObj.tgl_selesai),
+            "{{tempat}}": stDataObj.tempat,
+            "{{jam}}": stDataObj.jam,
+            "{{beban_anggaran_html}}": bebanAnggaranHtml,
+            "{{tanggal_ttd}}": formatDateIndoCetak(stDataObj.waktu.split(' ')[0]),
+            "{{jabatan_pejabat_ttd}}": pejabat.jabatan,
+            "{{nama_pejabat_ttd}}": namaTtdBersih
+        };
+
+        for (var key in replacements) {
+            htmlContent = htmlContent.split(key).join(replacements[key]);
+        }
+
+        var finalHTML = "<!DOCTYPE html><html><head><meta charset='UTF-8'><title>Surat Tugas</title></head><body>" + htmlContent + "</body></html>";
+
+        var iframe = document.createElement('iframe');
+        iframe.style.position = 'fixed';
+        iframe.style.right = '0';
+        iframe.style.bottom = '0';
+        iframe.style.width = '0';
+        iframe.style.height = '0';
+        iframe.style.border = 'none';
+        document.body.appendChild(iframe);
+
+        var doc = iframe.contentWindow.document;
+        doc.open();
+        doc.write(finalHTML);
+        doc.close();
+
+        setTimeout(function() {
+            hideLoading();
+            iframe.contentWindow.focus();
+            iframe.contentWindow.print();
+            setTimeout(function() { if (document.body.contains(iframe)) document.body.removeChild(iframe); }, 3000);
+        }, 1500);
+    }
+  </script>
+
+==================================================
+FILE: permohonan/st/js_st.html
+==================================================
+
+<!-- ==========================================
+     FILE: js_st.html (Client-Side Logic Surat Tugas Integrasi SPD/Plh)
+     ========================================== -->
+<script>
+  let stPesertaList = []; 
+  let currentTargetPlhNip = null;
+
+  function attachSearchToInput(inputId, dropId, dataArr, onSelectCallback) {
+      const inp = document.getElementById(inputId);
+      const drop = document.getElementById(dropId);
+      if(!inp || !drop) return;
+      let focusIdx = 0;
+
+      function renderList(filterTxt) {
+          drop.innerHTML = '';
+          let filtered = dataArr.filter(item => item.label.toLowerCase().includes(filterTxt.toLowerCase()));
+          if(filtered.length === 0) {
+              drop.innerHTML = `<div class="p-3 text-xs text-slate-500 italic">Tidak ditemukan...</div>`;
+              drop.classList.remove('hidden');
+              return;
+          }
+          filtered.forEach((item, idx) => {
+              let div = document.createElement('div');
+              let bgClass = (idx === focusIdx) ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-800';
+              div.className = `px-3 py-2 text-[11px] cursor-pointer transition border-b border-slate-800/50 last:border-0 ${bgClass}`;
+              div.innerHTML = item.html;
+              div.onmousedown = function(e) {
+                  e.preventDefault(); 
+                  onSelectCallback(item);
+                  drop.classList.add('hidden');
+              };
+              drop.appendChild(div);
+          });
+          drop.classList.remove('hidden');
+      }
+
+      inp.onfocus = () => { focusIdx = 0; renderList(inp.value); };
+      inp.oninput = () => { focusIdx = 0; renderList(inp.value); };
+      inp.onblur = () => { setTimeout(() => drop.classList.add('hidden'), 200); };
+
+      inp.onkeydown = (e) => {
+          let filtered = dataArr.filter(item => item.label.toLowerCase().includes(inp.value.toLowerCase()));
+          let items = drop.children;
+
+          if (e.key === 'ArrowDown') {
+              e.preventDefault();
+              focusIdx++;
+              if (focusIdx >= filtered.length) focusIdx = filtered.length - 1;
+              renderList(inp.value);
+              if(items[focusIdx]) items[focusIdx].scrollIntoView({block: 'nearest'});
+          } else if (e.key === 'ArrowUp') {
+              e.preventDefault();
+              focusIdx--;
+              if (focusIdx < 0) focusIdx = 0;
+              renderList(inp.value);
+              if(items[focusIdx]) items[focusIdx].scrollIntoView({block: 'nearest'});
+          } else if (e.key === 'Enter') {
+              e.preventDefault(); 
+              if (filtered.length > 0 && focusIdx < filtered.length) {
+                  onSelectCallback(filtered[focusIdx]);
+                  drop.classList.add('hidden');
+              }
+          }
+      };
+  }
+
+  function openModalST() {
+      document.getElementById('formST').reset();
+      stPesertaList = [];
+      renderPesertaST();
+      
+      // ZETTBOT FIX: Pastikan form kembali ke mode Tambah Baru
+      document.getElementById('stEditId').value = '';
+      document.getElementById('btnSubmitST').innerHTML = `Terbitkan Surat Tugas Terpadu <i class="fa-solid fa-paper-plane"></i>`;
+      
+      document.getElementById('stSearchPegawai').value = '';
+      document.getElementById('spdSearchPPK').value = '';
+      document.getElementById('spdPPK').value = '';
+      document.getElementById('stSearchTtd').value = '';
+      document.getElementById('stPejabatTtd').value = '';
+
+      let dataPegawaiGlobal = state.usersList.map(u => ({
+          label: `${u.nama} ${u.jabatan} ${u.nip}`,
+          html: `<div class="font-bold">${u.nama}</div><div class="text-[9px] text-slate-400">${u.jabatan}</div>`,
+          nip: u.nip, nama: u.nama
+      }));
+
+      let dataTtdGlobal = state.usersList.filter(u => {
+          const role = String(u.jabatan).toLowerCase();
+          return ["ketua", "wakil ketua", "panitera", "sekretaris"].some(r => role.includes(r));
+      }).map(u => ({
+          label: `${u.nama} ${u.jabatan}`,
+          html: `<div class="font-bold text-amber-400">${u.nama}</div><div class="text-[9px] text-amber-400/70">${u.jabatan}</div>`,
+          nip: u.nip, nama: u.nama
+      }));
+
+      attachSearchToInput('stSearchPegawai', 'dropPegawai', dataPegawaiGlobal, function(item) {
+          document.getElementById('stSearchPegawai').value = ''; 
+          addPesertaST(item.nip); 
+      });
+
+      attachSearchToInput('spdSearchPPK', 'dropPPK', dataPegawaiGlobal, function(item) {
+          document.getElementById('spdSearchPPK').value = item.nama; 
+          document.getElementById('spdPPK').value = item.nip; 
+      });
+
+     attachSearchToInput('stSearchTtd', 'dropTtd', dataTtdGlobal, function(item) {
+          document.getElementById('stSearchTtd').value = item.nama;
+          document.getElementById('stPejabatTtd').value = item.nip;
+      });
+
+      const modal = document.getElementById('modalSuratTugas');
+      if (modal.parentNode !== document.body) { document.body.appendChild(modal); }
+      
+      modal.classList.remove('hidden');
+      setTimeout(() => { modal.firstElementChild.classList.remove('scale-95'); }, 10);
+
+      try {
+          if (typeof google !== 'undefined' && google.script && google.script.run) {
+              google.script.run
+                  .withSuccessHandler(function(res) {
+                      if(res && res.status === 'success') {
+                          let elMenimbang = document.getElementById('stMenimbang');
+                          let elDasar = document.getElementById('stDasar');
+                          let elInstansi = document.getElementById('spdInstansi');
+                          let elMataAnggaran = document.getElementById('spdMataAnggaran');
+                          let elAngkutan = document.getElementById('spdAngkutan');
+                          let elParagrafBiaya = document.getElementById('stParagrafBiaya');
+                          
+                          if (elMenimbang && !elMenimbang.value) elMenimbang.value = res.data.menimbang || '';
+                          if (elDasar && !elDasar.value) elDasar.value = res.data.dasar || '';
+                          if (elInstansi && !elInstansi.value) elInstansi.value = res.data.instansi || '';
+                          if (elMataAnggaran && !elMataAnggaran.value) elMataAnggaran.value = res.data.mata_anggaran || '';
+                          if (elAngkutan && !elAngkutan.value) elAngkutan.value = res.data.angkutan || '';
+                          if (elParagrafBiaya && !elParagrafBiaya.value) elParagrafBiaya.value = res.data.paragraf_biaya || '';
+                          
+                          let elPPKSearch = document.getElementById('spdSearchPPK');
+                          let elPPKVal = document.getElementById('spdPPK');
+                          if (res.data.ppk && elPPKVal && !elPPKVal.value) {
+                              elPPKVal.value = res.data.ppk;
+                              const ppkUser = state.usersList.find(u => u.nip === res.data.ppk);
+                              if (ppkUser && elPPKSearch) {
+                                  elPPKSearch.value = ppkUser.nama;
+                              }
+                          }
+                      }
+                  })
+                  .withFailureHandler(function(err) {
+                      console.warn("Gagal menarik pengaturan default ST secara background:", err);
+                  })
+                  .getSettingsST(); 
+          }
+      } catch (error) {
+          console.warn("Backend belum siap (getSettingsST tidak ditemukan). Pastikan file st.gs sudah di-save.", error);
+      }
+  }
+
+  // ZETTBOT FIX: Fungsi Khusus untuk Mode Edit Surat Tugas
+  function editST(id) {
+      const stData = state.stList.find(st => String(st.id) === String(id));
+      if (!stData) { showNotify("Gagal", "Data Surat Tugas tidak ditemukan di sistem", "error"); return; }
+      
+      openModalST();
+      
+      // Ubah state form menjadi Mode Edit
+      document.getElementById('stEditId').value = id;
+      document.getElementById('btnSubmitST').innerHTML = `Perbarui Surat Tugas <i class="fa-solid fa-floppy-disk"></i>`;
+      
+      let ekstraData = {};
+      try { ekstraData = JSON.parse(stData.data_ekstra || '{}'); } catch(e) {}
+      
+      stPesertaList = [];
+      try { stPesertaList = JSON.parse(stData.peserta || '[]'); } catch(e) {}
+      
+      document.getElementById('stNomor').value = stData.nomor || '';
+      document.getElementById('spdNomor').value = ekstraData.nomor_spd || '';
+      document.getElementById('plhNomor').value = ekstraData.nomor_plh || '';
+      document.getElementById('stMenimbang').value = stData.menimbang || '';
+      document.getElementById('stDasar').value = stData.dasar || '';
+      document.getElementById('stParagrafBiaya').value = ekstraData.paragraf_biaya || '';
+      
+      document.getElementById('spdAngkutan').value = ekstraData.alat_angkut || '';
+      document.getElementById('spdTempatTujuan').value = ekstraData.tempat_tujuan_spd || '';
+      document.getElementById('spdInstansi').value = ekstraData.instansi || '';
+      document.getElementById('spdMataAnggaran').value = ekstraData.mata_anggaran || '';
+      document.getElementById('spdTingkat').value = ekstraData.tingkat_spd || 'Tingkat C';
+      
+      document.getElementById('spdPPK').value = ekstraData.ppk_nip || '';
+      const uPPK = state.usersList.find(x => x.nip === ekstraData.ppk_nip);
+      document.getElementById('spdSearchPPK').value = uPPK ? uPPK.nama : '';
+
+      document.getElementById('stTujuan').value = stData.tujuan || '';
+      document.getElementById('stTempat').value = stData.tempat || '';
+      document.getElementById('stTglMulai').value = stData.tgl_mulai || '';
+      document.getElementById('stTglSelesai').value = stData.tgl_selesai || '';
+      document.getElementById('stJam').value = stData.jam || '';
+      
+      document.getElementById('stPejabatTtd').value = stData.pejabat_ttd || '';
+      const uTTD = state.usersList.find(x => x.nip === stData.pejabat_ttd);
+      document.getElementById('stSearchTtd').value = uTTD ? uTTD.nama : '';
+
+      renderPesertaST();
+  }
+
+  function closeModalST() {
+     const modal = document.getElementById('modalSuratTugas');
+     modal.firstElementChild.classList.add('scale-95');
+     setTimeout(() => { modal.classList.add('hidden'); }, 200);
+  }
+
+  function openSettingST() {
+      const modal = document.getElementById('modalSettingST');
+      if (modal.parentNode !== document.body) { document.body.appendChild(modal); }
+      
+      let dataPegawaiGlobal = state.usersList.map(u => ({
+          label: `${u.nama} ${u.jabatan} ${u.nip}`,
+          html: `<div class="font-bold">${u.nama}</div><div class="text-[9px] text-slate-400">${u.jabatan}</div>`,
+          nip: u.nip, nama: u.nama
+      }));
+      
+      attachSearchToInput('setDefPPKSearch', 'dropSetPPK', dataPegawaiGlobal, function(item) {
+          document.getElementById('setDefPPKSearch').value = item.nama;
+          document.getElementById('setDefPPK').value = item.nip;
+      });
+
+      document.getElementById('setDefPPKSearch').value = document.getElementById('spdSearchPPK').value;
+      document.getElementById('setDefPPK').value = document.getElementById('spdPPK').value;
+      
+      document.getElementById('setDefMenimbang').value = document.getElementById('stMenimbang').value;
+      document.getElementById('setDefDasar').value = document.getElementById('stDasar').value;
+      document.getElementById('setDefInstansi').value = document.getElementById('spdInstansi').value;
+      document.getElementById('setDefMataAnggaran').value = document.getElementById('spdMataAnggaran').value;
+      document.getElementById('setDefAngkutan').value = document.getElementById('spdAngkutan').value;
+      document.getElementById('setDefParagrafBiaya').value = document.getElementById('stParagrafBiaya').value;
+
+      modal.classList.remove('hidden');
+      setTimeout(() => { modal.firstElementChild.classList.remove('scale-95'); }, 10);
+  }
+
+  function closeSettingST() {
+      const modal = document.getElementById('modalSettingST');
+      modal.firstElementChild.classList.add('scale-95');
+      setTimeout(() => { modal.classList.add('hidden'); }, 200);
+  }
+
+  function saveSettingST(event) {
+      event.preventDefault();
+      
+      const payload = {
+          ppk: document.getElementById('setDefPPK').value,
+          menimbang: document.getElementById('setDefMenimbang').value,
+          dasar: document.getElementById('setDefDasar').value,
+          instansi: document.getElementById('setDefInstansi').value,
+          mata_anggaran: document.getElementById('setDefMataAnggaran').value,
+          angkutan: document.getElementById('setDefAngkutan').value,
+          paragraf_biaya: document.getElementById('setDefParagrafBiaya').value
+      };
+
+      showNotify("Menyimpan...", "Menyimpan pengaturan dasar...", "success");
+      
+      google.script.run
+        .withSuccessHandler(function(res) {
+            if(res.status === 'success') {
+                document.getElementById('spdSearchPPK').value = document.getElementById('setDefPPKSearch').value;
+                document.getElementById('spdPPK').value = payload.ppk;
+                document.getElementById('stMenimbang').value = payload.menimbang;
+                document.getElementById('stDasar').value = payload.dasar;
+                document.getElementById('spdInstansi').value = payload.instansi;
+                document.getElementById('spdMataAnggaran').value = payload.mata_anggaran;
+                document.getElementById('spdAngkutan').value = payload.angkutan;
+                document.getElementById('stParagrafBiaya').value = payload.paragraf_biaya;
+                
+                closeSettingST();
+                showNotify("Pengaturan Tersimpan", res.message, "success");
+            } else {
+                showNotify("Gagal", res.message, "error");
+            }
+        })
+        .withFailureHandler(function(err) {
+            hideLoading(); showNotify("Error", err.toString(), "error");
+        })
+        .saveSettingsST(payload);
+  }
+
+  function addPesertaST(nipPassed) {
+      const nip = nipPassed; 
+      if (!nip) return;
+      
+      if (!stPesertaList.some(p => p.nip === nip)) {
+          const u = state.usersList.find(x => x.nip === nip);
+          if (u) {
+              stPesertaList.push({
+                  nip: u.nip, nama: u.nama, pangkat: u.pangkat || '-', jabatan: u.jabatan,
+                  get_spd: false, plh_nip: "", plh_nama: ""
+              });
+              renderPesertaST();
+          }
+      }
+  }
+
+  function removePesertaST(nip) {
+      stPesertaList = stPesertaList.filter(p => p.nip !== nip);
+      renderPesertaST();
+  }
+
+  function toggleSPD(nip) {
+      const pIndex = stPesertaList.findIndex(p => p.nip === nip);
+      if(pIndex !== -1) {
+          stPesertaList[pIndex].get_spd = !stPesertaList[pIndex].get_spd;
+          renderPesertaST();
+      }
+  }
+
+  function openSetPlh(nip) {
+      const p = stPesertaList.find(x => x.nip === nip);
+      if(!p) return;
+
+      currentTargetPlhNip = nip;
+      document.getElementById('plhHelperText').innerHTML = `Pengganti harian untuk: <b>${p.nama}</b>`;
+      
+      document.getElementById('plhSearchPegawai').value = '';
+      document.getElementById('selectPlhPengganti').value = '';
+      
+      let dataPlhList = state.usersList.filter(u => u.nip !== nip).map(u => ({
+          label: `${u.nama} ${u.jabatan} ${u.nip}`,
+          html: `<div class="font-bold">${u.nama}</div><div class="text-[9px] text-slate-400">${u.jabatan}</div>`,
+          nip: u.nip, nama: u.nama
+      }));
+      
+      attachSearchToInput('plhSearchPegawai', 'dropPlh', dataPlhList, function(item) {
+          document.getElementById('plhSearchPegawai').value = item.nama;
+          document.getElementById('selectPlhPengganti').value = item.nip;
+      });
+
+      if(p.plh_nip) {
+          document.getElementById('selectPlhPengganti').value = p.plh_nip;
+          document.getElementById('plhSearchPegawai').value = p.plh_nama;
+      }
+
+      const modal = document.getElementById('modalSetPlh');
+      if (modal.parentNode !== document.body) { document.body.appendChild(modal); }
+      modal.classList.remove('hidden');
+      setTimeout(() => { modal.firstElementChild.classList.remove('scale-95'); }, 10);
+  }
+
+  function closeSetPlh() {
+      const modal = document.getElementById('modalSetPlh');
+      modal.firstElementChild.classList.add('scale-95');
+      setTimeout(() => { modal.classList.add('hidden'); }, 200);
+  }
+
+  function simpanPlhAssignment() {
+      const selectPlh = document.getElementById('selectPlhPengganti');
+      if(!selectPlh.value) { showNotify("Pilih Pejabat", "Silakan pilih nama pejabat pengganti atau tekan Batalkan.", "warning"); return; }
+      
+      const pIndex = stPesertaList.findIndex(p => p.nip === currentTargetPlhNip);
+      if(pIndex !== -1) {
+          const uPlh = state.usersList.find(x => x.nip === selectPlh.value);
+          stPesertaList[pIndex].plh_nip = selectPlh.value;
+          stPesertaList[pIndex].plh_nama = uPlh ? uPlh.nama : '';
+          renderPesertaST();
+          closeSetPlh();
+      }
+  }
+
+  function hapusPlhAssignment() {
+      const pIndex = stPesertaList.findIndex(p => p.nip === currentTargetPlhNip);
+      if(pIndex !== -1) {
+          stPesertaList[pIndex].plh_nip = "";
+          stPesertaList[pIndex].plh_nama = "";
+          renderPesertaST();
+          closeSetPlh();
+      }
+  }
+
+  function renderPesertaST() {
+      const tbody = document.getElementById('stListPesertaBody');
+      tbody.innerHTML = '';
+      
+      if (stPesertaList.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-slate-500 italic">Belum ada pegawai ditambahkan.</td></tr>';
+          return;
+      }
+      
+      stPesertaList.forEach((p, index) => {
+          let spdBtnClass = p.get_spd 
+              ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/30 border-transparent" 
+              : "bg-slate-900 text-slate-500 border-slate-700 hover:bg-slate-800";
+          let spdIcon = p.get_spd ? `<i class="fa-solid fa-check"></i> Ya` : `Tidak`;
+
+          let plhBtnClass = p.plh_nip 
+              ? "bg-purple-600 text-white shadow-lg shadow-purple-600/30 border-transparent" 
+              : "bg-slate-900 text-slate-500 border-slate-700 hover:bg-slate-800 hover:text-purple-400";
+          let plhText = p.plh_nip ? `Plh: ${p.plh_nama.split(' ')[0]}` : `+ Tunjuk Plh`;
+
+          tbody.innerHTML += `
+              <tr class="hover:bg-slate-900/50 transition">
+                  <td class="p-3 font-bold text-slate-200 text-[11px]">${index + 1}. ${p.nama}</td>
+                  <td class="p-3 text-slate-400 text-[10px]">${p.jabatan}</td>
+                  
+                  <td class="p-3 text-center">
+                     <button type="button" onclick="toggleSPD('${p.nip}')" class="px-3 py-1.5 rounded-lg text-[10px] font-bold border transition-all ${spdBtnClass}">${spdIcon}</button>
+                  </td>
+                  
+                  <td class="p-3 text-center">
+                     <button type="button" onclick="openSetPlh('${p.nip}')" class="px-3 py-1.5 rounded-lg text-[10px] font-bold border transition-all truncate max-w-[120px] ${plhBtnClass}">${plhText}</button>
+                  </td>
+
+                  <td class="p-3 text-center">
+                      <button type="button" onclick="removePesertaST('${p.nip}')" class="w-7 h-7 bg-rose-500/10 text-rose-400 hover:bg-rose-500 hover:text-white rounded-lg flex items-center justify-center transition ml-auto mr-auto">
+                         <i class="fa-solid fa-trash text-[10px]"></i>
+                      </button>
+                  </td>
+              </tr>
+          `;
+      });
+  }
+
+  function submitSuratTugas(event) {
+      event.preventDefault();
+      
+      if (stPesertaList.length === 0) {
+          showNotify("Validasi Gagal", "Pilih minimal 1 (satu) pegawai yang akan ditugaskan!", "error");
+          return;
+      }
+
+      const ppkNip = document.getElementById('spdPPK').value;
+      const ttdNip = document.getElementById('stPejabatTtd').value;
+
+      if (!ttdNip) {
+          showNotify("Validasi Gagal", "Anda belum memilih Pimpinan Penandatangan ST dari kotak pencarian.", "error");
+          return;
+      }
+
+      let ppkNama = "";
+      if (ppkNip) {
+         const uPPK = state.usersList.find(x => x.nip === ppkNip);
+         if(uPPK) ppkNama = uPPK.nama;
+      }
+
+      const ekstraData = {
+          nomor_spd: document.getElementById('spdNomor').value,
+          nomor_plh: document.getElementById('plhNomor').value,
+          ppk_nip: ppkNip,
+          ppk_nama: ppkNama,
+          alat_angkut: document.getElementById('spdAngkutan').value,
+          tempat_tujuan_spd: document.getElementById('spdTempatTujuan').value,
+          instansi: document.getElementById('spdInstansi').value,
+          mata_anggaran: document.getElementById('spdMataAnggaran').value,
+          tingkat_spd: document.getElementById('spdTingkat').value,
+          paragraf_biaya: document.getElementById('stParagrafBiaya').value
+      };
+
+      const payload = {
+          id_st: document.getElementById('stEditId').value, // Jika mode edit, ini akan terisi
+          nomor_surat: document.getElementById('stNomor').value,
+          menimbang: document.getElementById('stMenimbang').value,
+          dasar: document.getElementById('stDasar').value,
+          tujuan: document.getElementById('stTujuan').value,
+          tempat: document.getElementById('stTempat').value,
+          tgl_mulai: document.getElementById('stTglMulai').value,
+          tgl_selesai: document.getElementById('stTglSelesai').value,
+          jam: document.getElementById('stJam').value,
+          pejabat_ttd: ttdNip,
+          peserta_json: JSON.stringify(stPesertaList), 
+          data_ekstra_json: JSON.stringify(ekstraData) 
+      };
+
+      // ZETTBOT FIX: Percabangan antara Add Baru dan Update
+      if (payload.id_st) {
+          showLoading("Memperbarui Surat Tugas...");
+          google.script.run
+            .withSuccessHandler(function(res) {
+                hideLoading();
+                if (res.status === 'success') {
+                    closeModalST();
+                    showNotify("Berhasil Diperbarui", res.message, "success");
+                    if (typeof syncAllServerData === 'function') syncAllServerData();
+                } else { showNotify("Gagal", res.message, "error"); }
+            })
+            .withFailureHandler(function(err) {
+                hideLoading(); showNotify("Error Koneksi", err.toString(), "error");
+            })
+            .updateSuratTugas(payload);
+      } else {
+          showLoading("Menerbitkan Dokumen Terpadu...");
+          google.script.run
+            .withSuccessHandler(function(res) {
+                hideLoading();
+                if (res.status === 'success') {
+                    closeModalST();
+                    showNotify("Berhasil", "ST, SPD, dan Plh berhasil diterbitkan.", "success");
+                    if (typeof syncAllServerData === 'function') syncAllServerData();
+                } else { showNotify("Gagal", res.message, "error"); }
+            })
+            .withFailureHandler(function(err) {
+                hideLoading(); showNotify("Error Koneksi", err.toString(), "error");
+            })
+            .addSuratTugas(payload);
+      }
+  }
+</script>
+
+==================================================
+FILE: permohonan/st/st.js
+==================================================
+
+// ==========================================
+// FILE: st.gs
+// Deskripsi: Backend Controller khusus Surat Tugas (ST)
+// ==========================================
+
+function setupSheetST() {
+  try {
+    const ss = SpreadsheetApp.openById(PropertiesService.getScriptProperties().getProperty("TRANSKEP_DB_ID"));
+    let sheetST = ss.getSheetByName('st_log');
+    
+    // Hanya buat header jika sheet belum ada
+    if (!sheetST) {
+      sheetST = ss.insertSheet('st_log');
+      const headers = [
+        'ID_ST', 'Waktu_Dibuat', 'Nomor_Surat', 'Menimbang', 'Dasar', 
+        'Tujuan', 'Tempat', 'Tgl_Mulai', 'Tgl_Selesai', 'Jam', 
+        'Data_Peserta_JSON', 'Pejabat_TTD', 'Status', 'Data_Ekstra_JSON'
+      ];
+      sheetST.appendRow(headers);
+      sheetST.getRange(1, 1, 1, headers.length).setFontWeight('bold').setBackground('#1e40af').setFontColor('#ffffff').setHorizontalAlignment('center');
+      sheetST.setFrozenRows(1);
+    }
+    SpreadsheetApp.flush();
+    return "Database st_log siap.";
+  } catch (e) {
+    return "Error: " + e.toString();
+  }
+}
+
+function addSuratTugas(payload) {
+  try {
+    const ss = SpreadsheetApp.openById(PropertiesService.getScriptProperties().getProperty("TRANSKEP_DB_ID"));
+    const sheetST = ss.getSheetByName('st_log');
+    if (!sheetST) throw new Error("Sheet st_log belum dibuat. Minta Admin jalankan setup database ST.");
+
+    const idST = "ST-" + new Date().getTime() + Math.floor(Math.random() * 1000);
+    const waktuDibuat = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'dd/MM/yyyy HH:mm:ss');
+    
+    // ZETTBOT FIX: Simpan ke sheet (Kolom A s.d N terkunci posisinya)
+    sheetST.appendRow([
+      idST, 
+      waktuDibuat, 
+      payload.nomor_surat || '', 
+      payload.menimbang || '', 
+      payload.dasar || '',
+      payload.tujuan || '', 
+      payload.tempat || '', 
+      payload.tgl_mulai || '', 
+      payload.tgl_selesai || '', 
+      payload.jam || '',
+      payload.peserta_json || '', 
+      payload.pejabat_ttd || '',
+      'DISETUJUI', // Ubah dari 'Aktif' menjadi 'DISETUJUI'
+      payload.data_ekstra_json || '' 
+    ]);
+    
+    SpreadsheetApp.flush();
+    return { status: 'success', message: 'Surat Tugas berhasil diterbitkan.', id: idST };
+  } catch (err) {
+    return { status: 'error', message: err.toString() };
+  }
+}
+
+// ZETTBOT FIX: Tambahan fungsi untuk Update data Surat Tugas yang sudah ada
+function updateSuratTugas(payload) {
+  try {
+    const ss = SpreadsheetApp.openById(PropertiesService.getScriptProperties().getProperty("TRANSKEP_DB_ID"));
+    const sheetST = ss.getSheetByName('st_log');
+    if (!sheetST) throw new Error("Database Surat Tugas tidak ditemukan.");
+
+    const data = sheetST.getDataRange().getValues();
+    let rowIndex = -1;
+    
+    // Cari baris berdasarkan ID_ST
+    for (let i = 1; i < data.length; i++) {
+      if (String(data[i][0]) === String(payload.id_st)) {
+        rowIndex = i + 1;
+        break;
+      }
+    }
+
+    if (rowIndex === -1) throw new Error("Data Surat Tugas tidak ditemukan untuk diperbarui.");
+
+    // Ambil waktu pembuatan asli agar tidak berubah
+    const originalWaktu = sheetST.getRange(rowIndex, 2).getValue();
+    
+    // ZETTBOT FIX: Array baris data baru untuk di-replace (Terlindungi dari pergeseran)
+    const updatedRow = [
+      payload.id_st, 
+      originalWaktu, 
+      payload.nomor_surat || '', 
+      payload.menimbang || '', 
+      payload.dasar || '',
+      payload.tujuan || '', 
+      payload.tempat || '', 
+      payload.tgl_mulai || '', 
+      payload.tgl_selesai || '', 
+      payload.jam || '',
+      payload.peserta_json || '', 
+      payload.pejabat_ttd || '',
+      'DISETUJUI', // Standar status yang sama
+      payload.data_ekstra_json || '' 
+    ];
+    
+    // Timpa (overwrite) baris tersebut
+    sheetST.getRange(rowIndex, 1, 1, updatedRow.length).setValues([updatedRow]);
+    SpreadsheetApp.flush();
+    
+    return { status: 'success', message: 'Data Surat Tugas berhasil diperbarui secara permanen.' };
+  } catch (err) {
+    return { status: 'error', message: err.toString() };
+  }
+}
+
+function getSuratTugasData() {
+  try {
+    const ss = SpreadsheetApp.openById(PropertiesService.getScriptProperties().getProperty("TRANSKEP_DB_ID"));
+    const sheetST = ss.getSheetByName('st_log');
+    if (!sheetST) return [];
+
+    const data = sheetST.getDataRange().getDisplayValues();
+    const result = [];
+    for (let i = 1; i < data.length; i++) {
+      result.push({
+        id: data[i][0], waktu: data[i][1], nomor: data[i][2], menimbang: data[i][3], dasar: data[i][4],
+        tujuan: data[i][5], tempat: data[i][6], tgl_mulai: data[i][7], tgl_selesai: data[i][8],
+        jam: data[i][9], peserta: data[i][10], pejabat_ttd: data[i][11], status: data[i][12],
+        data_ekstra: data[i][13] || '{}'
+      });
+    }
+    return result;
+  } catch (err) {
+    return [];
+  }
+}
+
+function deleteSuratTugasLog(id) {
+  try {
+    const ss = SpreadsheetApp.openById(PropertiesService.getScriptProperties().getProperty("TRANSKEP_DB_ID"));
+    const sheetST = ss.getSheetByName('st_log');
+    if (!sheetST) throw new Error("Database Surat Tugas tidak ditemukan.");
+
+    const data = sheetST.getDataRange().getValues();
+    let rowIndex = -1;
+    
+    for (let i = 1; i < data.length; i++) {
+      if (String(data[i][0]) === String(id)) {
+        rowIndex = i + 1;
+        break;
+      }
+    }
+
+    if (rowIndex === -1) throw new Error("Data Surat Tugas tidak ditemukan di database.");
+
+    sheetST.deleteRow(rowIndex);
+    SpreadsheetApp.flush();
+    
+    return { status: 'success', message: 'Surat Tugas berhasil dihapus permanen.' };
+  } catch (err) {
+    return { status: 'error', message: err.toString() };
+  }
+} 
+
+function saveSettingsST(payload) {
+  try {
+    const props = PropertiesService.getScriptProperties();
+    props.setProperty('ST_DEFAULT_PPK', payload.ppk);
+    props.setProperty('ST_DEFAULT_MENIMBANG', payload.menimbang);
+    props.setProperty('ST_DEFAULT_DASAR', payload.dasar);
+    props.setProperty('ST_DEFAULT_INSTANSI', payload.instansi);
+    props.setProperty('ST_DEFAULT_MATA_ANGGARAN', payload.mata_anggaran);
+    props.setProperty('ST_DEFAULT_ANGKUTAN', payload.angkutan);
+    props.setProperty('ST_DEFAULT_PARAGRAF_BIAYA', payload.paragraf_biaya);
+    return { status: 'success', message: 'Pengaturan dasar Surat Tugas berhasil disimpan.' };
+  } catch (e) {
+    return { status: 'error', message: e.toString() };
+  }
+}
+
+function getSettingsST() {
+  try {
+    const props = PropertiesService.getScriptProperties();
+    return {
+      status: 'success',
+      data: {
+        ppk: props.getProperty('ST_DEFAULT_PPK') || '',
+        menimbang: props.getProperty('ST_DEFAULT_MENIMBANG') || '',
+        dasar: props.getProperty('ST_DEFAULT_DASAR') || '',
+        instansi: props.getProperty('ST_DEFAULT_INSTANSI') || '',
+        mata_anggaran: props.getProperty('ST_DEFAULT_MATA_ANGGARAN') || '',
+        angkutan: props.getProperty('ST_DEFAULT_ANGKUTAN') || '',
+        paragraf_biaya: props.getProperty('ST_DEFAULT_PARAGRAF_BIAYA') || ''
+      }
+    };
+  } catch (e) {
+    return { status: 'error', data: {} };
+  }
+}
+
+==================================================
+FILE: permohonan/st/template_cetak_plh.html
+==================================================
+
+<!-- ==========================================
+     FILE: template_cetak_plh.html (Template Surat Penunjukan PLH)
+     ========================================== -->
+<div id="template-cetak-plh-container" style="display: none;" class="hidden no-print">
+  <style>
+    /* ==========================================
+       ZETTBOT FIX: SETTING KERTAS & MARGIN UNTUK PLH
+       ========================================== */
+    @media print {
+      @page { 
+          size: A4 portrait; 
+          margin: 0mm !important; 
+      }
+      html, body { 
+          background-color: white !important; 
+          color: black !important; 
+          font-family: 'Bookman Old Style', 'Times New Roman', serif !important; 
+          font-size: 11pt !important; 
+          line-height: 1.15 !important; 
+          margin: 0 !important;
+          padding: 0 !important;
+      }
+      .no-print { display: none !important; }
+    }
+    
+    .plh-wrapper { 
+        width: 100%; 
+        max-width: 210mm;
+        margin: 0 auto; 
+        padding: 10mm 13mm 10mm 15mm; /* Margin kertas */
+        box-sizing: border-box; 
+        font-family: 'Bookman Old Style', 'Times New Roman', serif; 
+        font-size: 11pt; 
+        color: black; 
+        line-height: 1.3; 
+    }
+
+    .plh-text-center { text-align: center; }
+    .plh-bold { font-weight: bold; }
+    .plh-logo { width: 95px; height: auto; margin-bottom: 5px; }
+    
+    .plh-header-title {
+        font-size: 16pt; 
+        font-weight: bold; 
+        text-decoration: underline; 
+        letter-spacing: 2px;
+        margin-bottom: 2px;
+    }
+    
+    .plh-main-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+    .plh-main-table td { vertical-align: top; padding: 4px 0; }
+    
+    .plh-col-label { width: 130px; }
+    .plh-col-colon { width: 15px; text-align: center; }
+    .plh-col-content { text-align: justify; }
+
+    .plh-list { margin: 0; padding-left: 20px; }
+    .plh-list li { margin-bottom: 2px; text-align: justify; }
+
+    .plh-identitas { width: 100%; border-collapse: collapse; }
+    .plh-identitas td { padding: 1px 0; vertical-align: top; }
+
+    /* ⬇️ TAG 1: MENGATUR JARAK ANTARA TEKS ATAS DENGAN BLOK TANDA TANGAN ⬇️ */
+    /* Ubah nilai "margin-top" (saat ini 30px). 
+       - Perkecil angka (misal 10px) untuk menaikkan blok tanda tangan.
+       - Perbesar angka (misal 50px) untuk menurunkannya. */
+    .plh-ttd-box { float: right; width: 300px; margin-top: 20px; }
+    /* ⬆️ ================================================================== ⬆️ */
+
+    .plh-ttd-table { width: 100%; border-collapse: collapse; }
+    .plh-ttd-table td { padding: 1px 0; }
+  </style>
+
+  <div class="plh-wrapper">
+     <!-- LOGO KOP -->
+     <div class="plh-text-center">
+        <!-- Menggunakan ID gambar dari GDrive -->
+        <img src="https://drive.google.com/thumbnail?id=1_Qbv_fdPOa2YEQAXXkvRxXevsd_4u1jZ&sz=w400" class="plh-logo" alt="Logo Pengadilan">
+     </div>
+
+     <!-- JUDUL SURAT -->
+     <div class="plh-text-center" style="margin-bottom: 25px;">
+        <div class="plh-header-title">SURAT &nbsp;&nbsp;PENUNJUKAN</div>
+        <div style="font-size: 11pt;">Nomor : {{nomor_plh}}</div>
+     </div>
+
+     <div class="plh-text-center plh-bold" style="margin-bottom: 15px; font-size: 11.5pt; text-transform: uppercase;">
+        {{jabatan_ttd_st}} PENGADILAN AGAMA INDRAMAYU
+     </div>
+
+     <!-- ISI SURAT -->
+     <table class="plh-main-table">
+       <tr>
+         <td class="plh-col-label">Menimbang</td>
+         <td class="plh-col-colon">:</td>
+         <td class="plh-col-content">
+            Bahwa sehubungan {{pejabat_jabatan}} Pengadilan Agama Indramayu Kelas I.A, melaksanakan tugas dinas luar.
+         </td>
+       </tr>
+       <tr>
+         <td class="plh-col-label">Dasar Hukum</td>
+         <td class="plh-col-colon">:</td>
+         <td class="plh-col-content">
+           <ol class="plh-list">
+             <li>Undang-Undang Nomor 7 tahun 1989 sebagaimana telah diubah dengan Undang-Undang Nomor 50 Tahun 2009 tentang Peradilan Agama;</li>
+             <li>Undang-Undang Nomor 43 tahun 1999 sebagaimana telah diubah dengan Undang-Undang nomor 8 tahun 1974 tentang pokok-pokok Kepegawaian;</li>
+             <li>Peraturan Pemerintah Nomor 100 tahun 2000 sebagaimana telah diubah dengan Peraturan pemerintah Nomor 13 tahun 2002 tentang Pengangkatan Pegawai Negeri Sipil dalam Jabatan Struktural;</li>
+             <li>Surat Kepala BKN Nomor K.26-3/V.5-10/99 tanggal 18 Januari 2002 tentang Pengangkatan Pejabat Pelaksana Tugas Harian (PLH);</li>
+             <li>Peraturan Mahkamah Agung RI. Nomor 7 Tahun 2016 pasal 12 ayat (1) tentang Penegakan Disiplin Kerja Hakim pada Mahkamah Agung dan Badan Peradilan yang Berada Di Bawahnya;</li>
+           </ol>
+         </td>
+       </tr>
+       
+       <tr>
+         <td colspan="3" class="plh-text-center plh-bold" style="padding: 15px 0;">MENUNJUK :</td>
+       </tr>
+       
+       <tr>
+         <td class="plh-col-label">Kepada</td>
+         <td class="plh-col-colon">:</td>
+         <td class="plh-col-content">
+           <table class="plh-identitas">
+             <tr><td style="width: 150px; letter-spacing: 3px;">N a m a</td><td style="width: 15px;">:</td><td class="plh-bold">{{plh_nama}}</td></tr>
+             <tr><td style="letter-spacing: 3px;">N I P</td><td>:</td><td>{{plh_nip}}</td></tr>
+             <tr><td>Pangkat/Gol.Ruang</td><td>:</td><td>{{plh_pangkat}}</td></tr>
+             <tr><td style="letter-spacing: 3px;">J a b a t a n</td><td>:</td><td>{{plh_jabatan}}</td></tr>
+             <tr><td>Unit Kerja</td><td>:</td><td>Pengadilan Agama Indramayu</td></tr>
+           </table>
+         </td>
+       </tr>
+       
+       <tr>
+         <td class="plh-col-label" style="padding-top: 15px;">Untuk</td>
+         <td class="plh-col-colon" style="padding-top: 15px;">:</td>
+         <td class="plh-col-content" style="padding-top: 15px;">
+           <ol class="plh-list">
+             <li>Melaksanakan tugas pada {{tanggal_tugas_plh}}, disamping jabatannya sebagai {{plh_jabatan}}, juga sebagai Pejabat Pelaksana Tugas Harian (PLH) {{pejabat_jabatan}} Pengadilan Agama Indramayu Kelas I.A;</li>
+             <li style="margin-top: 8px;">Melaksanakan perintah ini dengan seksama dan penuh tanggung jawab;</li>
+           </ol>
+         </td>
+       </tr>
+     </table>
+
+     <!-- TANDA TANGAN -->
+     <div class="plh-ttd-box">
+       <table class="plh-ttd-table">
+         <tr>
+           <td style="width: 100px;">Ditetapkan di</td>
+           <td style="width: 10px;">:</td>
+           <td>Indramayu</td>
+         </tr>
+         <tr style="border-bottom: 1px solid black; display: inline-block;">
+           <td style="padding-bottom: 2px;">Pada tanggal</td>
+           <td style="padding-bottom: 2px;">:</td>
+           <td style="padding-bottom: 2px;">{{tanggal_cetak}}</td>
+         </tr>
+       </table>
+       <div style="margin-top: 3px;">{{jabatan_ttd_st}},</div>
+       
+       <!-- Ruang untuk tanda tangan -->
+       <div style="height: 75px;"></div>
+       
+       <div class="plh-bold">{{nama_ttd_st}}</div>
+     </div>
+     
+     <!-- Clearfix agar footer tidak berantakan -->
+     <div style="clear: both;"></div>
+  </div>
+</div>
+
+==================================================
+FILE: permohonan/st/template_cetak_spd.html
+==================================================
+
+<!-- ==========================================
+     FILE: template_cetak_spd.html (Template Kertas SPD 2 Halaman)
+     ========================================== -->
+<!-- ZETTBOT FIX NUKLIR: Ganti ID jadi super unik agar tidak narik file backup -->
+<div id="spd-nuklir-2026" style="display: none;" class="hidden no-print">
+  <style>
+    /* ==========================================
+       ZETTBOT FIX: SETTING KERTAS & MARGIN
+       ========================================== */
+    @media print {
+      @page { 
+          size: A4 portrait; 
+          margin: 0mm !important; 
+      }
+      html, body { 
+          background-color: white !important; 
+          color: black !important; 
+          font-family: 'Bookman Old Style', 'Times New Roman', serif !important; 
+          font-size: 11pt !important; 
+          line-height: 1.15 !important; 
+          margin: 0 !important;
+          padding: 0 !important;
+      }
+      .no-print { display: none !important; }
+      .page-break { page-break-before: always; }
+    }
+    
+    /* ⬇️ TAG 8: LEBAR KERTAS (KANAN & KIRI) ⬇️ */
+    .spd-wrapper { 
+        width: 100%; 
+        max-width: 210mm;
+        margin: 0 auto; 
+        /* ZETTBOT FIX TAHAP 1: Padding disesuaikan agar layout melebar proporsional */
+        padding: 10mm 10mm 10mm 11mm; /* Atas, Kanan, Bawah, Kiri */
+        box-sizing: border-box; 
+        font-family: 'Bookman Old Style', 'Times New Roman', serif; 
+        font-size: 11pt; 
+        color: black; 
+        line-height: 1.15; 
+    }
+    /* ⬆️ ========================================================= ⬆️ */
+    
+    .spd-header-table { width: 100%; border: none; margin-bottom: 20px; font-size: 11pt; }
+    .spd-header-table td { padding: 1px 0; vertical-align: top; }
+    
+    .spd-title { text-align: center; margin-bottom: 15px; }
+    .spd-title h4 { margin: 0; font-size: 12pt; font-weight: bold; text-decoration: underline; letter-spacing: 1px; }
+    
+    .spd-main-table { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
+    
+    /* ⬇️ TAG 1: TINGGI/SPASI "NAPAS" KOLOM TABEL HALAMAN 1 ⬇️ */
+    .spd-main-table th, .spd-main-table td { border: 1px solid black; padding: 6px 8px; vertical-align: top; }
+    /* ⬆️ ========================================================= ⬆️ */
+
+    /* ⬇️ TAG 2: GESER GARIS TENGAH HALAMAN 1 ⬇️ */
+    .col-num { width: 4%; text-align: center; }
+    .col-label { width: 50%; } 
+    .col-value { width: 46%; } 
+    /* ⬆️ ========================================================= ⬆️ */
+
+    .td-no-pad { padding: 0 !important; }
+
+    .list-table { width: 100%; border-collapse: collapse; border: none; }
+    .list-table td { border: none !important; padding: 3px 4px !important; vertical-align: top; }
+    .list-table .l-num { width: 20px; }
+
+    /* ==========================================
+       HALAMAN 2: VISUM PRESISI TINGGI
+       ========================================== */
+    .spd-visum-table { width: 100%; border-collapse: collapse; margin-bottom: 10px; font-size: 11pt; table-layout: fixed; }
+    
+    /* ==========================================
+      /* ==========================================
+       HALAMAN 2: VISUM PRESISI TINGGI
+       ========================================== */
+    .spd-visum-table { width: 100%; border-collapse: collapse; margin-bottom: 10px; font-size: 11pt; table-layout: fixed; }
+    
+    /* ⬇️ TAG 4: TINGGI KOTAK VISUM (HALAMAN 2) ⬇️ */
+    .visum-cell { 
+        border: 1px solid black; 
+        padding: 8px; 
+        vertical-align: top; 
+        width: 50%; 
+        /* ZETTBOT FIX: Tinggi dinaikkan dari 160px jadi 200px agar lega */
+        height: 200px; 
+        position: relative; 
+    }
+    .visum-cell-tall { 
+        border: 1px solid black; 
+        padding: 8px; 
+        vertical-align: top; 
+        width: 50%; 
+        /* ZETTBOT FIX: Tinggi dinaikkan dari 220px jadi 260px */
+        height: 260px; 
+        position: relative; 
+    }
+    /* ⬆️ ========================================================= ⬆️ */
+
+    .visum-inner { width: 100%; border: none; }
+    .visum-inner td { padding: 1px 0; vertical-align: top; border: none !important; }
+    .v-num { width: 25px; }
+    .v-lbl { width: 130px; white-space: nowrap; } 
+    .v-cln { width: 10px; text-align: center; }
+  </style>
+
+
+  <!-- ================= HALAMAN 1 ================= -->
+  <div class="spd-wrapper">
+    <table class="spd-header-table">
+      <tr>
+        <!-- ⬇️ TAG 9: LEBAR KOLOM HEADER (Kiri & Kanan) ⬇️ -->
+        <!-- ZETTBOT FIX: Diberi padding-left agar terdorong pas ke garis kuning -->
+        <td style="width: 46%; padding-right: 14;">
+            MAHKAMAH AGUNG<br>
+            PENGADILAN AGAMA INDRAMAYU
+        </td>
+        <td style="width: 50%; padding-left: 0;">
+            <table style="width: 100%; border: none; table-layout: fixed;">
+                <tr><td style="width: 90px; white-space: nowrap;">Lembar ke</td><td style="width: 15px;">:</td><td></td></tr>
+                <tr><td style="white-space: nowrap;">Kode No</td><td>:</td><td></td></tr>
+                <tr><td style="white-space: nowrap;">Nomor</td><td>:</td><td style="white-space: nowrap; font-size: 10.5pt;">{{nomor_spd_pakem}}</td></tr>
+            </table>
+        </td>
+        <!-- ⬆️ ========================================================= ⬆️ -->
+      </tr>
+    </table>
+
+    <div class="spd-title" style="margin-top: 45px; margin-bottom: 25px;">
+      <h4>SURAT PERJALANAN DINAS</h4>
+    </div>
+
+    <table class="spd-main-table">
+      <tr>
+        <td class="col-num">1</td>
+        <td class="col-label">Pejabat Pembuat Komitmen</td>
+        <td class="col-value"><strong>{{ppk_nama}}</strong></td>
+      </tr>
+      <tr>
+        <td class="col-num">2</td>
+        <td class="col-label">Nama/NIP Pegawai yang diperintahkan</td>
+        <td class="col-value">
+            <strong>{{peserta_nama}}</strong><br>
+            NIP. {{peserta_nip}}
+        </td>
+      </tr>
+      
+      <tr>
+        <td class="col-num">3</td>
+        <td class="td-no-pad">
+           <table class="list-table">
+             <tr><td class="l-num">a.</td><td>Pangkat dan Golongan Ruang Gaji</td></tr>
+             <tr><td class="l-num">b.</td><td>Jabatan / Instansi</td></tr>
+             <tr><td class="l-num">c.</td><td>Tingkat Menurut Peraturan Perjalanan Dinas</td></tr>
+           </table>
+        </td>
+        <td class="td-no-pad">
+           <table class="list-table">
+             <tr><td class="l-num">a.</td><td>{{peserta_pangkat}}</td></tr>
+             <tr><td class="l-num">b.</td><td>{{peserta_jabatan}}</td></tr>
+             <tr><td class="l-num">c.</td><td>{{tingkat_spd}}</td></tr>
+           </table>
+        </td>
+      </tr>
+      
+      <tr>
+        <td class="col-num">4.</td>
+        <td class="col-label">Maksud Perjalanan Dinas</td>
+        <td class="col-value" style="text-align: justify;">{{maksud_tujuan}}</td>
+      </tr>
+      <tr>
+        <td class="col-num">5</td>
+        <td class="col-label">Alat Angkutan Yang Digunakan</td>
+        <td class="col-value">{{alat_angkut}}</td>
+      </tr>
+      
+      <tr>
+        <td class="col-num">6</td>
+        <td class="td-no-pad">
+           <table class="list-table">
+             <tr><td class="l-num">a.</td><td>Tempat Berangkat</td></tr>
+             <tr><td class="l-num">b.</td><td>Tempat Tujuan</td></tr>
+           </table>
+        </td>
+        <td class="td-no-pad">
+           <table class="list-table">
+             <tr><td class="l-num">a.</td><td>Indramayu</td></tr>
+             <tr><td class="l-num">b.</td><td>{{tempat_tujuan_spd}}</td></tr>
+           </table>
+        </td>
+      </tr>
+      
+      <tr>
+        <td class="col-num">7</td>
+        <td class="td-no-pad">
+           <table class="list-table">
+             <tr><td class="l-num">a.</td><td>Lamanya Perjalanan Dinas</td></tr>
+             <tr><td class="l-num">b.</td><td>Tanggal Berangkat</td></tr>
+             <tr><td class="l-num">c.</td><td>Tanggal Harus Kembali/tiba ditempat</td></tr>
+           </table>
+        </td>
+        <td class="td-no-pad">
+           <table class="list-table">
+             <tr><td class="l-num">a.</td><td>{{lama_hari}} ({{lama_hari_teks}}) hari</td></tr>
+             <tr><td class="l-num">b.</td><td>{{tgl_berangkat}}</td></tr>
+             <tr><td class="l-num">c.</td><td>{{tgl_kembali}}</td></tr>
+           </table>
+        </td>
+      </tr>
+      
+      <!-- ========================================================= 
+           ZETTBOT FIX NUKLIR: ROW 8 PENGIKUT 
+           DIPISAH JADI DUA TD AGAR GARIS TENGAH 100% LURUS
+           ========================================================= -->
+      <tr>
+        <td class="col-num">8</td>
+        <td class="td-no-pad" style="border-right: 1px solid black;">
+             <table style="width: 100%; border-collapse: collapse; border: none; margin: 0; padding: 0;">
+                <tr>
+                   <td style="width: 40%; border-right: 1px solid black !important; border-bottom: 1px solid black !important; border-top: none !important; border-left: none !important; padding: 6px 8px;">Pengikut</td>
+                   <td style="width: 60%; border-right: none !important; border-bottom: 1px solid black !important; border-top: none !important; border-left: none !important; padding: 6px 8px; text-align: center;">Nama</td>
+                </tr>
+                <tr>
+                   <td style="border-right: 1px solid black !important; border-bottom: none !important; border-top: none !important; border-left: none !important; min-height: 35px; height: 35px;"></td>
+                   <td style="border-right: none !important; border-bottom: none !important; border-top: none !important; border-left: none !important;"></td>
+                </tr>
+             </table>
+        </td>
+        <td class="td-no-pad">
+             <table style="width: 100%; border-collapse: collapse; border: none; margin: 0; padding: 0;">
+                <tr>
+                   <td style="width: 50%; border-right: 1px solid black !important; border-bottom: 1px solid black !important; border-top: none !important; border-left: none !important; padding: 6px 8px; text-align: center;">Tanggal Lahir</td>
+                   <td style="width: 50%; border-right: none !important; border-bottom: 1px solid black !important; border-top: none !important; border-left: none !important; padding: 6px 8px; text-align: center;">Keterangan</td>
+                </tr>
+                <tr>
+                   <td style="border-right: 1px solid black !important; border-bottom: none !important; border-top: none !important; border-left: none !important; min-height: 35px; height: 35px;"></td>
+                   <td style="border-right: none !important; border-bottom: none !important; border-top: none !important; border-left: none !important;"></td>
+                </tr>
+             </table>
+        </td>
+      </tr>
+
+      <tr>
+        <td class="col-num">9</td>
+        <td class="td-no-pad">
+           <div style="padding: 6px 8px 0px 8px;">Pembebanan Anggaran</div>
+           <table class="list-table">
+             <tr><td class="l-num">a.</td><td>Instansi</td></tr>
+             <tr><td class="l-num">b.</td><td>Mata Anggaran</td></tr>
+           </table>
+        </td>
+        <td class="td-no-pad">
+            <div style="padding-top: 24px;"></div>
+           <table class="list-table">
+             <tr><td class="l-num">a.</td><td>{{instansi}}</td></tr>
+             <tr><td class="l-num">b.</td><td>{{mata_anggaran}}</td></tr>
+           </table>
+        </td>
+      </tr>
+      <tr>
+        <td class="col-num">10</td>
+        <td class="col-label">Keterangan Lain</td>
+        <td class="col-value">{{keterangan_lain}}</td>
+      </tr>
+    </table>
+
+    <!-- ZETTBOT FIX: MENGGESER TANDA TANGAN HALAMAN 1 KE POSISI YANG PAS (Sesuai Garis Kuning) -->
+    <table style="width: 100%; border: none; margin-top: 25px;">
+      <tr>
+        <!-- ZETTBOT FIX: Menggunakan rasio 54% : 46% agar persis lurus dengan kop tabel bagian atas -->
+        <td style="width: 54%;"></td>
+        <td style="width: 46%;">
+          <table style="width: 100%; border: none; font-size: 11pt; padding:0; margin:0; border-spacing:0;">
+              <tr><td style="width: 90px; white-space: nowrap; padding:0;">Dikeluarkan di</td><td style="width: 15px; padding:0;">:</td><td style="padding:0;">Indramayu</td></tr>
+              <tr><td style="white-space: nowrap; padding:0;">Tanggal</td><td style="padding:0;">:</td><td style="padding:0;">{{tanggal_cetak}}</td></tr>
+          </table>
+
+          <!-- ⬇️ TAG 24: GARIS BAWAH TIPIS 1PX DI BAWAH TANGGAL ⬇️ -->
+          <div style="border-bottom: 1px solid black; margin-bottom: 5px; width: 220px;"></div>
+          <!-- ⬆️ ================================================ ⬆️ -->
+
+          <div style="margin-top: 5px;">Pejabat Pembuat Komitmen</div>
+          
+          <!-- ⬇️ TAG 5: JARAK TANDA TANGAN PPK (HALAMAN 1) ⬇️ -->
+          <div style="height: 70px;"></div>
+          <!-- ⬆️ ======================================================== ⬆️ -->
+          
+          <div style="font-weight: bold; text-decoration: underline;">{{ppk_nama}}</div>
+          <div>NIP. {{ppk_nip}}</div>
+        </td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- ================= HALAMAN 2 (PAGE BREAK) ================= -->
+ <div class="spd-wrapper page-break">
+    <table class="spd-visum-table">
+        <tbody>
+            <!-- BARIS I -->
+            <tr>
+                <td class="visum-cell">
+                    Yang Melaksanakan Tugas
+                </td>
+                <td class="visum-cell">
+                    <table class="visum-inner">
+                        <tr><td class="v-num">I.</td><td class="v-lbl">Berangkat dari</td><td class="v-cln">:</td><td>Indramayu</td></tr>
+                        <tr><td></td><td>Ke</td><td>:</td><td>{{tempat_tujuan_spd}}</td></tr>
+                        <tr><td></td><td>Pada Tanggal</td><td>:</td><td>{{tgl_berangkat}}</td></tr>
+                    </table>
+                    
+                    <!-- ZETTBOT FIX: Mode Air Mengalir (Tanpa Absolute) & Geser 155px -->
+                    <div style="margin-top: 10px; margin-left: 25px; margin-bottom: 2px;">
+                        <div>{{jabatan_ttd_st}},</div>
+                        
+                        <!-- ⬇️ TAG 15: JARAK TINGGI KOSONG TANDA TANGAN KETUA (HAL 2) ⬇️ -->
+                        <!-- Sekarang kalau height ditambah, kolom otomatis memanjang tanpa nabrak! -->
+                        <div style="height: 65px;"></div>
+                        <!-- ⬆️ ========================================================== ⬆️ -->
+                        
+                        <div style="font-weight: bold;">{{nama_ttd_st}}</div>
+                        <div>NIP. {{nip_ttd_st}}</div>
+                    </div>
+                </td>
+            </tr>
+
+            <!-- BARIS II -->
+            <tr>
+                <td class="visum-cell">
+                    <table class="visum-inner">
+                        <tr><td class="v-num">II</td><td class="v-lbl">Tiba di</td><td class="v-cln">:</td><td>{{tempat_tujuan_spd}}</td></tr>
+                        <tr><td></td><td>Pada Tanggal</td><td>:</td><td>{{tgl_berangkat}}</td></tr>
+                    </table>
+                    <!-- ⬇️ TAG 21: PENDORONG TITIK KIRI (Angka lebih besar agar sejajar Kanan) ⬇️ -->
+                    <div style="margin-top: 110px; margin-bottom: 10px; margin-left: 25px; margin-right: 8px; border-bottom: 1px dotted black;"></div>
+                    <!-- ⬆️ ==================================================================== ⬆️ -->
+                </td>
+                <td class="visum-cell">
+                    <table class="visum-inner">
+                        <tr><td class="v-num"></td><td class="v-lbl">Berangkat dari</td><td class="v-cln">:</td><td>{{tempat_tujuan_spd}}</td></tr>
+                        <tr><td></td><td>Ke</td><td>:</td><td>Indramayu</td></tr>
+                        <tr><td></td><td>Pada Tanggal</td><td>:</td><td>{{tgl_kembali}}</td></tr>
+                    </table>
+                    <!-- ⬇️ TAG 22: PENDORONG TITIK KANAN ⬇️ -->
+                    <div style="margin-top: 90px; margin-bottom: 10px; margin-left: 8px; margin-right: 8px; border-bottom: 1px dotted black;"></div>
+                    <!-- ⬆️ =============================== ⬆️ -->
+                </td>
+            </tr>
+
+            <!-- BARIS III -->
+            <tr>
+                <td class="visum-cell">
+                    <table class="visum-inner">
+                        <tr><td class="v-num">III</td><td class="v-lbl">Tiba di</td><td class="v-cln">:</td><td></td></tr>
+                        <tr><td></td><td>Pada Tanggal</td><td>:</td><td></td></tr>
+                    </table>
+                    <!-- ⬇️ TAG 21: PENDORONG TITIK KIRI (Angka lebih besar agar sejajar Kanan) ⬇️ -->
+                    <div style="margin-top: 110px; margin-bottom: 10px; margin-left: 25px; margin-right: 8px; border-bottom: 1px dotted black;"></div>
+                    <!-- ⬆️ ==================================================================== ⬆️ -->
+                </td>
+                <td class="visum-cell">
+                     <table class="visum-inner">
+                        <tr><td class="v-num"></td><td class="v-lbl">Berangkat dari</td><td class="v-cln">:</td><td></td></tr>
+                        <tr><td></td><td>Ke</td><td>:</td><td></td></tr>
+                        <tr><td></td><td>Pada Tanggal</td><td>:</td><td></td></tr>
+                    </table>
+                    <!-- ⬇️ TAG 22: PENDORONG TITIK KANAN ⬇️ -->
+                    <div style="margin-top: 90px; margin-bottom: 10px; margin-left: 8px; margin-right: 8px; border-bottom: 1px dotted black;"></div>
+                    <!-- ⬆️ =============================== ⬆️ -->
+                </td>
+            </tr>
+
+            <!-- BARIS IV -->
+            <tr>
+                <td class="visum-cell-tall">
+                    <table class="visum-inner">
+                        <tr><td class="v-num">IV</td><td class="v-lbl">Tiba Kembali di</td><td class="v-cln">:</td><td>Indramayu</td></tr>
+                        <tr><td></td><td>Pada Tanggal</td><td>:</td><td>{{tgl_kembali}}</td></tr>
+                    </table>
+                    
+                    <!-- ZETTBOT FIX: Mode Air Mengalir KIRI (Tanpa Absolute) -->
+                    <!-- ⬇️ TAG 19: PENDORONG TTD KIRI AGAR SEJAJAR DENGAN KANAN ⬇️ -->
+                    <div style="margin-top: 68px; margin-left: 33px; margin-bottom: 2px;">
+                    <div>Pejabat Pembuat Komitmen</div>
+                        
+                        <!-- ⬇️ TAG 6: JARAK TANDA TANGAN PPK (HALAMAN 2 KIRI) ⬇️ -->
+                        <div style="height: 85px;"></div>
+                        <!-- ⬆️ ======================================================== ⬆️ -->
+                        
+                        <div style="font-weight: bold; text-decoration: underline;">{{ppk_nama}}</div>
+                        <div>NIP. {{ppk_nip}}</div>
+                    </div>
+                </td>
+                <td class="visum-cell-tall">
+                    <div style="text-align: justify; margin-left: 25px; margin-right: 2px;">
+                        Telah diperiksa dengan keterangan bahwa perjalanan tersebut diatas benar dilakukan atas perintahnya dan semata-mata untuk kepentingan jabatan dalam waktu yang sesingkat-singkatnya.
+                    </div>
+                <!-- ZETTBOT FIX: Mode Air Mengalir KANAN (Tanpa Absolute) & Geser 155px -->
+                <div style="margin-top: 30px; margin-left: 33px; margin-bottom: 2px;">
+                    <div>Pejabat Pembuat Komitmen</div>
+                    
+                    <!-- ⬇️ TAG 7: JARAK TANDA TANGAN PPK (HALAMAN 2 KANAN) ⬇️ -->
+                    <div style="height: 85px;"></div>
+                    <!-- ⬆️ ======================================================== ⬆️ -->
+                    
+                    <div style="font-weight: bold; text-decoration: underline;">{{ppk_nama}}</div>
+                    <div>NIP. {{ppk_nip}}</div>
+                </div>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+
+    <div style="margin-top: 8px; font-size: 11pt;">V. PERHATIAN</div>
+    <div style="text-align: justify; font-size: 11pt; line-height: 1.15;">
+        Pejabat yang berwenang memberikan SPPD, pegawai yang melakukan perjalanan dinas, para pejabat yang mengesahkan tanggal berangkat/tiba serta bendaharawan bertanggungjawab berdasarkan peraturan-peraturan keuangan negara apabila negara menderita rugi akibat kesalahan. Kelalaian dan kealpaannya (angka 8 lampiran Surat Edaran Menteri Keuangan).
+    </div>
+  </div>
+</div>
+
+==================================================
+FILE: permohonan/st/template_cetak_st.html
+==================================================
+
+<!-- ==========================================
+     FILE: template_cetak_st.html (Template Kertas ST)
+     ========================================== -->
+<div id="template-cetak-st-container" style="display: none;" class="hidden no-print">
+  <style>
+    @media print {
+      @page { 
+          size: A4 portrait; 
+          margin: 0; 
+      }
+      html, body { 
+          background-color: white !important; 
+          color: black !important; 
+          font-family: 'Bookman Old Style', serif; 
+          font-size: 11pt; 
+          line-height: 1.15; 
+          margin: 0 !important;
+          padding: 0 !important;
+      }
+      .no-print { display: none !important; }
+    }
+    
+    .st-wrapper { 
+        width: 100%; 
+        max-width: 210mm;
+        margin: 0 auto; 
+        padding: 10mm 15mm 10mm 20mm; 
+        box-sizing: border-box; 
+        font-family: 'Bookman Old Style', serif; 
+        font-size: 11pt; 
+        color: black; 
+        line-height: 1.15; 
+    }
+    
+    /* =========================================================================
+       ZONA STATIS (KOTAK KUNING) - KOP & JUDUL
+       Berlaku sama untuk 1 orang, 2 orang, atau lebih. Dikunci rapat di sini.
+       ========================================================================= */
+
+    .st-kop-container { 
+        display: flex; align-items: center; 
+        
+        /* ⬇️ TAG B: JARAK BARIS KATA TELEPON DENGAN GARIS KOP SURAT ⬇️ */
+        padding-bottom: 5px; 
+        
+        border-bottom: 2px solid black; 
+        
+        /* ⬇️ TAG C: JARAK GARIS KOP SURAT DENGAN KATA "SURAT TUGAS" ⬇️ */
+        margin-bottom: 45px; 
+    }
+    .st-kop-logo { width: 90px; height: auto; flex-shrink: 0; }
+    .st-kop-text { flex-grow: 1; text-align: center; padding-right: 30px; }
+    
+    .st-kop-text h3, .st-kop-text h2 { 
+        margin: 0; font-size: 14pt; font-weight: bold; text-transform: uppercase; line-height: 1.15; 
+    }
+    
+    .st-kop-text p { 
+        /* ⬇️ TAG A: JARAK KATA "PENGADILAN AGAMA..." DENGAN "JALAN M.T. HARYONO..." ⬇️ */
+        margin: 2px 0 0 0; 
+        font-size: 8pt; 
+    }
+    
+    .st-title { 
+        text-align: center; 
+        
+        /* ⬇️ TAG E: JARAK NOMOR SURAT DENGAN "KETUA PENGADILAN AGAMA..." ⬇️ */
+        margin-bottom: 40px;
+    } 
+    
+    .st-title h4 { 
+        /* ⬇️ TAG D: KETEBALAN GARIS BAWAH "SURAT TUGAS" ⬇️ */
+        border-bottom: 2px solid black; 
+        display: inline-block;
+        margin: 0; 
+        padding-bottom: 1px; 
+        font-size: 22pt; 
+        font-weight: bold; 
+        letter-spacing: 5px; 
+        line-height: 1; 
+    }
+    
+    .st-title p { 
+        /* ⬇️ TAG C (Sub): JARAK GARIS BAWAH SURAT TUGAS DENGAN NOMOR SURAT ⬇️ */
+        margin: 2px 0 0 0; 
+        font-size: 9pt; 
+    }
+    
+    .st-sub-title {
+        text-align: center; font-weight: bold; font-size: 11pt; text-transform: uppercase; 
+        
+        /* ⬇️ TAG F: JARAK KATA "KETUA PENGADILAN AGAMA..." DENGAN KATA "MENIMBANG" ⬇️ */
+        margin-bottom: 5px; 
+    }
+
+    /* =========================================================================
+       ZONA DINAMIS (KOTAK UNGU) - ISI SURAT & TANDA TANGAN
+       ========================================================================= */
+
+    .st-content-table { width: 100%; border: none; margin-bottom: 0px; font-size: 11pt; border-spacing: 0; }
+    .st-content-table td { vertical-align: top; padding: 3px 0; } 
+    
+    .col-label { width: 15%; font-weight: normal; } 
+    .col-colon { width: 3%; text-align: center; }
+    .col-value { width: 82%; text-align: justify; }
+
+    .st-memberi-tugas { text-align: center; font-weight: bold; font-size: 11pt; }
+    .peserta-item { margin-bottom: 3px; } 
+    .peserta-table { width: 100%; border: none; font-size: 11pt; border-spacing: 0; }
+    .peserta-table td { padding: 0; vertical-align: top; } 
+    
+    /* =========================================================================
+       ZONA DINAMIS (KOTAK UNGU)
+       ========================================================================= */
+
+    .st-content-table { width: 100%; border: none; margin-bottom: 0px; font-size: 11pt; border-spacing: 0; }
+    .st-content-table td { vertical-align: top; padding: 3px 0; } 
+    
+    .col-label { width: 15%; font-weight: normal; } 
+    .col-colon { width: 3%; text-align: center; }
+    .col-value { width: 82%; text-align: justify; }
+
+    .st-memberi-tugas { text-align: center; font-weight: bold; font-size: 11pt; }
+    .peserta-item { margin-bottom: 3px; } 
+    .peserta-table { width: 100%; border: none; font-size: 11pt; border-spacing: 0; }
+    .peserta-table td { padding: 0; vertical-align: top; } 
+    
+    /* -------------------------------------------------------------------------
+       ZETTBOT FIX: PUSAT KENDALI SPACING ZONA UNGU
+       ------------------------------------------------------------------------- */
+       
+    /* === START TAG KHUSUS ST 1 ORANG === */
+    /* 1. Jarak antar baris utama (ZETTBOT FIX: Dikurangi jadi 10px agar tdk over page) */
+    .st-layout-single .st-content-table > tbody > tr > td { padding: 10px 0; } 
+    
+    /* 2. Jarak antar baris data pegawai */
+    .st-layout-single .peserta-table td { padding: 4px 0; margin-bottom: 5px} 
+    
+    /* 3. Jarak atas & bawah teks "Memberi Tugas" */
+    .st-layout-single .st-memberi-tugas { margin-top: 10px; margin-bottom: 10px; }
+    
+    /* 4. Jarak Paragraf Penutup (Anggaran & Tanggung Jawab) */
+    .st-layout-single > p { margin-top: 15px !important; margin-bottom: 10px !important; line-height: 1.3; }
+    
+    /* 5. Dorongan Tanda Tangan ke bawah kertas (ZETTBOT FIX: Dikurangi jadi 30px) */
+    .st-layout-single .st-ttd-container { margin-top: 30px; }
+
+    /* 6. MENGGESER KOLOM HARI/TANGGAL KE KIRI KHUSUS 1 ORANG */
+    .st-layout-single .tabel-untuk .p-col-num { display: none; }
+
+    /* 7. PADING KHUSUS MENIMBANG & DASAR */
+    /* Menambahkan jarak bagian Bawah (bottom) ekstra pada baris tertentu */
+    .st-layout-single .baris-menimbang td { padding-bottom: 10px; }
+    .st-layout-single .baris-dasar td { padding-bottom: 10px; }
+
+    /* 8. SPASI DALAM PARAGRAF (MENIMBANG, DASAR, UNTUK) */
+    /* line-height = jarak spasi antar baris kalimat; padding-bottom = jarak antar poin/nomor */
+    .st-layout-single .baris-menimbang .col-value table td,
+    .st-layout-single .baris-dasar .col-value table td {
+        line-height: 1.4; 
+        padding-bottom: 2px !important; 
+    }
+    .st-layout-single .baris-untuk .col-value > div:first-child {
+        line-height: 1.4;
+        padding-bottom: 2px; 
+    }
+
+    /* 9. MENGURANGI JARAK ANTARA KEPADA DAN UNTUK */
+    .st-layout-single .baris-kepada td { padding-bottom: 0px !important; }
+    .st-layout-single .baris-untuk td { padding-top: 5px !important; }
+    
+    /* === END TAG KHUSUS ST 1 ORANG === */
+
+
+    /* === START TAG KHUSUS ST 2 ORANG === */
+    /* Nilai margin/padding dibuat lebih rapat dibandingkan 1 Orang agar muat 1 lembar A4 */
+    
+    /* 1. Jarak antar baris utama (Menimbang, Dasar, Kepada, Untuk) */
+    .st-layout-double .st-content-table > tbody > tr > td { padding: 6px 0; } 
+    
+    /* 2. Jarak antar baris data pegawai */
+    .st-layout-double .peserta-table td { padding: 2px 0; } 
+    
+    /* 3. Jarak atas & bawah teks "Memberi Tugas" */
+    .st-layout-double .st-memberi-tugas { margin-top: 10px; margin-bottom: 10px; }
+    
+    /* 4. Jarak Paragraf Penutup (Anggaran & Tanggung Jawab) */
+    .st-layout-double > p { margin-top: 8px !important; margin-bottom: 10px !important; line-height: 1.25; }
+    
+    /* 5. Dorongan Tanda Tangan ke bawah kertas */
+    .st-layout-double .st-ttd-container { margin-top: 25px; }
+
+    /* 6. PADING KHUSUS MENIMBANG & DASAR */
+    .st-layout-double .baris-menimbang td { padding-bottom: 8px; }
+    .st-layout-double .baris-dasar td { padding-bottom: 8px; }
+
+    /* 7. SPASI DALAM PARAGRAF (MENIMBANG, DASAR, UNTUK) */
+    .st-layout-double .baris-menimbang .col-value table td,
+    .st-layout-double .baris-dasar .col-value table td {
+        line-height: 1.3; 
+        padding-bottom: 4px !important; 
+    }
+    
+    .st-layout-double .baris-untuk .col-value > div:first-child {
+        line-height: 1.3;
+        padding-bottom: 4px; 
+    }
+
+    /* 8. MENGURANGI JARAK ANTARA KEPADA DAN UNTUK */
+    .st-layout-double .baris-kepada td { padding-bottom: 0px !important; }
+    .st-layout-double .baris-untuk td { padding-top: 3px !important; }
+    /* === END TAG KHUSUS ST 2 ORANG === */
+
+
+
+    /* === START TAG KHUSUS ST 3 ORANG (Normal Layout) === */
+    /* Spacing sangat dirapatkan agar muat 3 orang + Tanda Tangan di 1 Lembar A4 */
+    
+    /* 1. Jarak antar baris utama (Menimbang, Dasar, Kepada, Untuk) */
+    .st-layout-normal .st-content-table > tbody > tr > td { padding: 3px 0; } 
+    
+    /* 2. Jarak antar baris data pegawai */
+    .st-layout-normal .peserta-table td { padding: 0.5px 0; } 
+    
+    /* 3. Jarak atas & bawah teks "Memberi Tugas" */
+    .st-layout-normal .st-memberi-tugas { margin-top: 5px; margin-bottom: 5px; }
+    
+    /* 4. Jarak Paragraf Penutup (Anggaran & Tanggung Jawab) */
+    .st-layout-normal > p { margin-top: 3px !important; margin-bottom: 3px !important; line-height: 1.2; }
+    
+    /* 5. Dorongan Tanda Tangan ke bawah kertas */
+    .st-layout-normal .st-ttd-container { margin-top: 15px; }
+
+    /* 6. PADING KHUSUS MENIMBANG & DASAR */
+    .st-layout-normal .baris-menimbang td { padding-bottom: 3px; }
+    .st-layout-normal .baris-dasar td { padding-bottom: 3px; }
+
+    /* 7. SPASI DALAM PARAGRAF (MENIMBANG, DASAR, UNTUK) */
+    .st-layout-normal .baris-menimbang .col-value table td,
+    .st-layout-normal .baris-dasar .col-value table td {
+        line-height: 1.2; 
+        padding-bottom: 2px !important; 
+    }
+    
+    .st-layout-normal .baris-untuk .col-value > div:first-child {
+        line-height: 1.2;
+        padding-bottom: 2px; 
+    }
+
+    /* 8. MENGURANGI JARAK ANTARA KEPADA DAN UNTUK */
+    .st-layout-normal .baris-kepada td { padding-bottom: 1px !important; }
+    .st-layout-normal .baris-untuk td { padding-top: 1px !important; }
+    /* === END TAG KHUSUS ST 3 ORANG === */
+
+
+ /* === START TAG KHUSUS ST 4 ORANG ATAU LEBIH (Multi Layout / 2 Halaman) === */
+    /* ZETTBOT FIX: Menggabungkan ide padding 3 orang + Penurunan Font Size 1pt */
+    
+    /* 1. MANTRA SIHIR: Mengecilkan font area isi agar muat banyak */
+    .st-layout-multi .st-content-table { font-size: 10pt; } 
+    .st-layout-multi .peserta-table { font-size: 10pt; }
+    .st-layout-multi .tabel-untuk { font-size: 10pt; }
+    .st-layout-multi .st-memberi-tugas { font-size: 10.5pt; margin-top: 5px; margin-bottom: 5px; }
+
+    /* 2. Pading dikunci rapat seperti layout 4 orang */
+    .st-layout-multi .st-content-table td { padding: 3px 0; } 
+    .st-layout-multi .peserta-table td { padding: 1px 0; } 
+    
+    .st-layout-multi .baris-menimbang td { padding-bottom: 3px; }
+    .st-layout-multi .baris-dasar td { padding-bottom: 3px; }
+    .st-layout-multi .baris-menimbang .col-value table td,
+    .st-layout-multi .baris-dasar .col-value table td { line-height: 1.2; padding-bottom: 2px !important; font-size: 10pt;}
+    .st-layout-multi .baris-untuk .col-value > div:first-child { line-height: 1.2; padding-bottom: 2px; }
+    
+    .st-layout-multi .baris-kepada td { padding-bottom: 0px !important; }
+    .st-layout-multi .baris-untuk td { padding-top: 0px !important; }
+    
+    /* 3. INI KUNCI UTAMANYA: Memaksa area Footer melompat ke Hal 2 */
+    .st-layout-multi .st-footer-section { 
+        page-break-before: always; 
+        padding-top: 20px; 
+    }
+    
+    /* Font di Hal 2 (Anggaran & TTD) dikembalikan ke 11pt agar tetap elegan */
+    .st-layout-multi .st-footer-section > p { margin-top: 15px !important; margin-bottom: 10px !important; line-height: 1.3; font-size: 11pt; }
+    .st-layout-multi .st-ttd-container { margin-top: 30px; font-size: 11pt; }
+    /* === END TAG KHUSUS ST 4 ORANG === */
+
+
+    .p-col-num { width: 5%; }
+    .p-col-label { width: 25%; }
+    .p-col-colon { width: 3%; text-align: center; }
+    .p-col-value { width: 67%; }
+  </style>
+
+  <div class="st-wrapper {{layout_class}}">
+    
+    <!-- ZONA STATIS (KOTAK KUNING) -->
+    <div class="st-kop-container">
+      <img src="https://drive.google.com/thumbnail?id=1_Qbv_fdPOa2YEQAXXkvRxXevsd_4u1jZ&sz=w500" class="st-kop-logo" alt="Logo">
+      <div class="st-kop-text">
+        <h3>MAHKAMAH AGUNG REPUBLIK INDONESIA</h3>
+        <h3>DIREKTORAT JENDERAL BADAN PERADILAN AGAMA</h3>
+        <h3>PENGADILAN TINGGI AGAMA BANDUNG</h3>
+        <h2>PENGADILAN AGAMA INDRAMAYU</h2>
+        <p>Jalan M.T. Haryono No.2A Kel. Sindang Kec. Sindang Kab. Indramayu Kode Pos 45222<br>
+        Telepon (0234) 273880 | Situs: <a href="https://www.pa-indramayu.go.id" style="color: blue; text-decoration: none;">www.pa-indramayu.go.id</a> | e-mail: <a href="mailto:pa.indramayu_ptabdg@yahoo.co.id" style="color: blue; text-decoration: none;">pa.indramayu_ptabdg@yahoo.co.id</a></p>
+      </div>
+    </div>
+    <div class="st-title">
+      <h4>SURAT TUGAS</h4>
+      <p>Nomor : {{nomor_surat}}</p>
+    </div>
+    <div class="st-sub-title">
+      {{jabatan_kop}}
+    </div>
+    <!-- END ZONA STATIS -->
+
+    <!-- ZONA DINAMIS (KOTAK UNGU) -->
+    <table class="st-content-table">
+      <tr class="baris-menimbang">
+        <td class="col-label">Menimbang</td>
+        <td class="col-colon">:</td>
+        <td class="col-value">{{menimbang}}</td>
+      </tr>
+      <tr class="baris-dasar">
+        <td class="col-label">Dasar</td>
+        <td class="col-colon">:</td>
+        <td class="col-value">{{dasar}}</td>
+      </tr>
+    </table>
+
+    <div class="st-memberi-tugas">Memberi Tugas</div>
+
+    <table class="st-content-table">
+      <tr class="baris-kepada">
+        <td class="col-label">Kepada</td>
+        <td class="col-colon">:</td>
+        <td class="col-value">
+           {{baris_peserta_html}}
+        </td>
+      </tr>
+      <tr class="baris-untuk">
+        <td class="col-label">Untuk</td>
+        <td class="col-colon">:</td>
+        <td class="col-value">
+            <div style="text-align: justify;">{{tujuan}}, pada:</div>
+            <table class="tabel-untuk" style="width: 100%; font-size: 11pt; border: none; border-spacing: 0;">
+                <tr>
+                    <td class="p-col-num"></td>
+                    <td class="p-col-label">Hari</td>
+                    <td class="p-col-colon">:</td>
+                    <td class="p-col-value">{{hari_kegiatan}}</td>
+                </tr>
+                <tr>
+                    <td class="p-col-num"></td>
+                    <td class="p-col-label">Tanggal</td>
+                    <td class="p-col-colon">:</td>
+                    <td class="p-col-value">{{tanggal_kegiatan}}</td>
+                </tr>
+                <tr>
+                    <td class="p-col-num"></td>
+                    <td class="p-col-label">Pukul</td>
+                    <td class="p-col-colon">:</td>
+                    <td class="p-col-value">{{jam}}</td>
+                </tr>
+                <tr>
+                    <td class="p-col-num"></td>
+                    <td class="p-col-label">Tempat</td>
+                    <td class="p-col-colon">:</td>
+                    <td class="p-col-value">{{tempat}}</td>
+                </tr>
+            </table>
+        </td>
+      </tr>
+    </table>
+
+    <!-- Blok Paragraf Anggaran -->
+    {{beban_anggaran_html}}
+
+    <p style="text-align: justify;">Surat tugas ini dibuat dan untuk dilaksanakan dengan penuh tanggung jawab.</p>
+
+    <div class="st-ttd-container" style="width: 100%; display: flex; justify-content: flex-end;">
+      <div style="width: 45%; text-align: left;">
+        <div>Indramayu, {{tanggal_ttd}}</div>
+        <div style="text-transform: capitalize;">{{jabatan_pejabat_ttd}},</div>
+        
+        <div style="height: 55px;"></div>
+        
+        <div style="font-weight: bold;">{{nama_pejabat_ttd}}</div>
+      </div>
+    </div>
+    <!-- END ZONA DINAMIS -->
+  </div>
+</div>
+
+==================================================
+FILE: permohonan/st/view_st.html
+==================================================
+
+  <!-- ==========================================
+      FILE: view_st.html (Modal Input Surat Tugas)
+      ========================================== -->
+  <div id="modalSuratTugas" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-[999] flex items-center justify-center p-4 hidden">
+    <div class="w-full max-w-5xl glass border border-slate-800 p-6 rounded-3xl shadow-2xl scale-95 transition-all flex flex-col h-[95vh]">
+      <div class="flex items-center justify-between pb-4 border-b border-slate-800 shrink-0">
+        <h3 class="text-lg font-bold text-white"><i class="fa-solid fa-file-signature text-blue-400 mr-2"></i> Penerbitan Surat Tugas (Terintegrasi SPD & Plh)</h3>
+        <button onclick="closeModalST()" class="text-slate-400 hover:text-slate-100"><i class="fa-solid fa-xmark text-lg"></i></button>
+      </div>
+      
+      <form id="formST" onsubmit="submitSuratTugas(event)" class="flex-1 overflow-y-auto py-4 space-y-5 text-sm pr-2 custom-scrollbar">
+        
+        <!-- ZETTBOT FIX: Input tersembunyi untuk melacak mode Edit -->
+        <input type="hidden" id="stEditId" value="">
+
+        <!-- BAGIAN 1: IDENTITAS SURAT (Multi Nomor) -->
+        <div class="bg-slate-900/50 border border-slate-800 p-4 rounded-xl space-y-4">
+          <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+              <h4 class="text-xs font-bold text-blue-400 uppercase tracking-wider">1. Identitas & Penomoran Surat</h4>
+              <button type="button" onclick="openSettingST()" class="text-[10px] text-slate-400 hover:text-blue-400 font-bold bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-700 transition">
+                <i class="fa-solid fa-gear"></i> Atur Dasar SK
+              </button>
+          </div>
+          
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label class="block text-slate-400 uppercase font-bold mb-1 text-[11px]">Nomor Surat Tugas <span class="text-rose-400">*</span></label>
+              <input type="text" id="stNomor" required placeholder="Contoh: .../ST.HM3.1.1/VIII/2026" class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+            <div>
+              <label class="block text-slate-400 uppercase font-bold mb-1 text-[11px]">Nomor SPD <span class="text-slate-500 font-normal">(Kosongkan jika tdk ada)</span></label>
+              <input type="text" id="spdNomor" placeholder="Contoh: .../KU.01/VIII/2026" class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+            </div>
+            <div>
+              <label class="block text-slate-400 uppercase font-bold mb-1 text-[11px]">Nomor Plh <span class="text-slate-500 font-normal">(Kosongkan jika tdk ada)</span></label>
+              <input type="text" id="plhNomor" placeholder="Contoh: .../KP7.4/II/2026" class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-purple-500">
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-slate-400 uppercase font-bold mb-1 text-[11px]">Menimbang (Teks) <span class="text-rose-400">*</span></label>
+              <textarea id="stMenimbang" rows="3" required placeholder="Bahwa untuk kepentingan dinas..." class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+            </div>
+            <div>
+              <label class="block text-slate-400 uppercase font-bold mb-1 text-[11px]">Dasar (Teks) <span class="text-rose-400">*</span></label>
+              <textarea id="stDasar" rows="3" required placeholder="1. Undang-Undang Nomor...\n2. Peraturan..." class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+            </div>
+          </div>
+
+          <div class="relative z-10">
+            <label class="block text-slate-400 uppercase font-bold mb-1 text-[11px]">Paragraf Biaya Surat Tugas (Opsional)</label>
+            <textarea id="stParagrafBiaya" rows="2" placeholder="Biaya perjalanan dinas ini dibebankan pada anggaran DIPA..." class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+          </div>
+        </div>
+
+        <!-- BAGIAN 2: PESERTA & KONFIGURASI SPD/PLH -->
+        <div class="bg-slate-900/50 border border-slate-800 p-4 rounded-xl space-y-4">
+          <h4 class="text-xs font-bold text-blue-400 uppercase tracking-wider border-b border-slate-800 pb-2">2. Daftar Pegawai & Pengaturan Fasilitas</h4>
+          
+          <div class="relative w-full">
+            <div class="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none">
+                <i class="fa-solid fa-magnifying-glass text-slate-500"></i>
+            </div>
+            <input type="text" id="stSearchPegawai" autocomplete="off" placeholder="Ketik nama pegawai lalu tekan Enter..." class="w-full pl-10 pr-4 py-3 bg-slate-950 border border-blue-500/50 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 font-semibold shadow-inner">
+            <!-- Dropdown Melayang -->
+            <div id="dropPegawai" class="absolute z-10 w-full mt-1 bg-slate-900 border border-slate-700 rounded-xl overflow-hidden hidden max-h-48 overflow-y-auto shadow-2xl"></div>
+          </div>
+          
+          <div class="border border-slate-700 rounded-lg overflow-hidden">
+            <table class="w-full text-left text-xs">
+              <thead class="bg-slate-800 text-slate-300">
+                <tr>
+                  <th class="p-3">Nama Pegawai</th>
+                  <th class="p-3">Jabatan</th>
+                  <th class="p-3 text-center">Fasilitas SPD</th>
+                  <th class="p-3 text-center">Tunjuk Plh</th>
+                  <th class="p-3 text-center w-12">Hapus</th>
+                </tr>
+              </thead>
+              <tbody id="stListPesertaBody" class="bg-slate-950 divide-y divide-slate-800">
+                <tr><td colspan="5" class="p-4 text-center text-slate-500 italic">Belum ada pegawai ditambahkan.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- BAGIAN 3: PENGATURAN UMUM SPD -->
+        <div class="bg-slate-900/50 border border-emerald-500/30 p-4 rounded-xl space-y-4 relative">
+          <div class="absolute -right-10 -top-10 w-32 h-32 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none"></div>
+          <h4 class="text-xs font-bold text-emerald-400 uppercase tracking-wider border-b border-emerald-500/30 pb-2">3. Data Pembiayaan SPD & ST</h4>
+          
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 relative z-10 mb-4">
+            <div class="relative">
+                <label class="block text-slate-400 uppercase font-bold mb-1 text-[11px]">Pejabat Pembuat Komitmen (PPK)</label>
+                <input type="text" id="spdSearchPPK" autocomplete="off" placeholder="Ketik nama PPK..." class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                <input type="hidden" id="spdPPK"> 
+                <div id="dropPPK" class="absolute z-10 w-full mt-1 bg-slate-900 border border-slate-700 rounded-xl overflow-hidden hidden max-h-48 overflow-y-auto shadow-2xl"></div>
+            </div>
+            
+            <div>
+              <label class="block text-slate-400 uppercase font-bold mb-1 text-[11px]">Alat Angkutan</label>
+              <input type="text" id="spdAngkutan" placeholder="Contoh: Kendaraan Dinas / Umum" class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+            </div>
+            <div>
+              <label class="block text-slate-400 uppercase font-bold mb-1 text-[11px]">Tempat Tujuan (Khusus SPD)</label>
+              <input type="text" id="spdTempatTujuan" placeholder="Contoh: Kantor Pelayanan Kekayaan..." class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 relative z-10">
+            <div>
+              <label class="block text-slate-400 uppercase font-bold mb-1 text-[11px]">Instansi (Beban Anggaran)</label>
+              <input type="text" id="spdInstansi" placeholder="Contoh: Pengadilan Agama Indramayu" class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+            </div>
+            <div>
+              <label class="block text-slate-400 uppercase font-bold mb-1 text-[11px]">Mata Anggaran</label>
+              <input type="text" id="spdMataAnggaran" placeholder="Contoh: 524111" class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+            </div>
+            <div>
+              <label class="block text-slate-400 uppercase font-bold mb-1 text-[11px]">Tingkat SPD <span class="text-rose-400">*</span></label>
+              <select id="spdTingkat" required class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                  <option value="Tingkat A">Tingkat A</option>
+                  <option value="Tingkat B">Tingkat B</option>
+                  <option value="Tingkat C" selected>Tingkat C</option>
+                  <option value="Tingkat D">Tingkat D</option>
+                  <option value="Tingkat E">Tingkat E</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- BAGIAN 4: PELAKSANAAN TUGAS -->
+        <div class="bg-slate-900/50 border border-slate-800 p-4 rounded-xl space-y-4">
+          <h4 class="text-xs font-bold text-blue-400 uppercase tracking-wider border-b border-slate-800 pb-2">4. Detail Pelaksanaan & TTD</h4>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="space-y-4">
+              <div>
+                <label class="block text-slate-400 uppercase font-bold mb-1 text-[11px]">Maksud / Tujuan Tugas (Untuk) <span class="text-rose-400">*</span></label>
+                <textarea id="stTujuan" rows="2" required placeholder="Melaksanakan pengawasan ke..." class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+              </div>
+              <div>
+                <label class="block text-slate-400 uppercase font-bold mb-1 text-[11px]">Tempat Pelaksanaan <span class="text-rose-400">*</span></label>
+                <input type="text" id="stTempat" required placeholder="Contoh: Pengadilan Tinggi Agama Bandung" class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500">
+              </div>
+            </div>
+            
+            <div class="space-y-4">
+              <div class="grid grid-cols-2 gap-2">
+                <div>
+                  <label class="block text-slate-400 uppercase font-bold mb-1 text-[11px]">Tgl Berangkat <span class="text-rose-400">*</span></label>
+                  <input type="date" id="stTglMulai" required class="w-full px-3.5 py-2 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                  <label class="block text-slate-400 uppercase font-bold mb-1 text-[11px]">Tgl Kembali <span class="text-rose-400">*</span></label>
+                  <input type="date" id="stTglSelesai" required class="w-full px-3.5 py-2 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+              </div>
+              <div>
+                <label class="block text-slate-400 uppercase font-bold mb-1 text-[11px]">Waktu / Jam <span class="text-rose-400">*</span></label>
+                <input type="text" id="stJam" required placeholder="08.00 WIB s.d. Selesai" class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500">
+              </div>
+              
+              <div class="relative">
+                <label class="block text-slate-400 uppercase font-bold mb-1 text-[11px] text-amber-400">Pimpinan Penandatangan <span class="text-rose-400">*</span></label>
+                <input type="text" id="stSearchTtd" autocomplete="off" placeholder="Ketik nama Pimpinan..." class="w-full px-3.5 py-2.5 bg-slate-950 border border-amber-500/50 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-500">
+                <input type="hidden" id="stPejabatTtd">
+                <div id="dropTtd" class="absolute z-10 w-full mt-1 bg-slate-900 border border-slate-700 rounded-xl overflow-hidden hidden max-h-48 overflow-y-auto shadow-2xl"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- SUBMIT BUTTON -->
+        <div class="pt-4 shrink-0">
+          <button type="submit" id="btnSubmitST" class="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl shadow-lg shadow-blue-600/20 transition uppercase tracking-wider flex items-center justify-center gap-2">
+              Terbitkan Surat Tugas Terpadu <i class="fa-solid fa-paper-plane"></i>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MINI MODAL: TUNJUK PLH -->
+  <div id="modalSetPlh" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-[9999] flex items-center justify-center p-4 hidden">
+    <div class="w-full max-w-sm glass border border-purple-500/30 p-5 rounded-2xl shadow-2xl scale-95 transition-all overflow-visible">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-700 mb-4">
+          <h4 class="font-bold text-white"><i class="fa-solid fa-user-shield text-purple-400 mr-2"></i> Tunjuk Pejabat Plh.</h4>
+          <button type="button" onclick="closeSetPlh()" class="text-slate-400 hover:text-rose-400"><i class="fa-solid fa-xmark text-lg"></i></button>
+        </div>
+        <p class="text-xs text-slate-400 mb-4" id="plhHelperText">Pilih pejabat yang akan menggantikan tugas harian.</p>
+        
+        <div class="relative mb-5">
+          <input type="text" id="plhSearchPegawai" autocomplete="off" placeholder="Ketik nama Pejabat..." class="w-full px-3.5 py-3 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm">
+          <input type="hidden" id="selectPlhPengganti">
+          <div id="dropPlh" class="absolute z-50 w-full mt-1 bg-slate-900 border border-slate-700 rounded-xl overflow-hidden hidden max-h-48 overflow-y-auto shadow-2xl"></div>
+        </div>
+        
+        <div class="flex gap-2">
+          <button type="button" onclick="hapusPlhAssignment()" class="flex-1 py-2.5 bg-rose-500/10 hover:bg-rose-500 text-rose-400 hover:text-white font-bold rounded-xl transition text-xs border border-rose-500/20">Batalkan Plh</button>
+          <button type="button" onclick="simpanPlhAssignment()" class="flex-1 py-2.5 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-xl shadow-lg shadow-purple-600/20 transition text-xs">Simpan Plh <i class="fa-solid fa-check ml-1"></i></button>
+        </div>
+    </div>
+  </div>
+
+  <!-- MINI MODAL: PENGATURAN DASAR ST -->
+  <div id="modalSettingST" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-[9999] flex items-center justify-center p-4 hidden">
+    <div class="w-full max-w-2xl glass border border-blue-500/30 p-6 rounded-2xl shadow-2xl scale-95 transition-all overflow-visible">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-700 mb-4">
+          <h4 class="font-bold text-white"><i class="fa-solid fa-gear text-blue-400 mr-2"></i> Pengaturan Dasar SK / ST</h4>
+          <button type="button" onclick="closeSettingST()" class="text-slate-400 hover:text-rose-400"><i class="fa-solid fa-xmark text-lg"></i></button>
+        </div>
+        <p class="text-xs text-slate-400 mb-5 leading-relaxed">Data ini akan disimpan ke sistem dan otomatis terisi setiap kali Anda membuka form Surat Tugas untuk menghemat waktu.</p>
+
+        <form onsubmit="saveSettingST(event)" class="space-y-4">
+            <div class="relative">
+                <label class="block text-slate-400 uppercase font-bold mb-1 text-[11px]">Default PPK</label>
+                <input type="text" id="setDefPPKSearch" autocomplete="off" placeholder="Ketik nama PPK..." class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <input type="hidden" id="setDefPPK">
+                <div id="dropSetPPK" class="absolute z-50 w-full mt-1 bg-slate-900 border border-slate-700 rounded-xl overflow-hidden hidden max-h-48 overflow-y-auto shadow-2xl"></div>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-slate-400 uppercase font-bold mb-1 text-[11px]">Default Menimbang</label>
+                    <textarea id="setDefMenimbang" rows="3" class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                </div>
+                <div>
+                    <label class="block text-slate-400 uppercase font-bold mb-1 text-[11px]">Default Dasar (Hukum/Aturan)</label>
+                    <textarea id="setDefDasar" rows="3" class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                    <label class="block text-slate-400 uppercase font-bold mb-1 text-[11px]">Default Instansi (SPD)</label>
+                    <textarea id="setDefInstansi" rows="2" class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                </div>
+                <div>
+                    <label class="block text-slate-400 uppercase font-bold mb-1 text-[11px]">Default Mata Anggaran (SPD)</label>
+                    <textarea id="setDefMataAnggaran" rows="2" class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                </div>
+                <div>
+                    <label class="block text-slate-400 uppercase font-bold mb-1 text-[11px]">Default Alat Angkutan (SPD)</label>
+                    <textarea id="setDefAngkutan" rows="2" class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-slate-400 uppercase font-bold mb-1 text-[11px]">Default Paragraf Biaya (ST)</label>
+                <textarea id="setDefParagrafBiaya" rows="2" class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+            </div>
+            
+            <div class="pt-3">
+              <button type="submit" class="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl shadow-lg shadow-blue-600/20 transition text-sm">
+                  Terapkan Default <i class="fa-solid fa-check ml-1"></i>
+              </button>
+            </div>
+        </form>
+    </div>
+  </div>
+

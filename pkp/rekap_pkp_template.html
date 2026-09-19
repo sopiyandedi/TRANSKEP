@@ -1,0 +1,87 @@
+<div id="template-rekap-pck-bkn" style="display:none;" class="no-print">
+  <style>
+    @media print {
+      @page { size: A4 portrait; margin: 15mm; }
+      html, body { background: white !important; color: black !important; font-family: 'Times New Roman', Times, serif; font-size: 10pt; margin:0; padding:0; }
+      
+      /* ZETTBOT FIX: Hide semua elemen UI saat mencetak template ini */
+      body.print-mode-rekap > * { display: none !important; }
+      body.print-mode-rekap > #template-rekap-pck-bkn { display: block !important; position: relative; width: 100%; box-sizing: border-box; }
+      
+      .text-center { text-align: center; } 
+      .text-right { text-align: right; } 
+      .font-bold { font-weight: bold; }
+      
+      /* Tabel Identitas Atas */
+      .meta-table { width: 55%; border-collapse: collapse; margin-bottom: 25px; }
+      .meta-table td { border: 1px solid black; padding: 5px 8px; vertical-align: middle; }
+      
+      /* Tabel Utama */
+      .table-data { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 9.5pt; }
+      .table-data th, .table-data td { border: 1px solid black; padding: 6px 4px; vertical-align: middle; }
+      
+      /* ZETTBOT TRICK: Membuat Header Tabel berulang di setiap halaman jika halamannya panjang! */
+      thead { display: table-header-group; }
+      
+      /* Area TTD (Rata Kanan) */
+      .sig-area { width: 100%; margin-top: 40px; display: flex; justify-content: flex-end; page-break-inside: avoid;}
+      .sig-box { width: 300px; text-align: center; }
+      .sig-space { height: 75px; }
+      
+      /* Catatan Bawah */
+      .notes-area { font-size: 9.5pt; margin-top: 40px; text-align: left; line-height: 1.4; page-break-inside: avoid; }
+    }
+  </style>
+
+  <div class="text-center" style="font-size: 12pt; margin-bottom: 25px;">
+    FORMULIR REKAPITULASI PENILAIAN CAPAIAN<br>KINERJA PEGAWAI NEGERI SIPIL*
+  </div>
+
+  <table class="meta-table">
+    <tr>
+      <td width="10%" class="text-center">1</td>
+      <td width="30%">Bulan</td>
+      <td id="rekap-pck-print-bulan" class="font-bold uppercase"></td>
+    </tr>
+    <tr>
+      <td class="text-center">2</td>
+      <td>Unit Kerja</td>
+      <td class="font-bold">Pengadilan Agama Indramayu</td>
+    </tr>
+  </table>
+
+  <table class="table-data">
+    <thead>
+      <tr>
+        <th width="5%" class="text-center">NO</th>
+        <th width="32%" class="text-center">NAMA / NIP</th>
+        <th width="6%" class="text-center">AK</th>
+        <th width="28%" class="text-center">JABATAN</th>
+        <th width="14%" class="text-center">CAPAIAN<br>KINERJA</th>
+        <th width="15%" class="text-center">KETERANGAN</th>
+      </tr>
+      <tr style="background-color: #f8f9fa;">
+        <th class="text-center">(1)</th>
+        <th class="text-center">(2)</th>
+        <th class="text-center">(3)</th>
+        <th class="text-center">(4)</th>
+        <th class="text-center">(5)</th>
+        <th class="text-center">(6)</th>
+      </tr>
+    </thead>
+    <tbody id="rekap-pck-tbody">
+      <!-- Diinjeksi oleh JS -->
+    </tbody>
+  </table>
+
+  <div class="sig-area">
+    <div class="sig-box">
+      <div id="rekap-pck-print-tanggal">Indramayu, ......................</div>
+      <div>Pejabat Penilai</div>
+      <div class="sig-space"></div>
+      <div class="font-bold" id="rekap-pck-print-pejabat-nama">Nama</div>
+      <div id="rekap-pck-print-pejabat-nip">NIP.</div>
+    </div>
+  </div>
+
+  </div>

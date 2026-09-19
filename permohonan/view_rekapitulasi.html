@@ -1,0 +1,180 @@
+<div class="space-y-6">
+  <!-- BARIS ATAS: PENYARING FILTER & AKSI -->
+  <!-- ZETTBOT FIX: Ubah z-10 menjadi z-30 agar tumpukan filter menang melawan header tabel (z-20) -->
+  <div class="bg-slate-950/40 border border-slate-900 rounded-2xl p-5 relative z-30 no-print">
+    <div class="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-4 border-b border-slate-800/50 pb-4">
+      <div class="flex-1">
+          <h3 class="text-lg font-bold text-slate-200"><i class="fa-solid fa-globe text-indigo-400 mr-2"></i> Rekapitulasi Global & Kontrol</h3>
+          <p class="text-slate-500 text-xs mt-1">Saring data, pantau status, dan kelola arsip dinas secara menyeluruh.</p>
+      </div>
+      
+      <div id="rekapAdminActions" class="flex flex-wrap gap-2 hidden">
+         <button onclick="openFormCutiModal(true)" class="px-4 py-2 bg-indigo-500/10 hover:bg-indigo-500 text-indigo-400 hover:text-white font-bold rounded-xl border border-indigo-500/20 transition flex items-center justify-center gap-2 text-xs">
+            <i class="fa-solid fa-user-shield"></i> Bypass Usul Cuti
+         </button>
+         <button onclick="openModalST()" class="px-4 py-2 bg-emerald-500/10 hover:bg-emerald-500 text-emerald-400 hover:text-white font-bold rounded-xl border border-emerald-500/20 transition flex items-center justify-center gap-2 text-xs">
+            <i class="fa-solid fa-file-signature"></i> Buat Surat Tugas (DL)
+         </button>
+      </div>
+    </div>
+
+    <div class="flex flex-col md:flex-row md:items-end justify-between gap-4">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 flex-1">
+        
+        <!-- Custom Searchable Input -->
+        <div id="containerFilterUser" class="relative lg:col-span-4">
+          <label class="block text-xs font-semibold text-slate-400 uppercase mb-1.5">Saring Pegawai</label>
+          <div class="relative flex items-center">
+             <input type="text" id="customSearchInput" autocomplete="off"
+                onfocus="showCustomDropdown()" 
+                onkeyup="filterCustomDropdown()"
+                onblur="setTimeout(hideCustomDropdown, 200)"
+                placeholder="Ketik nama pegawai..." 
+                class="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition pr-12">
+             
+             <!-- Tombol X untuk clear teks (ZETTBOT FIX: Posisi digeser ke right-3.5 karena chevron dihapus) -->
+             <button type="button" id="btnCustomSearchClear" onmousedown="clearCustomSearch(event)" class="absolute right-3.5 text-slate-500 hover:text-rose-400 transition hidden z-10 w-6 h-6 flex items-center justify-center" title="Hapus Pencarian">
+                <i class="fa-solid fa-xmark"></i>
+             </button>
+             
+             <!-- ZETTBOT FIX: Ikon chevron-down telah dihapus sesuai permintaan -->
+             
+             <!-- Dropdown List -->
+             <div id="customDropdownList" class="absolute top-[100%] left-0 z-[70] w-full mt-2 bg-slate-800 border border-slate-600 rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.8)] hidden flex-col overflow-hidden max-h-56 overflow-y-auto custom-scrollbar">
+                <div id="customOptionsContainer">
+                   <!-- Dipopulasikan via JS -->
+                </div>
+             </div>
+          </div>
+          <!-- Menyimpan Value NIP yang dipilih -->
+          <input type="hidden" id="rekapFilterUser" value="all" onchange="filterRekap()">
+        </div>
+
+        <!-- Kolom Filter Jenis Kegiatan (Khusus Admin) -->
+        <div id="containerFilterJenis" class="relative lg:col-span-4 hidden">
+           <label class="block text-xs font-semibold text-slate-400 uppercase mb-1.5">Jenis Izin / Dinas</label>
+           <select id="rekapFilterJenis" onchange="filterRekap()" class="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition appearance-none">
+              <option value="all">Semua Jenis Kegiatan</option>
+              <option value="Tahunan">Cuti Tahunan</option>
+              <option value="Sakit">Cuti Sakit</option>
+              <option value="Alasan Penting">Cuti Alasan Penting</option>
+              <option value="Melahirkan">Cuti Melahirkan</option>
+              <option value="Besar">Cuti Besar</option>
+              <option value="CLTN">Cuti Di Luar Tanggungan Negara (CLTN)</option>
+              <option value="Izin Keluar Kantor">Izin Keluar Kantor (IK)</option>
+              <option value="Izin Pribadi">Izin Pribadi (IP)</option>
+              <option value="Work From Home">Work From Home (WFH)</option>
+              <option value="Dinas Luar">Dinas Luar (DL)</option>
+           </select>
+           <i class="fa-solid fa-chevron-down absolute right-3.5 top-[38px] text-slate-500 text-[10px] pointer-events-none"></i>
+        </div>
+
+        <div class="lg:col-span-2">
+          <label class="block text-xs font-semibold text-slate-400 uppercase mb-1.5">Dari Tanggal</label>
+          <input type="date" id="rekapFilterStart" onchange="filterRekap()"
+            class="w-full px-3.5 py-2.5 bg-slate-900/50 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        </div>
+        <div class="lg:col-span-2">
+          <label class="block text-xs font-semibold text-slate-400 uppercase mb-1.5">Sampai Tanggal</label>
+          <input type="date" id="rekapFilterEnd" onchange="filterRekap()"
+            class="w-full px-3.5 py-2.5 bg-slate-900/50 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        </div>
+      </div>
+
+      <button id="btnCetakRekap" onclick="cetakRekap()" class="px-5 py-2.5 bg-slate-800/80 hover:bg-slate-700 text-slate-200 hover:text-white font-semibold rounded-xl border border-slate-700 transition flex items-center justify-center gap-2 hidden lg:h-[42px] mt-auto">
+        <i class="fa-solid fa-print"></i> Cetak Tabel
+      </button>
+    </div>
+  </div>
+
+  <!-- AREA TABEL LAPORAN (PRINT-FRIENDLY) -->
+  <div class="flex flex-col h-[550px]" id="printArea">
+    
+    <!-- KOP DINAS -->
+    <div class="print-only hidden text-center border-b-2 border-black pb-4 mb-6">
+      <h2 class="text-xl font-bold uppercase">Mahkamah Agung Republik Indonesia</h2>
+      <h3 class="text-lg font-bold uppercase tracking-wide">Pengadilan Agama Indramayu Kelas IA</h3>
+      <p class="text-xs text-slate-600 mt-1">Jl. Raya Indramayu No. 100, Indramayu, Jawa Barat — Telp (0231) 12345</p>
+      <div class="text-sm font-bold border-t border-slate-400 mt-4 pt-4 uppercase">Laporan Rekapitulasi Dinas Pegawai</div>
+    </div>
+
+    <!-- Inner Wrapper -->
+    <div class="flex-1 overflow-auto border border-slate-900 rounded-2xl bg-slate-950/40 pb-16 relative">
+      <table class="w-full text-left text-xs border-collapse">
+        <thead>
+          <tr class="border-b border-slate-800 bg-slate-900 text-slate-300 font-semibold sticky top-0 z-20 shadow-md" id="trRekapHeader">
+            <th class="p-4">Identitas Pegawai</th>
+            <th class="p-4">ID / Tanggal Usulan</th>
+            <th class="p-4">Jenis Izin</th>
+            <th class="p-4">Periode</th>
+            <th class="p-4">Keperluan Dinas / Alasan</th>
+            <th class="p-4">Status Persetujuan</th>
+            <!-- Th Aksi akan di-inject via JS jika Admin -->
+          </tr>
+        </thead>
+        <tbody id="tblRekapBody">
+          <!-- Dinamis via JS -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- MODAL INPUT DINAS LUAR (MULTI PEGAWAI) -->
+  <div id="modalDinasLuar" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-[60] flex items-center justify-center p-4 hidden">
+    <div class="w-full max-w-2xl glass border border-slate-800 p-6 rounded-3xl shadow-2xl scale-95 transition-all flex flex-col h-[85vh]">
+      <div class="flex items-center justify-between pb-4 border-b border-slate-800 shrink-0">
+        <h3 class="text-lg font-bold text-white"><i class="fa-solid fa-plane-departure text-emerald-400 mr-2"></i> Input Massal Dinas Luar (DL)</h3>
+        <button onclick="closeDinasLuarModal()" class="text-slate-400 hover:text-slate-100"><i class="fa-solid fa-xmark text-lg"></i></button>
+      </div>
+      
+      <div class="flex-1 overflow-y-auto py-4 space-y-5 text-sm pr-2 custom-scrollbar">
+          
+          <div class="bg-emerald-500/10 border border-emerald-500/20 p-3 rounded-xl flex items-start gap-3">
+             <i class="fa-solid fa-circle-info text-emerald-400 mt-0.5"></i>
+             <p class="text-[10px] text-emerald-400/90 leading-relaxed font-medium">Modul ini khusus digunakan Admin/Operator untuk mencatat pegawai yang sedang tugas luar kantor (DL). Data yang diinput otomatis berstatus Disetujui.</p>
+          </div>
+
+          <!-- Bagian Pilihan Pegawai (Dinamis) -->
+          <div class="border border-slate-800 bg-slate-900/50 p-4 rounded-xl">
+             <label class="block text-slate-400 uppercase font-bold mb-2 text-xs">Tambahkan Pegawai Terlibat</label>
+             <div class="flex gap-2 mb-3">
+                <select id="dlSelectPegawai" class="flex-1 px-3.5 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-xs">
+                   <!-- Populated via JS -->
+                </select>
+                <button type="button" onclick="addPegawaiToDlList()" class="px-4 py-2 bg-slate-800 hover:bg-emerald-600 text-slate-300 hover:text-white font-bold rounded-xl transition text-xs shrink-0 border border-slate-700">
+                   <i class="fa-solid fa-plus"></i> Tambah
+                </button>
+             </div>
+             
+             <!-- List Pegawai Terpilih -->
+             <div id="dlSelectedList" class="flex flex-wrap gap-2 min-h-[40px] p-2 border border-slate-800/50 rounded-lg bg-slate-950/50 empty:hidden">
+                <!-- Chips via JS -->
+             </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-slate-400 uppercase font-bold mb-1 text-xs">Tanggal Berangkat</label>
+              <input type="date" id="dlMulai" class="w-full px-3.5 py-3 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+            </div>
+            <div>
+              <label class="block text-slate-400 uppercase font-bold mb-1 text-xs">Tanggal Kembali</label>
+              <input type="date" id="dlSelesai" class="w-full px-3.5 py-3 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+            </div>
+          </div>
+          
+          <div>
+            <label class="block text-slate-400 uppercase font-bold mb-1 text-xs">Tujuan & Agenda Dinas Luar</label>
+            <textarea id="dlTujuan" rows="3" placeholder="Contoh: Mengikuti Bimtek Kepaniteraan di PTA Bandung / Pengawasan Bidang..." class="w-full px-3.5 py-3 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500"></textarea>
+          </div>
+      </div>
+      
+      <div class="pt-4 border-t border-slate-800 shrink-0">
+         <button type="button" onclick="submitDinasLuar()" class="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl shadow-lg shadow-emerald-600/20 transition uppercase tracking-wider flex items-center justify-center gap-2">
+            Simpan Data Dinas Luar <i class="fa-solid fa-floppy-disk"></i>
+         </button>
+      </div>
+    </div>
+  </div>
+
+</div>

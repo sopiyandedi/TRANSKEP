@@ -1,0 +1,130 @@
+<script>
+  // ==========================================
+  // FILE: js_cetak_jobdes.html
+  // Deskripsi: Engine Cetak PDF via Hidden iFrame & Margin Hack
+  // ==========================================
+
+  window.cetakJobdes = function() {
+    var nama = document.getElementById('jdPrevNama').innerText;
+    if (nama === '-' || !nama) {
+        window.zettbosAlert("Silakan pilih pegawai terlebih dahulu pada pencarian untuk dicetak.", "error");
+        return;
+    }
+
+    var btnPrint = document.querySelector('button[onclick="window.cetakJobdes()"]');
+    var oriText = "";
+    if (btnPrint) {
+        oriText = btnPrint.innerHTML;
+        btnPrint.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Menyiapkan Dokumen...';
+        btnPrint.disabled = true;
+    }
+
+    var template = document.getElementById('templateCetakJobdes');
+    if (!template) {
+        window.zettbosAlert("Error: File Template cetak tidak ditemukan.", "error");
+        if(btnPrint) { btnPrint.innerHTML = oriText; btnPrint.disabled = false; }
+        return;
+    }
+
+    // Clone template agar data aslinya tidak rusak saat diinjeksi
+    var tempNode = template.cloneNode(true);
+    
+    // Injeksi Data ke Clone Template
+    tempNode.querySelector('#prtJudulSk').innerText = window.jobdesConfigSk.dasar;
+    tempNode.querySelector('#prtNoSk').innerText = window.jobdesConfigSk.nomor;
+    tempNode.querySelector('#prtTglSk').innerText = window.jobdesConfigSk.tanggal;
+    tempNode.querySelector('#prtJabatan').innerText = document.getElementById('jdPrevNamaJabatan').innerText;
+    tempNode.querySelector('#prtAtasan').innerText = document.getElementById('jdPrevAtasan').innerText;
+    tempNode.querySelector('#prtNama').innerText = nama;
+    tempNode.querySelector('#prtNip').innerText = document.getElementById('jdPrevNip').innerText;
+    tempNode.querySelector('#prtPangkat').innerText = document.getElementById('jdPrevPangkat').innerText;
+    
+    tempNode.querySelector('#prtIkhtisar').innerHTML = document.getElementById('jdPrevIkhtisar').innerHTML;
+    tempNode.querySelector('#prtPokok').innerHTML = document.getElementById('jdPrevPokok').innerHTML;
+    tempNode.querySelector('#prtTambahan').innerHTML = document.getElementById('jdPrevTambahan').innerHTML;
+    tempNode.querySelector('#prtTanggung').innerHTML = document.getElementById('jdPrevTanggung').innerHTML;
+    tempNode.querySelector('#prtHasil').innerHTML = document.getElementById('jdPrevHasil').innerHTML;
+
+    var styleContent = document.getElementById('styleCetakJobdes').outerHTML;
+    var innerContent = tempNode.querySelector('#contentCetakJobdes').innerHTML;
+
+    // THE MAGIC HACK: Table Wrapper untuk margin tiap halaman (Anti Tulisan Google)
+    var magicWrapper = `
+        <style>
+            /* Reset paksa margin dari template lama, dan aplikasikan hack margin */
+            @page { 
+                size: A4 portrait; 
+                /* ⬇️ EDIT MARGIN KANAN & KIRI DI SINI ⬇️ */
+                /* Format: margin: 0 [KANAN] 0 [KIRI] */
+                margin: 0 1.5cm 0 2.5cm !important; 
+            }
+            body {
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+            /* Thead dan Tfoot ini yang bertugas menjadi Margin Atas dan Bawah di setiap halaman */
+            table.print-margin-table { width: 100%; border-collapse: collapse; border: none; }
+            
+            /* ⬇️ EDIT MARGIN ATAS & BAWAH DI SINI ⬇️ */
+            .spacer-top { height: 2cm; }    /* Jarak dari ujung kertas atas ke teks */
+            .spacer-bottom { height: 2cm; } /* Jarak dari ujung kertas bawah ke teks */
+            
+            /* Mengakali cetak-kertas dari template.html agar tidak double padding */
+            .cetak-kertas-override {
+                padding: 0 !important; 
+                min-height: auto !important; 
+                width: 100% !important;
+                box-sizing: border-box;
+            }
+        </style>
+        ` + styleContent + `
+        <table class="print-margin-table">
+            <thead><tr><td><div class="spacer-top"></div></td></tr></thead>
+            <tbody>
+                <tr>
+                    <td>
+                        <div class="cetak-kertas cetak-kertas-override">
+                            ` + innerContent + `
+                        </div>
+                    </td>
+                </tr>
+            </tbody>
+            <tfoot><tr><td><div class="spacer-bottom"></div></td></tr></tfoot>
+        </table>
+    `;
+
+    var printHTML = '<!DOCTYPE html><html lang="id"><head><meta charset="UTF-8"><title>Uraian Tugas - ' + nama + '</title></head><body>' + magicWrapper + '</body></html>';
+
+    var iframe = document.createElement('iframe');
+    iframe.style.position = 'fixed';
+    iframe.style.right = '-10000px';
+    iframe.style.bottom = '-10000px';
+    iframe.style.width = '0px';
+    iframe.style.height = '0px';
+    document.body.appendChild(iframe);
+
+    var idoc = iframe.contentWindow || iframe.contentDocument;
+    if (idoc.document) idoc = idoc.document;
+    
+    idoc.open();
+    idoc.write(printHTML);
+    idoc.close();
+
+    // Tunggu iframe merender CSS sepenuhnya sebelum mencetak
+    iframe.onload = function() {
+        setTimeout(function() {
+            if(btnPrint) { btnPrint.innerHTML = oriText; btnPrint.disabled = false; }
+            
+            iframe.contentWindow.focus();
+            iframe.contentWindow.print();
+            
+            // Hapus iframe otomatis dari background setelah dialog tertutup
+            setTimeout(function() {
+                if (document.body.contains(iframe)) {
+                    document.body.removeChild(iframe);
+                }
+            }, 2000);
+        }, 500); // Jeda kecil untuk merender font dan tabel
+    };
+  };
+</script>

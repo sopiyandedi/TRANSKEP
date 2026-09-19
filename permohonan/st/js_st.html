@@ -1,0 +1,502 @@
+<!-- ==========================================
+     FILE: js_st.html (Client-Side Logic Surat Tugas Integrasi SPD/Plh)
+     ========================================== -->
+<script>
+  let stPesertaList = []; 
+  let currentTargetPlhNip = null;
+
+  function attachSearchToInput(inputId, dropId, dataArr, onSelectCallback) {
+      const inp = document.getElementById(inputId);
+      const drop = document.getElementById(dropId);
+      if(!inp || !drop) return;
+      let focusIdx = 0;
+
+      function renderList(filterTxt) {
+          drop.innerHTML = '';
+          let filtered = dataArr.filter(item => item.label.toLowerCase().includes(filterTxt.toLowerCase()));
+          if(filtered.length === 0) {
+              drop.innerHTML = `<div class="p-3 text-xs text-slate-500 italic">Tidak ditemukan...</div>`;
+              drop.classList.remove('hidden');
+              return;
+          }
+          filtered.forEach((item, idx) => {
+              let div = document.createElement('div');
+              let bgClass = (idx === focusIdx) ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-800';
+              div.className = `px-3 py-2 text-[11px] cursor-pointer transition border-b border-slate-800/50 last:border-0 ${bgClass}`;
+              div.innerHTML = item.html;
+              div.onmousedown = function(e) {
+                  e.preventDefault(); 
+                  onSelectCallback(item);
+                  drop.classList.add('hidden');
+              };
+              drop.appendChild(div);
+          });
+          drop.classList.remove('hidden');
+      }
+
+      inp.onfocus = () => { focusIdx = 0; renderList(inp.value); };
+      inp.oninput = () => { focusIdx = 0; renderList(inp.value); };
+      inp.onblur = () => { setTimeout(() => drop.classList.add('hidden'), 200); };
+
+      inp.onkeydown = (e) => {
+          let filtered = dataArr.filter(item => item.label.toLowerCase().includes(inp.value.toLowerCase()));
+          let items = drop.children;
+
+          if (e.key === 'ArrowDown') {
+              e.preventDefault();
+              focusIdx++;
+              if (focusIdx >= filtered.length) focusIdx = filtered.length - 1;
+              renderList(inp.value);
+              if(items[focusIdx]) items[focusIdx].scrollIntoView({block: 'nearest'});
+          } else if (e.key === 'ArrowUp') {
+              e.preventDefault();
+              focusIdx--;
+              if (focusIdx < 0) focusIdx = 0;
+              renderList(inp.value);
+              if(items[focusIdx]) items[focusIdx].scrollIntoView({block: 'nearest'});
+          } else if (e.key === 'Enter') {
+              e.preventDefault(); 
+              if (filtered.length > 0 && focusIdx < filtered.length) {
+                  onSelectCallback(filtered[focusIdx]);
+                  drop.classList.add('hidden');
+              }
+          }
+      };
+  }
+
+  function openModalST() {
+      document.getElementById('formST').reset();
+      stPesertaList = [];
+      renderPesertaST();
+      
+      // ZETTBOT FIX: Pastikan form kembali ke mode Tambah Baru
+      document.getElementById('stEditId').value = '';
+      document.getElementById('btnSubmitST').innerHTML = `Terbitkan Surat Tugas Terpadu <i class="fa-solid fa-paper-plane"></i>`;
+      
+      document.getElementById('stSearchPegawai').value = '';
+      document.getElementById('spdSearchPPK').value = '';
+      document.getElementById('spdPPK').value = '';
+      document.getElementById('stSearchTtd').value = '';
+      document.getElementById('stPejabatTtd').value = '';
+
+      let dataPegawaiGlobal = state.usersList.map(u => ({
+          label: `${u.nama} ${u.jabatan} ${u.nip}`,
+          html: `<div class="font-bold">${u.nama}</div><div class="text-[9px] text-slate-400">${u.jabatan}</div>`,
+          nip: u.nip, nama: u.nama
+      }));
+
+      let dataTtdGlobal = state.usersList.filter(u => {
+          const role = String(u.jabatan).toLowerCase();
+          return ["ketua", "wakil ketua", "panitera", "sekretaris"].some(r => role.includes(r));
+      }).map(u => ({
+          label: `${u.nama} ${u.jabatan}`,
+          html: `<div class="font-bold text-amber-400">${u.nama}</div><div class="text-[9px] text-amber-400/70">${u.jabatan}</div>`,
+          nip: u.nip, nama: u.nama
+      }));
+
+      attachSearchToInput('stSearchPegawai', 'dropPegawai', dataPegawaiGlobal, function(item) {
+          document.getElementById('stSearchPegawai').value = ''; 
+          addPesertaST(item.nip); 
+      });
+
+      attachSearchToInput('spdSearchPPK', 'dropPPK', dataPegawaiGlobal, function(item) {
+          document.getElementById('spdSearchPPK').value = item.nama; 
+          document.getElementById('spdPPK').value = item.nip; 
+      });
+
+     attachSearchToInput('stSearchTtd', 'dropTtd', dataTtdGlobal, function(item) {
+          document.getElementById('stSearchTtd').value = item.nama;
+          document.getElementById('stPejabatTtd').value = item.nip;
+      });
+
+      const modal = document.getElementById('modalSuratTugas');
+      if (modal.parentNode !== document.body) { document.body.appendChild(modal); }
+      
+      modal.classList.remove('hidden');
+      setTimeout(() => { modal.firstElementChild.classList.remove('scale-95'); }, 10);
+
+      try {
+          if (typeof google !== 'undefined' && google.script && google.script.run) {
+              google.script.run
+                  .withSuccessHandler(function(res) {
+                      if(res && res.status === 'success') {
+                          let elMenimbang = document.getElementById('stMenimbang');
+                          let elDasar = document.getElementById('stDasar');
+                          let elInstansi = document.getElementById('spdInstansi');
+                          let elMataAnggaran = document.getElementById('spdMataAnggaran');
+                          let elAngkutan = document.getElementById('spdAngkutan');
+                          let elParagrafBiaya = document.getElementById('stParagrafBiaya');
+                          
+                          if (elMenimbang && !elMenimbang.value) elMenimbang.value = res.data.menimbang || '';
+                          if (elDasar && !elDasar.value) elDasar.value = res.data.dasar || '';
+                          if (elInstansi && !elInstansi.value) elInstansi.value = res.data.instansi || '';
+                          if (elMataAnggaran && !elMataAnggaran.value) elMataAnggaran.value = res.data.mata_anggaran || '';
+                          if (elAngkutan && !elAngkutan.value) elAngkutan.value = res.data.angkutan || '';
+                          if (elParagrafBiaya && !elParagrafBiaya.value) elParagrafBiaya.value = res.data.paragraf_biaya || '';
+                          
+                          let elPPKSearch = document.getElementById('spdSearchPPK');
+                          let elPPKVal = document.getElementById('spdPPK');
+                          if (res.data.ppk && elPPKVal && !elPPKVal.value) {
+                              elPPKVal.value = res.data.ppk;
+                              const ppkUser = state.usersList.find(u => u.nip === res.data.ppk);
+                              if (ppkUser && elPPKSearch) {
+                                  elPPKSearch.value = ppkUser.nama;
+                              }
+                          }
+                      }
+                  })
+                  .withFailureHandler(function(err) {
+                      console.warn("Gagal menarik pengaturan default ST secara background:", err);
+                  })
+                  .getSettingsST(); 
+          }
+      } catch (error) {
+          console.warn("Backend belum siap (getSettingsST tidak ditemukan). Pastikan file st.gs sudah di-save.", error);
+      }
+  }
+
+  // ZETTBOT FIX: Fungsi Khusus untuk Mode Edit Surat Tugas
+  function editST(id) {
+      const stData = state.stList.find(st => String(st.id) === String(id));
+      if (!stData) { showNotify("Gagal", "Data Surat Tugas tidak ditemukan di sistem", "error"); return; }
+      
+      openModalST();
+      
+      // Ubah state form menjadi Mode Edit
+      document.getElementById('stEditId').value = id;
+      document.getElementById('btnSubmitST').innerHTML = `Perbarui Surat Tugas <i class="fa-solid fa-floppy-disk"></i>`;
+      
+      let ekstraData = {};
+      try { ekstraData = JSON.parse(stData.data_ekstra || '{}'); } catch(e) {}
+      
+      stPesertaList = [];
+      try { stPesertaList = JSON.parse(stData.peserta || '[]'); } catch(e) {}
+      
+      document.getElementById('stNomor').value = stData.nomor || '';
+      document.getElementById('spdNomor').value = ekstraData.nomor_spd || '';
+      document.getElementById('plhNomor').value = ekstraData.nomor_plh || '';
+      document.getElementById('stMenimbang').value = stData.menimbang || '';
+      document.getElementById('stDasar').value = stData.dasar || '';
+      document.getElementById('stParagrafBiaya').value = ekstraData.paragraf_biaya || '';
+      
+      document.getElementById('spdAngkutan').value = ekstraData.alat_angkut || '';
+      document.getElementById('spdTempatTujuan').value = ekstraData.tempat_tujuan_spd || '';
+      document.getElementById('spdInstansi').value = ekstraData.instansi || '';
+      document.getElementById('spdMataAnggaran').value = ekstraData.mata_anggaran || '';
+      document.getElementById('spdTingkat').value = ekstraData.tingkat_spd || 'Tingkat C';
+      
+      document.getElementById('spdPPK').value = ekstraData.ppk_nip || '';
+      const uPPK = state.usersList.find(x => x.nip === ekstraData.ppk_nip);
+      document.getElementById('spdSearchPPK').value = uPPK ? uPPK.nama : '';
+
+      document.getElementById('stTujuan').value = stData.tujuan || '';
+      document.getElementById('stTempat').value = stData.tempat || '';
+      document.getElementById('stTglMulai').value = stData.tgl_mulai || '';
+      document.getElementById('stTglSelesai').value = stData.tgl_selesai || '';
+      document.getElementById('stJam').value = stData.jam || '';
+      
+      document.getElementById('stPejabatTtd').value = stData.pejabat_ttd || '';
+      const uTTD = state.usersList.find(x => x.nip === stData.pejabat_ttd);
+      document.getElementById('stSearchTtd').value = uTTD ? uTTD.nama : '';
+
+      renderPesertaST();
+  }
+
+  function closeModalST() {
+     const modal = document.getElementById('modalSuratTugas');
+     modal.firstElementChild.classList.add('scale-95');
+     setTimeout(() => { modal.classList.add('hidden'); }, 200);
+  }
+
+  function openSettingST() {
+      const modal = document.getElementById('modalSettingST');
+      if (modal.parentNode !== document.body) { document.body.appendChild(modal); }
+      
+      let dataPegawaiGlobal = state.usersList.map(u => ({
+          label: `${u.nama} ${u.jabatan} ${u.nip}`,
+          html: `<div class="font-bold">${u.nama}</div><div class="text-[9px] text-slate-400">${u.jabatan}</div>`,
+          nip: u.nip, nama: u.nama
+      }));
+      
+      attachSearchToInput('setDefPPKSearch', 'dropSetPPK', dataPegawaiGlobal, function(item) {
+          document.getElementById('setDefPPKSearch').value = item.nama;
+          document.getElementById('setDefPPK').value = item.nip;
+      });
+
+      document.getElementById('setDefPPKSearch').value = document.getElementById('spdSearchPPK').value;
+      document.getElementById('setDefPPK').value = document.getElementById('spdPPK').value;
+      
+      document.getElementById('setDefMenimbang').value = document.getElementById('stMenimbang').value;
+      document.getElementById('setDefDasar').value = document.getElementById('stDasar').value;
+      document.getElementById('setDefInstansi').value = document.getElementById('spdInstansi').value;
+      document.getElementById('setDefMataAnggaran').value = document.getElementById('spdMataAnggaran').value;
+      document.getElementById('setDefAngkutan').value = document.getElementById('spdAngkutan').value;
+      document.getElementById('setDefParagrafBiaya').value = document.getElementById('stParagrafBiaya').value;
+
+      modal.classList.remove('hidden');
+      setTimeout(() => { modal.firstElementChild.classList.remove('scale-95'); }, 10);
+  }
+
+  function closeSettingST() {
+      const modal = document.getElementById('modalSettingST');
+      modal.firstElementChild.classList.add('scale-95');
+      setTimeout(() => { modal.classList.add('hidden'); }, 200);
+  }
+
+  function saveSettingST(event) {
+      event.preventDefault();
+      
+      const payload = {
+          ppk: document.getElementById('setDefPPK').value,
+          menimbang: document.getElementById('setDefMenimbang').value,
+          dasar: document.getElementById('setDefDasar').value,
+          instansi: document.getElementById('setDefInstansi').value,
+          mata_anggaran: document.getElementById('setDefMataAnggaran').value,
+          angkutan: document.getElementById('setDefAngkutan').value,
+          paragraf_biaya: document.getElementById('setDefParagrafBiaya').value
+      };
+
+      showNotify("Menyimpan...", "Menyimpan pengaturan dasar...", "success");
+      
+      google.script.run
+        .withSuccessHandler(function(res) {
+            if(res.status === 'success') {
+                document.getElementById('spdSearchPPK').value = document.getElementById('setDefPPKSearch').value;
+                document.getElementById('spdPPK').value = payload.ppk;
+                document.getElementById('stMenimbang').value = payload.menimbang;
+                document.getElementById('stDasar').value = payload.dasar;
+                document.getElementById('spdInstansi').value = payload.instansi;
+                document.getElementById('spdMataAnggaran').value = payload.mata_anggaran;
+                document.getElementById('spdAngkutan').value = payload.angkutan;
+                document.getElementById('stParagrafBiaya').value = payload.paragraf_biaya;
+                
+                closeSettingST();
+                showNotify("Pengaturan Tersimpan", res.message, "success");
+            } else {
+                showNotify("Gagal", res.message, "error");
+            }
+        })
+        .withFailureHandler(function(err) {
+            hideLoading(); showNotify("Error", err.toString(), "error");
+        })
+        .saveSettingsST(payload);
+  }
+
+  function addPesertaST(nipPassed) {
+      const nip = nipPassed; 
+      if (!nip) return;
+      
+      if (!stPesertaList.some(p => p.nip === nip)) {
+          const u = state.usersList.find(x => x.nip === nip);
+          if (u) {
+              stPesertaList.push({
+                  nip: u.nip, nama: u.nama, pangkat: u.pangkat || '-', jabatan: u.jabatan,
+                  get_spd: false, plh_nip: "", plh_nama: ""
+              });
+              renderPesertaST();
+          }
+      }
+  }
+
+  function removePesertaST(nip) {
+      stPesertaList = stPesertaList.filter(p => p.nip !== nip);
+      renderPesertaST();
+  }
+
+  function toggleSPD(nip) {
+      const pIndex = stPesertaList.findIndex(p => p.nip === nip);
+      if(pIndex !== -1) {
+          stPesertaList[pIndex].get_spd = !stPesertaList[pIndex].get_spd;
+          renderPesertaST();
+      }
+  }
+
+  function openSetPlh(nip) {
+      const p = stPesertaList.find(x => x.nip === nip);
+      if(!p) return;
+
+      currentTargetPlhNip = nip;
+      document.getElementById('plhHelperText').innerHTML = `Pengganti harian untuk: <b>${p.nama}</b>`;
+      
+      document.getElementById('plhSearchPegawai').value = '';
+      document.getElementById('selectPlhPengganti').value = '';
+      
+      let dataPlhList = state.usersList.filter(u => u.nip !== nip).map(u => ({
+          label: `${u.nama} ${u.jabatan} ${u.nip}`,
+          html: `<div class="font-bold">${u.nama}</div><div class="text-[9px] text-slate-400">${u.jabatan}</div>`,
+          nip: u.nip, nama: u.nama
+      }));
+      
+      attachSearchToInput('plhSearchPegawai', 'dropPlh', dataPlhList, function(item) {
+          document.getElementById('plhSearchPegawai').value = item.nama;
+          document.getElementById('selectPlhPengganti').value = item.nip;
+      });
+
+      if(p.plh_nip) {
+          document.getElementById('selectPlhPengganti').value = p.plh_nip;
+          document.getElementById('plhSearchPegawai').value = p.plh_nama;
+      }
+
+      const modal = document.getElementById('modalSetPlh');
+      if (modal.parentNode !== document.body) { document.body.appendChild(modal); }
+      modal.classList.remove('hidden');
+      setTimeout(() => { modal.firstElementChild.classList.remove('scale-95'); }, 10);
+  }
+
+  function closeSetPlh() {
+      const modal = document.getElementById('modalSetPlh');
+      modal.firstElementChild.classList.add('scale-95');
+      setTimeout(() => { modal.classList.add('hidden'); }, 200);
+  }
+
+  function simpanPlhAssignment() {
+      const selectPlh = document.getElementById('selectPlhPengganti');
+      if(!selectPlh.value) { showNotify("Pilih Pejabat", "Silakan pilih nama pejabat pengganti atau tekan Batalkan.", "warning"); return; }
+      
+      const pIndex = stPesertaList.findIndex(p => p.nip === currentTargetPlhNip);
+      if(pIndex !== -1) {
+          const uPlh = state.usersList.find(x => x.nip === selectPlh.value);
+          stPesertaList[pIndex].plh_nip = selectPlh.value;
+          stPesertaList[pIndex].plh_nama = uPlh ? uPlh.nama : '';
+          renderPesertaST();
+          closeSetPlh();
+      }
+  }
+
+  function hapusPlhAssignment() {
+      const pIndex = stPesertaList.findIndex(p => p.nip === currentTargetPlhNip);
+      if(pIndex !== -1) {
+          stPesertaList[pIndex].plh_nip = "";
+          stPesertaList[pIndex].plh_nama = "";
+          renderPesertaST();
+          closeSetPlh();
+      }
+  }
+
+  function renderPesertaST() {
+      const tbody = document.getElementById('stListPesertaBody');
+      tbody.innerHTML = '';
+      
+      if (stPesertaList.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-slate-500 italic">Belum ada pegawai ditambahkan.</td></tr>';
+          return;
+      }
+      
+      stPesertaList.forEach((p, index) => {
+          let spdBtnClass = p.get_spd 
+              ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/30 border-transparent" 
+              : "bg-slate-900 text-slate-500 border-slate-700 hover:bg-slate-800";
+          let spdIcon = p.get_spd ? `<i class="fa-solid fa-check"></i> Ya` : `Tidak`;
+
+          let plhBtnClass = p.plh_nip 
+              ? "bg-purple-600 text-white shadow-lg shadow-purple-600/30 border-transparent" 
+              : "bg-slate-900 text-slate-500 border-slate-700 hover:bg-slate-800 hover:text-purple-400";
+          let plhText = p.plh_nip ? `Plh: ${p.plh_nama.split(' ')[0]}` : `+ Tunjuk Plh`;
+
+          tbody.innerHTML += `
+              <tr class="hover:bg-slate-900/50 transition">
+                  <td class="p-3 font-bold text-slate-200 text-[11px]">${index + 1}. ${p.nama}</td>
+                  <td class="p-3 text-slate-400 text-[10px]">${p.jabatan}</td>
+                  
+                  <td class="p-3 text-center">
+                     <button type="button" onclick="toggleSPD('${p.nip}')" class="px-3 py-1.5 rounded-lg text-[10px] font-bold border transition-all ${spdBtnClass}">${spdIcon}</button>
+                  </td>
+                  
+                  <td class="p-3 text-center">
+                     <button type="button" onclick="openSetPlh('${p.nip}')" class="px-3 py-1.5 rounded-lg text-[10px] font-bold border transition-all truncate max-w-[120px] ${plhBtnClass}">${plhText}</button>
+                  </td>
+
+                  <td class="p-3 text-center">
+                      <button type="button" onclick="removePesertaST('${p.nip}')" class="w-7 h-7 bg-rose-500/10 text-rose-400 hover:bg-rose-500 hover:text-white rounded-lg flex items-center justify-center transition ml-auto mr-auto">
+                         <i class="fa-solid fa-trash text-[10px]"></i>
+                      </button>
+                  </td>
+              </tr>
+          `;
+      });
+  }
+
+  function submitSuratTugas(event) {
+      event.preventDefault();
+      
+      if (stPesertaList.length === 0) {
+          showNotify("Validasi Gagal", "Pilih minimal 1 (satu) pegawai yang akan ditugaskan!", "error");
+          return;
+      }
+
+      const ppkNip = document.getElementById('spdPPK').value;
+      const ttdNip = document.getElementById('stPejabatTtd').value;
+
+      if (!ttdNip) {
+          showNotify("Validasi Gagal", "Anda belum memilih Pimpinan Penandatangan ST dari kotak pencarian.", "error");
+          return;
+      }
+
+      let ppkNama = "";
+      if (ppkNip) {
+         const uPPK = state.usersList.find(x => x.nip === ppkNip);
+         if(uPPK) ppkNama = uPPK.nama;
+      }
+
+      const ekstraData = {
+          nomor_spd: document.getElementById('spdNomor').value,
+          nomor_plh: document.getElementById('plhNomor').value,
+          ppk_nip: ppkNip,
+          ppk_nama: ppkNama,
+          alat_angkut: document.getElementById('spdAngkutan').value,
+          tempat_tujuan_spd: document.getElementById('spdTempatTujuan').value,
+          instansi: document.getElementById('spdInstansi').value,
+          mata_anggaran: document.getElementById('spdMataAnggaran').value,
+          tingkat_spd: document.getElementById('spdTingkat').value,
+          paragraf_biaya: document.getElementById('stParagrafBiaya').value
+      };
+
+      const payload = {
+          id_st: document.getElementById('stEditId').value, // Jika mode edit, ini akan terisi
+          nomor_surat: document.getElementById('stNomor').value,
+          menimbang: document.getElementById('stMenimbang').value,
+          dasar: document.getElementById('stDasar').value,
+          tujuan: document.getElementById('stTujuan').value,
+          tempat: document.getElementById('stTempat').value,
+          tgl_mulai: document.getElementById('stTglMulai').value,
+          tgl_selesai: document.getElementById('stTglSelesai').value,
+          jam: document.getElementById('stJam').value,
+          pejabat_ttd: ttdNip,
+          peserta_json: JSON.stringify(stPesertaList), 
+          data_ekstra_json: JSON.stringify(ekstraData) 
+      };
+
+      // ZETTBOT FIX: Percabangan antara Add Baru dan Update
+      if (payload.id_st) {
+          showLoading("Memperbarui Surat Tugas...");
+          google.script.run
+            .withSuccessHandler(function(res) {
+                hideLoading();
+                if (res.status === 'success') {
+                    closeModalST();
+                    showNotify("Berhasil Diperbarui", res.message, "success");
+                    if (typeof syncAllServerData === 'function') syncAllServerData();
+                } else { showNotify("Gagal", res.message, "error"); }
+            })
+            .withFailureHandler(function(err) {
+                hideLoading(); showNotify("Error Koneksi", err.toString(), "error");
+            })
+            .updateSuratTugas(payload);
+      } else {
+          showLoading("Menerbitkan Dokumen Terpadu...");
+          google.script.run
+            .withSuccessHandler(function(res) {
+                hideLoading();
+                if (res.status === 'success') {
+                    closeModalST();
+                    showNotify("Berhasil", "ST, SPD, dan Plh berhasil diterbitkan.", "success");
+                    if (typeof syncAllServerData === 'function') syncAllServerData();
+                } else { showNotify("Gagal", res.message, "error"); }
+            })
+            .withFailureHandler(function(err) {
+                hideLoading(); showNotify("Error Koneksi", err.toString(), "error");
+            })
+            .addSuratTugas(payload);
+      }
+  }
+</script>

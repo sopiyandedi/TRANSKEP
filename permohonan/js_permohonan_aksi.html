@@ -1,0 +1,162 @@
+<script>
+  // =========================================================================
+  // LOGIKA CLIENT-SIDE: AKSI TOMBOL (HAPUS, TARIK, BATAL)
+  // =========================================================================
+
+  function deleteCutiRecord(id) {
+    showCustomConfirm("Tarik Pengajuan", "Batalkan dan tarik pengajuan ini? Saldo cuti Anda akan dikembalikan utuh.", function() {
+      showLoading("Menarik data...");
+      google.script.run
+        .withSuccessHandler(function(res) {
+          hideLoading();
+          if (res.status === 'success') {
+            showNotify("Ditarik", res.message, "success");
+            
+            if (state && state.cutiLogs && state.user) {
+                const logIndex = state.cutiLogs.findIndex(function(l) { return String(l.id) === String(id); });
+                if (logIndex !== -1) {
+                    const logToCancel = state.cutiLogs[logIndex];
+                    if (logToCancel.jenis === 'Tahunan') {
+                        try {
+                            let h = JSON.parse(logToCancel.history || "{}");
+                            state.user.s_tahunan_2024 = Number(state.user.s_tahunan_2024 || 0) + (Number(h.y24) || 0);
+                            state.user.s_tahunan_2025 = Number(state.user.s_tahunan_2025 || 0) + (Number(h.y25) || 0);
+                            state.user.s_tahunan_2026 = Number(state.user.s_tahunan_2026 || 0) + (Number(h.y26) || 0);
+                        } catch(e) {}
+                    } else {
+                        let field = "";
+                        if(logToCancel.jenis === 'Sakit') field = 's_sakit';
+                        else if(logToCancel.jenis === 'Alasan Penting' || logToCancel.jenis === 'Penting') field = 's_penting';
+                        else if(logToCancel.jenis === 'Besar') field = 's_besar';
+                        else if(logToCancel.jenis === 'Melahirkan') field = 's_melahirkan';
+                        else if(logToCancel.jenis === 'CLTN') field = 's_cltn';
+                        if (field !== "") state.user[field] = Number(state.user[field] || 0) + Number(logToCancel.sisa_cuti || 0);
+                    }
+                    
+                    if (state.usersList) {
+                        const uIdx = state.usersList.findIndex(function(u) { return String(u.nip) === String(state.user.nip); });
+                        if (uIdx !== -1) state.usersList[uIdx] = Object.assign({}, state.user);
+                    }
+                    state.cutiLogs.splice(logIndex, 1);
+                    if (typeof renderPermohonanView === 'function') renderPermohonanView();
+                }
+            }
+          } else { showNotify("Gagal Membatalkan", res.message, "error"); }
+        })
+        .withFailureHandler(function(err) { hideLoading(); showNotify("Error", err.toString(), "error"); })
+        .deleteCutiLog(id);
+    });
+  }
+
+  function deleteIK(id) {
+    showCustomConfirm("Tarik Pengajuan", "Batalkan dan tarik pengajuan Izin Keluar ini?", function() {
+      showLoading("Menarik data...");
+      google.script.run
+        .withSuccessHandler(function(res) {
+          hideLoading();
+          if (res.status === 'success') {
+            showNotify("Ditarik", res.message, "success");
+            if (state && state.ikLogs) {
+                const idx = state.ikLogs.findIndex(l => String(l.id) === String(id));
+                if (idx !== -1) state.ikLogs.splice(idx, 1);
+                if (typeof renderPermohonanView === 'function') renderPermohonanView();
+            }
+          } else { showNotify("Gagal Membatalkan", res.message, "error"); }
+        })
+        .withFailureHandler(function(err) { hideLoading(); showNotify("Error", err.toString(), "error"); })
+        .deleteIzinKeluarLog(id);
+    });
+  }
+
+  function deleteIP(id) {
+    showCustomConfirm("Tarik Pengajuan", "Batalkan dan tarik pengajuan Izin Pribadi ini?", function() {
+      showLoading("Menarik data...");
+      google.script.run
+        .withSuccessHandler(function(res) {
+          hideLoading();
+          if (res.status === 'success') {
+            showNotify("Ditarik", res.message, "success");
+            if (state && state.ipLogs) {
+                const idx = state.ipLogs.findIndex(l => String(l.id) === String(id));
+                if (idx !== -1) state.ipLogs.splice(idx, 1);
+                if (typeof renderPermohonanView === 'function') renderPermohonanView();
+            }
+          } else { showNotify("Gagal Membatalkan", res.message, "error"); }
+        })
+        .withFailureHandler(function(err) { hideLoading(); showNotify("Error", err.toString(), "error"); })
+        .deleteIzinPribadiLog(id);
+    });
+  }
+
+  function deleteWFH(id) {
+    showCustomConfirm("Tarik Pengajuan", "Batalkan dan tarik pengajuan WFH ini?", function() {
+      showLoading("Menarik data...");
+      google.script.run
+        .withSuccessHandler(function(res) {
+          hideLoading();
+          if (res.status === 'success') {
+            showNotify("Ditarik", res.message, "success");
+            if (state && state.wfhLogs) {
+                const idx = state.wfhLogs.findIndex(l => String(l.id) === String(id));
+                if (idx !== -1) state.wfhLogs.splice(idx, 1);
+                if (typeof renderPermohonanView === 'function') renderPermohonanView();
+            }
+          } else { showNotify("Gagal Membatalkan", res.message, "error"); }
+        })
+        .withFailureHandler(function(err) { hideLoading(); showNotify("Error", err.toString(), "error"); })
+        .deleteWfhLog(id);
+    });
+  }
+
+  function editCuti(id) { showNotify("Segera Hadir", "Fitur Edit sedang dikembangkan di Tahap 3.", "warning"); }
+  function editIK(id) { openModalIK(id); }
+  function editIP(id) { openModalIP(id); }
+  function editWFHPlan(id) { openModalWFH(id); }
+  function editWFHLap(id) { openModalLaporanWFH(id); }
+
+  function openCancelModal(id) {
+     document.getElementById('cancelCutiId').value = id;
+     document.getElementById('cancelAlasan').value = '';
+     const modal = document.getElementById('modalCancelCuti');
+     
+     if (modal.parentNode !== document.body) {
+         document.body.appendChild(modal);
+     }
+     
+     modal.classList.remove('hidden');
+     setTimeout(() => { modal.firstElementChild.classList.remove('scale-95'); }, 10);
+  }
+
+  function closeCancelModal() {
+     const modal = document.getElementById('modalCancelCuti');
+     modal.firstElementChild.classList.add('scale-95');
+     setTimeout(() => { modal.classList.add('hidden'); }, 200);
+  }
+
+  function submitCancelCuti() {
+      const id = document.getElementById('cancelCutiId').value;
+      const alasanBatal = document.getElementById('cancelAlasan').value;
+      if (!alasanBatal.trim()) { showNotify("Validasi", "Alasan pembatalan wajib diisi!", "error"); return; }
+
+      showLoading("Mengajukan pembatalan ke Pejabat...");
+      google.script.run
+        .withSuccessHandler(function(res) {
+            hideLoading();
+            closeCancelModal();
+            if (res.status === 'success') {
+                showNotify("Berhasil Diajukan", "Usulan pembatalan menunggu persetujuan Pejabat.", "success");
+                
+                if (state && state.cutiLogs) {
+                    const logIndex = state.cutiLogs.findIndex(l => String(l.id) === String(id));
+                    if (logIndex !== -1) {
+                        state.cutiLogs[logIndex].status = 'Menunggu Pembatalan';
+                        state.cutiLogs[logIndex].alasan += "\n\n[USULAN PEMBATALAN]: " + alasanBatal;
+                        if (typeof renderPermohonanView === 'function') renderPermohonanView();
+                    }
+                }
+            } else { showNotify("Gagal", res.message, "error"); }
+        })
+        .withFailureHandler(function(err) { hideLoading(); showNotify("Error", err.toString(), "error"); })
+        .requestCancelCuti(id, alasanBatal);
+  }
+</script>

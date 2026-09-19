@@ -1,0 +1,244 @@
+<div id="section-sop" class="menu-section hidden flex-col gap-8">
+  
+  <!-- Header SOP Filter -->
+  <div class="glass mb-4 p-4 rounded-3xl border border-slate-800/80 bg-slate-900/60 shadow-xl flex flex-col lg:flex-row gap-4 items-center justify-between">
+     <div class="flex flex-wrap gap-2 items-center bg-slate-950 p-1.5 rounded-2xl border border-slate-800/50 w-full lg:w-auto overflow-x-auto no-scrollbar">
+        <button onclick="setSopFilter('Semua SOP')" id="btnSop-semua" class="sop-filter-btn px-4 py-2 rounded-xl text-xs font-bold transition-all bg-indigo-600 text-white shadow-lg shadow-indigo-500/20 whitespace-nowrap">Semua SOP</button>
+        <button onclick="setSopFilter('PJ. Manajemen')" id="btnSop-manajemen" class="sop-filter-btn px-4 py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-slate-200 transition-all whitespace-nowrap">PJ. Manajemen</button>
+        <button onclick="setSopFilter('PJ. Kepaniteraan')" id="btnSop-kepaniteraan" class="sop-filter-btn px-4 py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-slate-200 transition-all whitespace-nowrap">PJ. Kepaniteraan</button>
+        <button onclick="setSopFilter('PJ. Kesekretariatan')" id="btnSop-kesekretariatan" class="sop-filter-btn px-4 py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-slate-200 transition-all whitespace-nowrap">PJ. Kesekretariatan</button>
+        <div class="w-px h-6 bg-slate-800 mx-1"></div>
+        <button onclick="setSopFilter('Rekap per Pegawai')" id="btnSop-rekap" class="sop-filter-btn px-4 py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-slate-200 transition-all flex items-center gap-2 whitespace-nowrap">
+           <i class="fa-solid fa-users-viewfinder"></i> Rekap per Pegawai
+        </button>
+     </div>
+     
+     <button id="btnTambahSopMaster" onclick="openModalSop()" class="w-full lg:w-auto px-5 py-2.5 rounded-xl text-xs font-bold bg-indigo-500 hover:bg-indigo-400 text-white transition-all shadow-[0_0_15px_rgba(99,102,241,0.3)] flex items-center justify-center gap-2 shrink-0">
+        <i class="fa-solid fa-plus"></i> DAFTARKAN SOP BARU
+     </button>
+  </div>
+
+  <!-- Main Container -->
+  <div class="glass border border-slate-800 rounded-3xl bg-slate-900/80 shadow-2xl overflow-hidden flex flex-col relative">
+      <div class="p-6 border-b border-slate-800/80 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div class="flex items-center gap-4">
+             <div class="w-12 h-12 bg-indigo-500/10 rounded-2xl flex items-center justify-center border border-indigo-500/20">
+                 <i class="fa-solid fa-book-bookmark text-2xl text-indigo-400"></i>
+             </div>
+             <div>
+                <h3 class="text-xl font-black text-slate-200 tracking-wide">Pusat Manajemen Dokumen SOP</h3>
+                <p class="text-xs text-slate-500 mt-1">Daftar Dokumen Standar Operasional Prosedur Pengadilan Agama Indramayu.</p>
+             </div>
+          </div>
+          
+          <!-- Search Bar ZETTBOT FIX: Tidak disembunyikan saat mode rekap agar bisa searchable -->
+          <div id="sopSearchContainer" class="relative w-full md:w-72 group">
+             <i class="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-indigo-400 transition-colors"></i>
+             <input type="text" id="searchInputSop" onkeyup="filterTableSop()" placeholder="Cari SOP atau Nama Pegawai..." class="w-full pl-11 pr-4 py-2.5 bg-slate-950/50 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all placeholder:text-slate-600">
+          </div>
+      </div>
+
+      <!-- Container: Table List -->
+      <div id="sopListContainer" class="w-full overflow-x-auto border border-slate-900 rounded-2xl bg-slate-950/40 mt-4">
+         <table class="w-full text-left text-xs border-collapse">
+            <thead>
+               <tr class="border-b border-slate-900 bg-slate-900 text-slate-400 font-semibold sticky top-0 z-10 whitespace-nowrap">
+                  <th class="p-4 w-12 text-center">No</th>
+                  <th class="p-4">Judul Dokumen SOP</th>
+                  <th class="p-4">Kategori (PJ)</th>
+                  <th class="p-4">Nomor SOP</th>
+                  <th class="p-4">Tgl Efektif</th>
+                  <th class="p-4 text-center">Tgl Input</th>
+                  <th class="p-4 text-center">Unduh</th>
+                  <th class="p-4 text-center">Aksi Operasi</th>
+               </tr>
+            </thead>
+            <tbody id="sopTableBody">
+               <!-- Auto Generated via JS -->
+            </tbody>
+         </table>
+         <div id="sopEmptyState" class="hidden flex-col items-center justify-center py-16 text-center">
+             <div class="w-20 h-20 bg-slate-800/30 rounded-full flex items-center justify-center mb-4"><i class="fa-solid fa-folder-open text-3xl text-slate-600"></i></div>
+             <h4 class="text-slate-300 font-bold text-lg">Belum Ada Dokumen SOP</h4>
+             <p class="text-slate-500 text-xs mt-2 max-w-sm">Data Standar Operasional Prosedur untuk kategori ini belum tersedia atau tidak ditemukan.</p>
+         </div>
+      </div>
+
+      <!-- Container: Rekap per Pegawai (Accordion) -->
+      <!-- ZETTBOT FIX: bg-transparent & hapus gap agar list pegawai merapat 1:1 mirip SK -->
+      <div id="sopRekapContainer" class="w-full hidden bg-transparent">
+         <div class="p-4 text-xs uppercase tracking-wider text-slate-400 font-bold border-b border-slate-800 flex bg-slate-950/80">
+            <div class="w-16 text-center">No</div>
+            <div class="flex-1">Identitas Pegawai Terkait</div>
+            <div class="w-48 text-center hidden sm:block">Total Keterlibatan SOP</div>
+            <div class="w-32 text-center pr-6">Aksi Operasi</div>
+         </div>
+         <div id="sopRekapBody" class="flex flex-col w-full">
+             <!-- Auto Generated Accordion JS -->
+         </div>
+      </div>
+  </div>
+</div>
+
+<!-- ===================================== -->
+<!-- MODAL DAFTAR/EDIT SOP -->
+<!-- ===================================== -->
+<div id="modalSop" class="fixed inset-0 z-[999] flex items-center justify-center bg-slate-950/80 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
+  <div class="glass border border-slate-800 bg-slate-900/95 rounded-2xl shadow-2xl w-full max-w-4xl mx-4 max-h-[90vh] flex flex-col transform scale-95 transition-transform duration-300">
+     
+     <div class="flex items-center justify-between p-5 border-b border-slate-800 bg-slate-950/50 rounded-t-2xl shrink-0">
+        <h3 id="modalSopTitle" class="text-lg font-black text-white flex items-center gap-3">
+           <div class="p-1.5 bg-indigo-500/20 text-indigo-400 rounded-lg"><i class="fa-solid fa-plus text-sm"></i></div>
+           Daftarkan SOP Baru
+        </h3>
+        <button type="button" onclick="closeModalSop()" class="text-slate-400 hover:text-rose-400 transition w-8 h-8 flex items-center justify-center bg-slate-800 hover:bg-rose-500/10 rounded-lg">
+           <i class="fa-solid fa-xmark"></i>
+        </button>
+     </div>
+
+     <div class="p-6 overflow-y-auto no-scrollbar flex-1">
+        <form id="formSop" onsubmit="saveSopSubmit(event)" class="space-y-6">
+           <input type="hidden" id="sopId">
+           
+           <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <div class="md:col-span-2">
+                 <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Judul Dokumen (SOP)</label>
+                 <input type="text" id="sopJudul" required placeholder="Contoh: SOP Pelayanan Terpadu Satu Pintu" class="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all">
+              </div>
+              
+              <div>
+                 <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Kategori (Penanggung Jawab)</label>
+                 <select id="sopKategori" required class="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all appearance-none cursor-pointer">
+                    <option value="PJ. Manajemen">PJ. Manajemen</option>
+                    <option value="PJ. Kepaniteraan">PJ. Kepaniteraan</option>
+                    <option value="PJ. Kesekretariatan">PJ. Kesekretariatan</option>
+                 </select>
+              </div>
+
+              <div>
+                 <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Tautan Google Drive (Berkas PDF)</label>
+                 <input type="url" id="sopLink" required placeholder="https://drive.google.com/..." class="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all">
+              </div>
+
+              <!-- Baris Urutan Sesuai Form SOP Fisik -->
+              <div>
+                 <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Nomor SOP</label>
+                 <input type="text" id="sopNomor" required placeholder="Contoh: SOP/AP/01 atau SOP/AS/01" class="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all">
+              </div>
+              
+              <div>
+                 <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Tanggal Pembuatan</label>
+                 <input type="date" id="sopTglPembuatan" required class="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all [color-scheme:dark]">
+              </div>
+
+              <div>
+                 <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Tanggal Revisi (Opsional)</label>
+                 <input type="date" id="sopTglRevisi" class="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all [color-scheme:dark]">
+              </div>
+
+              <div>
+                 <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Tanggal Efektif</label>
+                 <input type="date" id="sopTglEfektif" required class="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all [color-scheme:dark]">
+              </div>
+           </div>
+
+           <!-- Multi-Select Pegawai Dinamis -->
+           <div class="pt-4 border-t border-slate-800">
+              <label class="block text-[11px] font-bold text-indigo-400 uppercase tracking-widest mb-4">Susunan Pelaksana & Pihak Terkait</label>
+              
+              <div class="flex flex-col md:flex-row gap-3 items-start relative z-50">
+                 <div class="w-full relative group flex-1">
+                    <input type="text" id="sopPegawaiSearch" placeholder="Cari nama pegawai untuk ditambahkan..." autocomplete="off" onfocus="document.getElementById('sopPegawaiDropdown').classList.remove('hidden')" onkeyup="filterSopPegawaiDropdown()" class="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all placeholder:text-slate-600">
+                    
+                    <div id="sopPegawaiDropdown" class="absolute top-full left-0 right-0 mt-1 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl max-h-48 overflow-y-auto hidden z-[100] custom-scrollbar">
+                       <!-- Auto populated -->
+                    </div>
+                 </div>
+                 
+                 <div class="w-full md:w-64 shrink-0">
+                    <input type="text" id="sopPeranInput" placeholder="Peran (Opsional. Cth: Petugas)" class="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all placeholder:text-slate-600">
+                 </div>
+                 
+                 <div class="hidden md:flex items-center h-[46px] px-2 text-[10px] text-slate-500 italic">
+                    Pilih dari dropdown untuk menambahkan.
+                 </div>
+              </div>
+
+              <!-- List yang akan di submit -->
+              <div class="mt-4 border border-dashed border-slate-700 rounded-xl p-2 min-h-[100px] bg-slate-950/50" id="sopPelaksanaContainer">
+                 <div class="text-center py-6 text-slate-500 text-xs italic w-full" id="sopEmptyPelaksana">Belum ada pihak terkait yang ditambahkan.</div>
+                 <div id="sopPelaksanaListWrapper" class="flex flex-col gap-2 w-full hidden">
+                    <!-- Added list goes here -->
+                 </div>
+              </div>
+           </div>
+        </form>
+     </div>
+     
+     <!-- Sticky Footer -->
+     <div class="p-5 border-t border-slate-800 bg-slate-950/50 rounded-b-2xl flex justify-end gap-3 shrink-0">
+        <button type="button" onclick="closeModalSop()" class="px-6 py-3 rounded-xl text-xs font-bold text-slate-400 bg-slate-800 hover:bg-slate-700 hover:text-white transition">Batal</button>
+        <!-- Form disubmit dengan trigger klik tombol yang berasosiasi dengan id form -->
+        <button type="button" onclick="document.getElementById('formSop').requestSubmit()" class="px-6 py-3 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/30 transition flex items-center gap-2">
+           <i class="fa-solid fa-save"></i> Simpan Data SOP
+        </button>
+     </div>
+  </div>
+</div>
+
+<!-- ===================================== -->
+<!-- MODAL WHATSAPP BLAST (Per Item) -->
+<!-- ===================================== -->
+<div id="modalWaSop" class="fixed inset-0 z-[1000] flex items-center justify-center bg-slate-950/80 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
+    <div class="glass border border-emerald-500/30 bg-slate-900/95 rounded-2xl shadow-2xl w-full max-w-lg mx-4 flex flex-col transform scale-95 transition-transform duration-300">
+       <div class="flex items-center justify-between p-5 border-b border-slate-800 bg-emerald-500/10 rounded-t-2xl">
+          <h3 class="text-lg font-black text-emerald-400 flex items-center gap-3">
+             <i class="fa-brands fa-whatsapp text-2xl"></i>
+             Kirim Notifikasi SOP
+          </h3>
+          <button type="button" onclick="closeModalWaSop()" class="text-slate-400 hover:text-rose-400 transition w-8 h-8 flex items-center justify-center bg-slate-800 hover:bg-rose-500/10 rounded-lg">
+             <i class="fa-solid fa-xmark"></i>
+          </button>
+       </div>
+       <div class="p-6">
+          <p class="text-xs text-slate-300 mb-4 font-medium" id="waSopTitleTarget">Kirim notifikasi ke pelaksana SOP ini.</p>
+          <div id="waSopListContainer" class="max-h-64 overflow-y-auto custom-scrollbar flex flex-col gap-2 border border-slate-800 rounded-xl p-2 bg-slate-950">
+             <!-- Dihasilkan via JS -->
+          </div>
+       </div>
+    </div>
+</div>
+
+<!-- ===================================== -->
+<!-- MODAL WHATSAPP BLAST (Rekap / Bulk) -->
+<!-- ===================================== -->
+<div id="modalWaRekapSop" class="fixed inset-0 z-[1000] flex items-center justify-center bg-slate-950/80 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
+    <div class="glass border border-slate-800 bg-slate-900/95 rounded-2xl shadow-2xl w-full max-w-lg mx-4 flex flex-col transform scale-95 transition-transform duration-300">
+       <div class="flex items-start justify-between p-5 border-b border-slate-800 bg-slate-950/50 rounded-t-2xl shrink-0">
+          <div>
+              <h3 class="text-lg font-black text-emerald-400 flex items-center gap-2">
+                 <i class="fa-brands fa-whatsapp"></i> Kirim Rekap SOP (Bulk)
+              </h3>
+              <p id="waRekapSopUserName" class="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">NAMA PEGAWAI</p>
+          </div>
+          <button type="button" onclick="closeWaRekapSopBlast()" class="text-slate-400 hover:text-rose-400 transition w-8 h-8 flex items-center justify-center bg-slate-800 hover:bg-rose-500/10 rounded-lg shrink-0">
+             <i class="fa-solid fa-xmark"></i>
+          </button>
+       </div>
+       <div class="p-5">
+          <input type="hidden" id="waRekapSopTargetNip">
+          <div class="flex items-center justify-between p-3 bg-slate-950 border border-slate-800 rounded-xl mb-4">
+             <span class="text-xs font-bold text-slate-300">Pilih SOP yang ingin dibundel dalam pesan:</span>
+             <button type="button" onclick="toggleAllWaRekapSop()" class="text-[10px] font-bold text-indigo-400 hover:text-indigo-300 transition">Pilih Semua</button>
+          </div>
+          <div id="waRekapSopListContainer" class="max-h-64 overflow-y-auto custom-scrollbar flex flex-col gap-2">
+             <!-- Generated via JS -->
+          </div>
+       </div>
+       <div class="p-5 border-t border-slate-800 bg-slate-950/50 rounded-b-2xl">
+          <button type="button" onclick="sendBulkWaRekapSop()" class="w-full py-3 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-600/30 transition flex items-center justify-center gap-2">
+             RAKIT & BUKA PESAN WHATSAPP <i class="fa-solid fa-paper-plane"></i>
+          </button>
+       </div>
+    </div>
+</div>

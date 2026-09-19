@@ -1,0 +1,261 @@
+  <!-- ==========================================
+      FILE: view_st.html (Modal Input Surat Tugas)
+      ========================================== -->
+  <div id="modalSuratTugas" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-[999] flex items-center justify-center p-4 hidden">
+    <div class="w-full max-w-5xl glass border border-slate-800 p-6 rounded-3xl shadow-2xl scale-95 transition-all flex flex-col h-[95vh]">
+      <div class="flex items-center justify-between pb-4 border-b border-slate-800 shrink-0">
+        <h3 class="text-lg font-bold text-white"><i class="fa-solid fa-file-signature text-blue-400 mr-2"></i> Penerbitan Surat Tugas (Terintegrasi SPD & Plh)</h3>
+        <button onclick="closeModalST()" class="text-slate-400 hover:text-slate-100"><i class="fa-solid fa-xmark text-lg"></i></button>
+      </div>
+      
+      <form id="formST" onsubmit="submitSuratTugas(event)" class="flex-1 overflow-y-auto py-4 space-y-5 text-sm pr-2 custom-scrollbar">
+        
+        <!-- ZETTBOT FIX: Input tersembunyi untuk melacak mode Edit -->
+        <input type="hidden" id="stEditId" value="">
+
+        <!-- BAGIAN 1: IDENTITAS SURAT (Multi Nomor) -->
+        <div class="bg-slate-900/50 border border-slate-800 p-4 rounded-xl space-y-4">
+          <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+              <h4 class="text-xs font-bold text-blue-400 uppercase tracking-wider">1. Identitas & Penomoran Surat</h4>
+              <button type="button" onclick="openSettingST()" class="text-[10px] text-slate-400 hover:text-blue-400 font-bold bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-700 transition">
+                <i class="fa-solid fa-gear"></i> Atur Dasar SK
+              </button>
+          </div>
+          
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label class="block text-slate-400 uppercase font-bold mb-1 text-[11px]">Nomor Surat Tugas <span class="text-rose-400">*</span></label>
+              <input type="text" id="stNomor" required placeholder="Contoh: .../ST.HM3.1.1/VIII/2026" class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+            <div>
+              <label class="block text-slate-400 uppercase font-bold mb-1 text-[11px]">Nomor SPD <span class="text-slate-500 font-normal">(Kosongkan jika tdk ada)</span></label>
+              <input type="text" id="spdNomor" placeholder="Contoh: .../KU.01/VIII/2026" class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+            </div>
+            <div>
+              <label class="block text-slate-400 uppercase font-bold mb-1 text-[11px]">Nomor Plh <span class="text-slate-500 font-normal">(Kosongkan jika tdk ada)</span></label>
+              <input type="text" id="plhNomor" placeholder="Contoh: .../KP7.4/II/2026" class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-purple-500">
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-slate-400 uppercase font-bold mb-1 text-[11px]">Menimbang (Teks) <span class="text-rose-400">*</span></label>
+              <textarea id="stMenimbang" rows="3" required placeholder="Bahwa untuk kepentingan dinas..." class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+            </div>
+            <div>
+              <label class="block text-slate-400 uppercase font-bold mb-1 text-[11px]">Dasar (Teks) <span class="text-rose-400">*</span></label>
+              <textarea id="stDasar" rows="3" required placeholder="1. Undang-Undang Nomor...\n2. Peraturan..." class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+            </div>
+          </div>
+
+          <div class="relative z-10">
+            <label class="block text-slate-400 uppercase font-bold mb-1 text-[11px]">Paragraf Biaya Surat Tugas (Opsional)</label>
+            <textarea id="stParagrafBiaya" rows="2" placeholder="Biaya perjalanan dinas ini dibebankan pada anggaran DIPA..." class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+          </div>
+        </div>
+
+        <!-- BAGIAN 2: PESERTA & KONFIGURASI SPD/PLH -->
+        <div class="bg-slate-900/50 border border-slate-800 p-4 rounded-xl space-y-4">
+          <h4 class="text-xs font-bold text-blue-400 uppercase tracking-wider border-b border-slate-800 pb-2">2. Daftar Pegawai & Pengaturan Fasilitas</h4>
+          
+          <div class="relative w-full">
+            <div class="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none">
+                <i class="fa-solid fa-magnifying-glass text-slate-500"></i>
+            </div>
+            <input type="text" id="stSearchPegawai" autocomplete="off" placeholder="Ketik nama pegawai lalu tekan Enter..." class="w-full pl-10 pr-4 py-3 bg-slate-950 border border-blue-500/50 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 font-semibold shadow-inner">
+            <!-- Dropdown Melayang -->
+            <div id="dropPegawai" class="absolute z-10 w-full mt-1 bg-slate-900 border border-slate-700 rounded-xl overflow-hidden hidden max-h-48 overflow-y-auto shadow-2xl"></div>
+          </div>
+          
+          <div class="border border-slate-700 rounded-lg overflow-hidden">
+            <table class="w-full text-left text-xs">
+              <thead class="bg-slate-800 text-slate-300">
+                <tr>
+                  <th class="p-3">Nama Pegawai</th>
+                  <th class="p-3">Jabatan</th>
+                  <th class="p-3 text-center">Fasilitas SPD</th>
+                  <th class="p-3 text-center">Tunjuk Plh</th>
+                  <th class="p-3 text-center w-12">Hapus</th>
+                </tr>
+              </thead>
+              <tbody id="stListPesertaBody" class="bg-slate-950 divide-y divide-slate-800">
+                <tr><td colspan="5" class="p-4 text-center text-slate-500 italic">Belum ada pegawai ditambahkan.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- BAGIAN 3: PENGATURAN UMUM SPD -->
+        <div class="bg-slate-900/50 border border-emerald-500/30 p-4 rounded-xl space-y-4 relative">
+          <div class="absolute -right-10 -top-10 w-32 h-32 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none"></div>
+          <h4 class="text-xs font-bold text-emerald-400 uppercase tracking-wider border-b border-emerald-500/30 pb-2">3. Data Pembiayaan SPD & ST</h4>
+          
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 relative z-10 mb-4">
+            <div class="relative">
+                <label class="block text-slate-400 uppercase font-bold mb-1 text-[11px]">Pejabat Pembuat Komitmen (PPK)</label>
+                <input type="text" id="spdSearchPPK" autocomplete="off" placeholder="Ketik nama PPK..." class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                <input type="hidden" id="spdPPK"> 
+                <div id="dropPPK" class="absolute z-10 w-full mt-1 bg-slate-900 border border-slate-700 rounded-xl overflow-hidden hidden max-h-48 overflow-y-auto shadow-2xl"></div>
+            </div>
+            
+            <div>
+              <label class="block text-slate-400 uppercase font-bold mb-1 text-[11px]">Alat Angkutan</label>
+              <input type="text" id="spdAngkutan" placeholder="Contoh: Kendaraan Dinas / Umum" class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+            </div>
+            <div>
+              <label class="block text-slate-400 uppercase font-bold mb-1 text-[11px]">Tempat Tujuan (Khusus SPD)</label>
+              <input type="text" id="spdTempatTujuan" placeholder="Contoh: Kantor Pelayanan Kekayaan..." class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 relative z-10">
+            <div>
+              <label class="block text-slate-400 uppercase font-bold mb-1 text-[11px]">Instansi (Beban Anggaran)</label>
+              <input type="text" id="spdInstansi" placeholder="Contoh: Pengadilan Agama Indramayu" class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+            </div>
+            <div>
+              <label class="block text-slate-400 uppercase font-bold mb-1 text-[11px]">Mata Anggaran</label>
+              <input type="text" id="spdMataAnggaran" placeholder="Contoh: 524111" class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+            </div>
+            <div>
+              <label class="block text-slate-400 uppercase font-bold mb-1 text-[11px]">Tingkat SPD <span class="text-rose-400">*</span></label>
+              <select id="spdTingkat" required class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                  <option value="Tingkat A">Tingkat A</option>
+                  <option value="Tingkat B">Tingkat B</option>
+                  <option value="Tingkat C" selected>Tingkat C</option>
+                  <option value="Tingkat D">Tingkat D</option>
+                  <option value="Tingkat E">Tingkat E</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- BAGIAN 4: PELAKSANAAN TUGAS -->
+        <div class="bg-slate-900/50 border border-slate-800 p-4 rounded-xl space-y-4">
+          <h4 class="text-xs font-bold text-blue-400 uppercase tracking-wider border-b border-slate-800 pb-2">4. Detail Pelaksanaan & TTD</h4>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="space-y-4">
+              <div>
+                <label class="block text-slate-400 uppercase font-bold mb-1 text-[11px]">Maksud / Tujuan Tugas (Untuk) <span class="text-rose-400">*</span></label>
+                <textarea id="stTujuan" rows="2" required placeholder="Melaksanakan pengawasan ke..." class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+              </div>
+              <div>
+                <label class="block text-slate-400 uppercase font-bold mb-1 text-[11px]">Tempat Pelaksanaan <span class="text-rose-400">*</span></label>
+                <input type="text" id="stTempat" required placeholder="Contoh: Pengadilan Tinggi Agama Bandung" class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500">
+              </div>
+            </div>
+            
+            <div class="space-y-4">
+              <div class="grid grid-cols-2 gap-2">
+                <div>
+                  <label class="block text-slate-400 uppercase font-bold mb-1 text-[11px]">Tgl Berangkat <span class="text-rose-400">*</span></label>
+                  <input type="date" id="stTglMulai" required class="w-full px-3.5 py-2 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                  <label class="block text-slate-400 uppercase font-bold mb-1 text-[11px]">Tgl Kembali <span class="text-rose-400">*</span></label>
+                  <input type="date" id="stTglSelesai" required class="w-full px-3.5 py-2 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+              </div>
+              <div>
+                <label class="block text-slate-400 uppercase font-bold mb-1 text-[11px]">Waktu / Jam <span class="text-rose-400">*</span></label>
+                <input type="text" id="stJam" required placeholder="08.00 WIB s.d. Selesai" class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500">
+              </div>
+              
+              <div class="relative">
+                <label class="block text-slate-400 uppercase font-bold mb-1 text-[11px] text-amber-400">Pimpinan Penandatangan <span class="text-rose-400">*</span></label>
+                <input type="text" id="stSearchTtd" autocomplete="off" placeholder="Ketik nama Pimpinan..." class="w-full px-3.5 py-2.5 bg-slate-950 border border-amber-500/50 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-500">
+                <input type="hidden" id="stPejabatTtd">
+                <div id="dropTtd" class="absolute z-10 w-full mt-1 bg-slate-900 border border-slate-700 rounded-xl overflow-hidden hidden max-h-48 overflow-y-auto shadow-2xl"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- SUBMIT BUTTON -->
+        <div class="pt-4 shrink-0">
+          <button type="submit" id="btnSubmitST" class="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl shadow-lg shadow-blue-600/20 transition uppercase tracking-wider flex items-center justify-center gap-2">
+              Terbitkan Surat Tugas Terpadu <i class="fa-solid fa-paper-plane"></i>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MINI MODAL: TUNJUK PLH -->
+  <div id="modalSetPlh" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-[9999] flex items-center justify-center p-4 hidden">
+    <div class="w-full max-w-sm glass border border-purple-500/30 p-5 rounded-2xl shadow-2xl scale-95 transition-all overflow-visible">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-700 mb-4">
+          <h4 class="font-bold text-white"><i class="fa-solid fa-user-shield text-purple-400 mr-2"></i> Tunjuk Pejabat Plh.</h4>
+          <button type="button" onclick="closeSetPlh()" class="text-slate-400 hover:text-rose-400"><i class="fa-solid fa-xmark text-lg"></i></button>
+        </div>
+        <p class="text-xs text-slate-400 mb-4" id="plhHelperText">Pilih pejabat yang akan menggantikan tugas harian.</p>
+        
+        <div class="relative mb-5">
+          <input type="text" id="plhSearchPegawai" autocomplete="off" placeholder="Ketik nama Pejabat..." class="w-full px-3.5 py-3 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm">
+          <input type="hidden" id="selectPlhPengganti">
+          <div id="dropPlh" class="absolute z-50 w-full mt-1 bg-slate-900 border border-slate-700 rounded-xl overflow-hidden hidden max-h-48 overflow-y-auto shadow-2xl"></div>
+        </div>
+        
+        <div class="flex gap-2">
+          <button type="button" onclick="hapusPlhAssignment()" class="flex-1 py-2.5 bg-rose-500/10 hover:bg-rose-500 text-rose-400 hover:text-white font-bold rounded-xl transition text-xs border border-rose-500/20">Batalkan Plh</button>
+          <button type="button" onclick="simpanPlhAssignment()" class="flex-1 py-2.5 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-xl shadow-lg shadow-purple-600/20 transition text-xs">Simpan Plh <i class="fa-solid fa-check ml-1"></i></button>
+        </div>
+    </div>
+  </div>
+
+  <!-- MINI MODAL: PENGATURAN DASAR ST -->
+  <div id="modalSettingST" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-[9999] flex items-center justify-center p-4 hidden">
+    <div class="w-full max-w-2xl glass border border-blue-500/30 p-6 rounded-2xl shadow-2xl scale-95 transition-all overflow-visible">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-700 mb-4">
+          <h4 class="font-bold text-white"><i class="fa-solid fa-gear text-blue-400 mr-2"></i> Pengaturan Dasar SK / ST</h4>
+          <button type="button" onclick="closeSettingST()" class="text-slate-400 hover:text-rose-400"><i class="fa-solid fa-xmark text-lg"></i></button>
+        </div>
+        <p class="text-xs text-slate-400 mb-5 leading-relaxed">Data ini akan disimpan ke sistem dan otomatis terisi setiap kali Anda membuka form Surat Tugas untuk menghemat waktu.</p>
+
+        <form onsubmit="saveSettingST(event)" class="space-y-4">
+            <div class="relative">
+                <label class="block text-slate-400 uppercase font-bold mb-1 text-[11px]">Default PPK</label>
+                <input type="text" id="setDefPPKSearch" autocomplete="off" placeholder="Ketik nama PPK..." class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <input type="hidden" id="setDefPPK">
+                <div id="dropSetPPK" class="absolute z-50 w-full mt-1 bg-slate-900 border border-slate-700 rounded-xl overflow-hidden hidden max-h-48 overflow-y-auto shadow-2xl"></div>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-slate-400 uppercase font-bold mb-1 text-[11px]">Default Menimbang</label>
+                    <textarea id="setDefMenimbang" rows="3" class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                </div>
+                <div>
+                    <label class="block text-slate-400 uppercase font-bold mb-1 text-[11px]">Default Dasar (Hukum/Aturan)</label>
+                    <textarea id="setDefDasar" rows="3" class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                    <label class="block text-slate-400 uppercase font-bold mb-1 text-[11px]">Default Instansi (SPD)</label>
+                    <textarea id="setDefInstansi" rows="2" class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                </div>
+                <div>
+                    <label class="block text-slate-400 uppercase font-bold mb-1 text-[11px]">Default Mata Anggaran (SPD)</label>
+                    <textarea id="setDefMataAnggaran" rows="2" class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                </div>
+                <div>
+                    <label class="block text-slate-400 uppercase font-bold mb-1 text-[11px]">Default Alat Angkutan (SPD)</label>
+                    <textarea id="setDefAngkutan" rows="2" class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-slate-400 uppercase font-bold mb-1 text-[11px]">Default Paragraf Biaya (ST)</label>
+                <textarea id="setDefParagrafBiaya" rows="2" class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+            </div>
+            
+            <div class="pt-3">
+              <button type="submit" class="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl shadow-lg shadow-blue-600/20 transition text-sm">
+                  Terapkan Default <i class="fa-solid fa-check ml-1"></i>
+              </button>
+            </div>
+        </form>
+    </div>
+  </div>

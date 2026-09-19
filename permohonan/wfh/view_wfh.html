@@ -1,0 +1,127 @@
+<!-- =========================================================================
+     ZETTBOS MODULAR UI: MODAL FORM RENCANA WFH
+========================================================================== -->
+<div id="modalFormWFH" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-[70] flex items-center justify-center p-4 hidden">
+    <div class="w-full max-w-4xl glass border border-amber-500/30 p-6 rounded-3xl shadow-2xl flex flex-col scale-95 transition-all duration-300 max-h-[90vh]">
+      
+      <div class="flex items-center justify-between pb-4 border-b border-slate-800 shrink-0">
+        <h3 class="text-lg font-bold text-white"><i class="fa-solid fa-laptop-house text-amber-400 mr-2"></i> Formulir Rencana WFH</h3>
+        <button onclick="closeModalWFH()" class="text-slate-400 hover:text-rose-400 transition-colors w-8 h-8 flex items-center justify-center bg-slate-800/50 hover:bg-rose-500/10 rounded-lg">
+           <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <form id="formWFH" onsubmit="submitFormWFH(event)" class="mt-4 space-y-4 text-xs overflow-y-auto custom-scrollbar pr-2 flex-1">
+         
+         <div class="bg-amber-500/10 border border-amber-500/20 p-3 rounded-xl flex items-start gap-3 mb-2">
+           <i class="fa-solid fa-circle-info text-amber-400 mt-0.5"></i>
+           <p class="text-[10px] text-amber-400/90 leading-relaxed font-medium">
+              Formulir ini digunakan untuk mengajukan Rencana Kerja (Target & Kuantitas) selama pelaksanaan Work From Home (WFH). Anda wajib mengisi target yang jelas sebelum disetujui oleh Atasan.
+           </p>
+         </div>
+         
+         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-slate-400 uppercase font-bold mb-1">Tanggal Pelaksanaan</label>
+            <input type="date" id="wfhTanggal" required class="w-full px-3.5 py-3 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-500">
+          </div>
+          <div>
+            <label class="block text-amber-400 uppercase font-bold mb-1">Penanggung Jawab</label>
+            <select id="wfhAtasan" required class="w-full px-3.5 py-3 bg-slate-950 border border-amber-500/50 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-500 font-bold">
+              <option value="">-- Pilih Penanggung Jawab --</option>
+            </select>
+          </div>
+        </div>
+
+        <div id="alertPlhWFH" class="hidden bg-amber-500/10 border border-amber-500/20 p-3 rounded-xl flex items-start gap-3 mb-2 mt-2">
+           <i class="fa-solid fa-triangle-exclamation text-amber-400 mt-0.5"></i>
+           <p class="text-[10px] text-amber-400/90 leading-relaxed font-medium">Sistem mendeteksi Penanggung Jawab Definitif sedang tidak berada di tempat hari ini. Pilihan dialihkan ke Pelaksana Harian (Plh).</p>
+        </div>
+
+        <!-- Tabel Dinamis Rencana Kerja -->
+        <div class="mt-4 border border-slate-800 rounded-xl overflow-hidden">
+            <div class="bg-slate-900/80 px-4 py-3 flex justify-between items-center border-b border-slate-800">
+                <label class="text-slate-300 uppercase font-bold text-xs"><i class="fa-solid fa-list-check text-amber-500 mr-2"></i>Daftar Rencana Target Kerja</label>
+                <button type="button" onclick="addBarisWFH()" class="bg-amber-500/20 hover:bg-amber-500 text-amber-400 hover:text-white border border-amber-500/30 px-3 py-1.5 rounded-lg transition text-[10px] font-bold shadow-sm shadow-amber-500/10">
+                    <i class="fa-solid fa-plus mr-1"></i> Tambah Target
+                </button>
+            </div>
+            <div class="p-3 bg-slate-950/50">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="text-[10px] text-slate-500 border-b border-slate-800 uppercase tracking-wider">
+                            <th class="pb-2 w-8 text-center">No</th>
+                            <th class="pb-2 px-2">Deskripsi Target Pekerjaan</th>
+                            <th class="pb-2 px-2 w-32">Kuantitas</th>
+                            <th class="pb-2 w-10 text-center">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody id="wfhTabelBody">
+                        <!-- Baris Dinamis ditambahkan via JS -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="pt-4">
+            <button type="submit" class="w-full py-4 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-xl shadow-[0_4px_15px_rgba(245,158,11,0.2)] transition uppercase tracking-wider flex items-center justify-center gap-2">
+              Kirim Rencana WFH <i class="fa-solid fa-paper-plane"></i>
+            </button>
+        </div>
+      </form>
+    </div>
+</div>
+
+<!-- =========================================================================
+     ZETTBOS MODULAR UI: MODAL FORM LAPORAN WFH
+========================================================================== -->
+<div id="modalFormLaporanWFH" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-[80] flex items-center justify-center p-4 hidden">
+    <div class="w-full max-w-5xl glass border border-emerald-500/30 p-6 rounded-3xl shadow-2xl flex flex-col scale-95 transition-all duration-300 max-h-[90vh]">
+      
+      <div class="flex items-center justify-between pb-4 border-b border-slate-800 shrink-0">
+        <h3 class="text-lg font-bold text-white"><i class="fa-solid fa-clipboard-check text-emerald-400 mr-2"></i> Formulir Laporan WFH</h3>
+        <button onclick="closeModalLaporanWFH()" class="text-slate-400 hover:text-rose-400 transition-colors w-8 h-8 flex items-center justify-center bg-slate-800/50 hover:bg-rose-500/10 rounded-lg">
+           <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <form id="formLaporanWFH" onsubmit="submitFormLaporanWFH(event)" class="mt-4 space-y-4 text-xs overflow-y-auto custom-scrollbar pr-2 flex-1">
+         <input type="hidden" id="laporanWfhId">
+         
+         <div class="bg-emerald-500/10 border border-emerald-500/20 p-3 rounded-xl flex items-start gap-3 mb-2">
+           <i class="fa-solid fa-circle-info text-emerald-400 mt-0.5"></i>
+           <p class="text-[10px] text-emerald-400/90 leading-relaxed font-medium">
+              Silakan isi kolom realisasi dan status capaian berdasarkan rencana target yang telah Anda buat sebelumnya. Data target tidak dapat diubah (Terkunci).
+           </p>
+         </div>
+         
+        <!-- Tabel Dinamis Realisasi Kerja -->
+        <div class="mt-4 border border-slate-800 rounded-xl overflow-hidden">
+            <div class="bg-slate-900/80 px-4 py-3 border-b border-slate-800">
+                <label class="text-slate-300 uppercase font-bold text-xs"><i class="fa-solid fa-list-check text-emerald-500 mr-2"></i>Daftar Capaian Target Kerja</label>
+            </div>
+            <div class="p-3 bg-slate-950/50 overflow-x-auto">
+                <table class="w-full text-left border-collapse min-w-[700px]">
+                    <thead>
+                        <tr class="text-[10px] text-slate-500 border-b border-slate-800 uppercase tracking-wider">
+                            <th class="pb-2 w-8 text-center">No</th>
+                            <th class="pb-2 px-2 w-1/3">Target Pekerjaan (Plan)</th>
+                            <th class="pb-2 px-2 w-1/3">Realisasi (Actual)</th>
+                            <th class="pb-2 px-2 w-32">Status Capaian</th>
+                        </tr>
+                    </thead>
+                    <tbody id="laporanWfhTabelBody">
+                        <!-- Baris Dinamis ditambahkan via JS -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="pt-4">
+            <button type="submit" class="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl shadow-[0_4px_15px_rgba(16,185,129,0.2)] transition uppercase tracking-wider flex items-center justify-center gap-2">
+              Kirim Laporan WFH <i class="fa-solid fa-check-double"></i>
+            </button>
+        </div>
+      </form>
+    </div>
+</div>

@@ -1,0 +1,185 @@
+<div class="space-y-6">
+    <div class="flex flex-col md:flex-row items-center justify-between gap-4 mb-4">
+      <div>
+        <h3 class="text-lg font-bold text-slate-200"><i class="fa-solid fa-clock-rotate-left text-indigo-400 mr-2"></i> Riwayat Pengajuan Cuti Anda</h3>
+        <p class="text-slate-500 text-xs mt-1">Daftar pelacakan persetujuan transaksi dinas dan cetak dokumen resmi.</p>
+      </div>
+      
+      <!-- ZETTBOT FIX: Restrukturisasi Area Tombol Sesuai Hierarki UI -->
+      <div class="flex flex-col md:flex-row gap-3 w-full md:w-auto items-stretch md:items-center">
+        
+        <!-- Tombol 1: Sisa Cuti (Ghost/Dark Style) -->
+        <button onclick="openModalSisaCuti()" class="flex-1 md:flex-none px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl border border-slate-700 transition flex items-center justify-center gap-2 text-xs">
+          <i class="fa-solid fa-wallet text-sm"></i> Cek Sisa Cuti
+        </button>
+        
+        <!-- Tombol 2: Dropdown Menu Pengajuan Lain (Neon Outline Style) -->
+        <div class="relative group flex-1 md:flex-none">
+            <button class="w-full px-4 py-2.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 font-bold rounded-xl border border-emerald-500/30 transition flex items-center justify-center gap-2 text-xs uppercase relative z-10">
+                <i class="fa-solid fa-layer-group text-sm"></i> Pengajuan Lain <i class="fa-solid fa-chevron-down text-[10px] ml-1 transition-transform duration-300 group-hover:rotate-180"></i>
+            </button>
+            
+            <!-- Isi List Dropdown -->
+            <div class="absolute right-0 top-[110%] w-56 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 transform origin-top z-[60] overflow-hidden">
+                <a href="#" onclick="openModalIP(); return false;" class="flex items-center gap-3 px-4 py-3 hover:bg-slate-800 text-slate-300 hover:text-emerald-400 transition text-xs font-bold border-b border-slate-800/60">
+                    <div class="w-6 h-6 rounded-lg bg-emerald-500/10 flex items-center justify-center shrink-0 text-emerald-400"><i class="fa-solid fa-user-clock"></i></div>
+                    Izin Pribadi
+                </a>
+                <a href="#" onclick="openModalIK(); return false;" class="flex items-center gap-3 px-4 py-3 hover:bg-slate-800 text-slate-300 hover:text-sky-400 transition text-xs font-bold border-b border-slate-800/60">
+                    <div class="w-6 h-6 rounded-lg bg-sky-500/10 flex items-center justify-center shrink-0 text-sky-400"><i class="fa-solid fa-person-walking-arrow-right"></i></div>
+                    Izin Keluar
+                </a>
+                <a href="#" onclick="openModalWFH(); return false;" class="flex items-center gap-3 px-4 py-3 hover:bg-slate-800 text-slate-300 hover:text-amber-400 transition text-xs font-bold">
+                    <div class="w-6 h-6 rounded-lg bg-amber-500/10 flex items-center justify-center shrink-0 text-amber-400"><i class="fa-solid fa-laptop-house"></i></div>
+                    Rencana WFH
+                </a>
+            </div>
+        </div>
+
+        <!-- Tombol 3: Usulkan Cuti Baru (Solid CTA / Raja) -->
+        <button onclick="openFormCutiModal()" class="flex-1 md:flex-none px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl shadow-[0_4px_15px_rgba(99,102,241,0.25)] transition flex items-center justify-center gap-2 text-xs uppercase">
+          <i class="fa-solid fa-paper-plane text-sm"></i> Usulkan Cuti Baru
+        </button>
+
+      </div>
+    </div>
+
+    <div class="flex-1 overflow-auto border border-slate-900 rounded-2xl bg-slate-950/40">
+      <table class="w-full text-left text-xs border-collapse">
+        <thead>
+          <tr class="border-b border-slate-900 bg-slate-900/40 text-slate-400 font-semibold sticky top-0 z-10">
+            <th class="p-4 w-12 text-center">No</th>
+            <th class="p-4">Jenis Cuti / ID</th>
+            <th class="p-4">Tanggal Pelaksanaan</th>
+            <th class="p-4">Durasi Pengajuan</th>
+            <th class="p-4">Verifikator Dual-Approval</th>
+            <th class="p-4">Status Akhir</th>
+            <th class="p-4 text-center">Aksi Operasi</th>
+          </tr>
+        </thead>
+        <tbody id="tblPermohonanBody">
+          <!-- Dinamis via JS -->
+        </tbody>
+      </table>
+    </div>
+
+    <!-- MODAL PENGAJUAN CUTI BARU (DAN BYPASS) -->
+    <div id="modalFormCuti" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-[70] flex items-center justify-center p-4 hidden">
+      <div class="w-full max-w-2xl glass border border-slate-800 p-6 rounded-3xl shadow-2xl h-[90vh] flex flex-col scale-95 transition-all">
+        <div class="flex items-center justify-between pb-4 border-b border-slate-800 shrink-0">
+          <h3 id="modalFormCutiTitle" class="text-lg font-bold text-white"><i class="fa-solid fa-file-signature text-indigo-400 mr-2"></i> Usulkan Permohonan Cuti Baru</h3>
+          <button onclick="closeFormCutiModal()" class="text-slate-400 hover:text-slate-100"><i class="fa-solid fa-xmark text-lg"></i></button>
+        </div>
+
+        <form id="formCuti" onsubmit="submitCuti(event)" class="flex-1 overflow-y-auto py-4 space-y-4 text-xs pr-2 custom-scrollbar">
+          
+          <!-- ZETTBOT FIX: Input khusus Mode Bypass Admin -->
+          <div id="containerBypassPegawai" class="hidden bg-indigo-500/10 border border-indigo-500/30 p-4 rounded-2xl mb-4">
+             <label class="block text-indigo-300 uppercase font-bold mb-1.5"><i class="fa-solid fa-user-shield mr-1"></i> Mode Bypass: Pilih Pegawai Pemohon</label>
+             <select id="cutiBypassNip" onchange="triggerBypassNipChange()" class="w-full px-3.5 py-3 bg-slate-950 border border-indigo-500/50 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-bold">
+               <!-- Populated by JS -->
+             </select>
+             <p class="text-[9px] text-indigo-400/80 mt-1.5 leading-relaxed">Anda mengusulkan cuti *atas nama* pegawai yang dipilih. Hierarki Atasan & Pejabat di bawah otomatis menyesuaikan profil mereka.</p>
+          </div>
+
+          <div id="alertPlh" class="hidden bg-amber-500/10 border border-amber-500/20 p-3 rounded-xl flex items-start gap-3 mb-2">
+             <i class="fa-solid fa-triangle-exclamation text-amber-400 mt-0.5"></i>
+             <p class="text-[10px] text-amber-400/90 leading-relaxed font-medium">Sistem mendeteksi Pimpinan/Atasan Definitif sedang tidak berada di tempat hari ini. Pilihan di bawah telah dialihkan ke opsi <b>Pelaksana Harian (Plh)</b>.</p>
+          </div>
+
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-slate-400 uppercase font-bold mb-1">Jenis Cuti</label>
+              <select id="cutiJenis" required onchange="toggleBuktiDukung()" class="w-full px-3.5 py-3 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                <option value="Tahunan">Tahunan</option>
+                <option value="Sakit">Sakit</option>
+                <option value="Alasan Penting">Alasan Penting</option>
+                <option value="Melahirkan">Melahirkan</option>
+                <option value="Besar">Besar</option>
+                <option value="CLTN">CLTN</option>
+              </select>
+            </div>
+            <div id="containerBuktiDukung" class="hidden">
+              <label class="block text-slate-400 uppercase font-bold mb-1">Upload Bukti Dukung</label>
+              <input type="file" id="cutiBukti" accept=".pdf, .jpg, .jpeg, .png" class="w-full px-3.5 py-2 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 text-xs file:mr-4 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-[10px] file:font-bold file:bg-indigo-500/20 file:text-indigo-400 hover:file:bg-indigo-500/30 transition">
+              <p class="text-[9px] text-slate-500 mt-1">*Wajib jika bukan Cuti Tahunan (Maks 2MB)</p>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-slate-400 uppercase font-bold mb-1">Mulai Pelaksanaan</label>
+              <input type="date" id="cutiMulai" required class="w-full px-3.5 py-3 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            </div>
+            <div>
+              <label class="block text-slate-400 uppercase font-bold mb-1">Selesai Pelaksanaan</label>
+              <input type="date" id="cutiSelesai" required class="w-full px-3.5 py-3 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-slate-400 uppercase font-bold mb-1">Keperluan / Alasan Cuti</label>
+            <textarea id="cutiAlasan" required rows="2" placeholder="Jelaskan alasan pengajuan cuti Anda..." class="w-full px-3.5 py-3 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
+          </div>
+
+          <div>
+            <label class="block text-slate-400 uppercase font-bold mb-1">Alamat Lengkap Selama Cuti</label>
+            <textarea id="cutiAlamat" required rows="2" placeholder="Tuliskan alamat domisili/tujuan selama Anda menjalankan cuti..." class="w-full px-3.5 py-3 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
+          </div>
+
+          <div id="containerPlhCuti" class="hidden bg-purple-500/10 border border-purple-500/30 p-4 rounded-xl mt-4 mb-4">
+              <label class="block text-purple-400 uppercase font-bold mb-1 text-[11px]"><i class="fa-solid fa-user-shield mr-1"></i> Tunjuk Pelaksana Harian (Plh)</label>
+              <select id="cutiPlh" class="w-full px-3.5 py-3 bg-slate-950 border border-purple-500/50 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-purple-500 font-semibold">
+                 <option value="">-- Pilih Pejabat Plh --</option>
+              </select>
+              <p class="text-[9px] text-purple-400/80 mt-1.5 leading-relaxed">Sistem mendeteksi Anda memegang jabatan struktural strategis. Silakan tunjuk Pelaksana Harian (Plh) selama masa cuti/izin.</p>
+          </div>
+
+          <div class="grid grid-cols-2 gap-4 border-t border-slate-800 pt-4">
+            <div>
+              <label class="block text-slate-400 uppercase font-bold mb-1">Atasan Langsung</label>
+              <select id="cutiAtasan" required class="w-full px-3.5 py-3 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                <option value="">-- Pilih Atasan --</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-slate-400 uppercase font-bold mb-1">Pejabat Berwenang</label>
+              <select id="cutiPejabat" required class="w-full px-3.5 py-3 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                <option value="">-- Pilih Pejabat --</option>
+              </select>
+            </div>
+          </div>
+
+          <button type="submit" class="w-full py-4 mt-4 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl shadow-lg transition uppercase tracking-wider">
+            Kirim Usulan Resmi <i class="fa-solid fa-paper-plane ml-2"></i>
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- MODAL PENGAJUAN PEMBATALAN CUTI -->
+    <div id="modalCancelCuti" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-[80] flex items-center justify-center p-4 hidden">
+        <div class="w-full max-w-sm glass border border-slate-800 p-6 rounded-3xl shadow-2xl scale-95 transition-all flex flex-col">
+          <div class="text-center mb-4">
+            <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-purple-500/10 text-purple-400 mb-3 border border-purple-500/20 shadow-lg shadow-purple-500/10">
+              <i class="fa-solid fa-file-circle-xmark text-2xl"></i>
+            </div>
+            <h3 class="text-lg font-bold text-white tracking-wide">Usulkan Pembatalan</h3>
+            <p class="text-[10px] text-slate-400 mt-1 px-4 leading-relaxed">Cuti Anda sudah disetujui, pembatalan memerlukan persetujuan Pejabat Berwenang.</p>
+          </div>
+          
+          <input type="hidden" id="cancelCutiId">
+          <div class="mb-5 text-left">
+             <label class="block text-xs font-bold text-slate-400 uppercase mb-1.5 pl-1">Alasan Pembatalan</label>
+             <textarea id="cancelAlasan" required rows="3" placeholder="Jelaskan alasan mengapa cuti ini dibatalkan... (Misal: Dipanggil sidang mendadak)" class="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 text-slate-200"></textarea>
+          </div>
+          
+          <div class="flex gap-3">
+             <button type="button" onclick="closeCancelModal()" class="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-xl transition">Kembali</button>
+             <button type="button" onclick="submitCancelCuti()" class="flex-1 py-3 bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-purple-600/20 transition flex items-center justify-center gap-2">
+                Ajukan Batal <i class="fa-solid fa-arrow-right"></i>
+             </button>
+          </div>
+        </div>
+    </div>
+</div>
