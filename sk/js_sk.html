@@ -21,18 +21,18 @@
     return index !== -1 ? index : 999;
   }
 
-function formatDateDMY(dateString) {
-  if(!dateString || dateString === '-') return '-';
-  const parts = dateString.split('-');
-  if(parts.length !== 3) return dateString;
-  
-  const namaBulan = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
-  const hari = parts[2];
-  const bulan = parseInt(parts[1], 10);
-  const tahun = parts[0];
-  
-  return hari + ' ' + namaBulan[bulan] + ' ' + tahun;
-}
+  function formatDateDMY(dateString) {
+    if(!dateString || dateString === '-') return '-';
+    const parts = dateString.split('-');
+    if(parts.length !== 3) return dateString;
+    
+    const namaBulan = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+    const hari = parts[2];
+    const bulan = parseInt(parts[1], 10);
+    const tahun = parts[0];
+    
+    return hari + ' ' + namaBulan[bulan] + ' ' + tahun;
+  }
 
   function renderSkView() {
     const userRole = state.user.role ? state.user.role.toLowerCase() : "";
@@ -44,7 +44,6 @@ function formatDateDMY(dateString) {
 
     let mapGroup = {};
     state.skList.forEach(sk => {
-       // ZETTBOT FIX: Base ID Extraction memastikan kelompok row lama & baru terikat pada ID Induk yg sama
        const baseId = String(sk.id).split('-').slice(0, 2).join('-');
        
        if(!mapGroup[baseId]) {
@@ -88,6 +87,16 @@ function formatDateDMY(dateString) {
     const datalist = document.getElementById('skListDatalist');
     if(datalist) {
        datalist.innerHTML = "";
+        // ZETTBOT FIX: 1. Masukkan Opsi Tag Grup dari js_sortir di urutan paling atas
+       if (typeof GROUP_TAGS !== 'undefined') {
+           Object.keys(GROUP_TAGS).forEach(tagKey => {
+               const opt = document.createElement('option');
+               opt.value = `[GRUP] ${GROUP_TAGS[tagKey].label} (${tagKey})`;
+               datalist.appendChild(opt);
+           });
+       }
+
+       // ZETTBOT FIX: 2. Masukkan Opsi Individu Pegawai di bawahnya
        state.usersList.forEach(u => {
           const opt = document.createElement('option');
           opt.value = `${u.nama} - ${u.jabatan} (${u.nip})`;
@@ -122,7 +131,6 @@ function formatDateDMY(dateString) {
         }
      });
      
-     // ZETTBOT FIX: Pastikan Admin dan Operator bisa melihat tombol Daftar SK Baru di semua Tab
      const userRole = state.user.role ? state.user.role.toLowerCase() : "";
      const isAdminOrOperator = userRole.includes('admin') || userRole.includes('operator');
      
@@ -161,7 +169,13 @@ function formatDateDMY(dateString) {
     }
     
     if (state.user.role === 'Pegawai') {
-       filteredData = filteredData.filter(sk => sk.members.some(m => String(m.nip) === String(state.user.nip)));
+       // ZETTBOT FIX: Gunakan mesin cekKeterlibatanPegawai untuk memfilter SK yang boleh dilihat user
+       filteredData = filteredData.filter(sk => {
+           if (typeof cekKeterlibatanPegawai !== 'undefined') {
+               return cekKeterlibatanPegawai(sk.members, state.user.nip).terlibat;
+           }
+           return sk.members.some(m => String(m.nip) === String(state.user.nip));
+       });
     }
 
     if (filteredData.length === 0) {
@@ -171,7 +185,8 @@ function formatDateDMY(dateString) {
 
     filteredData.forEach((sk, index) => {
       const tr = document.createElement('tr');
-      tr.className = "border-b border-slate-900 hover:bg-slate-900/10 transition";
+      // ZETTBOT FIX: Menambahkan class 'group' agar animasi bounce pada icon menyala saat di-hover
+      tr.className = "border-b border-slate-900 hover:bg-slate-900/10 transition group";
 
       let pjColor = "text-slate-400 bg-slate-800 border-slate-700";
       if(sk.pj_sk === 'PJ. Manajemen') pjColor = "text-blue-400 bg-blue-500/10 border-blue-500/20";
@@ -181,6 +196,7 @@ function formatDateDMY(dateString) {
       const userRole = state.user.role ? state.user.role.toLowerCase() : "";
       const isAdmin = userRole.includes('admin');
 
+      // ZETTBOT FIX: Ganti tombol Anchor Tag menjadi pemicu Modal Flipbook Interaktif
       tr.innerHTML = `
         <td class="p-4 text-center font-mono text-slate-500">${index + 1}</td>
         <td class="p-4 max-w-[200px]">
@@ -192,7 +208,10 @@ function formatDateDMY(dateString) {
         <td class="p-4 text-slate-400 text-xs">${sk.tgl_sk}</td>
         <td class="p-4 text-center font-mono text-slate-400 text-[10px] hidden">${sk.tgl_input}</td>
         <td class="p-4 text-center">
-          <a href="${sk.link_drive}" target="_blank" class="text-indigo-400 hover:text-indigo-300 p-2 hover:bg-indigo-500/10 rounded-xl inline-block transition" title="Lihat PDF"><i class="fa-solid fa-file-pdf text-lg"></i></a>
+          <!-- Modifikasi Flipbook ZettBOT -->
+          <button onclick="openFlipbook('${sk.link_drive}', '${sk.judul_sk}')" class="text-indigo-400 hover:text-indigo-300 p-2 hover:bg-indigo-500/10 border border-transparent hover:border-indigo-500/30 rounded-xl inline-block transition shadow-md" title="Baca Dokumen">
+            <i class="fa-solid fa-book-open-reader text-lg relative group-hover:animate-bounce"></i>
+          </button>
         </td>
         <td class="p-4 text-center space-x-1 whitespace-nowrap">
           <button onclick="toggleSkDetail('${sk.id}')" class="p-1.5 bg-slate-900 hover:bg-indigo-600/20 border border-slate-800 rounded-lg transition text-slate-400 hover:text-indigo-400" title="Lihat Susunan Anggota"><i id="chevron-sk-${sk.id}" class="fa-solid fa-chevron-down text-[10px] transition-transform duration-300"></i></button>
@@ -209,12 +228,28 @@ function formatDateDMY(dateString) {
       detailTr.id = `sk-detail-row-${sk.id}`;
       detailTr.className = "hidden bg-slate-950/80 border-b border-slate-900";
       
+      // ZETTBOT FIX: Rendering daftar tim dengan support Tampilan Grup di Accordion
       let membersHtml = sk.members.map((m, mIndex) => {
-          const pns = state.usersList.find(u => String(u.nip) === String(m.nip)) || {nama:'Data Dihapus', jabatan:'-'};
+          let namaTampil = 'Data Dihapus';
+          let jabTampil = '-';
+          let iconHtml = '<div class="w-5 text-center text-slate-600 font-bold text-xs">' + (mIndex + 1) + '</div>';
+          
+          if (String(m.nip).startsWith('[TAG:')) {
+              if (typeof GROUP_TAGS !== 'undefined' && GROUP_TAGS[m.nip]) {
+                  namaTampil = `[GRUP] ${GROUP_TAGS[m.nip].label}`;
+                  let estimasi = typeof hitungEstimasiGrup === 'function' ? hitungEstimasiGrup(m.nip) : 0;
+                  jabTampil = `Target: ±${estimasi} Pegawai (Otomatis)`;
+                  iconHtml = '<div class="w-5 text-center text-emerald-500 font-bold text-xs" title="Grup Sasaran"><i class="fa-solid fa-users"></i></div>';
+              }
+          } else {
+              const pns = state.usersList.find(u => String(u.nip) === String(m.nip));
+              if (pns) { namaTampil = pns.nama; jabTampil = pns.jabatan; }
+          }
+
           return `
             <div class="flex items-center justify-between py-2 border-b border-slate-800/50 last:border-0 gap-3">
-               <div class="w-5 text-center text-slate-600 font-bold text-xs">${mIndex + 1}</div>
-               <div class="flex-1 min-w-0"><div class="text-slate-200 font-semibold text-xs truncate">${pns.nama}</div><div class="text-slate-500 text-[10px] truncate">${pns.jabatan}</div></div>
+               ${iconHtml}
+               <div class="flex-1 min-w-0"><div class="text-slate-200 font-semibold text-xs truncate">${namaTampil}</div><div class="text-slate-500 text-[10px] truncate">${jabTampil}</div></div>
                <div class="text-right shrink-0"><span class="px-2 py-0.5 bg-slate-800 border border-slate-700 rounded text-[10px] text-slate-300 font-bold">${m.peran}</span></div>
             </div>`;
       }).join('');
@@ -248,28 +283,30 @@ function formatDateDMY(dateString) {
      tbody.innerHTML = "";
 
      let mapPegawai = {};
-     state.skList.forEach(sk => {
-        const nip = sk.nip;
-        if (!mapPegawai[nip]) {
-            const pns = state.usersList.find(u => String(u.nip) === String(nip)) || {nama:'Data Dihapus/Tidak Valid', jabatan:'-', no_hp:''};
-            mapPegawai[nip] = {
-                nip: nip, nama: pns.nama, jabatan: pns.jabatan, no_hp: pns.no_hp, skList: []
-            };
-        }
-
-        let parsedData = { no_sk: '-', tgl_sk: '-', peran: '-' };
-        try {
-            let j = JSON.parse(sk.tugas_sk);
-            parsedData = { no_sk: j.no_sk || '-', tgl_sk: j.tgl_sk || '-', peran: j.peran || '-' };
-        } catch(e) {}
-
-        const baseId = String(sk.id).split('-').slice(0, 2).join('-');
-
-        mapPegawai[nip].skList.push({
-            id: baseId, judul_sk: sk.judul_sk, link_drive: sk.link_drive, 
-            no_sk: parsedData.no_sk, tgl_sk: parsedData.tgl_sk, peran: parsedData.peran
-        });
-     });
+     
+     // ZETTBOT FIX: Bangun ulang map Rekap menggunakan Mesin cekKeterlibatanPegawai
+     if (typeof cekKeterlibatanPegawai !== 'undefined') {
+         state.usersList.forEach(u => {
+             if (u.role === 'Admin') return; // Lewati Super Admin IT dari rekap
+             
+             let terlibatSks = [];
+             groupedSkData.forEach(sk => {
+                 const cek = cekKeterlibatanPegawai(sk.members, u.nip);
+                 if (cek.terlibat) {
+                     terlibatSks.push({
+                         id: sk.id, judul_sk: sk.judul_sk, link_drive: sk.link_drive, 
+                         no_sk: sk.no_sk, tgl_sk: sk.tgl_sk, peran: cek.peran
+                     });
+                 }
+             });
+             
+             if (terlibatSks.length > 0) {
+                 mapPegawai[u.nip] = {
+                     nip: u.nip, nama: u.nama, jabatan: u.jabatan, no_hp: u.no_hp, skList: terlibatSks
+                 };
+             }
+         });
+     }
 
      groupedSkPegawaiData = Object.values(mapPegawai).sort((a,b) => {
          const bobotA = getBobotJabatanSk(a.jabatan);
@@ -295,7 +332,6 @@ function formatDateDMY(dateString) {
         const userRole = state.user.role ? state.user.role.toLowerCase() : "";
         const isAdmin = userRole.includes('admin');
 
-        // ZETTBOT FIX: Base-ID match untuk kalkulasi jumlah baca
         let readCount = 0;
         p.skList.forEach(sk => {
             const cleanSkId = String(sk.id).replace(/'/g, "").trim(); 
@@ -310,7 +346,6 @@ function formatDateDMY(dateString) {
         let progressColor = progressPercent === 100 ? 'bg-emerald-500' : (progressPercent > 0 ? 'bg-amber-500' : 'bg-rose-500');
         let textProgressColor = progressPercent === 100 ? 'text-emerald-400' : 'text-slate-500';
         
-        // ZETTBOT FIX: Kalkulasi sisa SK yang belum dibaca untuk Tooltip
         const unreadCount = p.skList.length - readCount;
         let tooltipText = unreadCount > 0 ? `Kekurangan: ${unreadCount} Dokumen SK belum dibaca` : `Sempurna! Semua Dokumen SK telah dibaca`;
 
@@ -358,7 +393,6 @@ function formatDateDMY(dateString) {
         
         let listHtml = '';
         p.skList.forEach((sk, i) => {
-            // ZETTBOT FIX: Pencocokan Base ID antara daftar sk dan daftar Acknowledgment
             const cleanSkId = String(sk.id).replace(/'/g, "").trim(); 
             const cleanNip = String(p.nip).replace(/'/g, "").trim();
             const currentUserNip = String(state.user.nip).replace(/'/g, "").trim();
@@ -382,6 +416,7 @@ function formatDateDMY(dateString) {
                else ackHtml = `<div class="text-[10px] text-rose-400 font-medium flex items-center justify-center gap-1 w-full whitespace-nowrap"><i class="fa-solid fa-circle-exclamation"></i> Belum membaca SK ini.</div>`;
             }
 
+            // ZETTBOT FIX: Ganti tombol Anchor Tag menjadi Pemicu Modal Flipbook Interaktif
             listHtml += `
                 <div class="flex items-center justify-between p-3 border-b border-slate-800/50 hover:bg-slate-800/20 transition last:border-0 rounded-lg mx-4 my-2">
                     <div class="flex-1 pr-4 min-w-0">
@@ -392,7 +427,8 @@ function formatDateDMY(dateString) {
                         ${ackHtml}
                     </div>
                     <div class="shrink-0 pl-2 text-right">
-                        <a href="${sk.link_drive}" target="_blank" class="px-3 py-1.5 bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500 hover:text-white border border-indigo-500/20 rounded-md text-[10px] font-bold transition whitespace-nowrap"><i class="fa-solid fa-file-pdf mr-1"></i> Buka PDF</a>
+                        <!-- Modifikasi Flipbook ZettBOT -->
+                        <button onclick="openFlipbook('${sk.link_drive}', '${sk.judul_sk}')" class="group px-3 py-1.5 bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500 hover:text-white border border-indigo-500/20 rounded-md text-[10px] font-bold transition whitespace-nowrap shadow-sm"><i class="fa-solid fa-book-open mr-1 group-hover:animate-bounce"></i> Baca Buku PDF</button>
                     </div>
                 </div>
             `;
@@ -415,9 +451,6 @@ function formatDateDMY(dateString) {
 
   function doAcknowledgeSk(skId, nip) {
       showCustomConfirm("Tandai Sudah Dibaca?", "Dengan menekan YA, Anda menyatakan telah membaca dan memahami tugas/peran Anda di dalam Surat Keputusan (SK) ini.", () => {
-          // ZETTBOT FIX: True Optimistic UI - Menghapus layar loading & Menghapus Notif Kuning yang dirasa spaming
-          
-          // 1. Langsung update UI Lokal menjadi "Sudah Dibaca" detik itu juga
           const nowRaw = new Date();
           if(!state.skAckList) state.skAckList = [];
           state.skAckList.push({
@@ -428,13 +461,11 @@ function formatDateDMY(dateString) {
           renderSkPegawaiTable(); 
           if (typeof updateSidebarBadges === 'function') updateSidebarBadges(); 
           
-          // 2. Kirim data diam-diam di background (tanpa membuat user menunggu)
           google.script.run
               .withSuccessHandler(res => {
                   if(res.status === 'success') {
                       showNotify("Tercatat", res.message, "success");
                   } else {
-                      // Jika server gagal, hapus kembali status bacanya
                       state.skAckList = state.skAckList.filter(a => !(a.sk_id === skId && a.nip === nip));
                       renderSkPegawaiTable();
                       if (typeof updateSidebarBadges === 'function') updateSidebarBadges();
@@ -621,9 +652,11 @@ function formatDateDMY(dateString) {
      if (nipMatch && nipMatch[1]) {
          const nip = nipMatch[1];
          if(tempMembers.some(m => m.nip === nip)) {
-             showNotify("Duplikat", "Pegawai ini sudah ada di dalam daftar tim.", "error");
+             showNotify("Duplikat", "Pegawai/Grup ini sudah ada di dalam daftar tim.", "error");
          } else {
-             tempMembers.push({ nip: nip, peran: "" });
+             // ZETTBOT FIX: Auto-Default Peran (Jika Grup: "Sesuai Jabatan", Jika NIP: "Anggota")
+             const defaultPeran = nip.startsWith('[TAG:') ? "Sesuai Jabatan" : "Anggota";
+             tempMembers.push({ nip: nip, peran: defaultPeran });
              renderSelectedMembers();
          }
          document.getElementById('skSearchMember').value = "";
@@ -651,20 +684,39 @@ function formatDateDMY(dateString) {
       } else {
           emptyState.classList.add('hidden');
           tempMembers.forEach((m, idx) => {
-            const pns = state.usersList.find(u => String(u.nip) === String(m.nip)) || {nama:'-', jabatan:'-'};
+            // ZETTBOT FIX: Logika Tampilan Pembeda Grup vs Individu
+            let pnsNama = '-';
+            let pnsJabatan = '-';
+            let iconHtml = '<div class="w-6 h-6 rounded bg-indigo-500/20 text-indigo-400 flex items-center justify-center text-[10px] shrink-0"><i class="fa-solid fa-user"></i></div>';
+            let borderClass = 'hover:border-indigo-500/50';
+
+            if (String(m.nip).startsWith('[TAG:')) {
+                if (typeof GROUP_TAGS !== 'undefined' && GROUP_TAGS[m.nip]) {
+                    pnsNama = `[GRUP] ${GROUP_TAGS[m.nip].label}`;
+                    let estimasi = typeof hitungEstimasiGrup === 'function' ? hitungEstimasiGrup(m.nip) : 0;
+                    pnsJabatan = `Sistem mendeteksi estimasi ±${estimasi} pegawai`;
+                    iconHtml = '<div class="w-6 h-6 rounded bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-[10px] shrink-0"><i class="fa-solid fa-users"></i></div>';
+                    borderClass = 'border-emerald-500/30 bg-emerald-950/20 hover:border-emerald-500/60';
+                }
+            } else {
+                const pns = state.usersList.find(u => String(u.nip) === String(m.nip)) || {nama:'-', jabatan:'-'};
+                pnsNama = pns.nama;
+                pnsJabatan = pns.jabatan;
+            }
+
             const row = document.createElement('div');
-            row.className = "flex items-center gap-3 p-3 bg-slate-900 border border-slate-800 rounded-xl hover:border-indigo-500/50 transition";
+            row.className = `flex items-center gap-3 p-3 bg-slate-900 border border-slate-800 rounded-xl transition ${borderClass}`;
             row.innerHTML = `
-                <div class="w-6 h-6 rounded bg-indigo-500/20 text-indigo-400 flex items-center justify-center text-xs font-bold shrink-0">${idx + 1}</div>
-                <div class="flex-1">
-                  <div class="font-bold text-slate-200 text-xs">${pns.nama}</div>
-                  <div class="text-[9px] text-slate-500">${pns.jabatan}</div>
+                ${iconHtml}
+                <div class="flex-1 min-w-0">
+                  <div class="font-bold text-slate-200 text-xs truncate">${pnsNama}</div>
+                  <div class="text-[9px] text-slate-500 truncate">${pnsJabatan}</div>
                 </div>
-                <div class="w-1/3">
+                <div class="w-1/3 shrink-0">
                   <input type="text" placeholder="Peran/Tugas..." value="${m.peran}" onchange="updateMemberRole('${m.nip}', this.value)" required
                       class="w-full px-2 py-1.5 bg-slate-950 border border-slate-700 rounded text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-200">
                 </div>
-                <button type="button" onclick="removeMember('${m.nip}')" class="text-rose-500 hover:text-white p-1.5 hover:bg-rose-500 rounded transition" title="Hapus">
+                <button type="button" onclick="removeMember('${m.nip}')" class="text-rose-500 hover:text-white p-1.5 hover:bg-rose-500 rounded transition shrink-0" title="Hapus">
                   <i class="fa-solid fa-xmark text-sm"></i>
                 </button>
             `;
@@ -741,9 +793,26 @@ function formatDateDMY(dateString) {
      const container = document.getElementById('waCheckboxContainer');
      container.innerHTML = "";
 
-     waTargetSkObj.members.forEach(m => {
-        const pns = state.usersList.find(u => String(u.nip) === String(m.nip));
-        if(!pns) return;
+     // ZETTBOT FIX: Ekstrak seluruh nomor WA aktual menggunakan Mesin Cek js_sortir
+     let finalWaTargets = [];
+     if (typeof cekKeterlibatanPegawai !== 'undefined') {
+         state.usersList.forEach(u => {
+             if (u.role === 'Admin') return;
+             const cek = cekKeterlibatanPegawai(waTargetSkObj.members, u.nip);
+             if (cek.terlibat) {
+                 finalWaTargets.push({ user: u, peran: cek.peran });
+             }
+         });
+     }
+
+     if (finalWaTargets.length === 0) {
+         container.innerHTML = `<div class="p-4 text-center text-slate-500 text-xs italic">Belum ada pegawai yang masuk dalam target SK ini.</div>`;
+         return;
+     }
+
+     finalWaTargets.forEach(target => {
+        const pns = target.user;
+        const peranAktual = target.peran;
 
         const row = document.createElement('div');
         row.className = "flex items-center justify-between p-3 bg-slate-900/40 rounded-xl border border-slate-800 transition hover:border-slate-600";
@@ -753,7 +822,6 @@ function formatDateDMY(dateString) {
            const cleanNo = pns.no_hp.replace(/[^0-9]/g, "");
            const formattedNo = cleanNo.startsWith("0") ? "62" + cleanNo.slice(1) : cleanNo;
            
-           // ZETTBOT FIX: Ekstraksi Gender dari digit ke-15 NIP untuk Sapaan Otomatis
            let sapaan = "Bapak/Ibu";
            let cleanNip = String(pns.nip).replace(/[^0-9]/g, '');
            if (cleanNip.length === 18) {
@@ -761,7 +829,7 @@ function formatDateDMY(dateString) {
                else if (cleanNip.charAt(14) === '2') sapaan = "Ibu";
            }
 
-           const pesanWa = `Yth. ${sapaan} *${pns.nama}*,\n\nKami informasikan bahwa Anda telah ditetapkan sebagai *${m.peran}* ke dalam *${waTargetSkObj.judul_sk}*.\n\nMohon mengunduh & mempelajari surat keputusan resmi melalui tautan PDF berikut:\n${waTargetSkObj.link_drive}\n\nTerima Kasih.\n_Sistem Kepegawaian TRANSKEP_`;
+           const pesanWa = `Yth. ${sapaan} *${pns.nama}*,\n\nKami informasikan bahwa Anda telah ditetapkan sebagai *${peranAktual}* ke dalam *${waTargetSkObj.judul_sk}*.\n\nMohon mengunduh & mempelajari surat keputusan resmi melalui tautan PDF berikut:\n${waTargetSkObj.link_drive}\n\nTerima Kasih.\n_Sistem Kepegawaian TRANSKEP_`;
            const waUrl = `https://api.whatsapp.com/send?phone=${formattedNo}&text=${encodeURIComponent(pesanWa)}`;
            
            waButtonHtml = `
@@ -776,7 +844,7 @@ function formatDateDMY(dateString) {
         row.innerHTML = `
            <div class="flex-1 min-w-0 pr-3">
               <div class="text-sm font-bold text-slate-200 truncate">${pns.nama}</div>
-              <div class="text-[10px] text-slate-400 truncate mt-0.5">Peran: <span class="text-indigo-300 font-semibold">${m.peran}</span> | WA: ${pns.no_hp || 'Kosong'}</div>
+              <div class="text-[10px] text-slate-400 truncate mt-0.5">Peran: <span class="text-indigo-300 font-semibold">${peranAktual}</span> | WA: ${pns.no_hp || 'Kosong'}</div>
            </div>
            <div>${waButtonHtml}</div>
         `;

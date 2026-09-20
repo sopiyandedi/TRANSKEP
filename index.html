@@ -8,6 +8,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <?!= include('stylesheet'); ?>
+  <?!= include('sk/css_animations'); ?>
 </head>
 <body class="bg-slate-950 text-slate-200 min-h-screen overflow-hidden flex selection:bg-indigo-500/30">
   
@@ -107,6 +108,7 @@
   <div id="app-container" class="w-full h-screen flex hidden">
      
      <!-- ZETTBOT FIX: Modul Sidebar menggunakan Folder -->
+     <?!= include('sk/view_iframepdf'); ?>
      <?!= include('front_view/view_sidebar'); ?>
 
      <main id="main-content" class="flex-1 h-full relative overflow-hidden bg-slate-950 flex flex-col">
@@ -205,7 +207,9 @@
   <?!= include('pkp/js_rekap_cetak'); ?>
   <?!= include('jobdes/js_jobdes'); ?>
   <?!= include('jobdes/js_cetak_jobdes'); ?>
+  <?!= include('sk/js_sortir'); ?>
   <?!= include('sk/js_sk'); ?>
+  <?!= include('sk/js_iframepdf'); ?>
   <?!= include('sop/js_sop'); ?>
   <?!= include('kinerja/js_kinerja'); ?>
   <?!= include('pegawai/js_manajemen_pegawai'); ?>

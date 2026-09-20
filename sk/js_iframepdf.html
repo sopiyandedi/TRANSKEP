@@ -1,0 +1,195 @@
+<script>
+  window.hidePdfLoader = function() {
+    try {
+      var loader = document.getElementById('fbLoadingContainer');
+      var iframe = document.getElementById('pdfIframe');
+      if (!loader || !iframe) return;
+
+      if (iframe.src && iframe.src !== window.location.href && iframe.src !== 'about:blank' && iframe.src !== '') {
+        loader.classList.add('opacity-0');
+        iframe.classList.remove('opacity-0');
+        setTimeout(function() {
+          loader.classList.add('hidden');
+        }, 400);
+      }
+    } catch (e) {
+      console.error("hidePdfLoader error:", e);
+    }
+  };
+
+  window.openFlipbook = function(driveUrl, judulDokumen) {
+    try {
+      var modal = document.getElementById('modalFlipbook');
+      var loader = document.getElementById('fbLoadingContainer');
+      var iframe = document.getElementById('pdfIframe');
+
+      if (!modal || !iframe) {
+        console.error("Modal (#modalFlipbook) atau Iframe (#pdfIframe) tidak ditemukan!");
+        return;
+      }
+
+      // Set Judul & Link
+      var titleEl = document.getElementById('fbModalTitle');
+      if (titleEl) titleEl.innerText = judulDokumen || "Dokumen PDF";
+
+      var btnDl = document.getElementById('fbBtnDownloadDirect');
+      if (btnDl) btnDl.href = driveUrl;
+
+      // Reset State UI & Loader
+      if (loader) {
+        loader.classList.remove('hidden');
+        loader.classList.remove('opacity-0');
+      }
+      iframe.classList.add('opacity-0');
+      
+      // ==============================================================
+      // ZETTBOT LOGIC OPSI C: Mencari data SK / SOP dari variabel Global
+      // ==============================================================
+      var noSkEl = document.getElementById('fbNoSk');
+      var tglSkEl = document.getElementById('fbTglSk');
+      var pjSkEl = document.getElementById('fbPjSk');
+      var membersListEl = document.getElementById('fbMembersList');
+      
+      if (noSkEl && tglSkEl && pjSkEl && membersListEl) {
+          // Set default kosong
+          noSkEl.innerText = '-'; tglSkEl.innerText = '-'; pjSkEl.innerText = '-';
+          membersListEl.innerHTML = '<div class="text-[10px] text-slate-500 italic">Mencari data...</div>';
+          
+          // Cari kecocokan URL di array groupedSkData ATAU state.sopList
+          var targetSk = null;
+          var targetSop = null;
+          
+          if (typeof groupedSkData !== 'undefined') {
+              targetSk = groupedSkData.find(function(s) { return s.link_drive === driveUrl; });
+          }
+          if (!targetSk && typeof state !== 'undefined' && state.sopList) {
+              targetSop = state.sopList.find(function(s) { return s.link_drive === driveUrl; });
+          }
+          
+          if (targetSk) {
+              // Jika ini SK
+              if(noSkEl.previousElementSibling) noSkEl.previousElementSibling.innerText = "Nomor SK";
+              if(tglSkEl.previousElementSibling) tglSkEl.previousElementSibling.innerText = "Tanggal SK";
+              
+              noSkEl.innerText = targetSk.no_sk || '-';
+              tglSkEl.innerText = targetSk.tgl_sk || '-';
+              pjSkEl.innerText = targetSk.pj_sk || '-';
+              
+              if (targetSk.members && targetSk.members.length > 0) {
+                  membersListEl.innerHTML = '';
+                  targetSk.members.forEach(function(m, idx) {
+                      var pnsName = 'Unknown User';
+                      var pnsJabatan = '-';
+                      
+                      if (typeof state !== 'undefined' && state.usersList) {
+                          var pns = state.usersList.find(function(u) { return String(u.nip) === String(m.nip); });
+                          if (pns) { pnsName = pns.nama; pnsJabatan = pns.jabatan; }
+                      }
+                      
+                      membersListEl.innerHTML += `
+                         <div class="bg-slate-950/80 border border-slate-800/80 p-2.5 rounded-lg hover:border-indigo-500/50 transition">
+                            <p class="text-[11px] font-bold text-slate-200 truncate" title="${pnsName}">${idx + 1}. ${pnsName}</p>
+                            <p class="text-[9px] text-slate-400 truncate mt-0.5 leading-tight">${pnsJabatan}</p>
+                            <p class="text-[9px] text-indigo-300 font-bold mt-1.5 bg-indigo-500/10 inline-block px-1.5 py-0.5 rounded border border-indigo-500/20">${m.peran || '-'}</p>
+                         </div>
+                      `;
+                  });
+              } else {
+                  membersListEl.innerHTML = '<div class="text-[10px] text-slate-500 italic bg-slate-900/50 p-3 rounded-lg border border-dashed border-slate-700">Tidak ada anggota tim yang terdaftar.</div>';
+              }
+          } else if (targetSop) {
+              // Jika ini SOP
+              if(noSkEl.previousElementSibling) noSkEl.previousElementSibling.innerText = "Nomor SOP";
+              if(tglSkEl.previousElementSibling) tglSkEl.previousElementSibling.innerText = "Tanggal Efektif";
+              
+              noSkEl.innerText = targetSop.nomor_sop || '-';
+              
+              // Format tanggal SOP
+              try {
+                  var d = new Date(targetSop.tanggal_efektif);
+                  tglSkEl.innerText = isNaN(d.getTime()) ? targetSop.tanggal_efektif : d.toLocaleDateString('id-ID', {day: '2-digit', month: 'long', year: 'numeric'});
+              } catch(e) { tglSkEl.innerText = targetSop.tanggal_efektif || '-'; }
+              
+              pjSkEl.innerText = targetSop.kategori_pj || '-';
+              
+              var pelaksanaArr = [];
+              try { pelaksanaArr = JSON.parse(targetSop.pelaksana_json || '[]'); } catch(e){}
+              
+              if (pelaksanaArr.length > 0) {
+                  membersListEl.innerHTML = '';
+                  pelaksanaArr.forEach(function(m, idx) {
+                      var pnsName = 'Unknown User';
+                      var pnsJabatan = '-';
+                      if (typeof state !== 'undefined' && state.usersList) {
+                          var pns = state.usersList.find(function(u) { return String(u.nip) === String(m.nip); });
+                          if (pns) { pnsName = pns.nama; pnsJabatan = pns.jabatan; }
+                      }
+                      
+                      // Theme aksen hijau (Emerald) khusus untuk membedakan SOP dengan SK
+                      membersListEl.innerHTML += `
+                         <div class="bg-slate-950/80 border border-emerald-800/50 p-2.5 rounded-lg hover:border-emerald-500/50 transition">
+                            <p class="text-[11px] font-bold text-slate-200 truncate" title="${pnsName}">${idx + 1}. ${pnsName}</p>
+                            <p class="text-[9px] text-slate-400 truncate mt-0.5 leading-tight">${pnsJabatan}</p>
+                            <p class="text-[9px] text-emerald-300 font-bold mt-1.5 bg-emerald-500/10 inline-block px-1.5 py-0.5 rounded border border-emerald-500/20">${m.peran || '-'}</p>
+                         </div>
+                      `;
+                  });
+              } else {
+                  membersListEl.innerHTML = '<div class="text-[10px] text-slate-500 italic bg-slate-900/50 p-3 rounded-lg border border-dashed border-slate-700">Tidak ada pelaksana yang terdaftar.</div>';
+              }
+          } else {
+              // Fallback jika bukan SK dan bukan SOP
+              if(noSkEl.previousElementSibling) noSkEl.previousElementSibling.innerText = "Nomor Dokumen";
+              if(tglSkEl.previousElementSibling) tglSkEl.previousElementSibling.innerText = "Tanggal";
+              membersListEl.innerHTML = '<div class="text-[10px] text-slate-500 italic bg-slate-900/50 p-3 rounded-lg border border-dashed border-slate-700">Data struktur tidak ditemukan untuk dokumen ini.</div>';
+          }
+      }
+      // ==============================================================
+
+      // Ekstrak ID Drive dan ubah URL menjadi mode '/preview'
+      var idMatch = String(driveUrl).match(/[-\w]{25,}/);
+      if (idMatch && idMatch[0]) {
+        var fileId = idMatch[0];
+        iframe.src = "https://drive.google.com/file/d/" + fileId + "/preview";
+      } else {
+        iframe.src = driveUrl;
+      }
+
+      // Pasang handler onload secara aman
+      iframe.onload = function() {
+        window.hidePdfLoader();
+      };
+
+      // Tampilkan modal
+      modal.classList.remove('hidden');
+      setTimeout(function() {
+        modal.classList.remove('opacity-0');
+        if (modal.firstElementChild) {
+          modal.firstElementChild.classList.remove('scale-95');
+        }
+      }, 10);
+    } catch (err) {
+      console.error("Gagal membuka PDF viewer:", err);
+    }
+  };
+
+  window.closeFlipbookModal = function() {
+    try {
+      var modal = document.getElementById('modalFlipbook');
+      if (!modal) return;
+
+      modal.classList.add('opacity-0');
+      if (modal.firstElementChild) {
+        modal.firstElementChild.classList.add('scale-95');
+      }
+
+      setTimeout(function() {
+        modal.classList.add('hidden');
+        var iframe = document.getElementById('pdfIframe');
+        if (iframe) iframe.src = '';
+      }, 250);
+    } catch (e) {
+      console.error("closeFlipbookModal error:", e);
+    }
+  };
+</script>

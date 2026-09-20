@@ -1,0 +1,103 @@
+<script>
+  /* STREAMING_CHUNK:Initializing global dictionary for job groups */
+  // ==========================================
+  // FILE: js_sortir.html
+  // FUNGSI: Sentralisasi Logika Role-Based Access
+  // ==========================================
+
+  // 1. KAMUS PEMETAAN JABATAN (ROLE DICTIONARY)
+  const GROUP_TAGS = {
+    '[TAG:SEMUA_PEGAWAI]': {
+      label: 'Seluruh Pegawai',
+      keywords: [] // Kosong, karena mencakup semua secara otomatis
+    },
+    '[TAG:HAKIM]': {
+      label: 'Kelompok Hakim',
+      keywords: ['ketua', 'wakil ketua', 'hakim']
+    },
+    '[TAG:KEPANITERAAN]': {
+      label: 'Kelompok Kepaniteraan',
+      keywords: ['panitera', 'juru sita', 'jsp', 'panmud', 'klerek', 'analis perkara']
+    },
+    '[TAG:KESEKRETARIATAN]': {
+      label: 'Kelompok Kesekretariatan',
+      keywords: ['sekretaris', 'kasubbag', 'pranata', 'operator', 'penata', 'arsiparis']
+    }
+  };
+
+  /* STREAMING_CHUNK:Defining core logic for evaluating user involvement */
+  // 2. MESIN CEK KETERLIBATAN PEGAWAI (CORE FILTER)
+  // Digunakan oleh Tabel SK dan Tabel SOP untuk mengecek apakah seorang NIP terlibat
+  // Return: { terlibat: boolean, peran: string, isGrup: boolean }
+  function cekKeterlibatanPegawai(pelaksanaArr, targetNip) {
+    let result = { terlibat: false, peran: '-', isGrup: false };
+    
+    // Jika tidak ada data pelaksana, otomatis false
+    if (!pelaksanaArr || pelaksanaArr.length === 0) return result;
+
+    // Ambil identitas lengkap target (NIP dan Jabatannya) dari state global
+    const targetUser = (typeof state !== 'undefined' && state.usersList) 
+        ? state.usersList.find(u => String(u.nip) === String(targetNip)) 
+        : null;
+
+    if (!targetUser) return result;
+
+    // PRIORITAS 1: Cek Ekplisit (Apakah NIP dia disebut spesifik?)
+    const exactMatch = pelaksanaArr.find(p => String(p.nip) === String(targetNip));
+    if (exactMatch) {
+        return { terlibat: true, peran: exactMatch.peran || '-', isGrup: false };
+    }
+
+    // PRIORITAS 2: Cek Berdasarkan Grup Jabatan (Apakah dia kena efek TAG?)
+    const targetJabatan = (targetUser.jabatan || '').toLowerCase();
+
+    for (let i = 0; i < pelaksanaArr.length; i++) {
+        const p = pelaksanaArr[i];
+        const tagKey = String(p.nip); // Tag disimpan memanfaatkan properti nip
+
+        if (tagKey.startsWith('[TAG:')) {
+            // Evaluasi Jika Tag SEMUA PEGAWAI
+            if (tagKey === '[TAG:SEMUA_PEGAWAI]') {
+                return { terlibat: true, peran: p.peran || '-', isGrup: true };
+            }
+
+            // Evaluasi Jika Kelompok Tertentu
+            const dictionaryItem = GROUP_TAGS[tagKey];
+            if (dictionaryItem && dictionaryItem.keywords) {
+                // Memindai apakah kata kunci kamus ada di dalam string jabatan pegawai
+                const isMatch = dictionaryItem.keywords.some(kw => targetJabatan.includes(kw));
+                if (isMatch) {
+                    return { terlibat: true, peran: p.peran || '-', isGrup: true };
+                }
+            }
+        }
+    }
+
+    return result; // Jika lolos semua cek dan tetap false
+  }
+
+  /* STREAMING_CHUNK:Defining group target estimation simulator */
+  // 3. MESIN SIMULASI ESTIMASI TARGET (Untuk UI Form Tambah Data)
+  // Digunakan untuk memberi tahu Admin berapa jumlah pegawai yang tercakup di grup tersebut
+  function hitungEstimasiGrup(tagKey) {
+    if (!tagKey || typeof state === 'undefined' || !state.usersList) return 0;
+    
+    // Jika tag SEMUA, hitung semua kecuali Admin IT
+    if (tagKey === '[TAG:SEMUA_PEGAWAI]') {
+        return state.usersList.filter(u => u.role !== 'Admin').length;
+    }
+
+    const dictionaryItem = GROUP_TAGS[tagKey];
+    if (!dictionaryItem || !dictionaryItem.keywords) return 0;
+
+    // Filter manual berdasarkan keywords
+    const count = state.usersList.reduce((acc, u) => {
+        const jab = (u.jabatan || '').toLowerCase();
+        const isMatch = dictionaryItem.keywords.some(kw => jab.includes(kw));
+        if (isMatch && u.role !== 'Admin') return acc + 1;
+        return acc;
+    }, 0);
+
+    return count;
+  }
+</script>

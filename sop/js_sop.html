@@ -88,7 +88,12 @@
              let pelaksanaStr = '';
              try {
                 const arr = JSON.parse(s.pelaksana_json || '[]');
-                pelaksanaStr = arr.map(p => getUserNameSop(p.nip)).join(' ').toLowerCase();
+                pelaksanaStr = arr.map(p => {
+                    if (String(p.nip).startsWith('[TAG:') && typeof GROUP_TAGS !== 'undefined' && GROUP_TAGS[p.nip]) {
+                        return GROUP_TAGS[p.nip].label.toLowerCase();
+                    }
+                    return getUserNameSop(p.nip).toLowerCase();
+                }).join(' ');
              } catch(e) {}
              return j.includes(keyword) || n.includes(keyword) || pelaksanaStr.includes(keyword);
          });
@@ -116,7 +121,6 @@
         const tr = document.createElement('tr');
         tr.className = "hover:bg-slate-900/50 transition-colors group border-b border-slate-800/30";
         
-        // ZETTBOT FIX: Warna Badge Dinamis menyesuaikan kategori PJ persis seperti menu SK
         let pjColor = "text-slate-400 bg-slate-800 border-slate-700";
         if(sop.kategori_pj === 'PJ. Manajemen') pjColor = "text-blue-400 bg-blue-500/10 border-blue-500/20";
         if(sop.kategori_pj === 'PJ. Kepaniteraan') pjColor = "text-emerald-400 bg-emerald-500/10 border-emerald-500/20";
@@ -159,22 +163,22 @@
            <td class="p-4 pl-6 text-center font-mono text-slate-500">${idx + 1}</td>
            <td class="p-4 max-w-[200px]">
               <div class="font-bold text-slate-200 truncate" title="${sop.judul_sop}">${sop.judul_sop}</div>
-              <div class="text-slate-500 text-[10px] mt-1"><i class="fa-solid fa-users mr-1"></i> ${countPelaksana} Pelaksana Terkait</div>
+              <div class="text-slate-500 text-[10px] mt-1"><i class="fa-solid fa-users mr-1"></i> ${countPelaksana} Entitas Terkait</div>
            </td>
            <td class="p-4"><span class="inline-flex px-2.5 py-1 rounded-md text-[10px] font-bold border ${pjColor} tracking-wider">${sop.kategori_pj}</span></td>
            <td class="p-4 text-slate-300 font-mono text-xs truncate max-w-[150px]" title="${sop.nomor_sop}">${sop.nomor_sop}</td>
            <td class="p-4 text-slate-400 text-xs">${formatTgl(sop.tanggal_efektif)}</td>
            <td class="p-4 text-center font-mono text-slate-400 text-[10px]">${formatTgl(sop.tgl_input)}</td>
            <td class="p-4 text-center">
-              <a href="${sop.link_drive}" target="_blank" class="text-indigo-400 hover:text-indigo-300 p-2 hover:bg-indigo-500/10 rounded-xl inline-block transition" title="Unduh PDF">
-                 <i class="fa-solid fa-file-pdf text-lg"></i>
-              </a>
+              <button onclick="openFlipbook('${sop.link_drive}', '${sop.judul_sop}')" class="text-indigo-400 hover:text-indigo-300 p-2 hover:bg-indigo-500/10 border border-transparent hover:border-indigo-500/30 rounded-xl inline-block transition shadow-md" title="Baca Dokumen">
+                 <i class="fa-solid fa-book-open-reader text-lg relative group-hover:animate-bounce"></i>
+              </button>
            </td>
            <td class="p-4 pr-6 text-center space-x-1">${actions}</td>
         `;
         tbody.appendChild(tr);
 
-        // Expanded Row (Detail Tim)
+        // Expanded Row (Detail Tim / Grup)
         const trDetail = document.createElement('tr');
         trDetail.id = `detail-sop-${sop.id}`;
         trDetail.className = "hidden bg-slate-900/30 border-b border-slate-800";
@@ -184,13 +188,30 @@
             detailHtml += `<span class="text-xs text-slate-500 italic">Belum ada pelaksana yang terdaftar pada SOP ini.</span>`;
         } else {
             pelaksanaArr.forEach(p => {
-               // ZETTBOT FIX: Penyeragaman Tipografi Detail SOP dengan Detail SK
+               let namaTampil = '-';
+               let peranTampil = p.peran || '-';
+               let iconColor = 'bg-indigo-500/20 text-indigo-400';
+               let iconTag = '<i class="fa-solid fa-user"></i>';
+
+               if (String(p.nip).startsWith('[TAG:')) {
+                   if (typeof GROUP_TAGS !== 'undefined' && GROUP_TAGS[p.nip]) {
+                       namaTampil = `[GRUP] ${GROUP_TAGS[p.nip].label}`;
+                       let estimasi = typeof hitungEstimasiGrup === 'function' ? hitungEstimasiGrup(p.nip) : 0;
+                       peranTampil = `Target: ±${estimasi} Pegawai (Otomatis)`;
+                       iconColor = 'bg-emerald-500/20 text-emerald-400';
+                       iconTag = '<i class="fa-solid fa-users"></i>';
+                   }
+               } else {
+                   namaTampil = getUserNameSop(p.nip);
+                   peranTampil = `Peran: ${p.peran || '-'}`;
+               }
+
                detailHtml += `
                   <div class="flex items-center gap-2 bg-slate-950 border border-slate-800 px-3 py-1.5 rounded-lg">
-                     <div class="w-6 h-6 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-400 text-[10px]"><i class="fa-solid fa-user"></i></div>
+                     <div class="w-6 h-6 rounded-full ${iconColor} flex items-center justify-center text-[10px]">${iconTag}</div>
                      <div>
-                        <p class="text-xs font-semibold text-slate-200 leading-none">${getUserNameSop(p.nip)}</p>
-                        <p class="text-[10px] text-slate-500 font-mono mt-0.5">Peran: ${p.peran || '-'}</p>
+                        <p class="text-xs font-semibold text-slate-200 leading-none">${namaTampil}</p>
+                        <p class="text-[10px] text-slate-500 font-mono mt-0.5">${peranTampil}</p>
                      </div>
                   </div>
                `;
@@ -235,7 +256,6 @@
      }
   }
 
-
   // ==========================================
   // REKAP PER PEGAWAI (TAMPILAN ACCORDION)
   // ==========================================
@@ -245,7 +265,6 @@
 
       if (!state.usersList || !state.sopList) return;
 
-      // ZETTBOT FIX: Identifikasi Role
       const role = state.user && state.user.role ? state.user.role : '';
       const isAdminOrOperator = (role === 'Admin' || role === 'Operator');
 
@@ -253,16 +272,17 @@
           let terlibatSops = state.sopList.filter(sop => {
               try {
                   const arr = JSON.parse(sop.pelaksana_json || '[]');
+                  if (typeof cekKeterlibatanPegawai !== 'undefined') {
+                      return cekKeterlibatanPegawai(arr, u.nip).terlibat;
+                  }
                   return arr.some(p => String(p.nip) === String(u.nip));
               } catch(e) { return false; }
           });
           return { user: u, sopList: terlibatSops, count: terlibatSops.length };
       });
 
-      // Filter: Hanya tampilkan pegawai yang jumlah keterlibatan SOP nya > 0
       userMapping = userMapping.filter(item => item.count > 0);
 
-      // ZETTBOT FIX: Jika bukan Admin/Operator, batasi hanya melihat rekapan dirinya sendiri
       if (!isAdminOrOperator) {
           userMapping = userMapping.filter(item => String(item.user.nip) === String(state.user.nip));
       }
@@ -308,7 +328,6 @@
               `;
           }
 
-          // ZETTBOT FIX: Penyeragaman tata letak sm:flex-row dan sm:gap-6 yang 100% identik dengan menu Rekap SK
           header.innerHTML = `
               <div class="flex items-center w-full">
                  <div class="w-16 text-center text-slate-500 font-mono text-xs shrink-0">${idx + 1}</div>
@@ -354,8 +373,13 @@
               let peranDetail = '-';
               try {
                   const arr = JSON.parse(sop.pelaksana_json || '[]');
-                  const found = arr.find(p => String(p.nip) === String(u.nip));
-                  if (found && found.peran) peranDetail = found.peran;
+                  if (typeof cekKeterlibatanPegawai !== 'undefined') {
+                      const cek = cekKeterlibatanPegawai(arr, u.nip);
+                      if (cek.terlibat) peranDetail = cek.peran;
+                  } else {
+                      const found = arr.find(p => String(p.nip) === String(u.nip));
+                      if (found && found.peran) peranDetail = found.peran;
+                  }
               } catch(e) {}
 
               const isAck = state.sopAckList.some(a => String(a.sop_id) === String(sop.id) && String(a.nip) === String(u.nip));
@@ -389,7 +413,7 @@
                         ${ackHtml}
                      </div>
                      <div class="shrink-0 pl-2 text-right">
-                        <a href="${sop.link_drive}" target="_blank" class="px-3 py-1.5 bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500 hover:text-white border border-indigo-500/20 rounded-md text-[10px] font-bold transition whitespace-nowrap"><i class="fa-solid fa-file-pdf mr-1"></i> Buka PDF</a>
+                        <button onclick="openFlipbook('${sop.link_drive}', '${sop.judul_sop}')" class="px-3 py-1.5 bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500 hover:text-white border border-indigo-500/20 rounded-md text-[10px] font-bold transition whitespace-nowrap shadow-sm"><i class="fa-solid fa-book-open mr-1"></i> Baca Dokumen</button>
                      </div>
                  </div>
               `;
@@ -422,7 +446,6 @@
           icon.classList.replace('fa-chevron-up', 'fa-chevron-down');
       }
   }
-
 
   // ==========================================
   // LOGIKA MODAL FORM (CRUD)
@@ -533,6 +556,23 @@
   function populateSopPegawaiDropdown() {
       const drop = document.getElementById('sopPegawaiDropdown');
       drop.innerHTML = '';
+      
+      // 1. Suntikkan Opsi Tag Grup di urutan paling atas
+      if (typeof GROUP_TAGS !== 'undefined') {
+          Object.keys(GROUP_TAGS).forEach(tagKey => {
+              const div = document.createElement('div');
+              div.className = "px-4 py-2 hover:bg-emerald-600 cursor-pointer border-b border-slate-700/50 last:border-0 transition-colors flex flex-col bg-slate-800";
+              div.innerHTML = `<span class="text-sm font-bold text-white">[GRUP] ${GROUP_TAGS[tagKey].label}</span><span class="text-[10px] text-emerald-200 font-mono">${tagKey}</span>`;
+              div.onclick = () => {
+                  addPegawaiToSopListDirect(tagKey);
+                  drop.classList.add('hidden');
+                  document.getElementById('sopPegawaiSearch').value = ''; 
+              };
+              drop.appendChild(div);
+          });
+      }
+
+      // 2. Opsi Pegawai Individual
       state.usersList.forEach(u => {
           if (u.role !== 'Admin') {
               const div = document.createElement('div');
@@ -580,13 +620,16 @@
       const inputPeran = document.getElementById('sopPeranInput');
       
       if (sopPelaksanaTerpilih.some(p => String(p.nip) === String(nip))) {
-          showNotify("Duplikat", "Pegawai tersebut sudah ada dalam daftar pelaksana.", "warning");
+          showNotify("Duplikat", "Pegawai/Grup tersebut sudah ada dalam daftar pelaksana.", "warning");
           return;
       }
 
+      const baseDefault = inputPeran.value.trim() || 'Pelaksana';
+      const defaultPeran = String(nip).startsWith('[TAG:') ? "Sesuai Tupoksi" : baseDefault;
+
       sopPelaksanaTerpilih.push({
           nip: String(nip),
-          peran: inputPeran.value.trim() || ''
+          peran: defaultPeran
       });
       
       renderSopPelaksanaList();
@@ -620,15 +663,34 @@
       empty.classList.add('hidden');
 
       sopPelaksanaTerpilih.forEach((p, idx) => {
-          const uName = getUserNameSop(p.nip);
+          let uName = '-';
+          let estimasiHtml = '';
+          let iconHtml = '<div class="w-6 h-6 rounded bg-indigo-500/20 text-indigo-400 flex items-center justify-center text-xs font-bold shrink-0">' + (idx+1) + '</div>';
+          let borderClass = 'bg-slate-900 border-slate-700/80 hover:bg-slate-800/80';
+
+          if (String(p.nip).startsWith('[TAG:')) {
+              if (typeof GROUP_TAGS !== 'undefined' && GROUP_TAGS[p.nip]) {
+                  uName = `[GRUP] ${GROUP_TAGS[p.nip].label}`;
+                  let estimasi = typeof hitungEstimasiGrup === 'function' ? hitungEstimasiGrup(p.nip) : 0;
+                  estimasiHtml = `<p class="text-[9px] text-emerald-400 font-mono mt-0.5">Sistem mendeteksi estimasi ±${estimasi} pegawai</p>`;
+                  iconHtml = '<div class="w-6 h-6 rounded bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-xs font-bold shrink-0" title="Grup"><i class="fa-solid fa-users"></i></div>';
+                  borderClass = 'bg-emerald-950/20 border-emerald-500/30 hover:bg-emerald-900/30';
+              }
+          } else {
+              uName = getUserNameSop(p.nip);
+          }
+
           const div = document.createElement('div');
-          div.className = "flex items-center justify-between bg-slate-900 border border-slate-700/80 p-2.5 rounded-xl hover:bg-slate-800/80 transition-colors";
+          div.className = `flex items-center justify-between border p-2.5 rounded-xl transition-colors ${borderClass}`;
           div.innerHTML = `
               <div class="flex items-center gap-3 w-full pr-4 overflow-hidden">
-                 <div class="w-6 h-6 rounded bg-indigo-500/20 text-indigo-400 flex items-center justify-center text-xs font-bold shrink-0">${idx+1}</div>
+                 ${iconHtml}
                  
                  <div class="flex flex-col md:flex-row md:items-center justify-between w-full gap-2 md:gap-4 overflow-hidden">
-                    <p class="text-sm font-bold text-slate-200 leading-none truncate md:w-1/2">${uName}</p>
+                    <div class="md:w-1/2">
+                       <p class="text-sm font-bold text-slate-200 leading-none truncate">${uName}</p>
+                       ${estimasiHtml}
+                    </div>
                     
                     <div class="flex items-center gap-2 w-full md:w-1/2">
                        <span class="text-[10px] text-slate-500 shrink-0">Peran:</span>
@@ -658,33 +720,41 @@
       document.getElementById('waSopTitleTarget').innerText = `Notifikasi Dokumen: ${sop.judul_sop}`;
       container.innerHTML = '';
       
-      if(pelaksanaArr.length === 0) {
+      // Ekstrak seluruh nomor WA menggunakan mesin cek js_sortir
+      let finalWaTargets = [];
+      if (typeof cekKeterlibatanPegawai !== 'undefined') {
+          state.usersList.forEach(u => {
+              if (u.role === 'Admin') return;
+              const cek = cekKeterlibatanPegawai(pelaksanaArr, u.nip);
+              if (cek.terlibat) finalWaTargets.push({ user: u, peran: cek.peran });
+          });
+      }
+
+      if(finalWaTargets.length === 0) {
           container.innerHTML = `<div class="p-4 text-center text-slate-500 text-xs italic">Belum ada pelaksana yang terdaftar untuk menerima notifikasi.</div>`;
       } else {
-          pelaksanaArr.forEach(p => {
-              const u = state.usersList.find(x => String(x.nip) === String(p.nip));
-              if(u) {
-                  let phone = String(u.no_hp || '').replace(/[^0-9]/g, '');
-                  if(phone.startsWith('0')) phone = '62' + phone.substring(1);
-                  
-                  const rawMsg = `Halo *${u.nama}*, terdapat pembaharuan Dokumen SOP baru:\n\n*${sop.judul_sop}*\nNomor: ${sop.nomor_sop}\nPeran Anda: ${p.peran || '-'}\n\nHarap buka portal *TRANSKEP* untuk membaca dan mengkonfirmasi pemahaman Anda (Acknowledgment). Terima kasih.`;
-                  const encMsg = encodeURIComponent(rawMsg);
-                  const waLink = phone.length > 8 ? `https://wa.me/${phone}?text=${encMsg}` : '#';
-                  
-                  const btnHtml = phone.length > 8 
-                     ? `<a href="${waLink}" target="_blank" class="px-3 py-1.5 rounded-lg text-[10px] font-bold bg-emerald-600 hover:bg-emerald-500 text-white transition flex items-center gap-1"><i class="fa-solid fa-paper-plane"></i> Kirim WA</a>`
-                     : `<button disabled class="px-3 py-1.5 rounded-lg text-[10px] font-bold bg-slate-800 text-slate-500 cursor-not-allowed">No WA Kosong</button>`;
+          finalWaTargets.forEach(target => {
+              const u = target.user;
+              let phone = String(u.no_hp || '').replace(/[^0-9]/g, '');
+              if(phone.startsWith('0')) phone = '62' + phone.substring(1);
+              
+              const rawMsg = `Halo *${u.nama}*, terdapat pembaharuan Dokumen SOP baru:\n\n*${sop.judul_sop}*\nNomor: ${sop.nomor_sop}\nPeran Anda: ${target.peran}\n\nHarap buka portal *TRANSKEP* untuk membaca dan mengkonfirmasi pemahaman Anda (Acknowledgment). Terima kasih.`;
+              const encMsg = encodeURIComponent(rawMsg);
+              const waLink = phone.length > 8 ? `https://wa.me/${phone}?text=${encMsg}` : '#';
+              
+              const btnHtml = phone.length > 8 
+                 ? `<a href="${waLink}" target="_blank" class="px-3 py-1.5 rounded-lg text-[10px] font-bold bg-emerald-600 hover:bg-emerald-500 text-white transition flex items-center gap-1"><i class="fa-solid fa-paper-plane"></i> Kirim WA</a>`
+                 : `<button disabled class="px-3 py-1.5 rounded-lg text-[10px] font-bold bg-slate-800 text-slate-500 cursor-not-allowed">No WA Kosong</button>`;
 
-                  container.innerHTML += `
-                     <div class="flex items-center justify-between p-3 bg-slate-900 rounded-lg hover:bg-slate-800 transition">
-                        <div>
-                           <p class="text-xs font-bold text-slate-200">${u.nama}</p>
-                           <p class="text-[10px] text-slate-500 font-mono mt-0.5">${u.no_hp || 'Tidak ada nomor'}</p>
-                        </div>
-                        ${btnHtml}
-                     </div>
-                  `;
-              }
+              container.innerHTML += `
+                 <div class="flex items-center justify-between p-3 bg-slate-900 rounded-lg hover:bg-slate-800 transition">
+                    <div>
+                       <p class="text-xs font-bold text-slate-200">${u.nama}</p>
+                       <p class="text-[10px] text-slate-500 font-mono mt-0.5">${u.no_hp || 'Tidak ada nomor'}</p>
+                    </div>
+                    ${btnHtml}
+                 </div>
+              `;
           });
       }
 
@@ -703,7 +773,6 @@
       setTimeout(() => m.classList.add('hidden'), 300);
   }
 
-
   // ==========================================
   // WA BLAST BULK REKAP PEGAWAI (ZETTBOT)
   // ==========================================
@@ -714,6 +783,9 @@
       const sops = state.sopList.filter(sop => {
           try {
               const arr = JSON.parse(sop.pelaksana_json || '[]');
+              if (typeof cekKeterlibatanPegawai !== 'undefined') {
+                  return cekKeterlibatanPegawai(arr, nip).terlibat;
+              }
               return arr.some(p => String(p.nip) === String(nip));
           } catch(e) { return false; }
       });
@@ -728,8 +800,10 @@
           let peranDetail = '-';
           try {
               const arr = JSON.parse(sop.pelaksana_json || '[]');
-              const found = arr.find(p => String(p.nip) === String(nip));
-              if(found && found.peran) peranDetail = found.peran;
+              if (typeof cekKeterlibatanPegawai !== 'undefined') {
+                  const cek = cekKeterlibatanPegawai(arr, nip);
+                  if (cek.terlibat) peranDetail = cek.peran;
+              }
           } catch(e) {}
 
           container.innerHTML += `
@@ -792,8 +866,10 @@
               let peranDetail = '-';
               try {
                   const arr = JSON.parse(sop.pelaksana_json || '[]');
-                  const found = arr.find(p => String(p.nip) === String(nip));
-                  if(found && found.peran) peranDetail = found.peran;
+                  if (typeof cekKeterlibatanPegawai !== 'undefined') {
+                      const cek = cekKeterlibatanPegawai(arr, nip);
+                      if (cek.terlibat) peranDetail = cek.peran;
+                  }
               } catch(e) {}
               msg += `${idx + 1}. *${sop.judul_sop}*\n   Nomor: ${sop.nomor_sop}\n   Peran: ${peranDetail}\n\n`;
           }
@@ -806,7 +882,6 @@
 
       window.open(waLink, '_blank');
   }
-
 
   // ==========================================
   // ACKNOWLEDGMENT (TANDA TERIMA) LOGIC
@@ -846,7 +921,6 @@
       });
   }
 
-
   // ==========================================
   // UTILS KHUSUS SOP
   // ==========================================
@@ -872,5 +946,4 @@
           return d.toISOString().split('T')[0];
       } catch(e) { return ''; }
   }
-
 </script>
