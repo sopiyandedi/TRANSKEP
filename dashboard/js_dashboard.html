@@ -304,24 +304,69 @@
       }
   }
 
-  // ZETTBOT TAHAP 3: HELPER UNTUK COPY & TOAST NOTIFICATION
+  // ZETTBOT FIX: COPY ENGINE KUAT & STABIL DI DALAM IFRAME GOOGLE APPS SCRIPT
   function copyDataAndNotify(text, type) {
+      if (!text) return;
+
+      var succeeded = false;
+
+      // 1. Coba Clipboard API Modern jika diizinkan browser
+      if (navigator.clipboard && window.isSecureContext) {
+          navigator.clipboard.writeText(text).then(function() {
+              if (typeof showNotify === 'function') {
+                  showNotify(type + ' Disalin', text + ' berhasil disalin ke clipboard.', 'success');
+              }
+          }).catch(function() {
+              // Jika ditolak iframe/browser, fallback ke execCommand
+              fallbackCopyText(text, type);
+          });
+          return;
+      }
+
+      // 2. Jalankan Fallback langsung jika Clipboard API tidak tersedia
+      fallbackCopyText(text, type);
+  }
+
+  function fallbackCopyText(text, type) {
+      var textArea = document.createElement("textarea");
+      textArea.value = text;
+      
+      // Pastikan textarea tidak terlihat di layar namun tetap bisa diseleksi
+      textArea.style.position = "fixed";
+      textArea.style.top = "0";
+      textArea.style.left = "0";
+      textArea.style.width = "2em";
+      textArea.style.height = "2em";
+      textArea.style.padding = "0";
+      textArea.style.border = "none";
+      textArea.style.outline = "none";
+      textArea.style.boxShadow = "none";
+      textArea.style.background = "transparent";
+      textArea.setAttribute("readonly", "");
+      
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+      textArea.setSelectionRange(0, textArea.value.length); // Kompatibilitas Mobile/iOS
+
       try {
-          const el = document.createElement('textarea');
-          el.value = text;
-          document.body.appendChild(el);
-          el.select();
-          document.execCommand('copy');
-          document.body.removeChild(el);
-          if (typeof showNotify === 'function') {
-              showNotify(type + ' Disalin', type + ' berhasil disalin ke clipboard.', 'success');
+          var successful = document.execCommand('copy');
+          if (successful) {
+              if (typeof showNotify === 'function') {
+                  showNotify(type + ' Disalin', text + ' berhasil disalin ke clipboard.', 'success');
+              }
+          } else {
+              if (typeof showNotify === 'function') {
+                  showNotify("Gagal Menyalin", "Izin clipboard tidak diberikan oleh browser.", "warning");
+              }
           }
       } catch (err) {
-          // Fallback
-          navigator.clipboard.writeText(text).then(() => {
-              if (typeof showNotify === 'function') showNotify(type + ' Disalin', type + ' berhasil disalin ke clipboard.', 'success');
-          });
+          if (typeof showNotify === 'function') {
+              showNotify("Gagal Menyalin", "Gagal menyalin teks ke clipboard.", "error");
+          }
       }
+
+      document.body.removeChild(textArea);
   }
 
   // ZETTBOT TAHAP 3: CLICK-TO-COPY UNIVERSAL PADA PENCARIAN
@@ -395,4 +440,26 @@
       const btn = document.getElementById('btnClearSearch');
       if (btn) btn.classList.add('hidden');
   }
+
+window.openModalKodeSurat = function() {
+      const modal = document.getElementById('modalKodeSurat'); // Sesuai ID modal kamu
+      if (modal) {
+          modal.classList.remove('hidden');
+          setTimeout(() => { modal.classList.remove('opacity-0'); modal.firstElementChild.classList.remove('scale-95'); }, 10);
+      } else {
+          if (typeof showNotify === 'function') showNotify('Informasi', 'File Modal Kode Surat belum termuat/ditemukan.', 'warning');
+      }
+  };
+
+  window.openModalReferensiAbsensi = function() {
+      const modal = document.getElementById('modalReferensiAbsensi'); // Sesuai ID modal kamu
+      if (modal) {
+          modal.classList.remove('hidden');
+          setTimeout(() => { modal.classList.remove('opacity-0'); modal.firstElementChild.classList.remove('scale-95'); }, 10);
+      } else {
+          if (typeof showNotify === 'function') showNotify('Informasi', 'File Modal Referensi Absensi belum termuat/ditemukan.', 'warning');
+      }
+  };
+
+
 </script>
