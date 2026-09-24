@@ -257,17 +257,52 @@
      background-color: #ffffff !important;
   }
  
+/* =========================================================
+   ZETTBOT FIX: PAKSA SEARCH RESULT SOLID DI LIGHT MODE
+   ========================================================= */
+.light-mode #searchResultPanel,
+.light-mode #searchResultPanel.glass,
+#searchResultPanel.light-mode {
+    background: #f0f9ff !important;
+    background-color: #f0f9ff !important;
+    opacity: 1 !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    border: 1px solid #bae6fd !important;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15) !important;
+}
+
+/* Pastikan wadah pembungkus isi list di dalamnya juga solid */
+.light-mode #searchResultPanel #searchResultContent {
+    background: #f0f9ff !important;
+    background-color: #f0f9ff !important;
+}
+
+/* Warna latar belakang per baris data agar tidak transparan */
+.light-mode #searchResultPanel #searchResultContent > div {
+    background-color: #f0f9ff !important;
+    border-bottom: 1px solid #e0f2fe !important;
+}
+
+/* Saat baris diarahkan kursor (hover) */
+.light-mode #searchResultPanel #searchResultContent > div:hover {
+    background-color: #e0f2fe !important;
+}
+
+/* ---------------------------------------------------------
+   Kode lama kamu tetap biarkan saja di bawah ini 
+   --------------------------------------------------------- */
 /* Penangkapan Brutal Hover Menu Search & List jadi biru muda */
-  .light-mode [class*="hover:bg-slate-"]:hover {
-     background-color: #f0f9ff !important; 
-  }
-  
-  /* Memastikan semua teks di dalam kotak search yang di-hover ikut terbaca */
-  .light-mode [class*="hover:bg-slate-"]:hover *,
-  .light-mode [class*="hover:bg-slate-"]:hover p,
-  .light-mode [class*="hover:bg-slate-"]:hover span {
-     color: #0369a1 !important; 
-  }
+.light-mode [class*="hover:bg-slate-"]:hover {
+    background-color: #f0f9ff !important;
+}
+
+/* Memastikan semua teks di dalam kotak search yang di-hover ikut terbaca */
+.light-mode [class*="hover:bg-slate-"]:hover *,
+.light-mode [class*="hover:bg-slate-"]:hover p,
+.light-mode [class*="hover:bg-slate-"]:hover span {
+    color: #0369a1 !important;
+}
 
 /* Menyamarkan garis pembatas hitam pada Sidebar / Layout */
   .light-mode .border-white\/10,
