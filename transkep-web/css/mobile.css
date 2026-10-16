@@ -1,0 +1,120 @@
+/* =========================================================
+   ZETTBOT MOBILE CSS: PERBAIKAN Z-INDEX SIDEBAR & OVERLAY
+   ========================================================= */
+
+@media (max-width: 1023px) {
+    
+    /* 1. Sembunyikan Header Desktop Besar di Mobile */
+    #global-profile-header {
+        display: none !important; 
+    }
+
+    /* 2. Top Bar dan Bottom Nav */
+    #mobile-top-bar {
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        height: 4rem !important; /* 64px */
+        z-index: 900 !important; /* Nilai di bawah overlay sidebar */
+    }
+
+    #mobile-bottom-nav {
+        position: fixed !important;
+        bottom: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        width: 100% !important;
+        height: 68px !important;
+        z-index: 99999 !important;
+        transform: translateZ(0) !important;
+    }
+
+    /* 3. ANGKAT SIDEBAR & OVERLAY KE LAPISAN PALING ATAS */
+    #sidebar-overlay {
+        position: fixed !important;
+        inset: 0 !important;
+        z-index: 999998 !important;
+    }
+
+    #main-sidebar {
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        bottom: 0 !important;
+        height: 100vh !important;
+        height: 100dvh !important;
+        z-index: 999999 !important;
+    }
+
+    #sidebar-header-box {
+        padding-top: 1rem !important;
+        height: auto !important;
+        min-height: 5.5rem !important;
+    }
+
+    html, body {
+        height: 100% !important;
+        overflow: hidden !important;
+    }
+
+    /* 4. Ruang Isi Konten Dashboard */
+    #view-container {
+        padding-top: 4.75rem !important;
+        padding-bottom: 5.5rem !important;
+        padding-left: 0.75rem !important;
+        padding-right: 0.75rem !important;
+        height: 100vh !important;
+        overflow-y: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+        box-sizing: border-box !important;
+    }
+
+    /* 5. Tombol Desktop Nonaktif di Mobile */
+    #btn-toggle-desktop {
+        display: none !important;
+    }
+
+    /* 6. Rapikan Badge Tanggal Dashboard */
+    #dateTodayBadge {
+        display: inline-block !important;
+        margin-top: 0.25rem !important;
+        font-size: 9px !important;
+    }
+
+    /* 7. SEMUA POP-UP / MODAL HARUS DI ATAS TOP & BOTTOM BAR */
+    div[id^="modal"], 
+    div[id*="Modal"], 
+    .fixed.inset-0 {
+        z-index: 2000000 !important;
+    }
+
+    div[id^="modal"] > div,
+    div[id*="Modal"] > div {
+        max-height: 92vh !important;
+        max-height: 92dvh !important;
+        overflow-y: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+    }
+}
+
+/* Penanganan Safe Area iPhone/Android Berponi */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+    #mobile-bottom-nav {
+        padding-bottom: env(safe-area-inset-bottom) !important;
+        height: calc(68px + env(safe-area-inset-bottom)) !important;
+    }
+    #view-container {
+        padding-bottom: calc(5.5rem + env(safe-area-inset-bottom)) !important;
+    }
+}
+
+/* Sentuhan Halus Mobile & Table Scroll */
+* {
+    -webkit-tap-highlight-color: transparent;
+}
+
+.overflow-x-auto {
+    -webkit-overflow-scrolling: touch;
+}
+

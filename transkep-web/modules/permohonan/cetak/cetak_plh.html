@@ -1,0 +1,172 @@
+<!-- VIEW COMPONENT: permohonan/st/template_cetak_plh.html -->
+<!-- ==========================================
+     FILE: template_cetak_plh.html (Template Surat Penunjukan PLH)
+     ========================================== -->
+<div id="template-cetak-plh-container" style="display: none;" class="hidden no-print">
+  <style>
+    /* ==========================================
+       ZETTBOT FIX: SETTING KERTAS & MARGIN UNTUK PLH
+       ========================================== */
+    @media print {
+      @page { 
+          size: A4 portrait; 
+          margin: 0mm !important; 
+      }
+      html, body { 
+          background-color: white !important; 
+          color: black !important; 
+          font-family: 'Bookman Old Style', 'Times New Roman', serif !important; 
+          font-size: 11pt !important; 
+          line-height: 1.15 !important; 
+          margin: 0 !important;
+          padding: 0 !important;
+      }
+      .no-print { display: none !important; }
+    }
+    
+    .plh-wrapper { 
+        width: 100%; 
+        max-width: 210mm;
+        margin: 0 auto; 
+        padding: 10mm 13mm 10mm 15mm; /* Margin kertas */
+        box-sizing: border-box; 
+        font-family: 'Bookman Old Style', 'Times New Roman', serif; 
+        font-size: 11pt; 
+        color: black; 
+        line-height: 1.3; 
+    }
+
+    .plh-text-center { text-align: center; }
+    .plh-bold { font-weight: bold; }
+    .plh-logo { width: 95px; height: auto; margin-bottom: 5px; }
+    
+    .plh-header-title {
+        font-size: 16pt; 
+        font-weight: bold; 
+        text-decoration: underline; 
+        letter-spacing: 2px;
+        margin-bottom: 2px;
+    }
+    
+    .plh-main-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+    .plh-main-table td { vertical-align: top; padding: 4px 0; }
+    
+    .plh-col-label { width: 130px; }
+    .plh-col-colon { width: 15px; text-align: center; }
+    .plh-col-content { text-align: justify; }
+
+    .plh-list { margin: 0; padding-left: 20px; }
+    .plh-list li { margin-bottom: 2px; text-align: justify; }
+
+    .plh-identitas { width: 100%; border-collapse: collapse; }
+    .plh-identitas td { padding: 1px 0; vertical-align: top; }
+
+    /* ⬇️ TAG 1: MENGATUR JARAK ANTARA TEKS ATAS DENGAN BLOK TANDA TANGAN ⬇️ */
+    /* Ubah nilai "margin-top" (saat ini 30px). 
+       - Perkecil angka (misal 10px) untuk menaikkan blok tanda tangan.
+       - Perbesar angka (misal 50px) untuk menurunkannya. */
+    .plh-ttd-box { float: right; width: 300px; margin-top: 5px; }
+    /* ⬆️ ================================================================== ⬆️ */
+
+    .plh-ttd-table { width: 100%; border-collapse: collapse; }
+    .plh-ttd-table td { padding: 1px 0; }
+  </style>
+
+  <div class="plh-wrapper">
+     <!-- LOGO KOP -->
+     <div class="plh-text-center">
+        <!-- Menggunakan ID gambar dari GDrive -->
+        <img src="https://drive.google.com/thumbnail?id=1_Qbv_fdPOa2YEQAXXkvRxXevsd_4u1jZ&sz=w400" class="plh-logo" alt="Logo Pengadilan">
+     </div>
+
+     <!-- JUDUL SURAT -->
+     <div class="plh-text-center" style="margin-bottom: 25px;">
+        <div class="plh-header-title">SURAT &nbsp;&nbsp;PENUNJUKAN</div>
+        <div style="font-size: 11pt;">Nomor : {{nomor_plh}}</div>
+     </div>
+
+     <div class="plh-text-center plh-bold" style="margin-bottom: 15px; font-size: 11.5pt; text-transform: uppercase;">
+        {{jabatan_ttd_st}} PENGADILAN AGAMA INDRAMAYU
+     </div>
+
+     <!-- ISI SURAT -->
+     <table class="plh-main-table">
+       <tr>
+         <td class="plh-col-label">Menimbang</td>
+         <td class="plh-col-colon">:</td>
+         <td class="plh-col-content">
+            Bahwa sehubungan {{pejabat_jabatan}} Pengadilan Agama Indramayu Kelas I.A, melaksanakan tugas dinas luar.
+         </td>
+       </tr>
+       <tr>
+         <td class="plh-col-label">Dasar Hukum</td>
+         <td class="plh-col-colon">:</td>
+         <td class="plh-col-content">
+           <ol class="plh-list">
+             <li>Undang-Undang Nomor 7 tahun 1989 sebagaimana telah diubah dengan Undang-Undang Nomor 50 Tahun 2009 tentang Peradilan Agama;</li>
+             <li>Undang-Undang Nomor 43 tahun 1999 sebagaimana telah diubah dengan Undang-Undang nomor 8 tahun 1974 tentang pokok-pokok Kepegawaian;</li>
+             <li>Peraturan Pemerintah Nomor 100 tahun 2000 sebagaimana telah diubah dengan Peraturan pemerintah Nomor 13 tahun 2002 tentang Pengangkatan Pegawai Negeri Sipil dalam Jabatan Struktural;</li>
+             <li>Surat Kepala BKN Nomor K.26-3/V.5-10/99 tanggal 18 Januari 2002 tentang Pengangkatan Pejabat Pelaksana Tugas Harian (PLH);</li>
+             <li>Peraturan Mahkamah Agung RI. Nomor 7 Tahun 2016 pasal 12 ayat (1) tentang Penegakan Disiplin Kerja Hakim pada Mahkamah Agung dan Badan Peradilan yang Berada Di Bawahnya;</li>
+           </ol>
+         </td>
+       </tr>
+       
+       <tr>
+         <td colspan="3" class="plh-text-center plh-bold" style="padding: 15px 0;">MENUNJUK :</td>
+       </tr>
+       
+       <tr>
+         <td class="plh-col-label">Kepada</td>
+         <td class="plh-col-colon">:</td>
+         <td class="plh-col-content">
+           <table class="plh-identitas">
+             <tr><td style="width: 150px; letter-spacing: 3px;">N a m a</td><td style="width: 15px;">:</td><td class="plh-bold">{{plh_nama}}</td></tr>
+             <tr><td style="letter-spacing: 3px;">N I P</td><td>:</td><td>{{plh_nip}}</td></tr>
+             <tr><td>Pangkat/Gol.Ruang</td><td>:</td><td>{{plh_pangkat}}</td></tr>
+             <tr><td style="letter-spacing: 3px;">J a b a t a n</td><td>:</td><td>{{plh_jabatan}}</td></tr>
+             <tr><td>Unit Kerja</td><td>:</td><td>Pengadilan Agama Indramayu</td></tr>
+           </table>
+         </td>
+       </tr>
+       
+       <tr>
+         <td class="plh-col-label" style="padding-top: 15px;">Untuk</td>
+         <td class="plh-col-colon" style="padding-top: 15px;">:</td>
+         <td class="plh-col-content" style="padding-top: 15px;">
+           <ol class="plh-list">
+             <li>Melaksanakan tugas pada {{tanggal_tugas_plh}}, disamping jabatannya sebagai {{plh_jabatan}}, juga sebagai Pejabat Pelaksana Tugas Harian (PLH) {{pejabat_jabatan}} Pengadilan Agama Indramayu Kelas I.A;</li>
+             <li style="margin-top: 8px;">Melaksanakan perintah ini dengan seksama dan penuh tanggung jawab;</li>
+           </ol>
+         </td>
+       </tr>
+     </table>
+
+     <!-- TANDA TANGAN -->
+     <div class="plh-ttd-box">
+       <table class="plh-ttd-table">
+         <tr>
+           <td style="width: 100px;">Ditetapkan di</td>
+           <td style="width: 10px;">:</td>
+           <td>Indramayu</td>
+         </tr>
+         <!-- PERBAIKAN: Hapus display: inline-block; dan pindahkan border ke setiap sel <td> -->
+         <tr>
+           <td style="padding-bottom: 4px; border-bottom: 1px solid black;">Pada tanggal</td>
+           <td style="padding-bottom: 4px; border-bottom: 1px solid black;">:</td>
+           <td style="padding-bottom: 4px; border-bottom: 1px solid black;">{{tanggal_cetak}}</td>
+           
+         </tr>
+       </table>
+       <div style="margin-top: 5px;">{{jabatan_ttd_st}},</div>
+       
+       <!-- PERBAIKAN: Kurangi tinggi ruang tanda tangan (dari 75px menjadi 55px) -->
+       <div style="height: 55px;"></div>
+       
+       <div class="plh-bold">{{nama_ttd_st}}</div>
+     </div>
+     
+     <!-- Clearfix agar footer tidak berantakan -->
+     <div style="clear: both;"></div>
+  </div>
+</div>

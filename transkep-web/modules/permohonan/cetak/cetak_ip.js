@@ -1,0 +1,143 @@
+// ==========================================
+// FILE: cetak_ip.js
+// MODUL CETAK MANDIRI (Clean Architecture)
+// ==========================================
+
+// --- Source: permohonan/ip/js_cetak_ip.html ---
+// FUNGSI BARU: Mengubah format tanggal (Misal: 2026-09-26 menjadi 26 September 2026)
+    function formatTanggalCetakFullIP(dateStr) {
+        if (!dateStr || dateStr === "-") return "-";
+        let d, m, y;
+        if (dateStr.includes('/')) {
+            let p = dateStr.split(' ')[0].split('/'); 
+            d = p[0]; m = p[1]; y = p[2];
+        } else if (dateStr.includes('-')) {
+            let p = dateStr.split(' ')[0].split('-');
+            if (p[0].length === 4) { y = p[0]; m = p[1]; d = p[2]; } 
+            else { d = p[0]; m = p[1]; y = p[2]; }
+        } else { return dateStr; }
+        
+        const months = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+        let mIdx = parseInt(m, 10) - 1;
+        if (mIdx >= 0 && mIdx < 12) {
+            return `${parseInt(d, 10)} ${months[mIdx]} ${y}`; 
+        }
+        return dateStr;
+    }
+
+    function cetakIzinPribadi(id) {
+        if (window.isGlobalPrinting) {
+            showNotify("Proses Sibuk", "Sistem sedang menyiapkan dokumen. Harap tunggu.", "warning");
+            return; 
+        }
+
+        if (!state || !state.user) {
+            showNotify("Sistem Memuat", "Data belum siap.", "warning");
+            return;
+        }
+        
+        window.isGlobalPrinting = true;
+        showLoading("Menyiapkan dokumen Izin Pribadi...");
+        
+        if (typeof google !== 'undefined') {
+            google.script.run
+                .withSuccessHandler(function(res) {
+                    if (res.status === 'success') {
+                        renderTemplateCetakIP(res.data);
+                    } else {
+                        hideLoading();
+                        window.isGlobalPrinting = false;
+                        showNotify("Gagal", res.message, "error");
+                    }
+                })
+                .withFailureHandler(function(err) {
+                    hideLoading();
+                    window.isGlobalPrinting = false;
+                    showNotify("Error Koneksi", err.toString(), "error");
+                })
+                .getIzinPribadiById(id);
+        } else {
+            setTimeout(() => {
+                hideLoading();
+                window.isGlobalPrinting = false;
+                alert("[CANVAS MODE] Simulasi cetak untuk ID: " + id);
+            }, 1000);
+        }
+    }
+    
+    function renderTemplateCetakIP(data) {
+        try {
+            // Data Pegawai (Pemohon, Atasan Langsung, Pejabat Berwenang)
+            const pemohon = state.usersList.find(u => String(u.nip) === String(data.nip)) || { nama: 'Tidak Diketahui', jabatan: '-' };
+            const atasan = state.usersList.find(u => String(u.nip) === String(data.atasan_nip)) || { nama: 'Tidak Diketahui', jabatan: '-' };
+            const pejabat = state.usersList.find(u => String(u.nip) === String(data.pejabat_nip)) || { nama: 'Tidak Diketahui', jabatan: '-' };
+            
+            // Format Tanggal Titi Mangsa (Pojok Kanan Atas)
+            const tglBuat = data.waktu ? data.waktu.split(' ')[0] : '-';
+            document.getElementById('cetakIpTanggalBuat').innerText = formatTanggalCetakFullIP(tglBuat);
+            
+            // Tujuan Surat (Diisi Pejabat Berwenang)
+            document.getElementById('cetakIpJabatanYth').innerText = pejabat.jabatan;
+            document.getElementById('cetakIpJabatanSurat').innerText = pejabat.jabatan;
+            
+            // Biodata Pemohon
+            document.getElementById('cetakIpNama').innerText = pemohon.nama;
+            document.getElementById('cetakIpNip').innerText = data.nip;
+            document.getElementById('cetakIpJabatan').innerText = pemohon.jabatan;
+            document.getElementById('cetakIpAlamat').innerText = data.alamat || "-";
+            
+            // Paragraf Isi
+            const dateObj = new Date(data.tanggal);
+            const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+            const dayName = isNaN(dateObj) ? "-" : days[dateObj.getDay()];
+            
+            document.getElementById('cetakIpHariSurat').innerText = dayName;
+            document.getElementById('cetakIpTanggalSurat').innerText = formatTanggalCetakFullIP(data.tanggal);
+            document.getElementById('cetakIpAlasanSurat').innerText = data.alasan;
+            
+            // TTD Pejabat Berwenang (Kiri)
+            document.getElementById('cetakIpJabatanPejabat').innerText = pejabat.jabatan;
+            document.getElementById('cetakIpNamaPejabat').innerText = pejabat.nama;
+            document.getElementById('cetakIpNipPejabat').innerText = data.pejabat_nip;
+
+            // TTD Atasan Langsung (Tengah)
+            document.getElementById('cetakIpJabatanAtasan').innerText = atasan.jabatan;
+            document.getElementById('cetakIpNamaAtasan').innerText = atasan.nama;
+            document.getElementById('cetakIpNipAtasan').innerText = data.atasan_nip;
+            
+            // Tanda Tangan Pemohon (Kanan)
+            document.getElementById('cetakIpNamaPemohon').innerText = pemohon.nama;
+            document.getElementById('cetakIpNipPemohon').innerText = data.nip;
+            
+            const printArea = document.getElementById('printAreaIP');
+            document.querySelectorAll('.print-only').forEach(el => {
+                el.classList.add('hidden');
+                el.style.display = 'none';
+            });
+
+            if(printArea) {
+                printArea.classList.remove('hidden');
+                printArea.style.display = 'none';
+            }
+            
+            setTimeout(() => {
+                hideLoading();
+                window.focus();
+                window.print();
+                
+                setTimeout(() => {
+                    if(printArea) {
+                        printArea.classList.add('hidden');
+                        printArea.style.display = '';
+                    }
+                    window.isGlobalPrinting = false;
+                }, 1500);
+            }, 800);
+            
+        } catch(e) {
+            hideLoading();
+            window.isGlobalPrinting = false;
+            showNotify("Error Render", "Terjadi kesalahan saat memuat template cetak IP.", "error");
+            console.error(e);
+        }
+    }

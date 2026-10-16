@@ -1,0 +1,264 @@
+// ==========================================
+// FILE: kgb.js (Modul Form SK KGB)
+// ==========================================
+
+// --- Source: eoffice/js_kgb.html ---
+// ==========================================
+  // FILE: eoffice/js_kgb.html
+  // DESKRIPSI: Logika Form & Live Generator KGB (Vue/Vanilla Helper)
+  // ENGINE: ZettBOT Core v1.0.0 (by Zettbos)
+  // ==========================================
+
+  // ALGORITMA KONVERSI ANGKA KE TERBILANG BAHASA INDONESIA
+  function terbilangAngka(angka) {
+    var bilangan = ["", "satu", "dua", "tiga", "empat", "lima", "enam", "tujuh", "delapan", "sembilan", "sepuluh", "sebelas"];
+    angka = Math.floor(Math.abs(Number(angka)));
+    if (isNaN(angka)) return "";
+    if (angka < 12) return bilangan[angka];
+    if (angka < 20) return terbilangAngka(angka - 10) + " belas";
+    if (angka < 100) return terbilangAngka(Math.floor(angka / 10)) + " puluh " + terbilangAngka(angka % 10);
+    if (angka < 200) return "seratus " + terbilangAngka(angka - 100);
+    if (angka < 1000) return terbilangAngka(Math.floor(angka / 100)) + " ratus " + terbilangAngka(angka % 100);
+    if (angka < 2000) return "seribu " + terbilangAngka(angka - 1000);
+    if (angka < 1000000) return terbilangAngka(Math.floor(angka / 1000)) + " ribu " + terbilangAngka(angka % 1000);
+    if (angka < 1000000000) return terbilangAngka(Math.floor(angka / 1000000)) + " juta " + terbilangAngka(angka % 1000000);
+    if (angka < 1000000000000) return terbilangAngka(Math.floor(angka / 1000000000)) + " milyar " + terbilangAngka(angka % 1000000000);
+    return "";
+  }
+
+  function terbilangRupiah(nominal) {
+    if (!nominal) return "";
+    var clean = String(nominal).replace(/[^0-9]/g, "");
+    if (!clean) return "";
+    var hasil = terbilangAngka(clean).replace(/\s+/g, " ").trim();
+    return hasil ? hasil + " rupiah" : "";
+  }
+
+  function formatBulanRomawi(bulanNum) {
+    var romawi = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII"];
+    return romawi[bulanNum] || "X";
+  }
+
+  function generateNomorKgbOtomatis() {
+    var now = new Date();
+    var romawi = formatBulanRomawi(now.getMonth());
+    var tahun = now.getFullYear();
+    return ".../KPA.W10-A2/KP2.1.2/" + romawi + "/" + tahun;
+  }
+
+  function formatTanggalIndoKgb(dateObj) {
+    if (!dateObj) return "";
+    var d = new Date(dateObj);
+    if (isNaN(d.getTime())) return String(dateObj);
+    var namaBulan = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+    return d.getDate() + " " + namaBulan[d.getMonth()] + " " + d.getFullYear();
+  }
+
+  function hitungTmtYadOtomatis(tmtBaruStr) {
+    if (!tmtBaruStr) return "";
+    // Coba deteksi tahun di dalam string (misal: "1 Desember 2026" atau "2026-12-01")
+    var matchYear = tmtBaruStr.match(/\b(20\d{2})\b/);
+    if (matchYear) {
+      var y = parseInt(matchYear[1]);
+      var nextY = y + 2;
+      return tmtBaruStr.replace(String(y), String(nextY));
+    }
+    return "";
+  }
+
+  // ==========================================
+  // EVENT LISTENER INPUT LIVE DI MODAL
+  // ==========================================
+  function handleGajiBaruInput(val) {
+    var fieldTerbilang = document.getElementById('kgbFieldTerbilang');
+    if (fieldTerbilang) {
+      fieldTerbilang.value = terbilangRupiah(val);
+    }
+  }
+
+  function handleTmtBaruChange(val) {
+    var fieldYad = document.getElementById('kgbFieldTmtYad');
+    if (fieldYad && (!fieldYad.value || fieldYad.dataset.auto === "true")) {
+      fieldYad.value = hitungTmtYadOtomatis(val);
+      fieldYad.dataset.auto = "true";
+    }
+  }
+
+  // ==========================================
+  // BUKA & TUTUP MODAL DETAIL KGB
+  // ==========================================
+  window.openKgbModalForm = function(kgbData) {
+    var modal = document.getElementById('modalDetailKGB');
+    if (!modal) return;
+
+    kgbData = kgbData || {};
+    var nip = String(kgbData.nip || '');
+
+    // Cari data pegawai dari state global
+    var uList = (window.vueState && window.vueState.usersList) ? window.vueState.usersList : (typeof state !== 'undefined' ? state.usersList : []);
+    var userObj = (Array.isArray(uList)) ? uList.find(function(u) { return String(u.nip) === nip; }) : null;
+
+    // Cari Nama Ketua Pengadilan Agama Indramayu untuk penandatangan
+    var ketuaObj = (Array.isArray(uList)) ? uList.find(function(u) { return u.jabatan && u.jabatan.toLowerCase().includes('ketua'); }) : null;
+    var defaultNamaKetua = ketuaObj ? ketuaObj.nama.replace(/,\s*[A-Za-z\.\s]+$/, '').trim() : '';
+
+    // Isi Nilai ke Field Formulir
+    document.getElementById('kgbFieldIdKgb').value = kgbData.id_kgb || ('KGB-' + nip);
+    document.getElementById('kgbFieldNip').value = nip;
+    document.getElementById('kgbDisplayNip').value = nip;
+    document.getElementById('kgbFieldNama').value = kgbData.nama_pegawai || (userObj ? userObj.nama : '');
+    document.getElementById('kgbFieldTglLahir').value = kgbData.tanggal_lahir || '';
+    document.getElementById('kgbFieldPangkat').value = kgbData.pangkat || (userObj ? userObj.pangkat : '');
+    document.getElementById('kgbFieldGolongan').value = kgbData.golongan || '';
+    document.getElementById('kgbFieldJabatan').value = kgbData.jabatan || (userObj ? userObj.jabatan : '');
+    document.getElementById('kgbFieldUnitKerja').value = kgbData.unit_kerja || 'Pengadilan Agama Indramayu Kelas 1.A.';
+
+    // Identitas Surat
+    document.getElementById('kgbFieldNomorSurat').value = kgbData.nomor_surat || generateNomorKgbOtomatis();
+    document.getElementById('kgbFieldTanggalSurat').value = kgbData.tanggal_surat || formatTanggalIndoKgb(new Date());
+    document.getElementById('kgbFieldTujuanKppn').value = kgbData.tujuan_kppn || 'Kepala Kantor Pelayanan Perbendaharaan Negara Cirebon di- CIREBON';
+
+    // Data SK Lama
+    document.getElementById('kgbFieldGajiLama').value = kgbData.gaji_lama || '';
+    document.getElementById('kgbFieldPejabatLama').value = kgbData.pejabat_lama || 'Ketua Pengadilan Agama Indramayu';
+    document.getElementById('kgbFieldNomorSkLama').value = kgbData.nomor_sk_lama || '';
+    document.getElementById('kgbFieldTanggalSkLama').value = kgbData.tanggal_sk_lama || '';
+    document.getElementById('kgbFieldTmtLama').value = kgbData.tmt_lama || '';
+    document.getElementById('kgbFieldMkgLama').value = kgbData.mkg_lama || '';
+
+    // Data KGB Baru
+    var tmtBaruVal = kgbData.tmt_baru || '';
+    document.getElementById('kgbFieldGajiBaru').value = kgbData.gaji_baru || '';
+    document.getElementById('kgbFieldTerbilang').value = kgbData.terbilang_gaji || terbilangRupiah(kgbData.gaji_baru);
+    document.getElementById('kgbFieldMkgBaru').value = kgbData.mkg_baru || '';
+    document.getElementById('kgbFieldTmtBaru').value = tmtBaruVal;
+    
+    var tmtYadVal = kgbData.tmt_yad || hitungTmtYadOtomatis(tmtBaruVal);
+    document.getElementById('kgbFieldTmtYad').value = tmtYadVal;
+    document.getElementById('kgbFieldTmtYad').dataset.auto = "true";
+
+    document.getElementById('kgbFieldNamaKetua').value = kgbData.nama_ketua || defaultNamaKetua;
+    document.getElementById('kgbFieldDasarPp').value = kgbData.dasar_pp || 'Peraturan Pemerintah Republik Indonesia Nomor : 05 Tahun 2024';
+
+    // Update Badge Status
+    var badge = document.getElementById('kgbBadgeStatus');
+    if (badge) {
+      var isSelesai = (kgbData.status === 'Selesai');
+      badge.innerText = isSelesai ? 'Selesai' : 'Draf Sedang Diproses';
+      badge.className = isSelesai 
+        ? 'px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-emerald-500/10 border border-emerald-500/20 text-emerald-400'
+        : 'px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-blue-500/10 border border-blue-500/20 text-blue-400';
+    }
+
+    // Tampilkan Modal
+    modal.classList.remove('hidden');
+    setTimeout(function() {
+      modal.classList.remove('opacity-0');
+      modal.firstElementChild.classList.remove('scale-95');
+    }, 10);
+  };
+
+  function closeKgbModalForm() {
+    var modal = document.getElementById('modalDetailKGB');
+    if (!modal) return;
+    modal.classList.add('opacity-0');
+    modal.firstElementChild.classList.add('scale-95');
+    setTimeout(function() {
+      modal.classList.add('hidden');
+    }, 300);
+  }
+
+  // ==========================================
+  // SUBMIT FORM KGB: SIMPAN DRAF / GENERATE DOCS
+  // ==========================================
+  async function submitKgbForm(actionType) {
+    var idKgb = document.getElementById('kgbFieldIdKgb').value;
+    var nip = document.getElementById('kgbFieldNip').value;
+    var nama = document.getElementById('kgbFieldNama').value;
+    var noSurat = document.getElementById('kgbFieldNomorSurat').value;
+    var gajiBaru = document.getElementById('kgbFieldGajiBaru').value;
+
+    if (!nip || !nama) {
+      if (typeof showNotify === 'function') showNotify("Peringatan", "Nama dan NIP Pegawai wajib ada.", "warning");
+      return;
+    }
+
+    if (actionType === 'generate' && !gajiBaru) {
+      if (typeof showNotify === 'function') showNotify("Peringatan", "Nominal Gaji Pokok Baru wajib diisi sebelum menerbitkan SK.", "warning");
+      return;
+    }
+
+    var payload = {
+      id_kgb: idKgb,
+      nip: nip,
+      nama_pegawai: nama,
+      tanggal_lahir: document.getElementById('kgbFieldTglLahir').value,
+      pangkat: document.getElementById('kgbFieldPangkat').value,
+      golongan: document.getElementById('kgbFieldGolongan').value,
+      jabatan: document.getElementById('kgbFieldJabatan').value,
+      unit_kerja: document.getElementById('kgbFieldUnitKerja').value,
+      nomor_surat: noSurat,
+      tanggal_surat: document.getElementById('kgbFieldTanggalSurat').value,
+      tujuan_kppn: document.getElementById('kgbFieldTujuanKppn').value,
+      gaji_lama: document.getElementById('kgbFieldGajiLama').value,
+      pejabat_lama: document.getElementById('kgbFieldPejabatLama').value,
+      nomor_sk_lama: document.getElementById('kgbFieldNomorSkLama').value,
+      tanggal_sk_lama: document.getElementById('kgbFieldTanggalSkLama').value,
+      tmt_lama: document.getElementById('kgbFieldTmtLama').value,
+      mkg_lama: document.getElementById('kgbFieldMkgLama').value,
+      gaji_baru: gajiBaru,
+      terbilang_gaji: document.getElementById('kgbFieldTerbilang').value,
+      mkg_baru: document.getElementById('kgbFieldMkgBaru').value,
+      tmt_baru: document.getElementById('kgbFieldTmtBaru').value,
+      tmt_yad: document.getElementById('kgbFieldTmtYad').value,
+      nama_ketua: document.getElementById('kgbFieldNamaKetua').value,
+      dasar_pp: document.getElementById('kgbFieldDasarPp').value
+    };
+
+    var token = localStorage.getItem('transkep_session_token') || '';
+    var currentUser = (window.vueState && window.vueState.user) ? window.vueState.user : (typeof state !== 'undefined' ? state.user : null);
+    var adminNip = (currentUser && currentUser.nip) || localStorage.getItem('transkep_active_nip') || '';
+
+    var btnDoc = document.getElementById('btnKgbGenerateDoc');
+    var btnDraft = document.getElementById('btnKgbSaveDraft');
+    if (btnDoc) btnDoc.disabled = true;
+    if (btnDraft) btnDraft.disabled = true;
+
+    if (typeof showLoading === 'function') {
+      showLoading(actionType === 'generate' ? "Menerbitkan SK KGB & membuat Google Docs..." : "Menyimpan draf KGB...");
+    }
+
+    try {
+      var res = await window.EofficeDataService.saveOrGenerateKgb(payload, actionType, adminNip, token);
+      if (typeof hideLoading === 'function') hideLoading();
+      if (btnDoc) btnDoc.disabled = false;
+      if (btnDraft) btnDraft.disabled = false;
+
+      if (res && res.status === 'success') {
+        closeKgbModalForm();
+        if (typeof showNotify === 'function') {
+          showNotify(
+            "Sukses", 
+            actionType === 'generate' ? "SK KGB berhasil diterbitkan ke Google Docs!" : "Draf KGB berhasil disimpan.", 
+            "success"
+          );
+        }
+        // Refresh list E-Office
+        if (typeof window.refreshEofficeData === 'function') {
+          window.refreshEofficeData();
+        }
+      } else {
+        if (typeof showNotify === 'function') {
+          showNotify("Gagal", (res ? res.message : "Terjadi kendala saat menyimpan berkas KGB."), "error");
+        }
+      }
+    } catch (err) {
+      if (typeof hideLoading === 'function') hideLoading();
+      if (btnDoc) btnDoc.disabled = false;
+      if (btnDraft) btnDraft.disabled = false;
+      console.error("Error save KGB: ", err);
+      if (typeof showNotify === 'function') {
+        showNotify("Error Sistem", err.toString(), "error");
+      }
+    }
+  }

@@ -1,0 +1,578 @@
+// ==========================================
+// FILE: dashboard_grafik.js (Engine Grafik Dashboard)
+// ==========================================
+
+// --- Source: dashboard/js_dashboard_grafik.html ---
+// ==========================================
+  // File: js_dashboard_grafik.html
+  // ZETTBOT: Modul Khusus Analitik, Chart.js & Export Data (STABLE)
+  // ==========================================
+
+  var chartInstanceGender = null;
+  var chartInstanceGolongan = null;
+  var chartInstanceJabatan = null;
+  var chartInstanceUsia = null;
+  var isCarouselDragInitialized = false;
+
+  // --- KAMUS BOBOT HIERARKI JABATAN (GLOBAL SCOPE) ---
+  function getJabatanWeight(jabatanStr) {
+      if (!jabatanStr) return 0;
+      var j = String(jabatanStr).toUpperCase().trim();
+      
+      if (j === 'KETUA') return 100;
+      if (j === 'WAKIL KETUA') return 99;
+      if (j === 'HAKIM UTAMA MUDA' || j.indexOf('HAKIM') !== -1) return 98;
+      if (j === 'PANITERA') return 97;
+      if (j === 'SEKRETARIS') return 96;
+      if (j === 'PANITERA MUDA GUGATAN') return 95;
+      if (j === 'PANITERA MUDA PERMOHONAN') return 94;
+      if (j === 'PANITERA MUDA HUKUM') return 93;
+      if (j.indexOf('PANITERA MUDA') !== -1) return 92;
+      if (j === 'KEPALA SUB BAGIAN UMUM DAN KEUANGAN') return 91;
+      if (j === 'KEPALA SUB BAGIAN KEPEGAWAIAN, ORTALA') return 90;
+      if (j === 'KEPALA SUB BAGIAN PERENCANAAN, TI DAN PELAPORAN') return 89;
+      if (j.indexOf('KEPALA SUB BAGIAN') !== -1) return 88;
+      if (j === 'PANITERA PENGGANTI') return 87;
+      if (j === 'JURU SITA') return 86;
+      if (j === 'JURU SITA PENGGANTI') return 85;
+      if (j === 'PRANATA KOMPUTER AHLI PERTAMA') return 84;
+      if (j === 'ARSIPARIS TERAMPIL') return 83;
+      if (j === 'OPERATOR - PENATA LAYANAN OPERASIONAL') return 82;
+      if (j === 'KLEREK - ANALIS PERKARA PERADILAN') return 81;
+      if (j === 'KLEREK - PENGELOLA PENANGANAN PERKARA') return 80;
+      if (j === 'KLEREK - PENGOLAH DATA DAN INFORMASI') return 79;
+      if (j === 'PENATA LAYANAN OPERASIONAL') return 78;
+      if (j === 'PENGELOLA LAYANAN OPERASIONAL') return 77;
+      if (j === 'OPERATOR LAYANAN OPERASIONAL') return 76;
+      return 0;
+  }
+
+  // --- ZETTBOT: GLOBAL SCRUBBER & SORTING ENGINE (JABATAN) ---
+  setInterval(function() {
+      if (typeof state !== 'undefined' && state.usersList && state.usersList.length > 0) {
+          var isChanged = false;
+          var initialLength = state.usersList.length;
+
+          // 1. FILTERING: Hapus Admin & Operator
+          var filteredList = state.usersList.filter(function(u) {
+              var role = String(u.role || '').toUpperCase();
+              var jab = String(u.jabatan || '').toUpperCase();
+              var nama = String(u.nama || '').toUpperCase();
+              return role !== 'ADMIN' && role !== 'OPERATOR' && jab !== 'ADMIN' && nama.indexOf('SUPER ADMIN') === -1;
+          });
+
+          // 3. SORTING ENGINE
+          filteredList.sort(function(a, b) {
+              return getJabatanWeight(b.jabatan) - getJabatanWeight(a.jabatan);
+          });
+
+          // 4. CEK PERUBAHAN
+          if (filteredList.length !== initialLength) {
+              isChanged = true;
+          } else {
+              for (var i = 0; i < filteredList.length; i++) {
+                  if (filteredList[i].nip !== state.usersList[i].nip) {
+                      isChanged = true;
+                      break;
+                  }
+              }
+          }
+
+          // 5. UPDATE MEMORI
+          state.usersList = filteredList;
+
+          if (isChanged) {
+              renderAllCharts();
+              var searchInput = document.getElementById('globalEmployeeSearch');
+              if (searchInput && searchInput.value.trim() !== '') {
+                  window.handleEmployeeSearch(searchInput.value);
+              }
+          }
+      }
+  }, 1000);
+
+   // --- CAROUSEL DRAG CONTROLLER ---
+  function initChartCarouselDrag() {
+      if (isCarouselDragInitialized) return; 
+      var slider = document.getElementById('chartCarousel');
+      if (!slider) return;
+      var isDown = false, startX, scrollLeft;
+
+      slider.addEventListener('mousedown', function(e) {
+        isDown = true; slider.style.cursor = 'grabbing';
+        slider.classList.remove('snap-x', 'snap-mandatory'); 
+        startX = e.pageX - slider.offsetLeft; scrollLeft = slider.scrollLeft;
+      });
+      slider.addEventListener('mouseleave', function() {
+        isDown = false; slider.style.cursor = 'grab';
+        slider.classList.add('snap-x', 'snap-mandatory');
+      });
+      slider.addEventListener('mouseup', function() {
+        isDown = false; slider.style.cursor = 'grab';
+        slider.classList.add('snap-x', 'snap-mandatory');
+      });
+      slider.addEventListener('mousemove', function(e) {
+        if (!isDown) return; e.preventDefault();
+        var x = e.pageX - slider.offsetLeft;
+        slider.scrollLeft = scrollLeft - ((x - startX) * 1.5); 
+      });
+      isCarouselDragInitialized = true;
+  }
+
+  // --- ENGINE RENDER GRAFIK ---
+  function renderAllCharts() {
+      try {
+          var male = 0, female = 0, total = 0;
+          var pCounts = {}, jCounts = {}, uCounts = {};
+
+          var usiaKategori = ['21-30', '31-35', '36-40', '41-45', '46-50', '51-55', '56-60', '61-70'];
+          usiaKategori.forEach(function(k) { uCounts[k] = 0; });
+
+          var st = (typeof state !== 'undefined' ? state : (window.vueState || window.state)) || {};
+          var uList = st.usersList || [];
+          if (!uList || uList.length === 0) return;
+
+          uList.forEach(function(u) {
+              total++;
+              var nipClean = String(u.nip || '').replace(/[^0-9]/g, '');
+              var isGenderCounted = false;
+
+              if (nipClean.length >= 15) {
+                  var genderDigit = nipClean.charAt(14);
+                  if (genderDigit === '2') { female++; isGenderCounted = true; } 
+                  else if (genderDigit === '1') { male++; isGenderCounted = true; }
+              }
+
+              if (!isGenderCounted) {
+                  var jk = String(u.jk || '').toUpperCase().trim();
+                  if (jk.indexOf('PEREMPUAN') !== -1 || jk === 'P' || jk === 'WANITA' || jk === 'PR') { female++; } 
+                  else { male++; }
+              }
+
+              var pk = u.pangkat || 'Belum Diisi';
+              pCounts[pk] = (pCounts[pk] || 0) + 1;
+
+              var jb = u.jabatan || 'Belum Diisi';
+              jCounts[jb] = (jCounts[jb] || 0) + 1;
+
+              if (nipClean.length >= 15) {
+                  var by = parseInt(nipClean.substring(0, 4));
+                  var age = new Date().getFullYear() - by;
+                  if (age >= 21 && age <= 30) uCounts['21-30']++;
+                  else if (age >= 31 && age <= 35) uCounts['31-35']++;
+                  else if (age >= 36 && age <= 40) uCounts['36-40']++;
+                  else if (age >= 41 && age <= 45) uCounts['41-45']++;
+                  else if (age >= 46 && age <= 50) uCounts['46-50']++;
+                  else if (age >= 51 && age <= 55) uCounts['51-55']++;
+                  else if (age >= 56 && age <= 60) uCounts['56-60']++;
+                  else if (age >= 61 && age <= 70) uCounts['61-70']++;
+              }
+          });
+
+          // Trigger klik bar untuk pencarian otomatis (VUE COMPATIBLE)
+          var onChartClickTrigger = function(e, elements) {
+             if(elements && elements.length > 0) {
+                 var idx = elements[0].index;
+                 var labelStr = e.chart.data.labels[idx] || '';
+                 
+                 // Bersihkan angka hitungan jika ada, contoh: "Laki-laki (34)" -> "Laki-laki"
+                 var cleanLabel = String(labelStr).replace(/\s*\(\d+\)\s*$/, '').trim();
+                 
+                 // 1. Langsung tembak label ke State Vue Dashboard
+                 if(cleanLabel && window.vmDashboard && typeof window.vmDashboard.externalSearch === 'function') {
+                     window.vmDashboard.externalSearch(cleanLabel);
+                     
+                     // 2. Scroll layar ke atas dengan mulus menuju area pencarian & hasil
+                     var searchSection = document.getElementById('section-dashboard');
+                     if (searchSection) {
+                         searchSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                     }
+                 }
+             }
+          };
+
+          // Plugin aman: Menggambar angka di ujung bar secara visual
+          var barDataLabelPlugin = {
+              id: 'barDataLabelPlugin',
+              afterDatasetsDraw: function(chart) {
+                  var ctx = chart.ctx;
+                  chart.data.datasets.forEach(function(dataset, i) {
+                      var meta = chart.getDatasetMeta(i);
+                      if (!meta.hidden) {
+                          meta.data.forEach(function(bar, index) {
+                              var val = dataset.data[index];
+                              if (val > 0) {
+                                  ctx.save();
+                                  ctx.fillStyle = '#cbd5e1';
+                                  ctx.font = 'bold 10px "Plus Jakarta Sans", sans-serif';
+                                  ctx.textAlign = 'left';
+                                  ctx.textBaseline = 'middle';
+                                  ctx.fillText(val, bar.x + 5, bar.y);
+                                  ctx.restore();
+                              }
+                          });
+                      }
+                  });
+              }
+          };
+
+          // 1. RENDER GENDER
+          var ctxG = document.getElementById('genderChartAdmin');
+          var elTotal = document.getElementById('chartTotalUserAdmin');
+          if (ctxG) {
+              if (chartInstanceGender) chartInstanceGender.destroy();
+              chartInstanceGender = new Chart(ctxG.getContext('2d'), {
+                  type: 'doughnut',
+                  data: {
+                      labels: ['Laki-laki (' + male + ')', 'Perempuan (' + female + ')'],
+                      datasets: [{
+                          data: [male, female],
+                          backgroundColor: ['#3b82f6', '#f43f5e'],
+                          borderWidth: 0,
+                          hoverOffset: 6
+                      }]
+                  },
+                  options: {
+                      responsive: true,
+                      maintainAspectRatio: false,
+                      cutout: '72%',
+                      plugins: {
+                          legend: {
+                              position: 'bottom',
+                              labels: { color: '#94a3b8', font: { size: 11, family: '"Plus Jakarta Sans", sans-serif' }, padding: 15 }
+                          },
+                          tooltip: {
+                              callbacks: {
+                                  label: function(item) {
+                                      var val = item.raw || 0;
+                                      var pct = total > 0 ? Math.round((val / total) * 100) : 0;
+                                      return ' ' + item.label + ': ' + val + ' orang (' + pct + '%)';
+                                  }
+                              }
+                          }
+                      },
+                      onClick: onChartClickTrigger
+                  }
+              });
+              if (elTotal) elTotal.innerText = total;
+          }
+
+          // 2. RENDER PANGKAT GOLONGAN
+          // Fungsi bobot untuk mengurutkan dari hierarki tertinggi ke terendah
+          function getGolonganWeight(pangkatStr) {
+              if (!pangkatStr) return -1;
+              var p = String(pangkatStr).toUpperCase().trim();
+
+              // Golongan IV (PNS)
+              if (p.indexOf('IV/E') !== -1) return 100;
+              if (p.indexOf('IV/D') !== -1) return 99;
+              if (p.indexOf('IV/C') !== -1) return 98;
+              if (p.indexOf('IV/B') !== -1) return 97;
+              if (p.indexOf('IV/A') !== -1) return 96;
+
+              // Golongan III (PNS)
+              if (p.indexOf('III/D') !== -1) return 90;
+              if (p.indexOf('III/C') !== -1) return 89;
+              if (p.indexOf('III/B') !== -1) return 88;
+              if (p.indexOf('III/A') !== -1) return 87;
+
+              // Golongan II (PNS)
+              if (p.indexOf('II/D') !== -1) return 80;
+              if (p.indexOf('II/C') !== -1) return 79;
+              if (p.indexOf('II/B') !== -1) return 78;
+              if (p.indexOf('II/A') !== -1) return 77;
+
+              // Golongan I (PNS)
+              if (p.indexOf('I/D') !== -1) return 70;
+              if (p.indexOf('I/C') !== -1) return 69;
+              if (p.indexOf('I/B') !== -1) return 68;
+              if (p.indexOf('I/A') !== -1) return 67;
+
+              // Golongan PPPK (XVII s.d I)
+              var pppkMap = {
+                  'XVII': 60, 'XVI': 59, 'XV': 58, 'XIV': 57, 'XIII': 56,
+                  'XII': 55, 'XI': 54, 'X': 53, 'IX': 52, 'VIII': 51,
+                  'VII': 50, 'VI': 49, 'V': 48, 'IV': 47, 'III': 46,
+                  'II': 45, 'I': 44
+              };
+              for (var romawi in pppkMap) {
+                  var regex = new RegExp('(^|\\b|GOLONGAN\\s*)' + romawi + '($|\\b)', 'i');
+                  if (regex.test(p)) {
+                      return pppkMap[romawi];
+                  }
+              }
+
+              if (p.indexOf('NON-ASN') !== -1 || p.indexOf('NON ASN') !== -1) return 10;
+              return 0;
+          }
+
+          // Urutkan label golongan dari bobot terbesar ke terkecil
+          var pLabels = Object.keys(pCounts).sort(function(a, b) {
+              return getGolonganWeight(b) - getGolonganWeight(a);
+          });
+          var pData = pLabels.map(function(l) { return pCounts[l]; });
+
+          var ctxP = document.getElementById('golonganChart');
+          if (ctxP) {
+              if (chartInstanceGolongan) chartInstanceGolongan.destroy();
+              var maxP = Math.max.apply(null, pData.concat([5]));
+              chartInstanceGolongan = new Chart(ctxP.getContext('2d'), {
+                  type: 'bar',
+                  data: {
+                      labels: pLabels,
+                      datasets: [{ label: 'Pegawai', data: pData, backgroundColor: '#10b981', borderRadius: 4 }]
+                  },
+                  options: {
+                      indexAxis: 'y',
+                      responsive: true,
+                      maintainAspectRatio: false,
+                      layout: { padding: { right: 28, left: 4 } },
+                      plugins: {
+                          legend: { display: false },
+                          tooltip: {
+                              callbacks: {
+                                  title: function(items) {
+                                      if (!items || !items.length) return '';
+                                      return pLabels[items[0].dataIndex] || '';
+                                  }
+                              }
+                          }
+                      },
+                      scales: {
+                          x: { display: false, max: maxP + 2 },
+                          y: { grid: { display: false }, ticks: { color: '#94a3b8', autoSkip: false, font: { size: 10, family: '"Plus Jakarta Sans", sans-serif' } } }
+                      },
+                      onClick: onChartClickTrigger
+                  },
+                  plugins: [barDataLabelPlugin]
+              });
+          }
+          var elTotPangkat = document.getElementById('totalPangkatText');
+          if(elTotPangkat) elTotPangkat.innerHTML = '<span class="inline-block w-2 h-2 rounded bg-emerald-500 mr-1.5"></span> Total Data: <span class="font-bold text-slate-200">' + total + ' Pegawai</span>';
+
+          // 3. RENDER JABATAN (TERURUT HIERARKI & ANTI-TERHIMPIT)
+          var jLabels = Object.keys(jCounts).sort(function(a, b) {
+              return getJabatanWeight(b) - getJabatanWeight(a);
+          });
+          var jData = jLabels.map(function(l) { return jCounts[l]; });
+          var ctxJ = document.getElementById('jabatanChart');
+          if (ctxJ) {
+              if (chartInstanceJabatan) chartInstanceJabatan.destroy();
+              var maxJ = Math.max.apply(null, jData.concat([5]));
+              chartInstanceJabatan = new Chart(ctxJ.getContext('2d'), {
+                  type: 'bar',
+                  data: {
+                      labels: jLabels,
+                      datasets: [{ label: 'Pegawai', data: jData, backgroundColor: '#f59e0b', borderRadius: 4 }]
+                  },
+                  options: {
+                      indexAxis: 'y',
+                      responsive: true,
+                      maintainAspectRatio: false,
+                      layout: { padding: { right: 28, left: 4 } },
+                      plugins: {
+                          legend: { display: false },
+                          tooltip: {
+                              callbacks: {
+                                  title: function(items) {
+                                      if (!items || !items.length) return '';
+                                      return jLabels[items[0].dataIndex] || '';
+                                  }
+                              }
+                          }
+                      },
+                      scales: {
+                          x: { display: false, max: maxJ + 2 },
+                          y: {
+                              grid: { display: false },
+                              ticks: {
+                                  color: '#94a3b8',
+                                  autoSkip: false,
+                                  font: { size: 9, family: '"Plus Jakarta Sans", sans-serif' }
+                              }
+                          }
+                      },
+                      onClick: onChartClickTrigger
+                  },
+                  plugins: [barDataLabelPlugin]
+              });
+          }
+          var elTotJabatan = document.getElementById('totalJabatanText');
+          if(elTotJabatan) elTotJabatan.innerHTML = '<span class="inline-block w-2 h-2 rounded bg-amber-500 mr-1.5"></span> Total Data: <span class="font-bold text-slate-200">' + total + ' Pegawai</span>';
+
+          // 4. RENDER USIA
+          var uLabels = Object.keys(uCounts), uData = uLabels.map(function(l) { return uCounts[l]; });
+          var ctxUsia = document.getElementById('usiaChart');
+          if (ctxUsia) {
+              if (chartInstanceUsia) chartInstanceUsia.destroy();
+              var maxU = Math.max.apply(null, uData.concat([5]));
+              chartInstanceUsia = new Chart(ctxUsia.getContext('2d'), {
+                  type: 'bar',
+                  data: {
+                      labels: uLabels,
+                      datasets: [{ label: 'Pegawai', data: uData, backgroundColor: '#f43f5e', borderRadius: 4 }]
+                  },
+                  options: {
+                      indexAxis: 'y',
+                      responsive: true,
+                      maintainAspectRatio: false,
+                      layout: { padding: { right: 28, left: 4 } },
+                      plugins: {
+                          legend: { display: false },
+                          tooltip: {
+                              callbacks: {
+                                  title: function(items) {
+                                      if (!items || !items.length) return '';
+                                      return 'Rentang Usia: ' + uLabels[items[0].dataIndex] + ' Tahun';
+                                  }
+                              }
+                          }
+                      },
+                      scales: {
+                          x: { display: false, max: maxU + 2 },
+                          y: { grid: { display: false }, ticks: { color: '#94a3b8', autoSkip: false, font: { size: 10, family: '"Plus Jakarta Sans", sans-serif' } } }
+                      },
+                      onClick: onChartClickTrigger
+                  },
+                  plugins: [barDataLabelPlugin]
+              });
+          }
+          var elTotUsia = document.getElementById('totalUsiaText');
+          if(elTotUsia) elTotUsia.innerHTML = '<span class="inline-block w-2 h-2 rounded bg-rose-500 mr-1.5"></span> Total Data: <span class="font-bold text-slate-200">' + total + ' Pegawai</span>';
+
+          initChartCarouselDrag();
+      } catch (err) {
+          console.error("Gagal render grafik:", err);
+      }
+  }
+
+  // --- KONTROLER NAVIGASI GESER SLIDER CAROUSEL ---
+  function scrollChartCarousel(direction) {
+      var slider = document.getElementById('chartCarousel');
+      if (!slider) return;
+      var scrollAmount = Math.max(slider.clientWidth * 0.75, 380);
+      slider.scrollBy({
+          left: direction === 'right' ? scrollAmount : -scrollAmount,
+          behavior: 'smooth'
+      });
+  }
+
+  // --- TOGGLE TAMPILAN: MODE GRID 2x2 VS SLIDER ---
+  function toggleChartLayoutMode() {
+      var slider = document.getElementById('chartCarousel');
+      var btnText = document.getElementById('textToggleChartLayout');
+      var btnIcon = document.getElementById('iconToggleChartLayout');
+      var navBtns = document.getElementById('chartNavButtons');
+      if (!slider) return;
+
+      var isGrid = slider.classList.contains('grid');
+      if (!isGrid) {
+          // Beralih ke Mode Grid 2x2 (Layar Lebar)
+          slider.classList.remove('flex', 'overflow-x-auto', 'snap-x', 'snap-mandatory', 'cursor-grab');
+          slider.classList.add('grid', 'grid-cols-1', 'xl:grid-cols-2', 'gap-6');
+          slider.querySelectorAll('.chart-card').forEach(function(c) {
+              c.classList.remove('shrink-0', 'w-[85vw]', 'sm:w-[420px]', 'md:w-[480px]', 'lg:w-[500px]', 'snap-center');
+              c.classList.add('w-full');
+          });
+          if (btnText) btnText.innerText = 'Mode Slider';
+          if (btnIcon) { btnIcon.classList.remove('fa-table-cells-large'); btnIcon.classList.add('fa-sliders'); }
+          if (navBtns) navBtns.classList.add('hidden');
+          localStorage.setItem('transkep_chart_mode', 'grid');
+      } else {
+          // Beralih ke Mode Slider
+          slider.classList.remove('grid', 'grid-cols-1', 'xl:grid-cols-2');
+          slider.classList.add('flex', 'overflow-x-auto', 'snap-x', 'snap-mandatory', 'cursor-grab');
+          slider.querySelectorAll('.chart-card').forEach(function(c) {
+              c.classList.remove('w-full');
+              c.classList.add('shrink-0', 'w-[85vw]', 'sm:w-[420px]', 'md:w-[480px]', 'lg:w-[500px]', 'snap-center');
+          });
+          if (btnText) btnText.innerText = 'Mode Grid';
+          if (btnIcon) { btnIcon.classList.remove('fa-sliders'); btnIcon.classList.add('fa-table-cells-large'); }
+          if (navBtns) navBtns.classList.remove('hidden');
+          localStorage.setItem('transkep_chart_mode', 'slider');
+      }
+      setTimeout(function() {
+          renderAllCharts();
+      }, 150);
+  }
+
+  // --- CEK DAN TERAPKAN MODE TAMPILAN TERSIMPAN ---
+  function applyStoredChartMode() {
+      var savedMode = localStorage.getItem('transkep_chart_mode');
+      if (savedMode === 'grid') {
+          var slider = document.getElementById('chartCarousel');
+          if (slider && !slider.classList.contains('grid')) {
+              toggleChartLayoutMode();
+          }
+      }
+  }
+
+  // Hook applyStoredChartMode ke DOM
+  document.addEventListener('DOMContentLoaded', function() {
+      setTimeout(applyStoredChartMode, 300);
+  });
+
+  // --- FUNGSI DOWNLOAD DENGAN PRESERVASI BACKGROUND GELAP & ANGKA TENGAH ---
+  function downloadChartImage(canvasId, fileNamePrefix) {
+      var canvas = document.getElementById(canvasId);
+      if (!canvas) {
+          if (typeof showNotify === 'function') showNotify("Gagal Mengunduh", "Elemen grafik tidak ditemukan.", "error");
+          return;
+      }
+      var dateObj = new Date();
+      var months = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Ags", "Sept", "Okt", "Nov", "Des"];
+      var dateStr = dateObj.getDate() + "-" + months[dateObj.getMonth()] + "-" + dateObj.getFullYear();
+      var finalFileName = fileNamePrefix + "_" + dateStr + ".png";
+
+      // Buat kanvas resolusi tinggi sementara agar tidak merusak tampilan live
+      var exportCanvas = document.createElement("canvas");
+      var dpr = window.devicePixelRatio || 2;
+      exportCanvas.width = canvas.width;
+      exportCanvas.height = canvas.height;
+      var expCtx = exportCanvas.getContext("2d");
+
+      // 1. Gambar latar belakang gelap profesional
+      expCtx.fillStyle = "#090d16";
+      expCtx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
+
+      // 2. Salin grafik chart yang sudah lengkap dengan angka
+      expCtx.drawImage(canvas, 0, 0);
+
+      // 3. Jika Donat Gender, tuliskan angka TOTAL di tengah
+      if (canvasId === 'genderChartAdmin') {
+          var totalEl = document.getElementById('chartTotalUserAdmin');
+          var totalVal = totalEl ? totalEl.innerText : '';
+          
+          expCtx.save();
+          expCtx.textAlign = 'center';
+          expCtx.textBaseline = 'middle';
+          
+          var cx = exportCanvas.width / 2;
+          var cy = (exportCanvas.height / 2) - 12;
+          
+          expCtx.fillStyle = '#f8fafc';
+          expCtx.font = 'bold 36px "Plus Jakarta Sans", sans-serif';
+          expCtx.fillText(totalVal, cx, cy);
+          
+          expCtx.fillStyle = '#64748b';
+          expCtx.font = 'bold 12px "Plus Jakarta Sans", sans-serif';
+          expCtx.fillText('TOTAL', cx, cy + 28);
+          expCtx.restore();
+      }
+
+      // 4. Download file
+      var imageURI = exportCanvas.toDataURL("image/png");
+      var downloadLink = document.createElement("a");
+      downloadLink.href = imageURI;
+      downloadLink.download = finalFileName;
+      document.body.appendChild(downloadLink);
+      downloadLink.click();
+      document.body.removeChild(downloadLink);
+
+      if (typeof showNotify === 'function') showNotify("Berhasil Disimpan", "Grafik HD berhasil diunduh!", "success");
+  }
+
+  window.downloadChartImage = downloadChartImage;
+  window.renderAllCharts = renderAllCharts;
+  window.scrollChartCarousel = scrollChartCarousel;
+  window.toggleChartLayoutMode = toggleChartLayoutMode;

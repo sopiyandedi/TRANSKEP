@@ -1,0 +1,115 @@
+<!-- VIEW COMPONENT: pkp/PK_template.html -->
+<div id="template-pk-container" class="print-only" style="display:none;">
+  <style>
+    @media print {
+      /* 1. BUNUH TEKS URL & TANGGAL BROWSER 100% */
+      @page { size: A4 landscape; margin: 0; }
+      
+      /* 2. MATIKAN EFEK FLEXBOX TAILWIND AGAR TIDAK ADA JARAK ATAS RAKSASA */
+      html, body {
+        display: block !important;
+        width: 100% !important;
+        height: 100% !important;
+        overflow: visible !important;
+        background-color: white !important;
+        color: black !important;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+      
+      /* SEMBUNYIKAN SELURUH APLIKASI WEB KECUALI TEMPLATE INI */
+      body.print-mode > * {
+        display: none !important;
+      }
+      
+      body.print-mode > #template-pk-container {
+        display: block !important;
+        position: relative;
+        width: 100%;
+        box-sizing: border-box;
+        /* 3. BANTALAN KERTAS (PENGGANTI MARGIN @PAGE YANG DI-NOL-KAN) */
+        padding: 12mm 15mm !important; 
+        font-family: 'Arial', sans-serif;
+        font-size: 9pt;
+      }
+
+      /* Typography Setup */
+      .title-form { font-size: 13pt; font-weight: bold; text-align: center; margin-bottom: 2px; text-transform: uppercase; }
+      .subtitle-form { font-size: 13pt; font-weight: bold; text-align: center; margin-bottom: 30px; text-transform: uppercase; }
+      
+      /* Table Custom Layout Landscape (BKN Format) */
+      .table-data { width: 100%; border-collapse: collapse; margin-bottom: 40px; border: 1px solid black; }
+      .table-data th, .table-data td { border: 1px solid black; padding: 6px 4px; vertical-align: top; }
+      .table-data th { text-align: center; font-weight: bold; background-color: #f8f9fa !important; vertical-align: middle; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      
+      /* Utility Class Khusus Cetak */
+      .text-center { text-align: center; }
+      .font-bold { font-weight: bold; }
+      
+      /* PENGATURAN POSISI TANDA TANGAN */
+      .signature-area { width: 100%; display: table; margin-top: 20px; font-size: 10pt; page-break-inside: avoid; }
+      
+      /* Box TTD KIRI (Atasan): Rata Kiri */
+      .sig-box-left { display: table-cell; width: 50%; text-align: left; vertical-align: bottom; padding-left: 5%; }
+      
+      /* Box TTD KANAN (Pejabat): Rata Kiri, digeser ke kanan dengan padding 20% */
+      .sig-box-right { display: table-cell; width: 50%; text-align: left; vertical-align: bottom; padding-left: 20%; }
+      
+      .sig-space { height: 80px; }
+    }
+  </style>
+
+  <div class="title-form">FORMULIR PERJANJIAN KINERJA INDIVIDU</div>
+  <div class="subtitle-form"><span id="pk-print-jabatan">JABATAN PEGAWAI</span> PENGADILAN AGAMA INDRAMAYU</div>
+  
+  <table class="table-data">
+    <thead>
+      <tr>
+        <th rowspan="2" width="4%">NO</th>
+        <th rowspan="2" width="22%">SASARAN KEGIATAN</th>
+        <th rowspan="2" width="4%">NO</th>
+        <th rowspan="2" width="22%">INDIKATOR KINERJA</th>
+        <th rowspan="2" width="5%">TARGET<br>MUTU</th>
+        <th rowspan="2" width="6%">TARGET<br>KUANTITAS</th>
+        <th rowspan="2" width="7%">SATUAN</th>
+        <th colspan="12">WAKTU PENYELESAIAN</th>
+        <th rowspan="2" width="13%">PAGU ANGGARAN<br><i>(dalam rupiah)</i></th>
+      </tr>
+      <tr>
+        <th width="2.5%">JAN</th><th width="2.5%">FEB</th><th width="2.5%">MAR</th><th width="2.5%">APR</th>
+        <th width="2.5%">MEI</th><th width="2.5%">JUN</th><th width="2.5%">JUL</th><th width="2.5%">AGS</th>
+        <th width="2.5%">SEP</th><th width="2.5%">OKT</th><th width="2.5%">NOV</th><th width="2.5%">DES</th>
+      </tr>
+      <tr style="background-color: #f8f9fa;">
+        <th class="text-center font-bold">(1)</th>
+        <th class="text-center font-bold">(2)</th>
+        <th class="text-center font-bold"></th>
+        <th class="text-center font-bold">(3)</th>
+        <th class="text-center font-bold">(4)</th>
+        <th class="text-center font-bold">(5)</th>
+        <th class="text-center font-bold">(6)</th>
+        <th colspan="12" class="text-center font-bold">(7)</th>
+        <th class="text-center font-bold">(8)</th>
+      </tr>
+    </thead>
+    <tbody id="pk-print-tbody">
+      <!-- Injeksi JS -->
+    </tbody>
+  </table>
+
+  <div class="signature-area">
+    <div class="sig-box-left">
+      <div>Atasan Pejabat Penilai</div>
+      <div class="sig-space"></div>
+      <div class="font-bold" id="pk-print-atasan-nama" style="text-decoration: underline;">Nama Atasan</div>
+      <div id="pk-print-atasan-nip">NIP. 123</div>
+    </div>
+    <div class="sig-box-right">
+      <div id="pk-print-tanggal">Indramayu, 2 Januari 2026</div>
+      <div>Pejabat Penilai,</div>
+      <div class="sig-space"></div>
+      <div class="font-bold" id="pk-print-penilai-nama" style="text-decoration: underline;">Nama Penilai</div>
+      <div id="pk-print-penilai-nip">NIP. 123</div>
+    </div>
+  </div>
+</div>

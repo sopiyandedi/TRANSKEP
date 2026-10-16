@@ -1,0 +1,442 @@
+// =========================================================================
+// FILE: dashboard.js (TRANSKEP Dashboard Logic & Vue Controller)
+// DESKRIPSI: Logika Komputasi Absensi Hari Ini, Notifikasi TMT Peringatan, & Pencarian
+// ENGINE: ZettBOT Core v1.0.0 (by Zettbos)
+// =========================================================================
+
+function formatYMD(dateObj) {
+  let d = new Date(dateObj), month = '' + (d.getMonth() + 1), day = '' + d.getDate(), year = d.getFullYear();
+  if (month.length < 2) month = '0' + month;
+  if (day.length < 2) day = '0' + day;
+  return [year, month, day].join('-');
+}
+
+function parseTanggalLokal(tglStr) {
+  if (!tglStr) return null;
+  tglStr = String(tglStr).trim();
+  if (!/[a-zA-Z]/.test(tglStr)) {
+    let parts = tglStr.split(/[\/\-]/);
+    if (parts.length === 3) {
+      let p0 = parseInt(parts[0], 10), p1 = parseInt(parts[1], 10), p2 = parseInt(parts[2], 10);
+      if (!isNaN(p0) && !isNaN(p1) && !isNaN(p2)) {
+        if (p2 > 1000) return new Date(p2, p1 - 1, p0);
+        else if (p0 > 1000) return new Date(p0, p1 - 1, p2);
+      }
+    }
+  }
+  let d = new Date(tglStr.replace(/-/g, ' '));
+  if (!isNaN(d.getTime())) return d;
+  return null;
+}
+
+function formatTanggalIndoDashboard(dateObj) {
+  if (!dateObj || isNaN(dateObj.getTime())) return '-';
+  const months = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+  return `${dateObj.getDate()} ${months[dateObj.getMonth()]} ${dateObj.getFullYear()}`;
+}
+
+function calculateAge(nip) {
+  let nipClean = String(nip).replace(/[^0-9]/g, '');
+  if (nipClean.length >= 15) return new Date().getFullYear() - parseInt(nipClean.substring(0, 4));
+  return 0;
+}
+
+function autoForwardTMT(targetNip, type, newDateStr) {
+  const token = localStorage.getItem('transkep_session_token') || localStorage.getItem('transkep_token') || '';
+  const adminNip = (window.state && window.state.user && window.state.user.nip) || (window.dashboardApp && window.dashboardApp.currentUser && window.dashboardApp.currentUser.nip) || '';
+  if (window.DashboardDataService) {
+    DashboardDataService.forwardTmtDate(adminNip, targetNip, type, newDateStr, token)
+      .then(() => console.log(`Auto-Forward ${type} sukses`))
+      .catch((err) => console.warn(`Auto-Forward ${type} gagal:`, err));
+  }
+}
+
+function fallbackCopyText(text, type) {
+  var textArea = document.createElement("textarea");
+  textArea.value = text;
+  textArea.style.position = "fixed";
+  textArea.style.top = "0";
+  textArea.style.left = "0";
+  textArea.style.opacity = "0";
+  document.body.appendChild(textArea);
+  textArea.focus();
+  textArea.select();
+  try {
+    document.execCommand('copy');
+    if (typeof showNotify === 'function') showNotify(type + ' Disalin', 'Teks berhasil disalin.', 'success');
+  } catch (err) { }
+  document.body.removeChild(textArea);
+}
+
+function copyDataAndNotify(text, type) {
+  if (!text) return;
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(text).then(() => {
+      if (typeof showNotify === 'function') showNotify(type + ' Disalin', 'Teks disalin ke clipboard.', 'success');
+    }).catch(() => fallbackCopyText(text, type));
+  } else fallbackCopyText(text, type);
+}
+
+// Inisialisasi Aplikasi Vue untuk Section Dashboard
+window.dashboardApp = Vue.createApp({
+  data() {
+    return {
+      currentUser: null,
+      usersList: [],
+      searchKeyword: '',
+      filterWarning: { name: '', jenis: '', bulan: '', tahun: '' },
+      isBgSyncDone: false,
+      cutiLogs: [], stList: [], ipLogs: [], ikLogs: [], wfhLogs: [],
+      showModalStatus: false,
+      modalTmt: { nip: '', type: '', nama: '', dbStatus: '' }
+    };
+  },
+  computed: {
+    isAdmin() {
+      return this.currentUser && (this.currentUser.role === 'Admin' || this.currentUser.role === 'Operator');
+    },
+    tanggalHariIni() {
+      return formatTanggalIndoDashboard(new Date());
+    },
+
+    absensiHariIni() {
+      if (!this.isBgSyncDone) return [];
+      let absentees = [];
+      const todayTime = new Date().setHours(0, 0, 0, 0);
+
+      const safeNip = (nipData) => {
+        if (nipData === null || nipData === undefined) return '';
+        return String(nipData).replace(/['"\s]/g, "").trim();
+      };
+
+      function isTodayInRange(tglMulai, tglSelesai) {
+        let start = parseTanggalLokal(tglMulai);
+        let end = parseTanggalLokal(tglSelesai ? tglSelesai : tglMulai);
+        if (!start) return false;
+        if (!end) end = start;
+        start.setHours(0, 0, 0, 0);
+        end.setHours(23, 59, 59, 999);
+        return (todayTime >= start.getTime() && todayTime <= end.getTime());
+      }
+
+      // Cuti
+      this.cutiLogs.forEach(c => {
+        if (String(c.status || '').trim().toUpperCase() === 'DISETUJUI' && isTodayInRange(c.tgl_mulai, c.tgl_selesai)) {
+          let user = this.usersList.find(u => safeNip(u.nip) === safeNip(c.nip));
+          if (user) {
+            let jenisCuti = String(c.jenis || '').trim();
+            let badgeWarna = 'text-rose-400 bg-rose-500/10 border-rose-500/30';
+            if (jenisCuti.toLowerCase().includes('tahunan')) badgeWarna = 'text-indigo-400 bg-indigo-500/10 border-indigo-500/30';
+            else if (jenisCuti.toLowerCase().includes('penting')) badgeWarna = 'text-amber-400 bg-amber-500/10 border-amber-500/30';
+            else if (jenisCuti.toLowerCase().includes('melahirkan') || jenisCuti.toLowerCase().includes('besar')) badgeWarna = 'text-purple-400 bg-purple-500/10 border-purple-500/30';
+            absentees.push({ user: user, type: 'Cuti ' + jenisCuti, badgeColor: badgeWarna, end: c.tgl_selesai, plh: '' });
+          }
+        }
+      });
+
+      // Surat Tugas (Dinas Luar)
+      this.stList.forEach(st => {
+        if (st.status !== 'DIBATALKAN' && isTodayInRange(st.tgl_mulai, st.tgl_selesai)) {
+          let parsedPeserta = [];
+          try {
+            let parsed = JSON.parse(st.peserta);
+            parsedPeserta = Array.isArray(parsed) ? parsed : [parsed];
+          } catch (e) { parsedPeserta = [{ nip: safeNip(st.peserta) }]; }
+
+          parsedPeserta.forEach(pObj => {
+            let pNip = safeNip(pObj.nip || pObj.NIP || pObj.id || (typeof pObj === 'string' ? pObj : ''));
+            let user = this.usersList.find(u => safeNip(u.nip) === pNip);
+            if (user) {
+              let plhText = '', plhNip = pObj.plh_nip || pObj.nip_plh || pObj.plh || '', plhNama = pObj.plh_nama || pObj.nama_plh || '';
+              if (!plhNip && !plhNama) {
+                try {
+                  let ekstraData = JSON.parse(st.data_ekstra || '{}');
+                  plhNip = ekstraData.plh_nip || ekstraData.nip_plh || ekstraData.plh || '';
+                  plhNama = ekstraData.nama_plh || ekstraData.plh_nama || '';
+                } catch (e) { }
+              }
+              if (plhNip && String(plhNip).trim() !== '') {
+                let plhUser = this.usersList.find(u => safeNip(u.nip) === safeNip(plhNip));
+                if (plhUser) plhText = formatNamaBersih(plhUser.nama);
+              }
+              if (!plhText && plhNama && String(plhNama).trim() !== '') plhText = formatNamaBersih(plhNama);
+              let infoTempat = st.tempat ? st.tempat : (st.tujuan ? st.tujuan : '');
+              if (infoTempat.length > 35) infoTempat = infoTempat.substring(0, 35) + '...';
+              absentees.push({ user: user, type: 'Dinas Luar', badgeColor: 'text-purple-400 bg-purple-500/10 border-purple-500/30', end: st.tgl_selesai, plh: plhText, tempat: infoTempat });
+            }
+          });
+        }
+      });
+
+      // Izin Pribadi, Izin Keluar, WFH
+      this.ipLogs.forEach(ip => {
+        if (String(ip.status || '').trim().toUpperCase() === 'DISETUJUI' && isTodayInRange(ip.tgl_mulai, ip.tgl_selesai)) {
+          let user = this.usersList.find(u => safeNip(u.nip) === safeNip(ip.nip));
+          if (user) absentees.push({ user: user, type: 'Izin', badgeColor: 'text-amber-400 bg-amber-500/10 border-amber-500/30', end: ip.tgl_selesai, plh: '' });
+        }
+      });
+      this.ikLogs.forEach(ik => {
+        if (String(ik.status || '').trim().toUpperCase() === 'DISETUJUI' && isTodayInRange(ik.tanggal, ik.tanggal)) {
+          let user = this.usersList.find(u => safeNip(u.nip) === safeNip(ik.nip));
+          if (user) absentees.push({ user: user, type: 'Izin Keluar', badgeColor: 'text-orange-400 bg-orange-500/10 border-orange-500/30', end: ik.tanggal, plh: '' });
+        }
+      });
+      this.wfhLogs.forEach(w => {
+        if (String(w.status_rencana || '').trim().toUpperCase() === 'DISETUJUI' && isTodayInRange(w.tanggal, w.tanggal)) {
+          let user = this.usersList.find(u => safeNip(u.nip) === safeNip(w.nip));
+          if (user) absentees.push({ user: user, type: 'WFH', badgeColor: 'text-teal-400 bg-teal-500/10 border-teal-500/30', end: w.tanggal, plh: '' });
+        }
+      });
+
+      let uniqueAbsentees = [];
+      let trackedNips = new Set();
+      absentees.forEach(a => {
+        if (!trackedNips.has(a.user.nip)) {
+          trackedNips.add(a.user.nip);
+          uniqueAbsentees.push(a);
+        }
+      });
+      return uniqueAbsentees;
+    },
+
+    searchResults() {
+      if (!this.searchKeyword || this.searchKeyword.trim() === '') return [];
+      const kw = this.searchKeyword.toLowerCase().replace(/[\u2013\u2014]/g, '-').trim();
+      let isGenderSearch = false;
+      let targetGender = '';
+      if (kw.indexOf('laki') !== -1) { isGenderSearch = true; targetGender = 'laki-laki'; }
+      else if (kw.indexOf('perempuan') !== -1 || kw.indexOf('wanita') !== -1) { isGenderSearch = true; targetGender = 'perempuan'; }
+
+      return this.usersList.filter(u => {
+        let nipClean = String(u.nip || '').replace(/[^0-9]/g, '');
+        let genderLabel = (nipClean.length >= 15 && nipClean.charAt(14) === '2') ? 'perempuan' : ((String(u.jk || '').toLowerCase().indexOf('perempuan') !== -1 || String(u.jk || '').toLowerCase() === 'p') ? 'perempuan' : 'laki-laki');
+        if (isGenderSearch) return genderLabel === targetGender;
+        let usiaMatch = false;
+        if (kw.indexOf('-') !== -1 && typeof calculateAge === 'function') {
+          let age = calculateAge(u.nip);
+          if (kw === '21-30' && age >= 21 && age <= 30) usiaMatch = true;
+          else if (kw === '31-35' && age >= 31 && age <= 35) usiaMatch = true;
+          else if (kw === '36-40' && age >= 36 && age <= 40) usiaMatch = true;
+          else if (kw === '41-45' && age >= 41 && age <= 45) usiaMatch = true;
+          else if (kw === '46-50' && age >= 46 && age <= 50) usiaMatch = true;
+          else if (kw === '51-55' && age >= 51 && age <= 55) usiaMatch = true;
+          else if (kw === '56-60' && age >= 56 && age <= 60) usiaMatch = true;
+          else if (kw === '61-70' && age >= 61 && age <= 70) usiaMatch = true;
+        }
+        return (u.nama || '').toLowerCase().indexOf(kw) !== -1 || String(u.nip || '').indexOf(kw) !== -1 || (u.jabatan || '').toLowerCase().indexOf(kw) !== -1 || (u.pangkat || '').toLowerCase().indexOf(kw) !== -1 || usiaMatch;
+      });
+    },
+
+    rawWarningsData() {
+      let warnings = [];
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const createWarningObj = (user, type, targetDate, today, dbStatus) => {
+        let diffTime = targetDate.getTime() - today.getTime();
+        let diffDays = Math.ceil(diffTime / (1000 * 3600 * 24));
+        let status = 'Menunggu', statusClass = 'text-amber-400 border-amber-500/30 bg-amber-500/10', targetText = '', isCompleted = false, targetClass = 'text-indigo-400';
+        let checkStatus = (dbStatus || '').toUpperCase();
+
+        if (checkStatus === 'PROSES') {
+          status = 'Sedang Diproses'; statusClass = 'text-blue-400 border-blue-500/30 bg-blue-500/10 font-bold shadow-[0_0_10px_rgba(59,130,246,0.2)]'; isCompleted = true; targetText = 'Berkas Terkirim'; targetClass = 'text-blue-400';
+        } else if (checkStatus === 'SELESAI') {
+          status = 'Selesai'; statusClass = 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10 font-bold shadow-[0_0_10px_rgba(16,185,129,0.2)]'; isCompleted = true; targetText = 'Berkas Diterima'; targetClass = 'text-emerald-400';
+        } else {
+          if (diffDays < 0) { status = 'Terlewat'; statusClass = 'text-rose-400 border-rose-500/50 bg-rose-500/10 font-bold'; targetClass = 'text-rose-400'; }
+          else if (diffDays <= 30) { status = 'Kritis'; statusClass = 'text-rose-100 border-rose-500 bg-rose-600 font-bold animate-pulse shadow-[0_0_15px_rgba(225,29,72,0.5)]'; targetClass = 'text-rose-500 font-extrabold animate-pulse'; }
+          else if (diffDays <= 90) { status = 'Segera'; statusClass = 'text-orange-400 border-orange-500/50 bg-orange-500/10 font-bold'; }
+        }
+
+        if (!isCompleted) {
+          if (diffDays < 0) targetText = 'OVERDUE';
+          else {
+            let diffY = Math.floor(diffDays / 365), diffM = Math.floor((diffDays % 365) / 30);
+            if (diffY > 0) targetText += diffY + ' Thn ';
+            if (diffM > 0) targetText += diffM + ' Bln';
+            if (!targetText) targetText = diffDays + ' Hari';
+          }
+        }
+        return {
+          user: user, type: type, rawDate: targetDate, dateStr: formatTanggalIndoDashboard(targetDate),
+          status: status, statusClass: statusClass, targetText: targetText, targetClass: targetClass,
+          month: targetDate.getMonth(), year: targetDate.getFullYear(), dbStatus: dbStatus || ''
+        };
+      };
+
+      this.usersList.forEach(u => {
+        if (u.role === 'Admin' || u.role === 'Operator') return;
+
+        // Pangkat
+        let knpDate = parseTanggalLokal(u.tmt_knp);
+        if (knpDate) {
+          let tambahanTahun = (String(u.jenis_jabatan || '').toUpperCase() === 'FUNGSIONAL') ? 2 : 4;
+          knpDate.setFullYear(knpDate.getFullYear() + tambahanTahun);
+          if (u.status_knp && u.status_knp.toUpperCase() === 'SELESAI' && u.tgl_selesai_knp) {
+            let diff = (today.getTime() - new Date(u.tgl_selesai_knp).getTime()) / (1000 * 3600 * 24);
+            if (diff >= 30) return;
+          }
+          warnings.push(createWarningObj(u, 'Pangkat', knpDate, today, u.status_knp));
+        }
+
+        // KGB
+        let kgbDate = parseTanggalLokal(u.tmt_kgb);
+        if (kgbDate) {
+          kgbDate.setFullYear(kgbDate.getFullYear() + 2);
+          if (u.status_kgb && u.status_kgb.toUpperCase() === 'SELESAI' && u.tgl_selesai_kgb) {
+            let diff = (today.getTime() - new Date(u.tgl_selesai_kgb).getTime()) / (1000 * 3600 * 24);
+            if (diff >= 30) return;
+          }
+          warnings.push(createWarningObj(u, 'KGB', kgbDate, today, u.status_kgb));
+        }
+
+        // Pensiun
+        let nipClean = String(u.nip).replace(/[^0-9]/g, '');
+        if (nipClean.length >= 15) {
+          let birthDate = new Date(parseInt(nipClean.substring(0, 4)), parseInt(nipClean.substring(4, 6)) - 1, parseInt(nipClean.substring(6, 8)));
+          birthDate.setFullYear(birthDate.getFullYear() + (parseInt(u.bup) || 58));
+          birthDate.setMonth(birthDate.getMonth() + 1, 1);
+          warnings.push(createWarningObj(u, 'Pensiun', birthDate, today, u.status_pensiun));
+        }
+      });
+
+      return warnings.sort((a, b) => a.rawDate - b.rawDate);
+    },
+
+    filteredAdminWarnings() {
+      return this.rawWarningsData.filter(item => {
+        let matchName = item.user.nama.toLowerCase().includes(this.filterWarning.name.toLowerCase()) || String(item.user.nip).includes(this.filterWarning.name);
+        let matchType = this.filterWarning.jenis === "" || item.type === this.filterWarning.jenis;
+        let matchBulan = this.filterWarning.bulan === "" || String(item.month) === this.filterWarning.bulan;
+        let matchTahun = this.filterWarning.tahun === "" || String(item.year) === this.filterWarning.tahun;
+        return matchName && matchType && matchBulan && matchTahun;
+      });
+    },
+    filteredPegawaiWarnings() {
+      if (!this.currentUser) return [];
+      return this.rawWarningsData.filter(item => String(item.user.nip) === String(this.currentUser.nip));
+    }
+  },
+
+  methods: {
+    formatNama(nama) { return formatNamaBersih(nama); },
+    formatDate(date) { return formatTanggalIndoDashboard(new Date(date)); },
+    copyTeks(teks, tipe) { copyDataAndNotify(teks, tipe); },
+
+    syncFromGlobal(globalState) {
+      this.currentUser = globalState.user;
+      this.usersList = globalState.usersList;
+      this.isBgSyncDone = globalState.isBgSyncDone;
+
+      this.cutiLogs = globalState.cutiLogs || [];
+      this.stList = globalState.stList || [];
+      this.ipLogs = globalState.ipLogs || [];
+      this.ikLogs = globalState.ikLogs || [];
+      this.wfhLogs = globalState.wfhLogs || [];
+
+      this.checkAutoForward();
+    },
+
+    checkAutoForward() {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      this.usersList.forEach(u => {
+        if (u.role === 'Admin' || u.role === 'Operator') return;
+
+        if (u.status_knp && u.status_knp.toUpperCase() === 'SELESAI' && u.tgl_selesai_knp) {
+          let diff = (today.getTime() - new Date(u.tgl_selesai_knp).getTime()) / (1000 * 3600 * 24);
+          if (diff >= 30) {
+            let knpDate = parseTanggalLokal(u.tmt_knp);
+            let tambahanTahun = (String(u.jenis_jabatan || '').toUpperCase() === 'FUNGSIONAL') ? 2 : 4;
+            knpDate.setFullYear(knpDate.getFullYear() + tambahanTahun);
+            autoForwardTMT(u.nip, 'Pangkat', formatYMD(knpDate));
+          }
+        }
+
+        if (u.status_kgb && u.status_kgb.toUpperCase() === 'SELESAI' && u.tgl_selesai_kgb) {
+          let diff = (today.getTime() - new Date(u.tgl_selesai_kgb).getTime()) / (1000 * 3600 * 24);
+          if (diff >= 30) {
+            let kgbDate = parseTanggalLokal(u.tmt_kgb);
+            kgbDate.setFullYear(kgbDate.getFullYear() + 2);
+            autoForwardTMT(u.nip, 'KGB', formatYMD(kgbDate));
+          }
+        }
+      });
+    },
+
+    externalSearch(kw) { this.searchKeyword = kw; },
+
+    openModalStatus(item) {
+      this.modalTmt.nip = item.user.nip;
+      this.modalTmt.type = item.type;
+      this.modalTmt.nama = item.user.nama;
+      this.modalTmt.dbStatus = item.dbStatus;
+      this.showModalStatus = true;
+    },
+    closeModalStatus() {
+      this.showModalStatus = false;
+    },
+    submitTmtStatus(newStatus) {
+      const targetNip = this.modalTmt.nip;
+      const typeStr = this.modalTmt.type;
+      const token = localStorage.getItem('transkep_session_token') || localStorage.getItem('transkep_token') || '';
+      const adminNip = (this.currentUser && this.currentUser.nip) || (window.state && window.state.user && window.state.user.nip) || '';
+
+      showLoading("Menyimpan status berkas...");
+
+      DashboardDataService.updateTmtStatus(adminNip, targetNip, typeStr, newStatus, token)
+        .then((res) => {
+          hideLoading();
+          this.closeModalStatus();
+          if (res && res.status === 'success') {
+            const notifyMsg = (typeStr === 'KGB' && newStatus === 'Proses')
+              ? "Status KGB diubah ke Proses. Pegawai telah masuk antrean E-Office!"
+              : "Status berkas diperbarui.";
+            showNotify("Berhasil Disimpan", notifyMsg, "success");
+
+            let userRef = this.usersList.find(u => String(u.nip) === String(targetNip));
+            if (userRef) {
+              const todayYMD = formatYMD(new Date());
+              if (typeStr === 'KGB') {
+                userRef.status_kgb = (newStatus === 'Menunggu') ? '' : newStatus;
+                userRef.tgl_selesai_kgb = (newStatus === 'Selesai') ? todayYMD : '';
+              }
+              if (typeStr === 'Pangkat') {
+                userRef.status_knp = (newStatus === 'Menunggu') ? '' : newStatus;
+                userRef.tgl_selesai_knp = (newStatus === 'Selesai') ? todayYMD : '';
+              }
+              if (typeStr === 'Pensiun') {
+                userRef.status_pensiun = (newStatus === 'Menunggu') ? '' : newStatus;
+                userRef.tgl_selesai_pensiun = (newStatus === 'Selesai') ? todayYMD : '';
+              }
+            }
+          } else {
+            showNotify("Gagal", res ? res.message : "Gagal menyimpan status", "error");
+          }
+        })
+        .catch((err) => {
+          hideLoading();
+          this.closeModalStatus();
+          showNotify("Error Sistem", err.toString(), "error");
+        });
+    }
+  }
+});
+
+document.addEventListener("DOMContentLoaded", () => {
+  const dashElem = document.getElementById('section-dashboard');
+  if (dashElem) {
+    window.vmDashboard = window.dashboardApp.mount('#section-dashboard');
+  }
+});
+
+function renderDashboardView() {
+  if (!state.user) return;
+  if (window.vmDashboard) window.vmDashboard.syncFromGlobal(state);
+  if (typeof renderAllCharts === 'function') {
+    setTimeout(renderAllCharts, 100);
+  }
+}
+
+window.renderDashboardView = renderDashboardView;

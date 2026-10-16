@@ -1,0 +1,241 @@
+// ==========================================
+// FILE: ik.js (Modul Formulir Izin Keluar Kantor)
+// ==========================================
+
+// --- Source: permohonan/ik/js_ik.html ---
+document.addEventListener("DOMContentLoaded", () => {
+    const { createApp } = Vue;
+
+    window.vmFormIK = createApp({
+        data() {
+            return {
+                s: state, // Mengambil reference state global
+                isOpen: false,
+                isScaled: false,
+                currentEditId: null,
+                form: {
+                    tipe_izin: '',
+                    tanggal: '',
+                    jam: '',
+                    alasan: '',
+                    atasan_nip: ''
+                }
+            };
+        },
+        computed: {
+            // Logika cerdas hierarki divisi & pendeteksi absen dipindah ke Computed
+            opsiAtasan() {
+                if (!this.s || !this.s.user) return { list: [], adaPlh: false };
+                
+                let atasanOpts = [];
+                let adaPlh = false;
+                const j = this.s.user.jabatan.toLowerCase();
+
+                const getPegawai = (keyword) => {
+                    return this.s.usersList.filter(x => String(x.nip) !== String(this.s.user.nip) && x.jabatan.toLowerCase().includes(keyword));
+                };
+
+                if (j.includes("hakim") || j.includes("wakil ketua") || j === "ketua") {
+                    let ketua = getPegawai("ketua").find(x => x.jabatan.toLowerCase() === "ketua");
+                    if (ketua && !this.isPegawaiAbsent(ketua.nip)) {
+                        atasanOpts.push(ketua);
+                    } else {
+                        adaPlh = true;
+                        let wakil = getPegawai("wakil ketua").find(x => x.jabatan.toLowerCase() === "wakil ketua");
+                        if (wakil && !this.isPegawaiAbsent(wakil.nip)) atasanOpts.push(wakil);
+                        else { 
+                            let hakims = getPegawai("hakim").filter(x => !this.isPegawaiAbsent(x.nip)); 
+                            atasanOpts.push(...hakims); 
+                        }
+                    }
+                }
+                else if (j.includes("panitera muda") || j.includes("panitera pengganti") || j.includes("jurusita") || j.includes("juru sita")) {
+                    let panitera = getPegawai("panitera").find(x => x.jabatan.toLowerCase() === "panitera");
+                    if (panitera && !this.isPegawaiAbsent(panitera.nip)) {
+                        atasanOpts.push(panitera);
+                    } else {
+                        adaPlh = true;
+                        let panmuds = getPegawai("panitera muda").filter(x => !this.isPegawaiAbsent(x.nip));
+                        atasanOpts.push(...panmuds);
+                    }
+                }
+                else if (j.includes("kepala sub bagian") || j.includes("kasubbag")) {
+                    let sekretaris = getPegawai("sekretaris").find(x => x.jabatan.toLowerCase() === "sekretaris");
+                    if (sekretaris && !this.isPegawaiAbsent(sekretaris.nip)) {
+                        atasanOpts.push(sekretaris);
+                    } else {
+                        adaPlh = true;
+                        let kasubbags = getPegawai("kepala sub bagian").filter(x => !this.isPegawaiAbsent(x.nip));
+                        if(kasubbags.length === 0) kasubbags = getPegawai("kasubbag").filter(x => !this.isPegawaiAbsent(x.nip));
+                        atasanOpts.push(...kasubbags);
+                    }
+                }
+                else {
+                    let ketua = getPegawai("ketua").find(x => x.jabatan.toLowerCase() === "ketua");
+                    if (ketua && !this.isPegawaiAbsent(ketua.nip)) atasanOpts.push(ketua);
+                    else {
+                        adaPlh = true;
+                        let wakil = getPegawai("wakil ketua").find(x => x.jabatan.toLowerCase() === "wakil ketua");
+                        if (wakil && !this.isPegawaiAbsent(wakil.nip)) atasanOpts.push(wakil);
+                        else { let hakims = getPegawai("hakim").filter(x => !this.isPegawaiAbsent(x.nip)); atasanOpts.push(...hakims); }
+                    }
+                    let panitera = getPegawai("panitera").find(x => x.jabatan.toLowerCase() === "panitera");
+                    if (panitera && !this.isPegawaiAbsent(panitera.nip)) atasanOpts.push(panitera);
+                    else {
+                        adaPlh = true;
+                        let panmuds = getPegawai("panitera muda").filter(x => !this.isPegawaiAbsent(x.nip));
+                        atasanOpts.push(...panmuds);
+                    }
+                    let sekretaris = getPegawai("sekretaris").find(x => x.jabatan.toLowerCase() === "sekretaris");
+                    if (sekretaris && !this.isPegawaiAbsent(sekretaris.nip)) atasanOpts.push(sekretaris);
+                    else {
+                        adaPlh = true;
+                        let kasubbags = getPegawai("kepala sub bagian").filter(x => !this.isPegawaiAbsent(x.nip));
+                        if(kasubbags.length === 0) kasubbags = getPegawai("kasubbag").filter(x => !this.isPegawaiAbsent(x.nip));
+                        atasanOpts.push(...kasubbags);
+                    }
+                }
+
+                // Hapus duplikat NIP
+                atasanOpts = [...new Map(atasanOpts.map(item => [item.nip, item])).values()];
+                return { list: atasanOpts, adaPlh: adaPlh };
+            }
+        },
+        watch: {
+            // Auto-select jika dropdown hanya punya 1 pilihan
+            'opsiAtasan.list'(newVal) {
+                if (newVal.length > 0 && (!this.form.atasan_nip || !newVal.find(x => x.nip === this.form.atasan_nip))) {
+                    this.form.atasan_nip = newVal[0].nip;
+                }
+            }
+        },
+        methods: {
+            formatJam() {
+                let val = this.form.jam.replace(/[^0-9]/g, '');
+                if (val.length >= 3) {
+                    val = val.substring(0, 2) + ':' + val.substring(2, 4);
+                }
+                this.form.jam = val;
+            },
+            validateJam() {
+                const val = this.form.jam;
+                if (val && !/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/.test(val)) {
+                    if(window.showNotify) window.showNotify("Format Jam Salah", "Gunakan format 24 jam antara 00:00 s/d 23:59 (Contoh: 13:45)", "warning");
+                }
+            },
+            isPegawaiAbsent(nip) {
+                const today = new Date();
+                today.setHours(0,0,0,0);
+                return this.s.cutiLogs.some(log => {
+                    if (String(log.nip) === String(nip) && log.status === 'Disetujui') {
+                        const start = new Date(log.tgl_mulai); start.setHours(0,0,0,0);
+                        const end = new Date(log.tgl_selesai); end.setHours(0,0,0,0);
+                        return today >= start && today <= end;
+                    }
+                    return false;
+                });
+            },
+            openModal(editId = null) {
+                if (!this.s || !this.s.user) {
+                    if(window.showNotify) window.showNotify("Sistem Memuat", "Silakan tunggu, data sistem belum siap.", "error");
+                    return;
+                }
+                
+                this.currentEditId = editId;
+                
+                // Reset / Populate Form
+                if (editId) {
+                    const log = this.s.ikLogs.find(l => String(l.id) === String(editId));
+                    if (log) {
+                        this.form.tipe_izin = log.tipe_izin || "";
+                        this.form.tanggal = log.tanggal;
+                        this.form.jam = log.jam || "";
+                        this.form.alasan = log.alasan;
+                        setTimeout(() => { this.form.atasan_nip = log.atasan_nip; }, 50);
+                    }
+                } else {
+                    this.form = { tipe_izin: '', tanggal: new Date().toISOString().split('T')[0], jam: '', alasan: '', atasan_nip: '' };
+                }
+
+                // Animasikan buka modal (Sama persis dengan vanilla)
+                this.isOpen = true;
+                setTimeout(() => { this.isScaled = true; }, 10);
+            },
+            closeModal() {
+                this.isScaled = false;
+                setTimeout(() => { this.isOpen = false; }, 200);
+            },
+            submitForm() {
+                if(!this.s.user) {
+                    if(window.showNotify) window.showNotify("Sesi Berakhir", "Harap login ulang.", "error"); 
+                    return;
+                }
+                
+                if (!this.form.alasan.toLowerCase().includes('dinas')) {
+                    if(window.showNotify) window.showNotify("Keperluan Tidak Valid", "Anda harus menyertakan kata 'dinas' di dalam alasan pengajuan Izin Keluar.", "error");
+                    return;
+                }
+
+                const payload = {
+                    id: this.currentEditId, 
+                    nip: this.s.user.nip,
+                    ...this.form
+                };
+
+                const token = localStorage.getItem('transkep_session_token'); 
+                if(window.showLoading) window.showLoading(this.currentEditId ? "Memperbarui Izin Keluar..." : "Mengirimkan Izin Keluar...");
+                
+                const actionPromise = this.currentEditId
+                    ? IzinDataService.updateIK(payload, token)
+                    : IzinDataService.submitIK(payload, token);
+
+                actionPromise
+                    .then((res) => {
+                        if(window.hideLoading) window.hideLoading();
+                        if(res.status === 'success') {
+                            this.closeModal();
+                            if(window.showNotify) window.showNotify("Berhasil Disimpan", res.message, "success");
+                            
+                            if (this.currentEditId) {
+                                const idx = this.s.ikLogs.findIndex(l => String(l.id) === String(this.currentEditId));
+                                if (idx !== -1) {
+                                    this.s.ikLogs[idx] = { ...this.s.ikLogs[idx], ...payload, status: 'Menunggu' };
+                                }
+                            } else {
+                                const virtualLog = {
+                                    id: (res.data && res.data.id) ? res.data.id : "IK-VIRTUAL-" + Date.now(),
+                                    tgl_pengajuan: new Date().toLocaleDateString('id-ID'),
+                                    ...payload,
+                                    status: 'Menunggu',
+                                    catatan: '',
+                                    z_type: 'IK',
+                                    z_sort: Date.now()
+                                };
+                                if (this.s && this.s.ikLogs) this.s.ikLogs.unshift(virtualLog);
+                            }
+                            if (typeof window.renderPermohonanView === 'function') window.renderPermohonanView();
+                        } else { 
+                            if(window.showNotify) window.showNotify("Gagal", res.message, "error"); 
+                        }
+                    })
+                    .catch((err) => {
+                        if(window.hideLoading) window.hideLoading(); 
+                        if(window.showNotify) window.showNotify("Error Jaringan", err.toString(), "error");
+                    });
+            }
+        }
+    }).mount('#vue-form-ik-wrapper');
+
+    // ---------------------------------------------------------
+    // BRIDGING KE TOMBOL VANILLA HTML (Bypass Integrasi)
+    // ---------------------------------------------------------
+    window.openModalIK = function(editId = null) {
+        if (window.vmFormIK) window.vmFormIK.openModal(editId);
+    };
+    
+    window.closeModalIK = function() {
+        if (window.vmFormIK) window.vmFormIK.closeModal();
+    };
+});
+
+// Logika Cetak IK dipisahkan ke js/cetak/cetak_ik.js

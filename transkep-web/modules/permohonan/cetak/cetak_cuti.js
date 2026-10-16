@@ -1,0 +1,229 @@
+// ==========================================
+// FILE: cetak_cuti.js
+// MODUL CETAK MANDIRI (Clean Architecture)
+// ==========================================
+
+// --- Source: permohonan/js_cetak_cuti.html ---
+// =========================================================================
+  // LOGIKA CLIENT-SIDE: CETAK FORMULIR CUTI (SAFE IFRAME PRINT MODE)
+  // =========================================================================
+
+  function formatJabatanSingkat(jab) {
+      if (!jab) return "-";
+      let j = jab.toUpperCase();
+      if (j.includes("KEPALA SUB BAGIAN PERENCANAAN, TI DAN PELAPORAN")) return "Kasubbag PTIP";
+      if (j.includes("KEPALA SUB BAGIAN UMUM DAN KEUANGAN")) return "Kasubbag Umum dan Keuangan";
+      if (j.includes("KEPALA SUB BAGIAN KEPEGAWAIAN, ORTALA") || j.includes("KEPALA SUB BAGIAN KEPEGAWAIAN DAN ORTALA")) return "Kasubbag Kepegawaian & ORTALA";
+      return jab;
+  }
+
+  function formatDateIndoCetak(dateStr) {
+      if (!dateStr) return "-";
+      const months = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+      
+      // Jika formatnya YYYY-MM-DD (contoh: dari kalender mulai/selesai cuti)
+      let parts = dateStr.split('-');
+      if (parts.length === 3) {
+          return parseInt(parts[2], 10) + " " + months[parseInt(parts[1], 10) - 1] + " " + parts[0];
+      }
+      
+      // Jika formatnya DD/MM/YYYY (contoh: dari database tgl_pengajuan)
+      parts = dateStr.split('/');
+      if (parts.length === 3) {
+          return parseInt(parts[0], 10) + " " + months[parseInt(parts[1], 10) - 1] + " " + parts[2];
+      }
+      
+      return dateStr;
+  }
+
+  function printCutiForm(id) {
+      // =========================================================================
+      // PENGATURAN CETAK (UBAH DI SINI)
+      // =========================================================================
+      const JARAK_TANDA_TANGAN = "40px"; // <-- UBAH ANGKA INI UNTUK MENGATUR SPASI TANDA TANGAN
+      // =========================================================================
+
+      const log = state.cutiLogs.find(function(l) { return String(l.id) === String(id); });
+      if (!log) {
+          showNotify("Error Cetak", "Data transaksi cuti tidak ditemukan.", "error");
+          return;
+      }
+
+      const pns = state.usersList.find(function(u) { return String(u.nip) === String(log.nip); }) || { nama: '-', nip: '-', jabatan: '-', no_hp: '-' };
+      const atasan = state.usersList.find(function(u) { return String(u.nip) === String(log.atasan_nip); }) || { nama: '-', nip: '-', jabatan: '-' };
+      const pejabat = state.usersList.find(function(u) { return String(u.nip) === String(log.pejabat_nip); }) || { nama: '-', nip: '-', jabatan: '-' };
+
+      const templateContainer = document.getElementById('template-cetak-container');
+      if (!templateContainer) {
+          showNotify("Error Template", "Template cetak belum di-load ke dalam sistem.", "error");
+          return;
+      }
+
+      showLoading("Menyiapkan dokumen cetak...");
+
+      let htmlContent = templateContainer.innerHTML;
+
+      let cTahunan = "", cBesar = "", cSakit = "", cMelahirkan = "", cPenting = "", cCltn = "";
+      if (log.jenis === 'Tahunan') cTahunan = "✓";
+      else if (log.jenis === 'Besar') cBesar = "✓";
+      else if (log.jenis === 'Sakit') cSakit = "✓";
+      else if (log.jenis === 'Melahirkan') cMelahirkan = "✓";
+      else if (log.jenis === 'Alasan Penting' || log.jenis === 'Penting') cPenting = "✓";
+      else if (log.jenis === 'CLTN') cCltn = "✓";
+
+      let cAtasanSetuju = "", cAtasanUbah = "", cAtasanTangguh = "", cAtasanTolak = "";
+      if (log.status_atasan === 'Disetujui') cAtasanSetuju = "✓";
+      else if (log.status_atasan === 'Perubahan') cAtasanUbah = "✓";
+      else if (log.status_atasan === 'Ditolak') cAtasanTolak = "✓";
+      else if (log.status === 'DIBATALKAN') cAtasanTangguh = "✓"; 
+
+      let cPejabatSetuju = "", cPejabatUbah = "", cPejabatTangguh = "", cPejabatTolak = "";
+      if (log.status_pejabat === 'Disetujui') cPejabatSetuju = "✓";
+      else if (log.status_pejabat === 'Perubahan') cPejabatUbah = "✓";
+      else if (log.status_pejabat === 'Ditolak') cPejabatTolak = "✓";
+      else if (log.status === 'DIBATALKAN') cPejabatTangguh = "✓";
+
+      let hist = { y24: 0, y25: 0, y26: 0 };
+      if (log.jenis === 'Tahunan' && log.history) {
+          try { hist = JSON.parse(log.history); } catch (e) {}
+      }
+      
+      let sisaAw24 = Number(pns.s_tahunan_2024 || 0) + Number(hist.y24 || 0);
+      let sisaAw25 = Number(pns.s_tahunan_2025 || 0) + Number(hist.y25 || 0);
+      let sisaAw26 = Number(pns.s_tahunan_2026 || 0) + Number(hist.y26 || 0);
+      
+      let sisaAk24 = sisaAw24 - Number(hist.y24 || 0);
+      let sisaAk25 = sisaAw25 - Number(hist.y25 || 0);
+      let sisaAk26 = sisaAw26 - Number(hist.y26 || 0);
+
+      const qrPegawai = "https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=Diajukan%20oleh:%20" + encodeURIComponent(pns.nama);
+      const qrAtasan = "https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=Diketahui%20oleh:%20" + encodeURIComponent(atasan.nama);
+      const qrPejabat = "https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=Disetujui%20oleh:%20" + encodeURIComponent(pejabat.nama);
+
+      let atasanJabatanStr = formatJabatanSingkat(atasan.jabatan);
+      let pejabatJabatanStr = formatJabatanSingkat(pejabat.jabatan);
+
+      // ZETTBOT: Logika penampakan Barcode hanya jika status Disetujui
+      // Jika belum disetujui, cetak kotak kosong 65x65px agar layout tidak bergeser
+      let viewQrAtasan = (log.status_atasan === 'Disetujui') 
+          ? "<img src='" + qrAtasan + "' width='65' height='65' alt='QR Atasan' style='flex-shrink: 0;' />" 
+          : "<div style='width: 65px; height: 65px; flex-shrink: 0;'></div>";
+          
+      let viewQrPejabat = (log.status_pejabat === 'Disetujui') 
+          ? "<img src='" + qrPejabat + "' width='65' height='65' alt='QR Pejabat' style='flex-shrink: 0;' />" 
+          : "<div style='width: 65px; height: 65px; flex-shrink: 0;'></div>";
+
+      let atasanSig = "<div style='width: 100%; display: flex; justify-content: flex-end;'>" +
+                            "<div style='width: 42%; display: flex; flex-direction: column; align-items: flex-start; text-align: left;'>" +
+                              
+                              "<div style='font-size: 11pt !important; font-family: \"Times New Roman\", Times, serif; font-weight: bold; padding-left: 73px; flex-shrink: 0;'>" + 
+                                atasanJabatanStr + 
+                              "</div>" +
+                              
+                              "<div style='display: flex; gap: 8px; align-items: flex-start; flex-shrink: 0; margin-top: 4px;'>" +
+                                viewQrAtasan +
+                                "<div style='font-size: 11pt !important; line-height: 1.15; font-family: \"Times New Roman\", Times, serif; padding-top: " + JARAK_TANDA_TANGAN + ";'>" +
+                                  "<span style='text-decoration: underline; font-weight: bold;'>" + atasan.nama + "</span><br>" +
+                                  "NIP. " + atasan.nip +
+                                "</div>" +
+                              "</div>" +
+
+                            "</div>" +
+                          "</div>";
+
+      let pejabatSig = "<div style='width: 100%; display: flex; justify-content: flex-end;'>" +
+                             "<div style='width: 42%; display: flex; flex-direction: column; align-items: flex-start; text-align: left;'>" +
+                               
+                               "<div style='font-size: 11pt !important; font-family: \"Times New Roman\", Times, serif; font-weight: bold; padding-left: 73px; flex-shrink: 0;'>" + 
+                                 pejabatJabatanStr + 
+                               "</div>" +
+                               
+                               "<div style='display: flex; gap: 8px; align-items: flex-start; flex-shrink: 0; margin-top: 4px;'>" +
+                                 viewQrPejabat +
+                                 "<div style='font-size: 11pt !important; line-height: 1.15; font-family: \"Times New Roman\", Times, serif; padding-top: " + JARAK_TANDA_TANGAN + ";'>" +
+                                   "<span style='text-decoration: underline; font-weight: bold;'>" + pejabat.nama + "</span><br>" +
+                                   "NIP. " + pejabat.nip +
+                                 "</div>" +
+                               "</div>" +
+
+                             "</div>" +
+                           "</div>";
+
+      let showAlasan = log.alasan;
+      if (log.alasan.includes("[USULAN PEMBATALAN]:")) {
+          let parts = log.alasan.split("[USULAN PEMBATALAN]:");
+          showAlasan = parts[0].trim() + " [USULAN PEMBATALAN]: " + parts[1].trim();
+      }
+
+      const replacements = {
+          "{{formatPengajuanLengkap}}": formatDateIndoCetak(log.tgl_pengajuan),
+          "{{romawiCetak}}": (log.tgl_pengajuan && log.tgl_pengajuan.split('/')[1] ? ["I","II","III","IV","V","VI","VII","VIII","IX","X","XI","XII"][parseInt(log.tgl_pengajuan.split('/')[1], 10)-1] : "-"),
+          "{{tahunCetak}}": (log.tgl_pengajuan ? log.tgl_pengajuan.split('/')[2] : "-"),
+          
+          "{{pns_nama}}": pns.nama,
+          "{{pns_nip}}": pns.nip,
+          "{{pns_jabatan}}": formatJabatanSingkat(pns.jabatan),
+          "{{pns_no_hp}}": pns.no_hp,
+          
+          "{{chk_tahunan}}": cTahunan, "{{chk_besar}}": cBesar, "{{chk_sakit}}": cSakit, 
+          "{{chk_melahirkan}}": cMelahirkan, "{{chk_penting}}": cPenting, "{{chk_cltn}}": cCltn,
+          
+          "{{log_alasan}}": showAlasan,
+          "{{log_sisa_cuti}}": (log.sisa_cuti || 0),
+          "{{log_tgl_mulai}}": formatDateIndoCetak(log.tgl_mulai),
+          "{{log_tgl_selesai}}": formatDateIndoCetak(log.tgl_selesai),
+          "{{log_alamat}}": (log.alamat || '-'),
+          
+          "{{before24}}": sisaAw24, "{{after24}}": sisaAk24,
+          "{{before25}}": sisaAw25, "{{after25}}": sisaAk25,
+          "{{before26}}": sisaAw26, "{{after26}}": sisaAk26,
+          
+          "{{cuti_besar}}": (pns.s_besar || 0), "{{cuti_sakit}}": (pns.s_sakit || 0),
+          "{{cuti_melahirkan}}": (pns.s_melahirkan || 0), "{{cuti_penting}}": (pns.s_penting || 0),
+          "{{cuti_cltn}}": (pns.s_cltn || 0),
+          
+          "{{qrPegawaiUrl}}": qrPegawai,
+          "{{atasanSignatureContent}}": atasanSig,
+          "{{pejabatSignatureContent}}": pejabatSig,
+          
+          "{{jarak_ttd}}": JARAK_TANDA_TANGAN,
+          
+          "{{chk_atasan_setuju}}": cAtasanSetuju, "{{chk_atasan_ubah}}": cAtasanUbah, "{{chk_atasan_tangguh}}": cAtasanTangguh, "{{chk_atasan_tolak}}": cAtasanTolak,
+          "{{chk_pejabat_setuju}}": cPejabatSetuju, "{{chk_pejabat_ubah}}": cPejabatUbah, "{{chk_pejabat_tangguh}}": cPejabatTangguh, "{{chk_pejabat_tolak}}": cPejabatTolak
+      };
+
+      for (let key in replacements) {
+          htmlContent = htmlContent.split(key).join(replacements[key]);
+      }
+
+      let finalHTML = "<!DOCTYPE html><html lang='id'><head><meta charset='UTF-8'><title>Cetak Cuti - " + pns.nama + "</title>";
+      finalHTML += "</head><body>";
+      finalHTML += htmlContent;
+      finalHTML += "</body></html>";
+
+      const iframe = document.createElement('iframe');
+      iframe.style.position = 'fixed';
+      iframe.style.right = '0';
+      iframe.style.bottom = '0';
+      iframe.style.width = '0';
+      iframe.style.height = '0';
+      iframe.style.border = 'none';
+      document.body.appendChild(iframe);
+
+      const doc = iframe.contentWindow.document;
+      doc.open();
+      doc.write(finalHTML);
+      doc.close();
+
+      setTimeout(function() {
+          hideLoading();
+          iframe.contentWindow.focus();
+          iframe.contentWindow.print();
+          
+          setTimeout(function() {
+              if (document.body.contains(iframe)) {
+                  document.body.removeChild(iframe);
+              }
+          }, 3000);
+      }, 1500);
+  }

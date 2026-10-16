@@ -1,0 +1,114 @@
+  <!-- ========================================== -->
+  <!-- 4. GLOBAL MODALS (VUE ENGINE) -->
+  <!-- ========================================== -->
+  <div id="vue-global-modals" v-cloak>
+    
+    <!-- MODAL 1: INFORMASI SISA CUTI -->
+    <div v-if="showModalSisaCuti && currentUser" class="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-sm animate-fade-in">
+      <div class="glass border border-slate-800 bg-slate-900/95 rounded-2xl w-full max-w-lg flex flex-col shadow-2xl mx-4 overflow-hidden">
+        
+        <div class="flex items-center justify-between p-5 border-b border-slate-800/60 bg-slate-900/80">
+          <h3 class="text-lg font-bold text-white flex items-center gap-2"><i class="fa-solid fa-scale-balanced text-indigo-400"></i> Informasi Sisa Cuti</h3>
+          <button @click="showModalSisaCuti = false" class="text-slate-400 hover:text-rose-400 transition w-8 h-8 flex items-center justify-center bg-slate-800/50 hover:bg-rose-500/10 rounded-lg">
+            <i class="fa-solid fa-xmark text-xl"></i>
+          </button>
+        </div>
+        
+        <div class="p-6 space-y-4">
+           <div class="flex items-center gap-4 mb-2">
+               <div class="w-12 h-12 bg-indigo-500/10 text-indigo-400 rounded-xl flex items-center justify-center text-xl border border-indigo-500/20"><i class="fa-solid fa-user-tie"></i></div>
+               <div>
+                   <p class="text-xs text-slate-400 font-bold uppercase tracking-wider">Sisa Kuota Cuti Untuk</p>
+                   <p class="text-sm font-bold text-slate-200 mt-0.5">{{ currentUser.nama }}</p>
+               </div>
+           </div>
+           
+           <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+              <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 shadow-inner">
+                 <p class="text-[9px] text-slate-500 font-bold uppercase tracking-wider mb-1">Tahunan 2024</p>
+                 <p class="text-2xl font-black text-slate-300">{{ currentUser.s_tahunan_2024 || 0 }} <span class="text-[10px] font-bold uppercase text-slate-500">Hari</span></p>
+              </div>
+              <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 shadow-inner">
+                 <p class="text-[9px] text-slate-500 font-bold uppercase tracking-wider mb-1">Tahunan 2025</p>
+                 <p class="text-2xl font-black text-slate-300">{{ currentUser.s_tahunan_2025 || 0 }} <span class="text-[10px] font-bold uppercase text-slate-500">Hari</span></p>
+              </div>
+              <div class="bg-slate-950 p-4 rounded-xl border border-indigo-500/30 shadow-inner bg-indigo-500/5 relative overflow-hidden">
+                 <div class="absolute top-0 right-0 w-8 h-8 bg-indigo-500/20 rounded-bl-full"></div>
+                 <p class="text-[9px] text-indigo-400 font-bold uppercase tracking-wider mb-1">Tahunan 2026</p>
+                 <p class="text-2xl font-black text-indigo-400">{{ currentUser.s_tahunan_2026 || 0 }} <span class="text-[10px] font-bold uppercase text-indigo-500/50">Hari</span></p>
+              </div>
+              <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 shadow-inner">
+                 <p class="text-[9px] text-slate-500 font-bold uppercase tracking-wider mb-1">Cuti Penting</p>
+                 <p class="text-xl font-black text-amber-400">{{ currentUser.s_penting || 0 }} <span class="text-[10px] font-bold uppercase text-slate-500">Hari</span></p>
+              </div>
+              <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 shadow-inner">
+                 <p class="text-[9px] text-slate-500 font-bold uppercase tracking-wider mb-1">Cuti Sakit</p>
+                 <p class="text-xl font-black text-rose-400">{{ currentUser.s_sakit || 0 }} <span class="text-[10px] font-bold uppercase text-slate-500">Hari</span></p>
+              </div>
+               <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 shadow-inner">
+                 <p class="text-[9px] text-slate-500 font-bold uppercase tracking-wider mb-1">Cuti Besar</p>
+                 <p class="text-xl font-black text-purple-400">{{ currentUser.s_besar || 0 }} <span class="text-[10px] font-bold uppercase text-slate-500">Hari</span></p>
+              </div>
+           </div>
+           
+           <div class="mt-2 bg-emerald-500/10 border border-emerald-500/20 p-3 rounded-xl flex items-center gap-3">
+              <i class="fa-solid fa-circle-info text-emerald-400"></i>
+              <p class="text-[10px] text-emerald-400/80 leading-relaxed font-medium">Data sisa cuti ini otomatis terupdate setiap kali pengajuan cuti Anda disetujui (atau dipotong di awal untuk Cuti Tahunan).</p>
+           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL 2: GANTI PASSWORD -->
+    <div v-if="showModalPassword && currentUser" class="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm animate-fade-in">
+      <div class="glass border border-slate-800 bg-slate-900/95 rounded-3xl w-full max-w-sm flex flex-col shadow-2xl mx-4 overflow-hidden">
+        
+        <div class="bg-purple-600 p-6 text-center relative overflow-hidden">
+           <div class="absolute inset-0 bg-gradient-to-t from-slate-900/90 to-transparent"></div>
+           <i class="fa-solid fa-shield-halved text-4xl text-purple-200 mb-2 relative z-10 drop-shadow-md"></i>
+           <h3 class="text-lg font-bold text-white relative z-10 tracking-wide">Pembaruan Keamanan</h3>
+           <p class="text-xs text-purple-200/70 relative z-10 mt-1">Lindungi akun Anda dengan sandi kuat.</p>
+        </div>
+        
+        <form @submit.prevent="submitPassword" class="p-6 space-y-4">
+          <div>
+             <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Kata Sandi Lama</label>
+             <div class="relative">
+                <input :type="showOldPass ? 'text' : 'password'" v-model="formPass.old" required placeholder="Masukkan Sandi Saat Ini" class="w-full pl-4 pr-10 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-purple-500">
+                <button type="button" @click="showOldPass = !showOldPass" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-purple-400 focus:outline-none">
+                   <i :class="showOldPass ? 'fa-solid fa-eye' : 'fa-solid fa-eye-slash'" class="text-xs"></i>
+                </button>
+             </div>
+          </div>
+
+          <div class="pt-2 border-t border-slate-800">
+             <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 text-purple-400">Kata Sandi Baru</label>
+             <div class="relative">
+                <input :type="showNewPass ? 'text' : 'password'" v-model="formPass.new" required placeholder="Buat Sandi Baru" class="w-full pl-4 pr-10 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-purple-500">
+                <button type="button" @click="showNewPass = !showNewPass" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-purple-400 focus:outline-none">
+                   <i :class="showNewPass ? 'fa-solid fa-eye' : 'fa-solid fa-eye-slash'" class="text-xs"></i>
+                </button>
+             </div>
+          </div>
+
+          <div>
+             <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Konfirmasi Sandi Baru</label>
+             <div class="relative">
+                <input :type="showConfirmPass ? 'text' : 'password'" v-model="formPass.confirm" required placeholder="Ketik Ulang Sandi Baru" class="w-full pl-4 pr-10 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-purple-500">
+                <button type="button" @click="showConfirmPass = !showConfirmPass" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-purple-400 focus:outline-none">
+                   <i :class="showConfirmPass ? 'fa-solid fa-eye' : 'fa-solid fa-eye-slash'" class="text-xs"></i>
+                </button>
+             </div>
+          </div>
+          
+          <div class="flex gap-3 pt-4">
+             <button type="button" @click="showModalPassword = false" class="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-xl transition">Batal</button>
+             <button type="submit" class="flex-1 py-3 bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-purple-600/20 transition flex items-center justify-center gap-2">
+                Simpan <i class="fa-solid fa-check"></i>
+             </button>
+          </div>
+        </form>
+
+      </div>
+    </div>
+  </div>

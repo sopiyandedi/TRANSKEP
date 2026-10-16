@@ -1,0 +1,77 @@
+<!-- VIEW COMPONENT: jobdes/template_cetak_jobdes.html -->
+<div id="templateCetakJobdes" style="display: none;">
+    <style id="styleCetakJobdes">
+        /* Menghilangkan Header & Footer Bawaan Chrome Secara Paksa */
+        @page { size: A4 portrait; margin: 0; }
+        
+        /* Pengaturan Kertas A4 & Margin Resmi (Atas 2.5, Kanan 2, Bawah 2.5, Kiri 3) */
+        .cetak-kertas { 
+            font-family: "Times New Roman", Times, serif; 
+            font-size: 12pt; /* Diperbesar ke standar dokumen resmi */
+            color: #000; 
+            background: #fff; 
+            padding: 2.5cm 2cm 2.5cm 3cm; /* Kiri lebih lebar untuk jilid/staples */
+            box-sizing: border-box;
+            min-height: 29.7cm;
+            width: 21cm;
+            line-height: 1.5; /* Spasi standar 1.5 lines */
+        }
+        
+        .kop-surat { margin-bottom: 25px; }
+        .kop-surat table { width: 100%; border-collapse: collapse; }
+        .kop-surat td { padding: 2px 0; vertical-align: top; }
+        .col-label { width: 70px; }
+        .col-titik { width: 15px; }
+        
+        .judul-dokumen { text-align: center; font-weight: bold; text-decoration: underline; font-size: 12pt; margin-top: 25px; margin-bottom: 25px; }
+        
+        .identitas-pegawai table { width: 100%; border-collapse: collapse; margin-bottom: 25px; }
+        .identitas-pegawai td { padding: 4px 0; vertical-align: top; }
+        .id-label { width: 180px; text-transform: uppercase; }
+        .id-titik { width: 15px; text-align: center; }
+        
+        .section-title { font-weight: bold; text-transform: uppercase; margin-top: 20px; margin-bottom: 6px; }
+        
+        /* Anti terpotong halaman di tengah-tengah satu baris tugas */
+        .isi-teks { margin-bottom: 15px; text-align: justify; }
+        .isi-teks > div { page-break-inside: avoid; } 
+        
+    </style>
+
+    <div id="contentCetakJobdes" class="cetak-kertas">
+        <div class="kop-surat">
+            <table>
+                <tr><td colspan="3" id="prtJudulSk"></td></tr>
+                <tr><td class="col-label">Nomor</td><td class="col-titik">:</td><td id="prtNoSk"></td></tr>
+                <tr><td class="col-label">Tanggal</td><td class="col-titik">:</td><td id="prtTglSk"></td></tr>
+            </table>
+        </div>
+        
+        <div class="judul-dokumen">URAIAN TUGAS/JOB DESCRIPTION</div>
+        
+        <div class="identitas-pegawai">
+            <table>
+                <tr><td class="id-label">NAMA JABATAN</td><td class="id-titik">:</td><td id="prtJabatan"></td></tr>
+                <tr><td class="id-label">ATASAN LANGSUNG</td><td class="id-titik">:</td><td id="prtAtasan"></td></tr>
+                <tr><td class="id-label">N A M A</td><td class="id-titik">:</td><td id="prtNama"></td></tr>
+                <tr><td class="id-label">N I P</td><td class="id-titik">:</td><td id="prtNip"></td></tr>
+                <tr><td class="id-label">PANGKAT/GOL.</td><td class="id-titik">:</td><td id="prtPangkat"></td></tr>
+            </table>
+        </div>
+
+        <div class="section-title">IKHTISAR JABATAN<span style="display:inline-block; margin-left: 55px;">:</span></div>
+        <div class="isi-teks" id="prtIkhtisar"></div>
+
+        <div class="section-title">URAIAN TUGAS POKOK<span style="display:inline-block; margin-left: 28px;">:</span></div>
+        <div class="isi-teks" id="prtPokok"></div>
+
+        <div class="section-title">TUGAS TAMBAHAN<span style="display:inline-block; margin-left: 51px;">:</span></div>
+        <div class="isi-teks" id="prtTambahan"></div>
+
+        <div class="section-title">TANGGUNG JAWAB<span style="display:inline-block; margin-left: 55px;">:</span></div>
+        <div class="isi-teks" id="prtTanggung"></div>
+
+        <div class="section-title">HASIL KERJA<span style="display:inline-block; margin-left: 89px;">:</span></div>
+        <div class="isi-teks" id="prtHasil"></div>
+    </div>
+</div>

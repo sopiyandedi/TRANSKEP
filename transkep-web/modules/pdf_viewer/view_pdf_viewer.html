@@ -1,0 +1,83 @@
+<!-- VIEW COMPONENT: sk/view_iframepdf.html -->
+<!-- ==================================================== -->
+<!-- MODAL PDF VIEWER (GOOGLE DRIVE IFRAME ZETTBOT)       -->
+<!-- TAHAP 1.5: Opsi C (Layout 2 Kolom dengan Panel Info) -->
+<!-- ==================================================== -->
+<div id="modalFlipbook" class="fixed inset-0 z-[999999] flex items-center justify-center bg-slate-950/90 backdrop-blur-md hidden opacity-0 transition-opacity duration-300">
+  
+  <div class="glass border border-slate-800 bg-slate-900/95 shadow-2xl w-full max-w-7xl h-[96vh] md:h-[94vh] mx-2 md:mx-4 rounded-2xl md:rounded-3xl flex flex-col transform scale-95 transition-transform duration-300 relative overflow-hidden">
+     
+     <!-- HEADER MODAL -->
+     <div class="flex items-center justify-between px-3.5 py-2 md:px-5 md:py-2.5 border-b border-slate-800 bg-slate-950/80 shrink-0 relative z-20">
+        <div class="flex items-center gap-2.5 w-full pr-3 overflow-hidden">
+           <div class="w-7 h-7 md:w-8 md:h-8 bg-indigo-500/20 text-indigo-400 rounded-lg flex items-center justify-center shrink-0 border border-indigo-500/30">
+              <i class="fa-solid fa-file-pdf text-xs md:text-sm"></i>
+           </div>
+           <div class="flex-1 min-w-0">
+              <h3 id="fbModalTitle" class="text-xs md:text-sm font-bold text-white truncate leading-tight">Memuat Dokumen...</h3>
+              <p class="text-[9px] md:text-[10px] text-slate-400 font-mono mt-0.5 truncate flex items-center gap-1.5">
+                 <i class="fa-brands fa-google-drive text-slate-400"></i> Google Drive Secure Preview
+              </p>
+           </div>
+        </div>
+        
+        <!-- CONTROL BUTTONS -->
+        <div class="flex items-center gap-2 shrink-0">
+           <a href="#" id="fbBtnDownloadDirect" target="_blank" class="hidden sm:flex items-center justify-center px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-indigo-300 rounded-lg text-[11px] font-bold transition border border-slate-700 hover-glow-indigo">
+              <i class="fa-solid fa-arrow-up-right-from-square mr-1.5"></i> Buka Penuh
+           </a>
+           <button type="button" onclick="closeFlipbookModal()" class="w-7 h-7 md:w-8 md:h-8 flex items-center justify-center bg-slate-800 hover:bg-rose-500 text-slate-400 hover:text-white rounded-lg transition border border-slate-700 hover:border-rose-500 shadow-sm" title="Tutup">
+              <i class="fa-solid fa-xmark text-sm"></i>
+           </button>
+        </div>
+     </div>
+
+     <!-- BODY AREA (2 KOLOM) -->
+     <div class="flex-1 relative flex overflow-hidden w-full h-full bg-slate-950">
+        
+        <!-- KOLOM KIRI: PANEL RINCIAN SK & TIM (Sembunyi di HP, Tampil di Tablet/PC) -->
+        <div class="hidden md:flex flex-col w-72 lg:w-80 border-r border-slate-800 bg-slate-900/40 p-4 overflow-y-auto custom-scrollbar shrink-0 z-20">
+           
+           <h4 class="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-3 flex items-center gap-2"><i class="fa-solid fa-circle-info"></i> Informasi Dokumen</h4>
+           <div class="space-y-3 mb-5">
+              <div class="bg-slate-950/50 p-2.5 rounded-lg border border-slate-800/80">
+                 <p class="text-[9px] text-slate-500 mb-0.5 font-bold uppercase tracking-wider">Nomor SK</p>
+                 <p id="fbNoSk" class="text-xs text-slate-200 font-mono">-</p>
+              </div>
+              <div class="bg-slate-950/50 p-2.5 rounded-lg border border-slate-800/80">
+                 <p class="text-[9px] text-slate-500 mb-0.5 font-bold uppercase tracking-wider">Tanggal SK</p>
+                 <p id="fbTglSk" class="text-xs text-slate-200">-</p>
+              </div>
+              <div class="bg-slate-950/50 p-2.5 rounded-lg border border-slate-800/80">
+                 <p class="text-[9px] text-slate-500 mb-0.5 font-bold uppercase tracking-wider">Penanggung Jawab</p>
+                 <p id="fbPjSk" class="text-xs text-slate-200">-</p>
+              </div>
+           </div>
+           
+           <h4 class="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-3 border-t border-slate-800/80 pt-4 flex items-center gap-2"><i class="fa-solid fa-users"></i> Susunan Tim</h4>
+           <div id="fbMembersList" class="flex flex-col gap-2">
+              <!-- Dinamis via JS -->
+           </div>
+        </div>
+
+        <!-- KOLOM KANAN: IFRAME PREVIEW -->
+        <div class="flex-1 relative flex items-center justify-center overflow-hidden h-full">
+           
+           <!-- CUSTOM ZETTBOT LOADER -->
+           <div id="fbLoadingContainer" class="absolute inset-0 flex flex-col items-center justify-center z-10 bg-slate-900/90 backdrop-blur-sm transition-opacity duration-500">
+              <div class="relative flex justify-center items-center mb-4">
+                 <div class="absolute inset-0 border-4 border-indigo-500/30 rounded-full w-12 h-12 blur-sm animate-pulse"></div>
+                 <div class="w-12 h-12 border-4 border-slate-800 border-t-indigo-500 rounded-full animate-spin"></div>
+              </div>
+              <h4 class="text-slate-200 font-bold tracking-wider uppercase text-xs animate-pulse">Menghubungkan ke Drive...</h4>
+              <p class="text-[9px] text-slate-500 font-mono mt-1">Mengambil dokumen PDF</p>
+           </div>
+
+           <!-- IFRAME GOOGLE DRIVE PREVIEW -->
+           <iframe id="pdfIframe" src="" class="w-full h-full border-0 relative z-20 opacity-0 transition-opacity duration-700 bg-slate-800" allow="autoplay; encrypted-media"></iframe>
+           
+        </div>
+     </div>
+
+  </div>
+</div>

@@ -1,0 +1,140 @@
+<!-- VIEW COMPONENT: permohonan/ip/cetak_ip.html -->
+<!-- =========================================================================
+     ZETTBOS MODULAR UI: TEMPLATE CETAK IZIN PRIBADI (FIXED WORD LAYOUT)
+========================================================================== -->
+<style>
+    @media print {
+        @page { 
+            size: A4 portrait; 
+            margin-top: 2cm;
+            margin-bottom: 2cm;
+        }
+        body { margin: 0 !important; padding: 0 !important; }
+        #printAreaIP { 
+            font-family: "Bookman Old Style", Bookman, serif !important; 
+            font-size: 11.5pt !important;
+            color: black !important;
+            line-height: 1.5 !important;
+            width: 100% !important;
+            margin: 0 auto !important;
+            padding-top: 1cm !important;
+            padding-left: 1.5cm !important; 
+            padding-right: 1.5cm !important;
+            box-sizing: border-box !important;
+        }
+        .print-only { display: block !important; }
+    }
+    
+    #printAreaIP {
+        font-family: "Bookman Old Style", Bookman, serif;
+        font-size: 11.5pt;
+        line-height: 1.5;
+        padding-top: 1cm;
+        padding-left: 1.5cm;
+        padding-right: 1.5cm;
+        box-sizing: border-box;
+        max-width: 210mm;
+        margin: 0 auto;
+    }
+
+    /* Penyesuaian kerenggangan tabel biodata IP */
+    .ip-table td { 
+        padding-top: 2px; 
+        padding-bottom: 2px; 
+    }
+    .ip-label { width: 140px; }
+    .ip-colon { width: 20px; text-align: center; }
+</style>
+
+<div id="printAreaIP" class="hidden print-only bg-white text-black min-h-screen">
+    
+    <!-- Tempat & Tanggal Buat (Rata Kanan) -->
+    <div class="text-right mb-8">
+        <p>Indramayu, <span id="cetakIpTanggalBuat">-</span></p>
+    </div>
+    
+    <!-- Tujuan Surat -->
+    <div class="mb-6 leading-snug">
+        <p>Kepada, Yth.</p>
+        
+        <!-- [TAG SPASI A]: Jarak antara teks "Ketua..." dengan "di." -->
+        <!-- Ubah mb-3 menjadi mb-4 atau mb-6 jika ingin lebih renggang -->
+        <p class="font-bold mb-3"><span id="cetakIpJabatanYth">-</span> Pengadilan Agama Indramayu</p>
+        
+        <!-- [TAG SPASI B]: Jarak antara teks "di." dengan "T E M P A T" -->
+        <!-- Ubah mb-2 menjadi mb-4 atau mb-6 jika ingin lebih renggang -->
+        <p class="mb-2">di.</p>
+        
+        <p class="ml-8 uppercase tracking-[0.3em]">Tempat</p>
+    </div>
+    
+    <!-- Salam Pembuka -->
+    <p class="mb-4">Assalamualaikum, Wr. Wb.</p>
+    <p class="mb-4">Melalui surat ini, saya :</p>
+    
+    <!-- Data Diri -->
+    <table class="w-full ml-8 mb-6 ip-table">
+        <tr><td class="ip-label">N a m a</td><td class="ip-colon">:</td><td id="cetakIpNama" class="font-bold">-</td></tr>
+        <tr><td class="ip-label">N I P</td><td class="ip-colon">:</td><td id="cetakIpNip">-</td></tr>
+        <tr><td class="ip-label">Jabatan</td><td class="ip-colon">:</td><td id="cetakIpJabatan">-</td></tr>
+        <!-- Saya mengubah pr-4 menjadi pr-0 di baris Alamat agar mentok kanan -->
+        <tr><td class="ip-label align-top">Alamat</td><td class="ip-colon align-top">:</td><td id="cetakIpAlamat" class="text-justify pr-8">-</td></tr>
+    </table>
+    
+    <!-- Paragraf Isi -->
+    <!-- [TAG 1 - PARAGRAF KANAN]: Mengubah 'pr-4' menjadi 'pr-0' agar teks mentok sejajar dengan batas kertas / tulisan tanggal di atas. -->
+    <p class="mb-4 text-justify indent-[1.5cm] pr-0">
+        Dengan ini disampaikan kepada <span id="cetakIpJabatanSurat" class="font-bold">-</span> Pengadilan Agama Indramayu bahwa pada hari <span id="cetakIpHariSurat">-</span>, tanggal <span id="cetakIpTanggalSurat">-</span> saya tidak dapat melaksanakan tugas sebagaimana biasanya dikarenakan <span id="cetakIpAlasanSurat">-</span>.
+    </p>
+    
+    <p class="mb-4 indent-[1.5cm]">Demikian surat ijin ini saya buat dan disampaikan Terima kasih.</p>
+    
+    <!-- ===================================================================== -->
+    <!-- AREA TANDA TANGAN (FORMAT BERTINGKAT: PEMOHON DI ATAS, PEJABAT DI BAWAH) -->
+    <!-- ===================================================================== -->
+    <div class="text-[11pt]">
+        
+        <!-- BLOK ATAS: Pemohon (Rata Kanan) -->
+        <div class="flex justify-end mb-16">
+            <!-- [TAG 2 - TTD PEMOHON]: Mengubah 'w-[30%]' menjadi 'w-[45%]' agar seluruh blok teks bergeser ke kiri. (Ubah angkanya jadi 50% jika ingin lebih ke kiri lagi). -->
+            <div class="w-[35%]">
+                <p>Wassalamualaikum, Wr.Wb.</p>
+                <p>Hormat Saya,</p>
+                <div class="mt-[5rem]">
+                    <p id="cetakIpNamaPemohon" class="font-bold underline">-</p>
+                    <p>NIP. <span id="cetakIpNipPemohon">-</span></p>
+                </div>
+            </div>
+        </div>
+
+        <!-- BLOK BAWAH: Mengetahui (Tengah), Pejabat (Kiri), Atasan Langsung (Kanan) -->
+        <!-- [TAG 3 - TEKS MENGETAHUI]: Menambahkan 'mr-[5rem]' untuk mendorong teks dari tengah agak condong ke arah kiri. (Ubah angka 5rem jika kurang pas). -->
+        <div class="text-center mb-4 mr-[7rem]">
+            <p>Mengetahui,</p>
+        </div>
+        
+        <div class="flex justify-between mt-2">
+            <!-- Kolom Kiri Bawah: Pejabat Berwenang -->
+            <div class="w-[45%]">
+                <p>Pejabat Yang Berwenang,</p>
+                <p id="cetakIpJabatanPejabat" class="font-bold">-</p>
+                <div class="mt-[5rem]">
+                    <p id="cetakIpNamaPejabat" class="font-bold underline">-</p>
+                    <p>NIP. <span id="cetakIpNipPejabat">-</span></p>
+                </div>
+            </div>
+            
+            <!-- Kolom Kanan Bawah: Atasan Langsung -->
+            <!-- [TAG 4 - TTD ATASAN]: Mengubah 'w-[45%]' menjadi 'w-[52%]' agar area tulisannya lebih lebar dan batas kirinya mulai lebih awal (bergeser ke kiri). -->
+            <div class="w-[40%] pl-[1rem]">
+                <p>Atasan Langsung,</p>
+                <p id="cetakIpJabatanAtasan" class="font-bold">-</p>
+                <div class="mt-[5rem]">
+                    <p id="cetakIpNamaAtasan" class="font-bold underline">-</p>
+                    <p>NIP. <span id="cetakIpNipAtasan">-</span></p>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>

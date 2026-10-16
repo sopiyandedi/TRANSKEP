@@ -1,0 +1,138 @@
+// ==========================================
+// FILE: cetak_ik.js
+// MODUL CETAK MANDIRI (Clean Architecture)
+// ==========================================
+
+// --- Source: permohonan/ik/js_cetak_ik.html ---
+function cetakIzinKeluar(id) {
+        if (window.isGlobalPrinting) {
+            showNotify("Proses Sibuk", "Sistem sedang menyiapkan dokumen. Harap tunggu.", "warning"); return; 
+        }
+        if (!state || !state.user) {
+            showNotify("Sistem Memuat", "Data belum siap.", "warning"); return;
+        }
+        
+        window.isGlobalPrinting = true;
+        showLoading("Menyiapkan dokumen Izin Keluar...");
+        
+        if (typeof google !== 'undefined') {
+            google.script.run
+                .withSuccessHandler(function(res) {
+                    if (res.status === 'success') renderTemplateCetakIK(res.data);
+                    else {
+                        hideLoading(); window.isGlobalPrinting = false;
+                        showNotify("Gagal", res.message, "error");
+                    }
+                })
+                .withFailureHandler(function(err) {
+                    hideLoading(); window.isGlobalPrinting = false;
+                    showNotify("Error Koneksi", err.toString(), "error");
+                })
+                .getIzinKeluarById(id);
+        } else {
+            setTimeout(() => {
+                hideLoading(); window.isGlobalPrinting = false;
+                alert("[CANVAS MODE] Simulasi cetak IK untuk ID: " + id);
+            }, 1000);
+        }
+    }
+    
+    // FORMAT 1: Mengubah tanggal menjadi format "24 September 2026" untuk "Pada Tanggal"
+    function formatTanggalCetakPendek(dateStr) {
+        if (!dateStr) return "-";
+        let d, m, y;
+        
+        if (dateStr.includes('/')) {
+            let p = dateStr.split(' ')[0].split('/'); 
+            d = p[0]; m = p[1]; y = p[2];
+        } else if (dateStr.includes('-')) {
+            let p = dateStr.split(' ')[0].split('-');
+            if (p[0].length === 4) { y = p[0]; m = p[1]; d = p[2]; } 
+            else { d = p[0]; m = p[1]; y = p[2]; }
+        } else { return dateStr; }
+        
+        // BUG FIX: Menggunakan nama bulan penuh sesuai format Word
+        const months = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+        let mIdx = parseInt(m, 10) - 1;
+        
+        if (mIdx >= 0 && mIdx < 12) {
+            return `${parseInt(d, 10)} ${months[mIdx]} ${y}`; 
+        }
+        return dateStr;
+    }
+    
+    // FORMAT 2: MENGEMBALIKAN FUNGSI YANG HILANG
+    // Mengubah/Mempertahankan format ke "23/09/2026" untuk Tanda Tangan
+    function formatTanggalTTD(dateStr) {
+        if (!dateStr) return "-";
+        if (dateStr.includes('/')) return dateStr.split(' ')[0]; // Jika dari DB sudah dd/MM/yyyy
+        if (dateStr.includes('-')) {
+            let p = dateStr.split(' ')[0].split('-');
+            if (p[0].length === 4) return `${p[2]}/${p[1]}/${p[0]}`; // YYYY-MM-DD -> DD/MM/YYYY
+            return `${p[0]}/${p[1]}/${p[2]}`;
+        }
+        return dateStr;
+    }
+
+    function renderTemplateCetakIK(data) {
+        try {
+            const pemohon = state.usersList.find(u => String(u.nip) === String(data.nip)) || { nama: '-', jabatan: '-', pangkat: '-', golongan: '-' };
+            const atasan = state.usersList.find(u => String(u.nip) === String(data.atasan_nip)) || { nama: '-', jabatan: '-', pangkat: '-', golongan: '-' };
+            
+            // Perbaikan tampilan pangkat kosong menjadi "- (-)"
+            const formatPangkat = (userObj) => {
+                let p = userObj.pangkat || "-"; 
+                let g = userObj.golongan || "-";
+                if (p !== "-" || g !== "-") return `${p} (${g})`;
+                return "- (-)";
+            };
+            
+            // 1. Logika Strikethrough (Coret) dikembalikan ke Title Case (Datang/Pulang)
+            const tipe = data.tipe_izin || "";
+            let coretHtml = "Datang/Pulang";
+            if (tipe === "Datang") coretHtml = "Datang/<s>Pulang</s>";
+            else if (tipe === "Pulang") coretHtml = "<s>Datang</s>/Pulang";
+            document.getElementById('cetakIkTipeCoret').innerHTML = coretHtml;
+
+            // 2. Data Atasan
+            document.getElementById('cetakIkNamaAtasan').innerText = atasan.nama;
+            document.getElementById('cetakIkNipAtasan').innerText = data.atasan_nip;
+            document.getElementById('cetakIkPangkatAtasan').innerText = formatPangkat(atasan);
+            document.getElementById('cetakIkJabatanAtasan').innerText = atasan.jabatan;
+            
+            // 3. Data Pemohon
+            document.getElementById('cetakIkNamaPemohon').innerText = pemohon.nama;
+            document.getElementById('cetakIkNipPemohon').innerText = data.nip;
+            document.getElementById('cetakIkPangkatPemohon').innerText = formatPangkat(pemohon);
+            
+            // 4. Jam, Alasan, & Tanggal Pendek (Contoh: 24 Sep 2026)
+            document.getElementById('cetakIkJam').innerText = data.jam || "--:--";
+            document.getElementById('cetakIkAlasan').innerText = data.alasan;
+            document.getElementById('cetakIkTanggal').innerText = formatTanggalCetakPendek(data.tanggal);
+            
+            // 5. Titi Mangsa / TTD diubah menjadi format bulan huruf sesuai instruksi kotak ungu
+            const tglBuat = data.waktu ? data.waktu.split(' ')[0] : data.tanggal;
+            // Menggunakan fungsi formatTanggalCetakPendek agar hasilnya "23 September 2026"
+            document.getElementById('cetakIkTanggalBuat').innerText = formatTanggalCetakPendek(tglBuat);
+            
+            document.getElementById('cetakIkJabatanTTD').innerText = atasan.jabatan;
+            document.getElementById('cetakIkNamaTTD').innerText = atasan.nama;
+            document.getElementById('cetakIkNipTTD').innerText = data.atasan_nip;
+            
+            const printArea = document.getElementById('printAreaIK');
+            document.querySelectorAll('.print-only').forEach(el => { el.classList.add('hidden'); el.style.display = 'none'; });
+            if(printArea) { printArea.classList.remove('hidden'); printArea.style.display = 'none'; }
+            
+            setTimeout(() => {
+                hideLoading(); window.focus(); window.print();
+                setTimeout(() => {
+                    if(printArea) { printArea.classList.add('hidden'); printArea.style.display = ''; }
+                    window.isGlobalPrinting = false;
+                }, 1500);
+            }, 800);
+            
+        } catch(e) {
+            hideLoading(); window.isGlobalPrinting = false;
+            showNotify("Error Render", "Terjadi kesalahan saat memuat template.", "error"); console.error(e);
+        }
+    }

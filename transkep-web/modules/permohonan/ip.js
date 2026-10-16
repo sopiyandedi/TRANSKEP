@@ -1,0 +1,251 @@
+// ==========================================
+// FILE: ip.js (Modul Formulir Izin Pribadi)
+// ==========================================
+
+// --- Source: permohonan/ip/js_ip.html ---
+document.addEventListener("DOMContentLoaded", () => {
+    const { createApp } = Vue;
+
+    window.vmFormIP = createApp({
+        data() {
+            return {
+                s: state, // Mengambil reference state global
+                isOpen: false,
+                isScaled: false,
+                currentEditId: null,
+                form: {
+                    tanggal: '',
+                    alamat: '',
+                    alasan: '',
+                    atasan_nip: '',
+                    pejabat_nip: ''
+                }
+            };
+        },
+        computed: {
+            // 1. LOGIKA ATASAN LANGSUNG (Hierarki Sesuai Divisi)
+            opsiAtasan() {
+                if (!this.s || !this.s.user) return { list: [], adaPlh: false };
+                
+                let atasanOpts = [];
+                let adaPlh = false;
+                const j = this.s.user.jabatan ? this.s.user.jabatan.toLowerCase() : "";
+
+                const getPegawai = (keyword) => {
+                    return this.s.usersList.filter(x => String(x.nip) !== String(this.s.user.nip) && x.jabatan.toLowerCase().includes(keyword));
+                };
+
+                if (j.includes("hakim") || j.includes("wakil ketua") || j === "ketua") {
+                    let ketua = getPegawai("ketua").find(x => x.jabatan.toLowerCase() === "ketua");
+                    if (ketua && !this.isPegawaiAbsent(ketua.nip)) {
+                        atasanOpts.push(ketua);
+                    } else {
+                        adaPlh = true;
+                        let wakil = getPegawai("wakil ketua").find(x => x.jabatan.toLowerCase() === "wakil ketua");
+                        if (wakil && !this.isPegawaiAbsent(wakil.nip)) atasanOpts.push(wakil);
+                        else { 
+                            let hakims = getPegawai("hakim").filter(x => !this.isPegawaiAbsent(x.nip)); 
+                            atasanOpts.push(...hakims); 
+                        }
+                    }
+                }
+                else if (j.includes("panitera muda") || j.includes("panitera pengganti") || j.includes("jurusita") || j.includes("juru sita")) {
+                    let panitera = getPegawai("panitera").find(x => x.jabatan.toLowerCase() === "panitera");
+                    if (panitera && !this.isPegawaiAbsent(panitera.nip)) {
+                        atasanOpts.push(panitera);
+                    } else {
+                        adaPlh = true;
+                        let panmuds = getPegawai("panitera muda").filter(x => !this.isPegawaiAbsent(x.nip));
+                        atasanOpts.push(...panmuds);
+                    }
+                }
+                else if (j.includes("kepala sub bagian") || j.includes("kasubbag")) {
+                    let sekretaris = getPegawai("sekretaris").find(x => x.jabatan.toLowerCase() === "sekretaris");
+                    if (sekretaris && !this.isPegawaiAbsent(sekretaris.nip)) {
+                        atasanOpts.push(sekretaris);
+                    } else {
+                        adaPlh = true;
+                        let kasubbags = getPegawai("kepala sub bagian").filter(x => !this.isPegawaiAbsent(x.nip));
+                        if(kasubbags.length === 0) kasubbags = getPegawai("kasubbag").filter(x => !this.isPegawaiAbsent(x.nip));
+                        atasanOpts.push(...kasubbags);
+                    }
+                }
+                else {
+                    // Default untuk Staf Pelaksana
+                    let panmuds = getPegawai("panitera muda").filter(x => !this.isPegawaiAbsent(x.nip));
+                    let kasubbags = getPegawai("kepala sub bagian").filter(x => !this.isPegawaiAbsent(x.nip));
+                    if(kasubbags.length === 0) kasubbags = getPegawai("kasubbag").filter(x => !this.isPegawaiAbsent(x.nip));
+                    atasanOpts.push(...panmuds);
+                    atasanOpts.push(...kasubbags);
+                }
+
+                // Hapus duplikat
+                atasanOpts = [...new Map(atasanOpts.map(item => [item.nip, item])).values()];
+                return { list: atasanOpts, adaPlh: adaPlh };
+            },
+
+            // 2. LOGIKA PEJABAT BERWENANG (Ketua / Wakil / Hakim)
+            opsiPejabat() {
+                if (!this.s || !this.s.user) return { list: [], adaPlh: false };
+
+                let pejabatOpts = [];
+                let adaPlh = false;
+
+                let ketua = this.s.usersList.find(x => x.jabatan.toLowerCase() === "ketua");
+                if (ketua && !this.isPegawaiAbsent(ketua.nip)) {
+                    pejabatOpts.push(ketua);
+                } else {
+                    adaPlh = true;
+                    let wakil = this.s.usersList.find(x => x.jabatan.toLowerCase() === "wakil ketua");
+                    if (wakil && !this.isPegawaiAbsent(wakil.nip)) {
+                        pejabatOpts.push(wakil); 
+                    } else { 
+                        let hakims = this.s.usersList.filter(x => String(x.nip) !== String(this.s.user.nip) && x.jabatan.toLowerCase().includes("hakim") && !this.isPegawaiAbsent(x.nip)); 
+                        pejabatOpts.push(...hakims); 
+                    }
+                }
+
+                pejabatOpts = [...new Map(pejabatOpts.map(item => [item.nip, item])).values()];
+                return { list: pejabatOpts, adaPlh: adaPlh };
+            }
+        },
+        watch: {
+            // Auto-select dropdown jika daftar diperbarui
+            'opsiAtasan.list'(newVal) {
+                if (newVal.length > 0 && (!this.form.atasan_nip || !newVal.find(x => x.nip === this.form.atasan_nip))) {
+                    this.form.atasan_nip = newVal[0].nip;
+                }
+            },
+            'opsiPejabat.list'(newVal) {
+                if (newVal.length > 0 && (!this.form.pejabat_nip || !newVal.find(x => x.nip === this.form.pejabat_nip))) {
+                    this.form.pejabat_nip = newVal[0].nip;
+                }
+            }
+        },
+        methods: {
+            isPegawaiAbsent(nip) {
+                const today = new Date();
+                today.setHours(0,0,0,0);
+                return this.s.cutiLogs.some(log => {
+                    if (String(log.nip) === String(nip) && log.status === 'Disetujui') {
+                        const start = new Date(log.tgl_mulai); start.setHours(0,0,0,0);
+                        const end = new Date(log.tgl_selesai); end.setHours(0,0,0,0);
+                        return today >= start && today <= end;
+                    }
+                    return false;
+                });
+            },
+            openModal(editId = null) {
+                if (!this.s || !this.s.user) {
+                    if(window.showNotify) window.showNotify("Sistem Memuat", "Silakan tunggu, data sistem belum siap.", "error");
+                    return;
+                }
+                
+                this.currentEditId = editId;
+                
+                // Reset / Populate Form
+                if (editId) {
+                    const log = this.s.ipLogs.find(l => String(l.id) === String(editId));
+                    if (log) {
+                        this.form.tanggal = log.tanggal;
+                        this.form.alamat = log.alamat || this.s.user.alamat || "";
+                        this.form.alasan = log.alasan;
+                        setTimeout(() => { 
+                            this.form.atasan_nip = log.atasan_nip; 
+                            this.form.pejabat_nip = log.pejabat_nip;
+                        }, 50);
+                    }
+                } else {
+                    this.form = { 
+                        tanggal: new Date().toISOString().split('T')[0], 
+                        alamat: this.s.user.alamat || '', 
+                        alasan: '', 
+                        atasan_nip: '',
+                        pejabat_nip: ''
+                    };
+                }
+
+                this.isOpen = true;
+                setTimeout(() => { this.isScaled = true; }, 10);
+            },
+            closeModal() {
+                this.isScaled = false;
+                setTimeout(() => { this.isOpen = false; }, 200);
+            },
+            submitForm() {
+                if(!this.s.user) {
+                    if(window.showNotify) window.showNotify("Sesi Berakhir", "Harap login ulang.", "error"); 
+                    return;
+                }
+                
+                // Validasi Cuti Tahunan
+                let totalTahunan = Number(this.s.user.s_tahunan_2024 || 0) + Number(this.s.user.s_tahunan_2025 || 0) + Number(this.s.user.s_tahunan_2026 || 0);
+                if (totalTahunan > 0) {
+                    if(window.showNotify) window.showNotify("Pengajuan Ditolak", "Izin Pribadi hanya bisa dipakai jika Saldo Cuti Tahunan Anda sudah benar-benar habis. Sisa cuti tahunan Anda: " + totalTahunan + " Hari.", "warning");
+                    return;
+                }
+
+                const payload = {
+                    id: this.currentEditId, 
+                    nip: this.s.user.nip,
+                    ...this.form
+                };
+
+                const token = localStorage.getItem('transkep_session_token'); 
+                if(window.showLoading) window.showLoading(this.currentEditId ? "Memperbarui Izin Pribadi..." : "Mengirimkan Izin Pribadi...");
+                
+                const actionPromise = this.currentEditId
+                    ? IzinDataService.updateIP(payload, token)
+                    : IzinDataService.submitIP(payload, token);
+
+                actionPromise
+                    .then((res) => {
+                        if(window.hideLoading) window.hideLoading();
+                        if(res.status === 'success') {
+                            this.closeModal();
+                            if(window.showNotify) window.showNotify("Berhasil Disimpan", res.message, "success");
+                            
+                            // Reaktif pembaruan state
+                            if (this.currentEditId) {
+                                const idx = this.s.ipLogs.findIndex(l => String(l.id) === String(this.currentEditId));
+                                if (idx !== -1) {
+                                    this.s.ipLogs[idx] = { ...this.s.ipLogs[idx], ...payload, status: 'Menunggu' };
+                                }
+                            } else {
+                                const virtualLog = {
+                                    id: (res.data && res.data.id) ? res.data.id : "IP-VIRTUAL-" + Date.now(),
+                                    tgl_pengajuan: new Date().toLocaleDateString('id-ID'),
+                                    ...payload,
+                                    status: 'Menunggu',
+                                    catatan: '',
+                                    z_type: 'IP',
+                                    z_sort: Date.now()
+                                };
+                                if (this.s && this.s.ipLogs) this.s.ipLogs.unshift(virtualLog);
+                            }
+                            if (typeof window.renderPermohonanView === 'function') window.renderPermohonanView();
+                        } else { 
+                            if(window.showNotify) window.showNotify("Gagal", res.message, "error"); 
+                        }
+                    })
+                    .catch((err) => {
+                        if(window.hideLoading) window.hideLoading(); 
+                        if(window.showNotify) window.showNotify("Error Jaringan", err.toString(), "error");
+                    });
+            }
+        }
+    }).mount('#vue-form-ip-wrapper');
+
+    // ---------------------------------------------------------
+    // BRIDGING KE TOMBOL VANILLA HTML (Bypass Integrasi)
+    // ---------------------------------------------------------
+    window.openModalIP = function(editId = null) {
+        if (window.vmFormIP) window.vmFormIP.openModal(editId);
+    };
+    
+    window.closeModalIP = function() {
+        if (window.vmFormIP) window.vmFormIP.closeModal();
+    };
+});
+
+// Logika Cetak IP dipisahkan ke js/cetak/cetak_ip.js

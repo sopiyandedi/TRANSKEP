@@ -1,0 +1,390 @@
+// ==========================================
+// FILE: jobdes.js (TRANSKEP Modular)
+// ENGINE: ZettBOT Core v1.0.0
+// ==========================================
+
+// --- Source: jobdes/js_jobdes.html ---
+function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
+  }
+
+  function pormatTugasRapi(text) {
+      if (!text) return '-';
+      var lines = text.split('\n');
+      var htmlResult = '';
+
+      lines.forEach(function(line) {
+          var trimmed = line.trim();
+          if (!trimmed) return;
+          var match = trimmed.match(/^(\d+\.|[a-zA-Z]\.|[-*])\s*(.*)/);
+
+          if (match) {
+              var bullet = escapeHtml(match[1]); 
+              var content = escapeHtml(match[2]); 
+              var isSubList = /^[a-zA-Z]\./.test(match[1]); 
+              var paddingKiri = isSubList ? 'padding-left: 20px;' : ''; 
+              htmlResult += '<div style="display: flex; margin-bottom: 6px; line-height: 1.5; text-align: justify; ' + paddingKiri + '">' +
+                              '<div style="flex-shrink: 0; min-width: 24px; font-weight: 500;">' + bullet + '</div>' +
+                              '<div style="flex-grow: 1;">' + content + '</div>' +
+                            '</div>';
+          } else {
+              htmlResult += '<div style="text-align: justify; margin-bottom: 6px; line-height: 1.5;">' + escapeHtml(trimmed) + '</div>';
+          }
+      });
+      return htmlResult;
+  }
+
+  window.formatListJobdes = pormatTugasRapi;
+
+  window.jobdesConfigSk = {
+     dasar: "Lampiran II Surat Keputusan Ketua Pengadilan Agama Indramayu",
+     nomor: "013/Kpa.W10-A2/Sk.Kp7.1/I/2025",
+     tanggal: "2 Januari 2025"
+  };
+
+  document.addEventListener("DOMContentLoaded", () => {
+    window.vmJobdes = Vue.createApp({
+      data() {
+        return {
+          searchQuery: '',
+          showDropdown: false,
+          highlightedIndex: 0,
+          
+          searchAtasanQuery: '',
+          showDropdownAtasan: false,
+          highlightedIndexAtasan: 0,
+          
+          selectedNip: '',
+          configSk: { ...window.jobdesConfigSk },
+          modals: {
+            dasarSk: false,
+            editJobdes: false,
+            usulan: false,
+            notifAdmin: false
+          },
+          formEdit: { nip: '', nama: '', atasan: '', ikhtisar: '', pokok: '', tambahan: '', tanggung: '', hasil: '' },
+          formUsulan: { namaPegawai: '', isi: '' },
+          notifUsulan: [],
+          isFullscreen: false,
+          isLoadingWa: false,
+          isLoadingForm: false
+        };
+      },
+      computed: {
+        globalState() {
+          return window.vueState || {};
+        },
+        hasAdminAccess() {
+          const role = (this.globalState.user?.role || "").toLowerCase();
+          return role === "" || role.includes('admin') || role.includes('operator') || role.includes('super');
+        },
+        hasAtasanAccess() {
+          const role = (this.globalState.user?.role || "").toLowerCase();
+          return role.includes('atasan') || role.includes('pejabat') || role.includes('ketua') || this.hasAdminAccess;
+        },
+        filteredUsers() {
+          if (!this.searchQuery) return [];
+          const q = this.searchQuery.toLowerCase();
+          return (this.globalState.usersList || []).filter(u =>
+              (u.nama && u.nama.toLowerCase().includes(q)) ||
+              (u.jabatan && u.jabatan.toLowerCase().includes(q)) ||
+              (u.nip && u.nip.includes(q))
+          );
+        },
+        listAtasan() {
+           return (this.globalState.usersList || []).filter(usr => {
+              const uRole = (usr.role || "").toLowerCase();
+              return uRole.includes('atasan') || uRole.includes('pejabat') || uRole.includes('admin') || uRole.includes('super');
+           });
+        },
+        filteredAtasan() {
+          if (!this.searchAtasanQuery) return this.listAtasan;
+          const q = this.searchAtasanQuery.toLowerCase();
+          return this.listAtasan.filter(u =>
+              (u.nama && u.nama.toLowerCase().includes(q)) ||
+              (u.jabatan && u.jabatan.toLowerCase().includes(q)) ||
+              (u.nip && u.nip.includes(q))
+          );
+        },
+        selectedUser() {
+          return (this.globalState.usersList || []).find(u => u.nip === this.selectedNip) || null;
+        },
+        selectedJobdes() {
+          const jd = (this.globalState.jobdesList || []).find(j => j.nip === this.selectedNip);
+          return jd || { 
+            ikhtisar_jabatan: 'Deskripsi ikhtisar tugas belum diatur.', 
+            tugas_pokok: '- Belum diisi.', 
+            tugas_tambahan: '-', tanggung_jawab: '-', hasil_kerja: '-', atasan_nip: '' 
+          };
+        },
+        atasanUser() {
+          return (this.globalState.usersList || []).find(u => u.nip === this.selectedJobdes.atasan_nip) || { nama: '-' };
+        },
+        
+        fmtIkhtisar() { return pormatTugasRapi(this.selectedJobdes.ikhtisar_jabatan); },
+        fmtPokok() { return pormatTugasRapi(this.selectedJobdes.tugas_pokok); },
+        fmtTambahan() { return pormatTugasRapi(this.selectedJobdes.tugas_tambahan); },
+        fmtTanggung() { return pormatTugasRapi(this.selectedJobdes.tanggung_jawab); },
+        fmtHasil() { return pormatTugasRapi(this.selectedJobdes.hasil_kerja); }
+      },
+      watch: {
+         searchQuery(val) {
+             if(val === '') this.showDropdown = false;
+             this.highlightedIndex = 0; 
+         },
+         searchAtasanQuery(val) {
+             this.highlightedIndexAtasan = 0; 
+         }
+      },
+      methods: {
+        highlightNext(type) {
+            if (type === 'main') {
+                if (this.highlightedIndex < this.filteredUsers.length - 1) this.highlightedIndex++;
+            } else if (type === 'atasan') {
+                if (this.highlightedIndexAtasan < this.filteredAtasan.length - 1) this.highlightedIndexAtasan++;
+            }
+        },
+        highlightPrev(type) {
+            if (type === 'main') {
+                if (this.highlightedIndex > 0) this.highlightedIndex--;
+            } else if (type === 'atasan') {
+                if (this.highlightedIndexAtasan > 0) this.highlightedIndexAtasan--;
+            }
+        },
+        selectHighlighted(type) {
+            if (type === 'main' && this.showDropdown && this.filteredUsers.length > 0) {
+                this.selectPegawai(this.filteredUsers[this.highlightedIndex]);
+            } else if (type === 'atasan' && this.showDropdownAtasan && this.filteredAtasan.length > 0) {
+                this.selectAtasan(this.filteredAtasan[this.highlightedIndexAtasan]);
+            }
+        },
+        initView() {
+           if(this.hasAdminAccess) {
+              this.fetchNotifikasiAdmin();
+           } else {
+              if(this.globalState.user?.nip) this.selectedNip = this.globalState.user.nip;
+           }
+        },
+        clearSearch() {
+           this.searchQuery = '';
+           this.showDropdown = false;
+        },
+        // ZETTBOT FIX: Tambahan metode untuk hapus pencarian atasan secara instan
+        clearAtasanSearch() {
+           this.searchAtasanQuery = '';
+           this.formEdit.atasan = ''; 
+           this.showDropdownAtasan = true; 
+        },
+        selectPegawai(u) {
+           this.searchQuery = u.nama;
+           this.selectedNip = u.nip;
+           this.showDropdown = false;
+        },
+        selectAtasan(sup) {
+           this.formEdit.atasan = sup.nip;
+           this.searchAtasanQuery = sup.nama + " (" + sup.jabatan + ")";
+           this.showDropdownAtasan = false;
+        },
+        saveDasarSk() {
+           window.jobdesConfigSk = { ...this.configSk };
+           this.modals.dasarSk = false;
+           if(window.zettbosAlert) window.zettbosAlert("Kop Dasar SK diperbarui.", "success");
+        },
+        openModalEdit() {
+           if(!this.selectedNip) return;
+           
+           this.formEdit = {
+               nip: this.selectedNip,
+               nama: this.selectedUser.nama,
+               atasan: this.selectedJobdes.atasan_nip,
+               ikhtisar: this.selectedJobdes.ikhtisar_jabatan,
+               pokok: this.selectedJobdes.tugas_pokok,
+               tambahan: this.selectedJobdes.tugas_tambahan,
+               tanggung: this.selectedJobdes.tanggung_jawab,
+               hasil: this.selectedJobdes.hasil_kerja
+           };
+           
+           const atasanObj = this.listAtasan.find(a => a.nip === this.selectedJobdes.atasan_nip);
+           this.searchAtasanQuery = atasanObj ? atasanObj.nama + " (" + atasanObj.jabatan + ")" : '';
+           
+           this.modals.editJobdes = true;
+        },
+        async submitEditJobdes() {
+           if(!this.formEdit.atasan) {
+               if(window.zettbosAlert) window.zettbosAlert("Pilih Verifikator Atasan dari dropdown yang tersedia.", "error");
+               return;
+           }
+           
+           this.isLoadingForm = true;
+           const payload = {
+              nip: this.formEdit.nip,
+              atasan_nip: this.formEdit.atasan,
+              dasar_lampiran: "-",
+              ikhtisar_jabatan: this.formEdit.ikhtisar,
+              tugas_pokok: this.formEdit.pokok,
+              tugas_tambahan: this.formEdit.tambahan,
+              tanggung_jawab: this.formEdit.tanggung,
+              hasil_kerja: this.formEdit.hasil
+           };
+
+           const token = localStorage.getItem('transkep_session_token');
+           try {
+               const res = await window.JobdesDataService.saveJobdes(payload, this.globalState.user.nip, token);
+               this.isLoadingForm = false;
+               this.modals.editJobdes = false;
+               if (res && res.status === 'success') {
+                   if(window.zettbosAlert) window.zettbosAlert(res.message, "success");
+                   
+                   let existingIdx = this.globalState.jobdesList.findIndex(j => j.nip === payload.nip);
+                   if (existingIdx > -1) {
+                       this.globalState.jobdesList[existingIdx] = payload;
+                   } else {
+                       this.globalState.jobdesList.push(payload);
+                   }
+               } else {
+                   if(window.zettbosAlert) window.zettbosAlert("Gagal: " + (res ? res.message : "Gagal menyimpan data"), "error");
+               }
+           } catch (err) {
+               this.isLoadingForm = false;
+               this.modals.editJobdes = false;
+               if(window.zettbosAlert) window.zettbosAlert("Error Jaringan", "error");
+           }
+        },
+        openModalUsulan() {
+           if(!this.selectedNip) {
+              if(window.zettbosAlert) window.zettbosAlert("Pilih pegawai dulu.", "error"); 
+              return; 
+           }
+           this.formUsulan = { namaPegawai: this.selectedUser.nama, isi: '' };
+           this.modals.usulan = true;
+        },
+        async submitUsulan() {
+           this.isLoadingForm = true;
+           const payload = {
+              nip_pegawai: this.selectedNip,
+              nama_pegawai: this.formUsulan.namaPegawai,
+              nama_pengusul: this.globalState.user.nama || 'Unknown',
+              isi_usulan: this.formUsulan.isi
+           };
+           const token = localStorage.getItem('transkep_session_token');
+           try {
+               const res = await window.JobdesDataService.saveUsulan(payload, this.globalState.user.nip, token);
+               this.isLoadingForm = false;
+               this.modals.usulan = false;
+               if(res && res.status === 'success') {
+                   if(window.zettbosAlert) window.zettbosAlert(res.message, "success");
+               } else {
+                   if(window.zettbosAlert) window.zettbosAlert("Gagal kirim usulan.", "error");
+               }
+           } catch (err) {
+               this.isLoadingForm = false;
+               this.modals.usulan = false;
+               if(window.zettbosAlert) window.zettbosAlert("Error koneksi.", "error");
+           }
+        },
+        async fetchNotifikasiAdmin() {
+           const token = localStorage.getItem('transkep_session_token');
+           try {
+               const usulanArr = await window.JobdesDataService.getUsulanMenunggu(this.globalState.user.nip, token);
+               this.notifUsulan = usulanArr || [];
+           } catch (err) {
+               console.error("Gagal memuat notifikasi usulan:", err);
+           }
+        },
+        async prosesSelesaiUsulan(id) {
+           const token = localStorage.getItem('transkep_session_token');
+           this.notifUsulan = this.notifUsulan.filter(u => u.id !== id);
+           try {
+               const res = await window.JobdesDataService.tandaiUsulanSelesai(id, this.globalState.user.nip, token);
+               if(res && res.status === 'success') {
+                   if(window.zettbosAlert) window.zettbosAlert("Usulan ditandai selesai.", "success");
+                   this.fetchNotifikasiAdmin();
+               }
+           } catch (err) {
+               console.error("Gagal memproses selesai usulan:", err);
+           }
+        },
+        async sendJobdesWa() {
+           if(!this.selectedNip || !this.selectedUser) {
+               if(window.zettbosAlert) window.zettbosAlert("Silakan pilih pegawai terlebih dahulu.", "error"); 
+               return; 
+           }
+           
+           this.isLoadingWa = true;
+
+           let noWaRaw = this.selectedUser.no_wa || this.selectedUser.no_hp || "";
+           let noWaClean = String(noWaRaw).replace(/\D/g, ''); 
+           if (noWaClean.startsWith('0')) noWaClean = '62' + noWaClean.substring(1); 
+
+           const template = document.getElementById('templateCetakJobdes');
+           const tempNode = template.cloneNode(true);
+           
+           tempNode.querySelector('#prtJudulSk').innerText = this.configSk.dasar;
+           tempNode.querySelector('#prtNoSk').innerText = this.configSk.nomor;
+           tempNode.querySelector('#prtTglSk').innerText = this.configSk.tanggal;
+           tempNode.querySelector('#prtJabatan').innerText = document.getElementById('jdPrevNamaJabatan').innerText;
+           tempNode.querySelector('#prtAtasan').innerText = document.getElementById('jdPrevAtasan').innerText;
+           tempNode.querySelector('#prtNama').innerText = document.getElementById('jdPrevNama').innerText;
+           tempNode.querySelector('#prtNip').innerText = document.getElementById('jdPrevNip').innerText;
+           tempNode.querySelector('#prtPangkat').innerText = document.getElementById('jdPrevPangkat').innerText;
+           
+           tempNode.querySelector('#prtIkhtisar').innerHTML = document.getElementById('jdPrevIkhtisar').innerHTML;
+           tempNode.querySelector('#prtPokok').innerHTML = document.getElementById('jdPrevPokok').innerHTML;
+           tempNode.querySelector('#prtTambahan').innerHTML = document.getElementById('jdPrevTambahan').innerHTML;
+           tempNode.querySelector('#prtTanggung').innerHTML = document.getElementById('jdPrevTanggung').innerHTML;
+           tempNode.querySelector('#prtHasil').innerHTML = document.getElementById('jdPrevHasil').innerHTML;
+
+           const printHTML = '<!DOCTYPE html><html lang="id"><head><meta charset="UTF-8">' + document.getElementById('styleCetakJobdes').outerHTML + '</head><body>' + tempNode.querySelector('#contentCetakJobdes').outerHTML + '</body></html>';
+           const fileName = "Uraian_Tugas_" + this.selectedUser.nama.replace(/[^a-zA-Z0-9]/g, "_");
+           const token = localStorage.getItem('transkep_session_token');
+
+           try {
+               const res = await window.JobdesDataService.createPdfJobdes(printHTML, fileName, this.globalState.user.nip, token);
+               this.isLoadingWa = false;
+               if(res && res.status === 'success') {
+                   let pesanWa = `Yth. Bapak/Ibu *${this.selectedUser.nama}*,\n\nBerikut kami sampaikan dokumen *Uraian Tugas / Job Description* resmi Anda.\n\nUnduh dokumen PDF: ${res.url}\n\nTerima Kasih.\n_Sistem Kepegawaian TRANSKEP_`;
+                   let waLink = "https://api.whatsapp.com/send?text=" + encodeURIComponent(pesanWa);
+                   if (noWaClean) waLink = "https://api.whatsapp.com/send?phone=" + noWaClean + "&text=" + encodeURIComponent(pesanWa);
+                   window.open(waLink, "_blank");
+               } else {
+                   if(window.zettbosAlert) window.zettbosAlert("Gagal: " + (res ? res.message : "Gagal membuat dokumen PDF"), "error");
+               }
+           } catch (err) {
+               this.isLoadingWa = false;
+               if(window.zettbosAlert) window.zettbosAlert("Error Koneksi Jaringan", "error");
+           }
+        }
+      }
+    }).mount('#vue-jobdes-app');
+  });
+
+  window.renderJobdesView = function() {
+      if(window.vmJobdes && typeof window.vmJobdes.initView === 'function') {
+          window.vmJobdes.initView();
+      }
+  };
+
+  document.addEventListener('click', function(e) {
+      if(window.vmJobdes) {
+          const containerMain = document.getElementById('jdSearchContainer');
+          if (window.vmJobdes.showDropdown && containerMain && !containerMain.contains(e.target)) {
+              window.vmJobdes.showDropdown = false;
+          }
+          
+          const containerAtasan = document.getElementById('jdAtasanContainer');
+          if (window.vmJobdes.showDropdownAtasan && containerAtasan && !containerAtasan.contains(e.target)) {
+              window.vmJobdes.showDropdownAtasan = false;
+              
+              const atasanObj = window.vmJobdes.listAtasan.find(a => a.nip === window.vmJobdes.formEdit.atasan);
+              window.vmJobdes.searchAtasanQuery = atasanObj ? atasanObj.nama + " (" + atasanObj.jabatan + ")" : '';
+          }
+      }
+  });
+
+// Logika Cetak Jobdes dipisahkan ke js/cetak/cetak_jobdes.js

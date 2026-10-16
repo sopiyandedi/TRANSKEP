@@ -1,0 +1,362 @@
+<!-- VIEW COMPONENT: permohonan/template_cetak_cuti.html -->
+<div id="template-cetak-container" style="display: none;" class="hidden no-print">
+  
+  <style>
+    /* =========================================================================
+       PENGATURAN KERTAS & MARGIN (BULLETPROOF PRINT CSS)
+       ========================================================================= */
+    @media print {
+      @page {
+        size: A4;
+        margin: 0mm !important; 
+      }
+      
+      html, body {
+        margin: 0 !important;
+        padding: 2mm 5mm 2mm 6mm !important;
+        width: 100% !important;
+        box-sizing: border-box !important; 
+        
+        background-color: white !important;
+        color: black !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+      
+      .form-cuti-wrapper {
+        padding: 0 !important;
+        margin: 0 !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+      }
+      
+      .no-print {
+        display: none !important;
+      }
+    }
+
+    .form-cuti-wrapper {
+      width: 100%;
+      margin: 0 auto;
+      padding: 15mm; 
+      box-sizing: border-box;
+    }
+
+    /* =========================================================================
+       TIPOGRAFI & DESAIN TABEL (SEMUA 11PT MURNI)
+       ========================================================================= */
+    .form-cuti {
+      font-family: "Times New Roman", Times, serif;
+      font-size: 10pt !important;
+      line-height: 1.25;
+      color: #000;
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    .header-table { width: 100%; border: none !important; margin-bottom: 5px; }
+    .header-table td { border: none !important; padding: 1px 0 !important; vertical-align: top; font-size: 10pt !important; }
+
+    .title-area { text-align: center; margin-bottom: 15px; }
+    .title-area h2 { font-size: 11.5pt; font-weight: bold; text-decoration: underline; margin: 0; letter-spacing: 0.5px; }
+    .title-area p { font-size: 10pt; margin: 1px 0 0 0; }
+
+    .border-all {
+      border-collapse: collapse !important;
+      width: 100% !important;
+      table-layout: fixed !important;
+      margin-bottom: 6px !important;
+      box-sizing: border-box;
+    }
+    .border-all td, .border-all th {
+      border: 1px solid black !important;
+      padding: 3px 6px !important; 
+      vertical-align: middle;
+      font-size: 10pt !important;
+    }
+    .border-all th { font-weight: bold; background-color: #f2f2f2 !important; }
+
+    .section-title-td {
+      font-weight: bold;
+      background-color: #f2f2f2 !important;
+      text-transform: uppercase;
+      font-size: 10pt !important;
+      letter-spacing: 0.5px;
+    }
+  </style>
+
+  <!-- =========================================================================
+       STRUKTUR KONTEN UTAMA FORMULIR CUTI
+       ========================================================================= -->
+  <div class="form-cuti-wrapper">
+    <div class="form-cuti">
+      
+      <!-- HEADER ALAMAT & TANGGAL DINAS -->
+      <table class="header-table">
+        <tr>
+          <td style="width: 55%;">
+            Kepada Yth.<br>
+            Ketua Pengadilan Agama Indramayu<br>
+            Di-<br>
+            <span style="padding-left: 20px;">Indramayu</span>
+          </td>
+          <td style="width: 45%; text-align: right;">
+            Indramayu, {{formatPengajuanLengkap}}
+          </td>
+        </tr>
+      </table>
+
+      <!-- JUDUL RESMI BLANKO -->
+      <div class="title-area">
+        <h2>PERMINTAAN DAN PEMBERIAN CUTI</h2>
+        <p>Nomor : &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/KPA.W10-A/KP5.3/{{romawiCetak}}/{{tahunCetak}}</p>
+      </div>
+
+      <!-- I. DATA PEGAWAI -->
+      <table class="border-all">
+        <colgroup>
+          <col style="width: 15%;">               
+          <col style="width: 45%;">
+          <col style="width: 20%;">
+          <col style="width: 30%;">
+        </colgroup>
+        <tr>
+          <td colspan="4" class="section-title-td">I. DATA PEGAWAI</td>
+        </tr>
+        <tr>
+          <td>Nama</td>
+          <td style="font-weight: bold; font-size: 11pt;">{{pns_nama}}</td>
+          <td>NIP</td>
+          <td style="font-weight: bold; font-size: 11pt;">{{pns_nip}}</td>
+        </tr>
+        <tr>
+          <td>Jabatan</td>
+          <td>{{pns_jabatan}}</td>
+          <td>Masa Kerja</td>
+          <td>-</td>
+        </tr>
+        <tr>
+          <td>Unit Kerja</td>
+          <td colspan="3">Pengadilan Agama Indramayu</td>
+        </tr>
+      </table>
+
+      <!-- II. JENIS CUTI YANG DIAMBIL -->
+      <table class="border-all">
+        <colgroup>
+          <col style="width: 40%;">
+          <col style="width: 10%;">
+          <col style="width: 40%;">
+          <col style="width: 10%;">
+        </colgroup>
+        <tr>
+          <td colspan="4" class="section-title-td">II. JENIS CUTI YANG DIAMBIL</td>
+        </tr>
+        <tr>
+          <td>1. Cuti Tahunan</td>
+          <td style="text-align: center; font-weight: bold; font-size: 11pt;">{{chk_tahunan}}</td>
+          <td>4. Cuti Melahirkan</td>
+          <td style="text-align: center; font-weight: bold; font-size: 11pt;">{{chk_melahirkan}}</td>
+        </tr>
+        <tr>
+          <td>2. Cuti Besar</td>
+          <td style="text-align: center; font-weight: bold; font-size: 11pt;">{{chk_besar}}</td>
+          <td>5. Cuti Karena Alasan Penting</td>
+          <td style="text-align: center; font-weight: bold; font-size: 11pt;">{{chk_penting}}</td>
+        </tr>
+        <tr>
+          <td>3. Cuti Sakit</td>
+          <td style="text-align: center; font-weight: bold; font-size: 11pt;">{{chk_sakit}}</td>
+          <td>6. Cuti di Luar Tanggungan Negara</td>
+          <td style="text-align: center; font-weight: bold; font-size: 11pt;">{{chk_cltn}}</td>
+        </tr>
+      </table>
+
+      <!-- III. ALASAN CUTI -->
+      <table class="border-all">
+        <tr>
+          <td class="section-title-td">III. ALASAN CUTI</td>
+        </tr>
+        <tr>
+          <td style="height: 18px; vertical-align: top; padding-top: 2px !important;">{{log_alasan}}</td>
+        </tr>
+      </table>
+
+      <!-- IV. LAMANYA CUTI -->
+      <table class="border-all">
+        <colgroup>
+          <col style="width: 10%;">
+          <col style="width: 8%;">
+          <col style="width: 20%;">
+          <col style="width: 15%;">
+          <col style="width: 20%;">
+          <col style="width: 5%;">
+          <col style="width: 20%;">
+        </colgroup>
+        <tr>
+          <td colspan="7" class="section-title-td">IV. LAMANYA CUTI</td>
+        </tr>
+        <tr>
+          <td>Selama</td>
+          <td style="text-align: center; font-weight: bold;">{{log_sisa_cuti}}</td>
+          <td>Hari / <span style="text-decoration: line-through;">Bulan</span> / <span style="text-decoration: line-through;">Tahun</span></td>
+          <td>mulai tanggal</td>
+          <td style="text-align: center;">{{log_tgl_mulai}}</td>
+          <td style="text-align: center;">s.d</td>
+          <td style="text-align: center;">{{log_tgl_selesai}}</td>
+        </tr>
+      </table>
+
+      <!-- V. CATATAN CUTI -->
+      <table class="border-all">
+        <colgroup>
+          <col style="width: 7%;">
+          <col style="width: 13%;">
+          <col style="width: 19%;">
+          <col style="width: 18%;">
+          <col style="width: 35%;">
+          <col style="width: 8%;">
+        </colgroup>
+        <tr>
+          <td colspan="6" class="section-title-td">V. CATATAN CUTI</td>
+        </tr>
+        <tr>
+          <td colspan="3" style="font-weight: bold; font-size: 10pt !important;">1. Cuti Tahunan</td>
+          <td rowspan="2" style="text-align: center; font-weight: bold; font-size: 11pt !important; padding: 1px !important;">Paraf Petugas Cuti</td>
+          <td style="font-size: 10pt !important;">2. Cuti Besar</td>
+          <td style="text-align: center; font-weight: bold; font-size: 11pt !important;">{{cuti_besar}}</td>
+        </tr>
+        <tr>
+          <td style="text-align: center; font-size: 11pt !important; font-weight: bold;">Tahun</td>
+          <td style="text-align: center; font-size: 11pt !important; font-weight: bold;">Sisa (Awal)</td>
+          <td style="text-align: center; font-size: 11pt !important; font-weight: bold;">Keterangan (Sisa)</td>
+          <td style="font-size: 11pt !important;">3. Cuti Sakit</td>
+          <td style="text-align: center; font-weight: bold; font-size: 10pt !important;">{{cuti_sakit}}</td>
+        </tr>
+        <tr>
+          <td style="text-align: center; font-size: 11pt !important;">2024</td>
+          <td style="text-align: center; font-size: 11pt !important;">{{before24}}</td>
+          <td style="text-align: center; font-size: 11pt !important;">{{after24}}</td>
+          <td rowspan="3" style="text-align: center; vertical-align: middle; padding: 2px !important;"><img src="https://quickchart.io/qr?size=50&text=sudah%20di%20paraf%20oleh%20petugas%20cuti" width="45" height="45" alt="Paraf" style="margin: 0 auto; display: block;" /></td>
+          <td style="font-size: 11pt !important;">4. Cuti Melahirkan</td>
+          <td style="text-align: center; font-weight: bold; font-size: 10pt !important;">{{cuti_melahirkan}}</td>
+        </tr>
+        <tr>
+          <td style="text-align: center; font-size: 11pt !important;">2025</td>
+          <td style="text-align: center; font-size: 11pt !important;">{{before25}}</td>
+          <td style="text-align: center; font-size: 11pt !important;">{{after25}}</td>
+          <td style="font-size: 11pt !important;">5. Cuti Karena Alasan Penting</td>
+          <td style="text-align: center; font-weight: bold; font-size: 11pt !important;">{{cuti_penting}}</td>
+        </tr>
+        <tr>
+          <td style="text-align: center; font-size: 11pt !important;">2026</td>
+          <td style="text-align: center; font-size: 11pt !important;">{{before26}}</td>
+          <td style="text-align: center; font-size: 11pt !important;">{{after26}}</td>
+          <td style="font-size: 11pt !important;">6. Cuti di Luar Tanggungan Negara</td>
+          <td style="text-align: center; font-weight: bold; font-size: 11pt !important;">{{cuti_cltn}}</td>
+        </tr>
+      </table>
+
+      <!-- VI. ALAMAT SELAMA MENJALANKAN CUTI & SIGNATURE PEMOHON -->
+      <div style="display: flex; justify-content: space-between; align-items: stretch; margin-bottom: 6px; width: 100%;">
+        
+        <!-- Sisi Kiri: Tabel 2 Kolom untuk Alamat & Telepon -->
+        <table class="border-all" style="border-collapse: collapse !important; width: 60% !important; table-layout: fixed !important; margin: 0 !important; box-sizing: border-box;">
+          <colgroup>
+            <col style="width: 75%;">
+            <col style="width: 25%;">
+          </colgroup>
+          <tr>
+            <td class="section-title-td">VI. ALAMAT SELAMA MENJALANKAN CUTI</td>
+            <td class="section-title-td" style="text-align: center;">TELPON / HP</td>
+          </tr>
+          <tr>
+            <td style="vertical-align: top; height: 35px; padding: 4px 6px !important; line-height: 1.3; font-size: 10pt !important;">
+              {{log_alamat}}
+            </td>
+            <td style="vertical-align: middle; text-align: center; font-weight: bold; font-size: 10pt !important;">
+              {{pns_no_hp}}
+            </td>
+          </tr>
+        </table>
+
+        <!-- Sisi Kanan: Area Tanda Tangan Tanpa Garis Kolom -->
+        <div style="width: 40%; display: flex; flex-direction: column; justify-content: flex-end; align-items: flex-end; padding-bottom: 2px; box-sizing: border-box;">
+          <div style="display: flex; flex-direction: column; align-items: flex-start; text-align: left;">
+            <div style="font-size: 10pt !important; font-family: 'Times New Roman', Times, serif; margin-bottom: 20px; padding-left: 73px;">
+              Hormat Saya,
+            </div>
+            <div style="display: flex; align-items: flex-end; gap: 8px;">
+              <img src="{{qrPegawaiUrl}}" width="65" height="65" alt="TTE Pegawai" style="flex-shrink: 0; margin-bottom: 1px;" /> 
+              <div style="text-align: left; font-size: 10pt !important; line-height: 1.3; font-family: 'Times New Roman', Times, serif;">
+                <span style="text-decoration: underline; font-weight: bold;">{{pns_nama}}</span><br>
+                NIP. {{pns_nip}}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- VII. PERTIMBANGAN ATASAN LANGSUNG -->
+      <table class="border-all">
+        <colgroup>
+          <col style="width: 25%;">
+          <col style="width: 25%;">
+          <col style="width: 25%;">
+          <col style="width: 25%;">
+        </colgroup>
+        <tr>
+          <td colspan="4" class="section-title-td">VII. PERTIMBANGAN ATASAN LANGSUNG</td>
+        </tr>
+        <tr style="text-align: center; font-weight: bold; font-size: 10pt !important;">
+          <td>DISETUJUI</td>
+          <td>PERUBAHAN</td>
+          <td>DITANGGUHKAN</td>
+          <td>TIDAK DISETUJUI</td>
+        </tr>
+        <tr style="text-align: center; font-weight: bold; font-size: 10pt !important; height: 18px;">
+          <td>{{chk_atasan_setuju}}</td>
+          <td>{{chk_atasan_ubah}}</td>
+          <td>{{chk_atasan_tangguh}}</td>
+          <td>{{chk_atasan_tolak}}</td>
+        </tr>
+      </table>
+
+      <!-- BLOK TANDA TANGAN ATASAN LANGSUNG -->
+      <div style="width: 100%; margin-top: 3px; margin-bottom: 14px;">
+        {{atasanSignatureContent}}
+      </div>
+
+      <!-- VIII. KEPUTUSAN PEJABAT YANG BERWENANG -->
+      <table class="border-all">
+        <colgroup>
+          <col style="width: 25%;">
+          <col style="width: 25%;">
+          <col style="width: 25%;">
+          <col style="width: 25%;">
+        </colgroup>
+        <tr>
+          <td colspan="4" class="section-title-td">VIII. KEPUTUSAN PEJABAT YANG BERWENANG MEMBERIKAN CUTI</td>
+        </tr>
+        <tr style="text-align: center; font-weight: bold; font-size: 10pt !important;">
+          <td>DISETUJUI</td>
+          <td>PERUBAHAN</td>
+          <td>DITANGGUHKAN</td>
+          <td>TIDAK DISETUJUI</td>
+        </tr>
+        <tr style="text-align: center; font-weight: bold; font-size: 10pt !important; height: 18px;">
+          <td>{{chk_pejabat_setuju}}</td>
+          <td>{{chk_pejabat_ubah}}</td>
+          <td>{{chk_pejabat_tangguh}}</td>
+          <td>{{chk_pejabat_tolak}}</td>
+        </tr>
+      </table>
+
+      <!-- BLOK TANDA TANGAN PEJABAT BERWENANG -->
+      <div style="width: 100%; margin-top: 0.5px; margin-bottom: 0.5px;">
+        {{pejabatSignatureContent}}
+      </div>
+
+    </div>
+  </div>
+</div>

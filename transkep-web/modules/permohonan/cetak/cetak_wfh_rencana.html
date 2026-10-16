@@ -1,0 +1,108 @@
+<!-- VIEW COMPONENT: permohonan/wfh/cetak_wfh_rencana.html -->
+<!-- =========================================================================
+     FILE: permohonan/wfh/cetak_wfh_rencana.html
+========================================================================== -->
+<div id="templateCetakRencanaWfh" style="display: none;" class="hidden no-print">
+  
+  <style>
+     /* ZETTBOT FIX: Margin 0 di @page mematikan Header/Footer bawaan Chrome */
+     @media print {
+        @page { size: A4 portrait; margin: 0mm !important; } 
+        body { 
+            font-family: "Times New Roman", Times, serif; 
+            font-size: 11pt; 
+            color: black; 
+            -webkit-print-color-adjust: exact; 
+            print-color-adjust: exact; 
+            margin: 0 !important; 
+            /* Jarak Kertas: Atas 30mm, Kanan 20mm, Bawah 25mm, Kiri 35mm (Geser Kanan) */
+            padding: 15mm 15mm 15mm 20mm !important; 
+            box-sizing: border-box;
+        }
+     }
+     .wfh-table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
+     .wfh-table th, .wfh-table td { border: 1px solid black; padding: 6px 8px; vertical-align: top; }
+     .wfh-table th { background-color: #f3f4f6 !important; font-weight: bold; text-align: center; vertical-align: middle; }
+     .wfh-row-center { text-align: center; }
+     .bold { font-weight: bold; }
+     .uppercase { text-transform: uppercase; }
+  </style>
+
+  <div style="width: 100%;">
+     
+     <div style="text-align: center; margin-bottom: 30px;">
+        <div style="font-size: 12pt;" class="bold uppercase">Penetapan Target Kerja WFH (Work From Home)</div>
+        <div style="font-size: 12pt;" class="bold uppercase">Pada Pengadilan Agama Indramayu</div>
+     </div>
+
+     <!-- I. DATA PEGAWAI -->
+     <div style="margin-bottom: 20px;">
+        <div class="bold uppercase" style="margin-bottom: 10px; font-size: 11pt;">I. Data Pegawai</div>
+        <table style="width: 100%; border: none; font-size: 11pt; line-height: 1.5;">
+           <tr><td style="width: 160px; padding: 2px 0;">Nama</td><td style="width: 15px; padding: 2px 0;">:</td><td class="bold" style="padding: 2px 0;">{{wfh_nama}}</td></tr>
+           <tr><td style="padding: 2px 0;">NIP</td><td style="padding: 2px 0;">:</td><td style="padding: 2px 0;">{{wfh_nip}}</td></tr>
+           <tr><td style="padding: 2px 0;">Jabatan</td><td style="padding: 2px 0;">:</td><td style="padding: 2px 0;">{{wfh_jabatan}}</td></tr>
+           <tr><td style="padding: 2px 0;">Unit Kerja</td><td style="padding: 2px 0;">:</td><td style="padding: 2px 0;">{{wfh_unit}}</td></tr>
+           <tr><td style="padding: 2px 0;">Hari, Tanggal WFH</td><td style="padding: 2px 0;">:</td><td class="bold" style="padding: 2px 0;">{{wfh_tanggal}}</td></tr>
+           <tr><td style="padding: 2px 0; vertical-align: top;">Tempat</td><td style="padding: 2px 0; vertical-align: top;">:</td><td style="padding: 2px 0; vertical-align: top;">{{wfh_tempat}}</td></tr>
+        </table>
+     </div>
+
+     <!-- II. PENETAPAN TARGET KERJA -->
+     <div style="margin-bottom: 24px;">
+        <div class="bold uppercase" style="margin-bottom: 10px; font-size: 11pt;">II. Penetapan Target Kerja</div>
+        <table class="wfh-table" style="font-size: 11pt;">
+           <thead>
+               <tr>
+                  <th style="width: 5%;">No</th>
+                  <th style="width: 50%;">Uraian Target Kerja</th>
+                  <th style="width: 25%;">Output<br><span style="font-weight: normal; font-size: 10pt;">(Dokumen/Produk)</span></th>
+                  <th style="width: 20%;">Target<br><span style="font-weight: normal; font-size: 10pt;">(Kuantitas)</span></th>
+               </tr>
+               <tr style="background-color: #e5e7eb !important;" class="wfh-row-center">
+                  <td style="padding: 3px;">1</td><td style="padding: 3px;">2</td><td style="padding: 3px;">3</td><td style="padding: 3px;">4</td>
+               </tr>
+           </thead>
+           <!-- ZETTBOT FIX: Pakai ID Tbody untuk injeksi aman agar teks tidak bocor keluar tabel -->
+           <tbody id="wfh_target_tbody">
+               
+           </tbody>
+        </table>
+     </div>
+
+     <!-- III. SUMBER DAYA DAN KENDALA -->
+     <div style="margin-bottom: 40px;">
+        <div class="bold uppercase" style="margin-bottom: 10px; font-size: 11pt;">III. Sumber Daya dan Kendala</div>
+        <table style="width: 100%; border: none; font-size: 11pt;">
+           <tr>
+              <td style="width: 25px; vertical-align: top;" class="bold">a.</td>
+              <td style="padding-bottom: 6px; vertical-align: top;"><span class="bold">Kebutuhan Perangkat :</span> Laptop, Koneksi Internet, Akses VPN Instansi.</td>
+           </tr>
+           <tr>
+              <td style="width: 25px; vertical-align: top;" class="bold">b.</td>
+              <td style="vertical-align: top;"><span class="bold">Potensi Kendala :</span> {{wfh_kendala}}</td>
+           </tr>
+        </table>
+     </div>
+
+     <!-- IV. PERSETUJUAN -->
+     <div style="margin-bottom: 20px;">
+        <div class="bold uppercase" style="margin-bottom: 15px; font-size: 11pt;">IV. Persetujuan</div>
+        
+        <div style="width: 100%; display: flex; justify-content: space-between; font-size: 11pt;">
+           <div style="width: 58%; text-align: left; padding-left: 15px;">
+              <div style="margin-bottom: 90px;">Mengetahui/Menyetujui,<br>Penanggungjawab Bidang,</div>
+              <div class="bold" style="text-decoration: underline;">{{wfh_nama_atasan}}</div>
+              <div>NIP. {{wfh_nip_atasan}}</div>
+           </div>
+           
+           <div style="width: 38%; text-align: left;">
+              <div style="margin-bottom: 90px;">Indramayu, {{wfh_tgl_buat}}<br>Pegawai yang bersangkutan,</div>
+              <div class="bold" style="text-decoration: underline;">{{wfh_nama}}</div>
+              <div>NIP. {{wfh_nip}}</div>
+           </div>
+        </div>
+     </div>
+
+  </div>
+</div>

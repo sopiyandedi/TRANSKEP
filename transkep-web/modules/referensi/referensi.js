@@ -1,0 +1,310 @@
+// ==========================================
+// FILE: referensi.js (TRANSKEP Modular)
+// ENGINE: ZettBOT Core v1.0.0
+// ==========================================
+
+// --- Source: dashboard/referensi/js_referensi.html ---
+function openReferensiModal() {
+      // 1. Matikan pencarian jika sedang aktif
+      if (typeof clearEmployeeSearch === 'function') {
+          clearEmployeeSearch();
+      } else if (window.vmDashboard && window.vmDashboard.searchKeyword) {
+          window.vmDashboard.searchKeyword = '';
+      }
+      
+      const modal = document.getElementById('modalReferensiAbsensi');
+      if (modal) {
+          modal.classList.remove('hidden');
+          // 2. Transisi mulus Pop-up
+          setTimeout(() => {
+              modal.classList.remove('opacity-0');
+              if (modal.firstElementChild) modal.firstElementChild.classList.remove('scale-95');
+          }, 10);
+      }
+  }
+
+  function closeReferensiModal() {
+      const modal = document.getElementById('modalReferensiAbsensi');
+      if (modal) {
+          modal.classList.add('opacity-0');
+          if (modal.firstElementChild) modal.firstElementChild.classList.add('scale-95');
+          // Tunggu animasi selesai baru sembunyikan display block
+          setTimeout(() => {
+              modal.classList.add('hidden');
+          }, 300);
+      }
+  }
+
+  // Alias Global untuk Kompatibilitas
+  window.openReferensiModal = openReferensiModal;
+  window.closeReferensiModal = closeReferensiModal;
+  window.openModalReferensiAbsensi = openReferensiModal;
+  window.closeModalReferensiAbsensi = closeReferensiModal;
+
+// --- Source: dashboard/referensi/js_kode.html ---
+// 1. DATABASE LOKAL LENGKAP (BERDASARKAN SK SEKMA NO. 627/SEK/SK/VII/2023)
+  const kodeSuratDB = [
+      // --- HUKUM (HK) ---
+      { kode: "HK1.1.1", desk: "Undang-undang / Peraturan Pemerintah Pengganti Undang-undang (PERPU)" },
+      { kode: "HK1.1.2", desk: "Peraturan Pemerintah" },
+      { kode: "HK1.1.3", desk: "Peraturan Presiden" },
+      { kode: "HK1.1.4", desk: "Keputusan Presiden" },
+      { kode: "HK1.1.5", desk: "Instruksi Presiden" },
+      { kode: "HK1.2.1", desk: "Peraturan Mahkamah Agung" },
+      { kode: "HK1.2.2", desk: "Instruksi Mahkamah Agung" },
+      { kode: "HK1.2.3", desk: "Surat Edaran Mahkamah Agung" },
+      { kode: "HK1.2.4", desk: "Maklumat Ketua Mahkamah Agung" },
+      { kode: "HK1.2.5", desk: "Keputusan (Internal Mahkamah Agung)" },
+      { kode: "HK1.3.1", desk: "Surat Perjanjian / Nota Kesepahaman Dalam Negeri" },
+      { kode: "HK1.3.2", desk: "Surat Perjanjian / Nota Kesepahaman Luar Negeri" },
+      { kode: "HK2.1", desk: "Penyelesaian Perkara Pidana Umum" },
+      { kode: "HK2.2", desk: "Penyelesaian Perkara Pidana Khusus" },
+      { kode: "HK2.3", desk: "Penyelesaian Perkara Pidana Militer" },
+      { kode: "HK2.4", desk: "Penyelesaian Perkara Perdata Umum" },
+      { kode: "HK2.5", desk: "Penyelesaian Perkara Perdata Niaga" },
+      { kode: "HK2.6", desk: "Penyelesaian Perkara Perdata Agama" },
+      { kode: "HK2.7", desk: "Penyelesaian Perkara Tata Usaha Negara" },
+      
+      // --- HUMAS DAN PROTOKOL (HM) ---
+      { kode: "HM1.1.1", desk: "Penerangan dan publikasi (Pengumuman, Wawancara, Konferensi Pers, Tanggapan Media)" },
+      { kode: "HM1.1.2", desk: "Pidato / Sambutan / Ceramah Pimpinan" },
+      { kode: "HM1.2", desk: "Dokumentasi dan peliputan acara resmi" },
+      { kode: "HM2.1.1", desk: "Hubungan dengan Lembaga Pemerintah (RDP DPR, BAKOHUMAS, Audiensi)" },
+      { kode: "HM2.1.2", desk: "Hubungan dengan Lembaga Swasta" },
+      { kode: "HM2.1.3", desk: "Hubungan dengan Organisasi Sosial / LSM" },
+      { kode: "HM2.1.4", desk: "Hubungan dengan Perguruan Tinggi (PKL, Magang, Beasiswa)" },
+      { kode: "HM3.1.1", desk: "Upacara / Acara Kedinasan (Pelantikan, Serah Terima)" },
+      { kode: "HM3.1.2", desk: "Kunjungan Dinas (Dalam dan Luar Negeri)" },
+      { kode: "HM3.1.3", desk: "Agenda Pimpinan (Penjadwalan Rapat, dll)" },
+      
+      // --- KEARSIPAN (KA) ---
+      { kode: "KA1.1", desk: "Pengendalian Dan Pengurusan Arsip (Buku Agenda, Tanda Terima Arsip)" },
+      { kode: "KA1.2", desk: "Layanan Penggunaan Arsip (Peminjaman, Penggandaan, Legalisasi)" },
+      { kode: "KA2.1.1", desk: "Pengelolaan Arsip Aktif (Daftar Berkas, Laporan Arsip Aktif)" },
+      { kode: "KA2.1.2", desk: "Pengelolaan Arsip Inaktif (Denah Penyimpanan, Daftar Arsip Inaktif)" },
+      { kode: "KA2.1.3", desk: "Pengelolaan Arsip Vital" },
+      { kode: "KA2.1.4", desk: "Pengelolaan Arsip Terjaga" },
+      { kode: "KA2.1.5", desk: "Perawatan Arsip (Fumigasi, Laminasi)" },
+      { kode: "KA2.1.6", desk: "Penyelamatan dan Pemulihan Arsip" },
+      { kode: "KA2.2.1", desk: "Pemindahan Arsip Inaktif (Berita Acara Pindah Arsip)" },
+      { kode: "KA2.2.2", desk: "Pemusnahan Arsip (Berita Acara, Keputusan Musnah Arsip)" },
+      { kode: "KA2.2.3", desk: "Penyerahan Arsip Statis" },
+      { kode: "KA2.3", desk: "Pengawasan Kearsipan (LAKI, LAKE, Audit Arsip)" },
+      
+      // --- KEPEGAWAIAN (KP) ---
+      { kode: "KP1.1.1", desk: "Perencanaan dan Seleksi Hakim Agung" },
+      { kode: "KP1.1.2", desk: "Perencanaan dan Seleksi Hakim" },
+      { kode: "KP1.1.6", desk: "Perencanaan dan Seleksi Pengadaan PNS" },
+      { kode: "KP1.1.7", desk: "Perencanaan dan Seleksi Pengadaan PPPK" },
+      { kode: "KP1.2.8", desk: "Pegawai Pindah Instansi Masuk/Keluar MA" },
+      { kode: "KP2.1.1", desk: "Kenaikan pangkat / golongan" },
+      { kode: "KP2.1.2", desk: "Kenaikan gaji berkala (KGB)" },
+      { kode: "KP2.1.3", desk: "Penyesuaian masa kerja" },
+      { kode: "KP3.1.2", desk: "Asesmen Sumber Daya Manusia (Assessment)" },
+      { kode: "KP3.2.1", desk: "Ujian Penyesuaian Ijazah" },
+      { kode: "KP3.2.2", desk: "Ujian Dinas" },
+      { kode: "KP3.3.1", desk: "Tugas Belajar" },
+      { kode: "KP3.3.2", desk: "Izin Belajar" },
+      { kode: "KP3.4.1", desk: "Perencanaan dan Pelaksanaan Kinerja Pegawai (SKP, IKU, IKI)" },
+      { kode: "KP3.4.3", desk: "Evaluasi Kinerja Pegawai (DP3, Penilaian Prestasi Kinerja)" },
+      { kode: "KP4.1.2", desk: "Manajemen Talenta (Talent Management)" },
+      { kode: "KP4.1.3", desk: "Mutasi, Promosi, dan Demosi (Pindah Tugas, Pelantikan)" },
+      { kode: "KP5.2", desk: "Layanan Kesehatan Pegawai (Keterangan Sehat/Sakit, Medical Checkup)" },
+      { kode: "KP5.3", desk: "Cuti dan Izin Ke Luar Negeri (Cuti Tahunan, Sakit, Alasan Penting, Bersalin)" },
+      { kode: "KP5.8", desk: "Penghargaan dan Tanda Jasa (Satyalancana, dll)" },
+      { kode: "KP6.1", desk: "Pemberhentian Pegawai dengan Hak Pensiun (BUP, Meninggal Dunia)" },
+      { kode: "KP6.2", desk: "Pemberhentian Pegawai Tanpa Hak Pensiun" },
+      { kode: "KP7.1", desk: "Pelaksanaan Tugas Dalam Jabatan (Surat Tugas, Perjalanan Dinas / SPPD)" },
+      { kode: "KP7.2", desk: "Dokumentasi Identitas Pegawai (Karpeg, Karis, Karsu, KP4)" },
+      { kode: "KP7.3", desk: "Laporan Pajak-Pajak Pribadi (LP2P) dan Laporan Harta Kekayaan (LHK/LHKPN)" },
+      { kode: "KP7.4", desk: "Surat Penunjukan Pelaksana Tugas (Plt.) dan Pelaksana Harian (Plh.)" },
+      { kode: "KP8.1", desk: "Kode Etik dan Perilaku (Dugaan Pelanggaran, Sidang Etik)" },
+      { kode: "KP8.2", desk: "Sanksi / Hukuman Disiplin Pegawai (Teguran Tertulis, Penundaan Gaji)" },
+      
+      // --- PERLENGKAPAN (PL) ---
+      { kode: "PL1.1.1", desk: "Pengadaan Barang Persediaan (ATK, BAST, Kuitansi, SPK)" },
+      { kode: "PL1.1.2", desk: "Pengadaan Barang Inventaris" },
+      { kode: "PL1.1.5", desk: "Pengadaan Jasa Konsultansi" },
+      { kode: "PL1.1.7", desk: "Pengadaan Jasa Konstruksi" },
+      { kode: "PL1.2.1", desk: "Perencanaan Barang Milik Negara (RKBMN)" },
+      { kode: "PL1.2.3", desk: "Penghapusan dan Pemusnahan BMN" },
+      { kode: "PL1.2.5", desk: "Pencatatan BMN" },
+      { kode: "PL1.2.7", desk: "Pelaporan BMN" },
+      
+      // --- PERPUSTAKAAN (PS) ---
+      { kode: "PS1.1", desk: "Akuisisi Koleksi/Bahan pustaka" },
+      { kode: "PS1.3", desk: "Layanan Kepustakaan" },
+      { kode: "PS1.4.1", desk: "Keanggotaan Perpustakaan" },
+      { kode: "PS1.5", desk: "Sirkulasi Koleksi/ Bahan Pustaka (Peminjaman/Pengembalian)" },
+      
+      // --- PENGAWASAN (PW) ---
+      { kode: "PW1.1.1", desk: "Pengawasan/Pemantauan yang Memerlukan Tindak Lanjut (LHP, KKP)" },
+      { kode: "PW1.1.2", desk: "Pengawasan yang Mengandung Unsur Pelanggaran Non Administratif/Fraud" },
+      { kode: "PW1.3", desk: "Pengawasan/Pemantauan Pegawai" },
+      { kode: "PW1.4", desk: "Pengawasan Eksternal (BPK, KY, BPKP, ORI)" },
+      
+      // --- RUMAH TANGGA (RT) ---
+      { kode: "RT1.1.1", desk: "Pemeliharaan Bangunan Gedung dan Lingkungan (Fasilitas Kantor, Rumah Dinas)" },
+      { kode: "RT1.1.2", desk: "Pemeliharaan Peralatan Operasional (Kendaraan Dinas)" },
+      { kode: "RT1.1.3", desk: "Pemeliharaan Mekanikal Elektrikal (AC, Genset, Listrik)" },
+      { kode: "RT1.1.4", desk: "Ketertiban dan keamanan (Buku Tamu, Izin Keluar, Piket Satpam)" },
+      { kode: "RT1.1.5", desk: "Pengelolaan Parkir Kendaraan" },
+      { kode: "RT2.1", desk: "Pendaftaran Museum Mahkamah Agung" },
+      
+      // --- TEKNOLOGI INFORMASI (TI) ---
+      { kode: "TI1.1.1", desk: "Sistem Informasi / Aplikasi Umum (Pengembangan, User Manual)" },
+      { kode: "TI1.1.2", desk: "Sistem Informasi / Aplikasi Khusus" },
+      { kode: "TI1.2.1", desk: "Jaringan Internet dan Ekstranet" },
+      { kode: "TI1.3.1", desk: "Operasional Basis Data (Database)" },
+      { kode: "TI1.4.1", desk: "Infrastruktur Server Fisik" },
+      { kode: "TI1.4.2", desk: "Infrastruktur Server Virtual (Cloud)" },
+      { kode: "TI2.2.1", desk: "Pengelolaan Keamanan Informasi (Sertifikat Elektronik/TTE, Digital Signature)" },
+      
+      // --- PENDIDIKAN & PELATIHAN (DL) ---
+      { kode: "DL1.1", desk: "Beasiswa Pendidikan" },
+      { kode: "DL1.4", desk: "Kurikulum dan Silabus Pembelajaran" },
+      { kode: "DL1.6", desk: "Penyelenggaraan Pembelajaran (Daftar Hadir, Ujian, Tugas Akhir)" },
+      { kode: "DL1.9", desk: "Penerbitan Surat Keterangan Pembelajaran (Sertifikat Diklat)" },
+      
+      // --- PERENCANAAN ANGGARAN (RA) ---
+      { kode: "RA1.1", desk: "Penyusunan Rencana Program" },
+      { kode: "RA1.3", desk: "Rencana Kerja Strategis Lima Tahunan (RENSTRA)" },
+      { kode: "RA1.5", desk: "Rencana Kerja Tahunan (RENJA)" },
+      { kode: "RA1.6", desk: "Usulan Anggaran (DIPA)" },
+      { kode: "RA1.8", desk: "Revisi Anggaran" },
+      { kode: "RA1.10", desk: "Perjanjian Kinerja Tahunan (PKT)" },
+      
+      // --- KEUANGAN (KU) ---
+      { kode: "KU1.1.1", desk: "Penetapan PA, KPA, PPK, Bendahara, dan Pengelola Keuangan" },
+      { kode: "KU1.1.2", desk: "Dokumen Pertanggungjawaban atas beban APBN (SPJ)" },
+      { kode: "KU1.4", desk: "Penerimaan Negara Bukan Pajak (PNBP)" },
+      { kode: "KU2.1", desk: "Penyusunan Laporan Keuangan" },
+      
+      // --- ORGANISASI TATALAKSANA (OT) ---
+      { kode: "OT1.1", desk: "Pembentukan/Perubahan/Penghapusan Organisasi" },
+      { kode: "OT1.2", desk: "Tatalaksana / Mekanisme Kerja (SOP, Proses Bisnis)" },
+      { kode: "OT1.3", desk: "Analisis Jabatan dan Analisis Beban Kerja (ANJAB ABK)" },
+      { kode: "OT1.5", desk: "Peta Jabatan" }
+  ];
+
+  // 2. FUNGSI BUKA/TUTUP MODAL
+  function openKodeSuratModal() {
+      const modal = document.getElementById('modalKodeSurat');
+      if (modal) {
+          modal.classList.remove('hidden');
+          setTimeout(() => {
+              modal.classList.remove('opacity-0');
+              modal.firstElementChild.classList.remove('scale-95');
+              document.getElementById('inputSearchKode').focus();
+          }, 10);
+      }
+  }
+
+  function closeKodeSuratModal() {
+      const modal = document.getElementById('modalKodeSurat');
+      if (modal) {
+          modal.classList.add('opacity-0');
+          if (modal.firstElementChild) modal.firstElementChild.classList.add('scale-95');
+          setTimeout(() => {
+              modal.classList.add('hidden');
+              if (typeof clearKodeSearch === 'function') clearKodeSearch();
+          }, 300);
+      }
+  }
+
+  // Alias Global untuk Kompatibilitas
+  window.openKodeSuratModal = openKodeSuratModal;
+  window.closeKodeSuratModal = closeKodeSuratModal;
+  window.openModalKodeSurat = openKodeSuratModal;
+  window.closeModalKodeSurat = closeKodeSuratModal;
+
+  // 3. FUNGSI PENCARIAN REAL-TIME & ANTI-TYPO
+  function handleKodeSearch(val) {
+      const resultContainer = document.getElementById('kodeResultContainer');
+      const btnClear = document.getElementById('btnClearKode');
+      
+      val = val.toLowerCase().trim();
+      
+      if (val === '') { 
+          btnClear.classList.add('hidden'); 
+          resultContainer.innerHTML = 
+             '<div class="flex flex-col items-center justify-center h-full text-center p-10 opacity-70">' +
+                '<div class="w-20 h-20 bg-slate-800/50 rounded-full flex items-center justify-center mb-4 border border-slate-700/50">' +
+                    '<i class="fa-solid fa-folder-tree text-3xl text-slate-500"></i>' +
+                '</div>' +
+                '<h4 class="text-slate-300 font-bold text-sm tracking-wide">Pangkalan Data Klasifikasi Arsip (SEKMA 627)</h4>' +
+                '<p class="text-slate-500 text-xs mt-2 leading-relaxed max-w-sm">Ketikkan jenis urusan atau dokumen pada kolom pencarian di atas untuk mendapatkan kode surat secara instan.</p>' +
+            '</div>';
+          return; 
+      }
+      
+      btnClear.classList.remove('hidden');
+      
+      const results = kodeSuratDB.filter(item => {
+          let kodeMatch = item.kode.toLowerCase().includes(val);
+          let deskMatch = item.desk.toLowerCase().includes(val);
+          
+          let typoMatch = false;
+          if (val === 'citu' && item.desk.toLowerCase().includes('cuti')) typoMatch = true;
+          if (val === 'gaji' && item.desk.toLowerCase().includes('berkala')) typoMatch = true;
+          if (val === 'sppd' && item.desk.toLowerCase().includes('perjalanan dinas')) typoMatch = true;
+          if (val === 'atk' && item.desk.toLowerCase().includes('persediaan')) typoMatch = true;
+          if (val === 'lhkpn' && item.desk.toLowerCase().includes('kekayaan')) typoMatch = true;
+          if (val === 'abk' && item.desk.toLowerCase().includes('beban kerja')) typoMatch = true;
+          if (val === 'tte' && item.desk.toLowerCase().includes('elektronik')) typoMatch = true;
+          if (val === 'spj' && item.desk.toLowerCase().includes('pertanggungjawaban')) typoMatch = true;
+          if (val === 'dipa' && item.desk.toLowerCase().includes('usulan anggaran')) typoMatch = true;
+          
+          return kodeMatch || deskMatch || typoMatch;
+      });
+      
+      if (results.length === 0) { 
+          resultContainer.innerHTML = '<div class="p-8 text-center text-slate-500 text-sm">Kode atau kata kunci "'+val+'" tidak ditemukan dalam database.</div>'; 
+          return; 
+      }
+      
+      let html = '';
+      results.forEach(item => {
+          html += 
+          '<div class="p-4 bg-slate-900/60 border border-slate-800/80 hover:bg-slate-800 hover:border-emerald-500/30 transition rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4 group">' +
+             '<div class="flex-1">' +
+                 '<div class="flex items-center gap-3 mb-1">' +
+                     '<span class="px-2.5 py-1 bg-emerald-500/10 text-emerald-400 font-black text-sm rounded-lg border border-emerald-500/30 font-mono tracking-wide shadow-inner">' + item.kode + '</span>' +
+                 '</div>' +
+                 '<p class="text-sm text-slate-300 leading-relaxed">' + item.desk + '</p>' +
+             '</div>' +
+             '<button onclick="copyKodeToClipboard(\'' + item.kode + '\')" class="shrink-0 md:opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 px-4 py-2 bg-slate-800 hover:bg-emerald-600 text-slate-300 hover:text-white text-xs font-bold rounded-xl border border-slate-700 hover:border-emerald-500 w-full md:w-auto">' +
+                 '<i class="fa-regular fa-copy"></i> Salin Kode' +
+             '</button>' +
+          '</div>';
+      });
+      resultContainer.innerHTML = html;
+  }
+
+  function clearKodeSearch() {
+      const input = document.getElementById('inputSearchKode');
+      if (input) {
+          input.value = '';
+          handleKodeSearch(''); 
+          input.focus();
+      }
+  }
+
+  function copyKodeToClipboard(kodeText) {
+      try {
+          const el = document.createElement('textarea');
+          el.value = kodeText;
+          document.body.appendChild(el);
+          el.select();
+          document.execCommand('copy');
+          document.body.removeChild(el);
+          
+          if (typeof showNotify === 'function') {
+              showNotify('Kode Disalin', 'Kode klasifikasi ' + kodeText + ' berhasil disalin.', 'success');
+          }
+      } catch (err) {
+          navigator.clipboard.writeText(kodeText).then(() => {
+              if (typeof showNotify === 'function') showNotify('Kode Disalin', 'Kode klasifikasi ' + kodeText + ' berhasil disalin.', 'success');
+          });
+      }
+  }

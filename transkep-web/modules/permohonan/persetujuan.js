@@ -1,0 +1,380 @@
+// ==========================================
+// FILE: persetujuan.js (Modul Kotak Verifikasi Atasan)
+// ==========================================
+
+// --- Source: permohonan/js_persetujuan.html ---
+// ==========================================
+  // LOGIKA CLIENT-SIDE: PERSETUJUAN CUTI, IK, IP, WFH (VUE MIGRATED)
+  // ==========================================
+  
+  window.renderPersetujuanView = function() {
+      // Logic dipindahkan sepenuhnya ke Computed Properties Vue
+  };
+
+  document.addEventListener("DOMContentLoaded", () => {
+      const { createApp } = Vue;
+
+      window.vmPersetujuan = createApp({
+          data() {
+              return {
+                  s: state,
+                  bypassMode: null,
+                  selectedItems: [],
+                  
+                  showSingleModal: false,
+                  showBulkModal: false,
+                  singleTarget: null,
+                  singleNotes: '',
+                  bulkDecision: '',
+                  bulkNotes: 'ACC'
+              };
+          },
+          computed: {
+              isAdmin() {
+                  if (!this.s || !this.s.user) return false;
+                  return this.s.user.role === 'Admin' || this.s.user.role === 'Operator';
+              },
+              countAtasan() {
+                  if (!this.s || !this.s.user) return 0;
+                  let count = 0;
+                  
+                  if (this.s.cutiLogs) {
+                      this.s.cutiLogs.forEach(log => {
+                          if (log.status === 'Menunggu' && log.status_atasan === 'Menunggu') count++;
+                      });
+                  }
+                  if (this.s.ikLogs) {
+                      this.s.ikLogs.forEach(log => { if (log.status === 'Menunggu') count++; });
+                  }
+                  if (this.s.ipLogs) {
+                      this.s.ipLogs.forEach(log => { if (log.status === 'Menunggu') count++; });
+                  }
+                  if (this.s.wfhLogs) {
+                      this.s.wfhLogs.forEach(log => {
+                          if (log.status_rencana === 'Menunggu' || log.status_laporan === 'Menunggu') count++;
+                      });
+                  }
+                  return count;
+              },
+              countPejabat() {
+                  if (!this.s || !this.s.user) return 0;
+                  let count = 0;
+                  
+                  if (this.s.cutiLogs) {
+                      this.s.cutiLogs.forEach(log => {
+                          if (log.status === 'Menunggu Pembatalan') count++;
+                          if (log.status === 'Menunggu' && log.status_atasan === 'Disetujui' && log.status_pejabat === 'Menunggu') count++;
+                      });
+                  }
+                  return count;
+              },
+              
+              labelJenisAlasan() {
+                  if (!this.singleTarget) return 'Jenis Izin';
+                  if (this.singleTarget.z_type === 'Cuti') return "Jenis / Alasan Cuti";
+                  if (this.singleTarget.z_type === 'WFH') return "Kegiatan WFH";
+                  if (this.singleTarget.z_type === 'IK') return "Kepentingan Izin Keluar (IK)";
+                  if (this.singleTarget.z_type === 'IP') return "Keperluan Izin Pribadi (IP)";
+                  return 'Jenis Izin';
+              },
+              
+              logsToApprove() {
+                  if (!this.s || !this.s.user) return [];
+                  
+                  const myNip = String(this.s.user.nip);
+                  let logs = [];
+
+                  if (this.s.cutiLogs) {
+                      this.s.cutiLogs.forEach(log => {
+                          const isPendingBatal = (log.status === 'Menunggu Pembatalan');
+                          if (this.isAdmin) {
+                              if (log.status !== 'Menunggu' && !isPendingBatal) return;
+                              if (this.bypassMode === 'atasan' && log.status_atasan === 'Menunggu') logs.push(Object.assign({}, log, { z_type: 'Cuti' }));
+                              if (this.bypassMode === 'pejabat' && log.status_pejabat === 'Menunggu' && log.status_atasan === 'Disetujui') logs.push(Object.assign({}, log, { z_type: 'Cuti' }));
+                              if (this.bypassMode === 'pejabat' && isPendingBatal) logs.push(Object.assign({}, log, { z_type: 'Cuti' }));
+                          } else {
+                              if (log.status !== 'Menunggu' && !isPendingBatal) return;
+                              if (isPendingBatal && String(log.pejabat_nip) === myNip) logs.push(Object.assign({}, log, { z_type: 'Cuti' }));
+                              else if (!isPendingBatal && String(log.atasan_nip) === myNip && log.status_atasan === 'Menunggu') logs.push(Object.assign({}, log, { z_type: 'Cuti' }));
+                              else if (!isPendingBatal && String(log.pejabat_nip) === myNip && log.status_pejabat === 'Menunggu' && log.status_atasan === 'Disetujui') logs.push(Object.assign({}, log, { z_type: 'Cuti' }));
+                          }
+                      });
+                  }
+
+                  if (this.s.ikLogs) {
+                      this.s.ikLogs.forEach(log => {
+                          if (log.status !== 'Menunggu') return;
+                          if (this.isAdmin && this.bypassMode === 'atasan') logs.push(Object.assign({}, log, { z_type: 'IK' }));
+                          else if (!this.isAdmin && String(log.atasan_nip) === myNip) logs.push(Object.assign({}, log, { z_type: 'IK' }));
+                      });
+                  }
+
+                  if (this.s.ipLogs) {
+                      this.s.ipLogs.forEach(log => {
+                          if (log.status !== 'Menunggu') return;
+                          if (this.isAdmin && this.bypassMode === 'atasan') logs.push(Object.assign({}, log, { z_type: 'IP' }));
+                          else if (!this.isAdmin && String(log.atasan_nip) === myNip) logs.push(Object.assign({}, log, { z_type: 'IP' }));
+                      });
+                  }
+
+                  if (this.s.wfhLogs) {
+                      this.s.wfhLogs.forEach(log => {
+                          let isAtasan = (!this.isAdmin && String(log.atasan_nip) === myNip);
+                          let isBypass = (this.isAdmin && this.bypassMode === 'atasan');
+                          if (isAtasan || isBypass) {
+                              if (log.status_rencana === 'Menunggu') logs.push(Object.assign({}, log, { z_type: 'WFH', wfh_stage: 'Rencana' }));
+                              if (log.status_laporan === 'Menunggu') logs.push(Object.assign({}, log, { z_type: 'WFH', wfh_stage: 'Laporan' }));
+                          }
+                      });
+                  }
+
+                  return logs.map(log => {
+                      const pns = this.s.usersList.find(u => String(u.nip) === String(log.nip)) || { nama: 'Tidak Diketahui', jabatan: '-' };
+                      
+                      let actionRole = "";
+                      let btnColor = "bg-indigo-600 hover:bg-indigo-500 text-white";
+                      let displayJenis = log.jenis;
+                      let displayAlasan = log.alasan;
+                      let displayDurasi = "";
+
+                      if (log.z_type === 'Cuti') {
+                          displayDurasi = `<div>${log.tgl_mulai}</div><div class="text-slate-500 text-[10px] mt-0.5">s.d ${log.tgl_selesai}</div>`;
+                          if (log.status === 'Menunggu Pembatalan') {
+                              actionRole = "Pejabat (Batal)";
+                              btnColor = "bg-purple-600 hover:bg-purple-500 shadow-purple-600/20 text-white";
+                          } else if (this.isAdmin) {
+                              actionRole = (this.bypassMode === 'atasan') ? "Bypass Atasan" : "Bypass Pejabat";
+                              btnColor = (this.bypassMode === 'atasan') ? "bg-indigo-600 hover:bg-indigo-500 text-white" : "bg-purple-600 hover:bg-purple-500 text-white";
+                          } else {
+                              if (String(log.atasan_nip) === myNip && log.status_atasan === 'Menunggu') { actionRole = "Atasan Langsung"; btnColor = "bg-indigo-600 hover:bg-indigo-500 text-white"; }
+                              if (String(log.pejabat_nip) === myNip && log.status_pejabat === 'Menunggu') { actionRole = "Pejabat Berwenang"; btnColor = "bg-purple-600 hover:bg-purple-500 text-white"; }
+                          }
+                      } 
+                      else if (log.z_type === 'IK') {
+                          displayJenis = "Izin Keluar Kantor";
+                          displayDurasi = `<div>${log.tanggal}</div><div class="text-slate-500 text-[10px] mt-0.5">${log.jam_keluar || "-"} - ${log.jam_kembali || "-"}</div>`;
+                          actionRole = this.isAdmin ? "Bypass Atasan" : "Atasan Langsung";
+                          btnColor = "bg-sky-600 hover:bg-sky-500 text-white";
+                      } 
+                      else if (log.z_type === 'IP') {
+                          displayJenis = "Izin Pribadi";
+                          let tglMurniIP = log.tanggal || log.tgl_mulai || "-";
+                          displayDurasi = `<div>${tglMurniIP}</div>`;
+                          actionRole = this.isAdmin ? "Bypass Atasan" : "Atasan Langsung";
+                          btnColor = "bg-emerald-600 hover:bg-emerald-500 text-white";
+                      }
+                      else if (log.z_type === 'WFH') {
+                          displayJenis = `WFH (${log.wfh_stage})`;
+                          displayAlasan = log.wfh_stage === 'Rencana' ? "Target Pekerjaan WFH" : "Laporan Realisasi WFH";
+                          displayDurasi = `<div>${log.tanggal}</div><div class="text-slate-500 text-[10px] mt-0.5">Remote</div>`;
+                          actionRole = this.isAdmin ? "Bypass Atasan" : "Atasan Langsung";
+                          btnColor = "bg-amber-600 hover:bg-amber-500 text-white shadow-amber-600/20";
+                      }
+
+                      let statStr = log.status === 'Menunggu Pembatalan' 
+                          ? '<span class="px-2 py-1 bg-purple-500/10 border border-purple-500/20 text-purple-400 rounded text-[10px] font-bold">MENUNGGU PEMBATALAN</span>'
+                          : '<span class="px-2 py-1 bg-amber-500/10 border border-amber-500/20 text-amber-400 rounded text-[10px] font-bold">MENUNGGU PERSETUJUAN</span>';
+
+                      let showAlasan = displayAlasan;
+                      if (displayAlasan && displayAlasan.includes("[USULAN PEMBATALAN]:")) {
+                          showAlasan = displayAlasan.split("[USULAN PEMBATALAN]:")[0].trim();
+                      }
+
+                      return { ...log, pnsNama: pns.nama, actionRole, btnColor, displayJenis, displayDurasi, statStr, showAlasan };
+                  });
+              },
+              isAllSelected: {
+                  get() { return this.logsToApprove.length > 0 && this.selectedItems.length === this.logsToApprove.length; },
+                  set(val) {
+                      if (val) { this.selectedItems = this.logsToApprove.map(l => ({ id: l.id, type: l.z_type, stage: l.wfh_stage })); } 
+                      else { this.selectedItems = []; }
+                  }
+              }
+          },
+          watch: {
+              bypassMode() { this.selectedItems = []; }
+          },
+          methods: {
+              toggleBypass(mode) {
+                  if (this.bypassMode === mode) this.bypassMode = null;
+                  else this.bypassMode = mode;
+              },
+              getBatalReason(alasanFull) {
+                  if (!alasanFull) return "";
+                  const parts = alasanFull.split("[USULAN PEMBATALAN]:");
+                  return parts.length > 1 ? parts[1].trim() : alasanFull;
+              },
+              getPureAlasan(log) {
+                  if (log.z_type === 'WFH') {
+                      try {
+                          let jsonTarget = (log.wfh_stage === 'Rencana') ? log.rencana_json : log.laporan_json;
+                          let targetList = JSON.parse(jsonTarget || '[]');
+                          return "<br>" + targetList.map((t, idx) => 
+                              `<span class="block ml-3 mt-1.5 text-slate-300 not-italic">${idx+1}. ${t.deskripsi} <span class="text-indigo-400 font-medium tracking-wide">(${log.wfh_stage === 'Rencana' ? 'Target: '+t.kuantitas : 'Realisasi: '+t.realisasi})</span></span>`
+                          ).join('');
+                      } catch(e) { return "Detail WFH ada di formulir PDF"; }
+                  }
+                  return log.showAlasan;
+              },
+              getWfhBuktiUrls(log) {
+                  if (!log || !log.bukti_url) return [];
+                  try {
+                      const parsed = JSON.parse(log.bukti_url);
+                      return Array.isArray(parsed) ? parsed : [log.bukti_url];
+                  } catch(e) { return [log.bukti_url]; }
+              },
+              
+              openSingleApproval(log) {
+                  this.singleTarget = log;
+                  this.singleNotes = '';
+                  this.showSingleModal = true;
+              },
+              openBulkModal(decision) {
+                  this.bulkDecision = decision;
+                  this.bulkNotes = 'ACC';
+                  this.showBulkModal = true;
+              },
+
+              submitSingle(decision) {
+                  let notes = this.singleNotes.trim();
+                  if (decision === 'Ditolak' && notes === '') {
+                      if(window.showNotify) window.showNotify("Validasi Ditolak", "Alasan penolakan wajib diisi pada catatan!", "error"); return;
+                  }
+                  if (notes === '') notes = 'ACC';
+
+                  if(window.showLoading) window.showLoading("Menyimpan keputusan...");
+                  const token = localStorage.getItem('transkep_session_token');
+                  const logId = this.singleTarget.id;
+                  const zType = this.singleTarget.z_type;
+                  const stage = this.singleTarget.wfh_stage;
+
+                  let actionPromise = null;
+                  if (zType === 'Cuti') actionPromise = PersetujuanDataService.updateCutiStatus(logId, decision, notes, this.s.user.nip, this.bypassMode, token);
+                  else if (zType === 'IK') actionPromise = PersetujuanDataService.updateIkStatus(logId, decision, notes, this.s.user.nip, this.bypassMode, token);
+                  else if (zType === 'IP') actionPromise = PersetujuanDataService.updateIpStatus(logId, decision, notes, this.s.user.nip, this.bypassMode, token);
+                  else if (zType === 'WFH') actionPromise = PersetujuanDataService.updateWfhStatus(logId, stage, decision, notes, this.s.user.nip, this.bypassMode, token);
+                  else return;
+
+                  actionPromise
+                    .then((res) => {
+                        if(window.hideLoading) window.hideLoading();
+                        this.showSingleModal = false;
+                        if (res && res.status === 'success') {
+                            if(window.showNotify) window.showNotify("Berhasil", res.message, "success");
+                            this.routeStateUpdate(logId, zType, decision, notes, stage);
+                        } else { if(window.showNotify) window.showNotify("Error Sistem", res ? res.message : "Gagal memproses keputusan.", "error"); }
+                    })
+                    .catch((err) => {
+                        if(window.hideLoading) window.hideLoading();
+                        if(window.showNotify) window.showNotify("Gagal Jaringan", err.toString(), "error");
+                    });
+              },
+              
+              submitBulk() {
+                  let notes = this.bulkNotes.trim();
+                  if (this.bulkDecision === 'Ditolak' && notes === '') {
+                      if(window.showNotify) window.showNotify("Validasi Ditolak", "Alasan penolakan wajib diisi pada catatan!", "error"); return;
+                  }
+                  if (this.selectedItems.length === 0) return;
+
+                  if(window.showLoading) window.showLoading(`Memproses ${this.selectedItems.length} berkas secara massal...`);
+                  const token = localStorage.getItem('transkep_session_token');
+
+                  PersetujuanDataService.processBulkApproval(this.selectedItems, this.bulkDecision, notes, this.s.user.nip, this.bypassMode, token)
+                      .then((res) => {
+                          if(window.hideLoading) window.hideLoading();
+                          this.showBulkModal = false;
+                          if (res && res.status === 'success') {
+                              if(window.showNotify) window.showNotify("Bulk Approve Sukses", res.message, "success");
+                              this.selectedItems.forEach(item => {
+                                  this.routeStateUpdate(item.id, item.type, this.bulkDecision, notes, item.stage);
+                              });
+                              this.selectedItems = []; 
+                          } else { if(window.showNotify) window.showNotify("Error Sistem", res ? res.message : "Gagal memproses persetujuan massal.", "error"); }
+                      })
+                      .catch((err) => {
+                          if(window.hideLoading) window.hideLoading();
+                          this.showBulkModal = false;
+                          if(window.showNotify) window.showNotify("Gagal Jaringan", err.toString(), "error");
+                      });
+              },
+
+              routeStateUpdate(id, type, decision, notes, stage) {
+                  if (type === 'Cuti') this.updateStateCuti(id, decision, notes);
+                  else if (type === 'IK') this.updateStateIK(id, decision, notes);
+                  else if (type === 'IP') this.updateStateIP(id, decision, notes);
+                  else if (type === 'WFH') this.updateStateWFH(id, decision, notes, stage);
+                  
+                  if(typeof updateBadgePermohonan === 'function') setTimeout(updateBadgePermohonan, 100);
+              },
+              updateStateCuti(id, decision, notes) {
+                  const logIndex = this.s.cutiLogs.findIndex(l => String(l.id) === String(id));
+                  if (logIndex === -1) return;
+                  const log = this.s.cutiLogs[logIndex];
+                  
+                  const isBypassAtasan = (this.bypassMode === 'atasan' && this.isAdmin);
+                  const isBypassPejabat = (this.bypassMode === 'pejabat' && this.isAdmin);
+                  let isAtasan = (String(this.s.user.nip) === String(log.atasan_nip));
+                  let isPejabat = (String(this.s.user.nip) === String(log.pejabat_nip));
+                  const statusBefore = log.status;
+
+                  if (log.status === 'Menunggu Pembatalan') {
+                      if (decision === 'Disetujui') log.status = 'DIBATALKAN';
+                      else log.status = 'Disetujui';
+                  } else {
+                      if ((isAtasan && isPejabat) || (isBypassAtasan && isBypassPejabat)) {
+                          log.status_atasan = decision; log.status_pejabat = decision;
+                      } else {
+                          if (isAtasan || isBypassAtasan) log.status_atasan = decision;
+                          if (isPejabat || isBypassPejabat) log.status_pejabat = decision;
+                      }
+                      if (log.status_atasan === 'Ditolak' || log.status_pejabat === 'Ditolak') log.status = 'Ditolak';
+                      else if (log.status_atasan === 'Disetujui' && log.status_pejabat === 'Disetujui') log.status = 'Disetujui';
+                      else log.status = 'Menunggu';
+                  }
+
+                  let isRefundNeeded = false;
+                  if (log.status === 'Ditolak' && statusBefore !== 'Ditolak') isRefundNeeded = true;
+                  if (log.status === 'DIBATALKAN' && statusBefore !== 'DIBATALKAN') isRefundNeeded = true;
+
+                  if (isRefundNeeded) {
+                      const tIdx = this.s.usersList.findIndex(u => String(u.nip) === String(log.nip));
+                      if (tIdx !== -1) {
+                          let tUser = this.s.usersList[tIdx];
+                          if (log.jenis === 'Tahunan') {
+                              try {
+                                  let h = JSON.parse(log.history || "{}");
+                                  tUser.s_tahunan_2024 = Number(tUser.s_tahunan_2024 || 0) + Number(h.y24 || 0);
+                                  tUser.s_tahunan_2025 = Number(tUser.s_tahunan_2025 || 0) + Number(h.y25 || 0);
+                                  tUser.s_tahunan_2026 = Number(tUser.s_tahunan_2026 || 0) + Number(h.y26 || 0);
+                              } catch(e) {}
+                          } else if (log.jenis !== 'Dinas Luar') {
+                              let field = "";
+                              if(log.jenis === 'Sakit') field = 's_sakit'; else if(log.jenis === 'Alasan Penting' || log.jenis === 'Penting') field = 's_penting';
+                              else if(log.jenis === 'Besar') field = 's_besar'; else if(log.jenis === 'Melahirkan') field = 's_melahirkan'; else if(log.jenis === 'CLTN') field = 's_cltn';
+                              if (field !== "") tUser[field] = Number(tUser[field] || 0) + Number(log.sisa_cuti || 0);
+                          }
+                          if (String(log.nip) === String(this.s.user.nip)) this.s.user = Object.assign({}, tUser);
+                      }
+                  }
+              },
+              updateStateIK(id, decision, notes) {
+                  const idx = this.s.ikLogs.findIndex(l => String(l.id) === String(id));
+                  if(idx !== -1) { this.s.ikLogs[idx].status = decision; this.s.ikLogs[idx].catatan = notes; }
+              },
+              updateStateIP(id, decision, notes) {
+                  const idx = this.s.ipLogs.findIndex(l => String(l.id) === String(id));
+                  if(idx !== -1) { this.s.ipLogs[idx].status = decision; this.s.ipLogs[idx].catatan = notes; }
+              },
+              updateStateWFH(id, decision, notes, stage) {
+                  const idx = this.s.wfhLogs.findIndex(l => String(l.id) === String(id));
+                  if(idx !== -1) {
+                      if (stage === 'Rencana') this.s.wfhLogs[idx].status_rencana = decision;
+                      else if (stage === 'Laporan') this.s.wfhLogs[idx].status_laporan = decision;
+                      let oldNotes = this.s.wfhLogs[idx].catatan || "";
+                      this.s.wfhLogs[idx].catatan = oldNotes + "\n[" + stage + "]: " + notes;
+                  }
+              }
+          }
+      }).mount('#vue-persetujuan-wrapper');
+  });

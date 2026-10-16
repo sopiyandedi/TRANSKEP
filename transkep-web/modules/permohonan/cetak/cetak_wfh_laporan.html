@@ -1,0 +1,126 @@
+<!-- VIEW COMPONENT: permohonan/wfh/cetak_wfh_laporan.html -->
+<!-- =========================================================================
+     FILE: permohonan/wfh/cetak_wfh_laporan.html
+========================================================================== -->
+<div id="templateCetakLaporanWfh" style="display: none;" class="hidden no-print">
+  <style>
+     /* ZETTBOT FIX: Anti-Bentrok CSS & Margin Kertas Resmi */
+     @media print {
+        @page { size: A4 portrait; margin: 0mm !important; }
+        body { 
+            font-family: "Times New Roman", Times, serif; 
+            font-size: 11pt; 
+            color: black; 
+            -webkit-print-color-adjust: exact; 
+            print-color-adjust: exact; 
+            margin: 0 !important; 
+            padding: 15mm 20mm 15mm 30mm !important; /* Margin: Atas Kanan Bawah Kiri */
+            box-sizing: border-box; 
+        }
+     }
+     .wfh-table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
+     .wfh-table th, .wfh-table td { border: 1px solid black; padding: 6px 8px; vertical-align: top; }
+     .wfh-table th { background-color: #f3f4f6 !important; font-weight: bold; text-align: center; vertical-align: middle; }
+     .wfh-row-center { text-align: center; }
+     .bold { font-weight: bold; }
+     .uppercase { text-transform: uppercase; }
+     .section-title { font-weight: bold; text-transform: uppercase; font-size: 11pt; margin-bottom: 10px; margin-top: 20px; }
+  </style>
+
+
+  <div style="width: 100%;">
+     
+     <div style="text-align: center; margin-bottom: 30px;">
+        <div style="font-size: 12pt;" class="bold uppercase">Laporan Pelaksanaan Tugas WFH (Work From Home)</div>
+        <div style="font-size: 12pt;" class="bold uppercase">Pada Pengadilan Agama Indramayu</div>
+     </div>
+
+     <!-- I. DATA PEGAWAI -->
+     <div>
+        <div class="section-title">I. Data Pegawai</div>
+        <table style="width: 100%; border: none; font-size: 11pt; line-height: 1.5; margin-left: 15px;">
+           <tr><td style="width: 160px; padding: 2px 0;">Nama</td><td style="width: 15px; padding: 2px 0;">:</td><td class="bold" style="padding: 2px 0;">{{wfh_nama}}</td></tr>
+           <tr><td style="padding: 2px 0;">NIP</td><td style="padding: 2px 0;">:</td><td style="padding: 2px 0;">{{wfh_nip}}</td></tr>
+           <tr><td style="padding: 2px 0;">Jabatan</td><td style="padding: 2px 0;">:</td><td style="padding: 2px 0;">{{wfh_jabatan}}</td></tr>
+           <tr><td style="padding: 2px 0;">Unit Kerja</td><td style="padding: 2px 0;">:</td><td style="padding: 2px 0;">{{wfh_unit}}</td></tr>
+           <tr><td style="padding: 2px 0;">Tanggal Pelaksanaan</td><td style="padding: 2px 0;">:</td><td class="bold" style="padding: 2px 0;">{{wfh_tanggal}}</td></tr>
+           <tr><td style="padding: 2px 0; vertical-align: top;">Tempat</td><td style="padding: 2px 0; vertical-align: top;">:</td><td style="padding: 2px 0; vertical-align: top;">{{wfh_tempat}}</td></tr>
+        </table>
+     </div>
+
+     <!-- II. DASAR PELAKSANAAN -->
+     <div>
+        <div class="section-title">II. Dasar Pelaksanaan</div>
+        <table style="width: 100%; border: none; font-size: 11pt; line-height: 1.5; margin-left: 15px;">
+           <tr><td style="width: 25px; vertical-align: top;">a.</td><td style="text-align: justify; padding-bottom: 4px;">Peraturan Presiden Nomor 21 Tahun 2023 tentang Jam Kerja dan Hari Kerja Instansi Pemerintah dan Pegawai Aparatur Sipil Negara;</td></tr>
+           <tr><td style="vertical-align: top;">b.</td><td style="text-align: justify; padding-bottom: 4px;">Surat Edaran Menteri Pendayagunaan Aparatur Negara Dan Reformasi Birokrasi, Nomor 3 Tahun 2026 tentang Pelaksanaan Tugas Kedinasan Bagi Pegawai Aparatur Sipil Negara Di Instansi Pemerintah Dalam Rangka Mendukung Percepatan Transformasi Tata Kelola Penyelenggaraan Pemerintahan;</td></tr>
+           <tr><td style="vertical-align: top;">c.</td><td style="text-align: justify;">Surat Edaran Sekretaris Mahkamah Agung Republik Indonesia, Nomor 4 Tahun 2026, tanggal 8 April 2026, tentang Pelaksanaan Tugas Kedinasan Bagi Hakim Dan Aparatur Mahkamah Agung Dan Badan Peradilan Yang Berada Di Bawahnya Dalam Rangka Mendukung Transformasi Budaya Kerja Nasional.</td></tr>
+        </table>
+     </div>
+
+     <!-- III. HASIL PEKERJAAN (OUTPUT) -->
+     <div>
+        <div class="section-title">III. Hasil Pekerjaan (Output)</div>
+        <p style="margin-left: 15px; margin-bottom: 10px; text-align: justify; font-size: 11pt;">Sesuai dengan mandat KemenPAN RB bahwa WFH harus berbasis kinerja, berikut adalah rincian aktivitas yang diselesaikan:</p>
+        
+        <table class="wfh-table" style="font-size: 11pt;">
+           <thead>
+               <tr>
+                  <th style="width: 5%;">No</th>
+                  <th style="width: 18%;">Jam Kerja</th>
+                  <th style="width: 32%;">Target Pekerjaan (Rencana)</th>
+                  <th style="width: 32%;">Realisasi (Hasil Pelaksanaan)</th>
+                  <th style="width: 13%;">Status</th>
+               </tr>
+           </thead>
+           <tbody id="wfh_laporan_tbody" style="text-align: left; vertical-align: top;">
+               <!-- Data Baris Laporan Disuntik via JS -->
+           </tbody>
+        </table>
+     </div>
+
+     <!-- IV. PEMANFAATAN TEKNOLOGI INFORMASI -->
+     <div style="page-break-inside: avoid;">
+        <div class="section-title">IV. Pemanfaatan Teknologi Informasi</div>
+        <p style="margin-left: 15px; margin-bottom: 6px; font-size: 11pt;">Selama pelaksanaan WFH, komunikasi dan pelaporan dilakukan melalui:</p>
+        <table style="width: 100%; border: none; font-size: 11pt; line-height: 1.5; margin-left: 15px;">
+           <tr><td style="width: 25px; vertical-align: top;" class="bold">a.</td><td style="text-align: justify; padding-bottom: 6px;"><span class="bold">Presensi</span><br>Menggunakan aplikasi SIKEP Mahkamah Agung RI Masuk: 08:00 WIB dan Pulang: 16:30 WIB.</td></tr>
+           <tr><td style="vertical-align: top;" class="bold">b.</td><td style="text-align: justify; padding-bottom: 6px;"><span class="bold">Komunikasi</span><br>WhatsApp Group dan Email Dinas untuk koordinasi cepat.</td></tr>
+           <tr><td style="vertical-align: top;" class="bold">c.</td><td style="text-align: justify;"><span class="bold">Sistem Kinerja:</span><br>1. Input capaian harian melalui aplikasi e-Kinerja Badan Kepegawaian Negara.<br>2. Laporan Hasil Kerja Work From Home dalam dokumen Digital.</td></tr>
+        </table>
+     </div>
+
+     <!-- V. KENDALA DAN SOLUSI -->
+     <div style="page-break-inside: avoid;">
+        <div class="section-title">V. Kendala dan Solusi</div>
+        <table style="width: 100%; border: none; font-size: 11pt; line-height: 1.5; margin-left: 15px;">
+           <tr><td style="width: 25px; vertical-align: top;" class="bold">a.</td><td style="text-align: justify;"><span class="bold">Kendala:</span> -</td></tr>
+           <tr><td style="vertical-align: top;" class="bold">b.</td><td style="text-align: justify;"><span class="bold">Solusi :</span> -</td></tr>
+        </table>
+     </div>
+
+     <!-- VI. PENUTUP -->
+     <div style="page-break-inside: avoid;">
+        <div class="section-title">VI. Penutup</div>
+        <p style="margin-left: 15px; text-align: justify; font-size: 11pt;">Demikian laporan pelaksanaan tugas Work From Home (WFH) ini saya sampaikan sebagai bentuk pertanggungjawaban atas kinerja dan kehadiran.</p>
+     </div>
+
+     <!-- SIGNATURES (RATA KIRI SEJAJAR) -->
+     <div style="margin-top: 35px; page-break-inside: avoid;">
+        <div style="width: 100%; display: flex; justify-content: space-between; font-size: 11pt;">
+           <div style="width: 48%; text-align: left; padding-left: 15px;">
+              <div style="margin-bottom: 90px;">Mengetahui/Diperiksa Oleh,<br>Atasan Langsung,</div>
+              <div class="bold" style="text-decoration: underline;">{{wfh_nama_atasan}}</div>
+              <div>NIP. {{wfh_nip_atasan}}</div>
+           </div>
+           
+           <div style="width: 48%; text-align: left;">
+              <div style="margin-bottom: 90px;">Indramayu, {{wfh_tgl_buat}}<br>Pegawai Pembuat Laporan,</div>
+              <div class="bold" style="text-decoration: underline;">{{wfh_nama}}</div>
+              <div>NIP. {{wfh_nip}}</div>
+           </div>
+        </div>
+     </div>
+
+  </div>
+</div>

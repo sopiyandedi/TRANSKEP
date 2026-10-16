@@ -1,0 +1,982 @@
+            <!-- SECTION: PERMOHONAN CUTI, PERSETUJUAN & REKAPITULASI -->
+            <div id="section-permohonan" class="menu-section hidden flex-col gap-4">
+                <div class="flex flex-wrap gap-2 bg-slate-900/50 p-1.5 rounded-2xl border border-slate-800 w-full md:w-fit shrink-0">
+                   <button onclick="switchCutiTab('riwayat')" id="btn-tab-riwayat" class="px-5 py-2.5 rounded-xl text-sm font-bold bg-indigo-600 text-white shadow-lg shadow-indigo-600/20 transition flex items-center gap-2">
+                     <i class="fa-solid fa-clock-rotate-left"></i> Riwayat Saya
+                   </button>
+                   <button onclick="switchCutiTab('verifikasi')" id="btn-tab-verifikasi" class="relative px-5 py-2.5 rounded-xl text-sm font-bold text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition flex items-center gap-2 hidden">
+                     <i class="fa-solid fa-list-check"></i> Kotak Verifikasi
+                     <span id="badge-verifikasi" class="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-rose-500 text-[10px] text-white font-bold hidden shadow-lg shadow-rose-500/50 border-2 border-slate-900">0</span>
+                   </button>
+                   <button onclick="switchCutiTab('rekapitulasi')" id="btn-tab-rekapitulasi" class="px-5 py-2.5 rounded-xl text-sm font-bold text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition flex items-center gap-2">
+                     <i class="fa-solid fa-globe"></i> Rekapitulasi Global
+                   </button>
+                </div>
+
+                <div id="tab-riwayat" class="cuti-tab-content block w-full">
+<div id="vue-riwayat-permohonan" class="space-y-6" v-cloak>
+    <div class="flex flex-col md:flex-row items-center justify-between gap-4 mb-4">
+      <div>
+        <h3 class="text-lg font-bold text-slate-200"><i class="fa-solid fa-clock-rotate-left text-indigo-400 mr-2"></i> Riwayat Pengajuan Cuti Anda</h3>
+        <p class="text-slate-500 text-xs mt-1">Daftar pelacakan persetujuan transaksi dinas dan cetak dokumen resmi.</p>
+      </div>
+      
+      <div class="flex flex-col md:flex-row gap-3 w-full md:w-auto items-stretch md:items-center">
+        
+        <button onclick="openModalSisaCuti()" class="flex-1 md:flex-none px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl border border-slate-700 transition flex items-center justify-center gap-2 text-xs">
+          <i class="fa-solid fa-wallet text-sm"></i> Cek Sisa Cuti
+        </button>
+        
+        <div class="relative group flex-1 md:flex-none">
+            <button class="w-full px-4 py-2.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 font-bold rounded-xl border border-emerald-500/30 transition flex items-center justify-center gap-2 text-xs uppercase relative z-10">
+                <i class="fa-solid fa-layer-group text-sm"></i> Pengajuan Lain <i class="fa-solid fa-chevron-down text-[10px] ml-1 transition-transform duration-300 group-hover:rotate-180"></i>
+            </button>
+            <div class="absolute right-0 top-[110%] w-56 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 transform origin-top z-[60] overflow-hidden">
+                <a href="#" onclick="openModalIP(); return false;" class="flex items-center gap-3 px-4 py-3 hover:bg-slate-800 text-slate-300 hover:text-emerald-400 transition text-xs font-bold border-b border-slate-800/60">
+                    <div class="w-6 h-6 rounded-lg bg-emerald-500/10 flex items-center justify-center shrink-0 text-emerald-400"><i class="fa-solid fa-user-clock"></i></div>
+                    Izin Pribadi
+                </a>
+                <a href="#" onclick="openModalIK(); return false;" class="flex items-center gap-3 px-4 py-3 hover:bg-slate-800 text-slate-300 hover:text-sky-400 transition text-xs font-bold border-b border-slate-800/60">
+                    <div class="w-6 h-6 rounded-lg bg-sky-500/10 flex items-center justify-center shrink-0 text-sky-400"><i class="fa-solid fa-person-walking-arrow-right"></i></div>
+                    Izin Keluar
+                </a>
+                <a href="#" onclick="openModalWFH(); return false;" class="flex items-center gap-3 px-4 py-3 hover:bg-slate-800 text-slate-300 hover:text-amber-400 transition text-xs font-bold">
+                    <div class="w-6 h-6 rounded-lg bg-amber-500/10 flex items-center justify-center shrink-0 text-amber-400"><i class="fa-solid fa-laptop-house"></i></div>
+                    Rencana WFH
+                </a>
+            </div>
+        </div>
+
+        <button onclick="openFormCutiModal()" class="flex-1 md:flex-none px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl shadow-[0_4px_15px_rgba(99,102,241,0.25)] transition flex items-center justify-center gap-2 text-xs uppercase">
+          <i class="fa-solid fa-paper-plane text-sm"></i> Usulkan Cuti Baru
+        </button>
+      </div>
+    </div>
+
+    <!-- TABEL REAKTIF VUE -->
+    <div class="flex-1 overflow-auto border border-slate-900 rounded-2xl bg-slate-950/40">
+      <table class="w-full text-left text-xs border-collapse">
+        <thead>
+          <tr class="border-b border-slate-900 bg-slate-900/40 text-slate-400 font-semibold sticky top-0 z-10">
+            <th class="p-4 w-12 text-center">No</th>
+            <th class="p-4">Jenis Cuti / ID</th>
+            <th class="p-4">Tanggal Pelaksanaan</th>
+            <th class="p-4">Durasi Pengajuan</th>
+            <th class="p-4">Verifikator Dual-Approval</th>
+            <th class="p-4">Status Akhir</th>
+            <th class="p-4 text-center">Aksi Operasi</th>
+          </tr>
+        </thead>
+        
+        <tbody v-if="!s || !s.user">
+           <tr><td colspan="7" class="text-center p-8 text-slate-600 italic">Memuat data...</td></tr>
+        </tbody>
+        
+        <tbody v-else-if="formattedLogs.length === 0">
+           <tr><td colspan="7" class="text-center p-8 text-slate-600 italic">Belum ada riwayat pengajuan apapun.</td></tr>
+        </tbody>
+        
+        <tbody v-else>
+           <tr v-for="(log, index) in formattedLogs" :key="log.id" class="border-b border-slate-900 hover:bg-slate-900/10 transition text-xs">
+              <td class="p-4 text-center font-mono text-slate-500">{{ index + 1 }}</td>
+              <td class="p-4">
+                 <div class="font-bold text-slate-200">{{ log.jenisText }}</div>
+                 <div class="text-[10px] text-slate-500 mt-0.5 font-mono">{{ log.id }}</div>
+              </td>
+              <td :class="['p-4', log.tglDecor]">
+                 <div>{{ log.tgl_1 }}</div>
+                 <div class="text-[10px] opacity-70 mt-0.5">{{ log.tgl_2 }}</div>
+              </td>
+              <td class="p-4">
+                 <span :class="['inline-flex px-2 py-0.5 rounded border text-[10px] font-bold', log.durasiObj.class]">{{ log.durasiObj.text }}</span>
+              </td>
+              <td class="p-4 space-y-1">
+                 <div class="flex items-center gap-1.5"><i :class="['fa-solid fa-circle text-[8px]', log.atasanDot]"></i><span class="text-slate-400 truncate max-w-[120px]" :title="log.atasanNama">Atasan: {{ log.atasanNama }}</span></div>
+                 <div v-html="log.pejabatHtml"></div>
+              </td>
+              <td class="p-4">
+                 <span :class="['inline-flex px-2 py-0.5 rounded text-[10px] font-bold border uppercase tracking-wider text-center leading-tight whitespace-nowrap', log.statusColor]" v-html="log.statusAkhir.replace(' ', '<br>')"></span>
+              </td>
+              <td class="p-4 text-center">
+                 <div class="flex items-center justify-center gap-1.5">
+                    <button v-for="btn in log.actions" :class="btn.css" :title="btn.tooltip" @click="executeAction(btn.actionType, log.id)">
+                       <i v-if="btn.icon" :class="['fa-solid', btn.icon, btn.text ? 'text-xs' : '']"></i>
+                       <span v-if="btn.text" class="ml-1">{{ btn.text }}</span>
+                    </button>
+                 </div>
+              </td>
+           </tr>
+        </tbody>
+      </table>
+    </div>
+</div>
+
+<!-- ZETTBOT FIX TAHAP 5: Vue Wrapper untuk Form Cuti & Pembatalan Cuti -->
+<div id="vue-form-cuti-wrapper" v-cloak>
+  
+  <!-- MODAL PENGAJUAN CUTI BARU (DAN BYPASS) -->
+  <div id="modalFormCuti" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-[70] flex items-center justify-center p-4 hidden">
+    <div class="w-full max-w-2xl glass border border-slate-800 p-6 rounded-3xl shadow-2xl h-[90vh] flex flex-col scale-95 transition-all">
+      <div class="flex items-center justify-between pb-4 border-b border-slate-800 shrink-0">
+        <h3 class="text-lg font-bold text-white">
+          <i v-if="isBypassMode" class="fa-solid fa-user-shield text-indigo-400 mr-2"></i>
+          <i v-else-if="currentEditId" class="fa-solid fa-pen-to-square text-amber-400 mr-2"></i>
+          <i v-else class="fa-solid fa-file-signature text-indigo-400 mr-2"></i>
+          {{ isBypassMode ? 'Mode Bypass: Usulan Cuti' : (currentEditId ? 'Perbarui Permohonan Cuti' : 'Usulkan Permohonan Cuti Baru') }}
+        </h3>
+        <button @click="closeModal" type="button" class="text-slate-400 hover:text-slate-100"><i class="fa-solid fa-xmark text-lg"></i></button>
+      </div>
+
+      <form @submit.prevent="submitCuti" class="flex-1 overflow-y-auto py-4 space-y-4 text-xs pr-2 custom-scrollbar">
+        
+        <!-- ZETTBOT FIX: SEARCHABLE DROPDOWN UNTUK BYPASS -->
+        <div v-show="isBypassMode" class="bg-indigo-500/10 border border-indigo-500/30 p-4 rounded-2xl mb-4">
+           <label class="block text-indigo-300 uppercase font-bold mb-1.5"><i class="fa-solid fa-user-shield mr-1"></i> Mode Bypass: Pilih Pegawai Pemohon</label>
+           
+           <div class="relative">
+              <div class="relative flex items-center">
+                 <i class="fa-solid fa-magnifying-glass absolute left-3.5 text-indigo-400/50"></i>
+                 <input type="text"
+                    ref="bypassSearchInput"
+                    v-model="bypassSearchQuery"
+                    @focus="openBypassDropdown"
+                    @blur="closeBypassDropdown"
+                    placeholder="Ketik nama atau jabatan pegawai..."
+                    class="w-full pl-10 pr-10 py-3 bg-slate-950 border border-indigo-500/50 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-bold transition">
+
+                 <button type="button" v-show="bypassSearchQuery !== ''" @mousedown.prevent="clearBypassSearch" class="absolute right-3 text-slate-500 hover:text-rose-400 transition z-10 w-6 h-6 flex items-center justify-center">
+                    <i class="fa-solid fa-xmark"></i>
+                 </button>
+
+                 <!-- DROPDOWN PANEL -->
+                 <div v-show="isBypassDropdownOpen" class="absolute top-[100%] left-0 w-full mt-1.5 bg-slate-800 border border-slate-600 rounded-xl shadow-2xl flex-col overflow-hidden max-h-52 overflow-y-auto custom-scrollbar z-[100]">
+                    <div v-if="filteredBypassUsers.length === 0" class="px-4 py-3 text-xs text-slate-400 text-center italic">
+                        Pegawai tidak ditemukan.
+                    </div>
+                    <div v-for="u in filteredBypassUsers" :key="u.nip" @mousedown.prevent="selectBypassUser(u)" class="px-4 py-2.5 text-xs text-slate-300 hover:bg-indigo-600 hover:text-white cursor-pointer transition border-b border-slate-700/50 last:border-0 group">
+                       <div class="font-bold text-slate-200 group-hover:text-white">{{ u.nama }}</div>
+                       <div class="text-[10px] text-slate-400 group-hover:text-indigo-200 mt-0.5">{{ u.jabatan }}</div>
+                    </div>
+                 </div>
+              </div>
+           </div>
+           
+           <!-- Input tersembunyi agar validasi required HTML5 tetap berjalan jika form belum diisi -->
+           <input type="text" v-model="form.bypassNip" class="absolute opacity-0 w-0 h-0" :required="isBypassMode" tabindex="-1">
+
+           <p class="text-[9px] text-indigo-400/80 mt-1.5 leading-relaxed">Anda mengusulkan cuti *atas nama* pegawai yang dipilih. Hierarki Atasan & Pejabat di bawah otomatis menyesuaikan profil mereka.</p>
+        </div>
+
+        <div v-show="opsi.adaPlh" class="bg-amber-500/10 border border-amber-500/20 p-3 rounded-xl flex items-start gap-3 mb-2">
+           <i class="fa-solid fa-triangle-exclamation text-amber-400 mt-0.5"></i>
+           <p class="text-[10px] text-amber-400/90 leading-relaxed font-medium">Sistem mendeteksi Pimpinan/Atasan Definitif sedang tidak berada di tempat hari ini. Pilihan di bawah telah dialihkan ke opsi <b>Pelaksana Harian (Plh)</b>.</p>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-slate-400 uppercase font-bold mb-1">Jenis Cuti</label>
+            <select v-model="form.jenis" required class="w-full px-3.5 py-3 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+              <option value="Tahunan">Tahunan</option>
+              <option value="Sakit">Sakit</option>
+              <option value="Alasan Penting">Alasan Penting</option>
+              <option value="Melahirkan">Melahirkan</option>
+              <option value="Besar">Besar</option>
+              <option value="CLTN">CLTN</option>
+            </select>
+          </div>
+          <div v-show="form.jenis !== 'Tahunan'">
+            <label class="block text-slate-400 uppercase font-bold mb-1">Upload Bukti Dukung</label>
+            <input type="file" id="cutiBukti" accept=".pdf, .jpg, .jpeg, .png" @change="handleFileUpload" :required="form.jenis !== 'Tahunan' && !currentEditId" class="w-full px-3.5 py-2 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 text-xs file:mr-4 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-[10px] file:font-bold file:bg-indigo-500/20 file:text-indigo-400 hover:file:bg-indigo-500/30 transition">
+            <p class="text-[9px] text-slate-500 mt-1">*Wajib jika bukan Cuti Tahunan (Maks 2MB)</p>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-slate-400 uppercase font-bold mb-1">Mulai Pelaksanaan</label>
+            <input type="date" v-model="form.mulai" required class="w-full px-3.5 py-3 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          </div>
+          <div>
+            <label class="block text-slate-400 uppercase font-bold mb-1">Selesai Pelaksanaan</label>
+            <input type="date" v-model="form.selesai" required class="w-full px-3.5 py-3 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-slate-400 uppercase font-bold mb-1">Keperluan / Alasan Cuti</label>
+          <textarea v-model="form.alasan" required rows="2" placeholder="Jelaskan alasan pengajuan cuti Anda..." class="w-full px-3.5 py-3 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
+        </div>
+
+        <div>
+          <label class="block text-slate-400 uppercase font-bold mb-1">Alamat Lengkap Selama Cuti</label>
+          <textarea v-model="form.alamat" required rows="2" placeholder="Tuliskan alamat domisili/tujuan selama Anda menjalankan cuti..." class="w-full px-3.5 py-3 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
+        </div>
+
+        <div v-show="opsi.plhOpts.length > 0" class="bg-purple-500/10 border border-purple-500/30 p-4 rounded-xl mt-4 mb-4">
+            <label class="block text-purple-400 uppercase font-bold mb-1 text-[11px]"><i class="fa-solid fa-user-shield mr-1"></i> Tunjuk Pelaksana Harian (Plh)</label>
+            <select v-model="form.plh" class="w-full px-3.5 py-3 bg-slate-950 border border-purple-500/50 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-purple-500 font-semibold">
+               <option value="">-- Pilih Pejabat Plh --</option>
+               <option v-for="o in opsi.plhOpts" :key="o.nip" :value="o.nip">{{ o.nama }} ({{ o.jabatan }})</option>
+            </select>
+            <p class="text-[9px] text-purple-400/80 mt-1.5 leading-relaxed">Sistem mendeteksi Anda memegang jabatan struktural strategis. Silakan tunjuk Pelaksana Harian (Plh) selama masa cuti/izin.</p>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4 border-t border-slate-800 pt-4">
+          <div>
+            <label class="block text-slate-400 uppercase font-bold mb-1">Atasan Langsung</label>
+            <select v-model="form.atasan" required class="w-full px-3.5 py-3 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+              <option value="">-- Pilih Atasan --</option>
+              <option v-for="o in opsi.atasanOpts" :key="o.nip" :value="o.nip">{{ o.nama }} ({{ o.jabatan }})</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-slate-400 uppercase font-bold mb-1">Pejabat Berwenang</label>
+            <select v-model="form.pejabat" required class="w-full px-3.5 py-3 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+              <option value="">-- Pilih Pejabat --</option>
+              <option v-for="o in opsi.pejabatOpts" :key="o.nip" :value="o.nip">{{ o.nama }} ({{ o.jabatan }})</option>
+            </select>
+          </div>
+        </div>
+
+        <button type="submit" class="w-full py-4 mt-4 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl shadow-lg transition uppercase tracking-wider flex justify-center items-center gap-2">
+          {{ currentEditId ? 'Simpan Perubahan' : 'Kirim Usulan Resmi' }} <i class="fa-solid fa-paper-plane"></i>
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL PENGAJUAN PEMBATALAN CUTI (KINI DIMIGRASI KE VUE) -->
+  <div id="modalCancelCuti" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-[80] flex items-center justify-center p-4 hidden">
+      <div class="w-full max-w-sm glass border border-slate-800 p-6 rounded-3xl shadow-2xl scale-95 transition-all flex flex-col">
+        <div class="text-center mb-4">
+          <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-purple-500/10 text-purple-400 mb-3 border border-purple-500/20 shadow-lg shadow-purple-500/10">
+            <i class="fa-solid fa-file-circle-xmark text-2xl"></i>
+          </div>
+          <h3 class="text-lg font-bold text-white tracking-wide">Usulkan Pembatalan</h3>
+          <p class="text-[10px] text-slate-400 mt-1 px-4 leading-relaxed">Cuti Anda sudah disetujui, pembatalan memerlukan persetujuan Pejabat Berwenang.</p>
+        </div>
+        
+        <div class="mb-5 text-left">
+           <label class="block text-xs font-bold text-slate-400 uppercase mb-1.5 pl-1">Alasan Pembatalan</label>
+           <textarea v-model="cancelForm.alasan" required rows="3" placeholder="Jelaskan alasan mengapa cuti ini dibatalkan... (Misal: Dipanggil sidang mendadak)" class="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 text-slate-200"></textarea>
+        </div>
+        
+        <div class="flex gap-3">
+           <button type="button" @click="closeCancelModal()" class="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-xl transition">Kembali</button>
+           <button type="button" @click="submitCancelCuti()" class="flex-1 py-3 bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-purple-600/20 transition flex items-center justify-center gap-2">
+              Ajukan Batal <i class="fa-solid fa-arrow-right"></i>
+           </button>
+        </div>
+      </div>
+  </div>
+
+</div>
+                </div>
+                <div id="tab-verifikasi" class="cuti-tab-content hidden w-full">
+<div id="vue-persetujuan-wrapper" class="glass border border-slate-900 rounded-3xl p-6 flex flex-col h-[580px] relative overflow-hidden" v-cloak>
+  <div class="mb-4 flex flex-col md:flex-row md:items-end justify-between gap-4">
+    <div>
+      <h3 class="text-lg font-bold text-slate-200"><i class="fa-solid fa-list-check text-indigo-400 mr-2"></i> Kotak Masuk Verifikasi</h3>
+      <p class="text-slate-500 text-xs mt-1">Daftar berkas pengajuan dan usulan pembatalan yang membutuhkan verifikasi Anda.</p>
+    </div>
+    
+    <!-- ZETTBOT FIX: Menampilkan kembali Tombol Bypass dengan badge jumlah notifikasi dinamis -->
+    <div v-if="isAdmin" class="flex flex-col sm:flex-row items-start sm:items-center gap-2 bg-slate-900/50 p-1.5 rounded-xl border border-slate-800">
+       <span class="text-[10px] font-bold text-slate-500 uppercase px-2"><i class="fa-solid fa-key text-indigo-400 mr-1"></i> Mode Bypass:</span>
+       <div class="flex gap-2 w-full sm:w-auto">
+         <button @click="toggleBypass('atasan')" :class="bypassMode === 'atasan' ? 'bg-indigo-600 text-white border-indigo-500' : 'border-transparent text-slate-400 hover:bg-slate-800'" class="flex-1 sm:flex-none px-4 py-2 rounded-lg text-xs font-bold transition border">
+            Atasan Langsung ({{ countAtasan }})
+         </button>
+         <button @click="toggleBypass('pejabat')" :class="bypassMode === 'pejabat' ? 'bg-purple-600 text-white border-purple-500' : 'border-transparent text-slate-400 hover:bg-slate-800'" class="flex-1 sm:flex-none px-4 py-2 rounded-lg text-xs font-bold transition border">
+            Pejabat Berwenang ({{ countPejabat }})
+         </button>
+       </div>
+    </div>
+  </div>
+
+  <div class="flex-1 overflow-auto border border-slate-900 rounded-2xl bg-slate-950/40 pb-20">
+    <table class="w-full text-left text-xs border-collapse">
+      <thead>
+        <tr class="border-b border-slate-900 bg-slate-900/40 text-slate-400 font-semibold sticky top-0 z-10">
+          <th class="p-4 w-12 text-center">
+             <input type="checkbox" v-model="isAllSelected" class="w-4 h-4 rounded border-slate-600 bg-slate-900 focus:ring-indigo-500 cursor-pointer accent-indigo-600">
+          </th>
+          <th class="p-4">Identitas Pegawai</th>
+          <th class="p-4">Jenis & Alasan</th>
+          <th class="p-4">Durasi Tanggal</th>
+          <th class="p-4">Posisi Peninjauan Anda</th>
+          <th class="p-4">Status Transaksi</th>
+          <th class="p-4 text-center">Aksi Keputusan</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- Empty State -->
+        <tr v-if="logsToApprove.length === 0">
+           <td colspan="7" class="text-center p-8 text-slate-600 italic">Tidak ada berkas yang menunggu persetujuan Anda.</td>
+        </tr>
+        
+        <!-- Loop Data Engine -->
+        <tr v-for="log in logsToApprove" :key="log.id" class="border-b border-slate-900 hover:bg-slate-900/10 transition-all duration-300 ease-out">
+          <td class="p-4 text-center">
+            <input type="checkbox" v-model="selectedItems" :value="{ id: log.id, type: log.z_type, stage: log.wfh_stage }" class="w-4 h-4 rounded border-slate-600 bg-slate-900 cursor-pointer accent-indigo-600">
+          </td>
+          <td class="p-4">
+            <div class="font-bold text-slate-200">{{ log.pnsNama }}</div>
+            <div class="text-slate-500 text-[10px] mt-0.5">NIP: {{ log.nip }}</div>
+          </td>
+          <td class="p-4">
+            <div class="font-bold text-slate-300">{{ log.displayJenis }}</div>
+            <div class="text-slate-500 text-[10px] mt-0.5 italic max-w-[150px] truncate" :title="log.showAlasan">{{ log.showAlasan }}</div>
+          </td>
+          <td class="p-4 text-slate-300" v-html="log.displayDurasi"></td>
+          <td class="p-4">
+            <span class="inline-flex px-2 py-1 rounded bg-slate-800 text-slate-400 text-[10px] font-bold">{{ log.actionRole }}</span>
+          </td>
+          <td class="p-4" v-html="log.statStr"></td>
+          <td class="p-4 text-center">
+            <button @click="openSingleApproval(log)" :class="log.btnColor" class="px-4 py-2 font-bold rounded-lg shadow-lg transition text-xs"><i class="fa-solid fa-pen-to-square mr-1"></i> Tinjau</button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div :class="selectedItems.length > 0 ? 'translate-y-0 opacity-100 pointer-events-auto' : 'translate-y-32 opacity-0 pointer-events-none'" class="absolute bottom-6 left-1/2 transform -translate-x-1/2 bg-slate-800 border border-indigo-500/50 shadow-[0_10px_40px_rgba(99,102,241,0.3)] rounded-full px-6 py-3 flex items-center gap-6 z-[40] transition-all duration-500">
+     <div class="border-r border-slate-600 pr-6 text-sm font-bold text-slate-200 flex items-center gap-2">
+         <div class="w-6 h-6 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center text-xs">{{ selectedItems.length }}</div>
+         <span class="hidden sm:inline">Berkas Terpilih</span>
+     </div>
+     <div class="flex gap-3">
+         <button @click="openBulkModal('Ditolak')" class="px-4 py-2 bg-rose-500/10 hover:bg-rose-500 text-rose-400 hover:text-white rounded-xl text-xs font-bold border border-rose-500/20 transition flex items-center gap-2">
+             <i class="fa-solid fa-xmark"></i> Tolak
+         </button>
+         <button @click="openBulkModal('Disetujui')" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-emerald-600/20 transition flex items-center gap-2">
+             <i class="fa-solid fa-check-double"></i> Setujui Masal
+         </button>
+     </div>
+  </div>
+
+  <div v-if="showSingleModal && singleTarget" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-[80] flex items-center justify-center p-4 animate-fade-in">
+    <div class="w-full max-w-lg glass border border-slate-800 p-6 rounded-3xl shadow-2xl">
+      <div class="flex items-center justify-between pb-4 border-b border-slate-800 mb-6">
+        <h3 class="text-lg font-bold text-white"><i class="fa-solid fa-gavel text-indigo-400 mr-2"></i> Verifikasi Berkas</h3>
+        <button @click="showSingleModal = false" class="text-slate-400 hover:text-slate-100"><i class="fa-solid fa-xmark text-lg"></i></button>
+      </div>
+
+      <div class="space-y-4 mb-6 text-sm">
+        <div v-if="singleTarget.status === 'Menunggu Pembatalan'" class="bg-purple-500/10 border border-purple-500/20 p-4 rounded-xl flex items-start gap-3">
+           <i class="fa-solid fa-file-circle-xmark text-purple-400 mt-1 text-lg"></i>
+           <div>
+              <h4 class="text-purple-300 text-xs font-bold uppercase tracking-wider mb-1">Usulan Pembatalan Cuti</h4>
+              <p class="text-purple-200/80 text-sm italic font-medium leading-relaxed">"{{ getBatalReason(singleTarget.alasan) }}"</p>
+           </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4 bg-slate-900/40 border border-slate-800 p-4 rounded-2xl">
+          <div>
+            <span class="text-xs text-slate-500 font-medium">Nama Pegawai:</span>
+            <div class="font-bold text-slate-200 mt-0.5">{{ singleTarget.pnsNama }}</div>
+          </div>
+          <div>
+            <span class="text-xs text-slate-500 font-medium">NIP Pegawai:</span>
+            <div class="font-mono text-slate-300 mt-0.5">{{ singleTarget.nip }}</div>
+          </div>
+          <div class="col-span-2 border-t border-slate-800/60 pt-3">
+            <span class="text-xs text-slate-500 font-medium">{{ labelJenisAlasan }}:</span>
+            <div class="text-slate-300 mt-0.5 font-semibold">
+               <span>{{ singleTarget.displayJenis }}</span> - <span class="text-slate-400 font-normal italic">{{ getPureAlasan(singleTarget) }}</span>
+            </div>
+          </div>
+          
+          <div v-if="singleTarget.bukti_url && singleTarget.bukti_url.trim() !== ''" class="col-span-2 border-t border-slate-800/60 pt-3">
+            <span class="text-xs text-slate-500 font-medium">Lampiran Bukti Dukung:</span>
+            <div class="mt-1.5 flex flex-wrap gap-2">
+              <template v-if="singleTarget.z_type === 'WFH' && singleTarget.wfh_stage === 'Laporan'">
+                  <a v-for="(url, i) in getWfhBuktiUrls(singleTarget)" :key="i" :href="url" target="_blank" class="inline-flex items-center gap-2 px-3 py-2 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500 hover:text-white border border-emerald-500/20 rounded-xl text-xs font-bold transition">
+                      <i class="fa-solid fa-file-arrow-down text-sm"></i> Eviden {{ i+1 }}
+                  </a>
+              </template>
+              <template v-else>
+                  <a :href="singleTarget.bukti_url" target="_blank" class="inline-flex items-center gap-2 px-3 py-2 bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500 hover:text-white border border-indigo-500/20 rounded-xl text-xs font-bold transition">
+                    <i class="fa-solid fa-file-arrow-down text-sm"></i> Lihat Dokumen Bukti
+                  </a>
+              </template>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-400 uppercase mb-1.5">Catatan Pendapat / Tanggapan Dinas</label>
+          <textarea v-model="singleNotes" required rows="3" placeholder="Tulis catatan pertimbangan dinas Anda..." class="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-200"></textarea>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 gap-3">
+        <button @click="submitSingle('Ditolak')" class="py-3 bg-rose-500/10 hover:bg-rose-500 border border-rose-500/20 hover:border-rose-500 text-rose-400 hover:text-white font-semibold rounded-xl transition duration-200">
+          <i class="fa-solid fa-circle-xmark mr-2"></i> Tolak Usulan
+        </button>
+        <button @click="submitSingle('Disetujui')" class="py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-xl shadow-lg shadow-emerald-600/20 transition duration-200">
+          <i class="fa-solid fa-circle-check mr-2"></i> Setujui Berkas
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div v-if="showBulkModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-fade-in">
+    <div class="w-full max-w-sm glass border border-indigo-500/30 p-6 rounded-3xl shadow-2xl">
+      <div class="text-center mb-6">
+          <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-indigo-500/10 text-indigo-400 mb-3 border border-indigo-500/20 shadow-[0_0_15px_rgba(99,102,241,0.2)]">
+              <i class="fa-solid fa-layer-group text-2xl"></i>
+          </div>
+          <h3 class="text-lg font-bold text-white tracking-wide">Persetujuan Majemuk</h3>
+          <p class="text-xs text-slate-400 mt-1 leading-relaxed">Anda akan menerapkan keputusan 
+             <span :class="bulkDecision === 'Disetujui' ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' : 'bg-rose-500/20 text-rose-400 border-rose-500/30'" class="font-bold px-2 py-0.5 rounded border text-[10px] uppercase">{{ bulkDecision }}</span> 
+             untuk <span class="font-bold text-white bg-slate-800 px-1.5 py-0.5 rounded">{{ selectedItems.length }}</span> berkas secara serentak.</p>
+      </div>
+
+      <div class="mb-6 text-left">
+          <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 pl-1">Satu Catatan Untuk Semua (Opsional)</label>
+          <textarea v-model="bulkNotes" required rows="3" placeholder="Contoh: ACC, laksanakan dengan baik..."
+            class="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-200 resize-none"></textarea>
+      </div>
+
+      <div class="flex gap-3">
+        <button @click="showBulkModal = false" class="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-xl transition border border-slate-700">Batal</button>
+        <button @click="submitBulk()" class="flex-1 py-3 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-indigo-600/20 transition flex items-center justify-center gap-2">
+          <i class="fa-solid fa-bolt"></i> Eksekusi Bulk
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+                </div>
+                <div id="tab-rekapitulasi" class="cuti-tab-content hidden w-full">
+<div id="vue-rekapitulasi-wrapper" class="space-y-6" v-cloak>
+  <!-- BARIS ATAS: PENYARING FILTER & AKSI -->
+  <div class="bg-slate-950/40 border border-slate-900 rounded-2xl p-5 relative z-30 no-print">
+    <div class="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-4 border-b border-slate-800/50 pb-4">
+      <div class="flex-1">
+          <h3 class="text-lg font-bold text-slate-200"><i class="fa-solid fa-globe text-indigo-400 mr-2"></i> Rekapitulasi Global & Kontrol</h3>
+          <p class="text-slate-500 text-xs mt-1">Saring data, pantau status, dan kelola arsip dinas secara menyeluruh.</p>
+      </div>
+      
+      <div v-show="isAdmin" class="flex flex-wrap gap-2">
+         <button @click="execBypassCuti()" class="px-4 py-2 bg-indigo-500/10 hover:bg-indigo-500 text-indigo-400 hover:text-white font-bold rounded-xl border border-indigo-500/20 transition flex items-center justify-center gap-2 text-xs">
+            <i class="fa-solid fa-user-shield"></i> Bypass Usul Cuti
+         </button>
+         <button @click="execBuatST()" class="px-4 py-2 bg-emerald-500/10 hover:bg-emerald-500 text-emerald-400 hover:text-white font-bold rounded-xl border border-emerald-500/20 transition flex items-center justify-center gap-2 text-xs">
+            <i class="fa-solid fa-file-signature"></i> Buat Surat Tugas (DL)
+         </button>
+      </div>
+    </div>
+
+    <div class="flex flex-col md:flex-row md:items-end justify-between gap-4">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 flex-1">
+        
+        <!-- Custom Searchable Input -->
+        <div :class="isAdmin ? 'lg:col-span-4' : 'lg:col-span-8'" class="relative">
+          <label class="block text-xs font-semibold text-slate-400 uppercase mb-1.5">Saring Pegawai</label>
+          <div class="relative flex items-center">
+             <input type="text" ref="searchInputBox" v-model="searchQuery" autocomplete="off"
+                @focus="openDropdown()" 
+                @blur="closeDropdown()"
+                placeholder="Ketik nama pegawai..." 
+                class="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition pr-12">
+             
+             <!-- Tombol X untuk clear teks -->
+             <button type="button" v-show="searchQuery.trim() !== ''" @mousedown.prevent="clearSearch()" class="absolute right-3.5 text-slate-500 hover:text-rose-400 transition z-10 w-6 h-6 flex items-center justify-center" title="Hapus Pencarian">
+                <i class="fa-solid fa-xmark"></i>
+             </button>
+             
+             <!-- Dropdown List -->
+             <div v-show="isDropdownOpen" class="absolute top-[100%] left-0 z-[70] w-full mt-2 bg-slate-800 border border-slate-600 rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.8)] flex-col overflow-hidden max-h-56 overflow-y-auto custom-scrollbar">
+                <div>
+                   <div @mousedown.prevent="selectUser('all', 'Semua Pegawai')" class="px-3 py-2 text-xs text-slate-300 hover:bg-indigo-600 hover:text-white cursor-pointer transition">Semua Pegawai</div>
+                   <div v-for="u in availableUsers" :key="u.nip" @mousedown.prevent="selectUser(u.nip, `${u.nama} (${u.jabatan})`)" class="px-3 py-2 text-xs text-slate-300 hover:bg-indigo-600 hover:text-white cursor-pointer transition border-t border-slate-700/50">
+                       {{ u.nama }} <span class="text-[9px] text-slate-400 block">{{ u.jabatan }}</span>
+                   </div>
+                </div>
+             </div>
+          </div>
+        </div>
+
+        <!-- Kolom Filter Jenis Kegiatan (Khusus Admin) -->
+        <div v-show="isAdmin" class="relative lg:col-span-4">
+           <label class="block text-xs font-semibold text-slate-400 uppercase mb-1.5">Jenis Izin / Dinas</label>
+           <select v-model="filter.jenis" class="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition appearance-none">
+              <option value="all">Semua Jenis Kegiatan</option>
+              <option value="Tahunan">Cuti Tahunan</option>
+              <option value="Sakit">Cuti Sakit</option>
+              <option value="Alasan Penting">Cuti Alasan Penting</option>
+              <option value="Melahirkan">Cuti Melahirkan</option>
+              <option value="Besar">Cuti Besar</option>
+              <option value="CLTN">Cuti Di Luar Tanggungan Negara (CLTN)</option>
+              <option value="Izin Keluar Kantor">Izin Keluar Kantor (IK)</option>
+              <option value="Izin Pribadi">Izin Pribadi (IP)</option>
+              <option value="Work From Home">Work From Home (WFH)</option>
+              <option value="Dinas Luar">Dinas Luar (DL)</option>
+           </select>
+           <i class="fa-solid fa-chevron-down absolute right-3.5 top-[38px] text-slate-500 text-[10px] pointer-events-none"></i>
+        </div>
+
+        <div class="lg:col-span-2">
+          <label class="block text-xs font-semibold text-slate-400 uppercase mb-1.5">Dari Tanggal</label>
+          <input type="date" v-model="filter.start" class="w-full px-3.5 py-2.5 bg-slate-900/50 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        </div>
+        <div class="lg:col-span-2">
+          <label class="block text-xs font-semibold text-slate-400 uppercase mb-1.5">Sampai Tanggal</label>
+          <input type="date" v-model="filter.end" class="w-full px-3.5 py-2.5 bg-slate-900/50 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        </div>
+      </div>
+
+      <button v-show="isAdmin" @click="cetakRekap()" class="px-5 py-2.5 bg-slate-800/80 hover:bg-slate-700 text-slate-200 hover:text-white font-semibold rounded-xl border border-slate-700 transition flex items-center justify-center gap-2 lg:h-[42px] mt-auto">
+        <i class="fa-solid fa-print"></i> Cetak Tabel
+      </button>
+    </div>
+  </div>
+
+  <!-- AREA TABEL LAPORAN (PRINT-FRIENDLY) -->
+  <div class="flex flex-col h-[550px]" id="printArea">
+    
+    <!-- KOP DINAS -->
+    <div class="print-only hidden text-center border-b-2 border-black pb-4 mb-6">
+      <h2 class="text-xl font-bold uppercase">Mahkamah Agung Republik Indonesia</h2>
+      <h3 class="text-lg font-bold uppercase tracking-wide">Pengadilan Agama Indramayu Kelas IA</h3>
+      <p class="text-xs text-slate-600 mt-1">Jl. Raya Indramayu No. 100, Indramayu, Jawa Barat — Telp (0231) 12345</p>
+      <div class="text-sm font-bold border-t border-slate-400 mt-4 pt-4 uppercase">Laporan Rekapitulasi Dinas Pegawai</div>
+    </div>
+
+    <!-- Inner Wrapper -->
+    <div class="flex-1 overflow-auto border border-slate-900 rounded-2xl bg-slate-950/40 pb-16 relative">
+      <table class="w-full text-left text-xs border-collapse">
+        <thead>
+          <tr class="border-b border-slate-800 bg-slate-900 text-slate-300 font-semibold sticky top-0 z-20 shadow-md">
+            <th class="p-4">Identitas Pegawai</th>
+            <th class="p-4">ID / Tanggal Usulan</th>
+            <th class="p-4">Jenis Izin</th>
+            <th class="p-4">Periode</th>
+            <th class="p-4">Keperluan Dinas / Alasan</th>
+            <th class="p-4">Status Persetujuan</th>
+            <th v-if="isAdmin" class="p-4 text-center no-print w-32">Aksi Kontrol</th>
+          </tr>
+        </thead>
+        
+        <tbody v-if="!filter.start && !filter.end">
+            <tr>
+                <td :colspan="isAdmin ? 7 : 6" class="text-center p-16 text-slate-500">
+                    <i class="fa-regular fa-calendar-days text-4xl mb-4 text-slate-600"></i>
+                    <h4 class="font-bold text-slate-400 text-sm tracking-wide uppercase">Pilih rentang tanggal yang ingin Anda ketahui</h4>
+                    <p class="text-xs mt-2 text-slate-500 max-w-sm mx-auto leading-relaxed">Silakan tentukan <span class="font-bold text-slate-300">Dari Tanggal</span> dan <span class="font-bold text-slate-300">Sampai Tanggal</span> terlebih dahulu untuk menampilkan rekapitulasi data.</p>
+                </td>
+            </tr>
+        </tbody>
+
+        <tbody v-else-if="filteredLogs.length === 0">
+            <tr>
+                <td :colspan="isAdmin ? 7 : 6" class="text-center p-8 text-slate-600">
+                    Tidak ada data transaksi izin/dinas yang cocok dengan rentang waktu atau jenis tersebut.
+                </td>
+            </tr>
+        </tbody>
+
+        <tbody v-else>
+            <tr v-for="log in filteredLogs" :key="log.id + '-' + log.nip" class="border-b border-slate-900 hover:bg-slate-900/10 transition text-xs">
+                <td class="p-4">
+                  <div class="font-bold text-slate-200">{{ log.pnsNama }}</div>
+                  <div class="text-slate-500 text-[10px] mt-0.5">NIP: {{ log.nip }} | {{ log.pnsJabatan }}</div>
+                </td>
+                <td class="p-4">
+                  <div class="font-mono text-slate-300 font-semibold">{{ log.id }}</div>
+                  <div class="text-slate-500 text-[10px] mt-0.5">{{ log.tgl_pengajuan }}</div>
+                </td>
+                <td class="p-4 font-bold text-slate-300">{{ log.jenis }}</td>
+                <td class="p-4 text-slate-300">
+                  <div>{{ log.tgl_mulai_indo }}</div>
+                  <div class="text-[10px] text-slate-500">s.d {{ log.tgl_selesai_indo }}</div>
+                </td>
+                <td class="p-4 text-slate-400 max-w-[250px] truncate" :title="log.tooltipText">{{ log.alasanText }}</td>
+                <td class="p-4">
+                  <span :class="['inline-flex px-2 py-0.5 rounded-md text-[10px] font-bold border uppercase tracking-wider', log.statusColor]">{{ log.status }}</span>
+                </td>
+                
+                <td v-if="isAdmin" class="p-4 text-center no-print whitespace-nowrap">
+                    <div class="flex items-center justify-center">
+                        
+                        <!-- Buttons: ST -->
+                        <div v-if="log.is_st" class="flex gap-1 justify-center items-center">
+                            <button @click="execCetakST(log.id)" class="px-2 py-1.5 bg-slate-800 hover:bg-emerald-600 text-emerald-400 hover:text-white rounded-md transition border border-emerald-500/30 text-[9px] font-bold tracking-wider" title="Cetak Surat Tugas">ST</button>
+                            <button v-if="log.get_spd" @click="execCetakSPD(log.id, log.nip)" class="px-2 py-1.5 bg-slate-800 hover:bg-amber-600 text-amber-400 hover:text-white rounded-md transition border border-amber-500/30 text-[9px] font-bold tracking-wider" title="Cetak SPD">SPD</button>
+                            <button v-if="log.plh_nip" @click="execCetakPlhST(log.id, log.nip)" class="px-2 py-1.5 bg-slate-800 hover:bg-purple-600 text-purple-400 hover:text-white rounded-md transition border border-purple-500/30 text-[9px] font-bold tracking-wider" title="Cetak Penunjukan Plh">PLH</button>
+                            <button @click="execEditST(log.id)" class="p-2 bg-slate-800 hover:bg-blue-600 text-blue-400 hover:text-white rounded-lg transition border border-blue-500/30 ml-1" title="Edit Data Surat Tugas"><i class="fa-solid fa-gear"></i></button>
+                            <button @click="deleteSTRecord(log.id)" class="p-2 bg-rose-500/10 hover:bg-rose-500 text-rose-400 hover:text-white rounded-lg transition border border-rose-500/20 ml-1" title="Hapus ST"><i class="fa-solid fa-trash-can"></i></button>
+                        </div>
+                        
+                        <!-- Buttons: IK -->
+                        <template v-else-if="log.z_type === 'IK'">
+                            <div class="flex gap-1 justify-center items-center">
+                                <button @click="execCetakIK(log.id)" class="px-2 py-1.5 bg-slate-800 hover:bg-sky-600 text-sky-400 hover:text-white rounded-md transition border border-sky-500/30 text-[9px] font-bold tracking-wider" title="Cetak IK">IK</button>
+                            </div>
+                            <button @click="deleteIKFromRekap(log.id)" class="p-2 bg-rose-500/10 hover:bg-rose-500 text-rose-400 hover:text-white rounded-lg transition border border-rose-500/20 ml-1" title="Hapus Permanen IK"><i class="fa-solid fa-trash-can"></i></button>
+                        </template>
+                        
+                        <!-- Buttons: IP -->
+                        <template v-else-if="log.z_type === 'IP'">
+                            <div class="flex gap-1 justify-center items-center">
+                                <button @click="execCetakIP(log.id)" class="px-2 py-1.5 bg-slate-800 hover:bg-emerald-600 text-emerald-400 hover:text-white rounded-md transition border border-emerald-500/30 text-[9px] font-bold tracking-wider" title="Cetak IP">IP</button>
+                            </div>
+                            <button @click="deleteIPFromRekap(log.id)" class="p-2 bg-rose-500/10 hover:bg-rose-500 text-rose-400 hover:text-white rounded-lg transition border border-rose-500/20 ml-1" title="Hapus Permanen IP"><i class="fa-solid fa-trash-can"></i></button>
+                        </template>
+                        
+                        <!-- Buttons: WFH -->
+                        <template v-else-if="log.z_type === 'WFH'">
+                            <div class="flex gap-1 justify-center items-center">
+                                <button @click="execCetakWfhPlan(log.id)" class="px-2 py-1.5 bg-slate-800 hover:bg-amber-600 text-amber-400 hover:text-white rounded-md transition border border-amber-500/30 text-[9px] font-bold tracking-wider" title="Cetak Rencana WFH">PLAN</button>
+                                <button v-if="log.wfh_laporan && log.wfh_laporan !== 'Belum Lapor'" @click="execCetakWfhLap(log.id)" class="px-2 py-1.5 bg-slate-800 hover:bg-emerald-600 text-emerald-400 hover:text-white rounded-md transition border border-emerald-500/30 text-[9px] font-bold tracking-wider" title="Cetak Laporan WFH">LAP</button>
+                            </div>
+                            <button @click="deleteWFHFromRekap(log.id)" class="p-2 bg-rose-500/10 hover:bg-rose-500 text-rose-400 hover:text-white rounded-lg transition border border-rose-500/20 ml-1" title="Hapus Permanen WFH"><i class="fa-solid fa-trash-can"></i></button>
+                        </template>
+
+                        <!-- Buttons: CUTI -->
+                        <template v-else-if="log.z_type === 'Cuti'">
+                            <div class="flex gap-1 justify-center items-center">
+                                <button @click="execCetakCuti(log.id)" class="px-2 py-1.5 bg-slate-800 hover:bg-indigo-600 text-slate-400 hover:text-white rounded-md transition border border-slate-700 text-[9px] font-bold tracking-wider" title="Cetak Berkas Cuti">CUTI</button>
+                                <button v-if="log.plh_nip || (log.history && log.history.includes('plh_nip'))" @click="execCetakPlhCuti(log.id, log.nip, log.history, log.plh_nip)" class="px-2 py-1.5 bg-slate-800 hover:bg-purple-600 text-purple-400 hover:text-white rounded-md transition border border-purple-500/30 text-[9px] font-bold tracking-wider" title="Cetak Penunjukan Plh Cuti">PLH</button>
+                            </div>
+                            <button v-if="log.status !== 'DIBATALKAN'" @click="deleteRekapRecord(log.id)" class="p-2 bg-rose-500/10 hover:bg-rose-500 text-rose-400 hover:text-white rounded-lg transition border border-rose-500/20 ml-1" title="Batalkan Cuti"><i class="fa-solid fa-trash-can"></i></button>
+                            <div v-else class="w-[34px] ml-1"></div>
+                        </template>
+
+                    </div>
+                </td>
+            </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  
+  <!-- MODAL DINAS LUAR DIBIARKAN AMAN DI LUAR VUE WRAPPER -->
+  <div id="modalDinasLuar" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-[60] flex items-center justify-center p-4 hidden no-print">
+      <!-- (Sesuai original kode, di luar manajemen Vue rekapitulasi) -->
+  </div>
+</div>
+                </div>
+            </div>
+
+
+<!-- VIEW COMPONENT: permohonan/st/view_st.html -->
+<!-- ==========================================
+      FILE: view_st.html (Modal Input Surat Tugas - VUE MIGRATED)
+      ========================================== -->
+<div id="vue-form-st-wrapper" v-cloak>
+  <teleport to="body">
+    <!-- MODAL UTAMA: INPUT SURAT TUGAS -->
+    <div id="modalSuratTugas" :class="{'hidden': !isStOpen}" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
+      <div :class="{'scale-95': !isStScaled}" class="w-full max-w-5xl glass border border-slate-800 p-6 rounded-3xl shadow-2xl transition-all flex flex-col h-[95vh] transform duration-300">
+        <div class="flex items-center justify-between pb-4 border-b border-slate-800 shrink-0">
+          <h3 class="text-lg font-bold text-white"><i class="fa-solid fa-file-signature text-blue-400 mr-2"></i> Penerbitan Surat Tugas (Terintegrasi SPD & Plh)</h3>
+          <button @click="closeModalST" type="button" class="text-slate-400 hover:text-slate-100"><i class="fa-solid fa-xmark text-lg"></i></button>
+        </div>
+        
+        <form @submit.prevent="submitST" class="flex-1 overflow-y-auto py-4 space-y-5 text-sm pr-2 custom-scrollbar">
+          
+          <!-- BAGIAN 1: IDENTITAS SURAT -->
+          <div class="bg-slate-900/50 border border-slate-800 p-4 rounded-xl space-y-4">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+                <h4 class="text-xs font-bold text-blue-400 uppercase tracking-wider">1. Identitas & Penomoran Surat</h4>
+                <button type="button" @click="openSetting" class="text-[10px] text-slate-400 hover:text-blue-400 font-bold bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-700 transition">
+                  <i class="fa-solid fa-gear"></i> Atur Dasar SK
+                </button>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label class="block text-slate-400 uppercase font-bold mb-1 text-[11px]">Nomor Surat Tugas <span class="text-rose-400">*</span></label>
+                <input type="text" v-model="form.nomor_surat" required placeholder="Contoh: .../ST.HM3.1.1/VIII/2026" class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500">
+              </div>
+              <div>
+                <label class="block text-slate-400 uppercase font-bold mb-1 text-[11px]">Nomor SPD <span class="text-slate-500 font-normal">(Kosongkan jika tdk ada)</span></label>
+                <input type="text" v-model="form.nomor_spd" placeholder="Contoh: .../KU.01/VIII/2026" class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+              </div>
+              <div>
+                <label class="block text-slate-400 uppercase font-bold mb-1 text-[11px]">Nomor Plh <span class="text-slate-500 font-normal">(Kosongkan jika tdk ada)</span></label>
+                <input type="text" v-model="form.nomor_plh" placeholder="Contoh: .../KP7.4/II/2026" class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-purple-500">
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-slate-400 uppercase font-bold mb-1 text-[11px]">Menimbang (Teks) <span class="text-rose-400">*</span></label>
+                <textarea v-model="form.menimbang" rows="3" required placeholder="Bahwa untuk kepentingan dinas..." class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+              </div>
+              <div>
+                <label class="block text-slate-400 uppercase font-bold mb-1 text-[11px]">Dasar (Teks) <span class="text-rose-400">*</span></label>
+                <textarea v-model="form.dasar" rows="3" required placeholder="1. Undang-Undang Nomor...\n2. Peraturan..." class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+              </div>
+            </div>
+
+            <div class="relative z-10">
+              <label class="block text-slate-400 uppercase font-bold mb-1 text-[11px]">Paragraf Biaya Surat Tugas (Opsional)</label>
+              <textarea v-model="form.paragraf_biaya" rows="2" placeholder="Biaya perjalanan dinas ini dibebankan pada anggaran DIPA..." class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+            </div>
+          </div>
+
+          <!-- BAGIAN 2: PESERTA & KONFIGURASI SPD/PLH -->
+          <div class="bg-slate-900/50 border border-slate-800 p-4 rounded-xl space-y-4">
+            <h4 class="text-xs font-bold text-blue-400 uppercase tracking-wider border-b border-slate-800 pb-2">2. Daftar Pegawai & Pengaturan Fasilitas</h4>
+            
+            <!-- Auto-Search Pegawai (ZETTBOT FIX: Tambah Event @input dan Visual Highlight) -->
+            <div class="relative w-full">
+              <div class="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none">
+                  <i class="fa-solid fa-magnifying-glass text-slate-500"></i>
+              </div>
+              <input type="text" v-model="sqPegawai" @focus="dropPegawai = true" @input="dropPegawai = true" @blur="closeDrop('dropPegawai')" @keydown.enter.prevent="handleEnterPegawai" autocomplete="off" placeholder="Ketik nama atau NIP pegawai lalu tekan Enter..." class="w-full pl-10 pr-10 py-3 bg-slate-950 border border-blue-500/50 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 font-semibold shadow-inner transition">
+              <button type="button" v-show="sqPegawai !== ''" @mousedown.prevent="sqPegawai = ''" class="absolute right-3 top-[50%] -translate-y-[50%] text-slate-500 hover:text-rose-400 transition w-6 h-6 flex items-center justify-center">
+                  <i class="fa-solid fa-xmark"></i>
+              </button>
+              <div v-show="dropPegawai" class="absolute z-50 w-full mt-1 bg-slate-800 border border-slate-600 rounded-xl overflow-hidden max-h-48 overflow-y-auto shadow-[0_20px_50px_rgba(0,0,0,0.8)]">
+                  <div v-if="filteredPegawai.length === 0" class="p-3 text-xs text-slate-500 italic text-center">Tidak ditemukan...</div>
+                  <div v-for="(u, index) in filteredPegawai" :key="u.nip" @mousedown.prevent="addPeserta(u)" :class="index === 0 ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-blue-600 hover:text-white'" class="px-3 py-2 text-[11px] cursor-pointer transition border-b border-slate-700/50">
+                      <div class="font-bold">{{ u.nama }}</div><div class="text-[9px] opacity-70">{{ u.jabatan }} | {{ u.nip }}</div>
+                  </div>
+              </div>
+            </div>
+            
+            <div class="border border-slate-700 rounded-lg overflow-hidden">
+              <table class="w-full text-left text-xs">
+                <thead class="bg-slate-800 text-slate-300">
+                  <tr>
+                    <th class="p-3">Nama Pegawai</th>
+                    <th class="p-3">Jabatan</th>
+                    <th class="p-3 text-center">Fasilitas SPD</th>
+                    <th class="p-3 text-center">Tunjuk Plh</th>
+                    <th class="p-3 text-center w-12">Hapus</th>
+                  </tr>
+                </thead>
+                <tbody class="bg-slate-950 divide-y divide-slate-800">
+                  <tr v-if="pesertaList.length === 0"><td colspan="5" class="p-4 text-center text-slate-500 italic">Belum ada pegawai ditambahkan.</td></tr>
+                  <tr v-for="(p, index) in pesertaList" :key="p.nip" class="hover:bg-slate-900/50 transition">
+                    <td class="p-3 font-bold text-slate-200 text-[11px]">{{ index + 1 }}. {{ p.nama }}</td>
+                    <td class="p-3 text-slate-400 text-[10px]">{{ p.jabatan }}</td>
+                    <td class="p-3 text-center">
+                       <button type="button" @click="toggleSPD(p.nip)" :class="p.get_spd ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/30 border-transparent' : 'bg-slate-900 text-slate-500 border-slate-700 hover:bg-slate-800'" class="px-3 py-1.5 rounded-lg text-[10px] font-bold border transition-all">
+                          <i v-if="p.get_spd" class="fa-solid fa-check"></i> {{ p.get_spd ? 'Ya' : 'Tidak' }}
+                       </button>
+                    </td>
+                    <td class="p-3 text-center">
+                       <button type="button" @click="openSetPlh(p.nip)" :class="p.plh_nip ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/30 border-transparent' : 'bg-slate-900 text-slate-500 border-slate-700 hover:bg-slate-800 hover:text-purple-400'" class="px-3 py-1.5 rounded-lg text-[10px] font-bold border transition-all truncate max-w-[120px]">
+                          {{ p.plh_nip ? 'Plh: ' + p.plh_nama.split(' ')[0] : '+ Tunjuk Plh' }}
+                       </button>
+                    </td>
+                    <td class="p-3 text-center">
+                        <button type="button" @click="removePeserta(p.nip)" class="w-7 h-7 bg-rose-500/10 text-rose-400 hover:bg-rose-500 hover:text-white rounded-lg flex items-center justify-center transition ml-auto mr-auto">
+                           <i class="fa-solid fa-trash text-[10px]"></i>
+                        </button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- BAGIAN 3: PENGATURAN UMUM SPD -->
+          <div class="bg-slate-900/50 border border-emerald-500/30 p-4 rounded-xl space-y-4 relative">
+            <div class="absolute -right-10 -top-10 w-32 h-32 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none"></div>
+            <h4 class="text-xs font-bold text-emerald-400 uppercase tracking-wider border-b border-emerald-500/30 pb-2">3. Data Pembiayaan SPD & ST</h4>
+            
+            <!-- Auto-Search PPK (ZETTBOT FIX: Tambah Event @input dan Visual Highlight) -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 relative z-10 mb-4">
+              <div class="relative">
+                  <label class="block text-slate-400 uppercase font-bold mb-1 text-[11px]">Pejabat Pembuat Komitmen (PPK)</label>
+                  <input type="text" v-model="sqPPK" @focus="dropPPK = true" @input="dropPPK = true" @blur="closeDrop('dropPPK')" @keydown.enter.prevent="handleEnterPPK" autocomplete="off" placeholder="Ketik nama PPK..." class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 pr-10">
+                  <button type="button" v-show="sqPPK !== ''" @mousedown.prevent="sqPPK = ''; form.ppk_nip = ''" class="absolute right-3 top-[28px] text-slate-500 hover:text-rose-400 w-6 h-6 flex items-center justify-center"><i class="fa-solid fa-xmark"></i></button>
+                  <div v-show="dropPPK" class="absolute z-50 w-full mt-1 bg-slate-800 border border-slate-600 rounded-xl overflow-hidden max-h-48 overflow-y-auto shadow-2xl">
+                      <div v-if="filteredPegawaiPPK.length === 0" class="p-3 text-xs text-slate-500 italic text-center">Tidak ditemukan...</div>
+                      <div v-for="(u, index) in filteredPegawaiPPK" :key="u.nip" @mousedown.prevent="selectPPK(u)" :class="index === 0 ? 'bg-emerald-600 text-white' : 'text-slate-300 hover:bg-emerald-600 hover:text-white'" class="px-3 py-2 text-[11px] cursor-pointer transition border-b border-slate-700/50">
+                          <div class="font-bold">{{ u.nama }}</div><div class="text-[9px] opacity-70">{{ u.jabatan }}</div>
+                      </div>
+                  </div>
+              </div>
+              
+              <div>
+                <label class="block text-slate-400 uppercase font-bold mb-1 text-[11px]">Alat Angkutan</label>
+                <input type="text" v-model="form.angkutan" placeholder="Contoh: Kendaraan Dinas / Umum" class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+              </div>
+              <div>
+                <label class="block text-slate-400 uppercase font-bold mb-1 text-[11px]">Tempat Tujuan (Khusus SPD)</label>
+                <input type="text" v-model="form.tempat_tujuan" placeholder="Contoh: Kantor Pelayanan Kekayaan..." class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 relative z-10">
+              <div>
+                <label class="block text-slate-400 uppercase font-bold mb-1 text-[11px]">Instansi (Beban Anggaran)</label>
+                <input type="text" v-model="form.instansi" placeholder="Contoh: Pengadilan Agama Indramayu" class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+              </div>
+              <div>
+                <label class="block text-slate-400 uppercase font-bold mb-1 text-[11px]">Mata Anggaran</label>
+                <input type="text" v-model="form.mata_anggaran" placeholder="Contoh: 524111" class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+              </div>
+              <div>
+                <label class="block text-slate-400 uppercase font-bold mb-1 text-[11px]">Tingkat SPD <span class="text-rose-400">*</span></label>
+                <select v-model="form.tingkat_spd" required class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                    <option value="Tingkat A">Tingkat A</option>
+                    <option value="Tingkat B">Tingkat B</option>
+                    <option value="Tingkat C">Tingkat C</option>
+                    <option value="Tingkat D">Tingkat D</option>
+                    <option value="Tingkat E">Tingkat E</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- BAGIAN 4: PELAKSANAAN TUGAS -->
+          <div class="bg-slate-900/50 border border-slate-800 p-4 rounded-xl space-y-4">
+            <h4 class="text-xs font-bold text-blue-400 uppercase tracking-wider border-b border-slate-800 pb-2">4. Detail Pelaksanaan & TTD</h4>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div class="space-y-4">
+                <div>
+                  <label class="block text-slate-400 uppercase font-bold mb-1 text-[11px]">Maksud / Tujuan Tugas (Untuk) <span class="text-rose-400">*</span></label>
+                  <textarea v-model="form.tujuan" rows="2" required placeholder="Melaksanakan pengawasan ke..." class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                </div>
+                <div>
+                  <label class="block text-slate-400 uppercase font-bold mb-1 text-[11px]">Tempat Pelaksanaan <span class="text-rose-400">*</span></label>
+                  <input type="text" v-model="form.tempat" required placeholder="Contoh: Pengadilan Tinggi Agama Bandung" class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+              </div>
+              
+              <div class="space-y-4">
+                <div class="grid grid-cols-2 gap-2">
+                  <div>
+                    <label class="block text-slate-400 uppercase font-bold mb-1 text-[11px]">Tgl Berangkat <span class="text-rose-400">*</span></label>
+                    <input type="date" v-model="form.tgl_mulai" required class="w-full px-3.5 py-2 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  </div>
+                  <div>
+                    <label class="block text-slate-400 uppercase font-bold mb-1 text-[11px]">Tgl Kembali <span class="text-rose-400">*</span></label>
+                    <input type="date" v-model="form.tgl_selesai" required class="w-full px-3.5 py-2 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  </div>
+                </div>
+                <div>
+                  <label class="block text-slate-400 uppercase font-bold mb-1 text-[11px]">Waktu / Jam <span class="text-rose-400">*</span></label>
+                  <input type="text" v-model="form.jam" required placeholder="08.00 WIB s.d. Selesai" class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                
+                <!-- Auto-Search Penandatangan TTD (ZETTBOT FIX: Tambah Event @input dan Visual Highlight) -->
+                <div class="relative">
+                  <label class="block text-slate-400 uppercase font-bold mb-1 text-[11px] text-amber-400">Pimpinan Penandatangan <span class="text-rose-400">*</span></label>
+                  <input type="text" v-model="sqTtd" @focus="dropTtd = true" @input="dropTtd = true" @blur="closeDrop('dropTtd')" @keydown.enter.prevent="handleEnterTtd" autocomplete="off" placeholder="Ketik nama Pimpinan lalu Enter..." class="w-full px-3.5 py-2.5 bg-slate-950 border border-amber-500/50 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-500 pr-10">
+                  <button type="button" v-show="sqTtd !== ''" @mousedown.prevent="sqTtd = ''; form.pejabat_ttd = ''" class="absolute right-3 top-[28px] text-slate-500 hover:text-rose-400 w-6 h-6 flex items-center justify-center"><i class="fa-solid fa-xmark"></i></button>
+                  <div v-show="dropTtd" class="absolute z-50 w-full mt-1 bg-slate-800 border border-slate-600 rounded-xl overflow-hidden max-h-48 overflow-y-auto shadow-2xl">
+                      <div v-if="filteredTtd.length === 0" class="p-3 text-xs text-slate-500 italic text-center">Tidak ditemukan...</div>
+                      <div v-for="(u, index) in filteredTtd" :key="u.nip" @mousedown.prevent="selectTtd(u)" :class="index === 0 ? 'bg-amber-600 text-white' : 'text-slate-300 hover:bg-amber-600 hover:text-white'" class="px-3 py-2 text-[11px] cursor-pointer transition border-b border-slate-700/50">
+                          <div class="font-bold">{{ u.nama }}</div><div class="text-[9px] opacity-70">{{ u.jabatan }}</div>
+                      </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- SUBMIT BUTTON -->
+          <div class="pt-4 shrink-0">
+            <button type="submit" class="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl shadow-lg shadow-blue-600/20 transition uppercase tracking-wider flex items-center justify-center gap-2">
+                {{ currentEditId ? 'Perbarui Surat Tugas' : 'Terbitkan Surat Tugas Terpadu' }} 
+                <i :class="currentEditId ? 'fa-solid fa-floppy-disk' : 'fa-solid fa-paper-plane'"></i>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- MINI MODAL: TUNJUK PLH -->
+    <div id="modalSetPlh" :class="{'hidden': !isPlhOpen}" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
+      <div :class="{'scale-95': !isPlhScaled}" class="w-full max-w-sm glass border border-purple-500/30 p-5 rounded-2xl shadow-2xl transition-all overflow-visible transform duration-200">
+          <div class="flex items-center justify-between pb-3 border-b border-slate-700 mb-4">
+            <h4 class="font-bold text-white"><i class="fa-solid fa-user-shield text-purple-400 mr-2"></i> Tunjuk Pejabat Plh.</h4>
+            <button type="button" @click="closeSetPlh" class="text-slate-400 hover:text-rose-400"><i class="fa-solid fa-xmark text-lg"></i></button>
+          </div>
+          <p class="text-xs text-slate-400 mb-4">Pengganti harian untuk: <b v-if="plhTargetObj">{{ plhTargetObj.nama }}</b></p>
+          
+          <!-- Auto-Search Plh (ZETTBOT FIX: Tambah Event @input dan Visual Highlight) -->
+          <div class="relative mb-5">
+            <input type="text" v-model="sqPlh" @focus="dropPlh = true" @input="dropPlh = true" @blur="closeDrop('dropPlh')" @keydown.enter.prevent="handleEnterPlh" autocomplete="off" placeholder="Ketik nama Pejabat lalu Enter..." class="w-full px-3.5 py-3 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm pr-10">
+            <button type="button" v-show="sqPlh !== ''" @mousedown.prevent="sqPlh = ''; plhNipTerpilih = ''" class="absolute right-3 top-[50%] -translate-y-[50%] text-slate-500 hover:text-rose-400 w-6 h-6 flex items-center justify-center"><i class="fa-solid fa-xmark"></i></button>
+            <div v-show="dropPlh" class="absolute z-50 w-full mt-1 bg-slate-800 border border-slate-600 rounded-xl overflow-hidden max-h-48 overflow-y-auto shadow-2xl">
+                <div v-if="filteredPlh.length === 0" class="p-3 text-xs text-slate-500 italic text-center">Tidak ditemukan...</div>
+                <div v-for="(u, index) in filteredPlh" :key="u.nip" @mousedown.prevent="selectPlh(u)" :class="index === 0 ? 'bg-purple-600 text-white' : 'text-slate-300 hover:bg-purple-600 hover:text-white'" class="px-3 py-2 text-[11px] cursor-pointer transition border-b border-slate-700/50">
+                    <div class="font-bold">{{ u.nama }}</div><div class="text-[9px] opacity-70">{{ u.jabatan }}</div>
+                </div>
+            </div>
+          </div>
+          
+          <div class="flex gap-2">
+            <button type="button" @click="hapusPlhAssignment" class="flex-1 py-2.5 bg-rose-500/10 hover:bg-rose-500 text-rose-400 hover:text-white font-bold rounded-xl transition text-xs border border-rose-500/20">Batalkan Plh</button>
+            <button type="button" @click="simpanPlhAssignment" class="flex-1 py-2.5 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-xl shadow-lg shadow-purple-600/20 transition text-xs">Simpan Plh <i class="fa-solid fa-check ml-1"></i></button>
+          </div>
+      </div>
+    </div>
+
+    <!-- MINI MODAL: PENGATURAN DASAR ST -->
+    <div id="modalSettingST" :class="{'hidden': !isSettingOpen}" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
+      <div :class="{'scale-95': !isSettingScaled}" class="w-full max-w-2xl glass border border-blue-500/30 p-6 rounded-2xl shadow-2xl transition-all overflow-visible transform duration-200">
+          <div class="flex items-center justify-between pb-3 border-b border-slate-700 mb-4">
+            <h4 class="font-bold text-white"><i class="fa-solid fa-gear text-blue-400 mr-2"></i> Pengaturan Dasar SK / ST</h4>
+            <button type="button" @click="closeSetting" class="text-slate-400 hover:text-rose-400"><i class="fa-solid fa-xmark text-lg"></i></button>
+          </div>
+          <p class="text-xs text-slate-400 mb-5 leading-relaxed">Data ini akan disimpan ke sistem dan otomatis terisi setiap kali Anda membuka form Surat Tugas untuk menghemat waktu.</p>
+
+          <form @submit.prevent="saveSetting" class="space-y-4">
+              
+              <!-- Auto-Search Default PPK (ZETTBOT FIX: Tambah Event @input dan Visual Highlight) -->
+              <div class="relative">
+                  <label class="block text-slate-400 uppercase font-bold mb-1 text-[11px]">Default PPK</label>
+                  <input type="text" v-model="sqSetPPK" @focus="dropSetPPK = true" @input="dropSetPPK = true" @blur="closeDrop('dropSetPPK')" @keydown.enter.prevent="handleEnterSetPPK" autocomplete="off" placeholder="Ketik nama PPK lalu Enter..." class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 pr-10">
+                  <button type="button" v-show="sqSetPPK !== ''" @mousedown.prevent="sqSetPPK = ''; formSetting.ppk = ''" class="absolute right-3 top-[28px] text-slate-500 hover:text-rose-400 w-6 h-6 flex items-center justify-center"><i class="fa-solid fa-xmark"></i></button>
+                  <div v-show="dropSetPPK" class="absolute z-50 w-full mt-1 bg-slate-800 border border-slate-600 rounded-xl overflow-hidden max-h-48 overflow-y-auto shadow-2xl">
+                      <div v-if="filteredPegawaiSetPPK.length === 0" class="p-3 text-xs text-slate-500 italic text-center">Tidak ditemukan...</div>
+                      <div v-for="(u, index) in filteredPegawaiSetPPK" :key="u.nip" @mousedown.prevent="selectSetPPK(u)" :class="index === 0 ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-blue-600 hover:text-white'" class="px-3 py-2 text-[11px] cursor-pointer transition border-b border-slate-700/50">
+                          <div class="font-bold">{{ u.nama }}</div><div class="text-[9px] opacity-70">{{ u.jabatan }}</div>
+                      </div>
+                  </div>
+              </div>
+              
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                      <label class="block text-slate-400 uppercase font-bold mb-1 text-[11px]">Default Menimbang</label>
+                      <textarea v-model="formSetting.menimbang" rows="3" class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                  </div>
+                  <div>
+                      <label class="block text-slate-400 uppercase font-bold mb-1 text-[11px]">Default Dasar (Hukum/Aturan)</label>
+                      <textarea v-model="formSetting.dasar" rows="3" class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                  </div>
+              </div>
+
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                      <label class="block text-slate-400 uppercase font-bold mb-1 text-[11px]">Default Instansi (SPD)</label>
+                      <textarea v-model="formSetting.instansi" rows="2" class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                  </div>
+                  <div>
+                      <label class="block text-slate-400 uppercase font-bold mb-1 text-[11px]">Default Mata Anggaran (SPD)</label>
+                      <textarea v-model="formSetting.mata_anggaran" rows="2" class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                  </div>
+                  <div>
+                      <label class="block text-slate-400 uppercase font-bold mb-1 text-[11px]">Default Alat Angkutan (SPD)</label>
+                      <textarea v-model="formSetting.angkutan" rows="2" class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                  </div>
+              </div>
+
+              <div>
+                  <label class="block text-slate-400 uppercase font-bold mb-1 text-[11px]">Default Paragraf Biaya (ST)</label>
+                  <textarea v-model="formSetting.paragraf_biaya" rows="2" class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+              </div>
+              
+              <div class="pt-3">
+                <button type="submit" class="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl shadow-lg shadow-blue-600/20 transition text-sm">
+                    Terapkan Default <i class="fa-solid fa-check ml-1"></i>
+                </button>
+              </div>
+          </form>
+      </div>
+    </div>
+  </teleport>
+</div>

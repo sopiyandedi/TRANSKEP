@@ -1,0 +1,15 @@
+{
+  "name": "transkep-web",
+  "version": "3.5.0",
+  "description": "TRANSKEP - Transparansi Kepegawaian Pengadilan Agama Indramayu (Modular SPA & PWA)",
+  "main": "index.html",
+  "keywords": [
+    "transkep",
+    "kepegawaian",
+    "pwa",
+    "spa",
+    "modular"
+  ],
+  "author": "Pengadilan Agama Indramayu & ZettBOT",
+  "license": "ISC"
+}

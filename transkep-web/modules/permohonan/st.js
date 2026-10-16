@@ -1,0 +1,431 @@
+// ==========================================
+// FILE: st.js (Modul Surat Tugas, SPD & Plh)
+// ==========================================
+
+// --- Source: permohonan/st/js_st.html ---
+document.addEventListener("DOMContentLoaded", () => {
+    const { createApp } = Vue;
+
+    window.vmFormST = createApp({
+        data() {
+            return {
+                s: state, // Mengambil reference state global
+                
+                // State Modal ST
+                isStOpen: false,
+                isStScaled: false,
+                currentEditId: null,
+                
+                // Form Induk ST & SPD
+                form: {
+                    nomor_surat: '',
+                    nomor_spd: '',
+                    nomor_plh: '',
+                    menimbang: '',
+                    dasar: '',
+                    paragraf_biaya: '',
+                    angkutan: '',
+                    tempat_tujuan: '',
+                    instansi: '',
+                    mata_anggaran: '',
+                    tingkat_spd: 'Tingkat C',
+                    ppk_nip: '',
+                    tujuan: '',
+                    tempat: '',
+                    tgl_mulai: '',
+                    tgl_selesai: '',
+                    jam: '',
+                    pejabat_ttd: ''
+                },
+                pesertaList: [], // Array of {nip, nama, pangkat, jabatan, get_spd, plh_nip, plh_nama}
+                
+                // Search States Modal ST
+                sqPegawai: '', dropPegawai: false,
+                sqPPK: '', dropPPK: false,
+                sqTtd: '', dropTtd: false,
+
+                // State Modal Plh
+                isPlhOpen: false,
+                isPlhScaled: false,
+                plhTargetNip: null,
+                sqPlh: '', dropPlh: false,
+                plhNipTerpilih: '',
+
+                // State Modal Setting Default
+                isSettingOpen: false,
+                isSettingScaled: false,
+                formSetting: {
+                    ppk: '', menimbang: '', dasar: '', instansi: '',
+                    mata_anggaran: '', angkutan: '', paragraf_biaya: ''
+                },
+                sqSetPPK: '', dropSetPPK: false
+            };
+        },
+        computed: {
+            plhTargetObj() {
+                if (!this.plhTargetNip) return null;
+                return this.pesertaList.find(p => p.nip === this.plhTargetNip);
+            },
+            // ZETTBOT FIX: 5 Mesin Filter Pencarian Real-Time (Dropdown Autocomplete)
+            filteredPegawai() {
+                if (!this.s.usersList) return [];
+                const q = this.sqPegawai.toLowerCase();
+                return this.s.usersList.filter(u => u.nama.toLowerCase().includes(q) || String(u.nip).includes(q));
+            },
+            filteredPegawaiPPK() {
+                if (!this.s.usersList) return [];
+                const q = this.sqPPK.toLowerCase();
+                return this.s.usersList.filter(u => u.nama.toLowerCase().includes(q));
+            },
+            filteredPegawaiSetPPK() {
+                if (!this.s.usersList) return [];
+                const q = this.sqSetPPK.toLowerCase();
+                return this.s.usersList.filter(u => u.nama.toLowerCase().includes(q));
+            },
+            filteredTtd() {
+                if (!this.s.usersList) return [];
+                const q = this.sqTtd.toLowerCase();
+                return this.s.usersList.filter(u => {
+                    const role = String(u.jabatan).toLowerCase();
+                    const isPimpinan = ["ketua", "wakil ketua", "panitera", "sekretaris"].some(r => role.includes(r));
+                    return isPimpinan && u.nama.toLowerCase().includes(q);
+                });
+            },
+            filteredPlh() {
+                if (!this.s.usersList) return [];
+                const q = this.sqPlh.toLowerCase();
+                // Filter supaya tidak memilih diri sendiri
+                return this.s.usersList.filter(u => u.nip !== this.plhTargetNip && u.nama.toLowerCase().includes(q));
+            }
+        },
+        methods: {
+            // Helper Buka Tutup Dropdown
+            closeDrop(dropName) {
+                setTimeout(() => { this[dropName] = false; }, 200);
+            },
+
+            // ----------------------------------------------------
+            // ZETTBOT FIX: Tombol Enter Eksekusi Hasil Teratas
+            // ----------------------------------------------------
+            handleEnterPegawai() {
+                if (this.dropPegawai && this.filteredPegawai.length > 0 && this.sqPegawai !== '') {
+                    this.addPeserta(this.filteredPegawai[0]);
+                }
+            },
+            handleEnterPPK() {
+                if (this.dropPPK && this.filteredPegawaiPPK.length > 0 && this.sqPPK !== '') {
+                    this.selectPPK(this.filteredPegawaiPPK[0]);
+                }
+            },
+            handleEnterTtd() {
+                if (this.dropTtd && this.filteredTtd.length > 0 && this.sqTtd !== '') {
+                    this.selectTtd(this.filteredTtd[0]);
+                }
+            },
+            handleEnterPlh() {
+                if (this.dropPlh && this.filteredPlh.length > 0 && this.sqPlh !== '') {
+                    this.selectPlh(this.filteredPlh[0]);
+                }
+            },
+            handleEnterSetPPK() {
+                if (this.dropSetPPK && this.filteredPegawaiSetPPK.length > 0 && this.sqSetPPK !== '') {
+                    this.selectSetPPK(this.filteredPegawaiSetPPK[0]);
+                }
+            },
+            
+            // Logika Seleksi Dropdown
+            addPeserta(user) {
+                this.sqPegawai = '';
+                this.dropPegawai = false;
+                if (!this.pesertaList.some(p => p.nip === user.nip)) {
+                    this.pesertaList.push({
+                        nip: user.nip, nama: user.nama, pangkat: user.pangkat || '-', jabatan: user.jabatan,
+                        get_spd: false, plh_nip: "", plh_nama: ""
+                    });
+                }
+            },
+            removePeserta(nip) {
+                this.pesertaList = this.pesertaList.filter(p => p.nip !== nip);
+            },
+            toggleSPD(nip) {
+                const idx = this.pesertaList.findIndex(p => p.nip === nip);
+                if(idx !== -1) this.pesertaList[idx].get_spd = !this.pesertaList[idx].get_spd;
+            },
+            selectPPK(user) {
+                this.sqPPK = user.nama;
+                this.form.ppk_nip = user.nip;
+                this.dropPPK = false;
+            },
+            selectTtd(user) {
+                this.sqTtd = user.nama;
+                this.form.pejabat_ttd = user.nip;
+                this.dropTtd = false;
+            },
+            selectSetPPK(user) {
+                this.sqSetPPK = user.nama;
+                this.formSetting.ppk = user.nip;
+                this.dropSetPPK = false;
+            },
+            selectPlh(user) {
+                this.sqPlh = user.nama;
+                this.plhNipTerpilih = user.nip;
+                this.dropPlh = false;
+            },
+
+            // ===============================================
+            // MODAL 1: FORM SURAT TUGAS
+            // ===============================================
+            openModal(editId = null) {
+                this.currentEditId = editId;
+                
+                // Reset State
+                this.pesertaList = [];
+                this.sqPegawai = ''; this.sqPPK = ''; this.sqTtd = '';
+                
+                if (editId) {
+                    // M O D E   E D I T
+                    const stData = this.s.stList.find(st => String(st.id) === String(editId));
+                    if (!stData) { if(window.showNotify) window.showNotify("Gagal", "Data Surat Tugas tidak ditemukan", "error"); return; }
+                    
+                    let ekstraData = {};
+                    try { ekstraData = JSON.parse(stData.data_ekstra || '{}'); } catch(e) {}
+                    try { this.pesertaList = JSON.parse(stData.peserta || '[]'); } catch(e) {}
+
+                    this.form = {
+                        nomor_surat: stData.nomor || '',
+                        nomor_spd: ekstraData.nomor_spd || '',
+                        nomor_plh: ekstraData.nomor_plh || '',
+                        menimbang: stData.menimbang || '',
+                        dasar: stData.dasar || '',
+                        paragraf_biaya: ekstraData.paragraf_biaya || '',
+                        angkutan: ekstraData.alat_angkut || '',
+                        tempat_tujuan: ekstraData.tempat_tujuan_spd || '',
+                        instansi: ekstraData.instansi || '',
+                        mata_anggaran: ekstraData.mata_anggaran || '',
+                        tingkat_spd: ekstraData.tingkat_spd || 'Tingkat C',
+                        ppk_nip: ekstraData.ppk_nip || '',
+                        tujuan: stData.tujuan || '',
+                        tempat: stData.tempat || '',
+                        tgl_mulai: stData.tgl_mulai || '',
+                        tgl_selesai: stData.tgl_selesai || '',
+                        jam: stData.jam || '',
+                        pejabat_ttd: stData.pejabat_ttd || ''
+                    };
+                    
+                    // Restore Nama di Input Search Edit Mode
+                    if(this.form.ppk_nip && this.s.usersList) {
+                        const uPPK = this.s.usersList.find(x => x.nip === this.form.ppk_nip);
+                        if(uPPK) this.sqPPK = uPPK.nama;
+                    }
+                    if(this.form.pejabat_ttd && this.s.usersList) {
+                        const uTTD = this.s.usersList.find(x => x.nip === this.form.pejabat_ttd);
+                        if(uTTD) this.sqTtd = uTTD.nama;
+                    }
+                } else {
+                    // M O D E   B A R U
+                    this.form = {
+                        nomor_surat: '', nomor_spd: '', nomor_plh: '', menimbang: '', dasar: '', paragraf_biaya: '',
+                        angkutan: '', tempat_tujuan: '', instansi: '', mata_anggaran: '', tingkat_spd: 'Tingkat C',
+                        ppk_nip: '', tujuan: '', tempat: '', tgl_mulai: '', tgl_selesai: '', jam: '', pejabat_ttd: ''
+                    };
+                    this.fetchSettingsST();
+                }
+
+                this.isStOpen = true;
+                setTimeout(() => { this.isStScaled = true; }, 10);
+            },
+            closeModalST() {
+                this.isStScaled = false;
+                setTimeout(() => { this.isStOpen = false; }, 200);
+            },
+            fetchSettingsST() {
+                StDataService.getSettings()
+                    .then((res) => {
+                        if(res && res.status === 'success' && res.data) {
+                            this.form.menimbang = res.data.menimbang || '';
+                            this.form.dasar = res.data.dasar || '';
+                            this.form.instansi = res.data.instansi || '';
+                            this.form.mata_anggaran = res.data.mata_anggaran || '';
+                            this.form.angkutan = res.data.angkutan || '';
+                            this.form.paragraf_biaya = res.data.paragraf_biaya || '';
+                            
+                            if (res.data.ppk) {
+                                this.form.ppk_nip = res.data.ppk;
+                                const ppkUser = this.s.usersList.find(u => u.nip === res.data.ppk);
+                                if (ppkUser) this.sqPPK = ppkUser.nama;
+                            }
+                        }
+                    })
+                    .catch((err) => {
+                        console.warn("[StDataService] Gagal memuat setting default ST:", err);
+                    });
+            },
+            submitST() {
+                if(!this.s.user) { if(window.showNotify) window.showNotify("Sesi Berakhir", "Harap login ulang.", "error"); return; }
+                
+                if (this.pesertaList.length === 0) {
+                    if(window.showNotify) window.showNotify("Validasi Gagal", "Pilih minimal 1 (satu) pegawai yang ditugaskan!", "error"); return;
+                }
+                if (!this.form.pejabat_ttd) {
+                    if(window.showNotify) window.showNotify("Validasi Gagal", "Anda belum memilih Pimpinan Penandatangan ST.", "error"); return;
+                }
+
+                let ppkNamaTarget = "";
+                if (this.form.ppk_nip) {
+                    const uPPK = this.s.usersList.find(x => x.nip === this.form.ppk_nip);
+                    if(uPPK) ppkNamaTarget = uPPK.nama;
+                }
+
+                const ekstraData = {
+                    nomor_spd: this.form.nomor_spd, nomor_plh: this.form.nomor_plh,
+                    ppk_nip: this.form.ppk_nip, ppk_nama: ppkNamaTarget,
+                    alat_angkut: this.form.angkutan, tempat_tujuan_spd: this.form.tempat_tujuan,
+                    instansi: this.form.instansi, mata_anggaran: this.form.mata_anggaran,
+                    tingkat_spd: this.form.tingkat_spd, paragraf_biaya: this.form.paragraf_biaya
+                };
+
+                const payload = {
+                    id_st: this.currentEditId,
+                    nomor_surat: this.form.nomor_surat,
+                    menimbang: this.form.menimbang,
+                    dasar: this.form.dasar,
+                    tujuan: this.form.tujuan,
+                    tempat: this.form.tempat,
+                    tgl_mulai: this.form.tgl_mulai,
+                    tgl_selesai: this.form.tgl_selesai,
+                    jam: this.form.jam,
+                    pejabat_ttd: this.form.pejabat_ttd,
+                    peserta_json: JSON.stringify(this.pesertaList), 
+                    data_ekstra_json: JSON.stringify(ekstraData) 
+                };
+
+                const token = localStorage.getItem('transkep_session_token'); 
+                if(window.showLoading) window.showLoading(this.currentEditId ? "Memperbarui Surat Tugas..." : "Menerbitkan Dokumen Terpadu...");
+                
+                const actionPromise = this.currentEditId
+                    ? StDataService.updateSuratTugas(payload, this.s.user.nip, token)
+                    : StDataService.addSuratTugas(payload, this.s.user.nip, token);
+
+                actionPromise
+                    .then((res) => {
+                        if(window.hideLoading) window.hideLoading();
+                        if (res.status === 'success') { 
+                            this.closeModalST(); 
+                            if(window.showNotify) window.showNotify("Berhasil", this.currentEditId ? res.message : "ST, SPD, dan Plh diterbitkan.", "success"); 
+                            if (typeof window.syncAllServerData === 'function') window.syncAllServerData(); 
+                        } else { 
+                            if(window.showNotify) window.showNotify("Gagal", res.message, "error"); 
+                        }
+                    })
+                    .catch((err) => { 
+                        if(window.hideLoading) window.hideLoading(); 
+                        if(window.showNotify) window.showNotify("Error Koneksi", err.toString(), "error"); 
+                    });
+            },
+
+            // ===============================================
+            // MODAL 2: PLH
+            // ===============================================
+            openSetPlh(nip) {
+                const p = this.pesertaList.find(x => x.nip === nip);
+                if(!p) return;
+
+                this.plhTargetNip = nip;
+                this.sqPlh = ''; this.plhNipTerpilih = '';
+
+                if(p.plh_nip) {
+                    this.plhNipTerpilih = p.plh_nip;
+                    this.sqPlh = p.plh_nama;
+                }
+
+                this.isPlhOpen = true;
+                setTimeout(() => { this.isPlhScaled = true; }, 10);
+            },
+            closeSetPlh() {
+                this.isPlhScaled = false;
+                setTimeout(() => { this.isPlhOpen = false; }, 200);
+            },
+            simpanPlhAssignment() {
+                if(!this.plhNipTerpilih) { if(window.showNotify) window.showNotify("Pilih Pejabat", "Silakan pilih nama pejabat pengganti.", "warning"); return; }
+                const idx = this.pesertaList.findIndex(p => p.nip === this.plhTargetNip);
+                if(idx !== -1) {
+                    const uPlh = this.s.usersList.find(x => x.nip === this.plhNipTerpilih);
+                    this.pesertaList[idx].plh_nip = this.plhNipTerpilih;
+                    this.pesertaList[idx].plh_nama = uPlh ? uPlh.nama : '';
+                    this.closeSetPlh();
+                }
+            },
+            hapusPlhAssignment() {
+                const idx = this.pesertaList.findIndex(p => p.nip === this.plhTargetNip);
+                if(idx !== -1) {
+                    this.pesertaList[idx].plh_nip = "";
+                    this.pesertaList[idx].plh_nama = "";
+                    this.closeSetPlh();
+                }
+            },
+
+            // ===============================================
+            // MODAL 3: PENGATURAN DASAR
+            // ===============================================
+            openSetting() {
+                this.sqSetPPK = this.sqPPK;
+                this.formSetting = {
+                    ppk: this.form.ppk_nip,
+                    menimbang: this.form.menimbang,
+                    dasar: this.form.dasar,
+                    instansi: this.form.instansi,
+                    mata_anggaran: this.form.mata_anggaran,
+                    angkutan: this.form.angkutan,
+                    paragraf_biaya: this.form.paragraf_biaya
+                };
+                
+                this.isSettingOpen = true;
+                setTimeout(() => { this.isSettingScaled = true; }, 10);
+            },
+            closeSetting() {
+                this.isSettingScaled = false;
+                setTimeout(() => { this.isSettingOpen = false; }, 200);
+            },
+            saveSetting() {
+                if(!this.s.user) return;
+                const token = localStorage.getItem('transkep_session_token');
+                if(window.showNotify) window.showNotify("Menyimpan...", "Menyimpan pengaturan dasar...", "success");
+                
+                StDataService.saveSettings(this.formSetting, this.s.user.nip, token)
+                    .then((res) => {
+                        if(res.status === 'success') {
+                            this.sqPPK = this.sqSetPPK;
+                            this.form.ppk_nip = this.formSetting.ppk;
+                            this.form.menimbang = this.formSetting.menimbang;
+                            this.form.dasar = this.formSetting.dasar;
+                            this.form.instansi = this.formSetting.instansi;
+                            this.form.mata_anggaran = this.formSetting.mata_anggaran;
+                            this.form.angkutan = this.formSetting.angkutan;
+                            this.form.paragraf_biaya = this.formSetting.paragraf_biaya;
+                            
+                            this.closeSetting();
+                            if(window.showNotify) window.showNotify("Tersimpan", res.message, "success");
+                        } else {
+                            if(window.showNotify) window.showNotify("Gagal", res.message, "error");
+                        }
+                    })
+                    .catch((err) => { 
+                        if(window.showNotify) window.showNotify("Error", err.toString(), "error"); 
+                    });
+            }
+        }
+    }).mount('#vue-form-st-wrapper');
+
+    // ---------------------------------------------------------
+    // BRIDGING KE TOMBOL VANILLA HTML (Bypass Integrasi Global)
+    // ---------------------------------------------------------
+    window.openModalST = function() {
+        if (window.vmFormST) window.vmFormST.openModal(null);
+    };
+    
+    window.editST = function(id) {
+        if (window.vmFormST) window.vmFormST.openModal(id);
+    };
+});
+
+// Logika Cetak ST, SPD, Plh dipisahkan ke js/cetak/cetak_st.js, js/cetak/cetak_spd.js, js/cetak/cetak_plh.js

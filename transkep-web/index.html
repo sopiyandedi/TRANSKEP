@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>TRANSKEP - Transparansi Kepegawaian PA Indramayu</title>
+  
+  <!-- PWA & Mobile Web App Meta Tags -->
+  <meta name="description" content="TRANSKEP - Sistem Informasi Manajemen & Transparansi Kepegawaian Pengadilan Agama Indramayu">
+  <meta name="theme-color" content="#4f46e5">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="application-name" content="TRANSKEP">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="TRANSKEP">
+  
+  <!-- Favicon & PWA Icons -->
+  <link rel="icon" type="image/png" href="img/logo.png">
+  <link rel="apple-touch-icon" href="img/logo.png">
+  <link rel="manifest" href="manifest.json">
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Vue.js 3 Global CDN -->
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  
+  <!-- SheetJS (Excel Importer/Exporter) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  
+  <!-- Google Fonts: Plus Jakarta Sans -->
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  
+  <!-- FontAwesome 6 -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  
+  <!-- Modular Stylesheets (100% Identik dengan TRANSKEP Asli) -->
+  <link rel="stylesheet" href="css/stylesheet.css">
+  <link rel="stylesheet" href="css/mobile.css">
+  <link rel="stylesheet" href="css/animations.css">
+  <link rel="stylesheet" href="css/custom.css">
+</head>
+
+<body class="bg-slate-950 text-slate-200 min-h-screen overflow-hidden flex selection:bg-indigo-500/30">
+  
+  <!-- ZETTBOT FIX: Script Eksekusi Instan Anti-Kedip (Anti-FOUC) -->
+  <script>
+    document.body.classList.add('preload-theme');
+    if (localStorage.getItem('transkep_theme') === 'light') {
+        document.body.classList.add('light-mode');
+    }
+    setTimeout(function() {
+        document.body.classList.remove('preload-theme');
+    }, 300);
+  </script>
+
+  <!-- Glowing Background Orbs -->
+  <div class="fixed top-[-10%] left-[-10%] w-96 h-96 bg-indigo-600/20 rounded-full blur-[120px] pointer-events-none -z-10"></div>
+  <div class="fixed bottom-[-10%] right-[-10%] w-96 h-96 bg-emerald-600/10 rounded-full blur-[120px] pointer-events-none -z-10"></div>
+
+  <!-- KANVAS BACKGROUND ANIMASI PARTIKEL JARINGAN -->
+  <canvas id="loginParticleCanvas" style="z-index: -10 !important;" class="fixed inset-0 w-full h-full pointer-events-none opacity-40"></canvas>
+
+  <!-- ========================================================= -->
+  <!-- 1. SLOT LOGIN SECTION & RESET PASSWORD                   -->
+  <!-- ========================================================= -->
+  <div id="slot-login"></div>
+
+  <!-- ========================================================= -->
+  <!-- 2. MAIN APP SHELL                                         -->
+  <!-- ========================================================= -->
+  <div id="app-container" class="w-full h-screen flex hidden">
+     
+     <!-- SLOT SIDEBAR & OVERLAY -->
+     <div id="slot-sidebar"></div>
+
+     <!-- Main Content Area -->
+     <main id="main-content" class="flex-1 h-full relative overflow-hidden bg-slate-950 flex flex-col">
+        <!-- Global Loader -->
+        <div id="global-loader" class="absolute inset-0 z-[90] bg-slate-950/80 backdrop-blur-sm flex flex-col items-center justify-center hidden">
+           <i class="fa-solid fa-circle-notch fa-spin text-indigo-500 text-4xl mb-4"></i>
+           <span class="text-slate-300 font-medium tracking-wide">Memuat...</span>
+        </div>
+
+        <!-- View Container -->
+        <div id="view-container" class="flex-1 overflow-y-auto p-4 md:p-8 relative w-full transition-all duration-300 custom-scrollbar">
+           <div id="slot-dashboard"></div>
+           <div id="slot-permohonan"></div>
+           <div id="slot-pkp"></div>
+           <div id="slot-jobdes"></div>
+           <div id="slot-sk"></div>
+           <div id="slot-sop"></div>
+           <div id="slot-kinerja"></div>
+           <div id="slot-eoffice"></div>
+           <div id="slot-pegawai"></div>
+           <div id="slot-modals-izin"></div>
+           <div id="slot-pdf-viewer"></div>
+           <div id="slot-referensi"></div>
+           <div id="slot-templates-cetak"></div>
+           <div id="slot-mobile-nav"></div>
+        </div>
+     </main>
+  </div>
+
+  <!-- ========================================================= -->
+  <!-- 3. SLOT GLOBAL MODALS (VUE ENGINE)                        -->
+  <!-- ========================================================= -->
+  <div id="slot-global-modals"></div>
+
+  <!-- ========================================================= -->
+  <!-- 4. ZETTBOT MODULAR COMPONENT & SCRIPT LOADER             -->
+  <!-- ========================================================= -->
+  <script>
+    (async function initModularTranskep() {
+      const VIEW_SLOTS = [
+        { slot: 'slot-login', file: 'core/view_login.html' },
+        { slot: 'slot-sidebar', file: 'core/view_sidebar.html' },
+        { slot: 'slot-dashboard', file: 'modules/dashboard/view_dashboard.html' },
+        { slot: 'slot-permohonan', file: 'modules/permohonan/view_permohonan.html' },
+        { slot: 'slot-pkp', file: 'modules/pkp/view_pkp.html' },
+        { slot: 'slot-jobdes', file: 'modules/jobdes/view_jobdes.html' },
+        { slot: 'slot-sk', file: 'modules/sk/view_sk.html' },
+        { slot: 'slot-sop', file: 'modules/sop/view_sop.html' },
+        { slot: 'slot-kinerja', file: 'modules/kinerja/view_kinerja.html' },
+        { slot: 'slot-eoffice', file: 'modules/eoffice/view_eoffice.html' },
+        { slot: 'slot-pegawai', file: 'modules/pegawai/view_pegawai.html' },
+        { slot: 'slot-modals-izin', file: 'modules/permohonan/view_modals_izin.html' },
+        { slot: 'slot-pdf-viewer', file: 'modules/pdf_viewer/view_pdf_viewer.html' },
+        { slot: 'slot-referensi', file: 'modules/referensi/view_referensi.html' },
+        { slot: 'slot-mobile-nav', file: 'core/view_mobile_nav.html' },
+        { slot: 'slot-global-modals', file: 'core/view_global_modals.html' }
+      ];
+
+      const CETAK_TEMPLATES = [
+        'modules/permohonan/cetak/cetak_cuti.html',
+        'modules/permohonan/cetak/cetak_st.html',
+        'modules/permohonan/cetak/cetak_spd.html',
+        'modules/permohonan/cetak/cetak_plh.html',
+        'modules/jobdes/cetak/cetak_jobdes.html',
+        'modules/pkp/cetak/cetak_pk.html',
+        'modules/pkp/cetak/cetak_pck.html',
+        'modules/pkp/cetak/cetak_rekap_pkp.html',
+        'modules/permohonan/cetak/cetak_ip.html',
+        'modules/permohonan/cetak/cetak_ik.html',
+        'modules/permohonan/cetak/cetak_wfh_rencana.html',
+        'modules/permohonan/cetak/cetak_wfh_laporan.html'
+      ];
+
+      const SCRIPTS = [
+        'core/api.js',
+        'core/particles.js',
+        'core/sidebar.js',
+        'core/login.js',
+        'core/core.js',
+        'modules/dashboard/dashboard_data.js',
+        'modules/dashboard/dashboard.js',
+        'modules/dashboard/dashboard_grafik.js',
+        'modules/permohonan/cuti_data.js',
+        'modules/permohonan/cuti.js',
+        'modules/permohonan/st_data.js',
+        'modules/permohonan/st.js',
+        'modules/permohonan/persetujuan_data.js',
+        'modules/permohonan/persetujuan.js',
+        'modules/permohonan/rekapitulasi_data.js',
+        'modules/permohonan/rekapitulasi.js',
+        'modules/permohonan/izin_data.js',
+        'modules/permohonan/ip.js',
+        'modules/permohonan/ik.js',
+        'modules/permohonan/wfh.js',
+        'modules/pkp/pkp_data.js',
+        'modules/pkp/pkp.js',
+        'modules/jobdes/jobdes_data.js',
+        'modules/jobdes/jobdes.js',
+        'modules/sk/sk_data.js',
+        'modules/sk/sk.js',
+        'modules/sop/sop_data.js',
+        'modules/sop/sop.js',
+        'modules/pdf_viewer/pdf_viewer.js',
+        'modules/kinerja/kinerja_data.js',
+        'modules/kinerja/kinerja.js',
+        'modules/eoffice/eoffice_data.js',
+        'modules/eoffice/eoffice.js',
+        'modules/eoffice/kgb.js',
+        'modules/eoffice/rapat.js',
+        'modules/pegawai/pegawai_data.js',
+        'modules/pegawai/pegawai.js',
+        'modules/referensi/referensi.js'
+      ];
+
+      const CETAK_SCRIPTS = [
+        'modules/permohonan/cetak/cetak_cuti.js',
+        'modules/permohonan/cetak/cetak_st.js',
+        'modules/permohonan/cetak/cetak_spd.js',
+        'modules/permohonan/cetak/cetak_plh.js',
+        'modules/jobdes/cetak/cetak_jobdes.js',
+        'modules/pkp/cetak/cetak_pk.js',
+        'modules/pkp/cetak/cetak_pck.js',
+        'modules/pkp/cetak/cetak_rekap_pkp.js',
+        'modules/permohonan/cetak/cetak_ip.js',
+        'modules/permohonan/cetak/cetak_ik.js',
+        'modules/permohonan/cetak/cetak_wfh_rencana.js',
+        'modules/permohonan/cetak/cetak_wfh_laporan.js'
+      ];
+
+      try {
+        console.log('🔄 [ZettBOT Loader] Memuat komponen tampilan views/ secara paralel...');
+        await Promise.all(VIEW_SLOTS.map(async item => {
+          const res = await fetch(item.file);
+          if (!res.ok) throw new Error(`HTTP ${res.status} saat memuat ${item.file}`);
+          const html = await res.text();
+          const el = document.getElementById(item.slot);
+          if (el) el.outerHTML = html;
+        }));
+
+        console.log('🔄 [ZettBOT Loader] Memuat 12 template cetak views/cetak/ secara paralel...');
+        const cetakSlot = document.getElementById('slot-templates-cetak');
+        if (cetakSlot) {
+          const cetakHtmls = await Promise.all(CETAK_TEMPLATES.map(async file => {
+            const res = await fetch(file);
+            if (!res.ok) throw new Error(`HTTP ${res.status} saat memuat ${file}`);
+            return await res.text();
+          }));
+          cetakSlot.outerHTML = cetakHtmls.join('\n');
+        }
+        console.log('✅ [ZettBOT Loader] Seluruh 16 komponen views/ & 12 template cetak sukses dimuat ke DOM.');
+
+        console.log('🔄 [ZettBOT Loader] Memuat modular JavaScript controller & cetak handlers...');
+        for (const src of [...SCRIPTS, ...CETAK_SCRIPTS]) {
+          await new Promise((resolve, reject) => {
+            const s = document.createElement('script');
+            s.src = src;
+            s.onload = resolve;
+            s.onerror = (e) => {
+              console.error(`Gagal memuat script: ${src}`, e);
+              resolve(); // Lanjutkan agar proses tidak terhenti
+            };
+            document.body.appendChild(s);
+          });
+        }
+        console.log('✅ [ZettBOT Loader] Seluruh script controller & print handlers aktif.');
+
+        // Picu event DOMContentLoaded dan load buatan agar seluruh modul menginisialisasi Vue
+        console.log('🚀 [ZETTBOT] Menginisialisasi event DOMContentLoaded aplikasi...');
+        document.dispatchEvent(new Event('DOMContentLoaded'));
+        window.dispatchEvent(new Event('load'));
+
+        // PWA Service Worker Registration
+        if ('serviceWorker' in navigator && (window.location.protocol === 'https:' || window.location.protocol === 'http:')) {
+          navigator.serviceWorker.register('./sw.js')
+            .then(reg => console.log('📱 ZETTBOT PWA: Service Worker terdaftar (Scope:', reg.scope, ')'))
+            .catch(err => console.warn('⚠️ ZETTBOT PWA: Registrasi Service Worker gagal:', err));
+        }
+
+      } catch (err) {
+        console.error('❌ [ZettBOT Loader] Terjadi kesalahan inisialisasi:', err);
+      }
+    })();
+  </script>
+
+</body>
+</html>

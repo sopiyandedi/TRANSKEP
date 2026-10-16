@@ -1,0 +1,396 @@
+<!-- VIEW COMPONENT: permohonan/st/template_cetak_st.html -->
+<!-- ==========================================
+     FILE: template_cetak_st.html (Template Kertas ST)
+     ========================================== -->
+<div id="template-cetak-st-container" style="display: none;" class="hidden no-print">
+  <style>
+    @media print {
+      @page { 
+          size: A4 portrait; 
+          margin: 0; 
+      }
+      html, body { 
+          background-color: white !important; 
+          color: black !important; 
+          font-family: 'Bookman Old Style', serif; 
+          font-size: 11pt; 
+          line-height: 1.15; 
+          margin: 0 !important;
+          padding: 0 !important;
+      }
+      .no-print { display: none !important; }
+    }
+    
+    .st-wrapper { 
+        width: 100%; 
+        max-width: 210mm;
+        margin: 0 auto; 
+        padding: 10mm 15mm 10mm 20mm; 
+        box-sizing: border-box; 
+        font-family: 'Bookman Old Style', serif; 
+        font-size: 11pt; 
+        color: black; 
+        line-height: 1.15; 
+    }
+    
+    /* =========================================================================
+       ZONA STATIS (KOTAK KUNING) - KOP & JUDUL
+       Berlaku sama untuk 1 orang, 2 orang, atau lebih. Dikunci rapat di sini.
+       ========================================================================= */
+
+    .st-kop-container { 
+        display: flex; align-items: center; 
+        
+        /* ⬇️ TAG B: JARAK BARIS KATA TELEPON DENGAN GARIS KOP SURAT ⬇️ */
+        padding-bottom: 5px; 
+        
+        border-bottom: 2px solid black; 
+        
+        /* ⬇️ TAG C: JARAK GARIS KOP SURAT DENGAN KATA "SURAT TUGAS" ⬇️ */
+        margin-bottom: 45px; 
+    }
+    .st-kop-logo { width: 90px; height: auto; flex-shrink: 0; }
+    .st-kop-text { flex-grow: 1; text-align: center; padding-right: 30px; }
+    
+    .st-kop-text h3, .st-kop-text h2 { 
+        margin: 0; font-size: 14pt; font-weight: bold; text-transform: uppercase; line-height: 1.15; 
+    }
+    
+    .st-kop-text p { 
+        /* ⬇️ TAG A: JARAK KATA "PENGADILAN AGAMA..." DENGAN "JALAN M.T. HARYONO..." ⬇️ */
+        margin: 2px 0 0 0; 
+        font-size: 8pt; 
+    }
+    
+    .st-title { 
+        text-align: center; 
+        
+        /* ⬇️ TAG E: JARAK NOMOR SURAT DENGAN "KETUA PENGADILAN AGAMA..." ⬇️ */
+        margin-bottom: 40px;
+    } 
+    
+    .st-title h4 { 
+        /* ⬇️ TAG D: KETEBALAN GARIS BAWAH "SURAT TUGAS" ⬇️ */
+        border-bottom: 2px solid black; 
+        display: inline-block;
+        margin: 0; 
+        padding-bottom: 1px; 
+        font-size: 22pt; 
+        font-weight: bold; 
+        letter-spacing: 5px; 
+        line-height: 1; 
+    }
+    
+    .st-title p { 
+        /* ⬇️ TAG C (Sub): JARAK GARIS BAWAH SURAT TUGAS DENGAN NOMOR SURAT ⬇️ */
+        margin: 2px 0 0 0; 
+        font-size: 9pt; 
+    }
+    
+    .st-sub-title {
+        text-align: center; font-weight: bold; font-size: 11pt; text-transform: uppercase; 
+        
+        /* ⬇️ TAG F: JARAK KATA "KETUA PENGADILAN AGAMA..." DENGAN KATA "MENIMBANG" ⬇️ */
+        margin-bottom: 5px; 
+    }
+
+    /* =========================================================================
+       ZONA DINAMIS (KOTAK UNGU) - ISI SURAT & TANDA TANGAN
+       ========================================================================= */
+
+    .st-content-table { width: 100%; border: none; margin-bottom: 0px; font-size: 11pt; border-spacing: 0; }
+    .st-content-table td { vertical-align: top; padding: 3px 0; } 
+    
+    .col-label { width: 15%; font-weight: normal; } 
+    .col-colon { width: 3%; text-align: center; }
+    .col-value { width: 82%; text-align: justify; }
+
+    .st-memberi-tugas { text-align: center; font-weight: bold; font-size: 11pt; }
+    .peserta-item { margin-bottom: 3px; } 
+    .peserta-table { width: 100%; border: none; font-size: 11pt; border-spacing: 0; }
+    .peserta-table td { padding: 0; vertical-align: top; } 
+    
+    /* =========================================================================
+       ZONA DINAMIS (KOTAK UNGU)
+       ========================================================================= */
+
+    .st-content-table { width: 100%; border: none; margin-bottom: 0px; font-size: 11pt; border-spacing: 0; }
+    .st-content-table td { vertical-align: top; padding: 3px 0; } 
+    
+    .col-label { width: 15%; font-weight: normal; } 
+    .col-colon { width: 3%; text-align: center; }
+    .col-value { width: 82%; text-align: justify; }
+
+    .st-memberi-tugas { text-align: center; font-weight: bold; font-size: 11pt; }
+    .peserta-item { margin-bottom: 3px; } 
+    .peserta-table { width: 100%; border: none; font-size: 11pt; border-spacing: 0; }
+    .peserta-table td { padding: 0; vertical-align: top; } 
+    
+    /* -------------------------------------------------------------------------
+       ZETTBOT FIX: PUSAT KENDALI SPACING ZONA UNGU
+       ------------------------------------------------------------------------- */
+       
+    /* === START TAG KHUSUS ST 1 ORANG === */
+    /* 1. Jarak antar baris utama (ZETTBOT FIX: Dikurangi jadi 10px agar tdk over page) */
+    .st-layout-single .st-content-table > tbody > tr > td { padding: 10px 0; } 
+    
+    /* 2. Jarak antar baris data pegawai */
+    .st-layout-single .peserta-table td { padding: 4px 0; margin-bottom: 5px} 
+    
+    /* 3. Jarak atas & bawah teks "Memberi Tugas" */
+    .st-layout-single .st-memberi-tugas { margin-top: 10px; margin-bottom: 10px; }
+    
+    /* 4. Jarak Paragraf Penutup (Anggaran & Tanggung Jawab) */
+    .st-layout-single > p { margin-top: 15px !important; margin-bottom: 10px !important; line-height: 1.3; }
+    
+    /* 5. Dorongan Tanda Tangan ke bawah kertas (ZETTBOT FIX: Dikurangi jadi 30px) */
+    .st-layout-single .st-ttd-container { margin-top: 30px; }
+
+    /* 6. MENGGESER KOLOM HARI/TANGGAL KE KIRI KHUSUS 1 ORANG */
+    .st-layout-single .tabel-untuk .p-col-num { display: none; }
+
+    /* 7. PADING KHUSUS MENIMBANG & DASAR */
+    /* Menambahkan jarak bagian Bawah (bottom) ekstra pada baris tertentu */
+    .st-layout-single .baris-menimbang td { padding-bottom: 10px; }
+    .st-layout-single .baris-dasar td { padding-bottom: 10px; }
+
+    /* 8. SPASI DALAM PARAGRAF (MENIMBANG, DASAR, UNTUK) */
+    /* line-height = jarak spasi antar baris kalimat; padding-bottom = jarak antar poin/nomor */
+    .st-layout-single .baris-menimbang .col-value table td,
+    .st-layout-single .baris-dasar .col-value table td {
+        line-height: 1.4; 
+        padding-bottom: 2px !important; 
+    }
+    .st-layout-single .baris-untuk .col-value > div:first-child {
+        line-height: 1.4;
+        padding-bottom: 2px; 
+    }
+
+    /* 9. MENGURANGI JARAK ANTARA KEPADA DAN UNTUK */
+    .st-layout-single .baris-kepada td { padding-bottom: 0px !important; }
+    .st-layout-single .baris-untuk td { padding-top: 5px !important; }
+    
+    /* === END TAG KHUSUS ST 1 ORANG === */
+
+
+    /* === START TAG KHUSUS ST 2 ORANG === */
+    /* Nilai margin/padding dibuat lebih rapat dibandingkan 1 Orang agar muat 1 lembar A4 */
+    
+    /* 1. Jarak antar baris utama (Menimbang, Dasar, Kepada, Untuk) */
+    .st-layout-double .st-content-table > tbody > tr > td { padding: 6px 0; } 
+    
+    /* 2. Jarak antar baris data pegawai */
+    .st-layout-double .peserta-table td { padding: 2px 0; } 
+    
+    /* 3. Jarak atas & bawah teks "Memberi Tugas" */
+    .st-layout-double .st-memberi-tugas { margin-top: 10px; margin-bottom: 10px; }
+    
+    /* 4. Jarak Paragraf Penutup (Anggaran & Tanggung Jawab) */
+    .st-layout-double > p { margin-top: 8px !important; margin-bottom: 10px !important; line-height: 1.25; }
+    
+    /* 5. Dorongan Tanda Tangan ke bawah kertas */
+    .st-layout-double .st-ttd-container { margin-top: 25px; }
+
+    /* 6. PADING KHUSUS MENIMBANG & DASAR */
+    .st-layout-double .baris-menimbang td { padding-bottom: 8px; }
+    .st-layout-double .baris-dasar td { padding-bottom: 8px; }
+
+    /* 7. SPASI DALAM PARAGRAF (MENIMBANG, DASAR, UNTUK) */
+    .st-layout-double .baris-menimbang .col-value table td,
+    .st-layout-double .baris-dasar .col-value table td {
+        line-height: 1.3; 
+        padding-bottom: 4px !important; 
+    }
+    
+    .st-layout-double .baris-untuk .col-value > div:first-child {
+        line-height: 1.3;
+        padding-bottom: 4px; 
+    }
+
+    /* 8. MENGURANGI JARAK ANTARA KEPADA DAN UNTUK */
+    .st-layout-double .baris-kepada td { padding-bottom: 0px !important; }
+    .st-layout-double .baris-untuk td { padding-top: 3px !important; }
+    /* === END TAG KHUSUS ST 2 ORANG === */
+
+
+
+    /* === START TAG KHUSUS ST 3 ORANG (Normal Layout) === */
+    /* Spacing sangat dirapatkan agar muat 3 orang + Tanda Tangan di 1 Lembar A4 */
+    
+    /* 1. Jarak antar baris utama (Menimbang, Dasar, Kepada, Untuk) */
+    .st-layout-normal .st-content-table > tbody > tr > td { padding: 3px 0; } 
+    
+    /* 2. Jarak antar baris data pegawai */
+    .st-layout-normal .peserta-table td { padding: 0.5px 0; } 
+    
+    /* 3. Jarak atas & bawah teks "Memberi Tugas" */
+    .st-layout-normal .st-memberi-tugas { margin-top: 5px; margin-bottom: 5px; }
+    
+    /* 4. Jarak Paragraf Penutup (Anggaran & Tanggung Jawab) */
+    .st-layout-normal > p { margin-top: 3px !important; margin-bottom: 3px !important; line-height: 1.2; }
+    
+    /* 5. Dorongan Tanda Tangan ke bawah kertas */
+    .st-layout-normal .st-ttd-container { margin-top: 15px; }
+
+    /* 6. PADING KHUSUS MENIMBANG & DASAR */
+    .st-layout-normal .baris-menimbang td { padding-bottom: 3px; }
+    .st-layout-normal .baris-dasar td { padding-bottom: 3px; }
+
+    /* 7. SPASI DALAM PARAGRAF (MENIMBANG, DASAR, UNTUK) */
+    .st-layout-normal .baris-menimbang .col-value table td,
+    .st-layout-normal .baris-dasar .col-value table td {
+        line-height: 1.2; 
+        padding-bottom: 2px !important; 
+    }
+    
+    .st-layout-normal .baris-untuk .col-value > div:first-child {
+        line-height: 1.2;
+        padding-bottom: 2px; 
+    }
+
+    /* 8. MENGURANGI JARAK ANTARA KEPADA DAN UNTUK */
+    .st-layout-normal .baris-kepada td { padding-bottom: 1px !important; }
+    .st-layout-normal .baris-untuk td { padding-top: 1px !important; }
+    /* === END TAG KHUSUS ST 3 ORANG === */
+
+
+ /* === START TAG KHUSUS ST 4 ORANG ATAU LEBIH (Multi Layout / 2 Halaman) === */
+    /* ZETTBOT FIX: Menggabungkan ide padding 3 orang + Penurunan Font Size 1pt */
+    
+    /* 1. MANTRA SIHIR: Mengecilkan font area isi agar muat banyak */
+    .st-layout-multi .st-content-table { font-size: 10pt; } 
+    .st-layout-multi .peserta-table { font-size: 10pt; }
+    .st-layout-multi .tabel-untuk { font-size: 10pt; }
+    .st-layout-multi .st-memberi-tugas { font-size: 10.5pt; margin-top: 5px; margin-bottom: 5px; }
+
+    /* 2. Pading dikunci rapat seperti layout 4 orang */
+    .st-layout-multi .st-content-table td { padding: 3px 0; } 
+    .st-layout-multi .peserta-table td { padding: 1px 0; } 
+    
+    .st-layout-multi .baris-menimbang td { padding-bottom: 3px; }
+    .st-layout-multi .baris-dasar td { padding-bottom: 3px; }
+    .st-layout-multi .baris-menimbang .col-value table td,
+    .st-layout-multi .baris-dasar .col-value table td { line-height: 1.2; padding-bottom: 2px !important; font-size: 10pt;}
+    .st-layout-multi .baris-untuk .col-value > div:first-child { line-height: 1.2; padding-bottom: 2px; }
+    
+    .st-layout-multi .baris-kepada td { padding-bottom: 0px !important; }
+    .st-layout-multi .baris-untuk td { padding-top: 0px !important; }
+    
+    /* 3. INI KUNCI UTAMANYA: Memaksa area Footer melompat ke Hal 2 */
+    .st-layout-multi .st-footer-section { 
+        page-break-before: always; 
+        padding-top: 20px; 
+    }
+    
+    /* Font di Hal 2 (Anggaran & TTD) dikembalikan ke 11pt agar tetap elegan */
+    .st-layout-multi .st-footer-section > p { margin-top: 15px !important; margin-bottom: 10px !important; line-height: 1.3; font-size: 11pt; }
+    .st-layout-multi .st-ttd-container { margin-top: 30px; font-size: 11pt; }
+    /* === END TAG KHUSUS ST 4 ORANG === */
+
+
+    .p-col-num { width: 5%; }
+    .p-col-label { width: 25%; }
+    .p-col-colon { width: 3%; text-align: center; }
+    .p-col-value { width: 67%; }
+  </style>
+
+  <div class="st-wrapper {{layout_class}}">
+    
+    <!-- ZONA STATIS (KOTAK KUNING) -->
+    <div class="st-kop-container">
+      <img src="https://drive.google.com/thumbnail?id=1_Qbv_fdPOa2YEQAXXkvRxXevsd_4u1jZ&sz=w500" class="st-kop-logo" alt="Logo">
+      <div class="st-kop-text">
+        <h3>MAHKAMAH AGUNG REPUBLIK INDONESIA</h3>
+        <h3>DIREKTORAT JENDERAL BADAN PERADILAN AGAMA</h3>
+        <h3>PENGADILAN TINGGI AGAMA BANDUNG</h3>
+        <h2>PENGADILAN AGAMA INDRAMAYU</h2>
+        <p>Jalan M.T. Haryono No.2A Kel. Sindang Kec. Sindang Kab. Indramayu Kode Pos 45222<br>
+        Telepon (0234) 273880 | Situs: <a href="https://www.pa-indramayu.go.id" style="color: blue; text-decoration: none;">www.pa-indramayu.go.id</a> | e-mail: <a href="mailto:pa.indramayu_ptabdg@yahoo.co.id" style="color: blue; text-decoration: none;">pa.indramayu_ptabdg@yahoo.co.id</a></p>
+      </div>
+    </div>
+    <div class="st-title">
+      <h4>SURAT TUGAS</h4>
+      <p>Nomor : {{nomor_surat}}</p>
+    </div>
+    <div class="st-sub-title">
+      {{jabatan_kop}}
+    </div>
+    <!-- END ZONA STATIS -->
+
+    <!-- ZONA DINAMIS (KOTAK UNGU) -->
+    <table class="st-content-table">
+      <tr class="baris-menimbang">
+        <td class="col-label">Menimbang</td>
+        <td class="col-colon">:</td>
+        <td class="col-value">{{menimbang}}</td>
+      </tr>
+      <tr class="baris-dasar">
+        <td class="col-label">Dasar</td>
+        <td class="col-colon">:</td>
+        <td class="col-value">{{dasar}}</td>
+      </tr>
+    </table>
+
+    <div class="st-memberi-tugas">Memberi Tugas</div>
+
+    <table class="st-content-table">
+      <tr class="baris-kepada">
+        <td class="col-label">Kepada</td>
+        <td class="col-colon">:</td>
+        <td class="col-value">
+           {{baris_peserta_html}}
+        </td>
+      </tr>
+      <tr class="baris-untuk">
+        <td class="col-label">Untuk</td>
+        <td class="col-colon">:</td>
+        <td class="col-value">
+            <div style="text-align: justify;">{{tujuan}}, pada:</div>
+            <table class="tabel-untuk" style="width: 100%; font-size: 11pt; border: none; border-spacing: 0;">
+                <tr>
+                    <td class="p-col-num"></td>
+                    <td class="p-col-label">Hari</td>
+                    <td class="p-col-colon">:</td>
+                    <td class="p-col-value">{{hari_kegiatan}}</td>
+                </tr>
+                <tr>
+                    <td class="p-col-num"></td>
+                    <td class="p-col-label">Tanggal</td>
+                    <td class="p-col-colon">:</td>
+                    <td class="p-col-value">{{tanggal_kegiatan}}</td>
+                </tr>
+                <tr>
+                    <td class="p-col-num"></td>
+                    <td class="p-col-label">Pukul</td>
+                    <td class="p-col-colon">:</td>
+                    <td class="p-col-value">{{jam}}</td>
+                </tr>
+                <tr>
+                    <td class="p-col-num"></td>
+                    <td class="p-col-label">Tempat</td>
+                    <td class="p-col-colon">:</td>
+                    <td class="p-col-value">{{tempat}}</td>
+                </tr>
+            </table>
+        </td>
+      </tr>
+    </table>
+
+    <!-- Blok Paragraf Anggaran -->
+    {{beban_anggaran_html}}
+
+    <p style="text-align: justify;">Surat tugas ini dibuat dan untuk dilaksanakan dengan penuh tanggung jawab.</p>
+
+    <div class="st-ttd-container" style="width: 100%; display: flex; justify-content: flex-end;">
+      <div style="width: 45%; text-align: left;">
+        <div>Indramayu, {{tanggal_ttd}}</div>
+        <div style="text-transform: capitalize;">{{jabatan_pejabat_ttd}},</div>
+        
+        <div style="height: 55px;"></div>
+        
+        <div style="font-weight: bold;">{{nama_pejabat_ttd}}</div>
+      </div>
+    </div>
+    <!-- END ZONA DINAMIS -->
+  </div>
+</div>

@@ -1,0 +1,68 @@
+// ==========================================
+// FILE: cetak_wfh_laporan.js
+// MODUL CETAK MANDIRI (Clean Architecture)
+// ==========================================
+
+// --- Source: permohonan/wfh/js_cetak_wfh_laporan.html ---
+// Membaca format (YYYY-MM-DD) dan (DD/MM/YYYY) dengan benar
+    function formatDateFullIndo(dateStr) {
+        if (!dateStr) return "-";
+        const months = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+        
+        let parts = dateStr.split('-');
+        if (parts.length === 3) {
+            return parseInt(parts[2], 10) + " " + months[parseInt(parts[1], 10) - 1] + " " + parts[0];
+        }
+        
+        parts = dateStr.split('/');
+        if (parts.length === 3) {
+            return parseInt(parts[0], 10) + " " + months[parseInt(parts[1], 10) - 1] + " " + parts[2];
+        }
+        return dateStr;
+    }
+
+    function cetakLaporanWFH(id) {
+        if (window.isGlobalPrinting) {
+            showNotify("Proses Sibuk", "Sistem sedang merakit dokumen PDF.", "warning");
+            return; 
+        }
+        
+        if (!state || !state.user) {
+            showNotify("Sistem Memuat", "Data belum siap.", "warning");
+            return;
+        }
+        
+        window.isGlobalPrinting = true;
+        // Ubah teks loading agar pengguna tahu proses ini makan waktu sedikit lebih lama
+        showLoading("Merakit Laporan PDF dengan presisi tinggi... (Mohon tunggu sekitar 5 detik)");
+        
+        const token = localStorage.getItem('transkep_session_token');
+        
+        if (typeof google !== 'undefined') {
+            google.script.run
+                .withSuccessHandler(function(res) {
+                    hideLoading(); 
+                    window.isGlobalPrinting = false;
+                    
+                    if (res.status === 'success') {
+                        showNotify("Berhasil", "Laporan PDF berhasil dibuat!", "success");
+                        // Membuka PDF asli dari Google Drive di tab baru
+                        window.open(res.url, '_blank');
+                    } else {
+                        showNotify("Gagal Mencetak", res.message, "error");
+                    }
+                })
+                .withFailureHandler(function(err) {
+                    hideLoading(); 
+                    window.isGlobalPrinting = false;
+                    showNotify("Error Koneksi", err.toString(), "error");
+                })
+                .generatePdfLaporanWFH(id, state.user.nip, token); // Memanggil backend Docs to PDF
+        } else {
+            setTimeout(() => { 
+                hideLoading(); 
+                window.isGlobalPrinting = false; 
+                alert("[CANVAS MODE] Berhasil memanggil backend. PDF URL akan terbuka di sini."); 
+            }, 1500);
+        }
+    }

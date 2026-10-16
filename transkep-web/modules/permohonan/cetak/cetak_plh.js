@@ -1,0 +1,141 @@
+// ==========================================
+// FILE: cetak_plh.js
+// MODUL CETAK MANDIRI (Clean Architecture)
+// ==========================================
+
+// --- Source: permohonan/st/js_cetak_plh.html ---
+// Fungsi Helper Tanggal (Lokal - Backup if global is missed)
+  function formatTglPlh(dateStr) {
+      if (!dateStr) return "-";
+      
+      let d, m, y;
+      
+      if (dateStr.includes('/')) {
+          // Format Database: DD/MM/YYYY (Contoh: 14/09/2026)
+          const parts = dateStr.split('/');
+          d = parseInt(parts[0], 10);
+          m = parseInt(parts[1], 10) - 1; // Array bulan dimulai dari 0
+          y = parseInt(parts[2], 10);
+      } else if (dateStr.includes('-')) {
+          // Format Input Form Date: YYYY-MM-DD (Contoh: 2026-09-14)
+          const parts = dateStr.split('-');
+          y = parseInt(parts[0], 10);
+          m = parseInt(parts[1], 10) - 1;
+          d = parseInt(parts[2], 10);
+      } else {
+          // Jika format kacau/tidak dikenali, kembalikan teks aslinya
+          return dateStr;
+      }
+
+      // Validasi jika hasil belahan bukan angka
+      if (isNaN(d) || isNaN(m) || isNaN(y)) return dateStr;
+
+      const months = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+      
+      return `${d} ${months[m]} ${y}`;
+  }
+
+  function printSuratPlh(idST, nipPejabatCuti) {
+      if (!state.stList) { showNotify("Gagal", "Data ST belum dimuat", "error"); return; }
+      const stDataObj = state.stList.find(st => String(st.id) === String(idST));
+      if (!stDataObj) { showNotify("Gagal", "Data ST tidak ditemukan", "error"); return; }
+
+      const template = document.getElementById('template-cetak-plh-container');
+      if (!template) { showNotify("Gagal", "Template Surat Plh belum dimuat", "error"); return; }
+
+      showLoading("Menyiapkan dokumen Penunjukan Plh...");
+
+      // 1. Ekstrak Data Ekstra & Peserta
+      let dataEkstra = {};
+      try { dataEkstra = JSON.parse(stDataObj.data_ekstra || '{}'); } catch(e) {}
+      
+      let pesertaArr = [];
+      try { pesertaArr = JSON.parse(stDataObj.peserta); } catch (e) {
+          showNotify("Error", "Data peserta rusak", "error"); hideLoading(); return;
+      }
+
+      // 2. Cari Identitas Pejabat yang Pergi Dinas (Definitif)
+      const pejabatTarget = pesertaArr.find(p => String(p.nip) === String(nipPejabatCuti));
+      if (!pejabatTarget || !pejabatTarget.plh_nip) {
+          showNotify("Ditolak", "Pegawai ini tidak memiliki pengaturan penunjukan Plh.", "warning"); 
+          hideLoading(); return;
+      }
+
+      // 3. Cari Identitas Pejabat Pengganti dari Master Data Users
+      const plhTarget = state.usersList.find(u => String(u.nip) === String(pejabatTarget.plh_nip));
+      if (!plhTarget) {
+          showNotify("Error", "Data pegawai Plh tidak ditemukan di sistem.", "error"); 
+          hideLoading(); return;
+      }
+
+      // 4. Cari Identitas Pejabat yang Menandatangani ST (Biasanya Ketua/Wakil)
+      const ttdST = state.usersList.find(u => String(u.nip) === String(stDataObj.pejabat_ttd)) || {nama: '-', nip: '-', jabatan: '-'};
+
+      let htmlContent = template.innerHTML;
+      
+      const tglBerangkat = stDataObj.tgl_mulai;
+      const tglKembali = stDataObj.tgl_selesai;
+      const diffTime = Math.abs(new Date(tglKembali) - new Date(tglBerangkat));
+      const lamaHari = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+
+      // ZETTBOT FIX: Logika 1 Hari atau Lebih untuk Penulisan Tanggal
+      let tanggalTugasStr = "";
+      if (lamaHari === 1 || tglBerangkat === tglKembali) {
+          tanggalTugasStr = `tanggal ${formatTglPlh(tglBerangkat)}`;
+      } else {
+          tanggalTugasStr = `tanggal ${formatTglPlh(tglBerangkat)} s.d ${formatTglPlh(tglKembali)}`;
+      }
+
+      // ZETTBOT FIX: Membersihkan Gelar untuk Tanda Tangan
+      let namaTtdBersih = "-";
+      if (typeof formatNamaBersih === 'function') {
+          namaTtdBersih = formatNamaBersih(ttdST.nama);
+      } else {
+          // Fallback regex jika fungsi global belum termuat
+          namaTtdBersih = ttdST.nama ? ttdST.nama.split(',')[0].replace(/^(H\.|Hj\.|Drs\.|Dra\.|Ir\.|Prof\.|Dr\.)\s*/i, '').trim() : "-";
+      }
+
+      const replacements = {
+          "{{nomor_plh}}": dataEkstra.nomor_plh || "- (Belum diinput)",
+          "{{nomor_st}}": stDataObj.nomor,
+          "{{tgl_st_dibuat}}": formatTglPlh(stDataObj.waktu.split(' ')[0]),
+          "{{maksud_tujuan}}": stDataObj.tujuan,
+          
+          "{{plh_nama}}": plhTarget.nama,
+          "{{plh_nip}}": plhTarget.nip,
+          "{{plh_pangkat}}": plhTarget.pangkat || "-",
+          "{{plh_jabatan}}": plhTarget.jabatan || "-",
+          
+          "{{pejabat_jabatan}}": pejabatTarget.jabatan || "-",
+          "{{pejabat_nama}}": pejabatTarget.nama,
+          "{{pejabat_nip}}": pejabatTarget.nip,
+          
+          "{{lama_hari}}": lamaHari,
+          "{{tanggal_tugas_plh}}": tanggalTugasStr,
+          
+          "{{jabatan_ttd_st}}": ttdST.jabatan,
+          "{{nama_ttd_st}}": namaTtdBersih,
+          "{{nip_ttd_st}}": ttdST.nip,
+          "{{tanggal_cetak}}": formatTglPlh(stDataObj.waktu.split(' ')[0])
+      };
+
+      for (let key in replacements) {
+          htmlContent = htmlContent.split(key).join(replacements[key]);
+      }
+
+      let finalHTML = "<!DOCTYPE html><html><head><meta charset='UTF-8'><title>Cetak Plh</title></head><body>" + htmlContent + "</body></html>";
+
+      const iframe = document.createElement('iframe');
+      iframe.style.position = 'fixed'; iframe.style.right = '0'; iframe.style.bottom = '0';
+      iframe.style.width = '0'; iframe.style.height = '0'; iframe.style.border = 'none';
+      document.body.appendChild(iframe);
+
+      const doc = iframe.contentWindow.document;
+      doc.open(); doc.write(finalHTML); doc.close();
+
+      setTimeout(function() {
+          hideLoading();
+          iframe.contentWindow.focus(); iframe.contentWindow.print();
+          setTimeout(function() { if (document.body.contains(iframe)) document.body.removeChild(iframe); }, 3000);
+      }, 1500);
+  }

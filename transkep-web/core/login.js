@@ -1,0 +1,89 @@
+// ==========================================
+// FILE: login.js
+// DESKRIPSI: Logika Modal Lupa Password (Frontend)
+// ENGINE: ZettBOT Core v1.0.0 (by Zettbos)
+// ==========================================
+
+let cooldownResetPass = false; // Flag anti-spam click
+
+function openLupaPassword() {
+  const modal = document.getElementById('modalLupaPassword');
+  const content = document.getElementById('modalLupaPasswordContent');
+  const waInput = document.getElementById('waLupaPassword');
+  if (waInput) waInput.value = '';
+  
+  if (modal && content) {
+    modal.classList.remove('hidden');
+    void modal.offsetWidth; // Trigger reflow untuk animasi smooth
+    modal.classList.remove('opacity-0');
+    content.classList.remove('scale-95');
+  }
+}
+
+function closeLupaPassword() {
+  const modal = document.getElementById('modalLupaPassword');
+  const content = document.getElementById('modalLupaPasswordContent');
+  
+  if (modal && content) {
+    modal.classList.add('opacity-0');
+    content.classList.add('scale-95');
+    setTimeout(() => {
+      modal.classList.add('hidden');
+    }, 300);
+  }
+}
+
+function submitLupaPassword(e) {
+  if (e) e.preventDefault();
+  
+  if (cooldownResetPass) {
+    if (typeof showNotify === 'function') {
+      showNotify("Tunggu Sebentar", "Sistem sedang memproses antrean sebelumnya. Silakan tunggu sekitar 60 detik sebelum mengirim permintaan baru.", "warning");
+    } else {
+      alert("Tunggu 60 detik sebelum mengirim permintaan baru.");
+    }
+    return;
+  }
+
+  const no_wa = document.getElementById('waLupaPassword').value;
+  if (!no_wa || no_wa.length < 9) {
+    if (typeof showNotify === 'function') showNotify("Input Tidak Valid", "Masukkan nomor WhatsApp yang valid (minimal 9 angka).", "error");
+    return;
+  }
+
+  const btn = document.getElementById('btnSubmitLupa');
+  const originalBtnHtml = btn ? btn.innerHTML : 'Kirim';
+  if (btn) {
+    btn.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> Memproses...`;
+    btn.disabled = true;
+  }
+
+  google.script.run
+    .withSuccessHandler(function(res) {
+      if (btn) {
+        btn.innerHTML = originalBtnHtml;
+        btn.disabled = false;
+      }
+      
+      if (res && res.status === 'success') {
+        closeLupaPassword();
+        if (typeof showNotify === 'function') showNotify("Permintaan Terkirim", res.message, "success");
+        
+        // Aktifkan Cooldown 60 detik agar tidak spam klik ke sistem backend
+        cooldownResetPass = true;
+        setTimeout(() => {
+          cooldownResetPass = false;
+        }, 60000);
+      } else {
+        if (typeof showNotify === 'function') showNotify("Gagal Memproses", res ? res.message : "Gagal memproses", "error");
+      }
+    })
+    .withFailureHandler(function(err) {
+      if (btn) {
+        btn.innerHTML = originalBtnHtml;
+        btn.disabled = false;
+      }
+      if (typeof showNotify === 'function') showNotify("Kesalahan Jaringan", "Terjadi kesalahan saat menghubungi server Google. Muat ulang halaman.", "error");
+    })
+    .requestPasswordReset(no_wa);
+}

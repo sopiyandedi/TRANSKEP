@@ -1,0 +1,46 @@
+/* ========================================================= */
+/* FILE: animations.css                                      */
+/* Kumpulan Efek Animasi & UI/UX (Pure CSS)                  */
+/* ========================================================= */
+
+/* 1. PAGE TRANSITION (Fade In Up) */
+@keyframes fadeSlideUp {
+    from {
+        opacity: 0;
+        transform: translateY(15px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+.animate-fade-in-up {
+    animation: fadeSlideUp 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+
+/* 2. NEON GLOW HOVER (Tombol & Card) */
+.hover-glow-indigo {
+    transition: all 0.3s ease;
+}
+.hover-glow-indigo:hover {
+    box-shadow: 0 0 15px rgba(99, 102, 241, 0.4);
+    transform: translateY(-2px);
+}
+
+.hover-glow-emerald {
+    transition: all 0.3s ease;
+}
+.hover-glow-emerald:hover {
+    box-shadow: 0 0 15px rgba(16, 185, 129, 0.4);
+    transform: translateY(-2px);
+}
+
+/* 3. SKELETON PULSE (Anti-Lag Loader) */
+@keyframes skeletonShimmer {
+    0% { opacity: 0.6; }
+    50% { opacity: 0.3; }
+    100% { opacity: 0.6; }
+}
+.animate-skeleton {
+    animation: skeletonShimmer 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
