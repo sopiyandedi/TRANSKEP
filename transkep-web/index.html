@@ -117,6 +117,7 @@
   <!-- 3. SLOT GLOBAL MODALS (VUE ENGINE)                        -->
   <!-- ========================================================= -->
   <div id="slot-global-modals"></div>
+  <div id="slot-magic-approval"></div>
 
   <!-- ========================================================= -->
   <!-- 4. ZETTBOT MODULAR COMPONENT & SCRIPT LOADER             -->
@@ -139,7 +140,8 @@
         { slot: 'slot-pdf-viewer', file: 'modules/pdf_viewer/view_pdf_viewer.html' },
         { slot: 'slot-referensi', file: 'modules/referensi/view_referensi.html' },
         { slot: 'slot-mobile-nav', file: 'core/view_mobile_nav.html' },
-        { slot: 'slot-global-modals', file: 'core/view_global_modals.html' }
+        { slot: 'slot-global-modals', file: 'core/view_global_modals.html' },
+        { slot: 'slot-magic-approval', file: 'modules/permohonan/view_magic_approval.html' }
       ];
 
       const CETAK_TEMPLATES = [
@@ -171,6 +173,7 @@
         'modules/permohonan/st.js',
         'modules/permohonan/persetujuan_data.js',
         'modules/permohonan/persetujuan.js',
+        'modules/permohonan/magic_approval.js',
         'modules/permohonan/rekapitulasi_data.js',
         'modules/permohonan/rekapitulasi.js',
         'modules/permohonan/izin_data.js',

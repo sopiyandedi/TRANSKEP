@@ -80,12 +80,47 @@ function addCutiLog(payload, aktorNip, clientToken) {
     
     const statusAwal = payload.jenis === 'Dinas Luar' ? 'Disetujui' : 'Menunggu';
     
+    const magicToken = Utilities.getUuid();
     sheetCuti.appendRow(sanitizeRowArray([
       newId, tglForm, payload.nip, payload.jenis, payload.tgl_mulai, payload.tgl_selesai, payload.alasan,
-      statusAwal, '', payload.atasan_nip || '-', payload.pejabat_nip || '-', durasi, payload.plh_nip || '', statusAwal, statusAwal, payload.alamat || '-', JSON.stringify(historyJson), fileUrl
+      statusAwal, '', payload.atasan_nip || '-', payload.pejabat_nip || '-', durasi, payload.plh_nip || '', statusAwal, statusAwal, payload.alamat || '-', JSON.stringify(historyJson), fileUrl, magicToken
     ]));
     
     SpreadsheetApp.flush(); 
+
+    // Notifikasi WhatsApp Magic Link ke Atasan Langsung (Non-blocking)
+    if (payload.jenis !== 'Dinas Luar' && payload.atasan_nip && payload.atasan_nip !== '-') {
+      try {
+        let atasanPhone = "";
+        let namaAtasan = "";
+        for (let u = 1; u < uData.length; u++) {
+          if (String(uData[u][0]) === String(payload.atasan_nip)) {
+            namaAtasan = uData[u][1];
+            atasanPhone = String(uData[u][4] || '');
+            break;
+          }
+        }
+        
+        if (atasanPhone && atasanPhone.length > 8) {
+          const magicLink = "https://transkep.github.io/?action=review_cuti&token=" + magicToken;
+          const msgWa = "*TRANSKEP - USULAN CUTI PEGAWAI* 📋\n\n" +
+            "Yth. Bapak/Ibu *" + namaAtasan + "* (Atasan Langsung),\n\n" +
+            "Terdapat pengajuan cuti baru yang membutuhkan persetujuan Anda:\n\n" +
+            "👤 *Pemohon:* " + namaPegawaiPemohon + "\n" +
+            "🆔 *NIP:* " + payload.nip + "\n" +
+            "🏷️ *Jenis:* Cuti " + payload.jenis + "\n" +
+            "📅 *Periode:* " + payload.tgl_mulai + " s.d " + payload.tgl_selesai + " (" + durasi + " hari kerja)\n" +
+            "📝 *Alasan:* " + (payload.alasan || '-') + "\n\n" +
+            "Silakan klik tautan di bawah ini untuk melihat detail lengkap dan memberikan persetujuan langsung (tanpa perlu login):\n" +
+            "👉 " + magicLink;
+            
+          sendWhatsAppMessage_(atasanPhone, msgWa);
+        }
+      } catch (errWa) {
+        Logger.log("Gagal kirim notif WA cuti ke atasan: " + errWa.toString());
+      }
+    }
+
     return { status: 'success', message: 'Pengajuan Cuti berhasil disimpan.', data: { id: newId, tgl_pengajuan: tglForm, durasi: durasi, history: JSON.stringify(historyJson), fileUrl: fileUrl, status: statusAwal } };
   } catch (err) { return { status: 'error', message: err.toString() }; }
 }

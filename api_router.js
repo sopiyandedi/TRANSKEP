@@ -50,6 +50,12 @@ function handleApiGet_(e) {
       return jsonResponse_(data);
     }
 
+    // 4. Ambil Detail Cuti via Magic Token (Persetujuan Cuti Tanpa Login)
+    if (action === 'getCutiByToken') {
+      const token = params.token || '';
+      return jsonResponse_(getCutiByToken(token));
+    }
+
     return jsonResponse_({
       status: 'error',
       message: "Aksi GET '" + action + "' tidak dikenali atau memerlukan metode POST."
@@ -143,6 +149,19 @@ function handleApiPost_(payload, e) {
 
       case 'saveOrGenerateRapatDoc':
         return jsonResponse_(saveOrGenerateRapatDoc(payload.data, payload.actionType, payload.nip, payload.token));
+
+      // Magic Link Approval & Resend WA
+      case 'getCutiByToken':
+        return jsonResponse_(getCutiByToken(payload.token));
+
+      case 'processMagicLinkApproval':
+        return jsonResponse_(processMagicLinkApproval(payload.token, payload.decision, payload.notes));
+
+      case 'resendCutiWhatsApp':
+        return jsonResponse_(resendCutiWhatsApp(payload.id, payload.nip, payload.token));
+
+      case 'requestPasswordReset':
+        return jsonResponse_(requestPasswordReset(payload.no_wa || payload.noWa));
 
       // Fallback: Jika action cocok dengan fungsi global terdaftar yang aman
       default:

@@ -140,7 +140,17 @@ ZONA BAWAH: MASTER CONTEXT & STATUS MIGRASI TERKINI (LIVING CONTEXT)
      11. **Modul Kotak Persetujuan (Tahap 29)**: [`modules/permohonan/persetujuan_data.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/modules/permohonan/persetujuan_data.js) & [`modules/permohonan/persetujuan.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/modules/permohonan/persetujuan.js).
      12. **Modul Rekapitulasi Riwayat Permohonan (Tahap 30)**: [`modules/permohonan/rekapitulasi_data.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/modules/permohonan/rekapitulasi_data.js) & [`modules/permohonan/rekapitulasi.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/modules/permohonan/rekapitulasi.js).
      13. **Modul Dashboard Analitik & Monitoring TMT (Tahap 31)**: [`modules/dashboard/dashboard_data.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/modules/dashboard/dashboard_data.js) & [`modules/dashboard/dashboard.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/modules/dashboard/dashboard.js).
-   - PWA Service Worker `sw.js` diperbarui ke versi **`transkep-v2.7.0`**.
+   - PWA Service Worker sw.js diperbarui ke versi **	ranskep-v2.8.0**.
+10. **Integrasi WhatsApp Gateway (WAHA + Ngrok) & Magic Link Approval (Tahap 32):**
+    - **Otomatisasi WhatsApp:** Mengintegrasikan self-hosted WAHA (Core 2026.9.1 WEBJS) via tunnel Ngrok publik (supernova-endpoint-unsubtly.ngrok-free.dev) untuk pengiriman pesan otomatis berkecepatan tinggi tanpa antrean eksternal.
+    - **Reset Sandi Otomatis:** Pegawai mengajukan lupa password di login screen -> sistem meng-generate kata sandi sementara 6-digit (TR-XXXXXX), Salted SHA-256 hash di user_data, dan otomatis mengirimkan kredensial via bot WhatsApp. Antrean manual di menu Admin tetap dipertahankan sebagai Plan B fallback.
+    - **Persetujuan Cuti Berjenjang via Magic Link:**
+      * Pegawai mengajukan cuti -> Cuti tersimpan 100% aman di database cuti_log.
+      * Sistem men-generate magic_token (UUID) di kolom 19 cuti_log dan mengirimkan Magic Link ke WhatsApp Atasan Langsung.
+      * Atasan mengklik Magic Link -> Popup review cuti terbuka instan tanpa login -> Atasan menyetujui -> Sistem otomatis meneruskan Magic Link ke Pejabat Berwenang via WAHA.
+      * Pejabat menyetujui -> Cuti resmi berstatus Disetujui, saldo terpotong resmi, dan notifikasi konfirmasi dikirimkan ke WhatsApp pemohon.
+    - **Tombol Kirim Ulang WA Cuti (Admin & Operator):** Tersedia tombol WhatsApp berwarna emerald pada kolom Aksi tabel Rekapitulasi khusus untuk baris cuti yang berstatus Menunggu, memungkinkan pengiriman ulang notifikasi kapan saja.
+    - **UI Magic Link Approval Modal:** Terintegrasi di 	ranskep-web/modules/permohonan/view_magic_approval.html dan magic_approval.js, didaftarkan pada PWA Service Worker sw.js versi **	ranskep-v2.8.0**.
 
 
 

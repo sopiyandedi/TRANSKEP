@@ -1,0 +1,151 @@
+<!-- ==========================================
+     MODAL MAGIC LINK APPROVAL CUTI (INSTANT POPUP)
+     ENGINE: Vue 3 + Tailwind (Anti-AI Human-Crafted UI)
+     DESKRIPSI: Memungkinkan Atasan Langsung & Pejabat Berwenang
+                memberikan persetujuan cuti 1-klik langsung dari WhatsApp tanpa login
+========================================== -->
+<div id="vue-magic-approval-wrapper" v-cloak>
+  <div v-if="isOpen" class="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md overflow-y-auto">
+    <div class="relative w-full max-w-lg bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl text-slate-200 my-8 transition-all">
+      
+      <!-- Tombol Tutup Silang -->
+      <button @click="closeModal()" class="absolute top-5 right-5 text-slate-500 hover:text-slate-300 w-8 h-8 flex items-center justify-center rounded-xl bg-slate-800/50 hover:bg-slate-800 transition">
+        <i class="fa-solid fa-xmark text-sm"></i>
+      </button>
+
+      <!-- 1. STATE: LOADING -->
+      <div v-if="isLoading" class="text-center py-12">
+        <i class="fa-solid fa-circle-notch fa-spin text-4xl text-emerald-400 mb-4"></i>
+        <h4 class="text-base font-bold text-white">Memverifikasi Tautan Cuti...</h4>
+        <p class="text-xs text-slate-400 mt-2">Mohon tunggu sebentar, sistem sedang memvalidasi kredensial permohonan.</p>
+      </div>
+
+      <!-- 2. STATE: ERROR / INVALID TOKEN -->
+      <div v-else-if="errorMessage" class="text-center py-8">
+        <div class="w-16 h-16 mx-auto mb-4 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400 text-2xl">
+          <i class="fa-solid fa-triangle-exclamation"></i>
+        </div>
+        <h4 class="text-lg font-bold text-white mb-2">Tautan Tidak Valid</h4>
+        <p class="text-xs text-slate-400 max-w-sm mx-auto leading-relaxed mb-6">{{ errorMessage }}</p>
+        <button @click="closeModal()" class="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-semibold transition">
+          Tutup Jendela
+        </button>
+      </div>
+
+      <!-- 3. STATE: ALREADY FINISHED / CLOSED -->
+      <div v-else-if="cutiData && (cutiData.current_stage === 'finished' || cutiData.current_stage === 'closed')" class="text-center py-8">
+        <div class="w-16 h-16 mx-auto mb-4 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 text-2xl">
+          <i class="fa-solid fa-circle-check"></i>
+        </div>
+        <h4 class="text-lg font-bold text-white mb-2">Berkas Sudah Selesai Diproses</h4>
+        <p class="text-xs text-slate-400 max-w-sm mx-auto leading-relaxed mb-4">
+          Permohonan cuti ini saat ini berstatus: <span class="font-bold uppercase text-indigo-300">[{{ cutiData.status }}]</span>. Tidak ada tindakan lebih lanjut yang diperlukan.
+        </p>
+        <button @click="closeModal()" class="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-semibold transition">
+          Tutup Jendela
+        </button>
+      </div>
+
+      <!-- 4. STATE: SUCCESS SUBMITTED -->
+      <div v-else-if="successMessage" class="text-center py-8">
+        <div class="w-16 h-16 mx-auto mb-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 text-3xl">
+          <i class="fa-solid fa-check"></i>
+        </div>
+        <h4 class="text-lg font-bold text-white mb-2">Keputusan Berhasil Disimpan</h4>
+        <p class="text-xs text-slate-300 max-w-sm mx-auto leading-relaxed mb-6">{{ successMessage }}</p>
+        <button @click="closeModal()" class="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition shadow-lg shadow-emerald-900/30">
+          Selesai & Tutup
+        </button>
+      </div>
+
+      <!-- 5. STATE: FORM REVIEW & DECISION -->
+      <div v-else-if="cutiData">
+        
+        <!-- Header Modal -->
+        <div class="flex items-center gap-3 mb-5">
+          <div class="w-10 h-10 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 text-lg shrink-0">
+            <i class="fa-solid fa-file-signature"></i>
+          </div>
+          <div>
+            <h3 class="text-base font-bold text-white">Verifikasi Persetujuan Cuti</h3>
+            <p class="text-[11px] text-slate-400">Portal TRANSKEP - Pengadilan Agama Indramayu</p>
+          </div>
+        </div>
+
+        <!-- Role Badge -->
+        <div class="mb-5 p-3 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-between">
+          <div class="text-xs text-indigo-200">
+            <span class="text-[10px] uppercase text-indigo-400 font-bold block tracking-wider">Peran Penyetuju</span>
+            <span class="font-bold text-sm">{{ cutiData.reviewer_title }}</span>
+          </div>
+          <span class="px-2.5 py-1 rounded-lg bg-indigo-500/20 text-indigo-300 font-medium text-[11px] border border-indigo-400/30">
+            {{ cutiData.reviewer_name }}
+          </span>
+        </div>
+
+        <!-- Detail Cuti Pegawai Card -->
+        <div class="space-y-3 p-4 rounded-2xl bg-slate-950/60 border border-slate-800 text-xs mb-5">
+          <div class="flex justify-between items-start border-b border-slate-800/80 pb-2.5">
+            <div>
+              <div class="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Nama Pegawai</div>
+              <div class="font-bold text-slate-200 text-sm mt-0.5">{{ cutiData.nama }}</div>
+              <div class="text-[11px] text-slate-400">NIP: {{ cutiData.nip }} | {{ cutiData.jabatan }}</div>
+            </div>
+            <span class="px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-300 border border-amber-500/20 text-[10px] font-bold uppercase tracking-wider">
+              Cuti {{ cutiData.jenis }}
+            </span>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2 border-b border-slate-800/80 pb-2.5">
+            <div>
+              <div class="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Periode Cuti</div>
+              <div class="font-semibold text-slate-300 mt-0.5">{{ cutiData.tgl_mulai }} s.d {{ cutiData.tgl_selesai }}</div>
+            </div>
+            <div>
+              <div class="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Durasi Kerja</div>
+              <div class="font-bold text-emerald-400 mt-0.5">{{ cutiData.durasi }} Hari Kerja</div>
+            </div>
+          </div>
+
+          <div class="border-b border-slate-800/80 pb-2.5">
+            <div class="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Alasan Permohonan</div>
+            <div class="text-slate-300 mt-0.5 leading-relaxed">{{ cutiData.alasan || '-' }}</div>
+          </div>
+
+          <div class="flex justify-between items-center">
+            <div>
+              <div class="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Alamat Selama Cuti</div>
+              <div class="text-slate-400 mt-0.5">{{ cutiData.alamat || '-' }}</div>
+            </div>
+            <a v-if="cutiData.fileUrl" :href="cutiData.fileUrl" target="_blank" class="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-indigo-300 rounded-lg text-[10px] font-bold transition flex items-center gap-1.5 border border-indigo-500/20">
+              <i class="fa-solid fa-paperclip"></i> Bukti Lampiran
+            </a>
+          </div>
+        </div>
+
+        <!-- Form Input Catatan -->
+        <div class="mb-5">
+          <label class="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1.5">
+            Catatan Tambahan <span class="text-slate-500 font-normal lowercase">(wajib diisi jika menolak)</span>
+          </label>
+          <textarea v-model="decisionNotes" rows="2" placeholder="Tuliskan catatan pertimbangan atau alasan penolakan..." class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-emerald-500 transition resize-none"></textarea>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="flex gap-3">
+          <button @click="submitDecision('Ditolak')" :disabled="isSubmitting" class="px-4 py-3 bg-rose-500/10 hover:bg-rose-500 text-rose-400 hover:text-white rounded-2xl text-xs font-bold transition border border-rose-500/20 disabled:opacity-50 flex items-center justify-center gap-1.5 shrink-0">
+            <i class="fa-solid fa-xmark"></i> Tolak
+          </button>
+          
+          <button @click="submitDecision('Disetujui')" :disabled="isSubmitting" class="flex-1 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl text-xs font-bold transition shadow-lg shadow-emerald-900/30 disabled:opacity-50 flex items-center justify-center gap-2">
+            <i v-if="isSubmitting" class="fa-solid fa-circle-notch fa-spin"></i>
+            <i v-else class="fa-solid fa-check"></i>
+            Setujui Permohonan Cuti
+          </button>
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+</div>

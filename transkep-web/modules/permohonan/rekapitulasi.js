@@ -406,6 +406,34 @@
                           if(window.showNotify) window.showNotify("Error", err.message || err.toString(), "error");
                       }
                   });
+              },
+
+              async resendCutiWA(log) {
+                  if (!this.isAdmin) return;
+                  const token = localStorage.getItem('transkep_session_token');
+                  const adminNip = this.s.user ? this.s.user.nip : '';
+                  
+                  if (window.showCustomConfirm) {
+                      window.showCustomConfirm(
+                          "Kirim Ulang Notifikasi WA",
+                          `Kirim ulang notifikasi WhatsApp & Magic Link untuk pengajuan cuti ${log.pnsNama || log.nip} ke Atasan/Pejabat terkait?`,
+                          async () => {
+                              if (window.showLoading) window.showLoading("Mengirim pesan WhatsApp via WAHA...");
+                              try {
+                                  const res = await RekapitulasiDataService.resendCutiWA(log.id, adminNip, token);
+                                  if (window.hideLoading) window.hideLoading();
+                                  if (res && res.status === 'success') {
+                                      if (window.showNotify) window.showNotify("WhatsApp Terkirim", res.message, "success");
+                                  } else {
+                                      if (window.showNotify) window.showNotify("Gagal Mengirim", res ? res.message : "Terjadi kesalahan.", "error");
+                                  }
+                              } catch (err) {
+                                  if (window.hideLoading) window.hideLoading();
+                                  if (window.showNotify) window.showNotify("Error Jaringan", err.message || err.toString(), "error");
+                              }
+                          }
+                      );
+                  }
               }
           }
       }).mount('#vue-rekapitulasi-wrapper');

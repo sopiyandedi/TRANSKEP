@@ -99,5 +99,24 @@ window.RekapitulasiDataService = {
         .withFailureHandler(err => reject(err))
         .deleteWfhLog(id, true, nip, token);
     });
+  },
+
+  /**
+   * Mengirimkan ulang notifikasi WhatsApp / Magic Link ke Atasan atau Pejabat
+   * @param {string} id - ID Transaksi Cuti
+   * @param {string} nip - NIP Admin/Operator
+   * @param {string} token - Token sesi aktif
+   * @returns {Promise<object>} Result status dan pesan dari backend
+   */
+  resendCutiWA(id, nip, token) {
+    return new Promise((resolve, reject) => {
+      if (!window.google || !google.script || !google.script.run) {
+        return reject(new Error("Koneksi Google Apps Script (google.script.run) tidak tersedia."));
+      }
+      google.script.run
+        .withSuccessHandler(res => resolve(res))
+        .withFailureHandler(err => reject(err))
+        .resendCutiWhatsApp(id, nip, token);
+    });
   }
 };

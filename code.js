@@ -129,6 +129,68 @@ function logoutSession(nip, clientToken) {
   }
 }
 
+// 7. Gateway Otomatisasi WhatsApp (WAHA + Ngrok) - ZettBOT v2.1
+function getWahaConfig_() {
+  const props = PropertiesService.getScriptProperties();
+  return {
+    baseUrl: props.getProperty('WAHA_BASE_URL') || 'https://supernova-endpoint-unsubtly.ngrok-free.dev',
+    apiKey: props.getProperty('WAHA_API_KEY') || '192167ce5e0147dcb4eaaaff7eccfc18',
+    session: props.getProperty('WAHA_SESSION') || 'default'
+  };
+}
+
+function sendWhatsAppMessage_(rawPhone, text) {
+  try {
+    if (!rawPhone || !text) return { status: 'error', message: 'Nomor atau pesan teks tidak boleh kosong.' };
+    
+    let phone = String(rawPhone).replace(/[^0-9]/g, '');
+    if (phone.startsWith('0')) {
+      phone = '62' + phone.substring(1);
+    }
+    if (!phone.endsWith('@c.us') && !phone.endsWith('@lid')) {
+      phone = phone + '@c.us';
+    }
+    
+    if (phone.length < 11) { // 628... @c.us minimal 11 karakter
+      return { status: 'error', message: 'Nomor WhatsApp tidak valid.' };
+    }
+    
+    const config = getWahaConfig_();
+    const endpoint = config.baseUrl.replace(/\/+$/, '') + '/api/sendText';
+    
+    const payload = {
+      chatId: phone,
+      text: String(text),
+      session: config.session
+    };
+    
+    const options = {
+      method: 'post',
+      contentType: 'application/json',
+      headers: {
+        'X-Api-Key': config.apiKey,
+        'ngrok-skip-browser-warning': 'true'
+      },
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true
+    };
+    
+    const response = UrlFetchApp.fetch(endpoint, options);
+    const respCode = response.getResponseCode();
+    const respText = response.getContentText();
+    
+    if (respCode >= 200 && respCode < 300) {
+      return { status: 'success', data: respText };
+    } else {
+      Logger.log("WAHA sendText returned HTTP " + respCode + ": " + respText);
+      return { status: 'error', code: respCode, message: respText };
+    }
+  } catch (err) {
+    Logger.log("sendWhatsAppMessage_ exception: " + err.toString());
+    return { status: 'error', message: err.toString() };
+  }
+}
+
 // ------------------------------------------
 // 1. AUTENTIKASI & TARIK DATA (CORE)
 // ------------------------------------------
@@ -399,6 +461,7 @@ function requestPasswordReset(no_wa) {
     const userData = userSheet.getDataRange().getDisplayValues(); 
 
     let userFound = null;
+    let userRowIndex = -1;
     for (let i = 1; i < userData.length; i++) {
       let userPhoneRaw = String(userData[i][4] || '').replace(/[^0-9]/g, '');
       if (userPhoneRaw.startsWith('0')) {
@@ -409,11 +472,17 @@ function requestPasswordReset(no_wa) {
         userFound = {
           nip: userData[i][0], nama: userData[i][1], no_wa: phone, pass: userData[i][5] 
         };
+        userRowIndex = i + 1;
         break;
       }
     }
 
-    if (!userFound) return { status: 'error', message: 'Nomor WhatsApp ini tidak terdaftar di dalam sistem pegawai. Silakan periksa kembali atau hubungi Admin.' };
+    if (!userFound || userRowIndex === -1) return { status: 'error', message: 'Nomor WhatsApp ini tidak terdaftar di dalam sistem pegawai. Silakan periksa kembali atau hubungi Admin.' };
+
+    // 1. Generate Kata Sandi Sementara (6 Digit OTP)
+    const tempPass = "TR-" + Math.floor(100000 + Math.random() * 900000);
+    const newHashedPass = hashPassword_(tempPass);
+    userSheet.getRange(userRowIndex, 6).setValue(newHashedPass);
 
     let logSheet = ss.getSheetByName('log_reset_pass');
     if (!logSheet) {
@@ -424,11 +493,27 @@ function requestPasswordReset(no_wa) {
     const uniqueId = 'REQ-' + new Date().getTime();
     const timestamp = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'dd/MM/yyyy HH:mm:ss');
 
-    // ZETTBOT HOTFIX KREDENSIAL: Jangan simpan password plaintext ke sheet log_reset_pass
-    logSheet.appendRow([uniqueId, timestamp, userFound.nip, userFound.nama, userFound.no_wa, '-']);
+    // Catat password sementara ke antrean agar admin tetap bisa klik manual sebagai Plan B
+    logSheet.appendRow([uniqueId, timestamp, userFound.nip, userFound.nama, userFound.no_wa, tempPass]);
     SpreadsheetApp.flush();
 
-    return { status: 'success', message: 'Permintaan berhasil dikirim. Admin akan segera memverifikasi dan mengirimkan kata sandi ke WA Anda.' };
+    // 2. Kirim otomatis via WhatsApp Gateway WAHA
+    const waText = "*TRANSKEP - RESET SANDI SEMENTARA* 🏢\n\n" +
+      "Halo *" + userFound.nama + "*,\n\n" +
+      "Permintaan reset kata sandi akun TRANSKEP Anda berhasil diproses.\n" +
+      "Berikut kredensial masuk sementara Anda:\n\n" +
+      "👤 *NIP:* " + userFound.nip + "\n" +
+      "🔑 *Sandi Sementara:* *" + tempPass + "*\n\n" +
+      "⚠️ *Perhatian:* Segera login ke portal dan perbarui kata sandi Anda di menu profil demi keamanan akun.\n\n" +
+      "🔗 *Link Login Portal:* https://transkep.github.io/";
+
+    let waResult = sendWhatsAppMessage_(userFound.no_wa, waText);
+    let msgFeedback = 'Kata sandi sementara telah berhasil dikirim otomatis ke nomor WhatsApp Anda (' + userFound.no_wa + ').';
+    if (!waResult || waResult.status !== 'success') {
+      msgFeedback = 'Permintaan reset berhasil dicatat. Admin telah menerima pemberitahuan dan akan segera mengirimkan sandi ke WA Anda.';
+    }
+
+    return { status: 'success', message: msgFeedback };
   } catch (err) {
     return { status: 'error', message: err.toString() };
   }

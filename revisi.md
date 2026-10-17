@@ -1360,3 +1360,78 @@ Seluruh komunikasi async RPC ini akan didelegasikan ke Data Service Layer terpad
 - [x] Loader `index.html` diperbarui (`modules/dashboard/dashboard_data.js` didaftarkan pada array `SCRIPTS`).
 - [x] PWA Service Worker `sw.js` diperbarui ke cache **`transkep-v2.7.0`** dan memprecache `./modules/dashboard/dashboard_data.js`.
 - [x] Verifikasi sintaks JS 100% presisi dan sinkron (`node --check` 0 error).
+
+---
+
+### Tahap 32: Integrasi WhatsApp Gateway (WAHA + Ngrok) untuk Notifikasi Cuti Berjenjang (Magic Link) & Reset Sandi Otomatis
+
+#### 1. Ruang Lingkup & Latar Belakang
+Mengintegrasikan gateway otomatisasi pesan WhatsApp self-hosted menggunakan **WAHA (WhatsApp HTTP API)** yang berjalan di Docker via tunnel **Ngrok** ke portal **TRANSKEP (PA Indramayu)**:
+- **Kredensial Gateway Terverifikasi:**
+  - Base URL Ngrok: `https://supernova-endpoint-unsubtly.ngrok-free.dev`
+  - WAHA API Key: `192167ce5e0147dcb4eaaaff7eccfc18`
+  - Session Name: `default` (Nomor Pengirim Bot: `6285139811819@c.us`)
+  - Status Container: `WORKING` (Port 3000)
+- **Temuan Audit Lapangan (Docker & Ngrok Extension):**
+  - Container WAHA berjalan normal di port 3000 dan endpoint `POST /api/sendText` siap beroperasi.
+  - Namun di Docker Desktop Extension Ngrok, domain `supernova-endpoint-unsubtly.ngrok-free.dev` saat ini masih tertambat ke container `n8n` (port 5678). Pengguna perlu menghentikan tunnel `n8n` di extension agar tunnel `waha` (port 3000) memegang domain publik.
+
+#### 2. Rencana Implementasi Bertahap (Non-Destruktif & Anti-Gagal)
+
+1. **Backend Gateway Helper (`code.js`):**
+   - Mengonfigurasi `ScriptProperties` untuk `WAHA_BASE_URL`, `WAHA_API_KEY`, `WAHA_SESSION`.
+   - Membuat fungsi privat aman `sendWhatsAppMessage_(targetPhone, messageText)`:
+     - Normalisasi nomor handphone Indonesia (`08...` -> `628...@c.us`).
+     - Mengirim payload JSON `{ chatId, text, session }` ke `POST /api/sendText`.
+     - Menyertakan header `ngrok-skip-browser-warning: true` dan `X-Api-Key`.
+     - Non-blocking `try...catch`: jika ngrok/waha offline, fungsi tidak melempar crash fatal.
+
+2. **Fitur 1: Reset Sandi Mandiri Otomatis via WhatsApp:**
+   - Memperbarui `requestPasswordReset(no_wa)` di [`code.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/code.js):
+     - Menghasilkan password sementara 6 karakter acak (`TR-XXXXXX`).
+     - Menghash kata sandi dengan Salted SHA-256 (`hashPassword_`) dan memperbarui kolom 6 spreadsheet `user_data`.
+     - Mengirimkan pesan WhatsApp instan berisi NIP dan kata sandi sementara ke nomor pemohon.
+     - Tetap mencatat transaksi ke tab `log_reset_pass` agar tombol manual "Kirim WA" di panel Admin tetap berfungsi sebagai Plan B.
+
+3. **Fitur 2: Pengajuan Cuti Berjenjang & Magic Link Approval (Atasan & Pejabat):**
+   - Memperbarui `addCutiLog` di [`permohonan/permohonan.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/permohonan.js):
+     - Penyimpanan data cuti ke sheet `cuti_log` **tetap sukses 100%** terlebih dahulu (prioritas integritas database).
+     - Menghasilkan token rahasia approval (`magic_token` via `Utilities.getUuid()`).
+     - Menyimpan token ke kolom baru (kolom 19) pada sheet `cuti_log`.
+     - Mengambil nomor WhatsApp Atasan Langsung dari sheet `user_data`.
+     - Memicu notifikasi WhatsApp non-blocking ke Atasan Langsung berisi rincian cuti pegawai dan Magic Link approval 1-klik tanpa perlu login:
+       `https://transkep.github.io/?action=review_cuti&token=UUID`
+   - Membuat controller backend `getCutiByToken(token)` & `processMagicLinkApproval(token, decision, notes)` di [`permohonan/persetujuan.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/persetujuan.js):
+     - Validasi token cuti secara aman.
+     - Jika Atasan menyetujui: Update status Atasan, lalu otomatis memicu pesan WhatsApp Magic Link ke Pejabat Berwenang.
+     - Jika Pejabat menyetujui: Finalisasi status `Disetujui`, potong saldo cuti resmi, dan kirim pesan konfirmasi sukses ke WhatsApp pemohon.
+
+4. **Fitur 3: Tombol "Kirim Ulang WA" di Rekapitulasi (Kolom Aksi):**
+   - Di [`transkep-web/modules/permohonan/view_permohonan.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/modules/permohonan/view_permohonan.html):
+     - Pada baris cuti yang berstatus `Menunggu`, tambahkan tombol icon WhatsApp:
+       `<button v-if="log.status === 'Menunggu'" @click="resendCutiWA(log)" class="p-2 bg-emerald-500/10 hover:bg-emerald-500 text-emerald-400 hover:text-white rounded-lg transition border border-emerald-500/20" title="Kirim Ulang Notifikasi WA / Magic Link ke Atasan"><i class="fa-brands fa-whatsapp"></i></button>`
+   - Di [`transkep-web/modules/permohonan/rekapitulasi_data.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/modules/permohonan/rekapitulasi_data.js):
+     - Menambahkan method `resendCutiWA(cutiId, adminNip, token)`.
+   - Di [`transkep-web/modules/permohonan/rekapitulasi.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/modules/permohonan/rekapitulasi.js):
+     - Menambahkan method UI `resendCutiWA(log)` dengan konfirmasi dialog dan indikator loading/toast.
+   - Di backend GAS [`permohonan/rekapitulasi.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/rekapitulasi.js):
+     - Menambahkan fungsi `resendCutiWhatsApp(cutiId, adminNip, clientToken)` yang mendeteksi jenjang persetujuan aktif (Atasan atau Pejabat) dan mengirimkan ulang notifikasi.
+
+5. **Antarmuka Magic Link Review Modal di Frontend (`transkep-web`):**
+   - Mendeteksi query string `?action=review_cuti&token=...` pada saat aplikasi dibuka.
+   - Menampilkan modal popup persetujuan yang terfokus, modern, dan mobile-friendly:
+     - Informasi Pemohon (Nama, NIP, Jabatan, Jenis Cuti, Tanggal, Alasan, Bukti lampiran jika ada).
+     - Tombol Aksi: `[Setujui Cuti]` dan `[Tolak Cuti]` (dengan input catatan alasan penolakan).
+     - Menampilkan status keberhasilan tanpa mengharuskan pimpinan memasukkan kredensial login.
+
+6. **Penyelarasan PWA Service Worker & Git Parity:**
+   #### 3. Status Eksekusi: [SELESAI]
+- [x] Helper backend `getWahaConfig_()` dan `sendWhatsAppMessage_()` dipasang di `code.js` lengkap dengan header `ngrok-skip-browser-warning: true` dan normalisasi nomor WhatsApp.
+- [x] Fitur 1 (Reset Sandi Otomatis): `requestPasswordReset(no_wa)` di `code.js` meng-generate kata sandi sementara 6 digit (`TR-XXXXXX`), Salted SHA-256 hash di `user_data`, kirim via WAHA, dan tetap mencatat ke `log_reset_pass` (Plan B manual Admin utuh).
+- [x] Fitur 2 (Pengajuan Cuti & Magic Link): `addCutiLog` di `permohonan/permohonan.js` menyimpan data cuti ke database 100% sukses lebih dulu, men-generate `magic_token`, dan mengirimkan pesan WAHA ke Atasan Langsung secara non-blocking.
+- [x] Kontroler Approval Cuti: `getCutiByToken`, `processMagicLinkApproval`, `refundCutiSaldo_`, dan `resendCutiWhatsApp` dipasang di `permohonan/persetujuan.js`.
+- [x] Dispatcher Headless API: Endpoint GET & POST untuk Magic Link didaftarkan di `api_router.js`.
+- [x] Fitur 3 (Tombol Kirim Ulang WA Cuti): Tombol icon WhatsApp dipasang di kolom aksi Rekapitulasi (`view_permohonan.html`), `resendCutiWA` di `rekapitulasi_data.js`, dan `resendCutiWA(log)` di `rekapitulasi.js` khusus untuk Admin & Operator.
+- [x] UI Magic Link Approval Modal: Dibuat di `transkep-web/modules/permohonan/view_magic_approval.html` dan `magic_approval.js`, terdaftar di `index.html`.
+- [x] PWA Service Worker `sw.js` diperbarui ke cache **`transkep-v2.8.0`** dengan precache aset magic approval baru.
+- [x] Verifikasi sintaks JavaScript 100% valid (`node --check` 0 error di seluruh berkas).
