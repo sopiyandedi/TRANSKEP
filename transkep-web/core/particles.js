@@ -4,18 +4,16 @@
 // ENGINE: ZettBOT Core v1.0.0 (by Zettbos)
 // ==========================================
 
-document.addEventListener("DOMContentLoaded", function() {
+function initLoginParticles() {
+  if (window.loginParticlesInitialized) return;
+  const canvas = document.getElementById("loginParticleCanvas");
+  if (!canvas) return;
+  window.loginParticlesInitialized = true;
+
   const mainContent = document.getElementById("main-content");
   if (mainContent) {
     mainContent.classList.remove("bg-slate-950");
   }
-  
-  initLoginParticles();
-});
-
-function initLoginParticles() {
-  const canvas = document.getElementById("loginParticleCanvas");
-  if (!canvas) return;
   const ctx = canvas.getContext("2d");
   
   let particlesArray = [];
@@ -140,4 +138,11 @@ function initLoginParticles() {
 
   init();
   animate();
+}
+
+// ZETTBOT: Eksekusi Instan (0ms delay) tanpa menunggu event async
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", initLoginParticles);
+} else {
+  initLoginParticles();
 }

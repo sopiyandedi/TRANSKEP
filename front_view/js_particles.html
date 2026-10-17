@@ -6,19 +6,16 @@
   // ==========================================
   // ZETTBOT: PARTICLE NETWORK BACKGROUND ENGINE
   // ==========================================
-  document.addEventListener("DOMContentLoaded", function() {
-    // FIX: Hapus background pekat dari Dasbor Utama agar kanvas -10 bisa terlihat tembus pandang
+  function initLoginParticles() {
+    if (window.loginParticlesInitialized) return;
+    const canvas = document.getElementById("loginParticleCanvas");
+    if (!canvas) return;
+    window.loginParticlesInitialized = true;
+
     const mainContent = document.getElementById("main-content");
     if (mainContent) {
         mainContent.classList.remove("bg-slate-950");
     }
-    
-    initLoginParticles();
-  });
-
-  function initLoginParticles() {
-    const canvas = document.getElementById("loginParticleCanvas");
-    if (!canvas) return;
     const ctx = canvas.getContext("2d");
     
     let particlesArray = [];
@@ -143,5 +140,12 @@
 
     init();
     animate();
+  }
+
+  // ZETTBOT: Eksekusi Instan (0ms delay)
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initLoginParticles);
+  } else {
+    initLoginParticles();
   }
 </script>
