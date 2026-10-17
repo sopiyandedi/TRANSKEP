@@ -5,14 +5,10 @@
  * ========================================================
  */
 
-function getPkpDb() {
-  return SpreadsheetApp.openById(PropertiesService.getScriptProperties().getProperty("TRANSKEP_DB_ID")) || SpreadsheetApp.getActiveSpreadsheet();
-}
-
 function checkAndCreateSheetPKP(sheetName, headers) {
   if (!sheetName || !headers || headers.length === 0) return null;
 
-  var ss = getPkpDb();
+  var ss = getDB();
   var sheet = ss.getSheetByName(sheetName);
   
   if (!sheet) {
@@ -40,12 +36,16 @@ function preparePKPDatabase() {
 /**
  * MENGELOLA SIMPAN PK
  */
-function submitBulkPKP(payload) {
+function submitBulkPKP(payload, userNip, clientToken) {
   var lock = LockService.getScriptLock();
   try {
     lock.waitLock(15000); 
     
-    var ss = getPkpDb();
+    if (!cekOtorisasi(userNip, clientToken)) {
+        return { success: false, message: 'Akses Ditolak: Sesi tidak valid.' };
+    }
+
+    var ss = getDB();
     var sheetDokumen = ss.getSheetByName("pkp_dokumen");
     var sheetRencana = ss.getSheetByName("pkp_rencana");
     var timestamp = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'dd/MM/yyyy HH:mm:ss');
@@ -116,9 +116,13 @@ function submitBulkPKP(payload) {
   }
 }
 
-function getDetailPKP(idPkp) {
+function getDetailPKP(idPkp, userNip, clientToken) {
   try {
-    var ss = getPkpDb();
+    if (!cekOtorisasi(userNip, clientToken)) {
+        return { success: false, message: 'Akses Ditolak: Sesi tidak valid.' };
+    }
+
+    var ss = getDB();
     var sheetDokumen = ss.getSheetByName("pkp_dokumen");
     var docData = sheetDokumen.getDataRange().getDisplayValues();
     var header = null;
@@ -163,12 +167,16 @@ function getDetailPKP(idPkp) {
 /**
  * MENGELOLA SIMPAN PCK
  */
-function submitBulkPCK(payload) {
+function submitBulkPCK(payload, userNip, clientToken) {
   var lock = LockService.getScriptLock();
   try {
     lock.waitLock(15000); 
 
-    var ss = getPkpDb();
+    if (!cekOtorisasi(userNip, clientToken)) {
+        return { success: false, message: 'Akses Ditolak: Sesi tidak valid.' };
+    }
+
+    var ss = getDB();
     var sheetDokumen = ss.getSheetByName("pck_dokumen");
     var sheetRealisasi = ss.getSheetByName("pck_realisasi");
     var timestamp = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'dd/MM/yyyy HH:mm:ss');
@@ -233,9 +241,13 @@ function submitBulkPCK(payload) {
   }
 }
 
-function getDataDokumenPCK(nipPegawai, userRole) {
+function getDataDokumenPCK(nipPegawai, userRole, clientToken) {
   try {
-    var ss = getPkpDb();
+    if (!cekOtorisasi(nipPegawai, clientToken)) {
+        return [];
+    }
+
+    var ss = getDB();
     var sheetPCK = ss.getSheetByName("pck_dokumen");
     var sheetPKP = ss.getSheetByName("pkp_dokumen");
     
@@ -276,9 +288,13 @@ function getDataDokumenPCK(nipPegawai, userRole) {
   } catch (e) { return []; }
 }
 
-function getDetailLengkapPCK(nipPegawai, bulanStr, tahunStr) {
+function getDetailLengkapPCK(nipPegawai, bulanStr, tahunStr, userNip, clientToken) {
   try {
-    var ss = getPkpDb();
+    if (!cekOtorisasi(userNip, clientToken)) {
+        return { success: false, message: "Akses Ditolak: Sesi tidak valid." };
+    }
+
+    var ss = getDB();
     var sheetPK = ss.getSheetByName("pkp_dokumen");
     var docPK = sheetPK.getDataRange().getDisplayValues();
     var idPkpFound = null;
@@ -346,9 +362,13 @@ function getDetailLengkapPCK(nipPegawai, bulanStr, tahunStr) {
 }
 
 // ZETTBOT FIX: Update Logika Step Persetujuan Dokumen
-function aksiDokumenPKP(idPKP, aksi) {
+function aksiDokumenPKP(idPKP, aksi, userNip, clientToken) {
   try {
-    var sheet = getPkpDb().getSheetByName("pkp_dokumen");
+    if (!cekOtorisasi(userNip, clientToken)) {
+        return { success: false, message: "Akses Ditolak: Sesi tidak valid." };
+    }
+
+    var sheet = getDB().getSheetByName("pkp_dokumen");
     var data = sheet.getDataRange().getDisplayValues();
     for (var i = 1; i < data.length; i++) {
       if (String(data[i][0]) === String(idPKP)) {
@@ -373,9 +393,13 @@ function aksiDokumenPKP(idPKP, aksi) {
   } catch(e) { return { success: false }; }
 }
 
-function aksiDokumenPCK(idPCK, aksi) {
+function aksiDokumenPCK(idPCK, aksi, userNip, clientToken) {
   try {
-    var sheet = getPkpDb().getSheetByName("pck_dokumen");
+    if (!cekOtorisasi(userNip, clientToken)) {
+        return { success: false, message: "Akses Ditolak: Sesi tidak valid." };
+    }
+
+    var sheet = getDB().getSheetByName("pck_dokumen");
     var data = sheet.getDataRange().getDisplayValues();
     for (var i = 1; i < data.length; i++) {
       if (String(data[i][0]) === String(idPCK)) {
@@ -395,9 +419,13 @@ function aksiDokumenPCK(idPCK, aksi) {
   } catch(e) { return { success: false }; }
 }
 
-function getDetailPrintPCK(idPCK) {
+function getDetailPrintPCK(idPCK, userNip, clientToken) {
    try {
-    var ss = getPkpDb();
+    if (!cekOtorisasi(userNip, clientToken)) {
+        return { success: false, message: "Akses Ditolak: Sesi tidak valid." };
+    }
+
+    var ss = getDB();
     var sheetPCK = ss.getSheetByName("pck_dokumen");
     var docPCK = sheetPCK.getDataRange().getDisplayValues();
     var header = null;
@@ -410,7 +438,7 @@ function getDetailPrintPCK(idPCK) {
     }
     if(!header) throw new Error("Data PCK tidak ditemukan");
     
-    var result = getDetailLengkapPCK(header.nip, header.bulan, header.tahun);
+    var result = getDetailLengkapPCK(header.nip, header.bulan, header.tahun, userNip, clientToken);
     if(!result.success) throw new Error(result.message);
     
     var sheetPK = ss.getSheetByName("pkp_dokumen");

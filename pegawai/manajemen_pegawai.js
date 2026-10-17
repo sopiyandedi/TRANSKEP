@@ -3,9 +3,13 @@
 // Deskripsi: Controller Backend untuk Kelola Pegawai
 // ==========================================
 
-function addUser(payload) {
+function addUser(payload, adminNip, clientToken) {
   try {
-    const ss = SpreadsheetApp.openById(PropertiesService.getScriptProperties().getProperty("TRANSKEP_DB_ID"));
+    if (!cekOtorisasiAdmin(adminNip, clientToken)) {
+        return { status: 'error', message: 'Akses Ditolak: Anda tidak memiliki izin Admin untuk menambah pegawai.' };
+    }
+
+    const ss = getDB();
     const sheet = ss.getSheetByName('user_data');
     const data = sheet.getDataRange().getValues();
     
@@ -27,7 +31,7 @@ function addUser(payload) {
     
     sheet.appendRow(newRow);
     const lastRow = sheet.getLastRow();
-    sheet.getRange(lastRow, 1).setNumberFormat('@'); // Set NIP jadi plain text agar tidak rusak (0 di depan hilang)
+    sheet.getRange(lastRow, 1).setNumberFormat('@'); // Set NIP jadi plain text
     
     SpreadsheetApp.flush();
     return { status: 'success', message: 'Data pegawai baru berhasil ditambahkan.' };
@@ -36,9 +40,13 @@ function addUser(payload) {
   }
 }
 
-function updateUser(payload) {
+function updateUser(payload, adminNip, clientToken) {
   try {
-    const ss = SpreadsheetApp.openById(PropertiesService.getScriptProperties().getProperty("TRANSKEP_DB_ID"));
+    if (!cekOtorisasiAdmin(adminNip, clientToken)) {
+        return { status: 'error', message: 'Akses Ditolak: Anda tidak memiliki izin Admin untuk mengubah data pegawai.' };
+    }
+
+    const ss = getDB();
     const sheet = ss.getSheetByName('user_data');
     const data = sheet.getDataRange().getValues();
     
@@ -62,7 +70,7 @@ function updateUser(payload) {
     sheet.getRange(rowIndex, 1, 1, 19).setValues(rowData);
     sheet.getRange(rowIndex, 1).setNumberFormat('@');
     
-    // ZETTBOT FIX: Update kolom ke-26 secara spesifik tanpa menyentuh kolom 20-25
+    // ZETTBOT FIX: Update kolom ke-26 secara spesifik
     sheet.getRange(rowIndex, 26).setValue(payload.jenis_jabatan || "Fungsional Umum");
     
     SpreadsheetApp.flush();
@@ -72,9 +80,13 @@ function updateUser(payload) {
   }
 }
 
-function deleteUser(nip) {
+function deleteUser(nip, adminNip, clientToken) {
   try {
-    const ss = SpreadsheetApp.openById(PropertiesService.getScriptProperties().getProperty("TRANSKEP_DB_ID"));
+    if (!cekOtorisasiAdmin(adminNip, clientToken)) {
+        return { status: 'error', message: 'Akses Ditolak: Anda tidak memiliki izin Admin untuk menghapus pegawai.' };
+    }
+
+    const ss = getDB();
     const sheet = ss.getSheetByName('user_data');
     const data = sheet.getDataRange().getValues();
     
@@ -96,9 +108,13 @@ function deleteUser(nip) {
   }
 }
 
-function importBulkUsers(jsonArray) { 
+function importBulkUsers(jsonArray, adminNip, clientToken) { 
   try {
-    const ss = SpreadsheetApp.openById(PropertiesService.getScriptProperties().getProperty("TRANSKEP_DB_ID"));
+    if (!cekOtorisasiAdmin(adminNip, clientToken)) {
+        return { status: 'error', message: 'Akses Ditolak: Anda tidak memiliki izin Admin untuk mengimpor data pegawai.' };
+    }
+
+    const ss = getDB();
     const sheet = ss.getSheetByName('user_data');
     const existingData = sheet.getDataRange().getValues();
     
@@ -125,7 +141,7 @@ function importBulkUsers(jsonArray) {
           sheet.getRange(existingMap[nipStr], 1).setNumberFormat('@');
           sheet.getRange(existingMap[nipStr], 26).setValue(jenis); // Set Kolom 26
        } else {
-          // Buat data baru dan padding string kosong dari kolom 20 hingga 25
+          // Buat data baru dan padding string kosong
           const newRow = [...rowData, "", "", "", "", "", "", jenis];
           sheet.appendRow(newRow);
           sheet.getRange(sheet.getLastRow(), 1).setNumberFormat('@');

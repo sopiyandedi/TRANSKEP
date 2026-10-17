@@ -1,49 +1,141 @@
 <!-- =========================================================================
-     ZETTBOS MODULAR UI: TEMPLATE CETAK IZIN KELUAR
+     ZETTBOS MODULAR UI: TEMPLATE CETAK IZIN KELUAR (FIXED WORD LAYOUT)
 ========================================================================== -->
-<div id="printAreaIK" class="hidden print-only bg-white text-black p-8 max-w-4xl mx-auto min-h-screen">
-    <!-- Kop Surat (Disesuaikan dengan format TRANSKEP) -->
-    <div class="text-center border-b-2 border-black pb-4 mb-6">
-        <h2 class="text-xl font-bold uppercase">Mahkamah Agung Republik Indonesia</h2>
-        <h3 class="text-lg font-bold uppercase tracking-wide">Pengadilan Agama Indramayu Kelas IA</h3>
-        <p class="text-xs text-slate-800 mt-1">Jl. Raya Indramayu No. 100, Indramayu, Jawa Barat — Telp (0231) 12345</p>
-    </div>
+<style>
+    @media print {
+        @page { 
+            /* [TAG: MARGIN KERTAS FISIK] 
+               Mengatur batas atas dan bawah kertas A4 saat di-print. 
+               Kiri & kanan diatur di #printAreaIK agar background tetap penuh jika diperlukan. */
+            size: A4 portrait; 
+            margin-top: 2cm;
+            margin-bottom: 2cm;
+        }
+        body {
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+        #printAreaIK { 
+            font-family: "Times New Roman", Times, serif !important; 
+            font-size: 11.5pt !important;
+            color: black !important;
+            line-height: 1.5 !important;
+            width: 100% !important;
+            margin: 0 auto !important;
+            
+            /* [TAG: PADDING KERTAS CETAK] 
+               Memaksa konten untuk menjorok ke dalam 2.5cm dari ujung kertas sebelah kiri dan kanan.
+               Sangat krusial menggunakan !important agar tidak di-reset oleh browser saat masuk mode print. */
+            padding-top: 1cm !important;
+            padding-left: 2.5cm !important; 
+            padding-right: 2.5cm !important;
+            box-sizing: border-box !important;
+        }
+        .print-only { display: block !important; }
+    }
     
-    <div class="text-center mb-8">
-        <h4 class="text-lg font-bold uppercase underline">Formulir Izin Keluar Kantor</h4>
-        <p class="text-sm mt-1">Nomor: <span id="cetakIkId" class="font-mono">-</span></p>
-    </div>
+    #printAreaIK {
+        font-family: "Times New Roman", Times, serif;
+        font-size: 12pt;
+        line-height: 1.5;
+        padding-top: 1cm;
+        /* [TAG: PADDING PREVIEW LAYAR] 
+           Sama seperti pengaturan print di atas, tapi ini untuk tampilan saat preview di layar */
+        padding-left: 2.5cm;
+        padding-right: 2.5cm;
+        box-sizing: border-box;
+    }
     
-    <div class="space-y-4 text-sm mb-12">
-        <p>Yang bertanda tangan di bawah ini:</p>
-        <table class="w-full ml-4">
-            <tr><td class="w-40 py-1">Nama</td><td class="w-4 py-1">:</td><td id="cetakIkNama" class="py-1 font-bold">-</td></tr>
-            <tr><td class="w-40 py-1">NIP</td><td class="w-4 py-1">:</td><td id="cetakIkNip" class="py-1">-</td></tr>
-            <tr><td class="w-40 py-1">Jabatan</td><td class="w-4 py-1">:</td><td id="cetakIkJabatan" class="py-1">-</td></tr>
+    /* [TAG: JARAK BARIS FORMULIR] 
+       Mengatur kerenggangan (spasi atas/bawah) pada tabel biodata (Pejabat & Pemohon).
+       Dibuat agak renggang (3px) agar terlihat pas seperti ketikan mesin tik/Word. */
+    .ik-table td {
+        padding-top: 3px;
+        padding-bottom: 3px;
+    }
+    
+    /* [TAG: JARAK BARIS LAMPIRAN] 
+       Khusus untuk blok kanan atas (SK Ketua MA). Jarak atas-bawah dinolkan (0px) 
+       dan line-height dikecilkan agar tulisannya padat dan merapat. */
+    .lampiran-table td {
+        padding-top: 0px !important;
+        padding-bottom: 0px !important;
+        line-height: 1.2;
+    }
+
+    /* [TAG: LEBAR KOLOM LABEL] 
+       Lebar 220px digunakan agar titik dua (:) posisinya tepat sejajar seperti ditekan tombol "Tab" di Word. */
+    .ik-col-label { width: 220px; }
+    .ik-col-separator { width: 20px; text-align: center; }
+</style>
+
+<div id="printAreaIK" class="hidden print-only bg-white text-black max-w-[210mm] mx-auto min-h-screen">
+    
+    <!-- [TAG: POSISI BLOK LAMPIRAN] 
+         margin-left: 50% berfungsi mendorong blok ini agar mulai tepat di garis tengah halaman.
+         mb-10 (margin-bottom) memberikan jarak yang cukup jauh antara blok Lampiran dengan Judul Surat di bawahnya. -->
+    <div style="margin-left: 50%;" class="mb-16 text-[11pt]">
+        <table class="lampiran-table">
+            <tr><td colspan="3">Lampiran II</td></tr>
+            <tr><td colspan="3">SK. Ketua mahkamah Agung RI</td></tr>
+            <tr><td style="width: 70px;">Nomor</td><td style="width: 15px; text-align: center;">:</td><td>071 / KMA / SK / V / 2008</td></tr>
+            <tr><td>Tanggal</td><td style="text-align: center;">:</td><td>14 Mei 2008</td></tr>
         </table>
-        
-        <p class="mt-4">Mengajukan izin untuk keluar kantor pada jam kerja, dengan rincian sebagai berikut:</p>
-        <table class="w-full ml-4">
-            <tr><td class="w-40 py-1">Tanggal</td><td class="w-4 py-1">:</td><td id="cetakIkTanggal" class="py-1 font-semibold">-</td></tr>
-            <tr><td class="w-40 py-1">Jam Keluar</td><td class="w-4 py-1">:</td><td id="cetakIkJamKeluar" class="py-1 font-semibold">-</td></tr>
-            <tr><td class="w-40 py-1">Jam Kembali</td><td class="w-4 py-1">:</td><td id="cetakIkJamKembali" class="py-1 font-semibold">-</td></tr>
-            <tr><td class="w-40 py-1 align-top">Tujuan / Keperluan</td><td class="w-4 py-1 align-top">:</td><td id="cetakIkAlasan" class="py-1 text-justify">-</td></tr>
-        </table>
-        
-        <p class="mt-4">Demikian permohonan ini disampaikan untuk dapat dipertimbangkan sebagaimana mestinya.</p>
     </div>
     
-    <!-- Area Tanda Tangan -->
-    <div class="flex justify-between mt-16 text-sm">
-        <div class="text-center w-64">
-            <p class="mb-20">Mengetahui/Menyetujui,<br>Atasan Langsung</p>
-            <p id="cetakIkNamaAtasan" class="font-bold underline">-</p>
-            <p>NIP. <span id="cetakIkNipAtasan">-</span></p>
-        </div>
-        <div class="text-center w-64">
-            <p class="mb-20">Indramayu, <span id="cetakIkTanggalBuat">-</span><br>Pegawai Pemohon</p>
-            <p id="cetakIkNamaPemohon" class="font-bold underline">-</p>
-            <p>NIP. <span id="cetakIkNipPemohon">-</span></p>
-        </div>
+    <!-- [TAG: JUDUL SURAT] 
+         mb-10 memberikan jarak kosong antara judul dan tabel 'Yang bertanda tangan' -->
+    <div class="text-center mb-10">
+        <h4 class="font-bold text-[14pt]">
+            SURAT IZIN KELUAR KANTOR (<span id="cetakIkTipeCoret">Datang/Pulang</span>)
+        </h4>
+    </div>
+    
+    <!-- [TAG: TABEL PEJABAT PEMBERI IZIN] 
+         mb-8 memberikan jarak sedang antara bagian pemberi izin dan pegawai yang diberi izin -->
+    <div class="mb-8">
+        <p class="mb-3">Yang bertanda tangan di bawah ini :</p>
+        <table class="ik-table w-full">
+            <tr><td class="ik-col-label">Nama</td><td class="ik-col-separator">:</td><td id="cetakIkNamaAtasan">-</td></tr>
+            <tr><td class="ik-col-label">NIP</td><td class="ik-col-separator">:</td><td id="cetakIkNipAtasan">-</td></tr>
+            <tr><td class="ik-col-label">Pangkat/ Gol/Ruang</td><td class="ik-col-separator">:</td><td id="cetakIkPangkatAtasan">-</td></tr>
+            <tr><td class="ik-col-label">Jabatan</td><td class="ik-col-separator">:</td><td id="cetakIkJabatanAtasan">-</td></tr>
+            <tr><td class="ik-col-label">Unit Kerja</td><td class="ik-col-separator">:</td><td>Pengadilan Agama Indramayu</td></tr>
+        </table>
+    </div>
+    
+    <!-- [TAG: TABEL PEGAWAI YANG DIBERI IZIN] -->
+    <div class="mb-6">
+        <p class="mb-3">Memberikan izin keluar kantor kepada :</p>
+        <table class="ik-table w-full">
+            <tr><td class="ik-col-label">Nama</td><td class="ik-col-separator">:</td><td id="cetakIkNamaPemohon">-</td></tr>
+            <tr><td class="ik-col-label">NIP</td><td class="ik-col-separator">:</td><td><span id="cetakIkNipPemohon">-</span></td></tr>
+            <tr><td class="ik-col-label">Pangkat/ Gol/Ruang</td><td class="ik-col-separator">:</td><td id="cetakIkPangkatPemohon">-</td></tr>
+            <tr><td class="ik-col-label">Unit Kerja</td><td class="ik-col-separator">:</td><td>Pengadilan Agama Indramayu</td></tr>
+            <tr><td class="ik-col-label">Jam</td><td class="ik-col-separator">:</td><td><span id="cetakIkJam">-</span> WIB</td></tr>
+            <tr>
+                <td class="ik-col-label align-top">Untuk Keperluan</td>
+                <td class="ik-col-separator align-top">:</td>
+                <td>
+                    <!-- [TAG: JARAK TEKS KEPERLUAN] 
+                         mb-4 memberikan jarak renggang antara paragraf penjelasan izin dengan teks "Pada Tanggal" di bawahnya -->
+                    <div id="cetakIkAlasan" class="mb-4 text-justify pr-4">-</div>
+                    <div>Pada Tanggal &nbsp;&nbsp;<span id="cetakIkTanggal">-</span></div>
+                </td>
+            </tr>
+        </table>
+    </div>
+    
+    <!-- [TAG: POSISI TITI MANGSA & TANDA TANGAN] 
+         margin-left: 50% menjaga agar rata kiri sejajar dengan blok Lampiran di atas.
+         margin-top: 3.5rem memberikan jarak lompatan ke bawah yang cukup lebar (seperti di enter 2-3 kali)
+         mb-20 pada nama jabatan memberikan ruang vertikal untuk tanda tangan basah (cap). -->
+    <div style="margin-left: 50%; margin-top: 3.5rem;" class="text-left text-[12pt] leading-snug">
+        <p>Indramayu, <span id="cetakIkTanggalBuat">-</span></p>
+        <p>Pejabat Yang Memberikan Izin</p>
+        <p id="cetakIkJabatanTTD" class="mb-20">-</p>
+        
+        <p id="cetakIkNamaTTD" class="underline">-</p>
+        <p>NIP. <span id="cetakIkNipTTD">-</span></p>
     </div>
 </div>

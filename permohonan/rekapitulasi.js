@@ -3,9 +3,11 @@
 // Deskripsi: Backend Controller untuk Rekapitulasi & Mesin Auto-Routing (Eskalasi/Delegasi)
 // ==========================================
 
-function getSmartRouting(atasanNip, pejabatNip, tglMulai, tglSelesai) {
+function getSmartRouting(atasanNip, pejabatNip, tglMulai, tglSelesai, userNip, clientToken) {
   try {
-    const ss = SpreadsheetApp.openById(PropertiesService.getScriptProperties().getProperty("TRANSKEP_DB_ID"));
+    if (!cekOtorisasi(userNip, clientToken)) return { status: 'error', message: 'Akses Ditolak: Sesi tidak valid.' };
+    
+    const ss = getDB();
     const userSheet = ss.getSheetByName('user_data');
     const cutiSheet = ss.getSheetByName('cuti_log');
     const stSheet = ss.getSheetByName('st_log');
@@ -14,16 +16,12 @@ function getSmartRouting(atasanNip, pejabatNip, tglMulai, tglSelesai) {
     const cutis = cutiSheet ? cutiSheet.getDataRange().getDisplayValues() : [];
     const sts = stSheet ? stSheet.getDataRange().getDisplayValues() : [];
 
-    // 1. Map seluruh pegawai
     let userList = [];
     for(let i=1; i<users.length; i++) {
        userList.push({ nip: String(users[i][0]).trim(), nama: users[i][1], jabatan: users[i][2] });
     }
 
-    // 2. Kumpulkan rekam jejak ketidakhadiran (Cuti & DL)
     let absences = [];
-    
-    // Cuti Disetujui
     for(let i=1; i<cutis.length; i++) {
         if(cutis[i][7] === 'Disetujui') {
              let hist = cutis[i][16] || '{}';
@@ -40,19 +38,12 @@ function getSmartRouting(atasanNip, pejabatNip, tglMulai, tglSelesai) {
         }
     }
 
-    // ST / Dinas Luar Aktif
     for(let i=1; i<sts.length; i++) {
         if(sts[i][12] !== 'DIBATALKAN') {
              let pArr = [];
              try { pArr = JSON.parse(sts[i][10] || '[]'); } catch(e) {}
              pArr.forEach(p => {
-                 absences.push({
-                     nip: String(p.nip).trim(),
-                     start: new Date(sts[i][7]),
-                     end: new Date(sts[i][8]),
-                     plh_nip: p.plh_nip || "",
-                     jenis: "Dinas Luar"
-                 });
+                 absences.push({ nip: String(p.nip).trim(), start: new Date(sts[i][7]), end: new Date(sts[i][8]), plh_nip: p.plh_nip || "", jenis: "Dinas Luar" });
              });
         }
     }

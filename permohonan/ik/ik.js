@@ -1,19 +1,19 @@
 // =========================================================================
-// ZETTBOS BACKEND MODULE: IZIN KELUAR (ik.gs / js.gs)
-// Fungsi backend murni untuk Modul Izin Keluar Kantor.
+// ZETTBOS BACKEND MODULE: IZIN KELUAR (Aman & Terpusat)
 // =========================================================================
 
-function submitIzinKeluar(payload) {
+function submitIzinKeluar(payload, clientToken) {
   try {
-    const ss = SpreadsheetApp.openById(PropertiesService.getScriptProperties().getProperty("TRANSKEP_DB_ID"));
+    if (!cekOtorisasi(payload.nip, clientToken)) return { status: 'error', message: 'Akses Ditolak: Sesi tidak valid.' };
+
+    const ss = getDB();
     let sheetIK = ss.getSheetByName('izin_keluar_log');
     
-    // ZettBOT Feature: Lazy-Initialization (Auto-Create database sheet)
     if(!sheetIK) {
         sheetIK = ss.insertSheet('izin_keluar_log');
-        const headers = ['ID', 'Waktu_Pengajuan', 'NIP', 'Tanggal', 'Jam_Keluar', 'Jam_Kembali', 'Keperluan', 'Atasan_NIP', 'Status', 'Catatan_Atasan'];
+        const headers = ['ID', 'Waktu_Pengajuan', 'NIP', 'Tanggal', 'Tipe_Izin', 'Jam', 'Keperluan', 'Atasan_NIP', 'Status', 'Catatan_Atasan'];
         sheetIK.appendRow(headers);
-        sheetIK.getRange("A1:J1").setFontWeight("bold").setBackground("#0ea5e9").setFontColor("#ffffff"); // Warna header Biru Langit
+        sheetIK.getRange("A1:J1").setFontWeight("bold").setBackground("#0ea5e9").setFontColor("#ffffff"); 
         sheetIK.setFrozenRows(1);
     }
     
@@ -21,29 +21,18 @@ function submitIzinKeluar(payload) {
     const newId = "IK-" + new Date().getTime() + Math.floor(Math.random() * 1000);
     
     sheetIK.appendRow([
-        newId,
-        timestamp,
-        payload.nip,
-        payload.tanggal,
-        payload.jam_keluar,
-        payload.jam_kembali,
-        payload.alasan,
-        payload.atasan_nip,
-        'Menunggu',
-        ''
+        newId, timestamp, payload.nip, payload.tanggal, payload.tipe_izin,
+        payload.jam, payload.alasan, payload.atasan_nip, 'Menunggu', ''
     ]);
     
     SpreadsheetApp.flush();
-    return { status: 'success', message: 'Izin Keluar berhasil diajukan dan sedang menunggu persetujuan Atasan.', data: { id: newId } };
-    
-  } catch (err) { 
-    return { status: 'error', message: err.toString() }; 
-  }
+    return { status: 'success', message: 'Izin Keluar berhasil diajukan dan sedang menunggu persetujuan.', data: { id: newId } };
+  } catch (err) { return { status: 'error', message: err.toString() }; }
 }
 
 function getIzinKeluarById(id) {
   try {
-    const ss = SpreadsheetApp.openById(PropertiesService.getScriptProperties().getProperty("TRANSKEP_DB_ID"));
+    const ss = getDB();
     const sheetIK = ss.getSheetByName('izin_keluar_log');
     if (!sheetIK) throw new Error("Data Izin Keluar belum tersedia.");
     
@@ -53,29 +42,22 @@ function getIzinKeluarById(id) {
         return {
           status: 'success',
           data: {
-            id: data[i][0],
-            waktu: data[i][1],
-            nip: data[i][2],
-            tanggal: data[i][3],
-            jam_keluar: data[i][4],
-            jam_kembali: data[i][5],
-            alasan: data[i][6],
-            atasan_nip: data[i][7],
-            status: data[i][8],
-            catatan: data[i][9]
+            id: data[i][0], waktu: data[i][1], nip: data[i][2],
+            tanggal: data[i][3], tipe_izin: data[i][4], jam: data[i][5],
+            alasan: data[i][6], atasan_nip: data[i][7], status: data[i][8], catatan: data[i][9]
           }
         };
       }
     }
     throw new Error("Data Izin Keluar tidak ditemukan.");
-  } catch (err) {
-    return { status: 'error', message: err.toString() };
-  }
+  } catch (err) { return { status: 'error', message: err.toString() }; }
 }
 
-function updateIkStatus(id, decision, notes, userNip, bypassMode = null) {
+function updateIkStatus(id, decision, notes, userNip, bypassMode, clientToken) {
   try {
-    const ss = SpreadsheetApp.openById(PropertiesService.getScriptProperties().getProperty("TRANSKEP_DB_ID"));
+    if (!cekOtorisasi(userNip, clientToken)) return { status: 'error', message: 'Akses Ditolak: Sesi tidak valid.' };
+
+    const ss = getDB();
     const sheet = ss.getSheetByName('izin_keluar_log');
     const data = sheet.getDataRange().getValues();
     
@@ -88,20 +70,19 @@ function updateIkStatus(id, decision, notes, userNip, bypassMode = null) {
     let finalNotes = notes;
     if (bypassMode) finalNotes += "\n\n*(Disetujui via Bypass Atasan)*";
     
-    sheet.getRange(rowIndex, 9).setValue(decision); // Set Kolom Status (I)
-    sheet.getRange(rowIndex, 10).setValue(finalNotes); // Set Kolom Catatan (J)
+    sheet.getRange(rowIndex, 9).setValue(decision); 
+    sheet.getRange(rowIndex, 10).setValue(finalNotes); 
     
     SpreadsheetApp.flush();
     return { status: 'success', message: 'Usulan Izin Keluar berhasil diproses.' };
-  } catch(e) { 
-    return { status: 'error', message: e.toString() }; 
-  }
+  } catch(e) { return { status: 'error', message: e.toString() }; }
 }
 
-// ZETTBOT FIX: Fungsi Delete/Tarik Data Izin Keluar Kantor
-function deleteIzinKeluarLog(id, forceDelete = false) {
+function deleteIzinKeluarLog(id, forceDelete, userNip, clientToken) {
   try {
-    const ss = SpreadsheetApp.openById(PropertiesService.getScriptProperties().getProperty("TRANSKEP_DB_ID"));
+    if (!cekOtorisasi(userNip, clientToken)) return { status: 'error', message: 'Akses Ditolak: Sesi tidak valid.' };
+
+    const ss = getDB();
     const sheet = ss.getSheetByName('izin_keluar_log');
     const data = sheet.getDataRange().getValues();
     
@@ -121,10 +102,11 @@ function deleteIzinKeluarLog(id, forceDelete = false) {
   } catch (err) { return { status: 'error', message: err.toString() }; }
 }
 
-// ZETTBOT FIX: Fungsi Soft Edit / Update Data IK
-function updateIzinKeluarLog(payload) {
+function updateIzinKeluarLog(payload, clientToken) {
   try {
-    const ss = SpreadsheetApp.openById(PropertiesService.getScriptProperties().getProperty("TRANSKEP_DB_ID"));
+    if (!cekOtorisasi(payload.nip, clientToken)) return { status: 'error', message: 'Akses Ditolak: Sesi tidak valid.' };
+
+    const ss = getDB();
     const sheet = ss.getSheetByName('izin_keluar_log');
     const data = sheet.getDataRange().getValues();
     
@@ -134,18 +116,17 @@ function updateIzinKeluarLog(payload) {
     }
     if (rowIndex === -1) throw new Error("Data tidak ditemukan.");
     
-    // Cek Keamanan
     if (data[rowIndex-1][8] !== 'Menunggu' && data[rowIndex-1][8] !== 'Ditolak') {
         throw new Error("Akses Ditolak: Hanya data berstatus Menunggu atau Ditolak yang bisa diubah.");
     }
     
     sheet.getRange(rowIndex, 4).setValue(payload.tanggal);
-    sheet.getRange(rowIndex, 5).setValue(payload.jam_keluar);
-    sheet.getRange(rowIndex, 6).setValue(payload.jam_kembali);
+    sheet.getRange(rowIndex, 5).setValue(payload.tipe_izin);
+    sheet.getRange(rowIndex, 6).setValue(payload.jam);
     sheet.getRange(rowIndex, 7).setValue(payload.alasan);
     sheet.getRange(rowIndex, 8).setValue(payload.atasan_nip);
-    sheet.getRange(rowIndex, 9).setValue('Menunggu'); // Reset Status
-    sheet.getRange(rowIndex, 10).setValue(''); // Reset Catatan
+    sheet.getRange(rowIndex, 9).setValue('Menunggu');
+    sheet.getRange(rowIndex, 10).setValue('');
     
     SpreadsheetApp.flush();
     return { status: 'success', message: 'Izin Keluar berhasil diperbarui.' };

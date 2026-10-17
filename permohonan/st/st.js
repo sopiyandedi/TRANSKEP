@@ -1,14 +1,13 @@
 // ==========================================
 // FILE: st.gs
-// Deskripsi: Backend Controller khusus Surat Tugas (ST)
+// Deskripsi: Backend Controller Surat Tugas (ST) (Aman & Terpusat)
 // ==========================================
 
 function setupSheetST() {
   try {
-    const ss = SpreadsheetApp.openById(PropertiesService.getScriptProperties().getProperty("TRANSKEP_DB_ID"));
+    const ss = getDB();
     let sheetST = ss.getSheetByName('st_log');
     
-    // Hanya buat header jika sheet belum ada
     if (!sheetST) {
       sheetST = ss.insertSheet('st_log');
       const headers = [
@@ -22,99 +21,68 @@ function setupSheetST() {
     }
     SpreadsheetApp.flush();
     return "Database st_log siap.";
-  } catch (e) {
-    return "Error: " + e.toString();
-  }
+  } catch (e) { return "Error: " + e.toString(); }
 }
 
-function addSuratTugas(payload) {
+function addSuratTugas(payload, userNip, clientToken) {
   try {
-    const ss = SpreadsheetApp.openById(PropertiesService.getScriptProperties().getProperty("TRANSKEP_DB_ID"));
-    const sheetST = ss.getSheetByName('st_log');
-    if (!sheetST) throw new Error("Sheet st_log belum dibuat. Minta Admin jalankan setup database ST.");
+    if (!cekOtorisasi(userNip, clientToken)) return { status: 'error', message: 'Akses Ditolak: Sesi tidak valid.' };
+
+    const ss = getDB();
+    let sheetST = ss.getSheetByName('st_log');
+    if (!sheetST) {
+      setupSheetST();
+      sheetST = ss.getSheetByName('st_log');
+    }
 
     const idST = "ST-" + new Date().getTime() + Math.floor(Math.random() * 1000);
     const waktuDibuat = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'dd/MM/yyyy HH:mm:ss');
     
-    // ZETTBOT FIX: Simpan ke sheet (Kolom A s.d N terkunci posisinya)
-    sheetST.appendRow([
-      idST, 
-      waktuDibuat, 
-      payload.nomor_surat || '', 
-      payload.menimbang || '', 
-      payload.dasar || '',
-      payload.tujuan || '', 
-      payload.tempat || '', 
-      payload.tgl_mulai || '', 
-      payload.tgl_selesai || '', 
-      payload.jam || '',
-      payload.peserta_json || '', 
-      payload.pejabat_ttd || '',
-      'DISETUJUI', // Ubah dari 'Aktif' menjadi 'DISETUJUI'
-      payload.data_ekstra_json || '' 
-    ]);
+    sheetST.appendRow(sanitizeRowArray([
+      idST, waktuDibuat, payload.nomor_surat || '', payload.menimbang || '', payload.dasar || '',
+      payload.tujuan || '', payload.tempat || '', payload.tgl_mulai || '', payload.tgl_selesai || '', 
+      payload.jam || '', payload.peserta_json || '', payload.pejabat_ttd || '',
+      'DISETUJUI', payload.data_ekstra_json || '' 
+    ]));
     
     SpreadsheetApp.flush();
     return { status: 'success', message: 'Surat Tugas berhasil diterbitkan.', id: idST };
-  } catch (err) {
-    return { status: 'error', message: err.toString() };
-  }
+  } catch (err) { return { status: 'error', message: err.toString() }; }
 }
 
-// ZETTBOT FIX: Tambahan fungsi untuk Update data Surat Tugas yang sudah ada
-function updateSuratTugas(payload) {
+function updateSuratTugas(payload, userNip, clientToken) {
   try {
-    const ss = SpreadsheetApp.openById(PropertiesService.getScriptProperties().getProperty("TRANSKEP_DB_ID"));
+    if (!cekOtorisasi(userNip, clientToken)) return { status: 'error', message: 'Akses Ditolak: Sesi tidak valid.' };
+
+    const ss = getDB();
     const sheetST = ss.getSheetByName('st_log');
     if (!sheetST) throw new Error("Database Surat Tugas tidak ditemukan.");
 
     const data = sheetST.getDataRange().getValues();
     let rowIndex = -1;
-    
-    // Cari baris berdasarkan ID_ST
     for (let i = 1; i < data.length; i++) {
-      if (String(data[i][0]) === String(payload.id_st)) {
-        rowIndex = i + 1;
-        break;
-      }
+      if (String(data[i][0]) === String(payload.id_st)) { rowIndex = i + 1; break; }
     }
+    if (rowIndex === -1) throw new Error("Data Surat Tugas tidak ditemukan.");
 
-    if (rowIndex === -1) throw new Error("Data Surat Tugas tidak ditemukan untuk diperbarui.");
-
-    // Ambil waktu pembuatan asli agar tidak berubah
     const originalWaktu = sheetST.getRange(rowIndex, 2).getValue();
     
-    // ZETTBOT FIX: Array baris data baru untuk di-replace (Terlindungi dari pergeseran)
     const updatedRow = [
-      payload.id_st, 
-      originalWaktu, 
-      payload.nomor_surat || '', 
-      payload.menimbang || '', 
-      payload.dasar || '',
-      payload.tujuan || '', 
-      payload.tempat || '', 
-      payload.tgl_mulai || '', 
-      payload.tgl_selesai || '', 
-      payload.jam || '',
-      payload.peserta_json || '', 
-      payload.pejabat_ttd || '',
-      'DISETUJUI', // Standar status yang sama
-      payload.data_ekstra_json || '' 
+      payload.id_st, originalWaktu, payload.nomor_surat || '', payload.menimbang || '', payload.dasar || '',
+      payload.tujuan || '', payload.tempat || '', payload.tgl_mulai || '', payload.tgl_selesai || '', 
+      payload.jam || '', payload.peserta_json || '', payload.pejabat_ttd || '',
+      'DISETUJUI', payload.data_ekstra_json || '' 
     ];
     
-    // Timpa (overwrite) baris tersebut
     sheetST.getRange(rowIndex, 1, 1, updatedRow.length).setValues([updatedRow]);
     SpreadsheetApp.flush();
-    
     return { status: 'success', message: 'Data Surat Tugas berhasil diperbarui secara permanen.' };
-  } catch (err) {
-    return { status: 'error', message: err.toString() };
-  }
+  } catch (err) { return { status: 'error', message: err.toString() }; }
 }
 
 function getSuratTugasData() {
   try {
-    const ss = SpreadsheetApp.openById(PropertiesService.getScriptProperties().getProperty("TRANSKEP_DB_ID"));
+    const ss = getDB();
     const sheetST = ss.getSheetByName('st_log');
     if (!sheetST) return [];
 
@@ -124,45 +92,37 @@ function getSuratTugasData() {
       result.push({
         id: data[i][0], waktu: data[i][1], nomor: data[i][2], menimbang: data[i][3], dasar: data[i][4],
         tujuan: data[i][5], tempat: data[i][6], tgl_mulai: data[i][7], tgl_selesai: data[i][8],
-        jam: data[i][9], peserta: data[i][10], pejabat_ttd: data[i][11], status: data[i][12],
-        data_ekstra: data[i][13] || '{}'
+        jam: data[i][9], peserta: data[i][10], pejabat_ttd: data[i][11], status: data[i][12], data_ekstra: data[i][13] || '{}'
       });
     }
     return result;
-  } catch (err) {
-    return [];
-  }
+  } catch (err) { return []; }
 }
 
-function deleteSuratTugasLog(id) {
+function deleteSuratTugasLog(id, userNip, clientToken) {
   try {
-    const ss = SpreadsheetApp.openById(PropertiesService.getScriptProperties().getProperty("TRANSKEP_DB_ID"));
+    if (!cekOtorisasi(userNip, clientToken)) return { status: 'error', message: 'Akses Ditolak: Sesi tidak valid.' };
+
+    const ss = getDB();
     const sheetST = ss.getSheetByName('st_log');
     if (!sheetST) throw new Error("Database Surat Tugas tidak ditemukan.");
 
     const data = sheetST.getDataRange().getValues();
     let rowIndex = -1;
-    
     for (let i = 1; i < data.length; i++) {
-      if (String(data[i][0]) === String(id)) {
-        rowIndex = i + 1;
-        break;
-      }
+      if (String(data[i][0]) === String(id)) { rowIndex = i + 1; break; }
     }
-
-    if (rowIndex === -1) throw new Error("Data Surat Tugas tidak ditemukan di database.");
+    if (rowIndex === -1) throw new Error("Data Surat Tugas tidak ditemukan.");
 
     sheetST.deleteRow(rowIndex);
     SpreadsheetApp.flush();
-    
     return { status: 'success', message: 'Surat Tugas berhasil dihapus permanen.' };
-  } catch (err) {
-    return { status: 'error', message: err.toString() };
-  }
+  } catch (err) { return { status: 'error', message: err.toString() }; }
 } 
 
-function saveSettingsST(payload) {
+function saveSettingsST(payload, userNip, clientToken) {
   try {
+    if (!cekOtorisasi(userNip, clientToken)) return { status: 'error', message: 'Akses Ditolak: Sesi tidak valid.' };
     const props = PropertiesService.getScriptProperties();
     props.setProperty('ST_DEFAULT_PPK', payload.ppk);
     props.setProperty('ST_DEFAULT_MENIMBANG', payload.menimbang);
@@ -172,9 +132,7 @@ function saveSettingsST(payload) {
     props.setProperty('ST_DEFAULT_ANGKUTAN', payload.angkutan);
     props.setProperty('ST_DEFAULT_PARAGRAF_BIAYA', payload.paragraf_biaya);
     return { status: 'success', message: 'Pengaturan dasar Surat Tugas berhasil disimpan.' };
-  } catch (e) {
-    return { status: 'error', message: e.toString() };
-  }
+  } catch (e) { return { status: 'error', message: e.toString() }; }
 }
 
 function getSettingsST() {
@@ -192,7 +150,5 @@ function getSettingsST() {
         paragraf_biaya: props.getProperty('ST_DEFAULT_PARAGRAF_BIAYA') || ''
       }
     };
-  } catch (e) {
-    return { status: 'error', data: {} };
-  }
+  } catch (e) { return { status: 'error', data: {} }; }
 }

@@ -1,864 +1,558 @@
 <script>
-  let currentSkTab = 'all';
-  let groupedSkData = [];
-  let tempMembers = []; 
-  let groupedSkPegawaiData = []; 
+// ==========================================
+// FILE: sk/js_sk.html (VUE.JS VERSION FULL)
+// ==========================================
 
-  const hierarkiJabatanSk = [
-    "Ketua", "Wakil Ketua", "Hakim", "Panitera", "Sekretaris",
-    "Panitera Muda Gugatan", "Panitera Muda Permohonan", "Panitera Muda Hukum",
-    "Kepala Sub Bagian Umum dan Keuangan", "Kepala Sub Bagian Kepegawaian, ORTALA",
-    "Kepala Sub Bagian Perencanaan, TI dan Pelaporan", "Panitera Pengganti",
-    "Juru Sita", "Juru Sita Pengganti", "Pranata Komputer Ahli Pertama",
-    "Operator - Penata Layanan Operasional", "Arsiparis Terampil",
-    "Klerek - Analis Perkara Peradilan", "Penata Layanan Operasional",
-    "Operator Layanan Operasional"
-  ];
+document.addEventListener("DOMContentLoaded", () => {
+    window.vmSkApp = Vue.createApp({
+        data() {
+            return {
+                globalState: window.vueState,
+                currentSkTab: 'Pegawai', // ZETTBOT FIX: Tab Rekap menjadi default saat modul dibuka
+                skSearchQuery: '',
+                expandedSkRows: [],
+                expandedPegawaiRows: [],
+                
+                showModalSkForm: false,
+                modalSkMode: 'add',
+                formSk: {
+                    id: '', tgl_input: '', judul_sk: '', pj_sk: 'PJ. Kesekretariatan',
+                    link_drive: '', no_sk: '', tgl_sk: ''
+                },
+                tempMembers: [],
+                skSearchMemberInput: '',
 
-  function getBobotJabatanSk(jabatan) {
-    if (!jabatan) return 999;
-    const index = hierarkiJabatanSk.findIndex(j => j.toLowerCase() === jabatan.toLowerCase().trim());
-    return index !== -1 ? index : 999;
-  }
+                // ZETTBOT: State untuk Upload File PDF, Drag-Drop & Pintasan Folder Drive
+                skSelectedFile: null,
+                skFileDataBase64: null,
+                isUploading: false,
+                isDraggingSk: false,
+                isOpeningDriveSk: false,
+                skDriveFolderUrl: null,
 
-  function formatDateDMY(dateString) {
-    if(!dateString || dateString === '-') return '-';
-    const parts = dateString.split('-');
-    if(parts.length !== 3) return dateString;
-    
-    const namaBulan = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
-    const hari = parts[2];
-    const bulan = parseInt(parts[1], 10);
-    const tahun = parts[0];
-    
-    return hari + ' ' + namaBulan[bulan] + ' ' + tahun;
-  }
-
-  function renderSkView() {
-    const userRole = state.user.role ? state.user.role.toLowerCase() : "";
-    if (userRole.includes('admin')) {
-      document.getElementById('btnTambahSk').classList.remove('hidden');
-    } else {
-      document.getElementById('btnTambahSk').classList.add('hidden');
-    }
-
-    let mapGroup = {};
-    state.skList.forEach(sk => {
-       const baseId = String(sk.id).split('-').slice(0, 2).join('-');
-       
-       if(!mapGroup[baseId]) {
-          let fallbackPj = (sk.pj_sk && sk.pj_sk !== '-' && sk.pj_sk !== 'undefined') ? sk.pj_sk : 'PJ. Kesekretariatan';
-          let parsedData = { no_sk: '-', tgl_sk: '-', pj: fallbackPj, peran: '-' };
-          
-          try {
-             if(sk.tugas_sk && sk.tugas_sk.startsWith('{')) {
-                 let j = JSON.parse(sk.tugas_sk);
-                 parsedData = { 
-                     no_sk: j.no_sk || '-', 
-                     tgl_sk: j.tgl_sk || '-', 
-                     pj: j.pj || fallbackPj, 
-                     peran: j.peran || '-' 
-                 };
-             }
-          } catch(e) {}
-
-          mapGroup[baseId] = {
-             id: baseId,
-             judul_sk: sk.judul_sk, 
-             link_drive: sk.link_drive, 
-             tgl_input: (sk.tgl_input && sk.tgl_input !== 'undefined') ? sk.tgl_input : '-',
-             no_sk: parsedData.no_sk, 
-             tgl_sk: parsedData.tgl_sk, 
-             pj_sk: parsedData.pj, 
-             members: []
-          };
-       }
-       let peran = '-';
-       try { 
-           if(sk.tugas_sk && sk.tugas_sk.startsWith('{')) {
-               peran = JSON.parse(sk.tugas_sk).peran || '-'; 
-           }
-       } catch(e) {}
-       
-       mapGroup[baseId].members.push({ nip: sk.nip, peran: peran });
-    });
-    groupedSkData = Object.values(mapGroup).reverse();
-
-    const datalist = document.getElementById('skListDatalist');
-    if(datalist) {
-       datalist.innerHTML = "";
-        // ZETTBOT FIX: 1. Masukkan Opsi Tag Grup dari js_sortir di urutan paling atas
-       if (typeof GROUP_TAGS !== 'undefined') {
-           Object.keys(GROUP_TAGS).forEach(tagKey => {
-               const opt = document.createElement('option');
-               opt.value = `[GRUP] ${GROUP_TAGS[tagKey].label} (${tagKey})`;
-               datalist.appendChild(opt);
-           });
-       }
-
-       // ZETTBOT FIX: 2. Masukkan Opsi Individu Pegawai di bawahnya
-       state.usersList.forEach(u => {
-          const opt = document.createElement('option');
-          opt.value = `${u.nama} - ${u.jabatan} (${u.nip})`;
-          datalist.appendChild(opt);
-       });
-    }
-
-    if(currentSkTab === 'Pegawai') {
-        renderSkPegawaiTable();
-    } else {
-        renderSkTable();
-    }
-  }
-
-  function filterSkTab(tabName) {
-     currentSkTab = tabName;
-     
-     const searchInput = document.getElementById('skSearchInput');
-     if(searchInput) searchInput.value = "";
-     
-     const tabs = ['all', 'PJ. Manajemen', 'PJ. Kepaniteraan', 'PJ. Kesekretariatan', 'Pegawai'];
-     
-     tabs.forEach(t => {
-        const btnId = t === 'all' ? 'tab-sk-all' : (t === 'Pegawai' ? 'tab-sk-pegawai' : 'tab-sk-' + t.toLowerCase().replace('pj. ', ''));
-        const btn = document.getElementById(btnId);
-        if(btn) {
-           if(t === tabName) {
-              btn.className = "px-4 py-2 rounded-lg text-xs font-bold transition-all bg-indigo-600 text-white shadow-md";
-           } else {
-              btn.className = "px-4 py-2 rounded-lg text-xs font-bold transition-all text-slate-400 hover:text-slate-200 hover:bg-slate-800/50";
-           }
-        }
-     });
-     
-     const userRole = state.user.role ? state.user.role.toLowerCase() : "";
-     const isAdminOrOperator = userRole.includes('admin') || userRole.includes('operator');
-     
-     if (tabName === 'Pegawai') {
-        document.getElementById('skModeSk').classList.add('hidden');
-        document.getElementById('skModePegawai').classList.remove('hidden');
-        
-        if (isAdminOrOperator) {
-            document.getElementById('btnTambahSk').classList.remove('hidden');
-        } else {
-            document.getElementById('btnTambahSk').classList.add('hidden'); 
-        }
-        
-        renderSkPegawaiTable();
-     } else {
-        document.getElementById('skModePegawai').classList.add('hidden');
-        document.getElementById('skModeSk').classList.remove('hidden');
-        
-        if (isAdminOrOperator) {
-            document.getElementById('btnTambahSk').classList.remove('hidden');
-        } else {
-            document.getElementById('btnTambahSk').classList.add('hidden'); 
-        }
-        
-        renderSkTable();
-     }
-  }
-
-  function renderSkTable() {
-    const tbody = document.getElementById('tblSkBody');
-    tbody.innerHTML = "";
-
-    let filteredData = groupedSkData;
-    if (currentSkTab !== 'all' && currentSkTab !== 'Pegawai') {
-       filteredData = groupedSkData.filter(sk => sk.pj_sk === currentSkTab);
-    }
-    
-    if (state.user.role === 'Pegawai') {
-       // ZETTBOT FIX: Gunakan mesin cekKeterlibatanPegawai untuk memfilter SK yang boleh dilihat user
-       filteredData = filteredData.filter(sk => {
-           if (typeof cekKeterlibatanPegawai !== 'undefined') {
-               return cekKeterlibatanPegawai(sk.members, state.user.nip).terlibat;
-           }
-           return sk.members.some(m => String(m.nip) === String(state.user.nip));
-       });
-    }
-
-    if (filteredData.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="8" class="text-center p-12 text-slate-500 italic">Belum ada koleksi dokumen SK pada kategori ini.</td></tr>`;
-      return;
-    }
-
-    filteredData.forEach((sk, index) => {
-      const tr = document.createElement('tr');
-      // ZETTBOT FIX: Menambahkan class 'group' agar animasi bounce pada icon menyala saat di-hover
-      tr.className = "border-b border-slate-900 hover:bg-slate-900/10 transition group";
-
-      let pjColor = "text-slate-400 bg-slate-800 border-slate-700";
-      if(sk.pj_sk === 'PJ. Manajemen') pjColor = "text-blue-400 bg-blue-500/10 border-blue-500/20";
-      if(sk.pj_sk === 'PJ. Kepaniteraan') pjColor = "text-emerald-400 bg-emerald-500/10 border-emerald-500/20";
-      if(sk.pj_sk === 'PJ. Kesekretariatan') pjColor = "text-amber-400 bg-amber-500/10 border-amber-500/20";
-
-      const userRole = state.user.role ? state.user.role.toLowerCase() : "";
-      const isAdmin = userRole.includes('admin');
-
-      // ZETTBOT FIX: Ganti tombol Anchor Tag menjadi pemicu Modal Flipbook Interaktif
-      tr.innerHTML = `
-        <td class="p-4 text-center font-mono text-slate-500">${index + 1}</td>
-        <td class="p-4 max-w-[200px]">
-          <div class="font-bold text-slate-200 truncate" title="${sk.judul_sk}">${sk.judul_sk}</div>
-          <div class="text-slate-500 text-[10px] mt-1"><i class="fa-solid fa-users mr-1"></i> ${sk.members.length} Anggota Tim</div>
-        </td>
-        <td class="p-4"><span class="inline-flex px-2.5 py-1 rounded-md text-[10px] font-bold border ${pjColor} tracking-wider">${sk.pj_sk}</span></td>
-        <td class="p-4 text-slate-300 font-mono text-xs truncate max-w-[150px]" title="${sk.no_sk}">${sk.no_sk}</td>
-        <td class="p-4 text-slate-400 text-xs">${sk.tgl_sk}</td>
-        <td class="p-4 text-center font-mono text-slate-400 text-[10px] hidden">${sk.tgl_input}</td>
-        <td class="p-4 text-center">
-          <!-- Modifikasi Flipbook ZettBOT -->
-          <button onclick="openFlipbook('${sk.link_drive}', '${sk.judul_sk}')" class="text-indigo-400 hover:text-indigo-300 p-2 hover:bg-indigo-500/10 border border-transparent hover:border-indigo-500/30 rounded-xl inline-block transition shadow-md" title="Baca Dokumen">
-            <i class="fa-solid fa-book-open-reader text-lg relative group-hover:animate-bounce"></i>
-          </button>
-        </td>
-        <td class="p-4 text-center space-x-1 whitespace-nowrap">
-          <button onclick="toggleSkDetail('${sk.id}')" class="p-1.5 bg-slate-900 hover:bg-indigo-600/20 border border-slate-800 rounded-lg transition text-slate-400 hover:text-indigo-400" title="Lihat Susunan Anggota"><i id="chevron-sk-${sk.id}" class="fa-solid fa-chevron-down text-[10px] transition-transform duration-300"></i></button>
-          ${isAdmin ? `
-            <button onclick="openWaModal('${sk.id}')" class="text-emerald-500 hover:text-emerald-400 p-1.5 hover:bg-emerald-500/10 rounded-lg transition" title="Daftar WA per SK"><i class="fa-brands fa-whatsapp"></i></button>
-            <button onclick="openSkFormModal('edit', '${sk.id}')" class="text-amber-500 hover:text-amber-400 p-1.5 hover:bg-amber-500/10 rounded-lg transition" title="Ubah SK"><i class="fa-solid fa-pen-to-square"></i></button>
-            <button onclick="deleteSkRecord('${sk.id}')" class="text-rose-500 hover:text-rose-400 p-1.5 hover:bg-rose-500/10 rounded-lg transition" title="Hapus SK"><i class="fa-regular fa-trash-can"></i></button>
-          ` : ''}
-        </td>
-      `;
-      tbody.appendChild(tr);
-
-      const detailTr = document.createElement('tr');
-      detailTr.id = `sk-detail-row-${sk.id}`;
-      detailTr.className = "hidden bg-slate-950/80 border-b border-slate-900";
-      
-      // ZETTBOT FIX: Rendering daftar tim dengan support Tampilan Grup di Accordion
-      let membersHtml = sk.members.map((m, mIndex) => {
-          let namaTampil = 'Data Dihapus';
-          let jabTampil = '-';
-          let iconHtml = '<div class="w-5 text-center text-slate-600 font-bold text-xs">' + (mIndex + 1) + '</div>';
-          
-          if (String(m.nip).startsWith('[TAG:')) {
-              if (typeof GROUP_TAGS !== 'undefined' && GROUP_TAGS[m.nip]) {
-                  namaTampil = `[GRUP] ${GROUP_TAGS[m.nip].label}`;
-                  let estimasi = typeof hitungEstimasiGrup === 'function' ? hitungEstimasiGrup(m.nip) : 0;
-                  jabTampil = `Target: ±${estimasi} Pegawai (Otomatis)`;
-                  iconHtml = '<div class="w-5 text-center text-emerald-500 font-bold text-xs" title="Grup Sasaran"><i class="fa-solid fa-users"></i></div>';
-              }
-          } else {
-              const pns = state.usersList.find(u => String(u.nip) === String(m.nip));
-              if (pns) { namaTampil = pns.nama; jabTampil = pns.jabatan; }
-          }
-
-          return `
-            <div class="flex items-center justify-between py-2 border-b border-slate-800/50 last:border-0 gap-3">
-               ${iconHtml}
-               <div class="flex-1 min-w-0"><div class="text-slate-200 font-semibold text-xs truncate">${namaTampil}</div><div class="text-slate-500 text-[10px] truncate">${jabTampil}</div></div>
-               <div class="text-right shrink-0"><span class="px-2 py-0.5 bg-slate-800 border border-slate-700 rounded text-[10px] text-slate-300 font-bold">${m.peran}</span></div>
-            </div>`;
-      }).join('');
-
-      detailTr.innerHTML = `
-        <td colspan="8" class="p-0">
-           <div class="p-5">
-              <div class="bg-slate-900/50 rounded-2xl border border-slate-800 p-4 max-w-3xl">
-                 <h4 class="text-xs font-bold text-indigo-400 uppercase tracking-wider border-b border-slate-800 pb-2 mb-2"><i class="fa-solid fa-sitemap mr-1"></i> Susunan Tim Kerja</h4>
-                 <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-0">${membersHtml}</div>
-              </div>
-           </div>
-        </td>`;
-      tbody.appendChild(detailTr);
-    });
-    
-    filterSkData();
-  }
-
-  function toggleSkDetail(id) {
-     const row = document.getElementById(`sk-detail-row-${id}`);
-     const chevron = document.getElementById(`chevron-sk-${id}`);
-     if(row && chevron) {
-        if(row.classList.contains('hidden')) { row.classList.remove('hidden'); chevron.classList.add('rotate-180'); } 
-        else { row.classList.add('hidden'); chevron.classList.remove('rotate-180'); }
-     }
-  }
-
-  function renderSkPegawaiTable() {
-     const tbody = document.getElementById('tblSkPegawaiBody');
-     tbody.innerHTML = "";
-
-     let mapPegawai = {};
-     
-     // ZETTBOT FIX: Bangun ulang map Rekap menggunakan Mesin cekKeterlibatanPegawai
-     if (typeof cekKeterlibatanPegawai !== 'undefined') {
-         state.usersList.forEach(u => {
-             if (u.role === 'Admin') return; // Lewati Super Admin IT dari rekap
-             
-             let terlibatSks = [];
-             groupedSkData.forEach(sk => {
-                 const cek = cekKeterlibatanPegawai(sk.members, u.nip);
-                 if (cek.terlibat) {
-                     terlibatSks.push({
-                         id: sk.id, judul_sk: sk.judul_sk, link_drive: sk.link_drive, 
-                         no_sk: sk.no_sk, tgl_sk: sk.tgl_sk, peran: cek.peran
-                     });
-                 }
-             });
-             
-             if (terlibatSks.length > 0) {
-                 mapPegawai[u.nip] = {
-                     nip: u.nip, nama: u.nama, jabatan: u.jabatan, no_hp: u.no_hp, skList: terlibatSks
-                 };
-             }
-         });
-     }
-
-     groupedSkPegawaiData = Object.values(mapPegawai).sort((a,b) => {
-         const bobotA = getBobotJabatanSk(a.jabatan);
-         const bobotB = getBobotJabatanSk(b.jabatan);
-         if (bobotA === bobotB) return a.nama.localeCompare(b.nama); 
-         return bobotA - bobotB;
-     });
-
-     let filteredData = groupedSkPegawaiData;
-     if (state.user.role === 'Pegawai') {
-        filteredData = filteredData.filter(p => String(p.nip) === String(state.user.nip));
-     }
-
-     if(filteredData.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="4" class="text-center p-16 text-slate-500 italic"><i class="fa-solid fa-users-slash text-3xl mb-3 block text-slate-700"></i>Belum ada data keikutsertaan SK yang terdaftar.</td></tr>`;
-        return;
-     }
-
-     filteredData.forEach((p, index) => {
-        const tr = document.createElement('tr');
-        tr.className = "border-b border-slate-900 hover:bg-slate-900/10 transition";
-        
-        const userRole = state.user.role ? state.user.role.toLowerCase() : "";
-        const isAdmin = userRole.includes('admin');
-
-        let readCount = 0;
-        p.skList.forEach(sk => {
-            const cleanSkId = String(sk.id).replace(/'/g, "").trim(); 
-            const isAck = state.skAckList && state.skAckList.some(a => {
-                const aSkId = String(a.sk_id).replace(/'/g, "").trim().split('-').slice(0, 2).join('-');
-                return aSkId === cleanSkId && String(a.nip).replace(/'/g, "").trim() === String(p.nip).replace(/'/g, "").trim();
-            });
-            if(isAck) readCount++;
-        });
-        
-        const progressPercent = p.skList.length > 0 ? Math.round((readCount / p.skList.length) * 100) : 0;
-        let progressColor = progressPercent === 100 ? 'bg-emerald-500' : (progressPercent > 0 ? 'bg-amber-500' : 'bg-rose-500');
-        let textProgressColor = progressPercent === 100 ? 'text-emerald-400' : 'text-slate-500';
-        
-        const unreadCount = p.skList.length - readCount;
-        let tooltipText = unreadCount > 0 ? `Kekurangan: ${unreadCount} Dokumen SK belum dibaca` : `Sempurna! Semua Dokumen SK telah dibaca`;
-
-        tr.innerHTML = `
-            <td class="p-4 text-center font-mono text-slate-500">${index + 1}</td>
-            <td class="p-4">
-                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-6">
-                    <div class="flex-1 min-w-0">
-                        <div class="font-bold text-slate-200 truncate">${p.nama}</div>
-                        <div class="text-slate-500 text-[10px] mt-0.5 font-mono truncate">NIP: ${p.nip} <span class="text-slate-700 mx-1">|</span> ${p.jabatan}</div>
-                    </div>
-                    
-                    <div class="w-full sm:w-[180px] shrink-0 group relative cursor-help" title="${tooltipText}">
-                        <div class="flex items-center justify-between mb-1.5 px-0.5">
-                            <span class="text-[9px] font-bold ${textProgressColor} tracking-wider">${readCount} / ${p.skList.length} DIBACA</span>
-                            <span class="text-[9px] font-bold ${textProgressColor}">${progressPercent}%</span>
-                        </div>
-                        <div class="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden shadow-inner border border-slate-900/50">
-                            <div class="h-full ${progressColor} transition-all duration-500" style="width: ${progressPercent}%"></div>
-                        </div>
-                    </div>
-                </div>
-            </td>
-            <td class="p-4 text-center">
-                <span class="inline-flex items-center px-3 py-1 rounded-lg text-xs font-bold border border-indigo-500/20 bg-indigo-500/10 text-indigo-300">
-                    <i class="fa-solid fa-file-contract mr-1.5 opacity-70"></i> Terlibat di ${p.skList.length} SK
-                </span>
-            </td>
-            <td class="p-4 text-center space-x-1.5 whitespace-nowrap">
-                <button onclick="toggleSkPegawaiDetail('${p.nip}')" class="p-1.5 bg-slate-900 hover:bg-indigo-600/20 border border-slate-800 rounded-lg transition text-slate-400 hover:text-indigo-400" title="Rincian SK">
-                    <i id="chevron-sk-peg-${p.nip}" class="fa-solid fa-chevron-down text-sm transition-transform duration-300"></i>
-                </button>
-                ${isAdmin ? `
-                    <button onclick="openWaPegawaiModal('${p.nip}')" class="text-emerald-500 hover:text-emerald-400 p-1.5 hover:bg-emerald-500/10 rounded-lg transition border border-transparent hover:border-emerald-500/20" title="Kirim Bundel PDF via WA">
-                        <i class="fa-brands fa-whatsapp text-sm"></i>
-                    </button>
-                ` : ''}
-            </td>
-        `;
-        tbody.appendChild(tr);
-
-        const detailTr = document.createElement('tr');
-        detailTr.id = `sk-peg-detail-row-${p.nip}`;
-        detailTr.className = "hidden bg-slate-950/80 border-b border-slate-900";
-        
-        let listHtml = '';
-        p.skList.forEach((sk, i) => {
-            const cleanSkId = String(sk.id).replace(/'/g, "").trim(); 
-            const cleanNip = String(p.nip).replace(/'/g, "").trim();
-            const currentUserNip = String(state.user.nip).replace(/'/g, "").trim();
+                showModalWaSk: false,
+                waTargetSkObj: null,
+                waSkTargets: [],
+                
+                showModalWaPegawaiSk: false,
+                waTargetPegawaiObj: null,
+                waPegawaiSkSelected: []
+            };
+        },
+        computed: {
+            isAdminOrOperator() {
+                if(!this.globalState.user) return false;
+                const role = this.globalState.user.role.toLowerCase();
+                return role.includes('admin') || role.includes('operator');
+            },
+            groupTagsOptions() {
+                return typeof GROUP_TAGS !== 'undefined' ? GROUP_TAGS : {};
+            },
+            groupedSkData() {
+                let mapGroup = {};
+                (this.globalState.skList || []).forEach(sk => {
+                   const baseId = String(sk.id).split('-').slice(0, 2).join('-');
+                   if(!mapGroup[baseId]) {
+                      let fallbackPj = (sk.pj_sk && sk.pj_sk !== '-' && sk.pj_sk !== 'undefined') ? sk.pj_sk : 'PJ. Kesekretariatan';
+                      let parsedData = { no_sk: '-', tgl_sk: '-', pj: fallbackPj, peran: '-' };
+                      try {
+                         if(sk.tugas_sk && sk.tugas_sk.startsWith('{')) {
+                             let j = JSON.parse(sk.tugas_sk);
+                             parsedData = { no_sk: j.no_sk || '-', tgl_sk: j.tgl_sk || '-', pj: j.pj || fallbackPj, peran: j.peran || '-' };
+                         }
+                      } catch(e) {}
             
-            const isAck = state.skAckList && state.skAckList.some(a => {
-                const aSkId = String(a.sk_id).replace(/'/g, "").trim().split('-').slice(0, 2).join('-');
-                const aNip = String(a.nip).replace(/'/g, "").trim();
-                return aSkId === cleanSkId && aNip === cleanNip;
-            });
-            
-            let ackHtml = '';
-            if (currentUserNip === cleanNip) {
-               if (isAck) {
-                   const ackData = state.skAckList.find(a => String(a.sk_id).replace(/'/g, "").trim().split('-').slice(0, 2).join('-') === cleanSkId && String(a.nip).replace(/'/g, "").trim() === cleanNip);
-                   ackHtml = `<div class="text-[10px] text-emerald-400 font-medium flex items-center justify-center gap-1.5 w-full whitespace-nowrap"><i class="fa-solid fa-check-double"></i> Dibaca: ${ackData ? ackData.tanggal_baca.split(' ')[0] : ''}</div>`;
-               } else {
-                   ackHtml = `<button onclick="doAcknowledgeSk('${cleanSkId}', '${cleanNip}')" class="text-[10px] font-bold text-white bg-emerald-600 hover:bg-emerald-500 px-3 py-1.5 rounded-lg shadow-lg shadow-emerald-500/20 transition flex items-center justify-center gap-1.5 w-full whitespace-nowrap"><i class="fa-regular fa-handshake"></i> Tandai Telah Dibaca</button>`;
-               }
-            } else {
-               if (isAck) ackHtml = `<div class="text-[10px] text-emerald-500 font-medium flex items-center justify-center gap-1 w-full whitespace-nowrap"><i class="fa-solid fa-check"></i> Sudah membaca SK ini.</div>`;
-               else ackHtml = `<div class="text-[10px] text-rose-400 font-medium flex items-center justify-center gap-1 w-full whitespace-nowrap"><i class="fa-solid fa-circle-exclamation"></i> Belum membaca SK ini.</div>`;
-            }
-
-            // ZETTBOT FIX: Ganti tombol Anchor Tag menjadi Pemicu Modal Flipbook Interaktif
-            listHtml += `
-                <div class="flex items-center justify-between p-3 border-b border-slate-800/50 hover:bg-slate-800/20 transition last:border-0 rounded-lg mx-4 my-2">
-                    <div class="flex-1 pr-4 min-w-0">
-                        <div class="text-slate-200 font-bold text-xs truncate">${i+1}. ${sk.judul_sk}</div>
-                        <div class="text-slate-500 text-[10px] mt-1 truncate">Peran Anda: <span class="text-indigo-300 font-bold">${sk.peran}</span> | No: <span class="font-mono text-slate-400">${sk.no_sk} (${sk.tgl_sk})</span></div>
-                    </div>
-                    <div class="flex-1 flex items-center justify-center shrink-0 px-4">
-                        ${ackHtml}
-                    </div>
-                    <div class="shrink-0 pl-2 text-right">
-                        <!-- Modifikasi Flipbook ZettBOT -->
-                        <button onclick="openFlipbook('${sk.link_drive}', '${sk.judul_sk}')" class="group px-3 py-1.5 bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500 hover:text-white border border-indigo-500/20 rounded-md text-[10px] font-bold transition whitespace-nowrap shadow-sm"><i class="fa-solid fa-book-open mr-1 group-hover:animate-bounce"></i> Baca Buku PDF</button>
-                    </div>
-                </div>
-            `;
-        });
-
-        detailTr.innerHTML = `
-            <td colspan="4" class="p-0">
-                <div class="p-4 bg-slate-900/40 rounded-b-xl shadow-inner">
-                    <div class="border border-slate-800 bg-slate-950/50 rounded-xl p-2 max-w-4xl mx-auto">
-                        ${listHtml}
-                    </div>
-                </div>
-            </td>
-        `;
-        tbody.appendChild(detailTr);
-     });
-     
-     filterSkData();
-  }
-
-  function doAcknowledgeSk(skId, nip) {
-      showCustomConfirm("Tandai Sudah Dibaca?", "Dengan menekan YA, Anda menyatakan telah membaca dan memahami tugas/peran Anda di dalam Surat Keputusan (SK) ini.", () => {
-          const nowRaw = new Date();
-          if(!state.skAckList) state.skAckList = [];
-          state.skAckList.push({
-              id: 'ACK-TEMP', sk_id: skId, nip: nip, 
-              tanggal_baca: nowRaw.toLocaleDateString('en-GB') + ' ' + nowRaw.toLocaleTimeString('en-GB')
-          });
-          
-          renderSkPegawaiTable(); 
-          if (typeof updateSidebarBadges === 'function') updateSidebarBadges(); 
-          
-          google.script.run
-              .withSuccessHandler(res => {
-                  if(res.status === 'success') {
-                      showNotify("Tercatat", res.message, "success");
-                  } else {
-                      state.skAckList = state.skAckList.filter(a => !(a.sk_id === skId && a.nip === nip));
-                      renderSkPegawaiTable();
-                      if (typeof updateSidebarBadges === 'function') updateSidebarBadges();
-                      showNotify("Gagal", res.message, "error");
-                  }
-              })
-              .withFailureHandler(err => { 
-                  state.skAckList = state.skAckList.filter(a => !(a.sk_id === skId && a.nip === nip));
-                  renderSkPegawaiTable();
-                  if (typeof updateSidebarBadges === 'function') updateSidebarBadges();
-                  showNotify("Error", err.message, "error"); 
-              })
-              .acknowledgeSk(skId, nip);
-      });
-  }
-
-  function toggleSkPegawaiDetail(nip) {
-      const row = document.getElementById(`sk-peg-detail-row-${nip}`);
-      const chevron = document.getElementById(`chevron-sk-peg-${nip}`);
-      if(row && chevron) {
-          if(row.classList.contains('hidden')) { row.classList.remove('hidden'); chevron.classList.add('rotate-180'); } 
-          else { row.classList.add('hidden'); chevron.classList.remove('rotate-180'); }
-      }
-  }
-
-  let waTargetPegawai = null;
-
-  function openWaPegawaiModal(nip) {
-      waTargetPegawai = groupedSkPegawaiData.find(p => p.nip === nip);
-      if(!waTargetPegawai) return;
-
-      document.getElementById('waModalTitlePegawai').innerText = waTargetPegawai.nama;
-      
-      const container = document.getElementById('waPegawaiCheckboxContainer');
-      container.innerHTML = "";
-
-      waTargetPegawai.skList.forEach((sk, i) => {
-          const row = document.createElement('label');
-          row.className = "flex items-center gap-3 p-3 bg-slate-900/50 hover:bg-slate-800/60 rounded-xl cursor-pointer transition border border-slate-800 hover:border-slate-600";
-          
-          const safeData = encodeURIComponent(JSON.stringify(sk));
-          
-          row.innerHTML = `
-             <input type="checkbox" checked class="wa-pegawai-sk-check rounded text-emerald-500 focus:ring-0 bg-slate-950 border-slate-600 w-4 h-4 cursor-pointer" 
-                    value="${i}" data-sk="${safeData}">
-             <div class="flex-1 min-w-0">
-                <div class="text-xs font-bold text-slate-200 truncate">${sk.judul_sk}</div>
-                <div class="text-[10px] text-slate-400 truncate mt-0.5">Sebagai: <span class="text-indigo-300 font-semibold">${sk.peran}</span></div>
-             </div>
-          `;
-          container.appendChild(row);
-      });
-
-      const modal = document.getElementById('modalWaPegawaiSk');
-      modal.classList.remove('hidden');
-      setTimeout(() => { if(modal.firstElementChild) modal.firstElementChild.classList.remove('scale-95'); }, 10);
-  }
-
-  function closeWaPegawaiModal() {
-      const modal = document.getElementById('modalWaPegawaiSk');
-      if(modal.firstElementChild) modal.firstElementChild.classList.add('scale-95');
-      setTimeout(() => modal.classList.add('hidden'), 200);
-  }
-
-  function filterSkData() {
-     const input = document.getElementById('skSearchInput');
-     const filter = input ? input.value.toLowerCase().trim() : "";
-     
-     const isPegawaiMode = currentSkTab === 'Pegawai';
-     const tbodyId = isPegawaiMode ? 'tblSkPegawaiBody' : 'tblSkBody';
-     const tbody = document.getElementById(tbodyId);
-     if (!tbody) return;
-
-     const rows = tbody.getElementsByTagName('tr');
-     if (rows.length === 1 && rows[0].cells.length === 1) return; 
-
-     for (let i = 0; i < rows.length; i += 2) {
-        const mainRow = rows[i];
-        const detailRow = rows[i + 1];
-        if (!mainRow) continue;
-
-        const rowText = mainRow.textContent || mainRow.innerText;
-        
-        if (rowText.toLowerCase().indexOf(filter) > -1) {
-           mainRow.style.display = "";
-        } else {
-           mainRow.style.display = "none";
-           if (detailRow) {
-              detailRow.style.display = "none";
-              const chevron = mainRow.querySelector('.fa-chevron-down');
-              if (chevron) chevron.classList.remove('rotate-180');
-              detailRow.classList.add('hidden');
-           }
-        }
-     }
-  }
-
-  function toggleWaPegawaiCheckAll() {
-      const checkboxes = document.querySelectorAll('.wa-pegawai-sk-check');
-      const btn = document.getElementById('btnWaPegawaiCheckAll');
-      let allChecked = true;
-      checkboxes.forEach(c => { if(!c.checked) allChecked = false; });
-
-      checkboxes.forEach(c => c.checked = !allChecked);
-      btn.innerText = allChecked ? "Pilih Semua" : "Batal Pilih";
-  }
-
-  function executeWaPegawai() {
-      const checkboxes = document.querySelectorAll('.wa-pegawai-sk-check:checked');
-      if(checkboxes.length === 0) {
-          showNotify("Peringatan", "Pilih minimal 1 SK untuk dikirimkan.", "error"); return;
-      }
-
-      if(!waTargetPegawai.no_hp || waTargetPegawai.no_hp.length < 9) {
-          showNotify("Nomor Tidak Valid", "Nomor WA pegawai tidak ditemukan/valid.", "error"); return;
-      }
-
-      let pesan = `Yth. Bapak/Ibu *${waTargetPegawai.nama}*,\n\nKami informasikan bahwa Anda telah ditetapkan ke dalam Beberapa SK sebagai berikut:\n\n`;
-
-      checkboxes.forEach((c, index) => {
-          const sk = JSON.parse(decodeURIComponent(c.getAttribute('data-sk')));
-          pesan += `${index + 1}. SK *${sk.judul_sk}* sebagai *${sk.peran}*\n`;
-          pesan += `Mohon mengunduh & mempelajari surat keputusan resmi melalui tautan PDF berikut:\n${sk.link_drive}\n\n`;
-      });
-
-      pesan += `Terima Kasih.\n_Sistem Kepegawaian TRANSKEP_`;
-
-      const cleanNo = waTargetPegawai.no_hp.replace(/[^0-9]/g, "");
-      const formattedNo = cleanNo.startsWith("0") ? "62" + cleanNo.slice(1) : cleanNo;
-      const waUrl = `https://api.whatsapp.com/send?phone=${formattedNo}&text=${encodeURIComponent(pesan)}`;
-      
-      window.open(waUrl, "_blank");
-      
-      closeWaPegawaiModal();
-      showNotify("WhatsApp Dibuka", "Silakan klik tombol kirim di aplikasi WhatsApp Anda.", "success");
-  }
-
-  function openSkFormModal(mode, id = null) {
-     document.getElementById('formSk').reset();
-     tempMembers = [];
-     renderSelectedMembers();
-     
-     const title = document.getElementById('skModalTitle');
-     document.getElementById('skIdInput').value = "";
-     document.getElementById('skTglInput').value = "";
-     document.getElementById('skNo').value = "";
-     document.getElementById('skTglDate').value = "";
-
-     if(mode === 'add') {
-        title.innerHTML = `<i class="fa-solid fa-square-plus text-indigo-400 mr-2"></i> Daftarkan SK Baru`;
-     } else {
-        title.innerHTML = `<i class="fa-solid fa-pen-to-square text-amber-400 mr-2"></i> Ubah Data SK`;
-        const sk = groupedSkData.find(s => s.id === id);
-        if(sk) {
-           document.getElementById('skIdInput').value = sk.id;
-           document.getElementById('skTglInput').value = sk.tgl_input;
-           document.getElementById('skJudul').value = sk.judul_sk;
-           document.getElementById('skPj').value = sk.pj_sk;
-           document.getElementById('skLink').value = sk.link_drive;
-           document.getElementById('skNo').value = sk.no_sk !== '-' ? sk.no_sk : "";
-           document.getElementById('skTglDate').value = sk.tgl_sk !== '-' ? sk.tgl_sk : "";
-           
-           tempMembers = JSON.parse(JSON.stringify(sk.members)); 
-           renderSelectedMembers();
-        }
-     }
-
-     const modal = document.getElementById('modalSkForm');
-     modal.classList.remove('hidden');
-     setTimeout(() => { if(modal.firstElementChild) modal.firstElementChild.classList.remove('scale-95'); }, 10);
-  }
-
-  function closeSkFormModal() {
-     const modal = document.getElementById('modalSkForm');
-     if(modal.firstElementChild) modal.firstElementChild.classList.add('scale-95');
-     setTimeout(() => modal.classList.add('hidden'), 200);
-  }
-
-  function handleAddMemberChange() {
-     const inputVal = document.getElementById('skSearchMember').value;
-     if(!inputVal) return;
-     const nipMatch = inputVal.match(/\((.*?)\)$/);
-     
-     if (nipMatch && nipMatch[1]) {
-         const nip = nipMatch[1];
-         if(tempMembers.some(m => m.nip === nip)) {
-             showNotify("Duplikat", "Pegawai/Grup ini sudah ada di dalam daftar tim.", "error");
-         } else {
-             // ZETTBOT FIX: Auto-Default Peran (Jika Grup: "Sesuai Jabatan", Jika NIP: "Anggota")
-             const defaultPeran = nip.startsWith('[TAG:') ? "Sesuai Jabatan" : "Anggota";
-             tempMembers.push({ nip: nip, peran: defaultPeran });
-             renderSelectedMembers();
-         }
-         document.getElementById('skSearchMember').value = "";
-     }
-  }
-
-  function removeMember(nip) {
-     tempMembers = tempMembers.filter(m => m.nip !== nip);
-     renderSelectedMembers();
-  }
-
-  function updateMemberRole(nip, val) {
-     const idx = tempMembers.findIndex(m => m.nip === nip);
-     if(idx !== -1) tempMembers[idx].peran = val;
-  }
-
-  function renderSelectedMembers() {
-      const container = document.getElementById('skSelectedMembersContainer');
-      const emptyState = document.getElementById('skEmptyMemberState');
-      
-      container.innerHTML = "";
-      
-      if(tempMembers.length === 0) {
-          emptyState.classList.remove('hidden');
-      } else {
-          emptyState.classList.add('hidden');
-          tempMembers.forEach((m, idx) => {
-            // ZETTBOT FIX: Logika Tampilan Pembeda Grup vs Individu
-            let pnsNama = '-';
-            let pnsJabatan = '-';
-            let iconHtml = '<div class="w-6 h-6 rounded bg-indigo-500/20 text-indigo-400 flex items-center justify-center text-[10px] shrink-0"><i class="fa-solid fa-user"></i></div>';
-            let borderClass = 'hover:border-indigo-500/50';
-
-            if (String(m.nip).startsWith('[TAG:')) {
-                if (typeof GROUP_TAGS !== 'undefined' && GROUP_TAGS[m.nip]) {
-                    pnsNama = `[GRUP] ${GROUP_TAGS[m.nip].label}`;
-                    let estimasi = typeof hitungEstimasiGrup === 'function' ? hitungEstimasiGrup(m.nip) : 0;
-                    pnsJabatan = `Sistem mendeteksi estimasi ±${estimasi} pegawai`;
-                    iconHtml = '<div class="w-6 h-6 rounded bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-[10px] shrink-0"><i class="fa-solid fa-users"></i></div>';
-                    borderClass = 'border-emerald-500/30 bg-emerald-950/20 hover:border-emerald-500/60';
+                      mapGroup[baseId] = {
+                         id: baseId, judul_sk: sk.judul_sk, link_drive: sk.link_drive, 
+                         tgl_input: (sk.tgl_input && sk.tgl_input !== 'undefined') ? sk.tgl_input : '-',
+                         no_sk: parsedData.no_sk, tgl_sk: parsedData.tgl_sk, pj_sk: parsedData.pj, members: []
+                      };
+                   }
+                   let peran = '-';
+                   try { 
+                       if(sk.tugas_sk && sk.tugas_sk.startsWith('{')) peran = JSON.parse(sk.tugas_sk).peran || '-'; 
+                   } catch(e) {}
+                   
+                   mapGroup[baseId].members.push({ nip: sk.nip, peran: peran });
+                });
+                return Object.values(mapGroup).reverse();
+            },
+            filteredSkData() {
+                let filtered = this.groupedSkData;
+                if (this.currentSkTab !== 'all' && this.currentSkTab !== 'Pegawai') {
+                   filtered = filtered.filter(sk => sk.pj_sk === this.currentSkTab);
                 }
-            } else {
-                const pns = state.usersList.find(u => String(u.nip) === String(m.nip)) || {nama:'-', jabatan:'-'};
-                pnsNama = pns.nama;
-                pnsJabatan = pns.jabatan;
+                
+                // ZETTBOT FIX: Hapus limitasi role Pegawai agar mereka bisa melihat seluruh dokumen SK
+                // (Transparansi penuh untuk koleksi dokumen di tab Semua SK / Filter PJ)
+                
+                if (this.skSearchQuery) {
+                    const q = this.skSearchQuery.toLowerCase();
+                    filtered = filtered.filter(sk => {
+                        let matchMembers = sk.members.some(m => this.getMemberNameDisplay(m.nip).toLowerCase().includes(q));
+                        return sk.judul_sk.toLowerCase().includes(q) || sk.no_sk.toLowerCase().includes(q) || matchMembers;
+                    });
+                }
+                return filtered;
+            },
+            groupedSkPegawaiData() {
+                let mapPegawai = {};
+                if (typeof cekKeterlibatanPegawai !== 'undefined') {
+                    (this.globalState.usersList || []).forEach(u => {
+                        if (u.role === 'Admin') return; 
+                        
+                        let terlibatSks = [];
+                        this.groupedSkData.forEach(sk => {
+                            const cek = cekKeterlibatanPegawai(sk.members, u.nip);
+                            if (cek.terlibat) {
+                                terlibatSks.push({
+                                    id: sk.id, judul_sk: sk.judul_sk, link_drive: sk.link_drive, 
+                                    no_sk: sk.no_sk, tgl_sk: sk.tgl_sk, peran: cek.peran
+                                });
+                            }
+                        });
+                        
+                        if (terlibatSks.length > 0) {
+                            let readCount = 0;
+                            terlibatSks.forEach(sk => {
+                                if (this.isSkAcknowledged(sk.id, u.nip)) readCount++;
+                            });
+                            
+                            const progressPercent = Math.round((readCount / terlibatSks.length) * 100);
+                            
+                            mapPegawai[u.nip] = {
+                                nip: u.nip, nama: u.nama, jabatan: u.jabatan, no_hp: u.no_hp, skList: terlibatSks,
+                                readCount: readCount,
+                                progressPercent: progressPercent,
+                                progressColor: progressPercent === 100 ? 'bg-emerald-500' : (progressPercent > 0 ? 'bg-amber-500' : 'bg-rose-500'),
+                                textProgressColor: progressPercent === 100 ? 'text-emerald-400' : 'text-slate-500'
+                            };
+                        }
+                    });
+                }
+                
+                const hierarki = ["Ketua", "Wakil Ketua", "Hakim", "Panitera", "Sekretaris", "Panitera Muda Gugatan", "Panitera Muda Permohonan", "Panitera Muda Hukum", "Kepala Sub Bagian Umum dan Keuangan", "Kepala Sub Bagian Kepegawaian, ORTALA", "Kepala Sub Bagian Perencanaan, TI dan Pelaporan", "Panitera Pengganti", "Juru Sita", "Juru Sita Pengganti", "Pranata Komputer Ahli Pertama", "Operator - Penata Layanan Operasional", "Arsiparis Terampil", "Klerek - Analis Perkara Peradilan", "Penata Layanan Operasional", "Operator Layanan Operasional"];
+                
+                return Object.values(mapPegawai).sort((a,b) => {
+                    const idxA = hierarki.findIndex(j => j.toLowerCase() === (a.jabatan || '').toLowerCase().trim());
+                    const idxB = hierarki.findIndex(j => j.toLowerCase() === (b.jabatan || '').toLowerCase().trim());
+                    const bobotA = idxA !== -1 ? idxA : 999;
+                    const bobotB = idxB !== -1 ? idxB : 999;
+                    if (bobotA === bobotB) return a.nama.localeCompare(b.nama); 
+                    return bobotA - bobotB;
+                });
+            },
+            filteredSkPegawaiData() {
+                let filtered = this.groupedSkPegawaiData;
+                // ZETTBOT FIX: Tab Rekap tetap aman, hanya menampilkan data milik user sendiri (jika bukan Admin)
+                if (this.globalState.user && this.globalState.user.role === 'Pegawai') {
+                   filtered = filtered.filter(p => String(p.nip) === String(this.globalState.user.nip));
+                }
+                if (this.skSearchQuery) {
+                    const q = this.skSearchQuery.toLowerCase();
+                    filtered = filtered.filter(p => p.nama.toLowerCase().includes(q) || p.nip.toLowerCase().includes(q));
+                }
+                return filtered;
             }
+        },
+        methods: {
+            getPjColorClass(pj) {
+                if(pj === 'PJ. Manajemen') return "text-blue-400 bg-blue-500/10 border-blue-500/20";
+                if(pj === 'PJ. Kepaniteraan') return "text-emerald-400 bg-emerald-500/10 border-emerald-500/20";
+                if(pj === 'PJ. Kesekretariatan') return "text-amber-400 bg-amber-500/10 border-amber-500/20";
+                return "text-slate-400 bg-slate-800 border-slate-700";
+            },
+            formatTglSk(dateStr) {
+                if (!dateStr || dateStr === '-') return '-';
+                try {
+                    const d = new Date(dateStr);
+                    if(isNaN(d.getTime())) return dateStr;
+                    return d.toLocaleDateString('id-ID', {day: '2-digit', month: 'long', year: 'numeric'});
+                } catch(e) { return dateStr; }
+            },
+            getTooltipProgress(readCount, total) {
+                const unreadCount = total - readCount;
+                return unreadCount > 0 ? "Kekurangan: " + unreadCount + " Dokumen SK belum dibaca" : "Sempurna! Semua Dokumen SK telah dibaca";
+            },
+            toggleSkDetail(id) {
+                const idx = this.expandedSkRows.indexOf(id);
+                if(idx !== -1) this.expandedSkRows.splice(idx, 1);
+                else this.expandedSkRows.push(id);
+            },
+            toggleSkPegawaiDetail(nip) {
+                const idx = this.expandedPegawaiRows.indexOf(nip);
+                if(idx !== -1) this.expandedPegawaiRows.splice(idx, 1);
+                else this.expandedPegawaiRows.push(nip);
+            },
+            isGroupMember(nip) {
+                return String(nip).startsWith('[TAG:');
+            },
+            getMemberNameDisplay(nip) {
+                if (this.isGroupMember(nip)) {
+                    return this.groupTagsOptions[nip] ? "[GRUP] " + this.groupTagsOptions[nip].label : 'Data Dihapus';
+                }
+                const pns = (this.globalState.usersList || []).find(u => String(u.nip) === String(nip));
+                return pns ? pns.nama : 'Data Dihapus';
+            },
+            getMemberJabatanDisplay(nip) {
+                if (this.isGroupMember(nip)) {
+                    const estimasi = typeof hitungEstimasiGrup === 'function' ? hitungEstimasiGrup(nip) : 0;
+                    return "Sistem mendeteksi estimasi ±" + estimasi + " pegawai";
+                }
+                const pns = (this.globalState.usersList || []).find(u => String(u.nip) === String(nip));
+                return pns ? pns.jabatan : '-';
+            },
+            openFlipbookPdf(link, judul) {
+                if (typeof window.openFlipbook === 'function') {
+                    window.openFlipbook(link, judul);
+                }
+            },
+            openSkDriveFolder() {
+                if (this.skDriveFolderUrl) {
+                    window.open(this.skDriveFolderUrl, '_blank');
+                    return;
+                }
+                const token = localStorage.getItem('transkep_session_token');
+                this.isOpeningDriveSk = true;
 
-            const row = document.createElement('div');
-            row.className = `flex items-center gap-3 p-3 bg-slate-900 border border-slate-800 rounded-xl transition ${borderClass}`;
-            row.innerHTML = `
-                ${iconHtml}
-                <div class="flex-1 min-w-0">
-                  <div class="font-bold text-slate-200 text-xs truncate">${pnsNama}</div>
-                  <div class="text-[9px] text-slate-500 truncate">${pnsJabatan}</div>
-                </div>
-                <div class="w-1/3 shrink-0">
-                  <input type="text" placeholder="Peran/Tugas..." value="${m.peran}" onchange="updateMemberRole('${m.nip}', this.value)" required
-                      class="w-full px-2 py-1.5 bg-slate-950 border border-slate-700 rounded text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-200">
-                </div>
-                <button type="button" onclick="removeMember('${m.nip}')" class="text-rose-500 hover:text-white p-1.5 hover:bg-rose-500 rounded transition shrink-0" title="Hapus">
-                  <i class="fa-solid fa-xmark text-sm"></i>
-                </button>
-            `;
-            container.appendChild(row);
-          });
-      }
-  }
+                const newTab = window.open('about:blank', '_blank');
+                if (newTab) {
+                    newTab.document.write('<body style="background:#020617;color:#94a3b8;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;font-size:14px;">Menghubungkan ke Folder Google Drive TRANSKEP SK...</body>');
+                }
 
-  function submitSk(e) {
-     e.preventDefault();
-     if(tempMembers.length === 0) {
-        showNotify("Gagal Disimpan", "Daftar susunan tim tidak boleh kosong. Tambahkan minimal 1 pegawai.", "error"); return;
-     }
+                google.script.run
+                    .withSuccessHandler(res => {
+                        this.isOpeningDriveSk = false;
+                        if (res && res.status === 'success' && res.url) {
+                            this.skDriveFolderUrl = res.url;
+                            if (newTab) {
+                                newTab.location.href = res.url;
+                            } else {
+                                window.open(res.url, '_blank');
+                            }
+                        } else {
+                            if (newTab) newTab.close();
+                            if(window.showNotify) window.showNotify("Gagal Membuka Folder", res ? res.message : "Respon tidak valid", "error");
+                        }
+                    })
+                    .withFailureHandler(err => {
+                        this.isOpeningDriveSk = false;
+                        if (newTab) newTab.close();
+                        if(window.showNotify) window.showNotify("Error Sistem", err.toString(), "error");
+                    })
+                    .getSkDriveFolderUrl(this.globalState.user.nip, token);
+            },
+            formatFileSize(bytes) {
+                if (!bytes) return '0 B';
+                if (bytes < 1024) return bytes + ' B';
+                else if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+                else return (bytes / 1048576).toFixed(2) + ' MB';
+            },
+            openSkFormModal(mode, id = null) {
+                this.modalSkMode = mode;
+                this.skSearchMemberInput = '';
+                
+                this.skSelectedFile = null;
+                this.skFileDataBase64 = null;
+                this.isUploading = false;
+                this.isDraggingSk = false;
+                if(this.$refs.skFileInput) this.$refs.skFileInput.value = '';
+                
+                if(mode === 'add') {
+                    this.formSk = { id: '', tgl_input: '', judul_sk: '', pj_sk: 'PJ. Kesekretariatan', link_drive: '', no_sk: '', tgl_sk: '' };
+                    this.tempMembers = [];
+                } else {
+                    const sk = this.groupedSkData.find(s => s.id === id);
+                    if(sk) {
+                        this.formSk = {
+                            id: sk.id, tgl_input: sk.tgl_input, judul_sk: sk.judul_sk, pj_sk: sk.pj_sk,
+                            link_drive: sk.link_drive, no_sk: sk.no_sk !== '-' ? sk.no_sk : "", tgl_sk: sk.tgl_sk !== '-' ? sk.tgl_sk : ""
+                        };
+                        this.tempMembers = JSON.parse(JSON.stringify(sk.members)); 
+                    }
+                }
+                this.showModalSkForm = true;
+            },
+            processSkFile(file, inputEl = null) {
+                if (!file) return;
+                
+                if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
+                    if(window.showNotify) window.showNotify("Format Tidak Sesuai", "Mohon maaf, sistem hanya menerima unggahan file berformat .PDF", "warning");
+                    if(inputEl) inputEl.value = '';
+                    this.skSelectedFile = null;
+                    this.skFileDataBase64 = null;
+                    return;
+                }
+                
+                if (file.size > 10 * 1024 * 1024) {
+                    if(window.showNotify) window.showNotify("Ukuran Terlalu Besar", "Mohon perkecil (compress) file PDF Anda. Maksimal ukuran yang diizinkan adalah 10 MB.", "warning");
+                    if(inputEl) inputEl.value = '';
+                    this.skSelectedFile = null;
+                    this.skFileDataBase64 = null;
+                    return;
+                }
+                
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const base64Url = e.target.result;
+                    this.skFileDataBase64 = base64Url.split(',')[1];
+                    this.skSelectedFile = file;
+                };
+                reader.readAsDataURL(file);
+            },
+            handleSkFileSelect(event) {
+                const file = event.target.files[0];
+                this.processSkFile(file, event.target);
+            },
+            handleSkFileDrop(event) {
+                this.isDraggingSk = false;
+                const file = event.dataTransfer && event.dataTransfer.files ? event.dataTransfer.files[0] : null;
+                this.processSkFile(file, this.$refs.skFileInput);
+            },
+            handleAddMemberChange() {
+                if(!this.skSearchMemberInput) return;
+    
+                let targetNip = null;
+                const inputVal = this.skSearchMemberInput;
+                const nipMatch = inputVal.match(/\((.*?)\)$/);
+    
+                if (nipMatch && nipMatch[1]) {
+                    targetNip = nipMatch[1];
+                } else {
+                    const searchTxt = inputVal.toLowerCase();
+                    const foundUser = (this.globalState.usersList || []).find(u => u.nama.toLowerCase().includes(searchTxt));
+                    if (foundUser) {
+                        targetNip = foundUser.nip;
+                    } else {
+                        const groupKeys = Object.keys(this.groupTagsOptions || {});
+                        const foundGroupKey = groupKeys.find(key => this.groupTagsOptions[key].label.toLowerCase().includes(searchTxt));
+                        if (foundGroupKey) targetNip = foundGroupKey;
+                    }
+                }
+    
+                if (targetNip) {
+                    if(this.tempMembers.some(m => String(m.nip) === String(targetNip))) {
+                        if(window.showNotify) window.showNotify("Duplikat", "Pegawai/Grup ini sudah ada di dalam daftar tim.", "warning");
+                    } else {
+                        const defaultPeran = targetNip.startsWith('[TAG:') ? "Sesuai Jabatan" : "Anggota";
+                        this.tempMembers.push({ nip: targetNip, peran: defaultPeran });
+                    }
+                    this.skSearchMemberInput = ""; 
+                } else {
+                    if(window.showNotify) window.showNotify("Tidak Ditemukan", "Pegawai tidak ditemukan dari kata kunci tersebut.", "error");
+                }
+            },
+            removeMember(nip) {
+                this.tempMembers = this.tempMembers.filter(m => m.nip !== nip);
+            },
+            submitSk() {
+                if(this.tempMembers.length === 0) {
+                    if(window.showNotify) window.showNotify("Gagal Disimpan", "Daftar susunan tim tidak boleh kosong.", "error"); 
+                    return;
+                }
+                
+                if (this.modalSkMode === 'add' && !this.skFileDataBase64) {
+                    if(window.showNotify) window.showNotify("Dokumen Kosong", "Mohon unggah file dokumen (PDF) SK terlebih dahulu.", "warning");
+                    return;
+                }
+                
+                const payload = { 
+                    ...this.formSk, 
+                    members: this.tempMembers,
+                    fileBase64: this.skFileDataBase64,
+                    fileName: this.skSelectedFile ? this.skSelectedFile.name : null
+                };
+                
+                const token = localStorage.getItem('transkep_session_token');
+                
+                this.isUploading = true;
+                if(window.showNotify && this.skFileDataBase64) {
+                    window.showNotify("Mengunggah File...", "Mohon jangan tutup jendela ini hingga proses upload ke Google Drive selesai.", "success");
+                }
+                
+                google.script.run
+                    .withSuccessHandler(res => {
+                        this.isUploading = false;
+                        if (res.status === 'success') {
+                            this.showModalSkForm = false;
+                            if(window.showNotify) window.showNotify("SK Tersimpan", res.message, "success");
+                            if(typeof syncAllServerData === 'function') syncAllServerData(); 
+                        } else {
+                            if(window.showNotify) window.showNotify("Gagal Simpan", res.message, "error");
+                        }
+                    })
+                    .withFailureHandler(err => {
+                        this.isUploading = false;
+                        if(window.showNotify) window.showNotify("Error Sistem", err.toString(), "error");
+                    })
+                    .saveSk(payload, this.globalState.user.nip, token);
+            },
+            deleteSkRecord(id) {
+                const token = localStorage.getItem('transkep_session_token');
+                if(window.showCustomConfirm) {
+                    window.showCustomConfirm("Hapus Surat Keputusan", "Anda yakin ingin menghapus seluruh catatan keikutsertaan penugasan pada SK ini?", () => {
+                        if(window.showLoading) window.showLoading("Menghapus berkas SK...");
+                        google.script.run
+                            .withSuccessHandler(res => {
+                                if(window.hideLoading) window.hideLoading();
+                                if (res.status === 'success') {
+                                    if(window.showNotify) window.showNotify("Dihapus", res.message, "success");
+                                    if(typeof syncAllServerData === 'function') syncAllServerData(); 
+                                } else {
+                                    if(window.showNotify) window.showNotify("Gagal Hapus", res.message, "error");
+                                }
+                            })
+                            .withFailureHandler(err => {
+                                if(window.hideLoading) window.hideLoading();
+                                if(window.showNotify) window.showNotify("Error Jaringan", err.toString(), "error");
+                            })
+                            .deleteSk(id, this.globalState.user.nip, token);
+                    });
+                }
+            },
+            isSkAcknowledged(skId, nip) {
+                if(!this.globalState.skAckList) return false;
+                const cleanSkId = String(skId).replace(/'/g, "").trim().split('-').slice(0, 2).join('-');
+                const cleanNip = String(nip).replace(/'/g, "").trim();
+                return this.globalState.skAckList.some(a => {
+                    const aSkId = String(a.sk_id).replace(/'/g, "").trim().split('-').slice(0, 2).join('-');
+                    const aNip = String(a.nip).replace(/'/g, "").trim();
+                    return aSkId === cleanSkId && aNip === cleanNip;
+                });
+            },
+            getSkAckDate(skId, nip) {
+                if(!this.globalState.skAckList) return '';
+                const cleanSkId = String(skId).replace(/'/g, "").trim().split('-').slice(0, 2).join('-');
+                const cleanNip = String(nip).replace(/'/g, "").trim();
+                const ack = this.globalState.skAckList.find(a => {
+                    const aSkId = String(a.sk_id).replace(/'/g, "").trim().split('-').slice(0, 2).join('-');
+                    const aNip = String(a.nip).replace(/'/g, "").trim();
+                    return aSkId === cleanSkId && aNip === cleanNip;
+                });
+                return ack ? ack.tanggal_baca.split(' ')[0] : '';
+            },
+            doAcknowledgeSk(skId, nip) {
+                const token = localStorage.getItem('transkep_session_token');
+                if(window.showCustomConfirm) {
+                    window.showCustomConfirm("Tandai Sudah Dibaca?", "Dengan menekan YA, Anda menyatakan telah membaca dan memahami tugas/peran Anda di dalam Surat Keputusan (SK) ini.", () => {
+                        const nowRaw = new Date();
+                        if(!this.globalState.skAckList) this.globalState.skAckList = [];
+                        
+                        this.globalState.skAckList.push({
+                            id: 'ACK-TEMP', sk_id: skId, nip: nip, 
+                            tanggal_baca: nowRaw.toLocaleDateString('en-GB') + ' ' + nowRaw.toLocaleTimeString('en-GB')
+                        });
+                        
+                        if (typeof updateSidebarBadges === 'function') updateSidebarBadges(); 
+                        
+                        google.script.run
+                            .withSuccessHandler(res => {
+                                if(res.status === 'success') {
+                                    if(window.showNotify) window.showNotify("Tercatat", res.message, "success");
+                                } else {
+                                    this.globalState.skAckList = this.globalState.skAckList.filter(a => !(a.sk_id === skId && a.nip === nip));
+                                    if (typeof updateSidebarBadges === 'function') updateSidebarBadges();
+                                    if(window.showNotify) window.showNotify("Gagal", res.message, "error");
+                                }
+                            })
+                            .withFailureHandler(err => { 
+                                this.globalState.skAckList = this.globalState.skAckList.filter(a => !(a.sk_id === skId && a.nip === nip));
+                                if (typeof updateSidebarBadges === 'function') updateSidebarBadges();
+                                if(window.showNotify) window.showNotify("Error", err.message, "error"); 
+                            })
+                            .acknowledgeSk(skId, nip, token);
+                    });
+                }
+            },
+            markWaSent(event) {
+                const el = event.currentTarget;
+                el.className = "px-3 py-1.5 bg-slate-700 text-slate-400 rounded-lg transition text-xs font-bold flex items-center shadow-sm whitespace-nowrap";
+                el.innerHTML = '<i class="fa-solid fa-check mr-1"></i> Terkirim';
+            },
+            openWaModal(skId) {
+                this.waTargetSkObj = this.groupedSkData.find(s => s.id === skId);
+                if(!this.waTargetSkObj) return;
 
-     const payload = {
-        id: document.getElementById('skIdInput').value,
-        tgl_input: document.getElementById('skTglInput').value,
-        judul_sk: document.getElementById('skJudul').value,
-        pj_sk: document.getElementById('skPj').value,
-        link_drive: document.getElementById('skLink').value,
-        no_sk: document.getElementById('skNo').value,
-        tgl_sk: document.getElementById('skTglDate').value,
-        members: tempMembers
-     };
-
-     showLoading("Menyimpan Dokumen SK...");
-     google.script.run
-      .withSuccessHandler(function(res) {
-        hideLoading();
-        if (res.status === 'success') {
-          closeSkFormModal();
-          showNotify("SK Tersimpan", res.message, "success");
-          syncAllServerData(); 
-        } else {
-          showNotify("Gagal Simpan", res.message, "error");
+                let finalWaTargets = [];
+                if (typeof cekKeterlibatanPegawai !== 'undefined') {
+                    (this.globalState.usersList || []).forEach(u => {
+                        if (u.role === 'Admin') return;
+                        const cek = cekKeterlibatanPegawai(this.waTargetSkObj.members, u.nip);
+                        if (cek.terlibat) finalWaTargets.push({ user: u, peran: cek.peran });
+                    });
+                }
+                this.waSkTargets = finalWaTargets;
+                this.showModalWaSk = true;
+            },
+            generateWaLinkSk(pns, peranAktual) {
+                const cleanNo = String(pns.no_hp).replace(/[^0-9]/g, "");
+                const formattedNo = cleanNo.startsWith("0") ? "62" + cleanNo.slice(1) : cleanNo;
+                
+                let sapaan = "Bapak/Ibu";
+                let cleanNip = String(pns.nip).replace(/[^0-9]/g, '');
+                if (cleanNip.length === 18) {
+                    if (cleanNip.charAt(14) === '1') sapaan = "Bapak";
+                    else if (cleanNip.charAt(14) === '2') sapaan = "Ibu";
+                }
+                
+                const pesanWa = "Yth. " + sapaan + " *" + pns.nama + "*,\n\n" +
+                                "Kami informasikan bahwa Anda telah ditetapkan sebagai *" + peranAktual + "* ke dalam *" + this.waTargetSkObj.judul_sk + "*.\n\n" +
+                                "Mohon mengunduh & mempelajari surat keputusan resmi melalui tautan PDF berikut:\n" + this.waTargetSkObj.link_drive + "\n\n" +
+                                "Terima Kasih.\n_Sistem Kepegawaian TRANSKEP_";
+                                
+                return "https://api.whatsapp.com/send?phone=" + formattedNo + "&text=" + encodeURIComponent(pesanWa);
+            },
+            openWaPegawaiModal(nip) {
+                this.waTargetPegawaiObj = this.groupedSkPegawaiData.find(p => p.nip === nip);
+                if(!this.waTargetPegawaiObj) return;
+                
+                this.waPegawaiSkSelected = this.waTargetPegawaiObj.skList.map(sk => sk.id);
+                this.showModalWaPegawaiSk = true;
+            },
+            toggleWaPegawaiCheckAll() {
+                if(this.waTargetPegawaiObj && this.waPegawaiSkSelected.length === this.waTargetPegawaiObj.skList.length) {
+                    this.waPegawaiSkSelected = [];
+                } else {
+                    this.waPegawaiSkSelected = this.waTargetPegawaiObj.skList.map(sk => sk.id);
+                }
+            },
+            executeWaPegawai() {
+                if(this.waPegawaiSkSelected.length === 0) {
+                    if(window.showNotify) window.showNotify("Peringatan", "Pilih minimal 1 SK untuk dikirimkan.", "error"); 
+                    return;
+                }
+          
+                if(!this.waTargetPegawaiObj.no_hp || this.waTargetPegawaiObj.no_hp.length < 9) {
+                    if(window.showNotify) window.showNotify("Nomor Tidak Valid", "Nomor WA pegawai tidak ditemukan/valid.", "error"); 
+                    return;
+                }
+          
+                let pesan = "Yth. Bapak/Ibu *" + this.waTargetPegawaiObj.nama + "*,\n\nKami informasikan bahwa Anda telah ditetapkan ke dalam Beberapa SK sebagai berikut:\n\n";
+                
+                let counter = 1;
+                this.waTargetPegawaiObj.skList.forEach(sk => {
+                    if (this.waPegawaiSkSelected.includes(sk.id)) {
+                        pesan += counter + ". SK *" + sk.judul_sk + "* sebagai *" + sk.peran + "*\n";
+                        pesan += "Mohon mengunduh & mempelajari surat keputusan melalui tautan PDF berikut:\n" + sk.link_drive + "\n\n";
+                        counter++;
+                    }
+                });
+          
+                pesan += "Terima Kasih.\n_Sistem Kepegawaian TRANSKEP_";
+          
+                const cleanNo = this.waTargetPegawaiObj.no_hp.replace(/[^0-9]/g, "");
+                const formattedNo = cleanNo.startsWith("0") ? "62" + cleanNo.slice(1) : cleanNo;
+                const waUrl = "https://api.whatsapp.com/send?phone=" + formattedNo + "&text=" + encodeURIComponent(pesan);
+                
+                window.open(waUrl, "_blank");
+                this.showModalWaPegawaiSk = false;
+                
+                if(window.showNotify) window.showNotify("WhatsApp Dibuka", "Silakan klik tombol kirim di aplikasi WhatsApp Anda.", "success");
+            }
         }
-      })
-      .withFailureHandler(function(err) {
-        hideLoading();
-        showNotify("Error Sistem", err.toString(), "error");
-      })
-      .saveSk(payload);
-  }
+    }).mount('#vue-sk-app');
+});
 
-  function deleteSkRecord(id) {
-    showCustomConfirm("Hapus Surat Keputusan", `Anda yakin ingin menghapus seluruh catatan keikutsertaan penugasan pada SK ini?`, function() {
-      showLoading("Menghapus berkas SK...");
-      google.script.run
-        .withSuccessHandler(function(res) {
-          hideLoading();
-          if (res.status === 'success') {
-            showNotify("Dihapus", res.message, "success");
-            syncAllServerData(); 
-          } else {
-            showNotify("Gagal Hapus", res.message, "error");
-          }
-        })
-        .withFailureHandler(function(err) {
-          hideLoading();
-          showNotify("Error Jaringan", err.toString(), "error");
-        })
-        .deleteSk(id);
-    });
-  }
-
-  let waTargetSkObj = null;
-  
-  function openWaModal(skId) {
-     waTargetSkObj = groupedSkData.find(s => s.id === skId);
-     if(!waTargetSkObj) return;
-
-     document.getElementById('waModalTitleSk').innerText = waTargetSkObj.judul_sk;
-     
-     const container = document.getElementById('waCheckboxContainer');
-     container.innerHTML = "";
-
-     // ZETTBOT FIX: Ekstrak seluruh nomor WA aktual menggunakan Mesin Cek js_sortir
-     let finalWaTargets = [];
-     if (typeof cekKeterlibatanPegawai !== 'undefined') {
-         state.usersList.forEach(u => {
-             if (u.role === 'Admin') return;
-             const cek = cekKeterlibatanPegawai(waTargetSkObj.members, u.nip);
-             if (cek.terlibat) {
-                 finalWaTargets.push({ user: u, peran: cek.peran });
-             }
-         });
-     }
-
-     if (finalWaTargets.length === 0) {
-         container.innerHTML = `<div class="p-4 text-center text-slate-500 text-xs italic">Belum ada pegawai yang masuk dalam target SK ini.</div>`;
-         return;
-     }
-
-     finalWaTargets.forEach(target => {
-        const pns = target.user;
-        const peranAktual = target.peran;
-
-        const row = document.createElement('div');
-        row.className = "flex items-center justify-between p-3 bg-slate-900/40 rounded-xl border border-slate-800 transition hover:border-slate-600";
-        
-        let waButtonHtml = "";
-        if (pns.no_hp && pns.no_hp.length >= 9) {
-           const cleanNo = pns.no_hp.replace(/[^0-9]/g, "");
-           const formattedNo = cleanNo.startsWith("0") ? "62" + cleanNo.slice(1) : cleanNo;
-           
-           let sapaan = "Bapak/Ibu";
-           let cleanNip = String(pns.nip).replace(/[^0-9]/g, '');
-           if (cleanNip.length === 18) {
-               if (cleanNip.charAt(14) === '1') sapaan = "Bapak";
-               else if (cleanNip.charAt(14) === '2') sapaan = "Ibu";
-           }
-
-           const pesanWa = `Yth. ${sapaan} *${pns.nama}*,\n\nKami informasikan bahwa Anda telah ditetapkan sebagai *${peranAktual}* ke dalam *${waTargetSkObj.judul_sk}*.\n\nMohon mengunduh & mempelajari surat keputusan resmi melalui tautan PDF berikut:\n${waTargetSkObj.link_drive}\n\nTerima Kasih.\n_Sistem Kepegawaian TRANSKEP_`;
-           const waUrl = `https://api.whatsapp.com/send?phone=${formattedNo}&text=${encodeURIComponent(pesanWa)}`;
-           
-           waButtonHtml = `
-             <a href="${waUrl}" target="_blank" onclick="this.classList.replace('bg-emerald-500/20','bg-slate-700'); this.classList.replace('text-emerald-400','text-slate-400'); this.innerHTML='<i class=\\'fa-solid fa-check mr-1\\'></i> Terkirim';" class="px-3 py-1.5 bg-emerald-500/20 hover:bg-emerald-500 border border-emerald-500/30 hover:border-emerald-500 text-emerald-400 hover:text-white rounded-lg transition text-xs font-bold flex items-center shadow-sm whitespace-nowrap">
-                <i class="fa-brands fa-whatsapp mr-1.5 text-sm"></i> Kirim WA
-             </a>
-           `;
-        } else {
-           waButtonHtml = `<span class="text-[10px] text-rose-500 italic px-2">No WA Tidak Valid</span>`;
-        }
-
-        row.innerHTML = `
-           <div class="flex-1 min-w-0 pr-3">
-              <div class="text-sm font-bold text-slate-200 truncate">${pns.nama}</div>
-              <div class="text-[10px] text-slate-400 truncate mt-0.5">Peran: <span class="text-indigo-300 font-semibold">${peranAktual}</span> | WA: ${pns.no_hp || 'Kosong'}</div>
-           </div>
-           <div>${waButtonHtml}</div>
-        `;
-        container.appendChild(row);
-     });
-
-     const modal = document.getElementById('modalWaSk');
-     modal.classList.remove('hidden');
-     setTimeout(() => { if(modal.firstElementChild) modal.firstElementChild.classList.remove('scale-95'); }, 10);
-  }
-
-  function closeWaModal() {
-     const modal = document.getElementById('modalWaSk');
-     if(modal.firstElementChild) modal.firstElementChild.classList.add('scale-95');
-     setTimeout(() => modal.classList.add('hidden'), 200);
-  }
+// ZETTBOT: Menimpa renderSkView bawaan agar router Vanilla tidak menabrak
+window.renderSkView = function() {};
 </script>

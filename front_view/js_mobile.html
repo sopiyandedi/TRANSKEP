@@ -1,0 +1,152 @@
+<script>
+// ==========================================
+// ZETTBOT: KONTROLER JAVASCRIPT KHUSUS MOBILE
+// ==========================================
+
+// 1. Handler khusus untuk update warna tombol aktif di Bottom Nav
+function switchMobileMenu(menuId) {
+    // Jalankan fungsi routing bawaan sistem
+    switchMenu(menuId);
+    
+    // Reset semua tombol mobile ke warna abu-abu
+    document.querySelectorAll('.mobile-nav-btn').forEach(btn => {
+        btn.classList.remove('text-indigo-400');
+        btn.classList.add('text-slate-500');
+        const indicator = btn.querySelector('div.absolute');
+        if(indicator) {
+            indicator.classList.remove('opacity-100', 'scale-x-100');
+            indicator.classList.add('opacity-0', 'scale-x-0');
+        }
+    });
+
+    // Aktifkan visual tombol yang dipilih
+    const activeBtn = document.getElementById('mob-nav-' + menuId);
+    if(activeBtn) {
+        activeBtn.classList.remove('text-slate-500');
+        activeBtn.classList.add('text-indigo-400');
+        const indicator = activeBtn.querySelector('div.absolute');
+        if(indicator) {
+            indicator.classList.remove('opacity-0', 'scale-x-0');
+            indicator.classList.add('opacity-100', 'scale-x-100');
+        }
+    }
+}
+
+// 2. Fungsi untuk menyuntik data profil ke Top Bar Mobile (VUE MIGRATED)
+function updateMobileProfileUI() {
+    if(!state.user) return;
+    
+    // Cek apakah Vue untuk Mobile Nav sudah jalan
+    if (!window.vmMobileNav) {
+        const topBar = document.getElementById('mobile-top-bar');
+        if (topBar) {
+            const { createApp } = Vue;
+            window.vmMobileNav = createApp({
+                data() {
+                    return { currentUser: state.user };
+                },
+                computed: {
+                    cleanName() {
+                        if(!this.currentUser) return "Pegawai";
+                        return this.currentUser.nama.split(',')[0].replace(/\b(Drs|Dr|H|Hj)\b\.?\s*/gi, '').trim();
+                    },
+                    userInitials() {
+                        if(!this.currentUser) return "ID";
+                        let words = this.cleanName.split(' ');
+                        let initials = (words[0] ? words[0].charAt(0).toUpperCase() : '') + (words[1] ? words[1].charAt(0).toUpperCase() : '');
+                        return initials || "ID";
+                    }
+                }
+            }).mount('#mobile-top-bar');
+        }
+    } else {
+        // Jika sudah aktif, lempar datanya dan biarkan Vue otomatis mengubah layar!
+        window.vmMobileNav.currentUser = state.user;
+    }
+}
+
+// 3. Pantau event render sistem agar UI Mobile ikut diperbarui secara otomatis
+document.addEventListener("DOMContentLoaded", () => {
+    // Membajak (override) fungsi renderGlobalHeader bawaan agar memanggil updateMobileProfileUI juga
+    const originalRenderGlobalHeader = window.renderGlobalHeader;
+    if(typeof originalRenderGlobalHeader === 'function') {
+        window.renderGlobalHeader = function() {
+            originalRenderGlobalHeader(); // Jalankan render desktop
+            updateMobileProfileUI();      // Jalankan update mobile
+        };
+    }
+});
+
+
+// Memaksa Bottom Nav selalu menempel di layar HP dalam iframe Google Sites
+function lockBottomNavPosition() {
+    const bottomNav = document.getElementById('mobile-bottom-nav');
+    if (!bottomNav) return;
+
+    // Hitung posisi dasar layar nyata
+    const viewportHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+    const scrollY = window.scrollY || window.pageYOffset || document.documentElement.scrollTop;
+
+    // Terapkan penyesuaian posisi dinamis
+    bottomNav.style.top = (scrollY + viewportHeight - 68) + 'px';
+    bottomNav.style.bottom = 'auto';
+}
+
+window.addEventListener('scroll', lockBottomNavPosition, { passive: true });
+window.addEventListener('resize', lockBottomNavPosition);
+if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', lockBottomNavPosition);
+    window.visualViewport.addEventListener('scroll', lockBottomNavPosition);
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+    lockBottomNavPosition();
+});
+
+// =========================================================
+// ZETTBOT FIX: PENGUNCI BAR ATAS & BAWAH UNTUK GOOGLE SITES
+// =========================================================
+function lockMobileBars() {
+    const topBar = document.getElementById('mobile-top-bar');
+    const bottomNav = document.getElementById('mobile-bottom-nav');
+
+    // Dapatkan posisi scroll dokumen saat ini
+    const scrollY = window.scrollY || document.documentElement.scrollTop;
+    
+    // Dapatkan tinggi layar kamera nyata (visual viewport) pengguna
+    const viewportHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+
+    // 1. Kunci Bar Atas di koordinat scrollY
+    if (topBar) {
+        topBar.style.setProperty('position', 'absolute', 'important');
+        topBar.style.setProperty('top', scrollY + 'px', 'important');
+        topBar.style.setProperty('z-index', '99999', 'important');
+    }
+
+    // 2. Kunci Bar Bawah di koordinat (scrollY + Tinggi Layar - Tinggi Bar)
+    if (bottomNav) {
+        bottomNav.style.setProperty('position', 'absolute', 'important');
+        bottomNav.style.setProperty('bottom', 'auto', 'important');
+        bottomNav.style.setProperty('top', (scrollY + viewportHeight - 68) + 'px', 'important'); // 68px = tinggi nav
+        bottomNav.style.setProperty('z-index', '99999', 'important');
+    }
+}
+
+// Pasang pelatuk (listener) agar posisi dihitung ulang saat layar digeser atau di-resize
+window.addEventListener('scroll', lockMobileBars, { passive: true });
+window.addEventListener('resize', lockMobileBars);
+
+// Gunakan visualViewport API jika peramban seluler mendukungnya (sangat krusial untuk Safari/Chrome HP)
+if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', lockMobileBars);
+    window.visualViewport.addEventListener('scroll', lockMobileBars);
+}
+
+// Jalankan kunci pertama kali saat aplikasi selesai dimuat
+document.addEventListener("DOMContentLoaded", () => {
+    // Beri sedikit jeda agar DOM Google Sites benar-benar terbentuk
+    setTimeout(lockMobileBars, 300);
+});
+
+
+</script>

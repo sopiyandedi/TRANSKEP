@@ -9,22 +9,21 @@
 function initPkpModule() {
     try {
         console.log("🚀 ZETTBOT: Menjalankan initPkpModule()...");
+        if (typeof mountPkpApp === 'function') mountPkpApp();
         
         var role = state.user ? state.user.role : '';
         var cleanUserNip = state.user ? String(state.user.nip).replace(/'/g, "").trim() : "";
+        const token = localStorage.getItem('transkep_session_token');
 
-        // ZETTBOT FIX: Hak Akses Ketat Tab Lapis 1 (Riwayat, Verifikasi, Rekap)
         var btnVerifikasi = document.getElementById("btn-pkp-verifikasi");
         var btnRekap = document.getElementById("btn-pkp-rekap");
         var btnRiwayat = document.getElementById("btn-pkp-riwayat");
         var tabLapis1Container = btnRiwayat ? btnRiwayat.parentElement : null;
         
-        // 1. Reset (Sembunyikan semua secara default agar container hilang untuk Pegawai)
         if(btnVerifikasi) btnVerifikasi.classList.add("hidden");
         if(btnRekap) btnRekap.classList.add("hidden");
         if(tabLapis1Container) tabLapis1Container.classList.add("hidden");
 
-        // 2. Munculkan kembali HANYA JIKA rolenya memenuhi syarat
         if (role === 'Admin' || role === 'Operator' || role === 'Atasan Langsung' || role === 'Pejabat Berwenang') {
             if(tabLapis1Container) tabLapis1Container.classList.remove("hidden");
             if(btnVerifikasi) btnVerifikasi.classList.remove("hidden");
@@ -46,12 +45,17 @@ function initPkpModule() {
             google.script.run
                 .withSuccessHandler(function(resPK) {
                     state.pkpDokumen = resPK || [];
+                    if (window.vueState) window.vueState.pkpDokumen = state.pkpDokumen;
                     
                     google.script.run
                         .withSuccessHandler(function(resPCK) {
                             hideLoading();
                             state.pckDokumen = resPCK || [];
+                            if (window.vueState) window.vueState.pckDokumen = state.pckDokumen;
                             
+                            if (window.vmPkpApp) {
+                                window.vmPkpApp.syncData(state.pkpDokumen, state.pckDokumen);
+                            }
                             switchMainTabPKP('PK'); 
                             if (typeof updateBadgeVerifikasiPKP === 'function') updateBadgeVerifikasiPKP();
                         })
@@ -59,16 +63,19 @@ function initPkpModule() {
                             hideLoading();
                             showNotify("Gagal Tarik PCK", e.message, "error");
                         })
-                        .getDataDokumenPCK(cleanUserNip, role);
+                        .getDataDokumenPCK(cleanUserNip, role, token);
                 })
                 .withFailureHandler(function(e) {
                     hideLoading();
                     showNotify("Gagal Tarik PKP", e.message, "error");
                 })
-                .getDataDokumenPKP(cleanUserNip, role);
+                .getDataDokumenPKP(cleanUserNip, role, token);
         } else {
             setTimeout(function() {
                 hideLoading();
+                if (window.vmPkpApp) {
+                    window.vmPkpApp.syncData(state.pkpDokumen, state.pckDokumen);
+                }
                 switchMainTabPKP('PK'); 
             }, 500);
         }
@@ -79,8 +86,10 @@ function initPkpModule() {
 
 function switchMainTabPKP(tipe) {
     state.activeMainTab = tipe;
+    if (window.vmPkpApp) {
+        window.vmPkpApp.activeMainTab = tipe;
+    }
     
-    // ZETTBOT FIX: Simpan Status Tab Utama Lapisan 1 agar logikanya menyambung
     var activeLapis1 = state.activeLapis1 || 'riwayat';
     var vPkRiwayat = document.getElementById("viewListPK-riwayat");
     var vPckRiwayat = document.getElementById("viewListPCK-riwayat");
@@ -93,11 +102,9 @@ function switchMainTabPKP(tipe) {
     var btnPck = document.getElementById("btnMainTabPCK");
     var btnAction = document.getElementById("btnActionPKP");
     
-    // ZETTBOT FIX: Mengambil elemen Filter Bulan & Tombol Cetak Rekap
     var filterBulan = document.getElementById("filterBulanPCK");
     var btnCetakRekap = document.getElementById("btnCetakRekapPCK");
 
-    // ZETTBOT FIX: Mengubah class menjadi warna tombol solid menyala (Aktif) dan Outline Indigo (Inaktif) Disamakan dengan Lapis 1
     var activeClassArray = ["bg-indigo-600", "hover:bg-indigo-500", "text-white", "shadow-lg", "shadow-indigo-600/20"];
     var inactiveClassArray = ["text-slate-400", "hover:text-slate-200", "hover:bg-slate-800"];
     
@@ -123,7 +130,6 @@ function switchMainTabPKP(tipe) {
         toggleMainClasses(btnPk, true);
         toggleMainClasses(btnPck, false);
         
-        // ZETTBOT FIX: Sembunyikan Elemen Cetak PCK di Tab PK
         if(filterBulan) filterBulan.classList.add("hidden");
         if(btnCetakRekap) btnCetakRekap.classList.add("hidden");
 
@@ -146,7 +152,6 @@ function switchMainTabPKP(tipe) {
         toggleMainClasses(btnPk, false);
         toggleMainClasses(btnPck, true);
 
-        // ZETTBOT FIX: Munculkan Elemen Cetak HANYA JIKA posisi di Tab Rekap
         if (activeLapis1 === 'rekap') {
             if(filterBulan) filterBulan.classList.remove("hidden");
             if(btnCetakRekap) btnCetakRekap.classList.remove("hidden");
@@ -164,8 +169,10 @@ function switchMainTabPKP(tipe) {
 }
 
 function switchTabLapis1PKP(tabName) {
-    // ZETTBOT FIX: Simpan Status Tab Utama Lapisan 1 secara global
     state.activeLapis1 = tabName;
+    if (window.vmPkpApp) {
+        window.vmPkpApp.activeLapis1 = tabName;
+    }
     var areaRiwayat = document.getElementById("pkp-area-riwayat");
     var areaVerifikasi = document.getElementById("pkp-area-verifikasi");
     var areaRekap = document.getElementById("pkp-area-rekap");
@@ -173,14 +180,11 @@ function switchTabLapis1PKP(tabName) {
     var btnVerifikasi = document.getElementById("btn-pkp-verifikasi");
     var btnRekap = document.getElementById("btn-pkp-rekap");
 
-    // ZETTBOT FIX: Mengubah class tab lapis 1 menjadi warna solid menyala
     var activeClasses = ["bg-indigo-600", "hover:bg-indigo-500", "text-white", "shadow-lg", "shadow-indigo-600/20"];
     var inactiveClasses = ["text-slate-400", "hover:text-slate-200", "hover:bg-slate-800"];
 
-    // ZETTBOT FIX: Mengambil elemen Filter Bulan & Tombol Cetak Rekap
     var filterBulan = document.getElementById("filterBulanPCK");
     var btnCetakRekap = document.getElementById("btnCetakRekapPCK");
-
 
     function toggleClasses(btn, makeActive) {
         if(!btn) return;
@@ -204,7 +208,6 @@ function switchTabLapis1PKP(tabName) {
         toggleClasses(btnRiwayat, true);
         document.getElementById("btnActionPKP").style.display = ""; 
 
-        // Sembunyikan Cetak Rekap
         if(filterBulan) filterBulan.classList.add("hidden");
         if(btnCetakRekap) btnCetakRekap.classList.add("hidden");
 
@@ -213,18 +216,15 @@ function switchTabLapis1PKP(tabName) {
         toggleClasses(btnVerifikasi, true);
         document.getElementById("btnActionPKP").style.display = "none";
 
-        // Sembunyikan Cetak Rekap
         if(filterBulan) filterBulan.classList.add("hidden");
         if(btnCetakRekap) btnCetakRekap.classList.add("hidden");
 
-        // ZETTBOT FIX: Me-render ulang tabel secara paksa saat tab Kotak Verifikasi diklik
         if(typeof renderAllTabelPKP === 'function') renderAllTabelPKP();
     } else if (tabName === 'rekap') {
         areaRekap.classList.remove("hidden");
         toggleClasses(btnRekap, true);
         document.getElementById("btnActionPKP").style.display = "none";
 
-        // ZETTBOT FIX: Munculkan Cetak Rekap HANYA JIKA Main Tab yang aktif adalah PCK
         if (state.activeMainTab === 'PCK') {
             if(filterBulan) filterBulan.classList.remove("hidden");
             if(btnCetakRekap) btnCetakRekap.classList.remove("hidden");
@@ -236,75 +236,129 @@ function switchTabLapis1PKP(tabName) {
 }
 
 function hapusDokumenPK(idPKP) {
+    const token = localStorage.getItem('transkep_session_token');
     showCustomConfirm("Hapus Dokumen PK", "Anda yakin ingin menghapus Permanen dokumen ini?", function() {
-        if (typeof google !== 'undefined' && google.script) { google.script.run.aksiDokumenPKP(idPKP, "Hapus"); }
+        if (typeof google !== 'undefined' && google.script) { google.script.run.aksiDokumenPKP(idPKP, "Hapus", state.user.nip, token); }
         state.pkpDokumen = state.pkpDokumen.filter(function(item) { return String(item.id_pkp) !== String(idPKP); });
+        if (window.vueState) window.vueState.pkpDokumen = state.pkpDokumen;
+        if (window.vmPkpApp) window.vmPkpApp.syncData(state.pkpDokumen, state.pckDokumen);
         if(typeof renderListPK === 'function') renderListPK();
         showNotify("Dihapus", "Dokumen PK berhasil dihapus.", "success");
     });
 }
 
 function hapusDokumenPCK(idPCK) {
+    const token = localStorage.getItem('transkep_session_token');
     showCustomConfirm("Hapus Laporan PCK", "Anda yakin ingin menghapus Laporan bulan ini?", function() {
-        if (typeof google !== 'undefined' && google.script) { google.script.run.aksiDokumenPCK(idPCK, "Hapus"); }
+        if (typeof google !== 'undefined' && google.script) { google.script.run.aksiDokumenPCK(idPCK, "Hapus", state.user.nip, token); }
         state.pckDokumen = state.pckDokumen.filter(function(item) { return String(item.id_pck) !== String(idPCK); });
+        if (window.vueState) window.vueState.pckDokumen = state.pckDokumen;
+        if (window.vmPkpApp) window.vmPkpApp.syncData(state.pkpDokumen, state.pckDokumen);
         if(typeof renderListPCK === 'function') renderListPCK();
         showNotify("Dihapus", "Laporan PCK berhasil dihapus.", "success");
     });
 }
 
 function kirimDokumenPK(idPKP) {
+    const token = localStorage.getItem('transkep_session_token');
     showCustomConfirm("Kirim Dokumen PK", "Kirim ke Atasan Penilai? Setelah dikirim, Anda tidak bisa mengedit dokumen ini lagi.", function() {
-        if (typeof google !== 'undefined' && google.script) { google.script.run.aksiDokumenPKP(idPKP, "Kirim"); }
+        if (typeof google !== 'undefined' && google.script) { google.script.run.aksiDokumenPKP(idPKP, "Kirim", state.user.nip, token); }
         for(var i=0; i<state.pkpDokumen.length; i++) {
-            // ZETTBOT FIX: Status berubah langsung ke Menunggu Penilai sesuai Hierarki PK
             if(String(state.pkpDokumen[i].id_pkp) === String(idPKP)) state.pkpDokumen[i].status = "Menunggu Penilai";
         }
+        if (window.vueState) window.vueState.pkpDokumen = state.pkpDokumen;
+        if (window.vmPkpApp) window.vmPkpApp.syncData(state.pkpDokumen, state.pckDokumen);
         if(typeof renderListPK === 'function') renderListPK();
         showNotify("Terkirim", "Dokumen PK berhasil diserahkan ke Atasan Penilai.", "success");
     });
 }
 
 function kirimDokumenPCK(idPCK) {
+    const token = localStorage.getItem('transkep_session_token');
     showCustomConfirm("Kirim Laporan PCK", "Kirim laporan ini ke Atasan? Data akan terkunci.", function() {
-        if (typeof google !== 'undefined' && google.script) { google.script.run.aksiDokumenPCK(idPCK, "Kirim"); }
+        if (typeof google !== 'undefined' && google.script) { google.script.run.aksiDokumenPCK(idPCK, "Kirim", state.user.nip, token); }
         for(var i=0; i<state.pckDokumen.length; i++) {
-            // ZETTBOT FIX: Status berubah langsung ke Menunggu Penilai sesuai Hierarki PCK
             if(String(state.pckDokumen[i].id_pck) === String(idPCK)) state.pckDokumen[i].status = "Menunggu Penilai";
         }
+        if (window.vueState) window.vueState.pckDokumen = state.pckDokumen;
+        if (window.vmPkpApp) window.vmPkpApp.syncData(state.pkpDokumen, state.pckDokumen);
         if(typeof renderListPCK === 'function') renderListPCK();
         showNotify("Terkirim", "Laporan PCK bulan ini telah diserahkan.", "success");
     });
 }
 
 function cetakDokumen(jenis, id) {
+    const token = localStorage.getItem('transkep_session_token');
+    
+    // Proteksi anti-spam klik (mengadopsi sistem WFH)
+    if (window.isGlobalPrinting) {
+        showNotify("Proses Sibuk", "Sistem sedang merakit dokumen PDF.", "warning");
+        return; 
+    }
+
     if (jenis === 'PK') {
-        showNotify("Persiapan Cetak PK", "Mengkompilasi data Target Tahunan...", "success");
+        window.isGlobalPrinting = true;
+        showLoading("Merakit PDF Perjanjian Kinerja... (Mohon tunggu)");
+        
         if (typeof google !== 'undefined' && google.script) {
             google.script.run
                 .withSuccessHandler(function(res) {
-                    if (res && res.success) renderPrintTemplatePK(res);
-                    else showNotify("Gagal Cetak", "Detail dokumen tidak ditemukan.", "error");
+                    hideLoading();
+                    window.isGlobalPrinting = false;
+                    
+                    if (res && res.status === 'success') {
+                        showNotify("Berhasil", "Dokumen PK berhasil dibuat!", "success");
+                        // Buka PDF di tab baru
+                        window.open(res.url, '_blank');
+                    } else {
+                        showNotify("Gagal Cetak", res.message, "error");
+                    }
                 })
-                .getDetailPKP(id);
+                .withFailureHandler(function(err) {
+                    hideLoading();
+                    window.isGlobalPrinting = false;
+                    showNotify("Error Koneksi", err.toString(), "error");
+                })
+                .generatePdfPK(id, state.user.nip, token);
+        } else {
+            setTimeout(() => { 
+                hideLoading(); window.isGlobalPrinting = false; 
+                alert("[CANVAS MODE] PDF PK akan terbuka di sini."); 
+            }, 1500);
         }
     } else if (jenis === 'PCK') {
-        showNotify("Persiapan Cetak PCK", "Mengkompilasi Laporan Capaian Bulanan...", "success");
+        window.isGlobalPrinting = true;
+        showLoading("Merakit PDF Laporan PCK... (Mohon tunggu)");
+        
         if (typeof google !== 'undefined' && google.script) {
             google.script.run
                 .withSuccessHandler(function(res) {
-                    if (res && res.success) renderPrintTemplatePCK(res);
-                    else showNotify("Gagal Cetak", "Data PCK belum lengkap.", "error");
+                    hideLoading();
+                    window.isGlobalPrinting = false;
+                    
+                    if (res && res.status === 'success') {
+                        showNotify("Berhasil", "Laporan PCK berhasil dibuat!", "success");
+                        // Buka PDF di tab baru
+                        window.open(res.url, '_blank');
+                    } else {
+                        showNotify("Gagal Cetak", res.message, "error");
+                    }
                 })
-                .getDetailPrintPCK(id);
+                .withFailureHandler(function(err) {
+                    hideLoading();
+                    window.isGlobalPrinting = false;
+                    showNotify("Error Koneksi", err.toString(), "error");
+                })
+                .generatePdfPCK(id, state.user.nip, token);
+        } else {
+            setTimeout(() => { 
+                hideLoading(); window.isGlobalPrinting = false; 
+                alert("[CANVAS MODE] PDF PCK akan terbuka di sini."); 
+            }, 1500);
         }
     }
 }
 
-// =======================================================
-// Fungsi renderPrintTemplatePK() & renderPrintTemplatePCK()
-// tetap utuh karena Anda tidak meminta perubahan desain cetak.
-// =======================================================
 function renderPrintTemplatePK(data) {
     try {
         var container = document.getElementById("template-pk-container");

@@ -1,602 +1,317 @@
 <script>
-  // ---------------------------------------------------------
-  // FUNGSI HELPER: KONVERSI TANGGAL GOOGLE SHEET KE HTML5
-  // ---------------------------------------------------------
-  function parseDateToHTML5(sheetDateStr) {
-    if (!sheetDateStr) return "";
-    if (sheetDateStr.includes('-') && sheetDateStr.split('-')[0].length === 4) return sheetDateStr;
-    
-    const parts = sheetDateStr.includes('/') ? sheetDateStr.split('/') : sheetDateStr.split('-');
-    if (parts.length === 3) {
-        let day = parts[0].padStart(2, '0');
-        let month = parts[1].padStart(2, '0');
-        let year = parts[2];
-        if (year.length === 2) year = "20" + year;
-        return `${year}-${month}-${day}`;
-    }
-    return "";
-  }
+  // ==========================================
+  // ZETTBOT: VUE JS COMPONENT - MODUL PEGAWAI
+  // ==========================================
 
-  // ---------------------------------------------------------
-  // FUNGSI BACKUP (EXPORT KE EXCEL)
-  // ---------------------------------------------------------
-  function exportPegawaiToExcel() {
-    if (typeof XLSX === 'undefined') {
-       showNotify('Library Terblokir', 'Modul export excel gagal dimuat koneksi.', 'error');
-       return;
-    }
-    
-    const dataExport = state.usersList.map(u => ({
-        'NIP': u.nip, 'Nama': u.nama, 'Jabatan': u.jabatan, 'Role': u.role, 'No_HP': u.no_hp, 'Password': u.pass,
-        'Sisa_Tahunan_2024': u.s_tahunan_2024, 'Sisa_Tahunan_2025': u.s_tahunan_2025, 'Sisa_Tahunan_2026': u.s_tahunan_2026,
-        'Sisa_Sakit': u.s_sakit, 'Sisa_Penting': u.s_penting, 'Sisa_Besar': u.s_besar, 'Sisa_Melahirkan': u.s_melahirkan, 'Sisa_CLTN': u.s_cltn,
-        'Pangkat': u.pangkat, 'Jenis_Jabatan': (u.jenis_jabatan || 'Fungsional Umum'), 'Alamat': u.alamat,
-        'TMT_KGB': u.tmt_kgb, 'TMT_KNP': u.tmt_knp, 'BUP': u.bup
-    }));
+  document.addEventListener("DOMContentLoaded", () => {
+    window.vmPegawai = Vue.createApp({
+      data() {
+        return {
+          searchPegawai: "",
+          expandedPegawai: [],
+          visiblePasswords: [],
+          showModalPegawai: false,
+          modalPegMode: 'add',
+          formPegawai: this.getEmptyForm(),
+          showModalAntrean: false,
+          antreanResetList: [],
+          hierarkiJabatan: [
+            "Ketua", "Wakil Ketua", "Hakim Utama Muda", "Panitera", "Sekretaris",
+            "Panitera Muda Gugatan", "Panitera Muda Permohonan", "Panitera Muda Hukum",
+            "Kepala Sub Bagian Umum dan Keuangan", "Kepala Sub Bagian Kepegawaian, ORTALA",
+            "Kepala Sub Bagian Perencanaan, TI dan Pelaporan", "Panitera Pengganti",
+            "Juru Sita", "Juru Sita Pengganti", "Pranata Komputer Ahli Pertama",
+            "Operator - Penata Layanan Operasional", "Arsiparis Terampil",
+            "Klerek - Analis Perkara Peradilan", "Klerek - Pengelola Penanganan Perkara",
+            "Klerek - Pengolah Data dan Informasi", "Penata Layanan Operasional",
+            "Pengelola Layanan Operasional", "Operator Layanan Operasional"
+          ]
+        };
+      },
+      computed: {
+        // Menyambungkan data Vue dengan state global aplikasi
+        usersList() {
+          return window.vueState ? window.vueState.usersList : [];
+        },
+        currentUser() {
+          return window.vueState ? window.vueState.user : null;
+        },
+        filteredUsers() {
+          let users = this.usersList.slice() || [];
+          
+          // Sorting
+          users.sort((a, b) => this.getBobotJabatan(a.jabatan) - this.getBobotJabatan(b.jabatan));
 
-    if(dataExport.length === 0) {
-        showNotify('Perhatian', 'Tidak ada data untuk dibackup.', 'error');
-        return;
-    }
-
-    try {
-        const ws = XLSX.utils.json_to_sheet(dataExport);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "Master_Pegawai");
-        XLSX.writeFile(wb, "Backup_Pegawai_TRANSKEP.xlsx");
-        showNotify('Backup Berhasil', 'Data pegawai telah diunduh ke perangkat Anda.', 'success');
-    } catch (error) {
-        showNotify('Gagal Memproses', 'Terjadi kesalahan saat membuat file.', 'error');
-    }
-  }
-
-  // ---------------------------------------------------------
-  // FUNGSI IMPORT (UPLOAD EXCEL)
-  // ---------------------------------------------------------
-  function handleImportPegawai(event) {
-    const file = event.target.files[0];
-    if (!file) return;
-    
-    const reader = new FileReader();
-    reader.onload = function(e) {
-        try {
-            const data = new Uint8Array(e.target.result);
-            const workbook = XLSX.read(data, {type: 'array'});
-            const firstSheetName = workbook.SheetNames[0];
-            const worksheet = workbook.Sheets[firstSheetName];
-            const json = XLSX.utils.sheet_to_json(worksheet, { defval: "" }); 
-            
-            if (json.length === 0) {
-                showNotify('Import Gagal', 'File Excel yang diunggah kosong.', 'error');
-                return;
-            }
-
-            if (!json[0].hasOwnProperty('NIP') || !json[0].hasOwnProperty('Nama')) {
-                showNotify('Import Ditolak', 'Format Excel tidak sesuai. Wajib menggunakan format hasil Backup.', 'error');
-                return;
-            }
-
-            showCustomConfirm(
-                "Konfirmasi Sinkronisasi", 
-                "Ditemukan " + json.length + " data profil di dalam file. Sistem akan menimpa NIP yang sudah ada. Lanjutkan?", 
-                function() {
-                    showLoading("Memasukkan data ke database...");
-                    google.script.run
-                        .withSuccessHandler(res => {
-                            hideLoading();
-                            document.getElementById('importPegawaiInput').value = ''; 
-                            if(res.status === 'success') {
-                                showNotify('Import Selesai', res.message, 'success');
-                                syncAllServerData(); 
-                            } else {
-                                showNotify('Import Gagal', res.message, 'error');
-                            }
-                        })
-                        .withFailureHandler(err => {
-                            hideLoading();
-                            document.getElementById('importPegawaiInput').value = ''; 
-                            showNotify('Error Sistem', err.toString(), 'error');
-                        })
-                        .importBulkUsers(json);
-                }
+          // Filtering
+          if (this.searchPegawai.trim() !== "") {
+            const keyword = this.searchPegawai.toLowerCase();
+            users = users.filter(u => 
+              (u.nama && u.nama.toLowerCase().includes(keyword)) ||
+              (u.nip && u.nip.toLowerCase().includes(keyword)) ||
+              (u.jabatan && u.jabatan.toLowerCase().includes(keyword))
             );
-
-        } catch(error) {
-            document.getElementById('importPegawaiInput').value = ''; 
-            showNotify('Import Gagal', 'Dokumen rusak atau tidak terbaca sebagai Excel murni.', 'error');
+          }
+          return users;
         }
-    };
-    reader.readAsArrayBuffer(file);
-  }
+      },
 
-  // ---------------------------------------------------------
-  // INDEKS HIERARKI JABATAN & FUNGSI TOGGLE PASSWORD
-  // ---------------------------------------------------------
-  const hierarkiJabatan = [
-    "Ketua", "Wakil Ketua", "Hakim Utama Muda", "Panitera", "Sekretaris",
-    "Panitera Muda Gugatan", "Panitera Muda Permohonan", "Panitera Muda Hukum",
-    "Kepala Sub Bagian Umum dan Keuangan", "Kepala Sub Bagian Kepegawaian, ORTALA",
-    "Kepala Sub Bagian Perencanaan, TI dan Pelaporan", "Panitera Pengganti",
-    "Juru Sita", "Juru Sita Pengganti", "Pranata Komputer Ahli Pertama",
-    "Operator - Penata Layanan Operasional", "Arsiparis Terampil",
-    "Klerek - Analis Perkara Peradilan", "Klerek - Pengelola Penanganan Perkara",
-    "Klerek - Pengolah Data dan Informasi", "Penata Layanan Operasional",
-    "Pengelola Layanan Operasional", "Operator Layanan Operasional"
-  ];
-
-  function getBobotJabatan(jabatan) {
-    if (!jabatan) return 999;
-    const index = hierarkiJabatan.findIndex(j => j.toLowerCase() === jabatan.toLowerCase().trim());
-    return index !== -1 ? index : 999;
-  }
-
-  function togglePassVisibility(nip, passLengkap) {
-    const mainTxt = document.getElementById('pass-main-txt-' + nip);
-    const mainIcon = document.getElementById('pass-main-icon-' + nip);
-
-    if (mainIcon && mainIcon.classList.contains("fa-eye-slash")) {
-      if(mainTxt) mainTxt.innerText = passLengkap;
-      if(mainIcon) mainIcon.className = "fa-solid fa-eye text-xs text-indigo-400";
-    } else {
-      if(mainTxt) mainTxt.innerText = "••••••••";
-      if(mainIcon) mainIcon.className = "fa-solid fa-eye-slash text-xs text-slate-400";
-    }
-  }
-
-  // ---------------------------------------------------------
-  // FUNGSI RENDER UTAMA & CRUD BAWAAN
-  // ---------------------------------------------------------
-  function renderManajemenView() {
-    const tbody = document.getElementById('tblManajemenBody');
-    if(!tbody) return;
-    tbody.innerHTML = "";
-
-    if (state.usersList.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="7" class="text-center p-8 text-slate-600">Tidak ada data pegawai terdaftar.</td></tr>';
-      return;
-    }
-
-    let sortedUsers = [...state.usersList].sort((a, b) => {
-       return getBobotJabatan(a.jabatan) - getBobotJabatan(b.jabatan);
-    });
-
-    sortedUsers.forEach((u, index) => {
-      const tr = document.createElement('tr');
-      tr.id = 'peg-main-row-' + u.nip;
-      tr.className = "border-b border-slate-900 hover:bg-slate-900/10 transition text-xs";
-
-      let roleStyle = "text-slate-400 bg-slate-900 border-slate-800"; 
-      if (u.role === 'Admin') roleStyle = "text-indigo-400 bg-indigo-500/10 border-indigo-500/20";
-      if (u.role === 'Pejabat Berwenang') roleStyle = "text-blue-400 bg-blue-500/10 border-blue-500/20";
-      if (u.role === 'Atasan Langsung') roleStyle = "text-emerald-400 bg-emerald-500/10 border-emerald-500/20";
-      if (u.role === 'Operator') roleStyle = "text-amber-400 bg-amber-500/10 border-amber-500/20";
-
-      const safePass = String(u.pass || "").replace(/'/g, "\\'").replace(/"/g, "&quot;");
-      const safeNama = String(u.nama || "").replace(/'/g, "\\'").replace(/"/g, "&quot;");
-
-      tr.innerHTML = 
-        '<td class="p-4 text-center font-mono text-slate-500 font-semibold">' + (index + 1) + '</td>' +
-        '<td class="p-4">' +
-          '<div class="font-bold text-slate-200">' + u.nama + '</div>' +
-          '<div class="text-[10px] text-slate-500 mt-0.5 font-mono">NIP: ' + u.nip + '</div>' +
-        '</td>' +
-        '<td class="p-4 text-slate-300 font-semibold">' + u.jabatan + '</td>' +
-        '<td class="p-4 text-slate-400">' + (u.pangkat || '-') + '</td>' +
-        '<td class="p-4">' +
-          '<span class="inline-flex px-2 py-0.5 rounded text-[10px] font-bold border ' + roleStyle + '">' + u.role + '</span>' +
-        '</td>' +
-        '<td class="p-4">' +
-          '<span class="flex items-center gap-2">' +
-            '<span id="pass-main-txt-' + u.nip + '" class="font-mono text-slate-400 tracking-wider">••••••••</span>' +
-            '<button onclick="togglePassVisibility(\'' + u.nip + '\', \'' + safePass + '\')" class="text-indigo-400 hover:text-indigo-300 focus:outline-none" title="Lihat Sandi">' +
-              '<i id="pass-main-icon-' + u.nip + '" class="fa-solid fa-eye-slash text-xs"></i>' +
-            '</button>' +
-          '</span>' +
-        '</td>' +
-        '<td class="p-4 text-center space-x-1.5 whitespace-nowrap">' +
-          '<button onclick="togglePegDetail(\'' + u.nip + '\')" class="p-1.5 bg-slate-900 hover:bg-indigo-600/20 border border-slate-800 rounded-lg transition text-slate-400 hover:text-indigo-400" title="Detail Jatah Cuti & Kontak">' +
-            '<i id="chevron-peg-' + u.nip + '" class="fa-solid fa-chevron-down text-[10px] transition-transform duration-300"></i>' +
-          '</button>' +
-          '<button onclick="sendCredentialViaWA(\'' + u.nip + '\')" class="text-emerald-500 hover:text-emerald-400 p-1.5 rounded-lg hover:bg-emerald-500/10 transition inline-block border border-transparent hover:border-emerald-500/20" title="Kirim Akses via WA">' +
-            '<i class="fa-brands fa-whatsapp"></i>' +
-          '</button>' +
-          '<button onclick="openPegawaiModal(\'edit\', \'' + u.nip + '\')" class="text-amber-500 hover:text-amber-400 p-1.5 rounded-lg hover:bg-amber-500/10 transition inline-block border border-transparent hover:border-amber-500/20" title="Edit Profil">' +
-            '<i class="fa-solid fa-user-gear"></i>' +
-          '</button>' +
-          '<button onclick="deletePegawaiRecord(\'' + u.nip + '\', \'' + safeNama + '\')" class="text-rose-500 hover:text-rose-400 p-1.5 rounded-lg hover:bg-rose-500/10 transition inline-block border border-transparent hover:border-rose-500/20" title="Hapus Pegawai">' +
-            '<i class="fa-regular fa-trash-can"></i>' +
-          '</button>' +
-        '</td>';
-      tbody.appendChild(tr);
-
-      const detailTr = document.createElement('tr');
-      detailTr.id = 'peg-detail-row-' + u.nip;
-      detailTr.className = "hidden bg-slate-950/80 border-b border-slate-900";
-      
-      let badgeJenis = "";
-      if (u.jenis_jabatan === 'Struktural') badgeJenis = '<span class="ml-2 px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-400 text-[9px] border border-indigo-500/30 uppercase">Struktural</span>';
-      else if (u.jenis_jabatan === 'Fungsional') badgeJenis = '<span class="ml-2 px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 text-[9px] border border-amber-500/30 uppercase">Fungsional</span>';
-      else badgeJenis = '<span class="ml-2 px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 text-[9px] border border-emerald-500/30 uppercase">Fungsional Umum</span>';
-
-      detailTr.innerHTML = 
-        '<td colspan="7" class="p-6">' +
-          '<div class="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs leading-relaxed">' +
-            '<div class="space-y-3 bg-slate-900/40 p-4 rounded-2xl border border-slate-900">' +
-              '<h4 class="font-bold text-slate-200 border-b border-slate-800 pb-1.5 flex items-center">' +
-                '<i class="fa-solid fa-address-card text-indigo-400 mr-2"></i> Kontak & Detail Kepangkatan' + badgeJenis +
-              '</h4>' +
-              '<div class="grid grid-cols-3 gap-2"><span class="text-slate-500">Nomor WhatsApp:</span><span class="col-span-2 text-slate-300 font-mono font-medium">' + (u.no_hp || '-') + '</span></div>' +
-              '<div class="grid grid-cols-3 gap-2"><span class="text-slate-500">Alamat Rumah:</span><span class="col-span-2 text-slate-300 italic">' + (u.alamat || '-') + '</span></div>' +
-              '<div class="grid grid-cols-3 gap-3 text-center mt-3 pt-3 border-t border-slate-800/50">' +
-                '<div class="bg-slate-950/50 p-2 rounded-xl border border-slate-800/80">' +
-                  '<div class="text-[9px] uppercase font-bold text-slate-500">TMT KGB</div>' +
-                  '<div class="text-xs font-bold text-slate-300 mt-0.5">' + (u.tmt_kgb || '-') + '</div>' +
-                '</div>' +
-                '<div class="bg-slate-950/50 p-2 rounded-xl border border-slate-800/80">' +
-                  '<div class="text-[9px] uppercase font-bold text-slate-500">TMT KNP</div>' +
-                  '<div class="text-xs font-bold text-slate-300 mt-0.5">' + (u.tmt_knp || '-') + '</div>' +
-                '</div>' +
-                '<div class="bg-slate-950/50 p-2 rounded-xl border border-slate-800/80">' +
-                  '<div class="text-[9px] uppercase font-bold text-slate-500">BUP</div>' +
-                  '<div class="text-xs font-bold text-slate-300 mt-0.5">' + (u.bup ? u.bup + ' Thn' : '-') + '</div>' +
-                '</div>' +
-              '</div>' +
-            '</div>' +
-            '<div class="space-y-3 bg-slate-900/40 p-4 rounded-2xl border border-slate-900">' +
-              '<h4 class="font-bold text-slate-200 border-b border-slate-800 pb-1.5 flex items-center gap-2">' +
-                '<i class="fa-solid fa-circle-info text-indigo-400"></i> Alokasi Sisa Jatah Cuti (Hari Kerja)' +
-              '</h4>' +
-              '<div class="grid grid-cols-3 gap-3 text-center mb-2">' +
-                '<div class="bg-indigo-950/20 p-2.5 rounded-xl border border-indigo-500/20"><div class="text-[9px] uppercase font-bold text-indigo-400">Tahunan 2024</div><div class="text-xs font-extrabold text-indigo-200 mt-0.5">' + u.s_tahunan_2024 + ' Hari</div></div>' +
-                '<div class="bg-indigo-950/20 p-2.5 rounded-xl border border-indigo-500/20"><div class="text-[9px] uppercase font-bold text-indigo-400">Tahunan 2025</div><div class="text-xs font-extrabold text-indigo-200 mt-0.5">' + u.s_tahunan_2025 + ' Hari</div></div>' +
-                '<div class="bg-indigo-950/20 p-2.5 rounded-xl border border-indigo-500/20"><div class="text-[9px] uppercase font-bold text-indigo-400">Tahunan 2026</div><div class="text-xs font-extrabold text-indigo-200 mt-0.5">' + u.s_tahunan_2026 + ' Hari</div></div>' +
-              '</div>' +
-              '<div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">' +
-                '<div class="bg-slate-900/60 p-2.5 rounded-xl border border-slate-800/80"><div class="text-[9px] uppercase font-bold text-slate-500">Sakit</div><div class="text-xs font-extrabold text-rose-400 mt-0.5">' + u.s_sakit + ' Hari</div></div>' +
-                '<div class="bg-slate-900/60 p-2.5 rounded-xl border border-slate-800/80"><div class="text-[9px] uppercase font-bold text-slate-500">Penting</div><div class="text-xs font-extrabold text-amber-400 mt-0.5">' + u.s_penting + ' Hari</div></div>' +
-                '<div class="bg-slate-900/60 p-2.5 rounded-xl border border-slate-800/80"><div class="text-[9px] uppercase font-bold text-slate-500">Besar</div><div class="text-xs font-extrabold text-blue-400 mt-0.5">' + u.s_besar + ' Hari</div></div>' +
-                '<div class="bg-slate-900/60 p-2.5 rounded-xl border border-slate-800/80"><div class="text-[9px] uppercase font-bold text-slate-500">Melahirkan</div><div class="text-xs font-extrabold text-purple-400 mt-0.5">' + u.s_melahirkan + ' Hari</div></div>' +
-              '</div>' +
-              '<div class="flex items-center justify-between text-[11px] bg-slate-950/40 p-2 px-3.5 rounded-xl border border-slate-900 mt-2">' +
-                '<span class="text-slate-500">Cuti di Luar Tanggungan Negara (CLTN):</span><span class="font-bold text-slate-300 font-mono">' + u.s_cltn + ' Hari</span>' +
-              '</div>' +
-            '</div>' +
-          '</div>' +
-        '</td>';
-      tbody.appendChild(detailTr);
-    });
-
-    filterPegawaiTable();
-  }
-
-  function filterPegawaiTable() {
-    const input = document.getElementById('pegSearchInput');
-    const filter = input ? input.value.toLowerCase().trim() : "";
-    const tbody = document.getElementById('tblManajemenBody');
-    if (!tbody) return;
-    
-    const rows = tbody.getElementsByTagName('tr');
-    for (let i = 0; i < rows.length; i += 2) {
-      const mainRow = rows[i];
-      const detailRow = rows[i + 1];
-      if (!mainRow) continue;
-
-      const nameCell = mainRow.cells[1];
-      const jabatanCell = mainRow.cells[2];
-
-      if (nameCell || jabatanCell) {
-        const nameText = nameCell.textContent || nameCell.innerText;
-        const jabatanText = jabatanCell.textContent || jabatanCell.innerText;
-        
-        if (nameText.toLowerCase().indexOf(filter) > -1 || jabatanText.toLowerCase().indexOf(filter) > -1) {
-          mainRow.style.display = "";
-        } else {
-          mainRow.style.display = "none";
-          if (detailRow) {
-            detailRow.style.display = "none";
-            const nip = mainRow.id.replace('peg-main-row-', '');
-            const chevron = document.getElementById('chevron-peg-' + nip);
-            if (chevron) chevron.classList.remove('rotate-180');
-            detailRow.classList.add('hidden');
-          }
+      // ==========================================
+      // TAMBAHKAN BLOK WATCH INI BRO
+      // ==========================================
+      watch: {
+        // Vue akan "mengawasi" setiap kali Anda mengetik di input pencarian
+        searchPegawai(newValue) {
+          // Tutup semua baris detail yang sedang terbuka
+          this.expandedPegawai = [];
+          
+          // Tutup juga semua password yang sedang di-intip (opsional, untuk keamanan)
+          this.visiblePasswords = [];
         }
-      }
-    }
-  }
+      },
+      // ==========================================
 
-  function togglePegDetail(nip) {
-    const row = document.getElementById('peg-detail-row-' + nip);
-    const chevron = document.getElementById('chevron-peg-' + nip);
-    
-    if (row && chevron) {
-      const isHidden = row.classList.contains('hidden');
-      if (isHidden) {
-        row.classList.remove('hidden');
-        chevron.classList.add('rotate-180');
-      } else {
-        row.classList.add('hidden');
-        chevron.classList.remove('rotate-180');
-        const passMainTxt = document.getElementById('pass-main-txt-' + nip);
-        const passMainIcon = document.getElementById('pass-main-icon-' + nip);
-        if (passMainTxt && passMainIcon) { passMainTxt.innerText = "••••••••"; passMainIcon.className = "fa-solid fa-eye-slash text-xs text-slate-400"; }
-      }
-    }
-  }
-
-  function openPegawaiModal(mode, nip) {
-    document.getElementById('formPegawai').reset();
-    document.getElementById('pegMode').value = mode;
-
-    const title = document.getElementById('pegModalTitle');
-    const nipInput = document.getElementById('pegNip');
-
-    if (mode === 'add') {
-      title.innerHTML = '<i class="fa-solid fa-user-plus text-indigo-400 mr-2"></i> Tambah Pegawai Baru';
-      nipInput.removeAttribute('readonly');
-      document.getElementById('pegCuti2024').value = 0;
-      document.getElementById('pegCuti2025').value = 0;
-      document.getElementById('pegCuti2026').value = 12;
-      document.getElementById('pegSakit').value = 30;
-      document.getElementById('pegPenting').value = 15;
-      document.getElementById('pegBesar').value = 90;
-      document.getElementById('pegMelahirkan').value = 90;
-      document.getElementById('pegCltn').value = 0;
-      document.getElementById('pegTmtKgb').value = "";
-      document.getElementById('pegTmtKnp').value = "";
-      document.getElementById('pegBup').value = "58";
-      
-      // ZETTBOT: Default UI Slider saat ditambah
-      setJenisJabatan('Fungsional Umum');
-    } else {
-      title.innerHTML = '<i class="fa-solid fa-user-pen text-indigo-400 mr-2"></i> Perbarui Profil Pegawai';
-      nipInput.setAttribute('readonly', 'true');
-
-      const u = state.usersList.find(usr => usr.nip === nip);
-      if (u) {
-        document.getElementById('pegOriginalNip').value = u.nip;
-        document.getElementById('pegNip').value = u.nip;
-        document.getElementById('pegNama').value = u.nama;
-        document.getElementById('pegJabatan').value = u.jabatan;
-        document.getElementById('pegPangkat').value = u.pangkat || "";
-        document.getElementById('pegRole').value = u.role;
-        document.getElementById('pegNoHp').value = u.no_hp;
-        document.getElementById('pegPass').value = u.pass;
-        document.getElementById('pegAlamat').value = u.alamat || "";
-        document.getElementById('pegCuti2024').value = u.s_tahunan_2024;
-        document.getElementById('pegCuti2025').value = u.s_tahunan_2025;
-        document.getElementById('pegCuti2026').value = u.s_tahunan_2026;
-        document.getElementById('pegSakit').value = u.s_sakit;
-        document.getElementById('pegPenting').value = u.s_penting;
-        document.getElementById('pegBesar').value = u.s_besar;
-        document.getElementById('pegMelahirkan').value = u.s_melahirkan;
-        document.getElementById('pegCltn').value = u.s_cltn;
-        document.getElementById('pegTmtKgb').value = parseDateToHTML5(u.tmt_kgb);
-        document.getElementById('pegTmtKnp').value = parseDateToHTML5(u.tmt_knp);
-        document.getElementById('pegBup').value = u.bup || "58";
-        
-        // ZETTBOT: Sesuaikan UI Slider saat diedit
-        setJenisJabatan(u.jenis_jabatan || 'Fungsional Umum');
-      }
-    }
-
-    document.getElementById('modalPegawai').classList.remove('hidden');
-  }
-
-  function closePegawaiModal() {
-    document.getElementById('modalPegawai').classList.add('hidden');
-  }
-
-  function submitPegawai(e) {
-    e.preventDefault();
-    const mode = document.getElementById('pegMode').value;
-    const payload = {
-      nip: document.getElementById('pegNip').value,
-      nama: document.getElementById('pegNama').value,
-      jabatan: document.getElementById('pegJabatan').value,
-      pangkat: document.getElementById('pegPangkat').value,
-      role: document.getElementById('pegRole').value,
-      no_hp: document.getElementById('pegNoHp').value,
-      pass: document.getElementById('pegPass').value,
-      alamat: document.getElementById('pegAlamat').value,
-      s_tahunan_2024: Number(document.getElementById('pegCuti2024').value),
-      s_tahunan_2025: Number(document.getElementById('pegCuti2025').value),
-      s_tahunan_2026: Number(document.getElementById('pegCuti2026').value),
-      s_sakit: Number(document.getElementById('pegSakit').value),
-      s_penting: Number(document.getElementById('pegPenting').value),
-      s_besar: Number(document.getElementById('pegBesar').value),
-      s_melahirkan: Number(document.getElementById('pegMelahirkan').value),
-      s_cltn: Number(document.getElementById('pegCltn').value),
-      tmt_kgb: document.getElementById('pegTmtKgb').value,
-      tmt_knp: document.getElementById('pegTmtKnp').value,
-      bup: Number(document.getElementById('pegBup').value),
-      jenis_jabatan: document.getElementById('pegJenisJabatan').value, // ZETTBOT: Tambahan Payload Slider
-      originalNip: document.getElementById('pegOriginalNip').value
-    };
-
-    showLoading("Mencatat perubahan profil ke database...");
-
-    if (mode === 'add') {
-      google.script.run
-        .withSuccessHandler(function(res) {
-          hideLoading();
-          closePegawaiModal();
-          if (res.status === 'success') {
-            showNotify("Profil Disimpan", res.message, "success");
-            syncAllServerData();
-          } else {
-            showNotify("Gagal Menyimpan", res.message, "error");
+      methods: {
+        getEmptyForm() {
+          return {
+            originalNip: "", nip: "", nama: "", jabatan: "", jenis_jabatan: "Fungsional Umum",
+            pangkat: "", role: "Pegawai", no_hp: "", pass: "", alamat: "",
+            s_tahunan_2024: 0, s_tahunan_2025: 0, s_tahunan_2026: 12, s_sakit: 30,
+            s_penting: 15, s_besar: 90, s_melahirkan: 90, s_cltn: 0, tmt_kgb: "", tmt_knp: "", bup: 58
+          };
+        },
+        getBobotJabatan(jabatan) {
+          if (!jabatan) return 999;
+          const index = this.hierarkiJabatan.findIndex(j => j.toLowerCase() === jabatan.toLowerCase().trim());
+          return index !== -1 ? index : 999;
+        },
+        getRoleStyle(role) {
+          if (role === 'Admin') return "text-indigo-400 bg-indigo-500/10 border-indigo-500/20";
+          if (role === 'Pejabat Berwenang') return "text-blue-400 bg-blue-500/10 border-blue-500/20";
+          if (role === 'Atasan Langsung') return "text-emerald-400 bg-emerald-500/10 border-emerald-500/20";
+          if (role === 'Operator') return "text-amber-400 bg-amber-500/10 border-amber-500/20";
+          return "text-slate-400 bg-slate-900 border-slate-800";
+        },
+        parseDateToHTML5(sheetDateStr) {
+          if (!sheetDateStr) return "";
+          if (sheetDateStr.includes('-') && sheetDateStr.split('-')[0].length === 4) return sheetDateStr;
+          const parts = sheetDateStr.includes('/') ? sheetDateStr.split('/') : sheetDateStr.split('-');
+          if (parts.length === 3) {
+              let d = parts[0].padStart(2, '0');
+              let m = parts[1].padStart(2, '0');
+              let y = parts[2].length === 2 ? "20" + parts[2] : parts[2];
+              return `${y}-${m}-${d}`;
           }
-        })
-        .withFailureHandler(function(err) {
-          hideLoading();
-          closePegawaiModal();
-          showNotify("Error Sistem", err.toString(), "error");
-        })
-        .addUser(payload);
-    } else {
-      google.script.run
-        .withSuccessHandler(function(res) {
-          hideLoading();
-          closePegawaiModal();
-          if (res.status === 'success') {
-            showNotify("Profil Disimpan", res.message, "success");
-            syncAllServerData();
+          return "";
+        },
+        toggleDetail(nip) {
+          const index = this.expandedPegawai.indexOf(nip);
+          if (index === -1) {
+             this.expandedPegawai.push(nip);
           } else {
-            showNotify("Gagal Menyimpan", res.message, "error");
+             this.expandedPegawai.splice(index, 1);
+             // Tutup mata password jika row ditutup
+             const passIdx = this.visiblePasswords.indexOf(nip);
+             if(passIdx !== -1) this.visiblePasswords.splice(passIdx, 1);
           }
-        })
-        .withFailureHandler(function(err) {
-          hideLoading();
-          closePegawaiModal();
-          showNotify("Error Sistem", err.toString(), "error");
-        })
-        .updateUser(payload);
-    }
-  }
-
-  function deletePegawaiRecord(nip, nama) {
-    showCustomConfirm("Hapus Data Pegawai", "Hapus permanen akun PNS atas nama " + nama + " (NIP: " + nip + ")? Tindakan ini tidak dapat dibatalkan.", function() {
-      showLoading("Mengeksekusi penghapusan pegawai...");
-      google.script.run
-        .withSuccessHandler(function(res) {
-          hideLoading();
-          if (res.status === 'success') {
-            showNotify("Berhasil Dihapus", res.message, "success");
-            syncAllServerData();
+        },
+        togglePassword(nip) {
+          const index = this.visiblePasswords.indexOf(nip);
+          if (index === -1) this.visiblePasswords.push(nip);
+          else this.visiblePasswords.splice(index, 1);
+        },
+        openPegawaiModal(mode, user = null) {
+          this.modalPegMode = mode;
+          if (mode === 'edit' && user) {
+            this.formPegawai = { ...user, originalNip: user.nip };
+            this.formPegawai.tmt_kgb = this.parseDateToHTML5(user.tmt_kgb);
+            this.formPegawai.tmt_knp = this.parseDateToHTML5(user.tmt_knp);
           } else {
-            showNotify("Gagal Hapus", res.message, "error");
+            this.formPegawai = this.getEmptyForm();
           }
-        })
-        .withFailureHandler(function(err) {
-          hideLoading();
-          showNotify("Error Jaringan", err.toString(), "error");
-        })
-        .deleteUser(nip);
-    });
-  }
+          this.showModalPegawai = true;
+        },
+        closePegawaiModal() {
+          this.showModalPegawai = false;
+        },
+        submitPegawai() {
+          const token = localStorage.getItem('transkep_session_token');
+          if(window.showLoading) window.showLoading("Mencatat perubahan profil ke database...");
 
-  // ---------------------------------------------------------
-  // ZETTBOT: FUNGSI INTERAKTIF SLIDER JENIS JABATAN
-  // ---------------------------------------------------------
-  function setJenisJabatan(jenis) {
-      document.getElementById('pegJenisJabatan').value = jenis;
-      const slider = document.getElementById('jabatanSlider');
-      
-      const btnS = document.getElementById('btnStruktural');
-      const btnFU = document.getElementById('btnFungsionalUmum');
-      const btnF = document.getElementById('btnFungsional');
+          const handler = google.script.run
+              .withSuccessHandler(res => {
+                if(window.hideLoading) window.hideLoading(); 
+                this.closePegawaiModal();
+                if (res.status === 'success') { 
+                  if(window.showNotify) window.showNotify("Profil Disimpan", res.message, "success"); 
+                  if(window.syncAllServerData) window.syncAllServerData(); 
+                } 
+                else { if(window.showNotify) window.showNotify("Gagal Menyimpan", res.message, "error"); }
+              })
+              .withFailureHandler(err => { 
+                if(window.hideLoading) window.hideLoading(); 
+                this.closePegawaiModal(); 
+                if(window.showNotify) window.showNotify("Error Sistem", err.toString(), "error"); 
+              });
+              
+          const adminNip = (this.currentUser && this.currentUser.nip) || localStorage.getItem('transkep_active_nip');
+          if (this.modalPegMode === 'add') handler.addUser(this.formPegawai, adminNip, token);
+          else handler.updateUser(this.formPegawai, adminNip, token);
+        },
+        deletePegawaiRecord(user) {
+          const token = localStorage.getItem('transkep_session_token');
+          if(window.showCustomConfirm) {
+             window.showCustomConfirm("Hapus Data Pegawai", `Hapus permanen akun PNS atas nama ${user.nama} (NIP: ${user.nip})? Tindakan ini tidak dapat dibatalkan.`, () => {
+                if(window.showLoading) window.showLoading("Mengeksekusi penghapusan pegawai...");
+                const adminNip = (this.currentUser && this.currentUser.nip) || localStorage.getItem('transkep_active_nip');
+                google.script.run
+                  .withSuccessHandler(res => {
+                    if(window.hideLoading) window.hideLoading();
+                    if (res.status === 'success') { 
+                        if(window.showNotify) window.showNotify("Berhasil Dihapus", res.message, "success"); 
+                        if(window.syncAllServerData) window.syncAllServerData(); 
+                    } else { 
+                        if(window.showNotify) window.showNotify("Gagal Hapus", res.message, "error"); 
+                    }
+                  })
+                  .deleteUser(user.nip, adminNip, token);
+             });
+          }
+        },
+        sendCredentialViaWA(user) {
+          let sapaan = "Bapak/Ibu";
+          let nipStr = String(user.nip).replace(/[^0-9]/g, '');
+          if (nipStr.length === 18) {
+              let digitKe15 = nipStr.substring(14, 15);
+              if (digitKe15 === '1') sapaan = "Bapak";
+              else if (digitKe15 === '2') sapaan = "Ibu";
+          }
+          let phone = String(user.no_hp || "").replace(/[^0-9]/g, ''); 
+          if (phone.startsWith('0')) phone = '62' + phone.substring(1);
+          if (!phone || phone.length < 9) { 
+              if(window.showNotify) window.showNotify("Gagal Mengirim", "Pegawai tidak memiliki nomor WA.", "error"); 
+              return; 
+          }
+          let displayPass = user.pass;
+          if (displayPass && String(displayPass).startsWith('SHA256$')) {
+              displayPass = "[Telah dienkripsi oleh Pegawai]";
+          }
+          const appUrl = "https://sites.google.com/view/transkepv2/transkep-v2-1";
+          const msg = `*INFORMASI AKUN TRANSKEP* 🏢\nHalo ${sapaan} *${user.nama}*,\n\nBerikut kredensial login Anda:\n\n👤 *NIP / Username:* ${user.nip}\n🔑 *Kata Sandi:* ${displayPass}\n\n🔗 *Link Login:*\n${appUrl}`;
+          window.open("https://api.whatsapp.com/send?phone=" + phone + "&text=" + encodeURIComponent(msg), '_blank');
+        },
+        exportPegawaiToExcel() {
+          if (typeof XLSX === 'undefined') {
+             if(window.showNotify) window.showNotify('Library Terblokir', 'Modul export excel gagal dimuat koneksi.', 'error');
+             return;
+          }
+          const dataExport = this.usersList.map(u => ({
+              'NIP': u.nip, 'Nama': u.nama, 'Jabatan': u.jabatan, 'Role': u.role, 'No_HP': u.no_hp, 'Password': u.pass,
+              'Sisa_Tahunan_2024': u.s_tahunan_2024, 'Sisa_Tahunan_2025': u.s_tahunan_2025, 'Sisa_Tahunan_2026': u.s_tahunan_2026,
+              'Sisa_Sakit': u.s_sakit, 'Sisa_Penting': u.s_penting, 'Sisa_Besar': u.s_besar, 'Sisa_Melahirkan': u.s_melahirkan, 'Sisa_CLTN': u.s_cltn,
+              'Pangkat': u.pangkat, 'Jenis_Jabatan': (u.jenis_jabatan || 'Fungsional Umum'), 'Alamat': u.alamat,
+              'TMT_KGB': u.tmt_kgb, 'TMT_KNP': u.tmt_knp, 'BUP': u.bup
+          }));
+          if(dataExport.length === 0) {
+              if(window.showNotify) window.showNotify('Perhatian', 'Tidak ada data untuk dibackup.', 'error'); return;
+          }
+          const ws = XLSX.utils.json_to_sheet(dataExport);
+          const wb = XLSX.utils.book_new();
+          XLSX.utils.book_append_sheet(wb, ws, "Master_Pegawai");
+          XLSX.writeFile(wb, "Backup_Pegawai_TRANSKEP.xlsx");
+          if(window.showNotify) window.showNotify('Backup Berhasil', 'Data pegawai telah diunduh ke perangkat Anda.', 'success');
+        },
+        handleImportPegawai(event) {
+          const file = event.target.files[0];
+          if (!file) return;
+          const reader = new FileReader();
+          reader.onload = (e) => {
+              try {
+                  const data = new Uint8Array(e.target.result);
+                  const workbook = XLSX.read(data, {type: 'array'});
+                  const json = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { defval: "" }); 
+                  if (json.length === 0) { if(window.showNotify) window.showNotify('Import Gagal', 'File Excel kosong.', 'error'); return; }
+                  if (!json[0].hasOwnProperty('NIP') || !json[0].hasOwnProperty('Nama')) { if(window.showNotify) window.showNotify('Import Ditolak', 'Format Excel tidak sesuai.', 'error'); return; }
 
-      if (btnS) { btnS.classList.remove('text-white'); btnS.classList.add('text-slate-400'); }
-      if (btnFU) { btnFU.classList.remove('text-white'); btnFU.classList.add('text-slate-400'); }
-      if (btnF) { btnF.classList.remove('text-white'); btnF.classList.add('text-slate-400'); }
+                  const token = localStorage.getItem('transkep_session_token');
+                  if(window.showCustomConfirm) {
+                     window.showCustomConfirm("Konfirmasi Sinkronisasi", `Ditemukan ${json.length} data profil. Sistem akan menimpa NIP yang sudah ada. Lanjutkan?`, () => {
+                          if(window.showLoading) window.showLoading("Memasukkan data ke database...");
+                          google.script.run
+                              .withSuccessHandler(res => {
+                                  if(window.hideLoading) window.hideLoading(); 
+                                  this.$refs.fileInput.value = ''; 
+                                  if(res.status === 'success') { 
+                                    if(window.showNotify) window.showNotify('Import Selesai', res.message, 'success'); 
+                                    if(window.syncAllServerData) window.syncAllServerData(); 
+                                  } 
+                                  else { if(window.showNotify) window.showNotify('Import Gagal', res.message, 'error'); }
+                              })
+                              .withFailureHandler(err => { 
+                                if(window.hideLoading) window.hideLoading(); 
+                                this.$refs.fileInput.value = ''; 
+                                if(window.showNotify) window.showNotify('Error', err.toString(), 'error'); 
+                              })
+                              .importBulkUsers(json, (this.currentUser && this.currentUser.nip) || localStorage.getItem('transkep_active_nip'), token);
+                     });
+                  }
+              } catch(error) { this.$refs.fileInput.value = ''; if(window.showNotify) window.showNotify('Import Gagal', 'Dokumen rusak.', 'error'); }
+          };
+          reader.readAsArrayBuffer(file);
+        },
+        fetchResetQueue() {
+          const token = localStorage.getItem('transkep_session_token');
+          const nip = (this.currentUser && this.currentUser.nip) || localStorage.getItem('transkep_active_nip');
+          if (!nip || !token) return;
 
-      if (jenis === 'Struktural') {
-          slider.style.left = '4px';
-          slider.className = 'absolute top-1 bottom-1 w-[32.5%] bg-indigo-600 rounded-lg transition-all duration-300 ease-in-out shadow';
-          if (btnS) { btnS.classList.remove('text-slate-400'); btnS.classList.add('text-white'); }
-      } else if (jenis === 'Fungsional') {
-          slider.style.left = 'calc(67.5% - 4px)';
-          slider.className = 'absolute top-1 bottom-1 w-[32.5%] bg-amber-600 rounded-lg transition-all duration-300 ease-in-out shadow';
-          if (btnF) { btnF.classList.remove('text-slate-400'); btnF.classList.add('text-white'); }
-      } else {
-          // Default Fungsional Umum (Tengah)
-          slider.style.left = '33.7%';
-          slider.className = 'absolute top-1 bottom-1 w-[32.5%] bg-emerald-600 rounded-lg transition-all duration-300 ease-in-out shadow';
-          if (btnFU) { btnFU.classList.remove('text-slate-400'); btnFU.classList.add('text-white'); }
-      }
-  }
-
-  // ---------------------------------------------------------
-  // ZETTBOT: FUNGSI KIRIM KREDENSIAL VIA WA
-  // ---------------------------------------------------------
-  function getSapaanGender(nip) {
-      let sapaan = "Bapak/Ibu";
-      let nipStr = String(nip).replace(/[^0-9]/g, '');
-      if (nipStr.length === 18) {
-          let digitKe15 = nipStr.substring(14, 15);
-          if (digitKe15 === '1') sapaan = "Bapak";
-          else if (digitKe15 === '2') sapaan = "Ibu";
-      }
-      return sapaan;
-  }
-
-  function sendCredentialViaWA(nip) {
-    const user = state.usersList.find(u => u.nip === nip);
-    if (!user) { showNotify("Data Tidak Ditemukan", "Terjadi kesalahan saat menarik data pegawai.", "error"); return; }
-    let rawPhone = user.no_hp || ""; let phone = rawPhone.replace(/[^0-9]/g, ''); 
-    if (phone.startsWith('0')) phone = '62' + phone.substring(1);
-    if (!phone || phone.length < 9) { showNotify("Gagal Mengirim", "Pegawai tidak memiliki nomor WA.", "error"); return; }
-    const appUrl = "https://sites.google.com/view/transkepv2/transkep-v2-1";
-    const msg = "*INFORMASI AKUN TRANSKEP* 🏢\nHalo " + getSapaanGender(user.nip) + " *" + user.nama + "*,\n\nBerikut kredensial login Anda:\n\n👤 *NIP / Username:* " + user.nip + "\n🔑 *Kata Sandi:* " + user.pass + "\n\n🔗 *Link Login:*\n" + appUrl;
-    window.open("https://api.whatsapp.com/send?phone=" + phone + "&text=" + encodeURIComponent(msg), '_blank');
-  }
-
-  // ---------------------------------------------------------
-  // ZETTBOT: FUNGSI ANTREAN LUPA PASSWORD (ADMIN)
-  // ---------------------------------------------------------
-  function fetchResetQueue(isOpenModal = false) {
-    if (isOpenModal) {
-       const container = document.getElementById('queuePassContainer');
-       if(container) container.innerHTML = '<div class="text-center p-8 text-slate-500 text-xs"><i class="fa-solid fa-circle-notch fa-spin text-rose-500 mb-3 text-2xl"></i><br>Menyinkronkan data antrean...</div>';
-       document.getElementById('modalAntreanPass').classList.remove('hidden');
-    }
-    google.script.run
-      .withSuccessHandler(function(queue) {
-         window.currentResetQueue = queue;
-         const badge = document.getElementById('badgeQueuePass');
-         if (badge) {
-             if (queue && queue.length > 0) { badge.innerText = queue.length; badge.classList.remove('hidden'); } 
-             else { badge.classList.add('hidden'); }
-         }
-         const modal = document.getElementById('modalAntreanPass');
-         if (modal && !modal.classList.contains('hidden')) renderResetQueue();
-      })
-      .getResetPasswordQueue();
-  }
-
-  function openQueueModal() { fetchResetQueue(true); }
-  function closeQueueModal() { document.getElementById('modalAntreanPass').classList.add('hidden'); }
-
-  function renderResetQueue() {
-      const container = document.getElementById('queuePassContainer');
-      const queue = window.currentResetQueue || [];
-      if (queue.length === 0) { container.innerHTML = '<div class="text-center p-8 text-slate-500 text-xs">Antrean kosong.</div>'; return; }
-      let html = '';
-      queue.forEach(q => {
-          const safeNama = String(q.nama || "").replace(/'/g, "\\'").replace(/"/g, "&quot;");
-          const safePass = String(q.pass || "").replace(/'/g, "\\'").replace(/"/g, "&quot;");
-          html += 
-          '<div class="bg-slate-900/60 border border-slate-800 p-4 rounded-2xl flex flex-col sm:flex-row justify-between gap-4">' +
-             '<div>' +
-                '<div class="font-bold text-slate-200 text-sm mb-0.5">' + q.nama + '</div>' +
-                '<div class="text-[10px] text-slate-400 font-mono">NIP: ' + q.nip + ' • WA: ' + q.no_wa + '</div>' +
-             '</div>' +
-             '<button onclick="processManualWAReset(\'' + q.id + '\', \'' + q.nip + '\', \'' + safeNama + '\', \'' + q.no_wa + '\', \'' + safePass + '\')" class="shrink-0 px-4 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold rounded-xl text-xs">Kirim WA</button>' +
-          '</div>';
-      });
-      container.innerHTML = html;
-  }
-
-  function processManualWAReset(reqId, nip, name, phone, pass) {
-      const appUrl = "https://sites.google.com/view/transkepv2/transkep-v2-1";
-      const msg = "*RESET AKUN TRANSKEP* 🏢\nHalo *" + name + "*,\n\nIni kredensial baru Anda:\n👤 *NIP:* " + nip + "\n🔑 *Sandi:* " + pass + "\n\n🔗 *Link Login:*\n" + appUrl;
-      const runProcess = () => {
-          if (typeof showLoading === 'function') showLoading("Memproses...");
           google.script.run
-             .withSuccessHandler(res => {
-                 if (typeof hideLoading === 'function') hideLoading();
-                 if(res.status === 'success') {
-                     showNotify("Selesai", "Berhasil diproses.", "success");
-                     fetchResetQueue(); 
-                     window.open("https://api.whatsapp.com/send?phone=" + phone + "&text=" + encodeURIComponent(msg), '_blank');
-                 }
-             })
-             .markResetAsDone(reqId);
-      };
-      if (typeof showCustomConfirm === 'function') showCustomConfirm("Proses Antrean?", "Lanjutkan?", runProcess);
-      else if(confirm("Kirim kredensial?")) runProcess();
-  }
-
-  setTimeout(fetchResetQueue, 1500);
-
+            .withSuccessHandler(queue => {
+               this.antreanResetList = queue || [];
+            })
+            .withFailureHandler(err => {
+               console.warn("Gagal memuat antrean reset:", err);
+            })
+            .getResetPasswordQueue(nip, token);
+        },
+        openQueueModal() {
+          this.fetchResetQueue();
+          this.showModalAntrean = true;
+        },
+        closeQueueModal() {
+          this.showModalAntrean = false;
+        },
+        processManualWAReset(q) {
+            const appUrl = "https://sites.google.com/view/transkepv2/transkep-v2-1";
+            const msg = `*RESET AKUN TRANSKEP* 🏢\nHalo *${q.nama}*,\n\nIni kredensial baru Anda:\n👤 *NIP:* ${q.nip}\n🔑 *Sandi:* ${q.pass}\n\n🔗 *Link Login:*\n${appUrl}`;
+            
+            const runProcess = () => {
+                if (window.showLoading) window.showLoading("Memproses...");
+                const token = localStorage.getItem('transkep_session_token');
+                const nip = (this.currentUser && this.currentUser.nip) || localStorage.getItem('transkep_active_nip');
+                google.script.run
+                   .withSuccessHandler(res => {
+                       if (window.hideLoading) window.hideLoading();
+                       if(res.status === 'success') {
+                           if(window.showNotify) window.showNotify("Selesai", "Berhasil diproses.", "success");
+                           this.fetchResetQueue(); 
+                           window.open("https://api.whatsapp.com/send?phone=" + q.no_wa + "&text=" + encodeURIComponent(msg), '_blank');
+                       } else {
+                           if(window.showNotify) window.showNotify("Gagal", res.message || "Gagal memproses antrean.", "error");
+                       }
+                   })
+                   .withFailureHandler(err => {
+                       if (window.hideLoading) window.hideLoading();
+                       if(window.showNotify) window.showNotify("Error", err.toString(), "error");
+                   })
+                   .markResetAsDone(q.id, nip, token);
+            };
+            
+            if (window.showCustomConfirm) window.showCustomConfirm("Proses Antrean?", "Lanjutkan?", runProcess);
+            else if(confirm("Kirim kredensial?")) runProcess();
+        }
+      },
+      mounted() {
+        setTimeout(() => this.fetchResetQueue(), 1500);
+      }
+    }).mount('#vue-manajemen-pegawai');
+  });
 </script>

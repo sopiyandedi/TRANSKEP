@@ -1,15 +1,22 @@
 <script>
   console.log("🚀 ZETTBOT: Menginisialisasi sistem javascript...");
 
-  // 1. GLOBAL STATE
-  // ZETTBOT FIX: Tambahan variabel 'isBgSyncDone' untuk melacak pemuatan di latar belakang
+  // =========================================================================
+  // ZETTBOT FIX: Menghapus deklarasi "const { createApp } = Vue;" agar tidak
+  // memicu SyntaxError bentrokan dengan modul file JS lainnya.
+  // =========================================================================
+
   let state = {
-    user: null, usersList: [], cutiLogs: [], jobdesList: [], skList: [], kinerjaList: [], sopList: [], sopAckList: [], stList: [], masterKinerjaList: [], ikLogs: [], ipLogs: [], wfhLogs: [], currentMenu: 'dashboard', rendered: {}, pendingPkpCount: 0,
+    user: null, usersList: [], cutiLogs: [], jobdesList: [], skList: [], skAckList: [], kinerjaList: [], sopList: [], sopAckList: [], stList: [], masterKinerjaList: [], ikLogs: [], ipLogs: [], wfhLogs: [], currentMenu: 'dashboard', rendered: {}, pendingPkpCount: 0,
     isBgSyncDone: false 
   };
+  
+  // ZETTBOT FIX: Mengekspos state mentah ke window agar modul lama (seperti js_permohonan) tidak kehilangan data
+  window.state = state; 
+  window.vueState = Vue.reactive(state);
+  
   const isGoogleEnv = (typeof google !== 'undefined' && google.script);
 
-  // 2. INISIALISASI
   document.addEventListener("DOMContentLoaded", () => {
     console.log("🚀 ZETTBOT: Halaman berhasil dimuat (DOMContentLoaded).");
 
@@ -29,12 +36,14 @@
     }
   });
 
-  // 3. PENGATUR VISUALISASI LAYAR 
   function toggleAppVisibility(isLoggedIn) {
     let loginSec = document.getElementById('login-section');
     let appCont = document.getElementById('app-container');
     const loader = document.getElementById('global-loader');
     
+    const mobTop = document.getElementById('mobile-top-bar');
+    const mobBottom = document.getElementById('mobile-bottom-nav');
+
     if (loader) {
         loader.classList.add('hidden');
         loader.style.display = 'none';
@@ -52,13 +61,16 @@
     if (isLoggedIn) {
       if (loginSec) { loginSec.classList.add('hidden'); loginSec.style.display = 'none'; }
       if (appCont) { appCont.classList.remove('hidden'); appCont.style.display = ''; }
+      if (mobTop) { mobTop.classList.remove('hidden'); }
+      if (mobBottom) { mobBottom.classList.remove('hidden'); }
     } else {
       if (loginSec) { loginSec.classList.remove('hidden'); loginSec.style.display = ''; }
       if (appCont) { appCont.classList.add('hidden'); appCont.style.display = 'none'; }
+      if (mobTop) { mobTop.classList.add('hidden'); }
+      if (mobBottom) { mobBottom.classList.add('hidden'); }
     }
   }
 
-  // 4. LOGIN & LOGOUT
   function handleLogin(event) {
     if (event) event.preventDefault();
     
@@ -104,20 +116,31 @@
   }
 
   function handleLogout() {
+    const activeNip = localStorage.getItem('transkep_active_nip');
+    const sessionToken = localStorage.getItem('transkep_session_token'); 
+
+    // ZETTBOT HARDENING: Hapus sesi di server-side CacheService seketika (CWE-613)
+    if (isGoogleEnv && activeNip && sessionToken) {
+      try {
+        google.script.run.logoutSession(activeNip, sessionToken);
+      } catch (err) {
+        console.warn("Server logout trigger error:", err);
+      }
+    }
+
     localStorage.removeItem('transkep_active_nip');
     localStorage.removeItem('transkep_last_menu');
     localStorage.removeItem('transkep_session_token'); 
     
-    state.currentMenu = 'dashboard';
-    state.user = null; 
-    state.rendered = {};
-    state.isBgSyncDone = false;
+    window.vueState.currentMenu = 'dashboard';
+    window.vueState.user = null; 
+    window.vueState.rendered = {};
+    window.vueState.isBgSyncDone = false;
     
     toggleAppVisibility(false);
     showNotify("Sesi Berakhir", "Anda telah berhasil keluar dari sistem.", "success");
   }
 
-  // 5. PENARIK DATA KESELURUHAN
   function syncAllServerData() {
     showLoading("Menyinkronkan profil & data inti...");
     const loginNip = localStorage.getItem('transkep_active_nip');
@@ -133,23 +156,23 @@
         .withSuccessHandler(function(response) {
           hideLoading();
           if (response && response.status === 'success') {
-            state.user = response.data.user;
-            state.usersList = response.data.usersList;
-            state.pendingPkpCount = response.data.pendingPkpCount || 0;
-            state.isBgSyncDone = false; // Reset flag saat login awal
+            window.vueState.user = response.data.user;
+            window.vueState.usersList = response.data.usersList;
+            window.vueState.pendingPkpCount = response.data.pendingPkpCount || 0;
+            window.vueState.isBgSyncDone = false; 
 
-            state.cutiLogs = [];
-            state.jobdesList = [];
-            state.skList = [];
-            state.skAckList = [];
-            state.kinerjaList = [];
-            state.sopList = [];
-            state.sopAckList = [];
-            state.stList = [];
-            state.masterKinerjaList = [];
-            state.ikLogs = [];
-            state.ipLogs = [];
-            state.wfhLogs = [];
+            window.vueState.cutiLogs = [];
+            window.vueState.jobdesList = [];
+            window.vueState.skList = [];
+            window.vueState.skAckList = [];
+            window.vueState.kinerjaList = [];
+            window.vueState.sopList = [];
+            window.vueState.sopAckList = [];
+            window.vueState.stList = [];
+            window.vueState.masterKinerjaList = [];
+            window.vueState.ikLogs = [];
+            window.vueState.ipLogs = [];
+            window.vueState.wfhLogs = [];
 
            if (typeof renderGlobalHeader === 'function') {
                 renderGlobalHeader(); 
@@ -162,7 +185,6 @@
             
             updateSidebarBadges();
 
-            // Panggil sisa data berat di belakang layar
             syncBackgroundData();
 
           } else {
@@ -179,7 +201,6 @@
     }
   }
 
-  // Fungsi Siluman Penarik Data Background
   function syncBackgroundData() {
      const loginNip = localStorage.getItem('transkep_active_nip');
      const sessionToken = localStorage.getItem('transkep_session_token');
@@ -188,27 +209,24 @@
      google.script.run
         .withSuccessHandler(function(res) {
             if (res && res.status === 'success') {
-                // Suntikkan semua data berat ke State UI
-                state.cutiLogs = res.data.cutiLogs || [];
-                state.stList = res.data.stList || [];
-                state.ikLogs = res.data.ikLogs || [];
-                state.ipLogs = res.data.ipLogs || [];
-                state.wfhLogs = res.data.wfhLogs || [];
-                state.jobdesList = res.data.jobdesList || [];
-                state.skList = res.data.skList || [];
-                state.skAckList = res.data.skAckList || [];
-                state.kinerjaList = res.data.kinerjaList || [];
-                state.sopList = res.data.sopList || [];
-                state.sopAckList = res.data.sopAckList || [];
-                state.masterKinerjaList = res.data.masterKinerjaList || [];
+                window.vueState.cutiLogs = res.data.cutiLogs || [];
+                window.vueState.stList = res.data.stList || [];
+                window.vueState.ikLogs = res.data.ikLogs || [];
+                window.vueState.ipLogs = res.data.ipLogs || [];
+                window.vueState.wfhLogs = res.data.wfhLogs || [];
+                window.vueState.jobdesList = res.data.jobdesList || [];
+                window.vueState.skList = res.data.skList || [];
+                window.vueState.skAckList = res.data.skAckList || [];
+                window.vueState.kinerjaList = res.data.kinerjaList || [];
+                window.vueState.sopList = res.data.sopList || [];
+                window.vueState.sopAckList = res.data.sopAckList || [];
+                window.vueState.masterKinerjaList = res.data.masterKinerjaList || [];
                 
-                // ZETTBOT FIX: Tandai background sync selesai agar UI bisa memunculkan data
-                state.isBgSyncDone = true;
+                window.vueState.isBgSyncDone = true;
 
                 updateSidebarBadges();
                 if (typeof updateBadgePermohonan === 'function') updateBadgePermohonan();
                 
-                // Re-render menu yang sedang aktif
                 const cm = state.currentMenu;
                 if (cm === 'dashboard' && typeof renderDashboardView === 'function') renderDashboardView();
                 if (cm === 'permohonan' && typeof renderPermohonanView === 'function') renderPermohonanView();
@@ -218,21 +236,16 @@
                 if (cm === 'sop' && typeof renderSopView === 'function') renderSopView();
                 if (cm === 'jobdes' && typeof renderJobdesView === 'function') renderJobdesView();
                 if (cm === 'kinerja' && typeof renderKinerjaView === 'function') renderKinerjaView();
-                
-                // ZETTBOT FIX: Tambahkan baris ini agar menu Manajemen juga ikut ter-refresh
-                if (cm === 'manajemen' && typeof renderManajemenView === 'function') renderManajemenView();
-            }
+           }
         })
         .withFailureHandler(function(err) {
             console.warn("Background Sync Gagal: " + err.message);
-            // Tetap buka blokiran UI meskipun gagal agar user tidak stuck
             state.isBgSyncDone = true;
             if (state.currentMenu === 'dashboard' && typeof renderDashboardView === 'function') renderDashboardView();
         })
         .getBackgroundData(loginNip, sessionToken);
   }
 
-  // 6. ROUTING MENU (DENGAN UI CACHING)
   function switchMenu(menuId) {
      try {
         if (state.user) {
@@ -240,9 +253,18 @@
            if (menuId === 'persetujuan' && role !== 'Admin' && role !== 'Atasan Langsung' && role !== 'Pejabat Berwenang') {
               menuId = 'dashboard';
            }
+           if (menuId === 'manajemen' && role !== 'Admin') {
+              menuId = 'dashboard';
+           }
+           if (menuId === 'eoffice' && role !== 'Admin') {
+              if (typeof showNotify === 'function') {
+                 showNotify("Akses Ditolak", "Menu E-Office hanya dapat diakses oleh Administrator.", "warning");
+              }
+              menuId = 'dashboard';
+           }
         }
 
-        state.currentMenu = menuId;
+        window.vueState.currentMenu = menuId;
         localStorage.setItem('transkep_last_menu', menuId);
 
         document.querySelectorAll('.menu-section').forEach(function(el) {
@@ -275,7 +297,7 @@
             if(activeIcon) activeIcon.classList.add('drop-shadow-[0_0_8px_rgba(34,211,238,0.8)]', 'text-cyan-400');
         }
 
-        if (!state.rendered[menuId]) {
+        if (!window.vueState.rendered[menuId]) {
             if (menuId === 'dashboard' && typeof renderDashboardView === 'function') renderDashboardView();
             else if (menuId === 'permohonan' && typeof renderPermohonanView === 'function') renderPermohonanView();
             else if (menuId === 'persetujuan' && typeof renderPersetujuanView === 'function') renderPersetujuanView();
@@ -284,10 +306,13 @@
             else if (menuId === 'pkp' && typeof initPkpModule === 'function') initPkpModule();
             else if (menuId === 'sk' && typeof renderSkView === 'function') renderSkView();
             else if (menuId === 'sop' && typeof renderSopView === 'function') renderSopView();
-            else if (menuId === 'kinerja' && typeof renderKinerjaView === 'function') renderKinerjaView();
-            else if (menuId === 'manajemen' && typeof renderManajemenView === 'function') renderManajemenView();
-
-            state.rendered[menuId] = true;
+            else if (menuId === 'kinerja' && typeof renderKinerjaView === 'function') renderKinerjaView(); 
+            else if (menuId === 'eoffice' && typeof renderEofficeView === 'function') renderEofficeView(); 
+            window.vueState.rendered[menuId] = true;
+        } else {
+            if (menuId === 'eoffice' && typeof window.refreshEofficeData === 'function') {
+                window.refreshEofficeData();
+            }
         }
 
         if (typeof closeMobileSidebar === 'function' && window.innerWidth < 1024) {
@@ -304,13 +329,17 @@
           if (!state.user) return;
           
           const userNip = String(state.user.nip).replace(/'/g, "").trim(); 
+          const isNotSuperAdmin = state.user.role !== 'Admin';
           let unreadSopCount = 0;
           
           const ackSop = state.sopAckList || [];
-          if (state.sopList) {
+          if (state.sopList && isNotSuperAdmin) {
               const involvedSops = state.sopList.filter(sop => {
                   try {
                       const arr = JSON.parse(sop.pelaksana_json || '[]');
+                      if (typeof cekKeterlibatanPegawai === 'function') {
+                          return cekKeterlibatanPegawai(arr, userNip).terlibat;
+                      }
                       return arr.some(p => String(p.nip).replace(/'/g, "").trim() === userNip);
                   } catch(e) { return false; }
               });
@@ -334,16 +363,27 @@
           let unreadSkCount = 0;
           const ackSk = state.skAckList || [];
           
-          if (state.skList) {
-              const involvedSks = state.skList.filter(sk => String(sk.nip).replace(/'/g, "").trim() === userNip);
-              
-              involvedSks.forEach(sk => {
+          if (state.skList && isNotSuperAdmin) {
+              const skMap = {};
+              state.skList.forEach(sk => {
                   const baseSkId = String(sk.id).replace(/'/g, "").trim().split('-').slice(0, 2).join('-');
-                  const isAck = ackSk.some(a => {
-                      const aBaseSkId = String(a.sk_id).replace(/'/g, "").trim().split('-').slice(0, 2).join('-');
-                      return aBaseSkId === baseSkId && String(a.nip).replace(/'/g, "").trim() === userNip;
-                  });
-                  if (!isAck) unreadSkCount++;
+                  if (!skMap[baseSkId]) skMap[baseSkId] = [];
+                  skMap[baseSkId].push({ nip: String(sk.nip).replace(/'/g, "").trim(), peran: '-' });
+              });
+
+              Object.keys(skMap).forEach(baseSkId => {
+                  const members = skMap[baseSkId];
+                  const isInvolved = (typeof cekKeterlibatanPegawai === 'function')
+                      ? cekKeterlibatanPegawai(members, userNip).terlibat
+                      : members.some(m => m.nip === userNip);
+
+                  if (isInvolved) {
+                      const isAck = ackSk.some(a => {
+                          const aBaseSkId = String(a.sk_id).replace(/'/g, "").trim().split('-').slice(0, 2).join('-');
+                          return aBaseSkId === baseSkId && String(a.nip).replace(/'/g, "").trim() === userNip;
+                      });
+                      if (!isAck) unreadSkCount++;
+                  }
               });
           }
 
@@ -375,7 +415,6 @@
       }
   }
 
-  /// 8. UTILITY GLOBALS
   function formatNamaBersih(namaLengkap) {
       if (!namaLengkap) return "-";
       let nama = namaLengkap.split(',')[0].trim();
@@ -406,7 +445,8 @@
     if (!toastContainer) {
       toastContainer = document.createElement('div');
       toastContainer.id = 'toast-container';
-      toastContainer.className = 'fixed top-5 right-5 z-[9999] flex flex-col gap-3 pointer-events-none';
+      toastContainer.className = 'fixed top-5 right-5 flex flex-col gap-3 pointer-events-none';
+      toastContainer.style.setProperty('z-index', '9999999', 'important');
       document.body.appendChild(toastContainer);
     }
 
@@ -505,6 +545,7 @@
       const role = state.user ? state.user.role : '';
       const menuManajemen = document.getElementById('nav-manajemen');
       const menuPersetujuan = document.getElementById('nav-persetujuan');
+      const menuEoffice = document.getElementById('nav-eoffice');
       
       if (menuManajemen) {
         if (role === 'Admin') { menuManajemen.classList.remove('hidden'); menuManajemen.style.display = ''; }
@@ -514,210 +555,13 @@
         if (role === 'Admin' || role === 'Atasan Langsung' || role === 'Pejabat Berwenang') { menuPersetujuan.classList.remove('hidden'); menuPersetujuan.style.display = ''; }
         else { menuPersetujuan.classList.add('hidden'); menuPersetujuan.style.display = 'none'; }
       }
+      if (menuEoffice) {
+        if (role === 'Admin') { menuEoffice.classList.remove('hidden'); menuEoffice.style.display = ''; }
+        else { menuEoffice.classList.add('hidden'); menuEoffice.style.display = 'none'; }
+      }
     } catch (e) {}
   }
-
-  function openModalSisaCuti() {
-    if (!state || !state.user) {
-        showNotify("Data Belum Siap", "Silakan tunggu hingga data selesai dimuat.", "warning");
-        return;
-    }
-
-    const u = state.user;
-    
-    let existingModal = document.getElementById('modalSisaCutiDinamic');
-    if (existingModal) existingModal.remove();
-
-    const modalHTML = `
-      <div id="modalSisaCutiDinamic" class="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-sm transition-opacity">
-        <div class="glass border border-slate-800 bg-slate-900/95 rounded-2xl w-full max-w-lg flex flex-col shadow-2xl transform transition-transform duration-300 scale-95 mx-4">
-          
-          <div class="flex items-center justify-between p-5 border-b border-slate-800/60 bg-slate-900/80">
-            <h3 class="text-lg font-bold text-white flex items-center gap-2"><i class="fa-solid fa-scale-balanced text-indigo-400"></i> Informasi Sisa Cuti</h3>
-            <button type="button" onclick="document.getElementById('modalSisaCutiDinamic').remove()" class="text-slate-400 hover:text-rose-400 transition w-8 h-8 flex items-center justify-center bg-slate-800/50 hover:bg-rose-500/10 rounded-lg">
-              <i class="fa-solid fa-xmark text-xl"></i>
-            </button>
-          </div>
-          
-          <div class="p-6 space-y-4">
-             <div class="flex items-center gap-4 mb-2">
-                 <div class="w-12 h-12 bg-indigo-500/10 text-indigo-400 rounded-xl flex items-center justify-center text-xl border border-indigo-500/20"><i class="fa-solid fa-user-tie"></i></div>
-                 <div>
-                     <p class="text-xs text-slate-400 font-bold uppercase tracking-wider">Sisa Kuota Cuti Untuk</p>
-                     <p class="text-sm font-bold text-slate-200 mt-0.5">${u.nama}</p>
-                 </div>
-             </div>
-             
-             <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
-                <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 shadow-inner">
-                   <p class="text-[9px] text-slate-500 font-bold uppercase tracking-wider mb-1">Tahunan 2024</p>
-                   <p class="text-2xl font-black text-slate-300">${u.s_tahunan_2024 || 0} <span class="text-[10px] font-bold uppercase text-slate-500">Hari</span></p>
-                </div>
-                <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 shadow-inner">
-                   <p class="text-[9px] text-slate-500 font-bold uppercase tracking-wider mb-1">Tahunan 2025</p>
-                   <p class="text-2xl font-black text-slate-300">${u.s_tahunan_2025 || 0} <span class="text-[10px] font-bold uppercase text-slate-500">Hari</span></p>
-                </div>
-                <div class="bg-slate-950 p-4 rounded-xl border border-indigo-500/30 shadow-inner bg-indigo-500/5 relative overflow-hidden">
-                   <div class="absolute top-0 right-0 w-8 h-8 bg-indigo-500/20 rounded-bl-full"></div>
-                   <p class="text-[9px] text-indigo-400 font-bold uppercase tracking-wider mb-1">Tahunan 2026</p>
-                   <p class="text-2xl font-black text-indigo-400">${u.s_tahunan_2026 || 0} <span class="text-[10px] font-bold uppercase text-indigo-500/50">Hari</span></p>
-                </div>
-                
-                <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 shadow-inner">
-                   <p class="text-[9px] text-slate-500 font-bold uppercase tracking-wider mb-1">Cuti Penting</p>
-                   <p class="text-xl font-black text-amber-400">${u.s_penting || 0} <span class="text-[10px] font-bold uppercase text-slate-500">Hari</span></p>
-                </div>
-                <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 shadow-inner">
-                   <p class="text-[9px] text-slate-500 font-bold uppercase tracking-wider mb-1">Cuti Sakit</p>
-                   <p class="text-xl font-black text-rose-400">${u.s_sakit || 0} <span class="text-[10px] font-bold uppercase text-slate-500">Hari</span></p>
-                </div>
-                 <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 shadow-inner">
-                   <p class="text-[9px] text-slate-500 font-bold uppercase tracking-wider mb-1">Cuti Besar</p>
-                   <p class="text-xl font-black text-purple-400">${u.s_besar || 0} <span class="text-[10px] font-bold uppercase text-slate-500">Hari</span></p>
-                </div>
-             </div>
-             
-             <div class="mt-2 bg-emerald-500/10 border border-emerald-500/20 p-3 rounded-xl flex items-center gap-3">
-                <i class="fa-solid fa-circle-info text-emerald-400"></i>
-                <p class="text-[10px] text-emerald-400/80 leading-relaxed font-medium">Data sisa cuti ini otomatis terupdate setiap kali pengajuan cuti Anda disetujui (atau dipotong di awal untuk Cuti Tahunan).</p>
-             </div>
-          </div>
-        </div>
-      </div>
-    `;
-    
-    document.body.insertAdjacentHTML('beforeend', modalHTML);
-    
-    setTimeout(() => {
-       const m = document.getElementById('modalSisaCutiDinamic');
-       if(m && m.firstElementChild) m.firstElementChild.classList.remove('scale-95');
-    }, 10);
-  }
-
-  function openChangePasswordModal() {
-    let existingModal = document.getElementById('modalChangePassword');
-    if (existingModal) existingModal.remove();
-
-    const modalHTML = `
-      <div id="modalChangePassword" class="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm transition-opacity opacity-0">
-        <div class="glass border border-slate-800 bg-slate-900/95 rounded-3xl w-full max-w-sm flex flex-col shadow-2xl transform transition-transform duration-300 scale-95 mx-4 overflow-hidden">
-          
-          <div class="bg-purple-600 p-6 text-center relative overflow-hidden">
-             <div class="absolute inset-0 bg-gradient-to-t from-slate-900/90 to-transparent"></div>
-             <i class="fa-solid fa-shield-halved text-4xl text-purple-200 mb-2 relative z-10 drop-shadow-md"></i>
-             <h3 class="text-lg font-bold text-white relative z-10 tracking-wide">Pembaruan Keamanan</h3>
-             <p class="text-xs text-purple-200/70 relative z-10 mt-1">Lindungi akun Anda dengan sandi kuat.</p>
-          </div>
-          
-          <form onsubmit="submitChangePassword(event)" class="p-6 space-y-4">
-            
-            <div>
-               <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Kata Sandi Lama</label>
-               <div class="relative">
-                  <input type="password" id="oldPassInput" required placeholder="Masukkan Sandi Saat Ini" class="w-full pl-4 pr-10 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-purple-500">
-                  <button type="button" onclick="const p = document.getElementById('oldPassInput'); if(p.type==='password'){p.type='text'; this.children[0].classList.replace('fa-eye-slash','fa-eye');} else {p.type='password'; this.children[0].classList.replace('fa-eye','fa-eye-slash');}" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-purple-400 focus:outline-none">
-                     <i class="fa-solid fa-eye-slash text-xs"></i>
-                  </button>
-               </div>
-            </div>
-
-            <div class="pt-2 border-t border-slate-800">
-               <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 text-purple-400">Kata Sandi Baru</label>
-               <div class="relative">
-                  <input type="password" id="newPassInput" required placeholder="Buat Sandi Baru" class="w-full pl-4 pr-10 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-purple-500">
-                  <button type="button" onclick="const p = document.getElementById('newPassInput'); if(p.type==='password'){p.type='text'; this.children[0].classList.replace('fa-eye-slash','fa-eye');} else {p.type='password'; this.children[0].classList.replace('fa-eye','fa-eye-slash');}" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-purple-400 focus:outline-none">
-                     <i class="fa-solid fa-eye-slash text-xs"></i>
-                  </button>
-               </div>
-            </div>
-
-            <div>
-               <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Konfirmasi Sandi Baru</label>
-               <div class="relative">
-                  <input type="password" id="confirmPassInput" required placeholder="Ketik Ulang Sandi Baru" class="w-full pl-4 pr-10 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-purple-500">
-                  <button type="button" onclick="const p = document.getElementById('confirmPassInput'); if(p.type==='password'){p.type='text'; this.children[0].classList.replace('fa-eye-slash','fa-eye');} else {p.type='password'; this.children[0].classList.replace('fa-eye','fa-eye-slash');}" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-purple-400 focus:outline-none">
-                     <i class="fa-solid fa-eye-slash text-xs"></i>
-                  </button>
-               </div>
-            </div>
-            
-            <div class="flex gap-3 pt-4">
-               <button type="button" onclick="closeChangePasswordModal()" class="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-xl transition">Batal</button>
-               <button type="submit" class="flex-1 py-3 bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-purple-600/20 transition flex items-center justify-center gap-2">
-                  Simpan <i class="fa-solid fa-check"></i>
-               </button>
-            </div>
-          </form>
-
-        </div>
-      </div>
-    `;
-
-    document.body.insertAdjacentHTML('beforeend', modalHTML);
-    const m = document.getElementById('modalChangePassword');
-    
-    setTimeout(() => {
-       m.classList.remove('opacity-0');
-       m.firstElementChild.classList.remove('scale-95');
-    }, 10);
-  }
-
-  function closeChangePasswordModal() {
-    const m = document.getElementById('modalChangePassword');
-    if (m) {
-       m.classList.add('opacity-0');
-       m.firstElementChild.classList.add('scale-95');
-       setTimeout(() => m.remove(), 300);
-    }
-  }
-
-  function submitChangePassword(event) {
-    event.preventDefault(); 
-    
-    const oldPass = document.getElementById('oldPassInput').value;
-    const newPass = document.getElementById('newPassInput').value;
-    const confirmPass = document.getElementById('confirmPassInput').value;
-
-    if (newPass !== confirmPass) {
-       showNotify("Validasi Gagal", "Konfirmasi sandi baru tidak sama. Silakan cek kembali.", "error");
-       return;
-    }
-    
-    if (newPass.length < 5) {
-       showNotify("Sandi Terlalu Pendek", "Gunakan minimal 5 karakter untuk keamanan yang lebih baik.", "warning");
-       return;
-    }
-
-    if (oldPass === newPass) {
-       showNotify("Perhatian", "Sandi baru tidak boleh sama persis dengan sandi lama.", "warning");
-       return;
-    }
-
-    showLoading("Mencocokkan kredensial di database...");
-
-    const nip = state.user.nip; 
-
-    google.script.run
-      .withSuccessHandler(function(res) {
-         hideLoading();
-         if (res.status === 'success') {
-            state.user.pass = newPass; 
-            const listIndex = state.usersList.findIndex(u => String(u.nip) === String(nip));
-            if (listIndex !== -1) state.usersList[listIndex].pass = newPass;
-
-            closeChangePasswordModal();
-            showNotify("Keamanan Diperbarui", "Sandi Anda telah sukses diubah. Ingat sandi baru Anda untuk sesi berikutnya.", "success");
-         } else {
-            showNotify("Ditolak Server", res.message, "error");
-         }
-      })
-      .withFailureHandler(function(err) {
-         hideLoading();
-         showNotify("Error Jaringan", "Tidak dapat terhubung ke server. " + err.message, "error");
-      })
-      .changeMyPassword(nip, oldPass, newPass);
-  }
-
+  
   function toggleThemeMode() {
       const body = document.body;
       body.classList.toggle('light-mode');
@@ -731,4 +575,81 @@
       }
   }
 
+  document.addEventListener("DOMContentLoaded", () => {
+      // ZETTBOT FIX: Menggunakan Vue.createApp secara eksplisit agar aman
+      window.vmGlobalModals = Vue.createApp({
+          data() {
+              return {
+                  currentUser: null,
+                  showModalSisaCuti: false,
+                  showModalPassword: false,
+                  
+                  formPass: { old: '', new: '', confirm: '' },
+                  showOldPass: false, showNewPass: false, showConfirmPass: false
+              };
+          },
+          methods: {
+              submitPassword() {
+                  if (this.formPass.new !== this.formPass.confirm) {
+                      if(window.showNotify) window.showNotify("Validasi Gagal", "Konfirmasi sandi baru tidak sama. Silakan cek kembali.", "error");
+                      return;
+                  }
+                  if (this.formPass.new.length < 5) {
+                      if(window.showNotify) window.showNotify("Sandi Terlalu Pendek", "Gunakan minimal 5 karakter untuk keamanan yang lebih baik.", "warning");
+                      return;
+                  }
+                  if (this.formPass.old === this.formPass.new) {
+                      if(window.showNotify) window.showNotify("Perhatian", "Sandi baru tidak boleh sama persis dengan sandi lama.", "warning");
+                      return;
+                  }
+
+                  if(window.showLoading) window.showLoading("Mencocokkan kredensial di database...");
+
+                  const nip = this.currentUser.nip; 
+                  const token = localStorage.getItem('transkep_session_token');
+
+                  google.script.run
+                    .withSuccessHandler((res) => {
+                       if(window.hideLoading) window.hideLoading();
+                       if (res.status === 'success') {
+                          window.vueState.user.pass = this.formPass.new; 
+                          const listIndex = state.usersList.findIndex(u => String(u.nip) === String(nip));
+                          if (listIndex !== -1) window.vueState.usersList[listIndex].pass = this.formPass.new;
+
+                          this.showModalPassword = false;
+                          if(window.showNotify) window.showNotify("Keamanan Diperbarui", "Sandi Anda telah sukses diubah. Ingat sandi baru Anda untuk sesi berikutnya.", "success");
+                          
+                          this.formPass = { old: '', new: '', confirm: '' }; 
+                       } else {
+                          if(window.showNotify) window.showNotify("Ditolak Server", res.message, "error");
+                       }
+                    })
+                    .withFailureHandler((err) => {
+                       if(window.hideLoading) window.hideLoading();
+                       if(window.showNotify) window.showNotify("Error Jaringan", "Tidak dapat terhubung ke server. " + err.message, "error");
+                    })
+                    .changeMyPassword(nip, this.formPass.old, this.formPass.new, token);
+              }
+          }
+      }).mount('#vue-global-modals');
+  });
+
+  window.openModalSisaCuti = function() {
+      if (!state || !state.user) {
+          if(window.showNotify) window.showNotify("Data Belum Siap", "Silakan tunggu hingga data selesai dimuat.", "warning");
+          return;
+      }
+      window.vmGlobalModals.currentUser = state.user;
+      window.vmGlobalModals.showModalSisaCuti = true;
+  };
+
+  window.openChangePasswordModal = function() {
+      if (!state || !state.user) return;
+      window.vmGlobalModals.currentUser = state.user;
+      window.vmGlobalModals.formPass = { old: '', new: '', confirm: '' }; 
+      window.vmGlobalModals.showOldPass = false;
+      window.vmGlobalModals.showNewPass = false;
+      window.vmGlobalModals.showConfirmPass = false;
+      window.vmGlobalModals.showModalPassword = true;
+  };
 </script>

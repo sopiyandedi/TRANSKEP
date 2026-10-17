@@ -1,108 +1,35 @@
 <div id="section-kinerja" class="menu-section space-y-6 hidden animate-fade-in">
+  <div id="vue-kinerja-app" v-cloak class="h-full flex flex-col space-y-6">
 
-  <!-- HEADER & FILTER -->
-  <div class="glass border border-slate-900 rounded-3xl p-6 no-print relative z-10 flex flex-col gap-4">
-    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-      <div>
-        <h3 class="text-lg font-bold text-slate-200"><i class="fa-solid fa-chart-line text-indigo-400 mr-2"></i> Sasaran Kinerja Pegawai (E-Kinerja)</h3>
-        <p class="text-slate-500 text-xs mt-1">Sistem Pengarsipan dan Tanda Tangan Elektronik SKP Pengadilan Agama Indramayu.</p>
-      </div>
-      
-      <button id="btnTambahKinerja" onclick="openKinerjaModal()" class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl shadow-lg shadow-indigo-600/20 transition flex items-center justify-center gap-2 text-xs tracking-wider w-full md:w-auto">
-        <i class="fa-solid fa-plus"></i> Tambah SKP
-      </button>
-    </div>
-
-    <div class="flex flex-col md:flex-row items-center justify-between gap-4 mt-2 border-t border-slate-800 pt-4">
-      <!-- Filter Controls -->
-      <div class="flex flex-wrap items-center gap-3 w-full md:w-auto">
-        <div class="flex items-center gap-2">
-          <label class="text-xs text-slate-400 font-semibold">Tahun:</label>
-          <select id="filterKinerjaTahun" onchange="renderKinerjaTable()" class="px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-slate-200 focus:ring-1 focus:ring-indigo-500">
-            <option value="all">Semua</option>
-            <option value="2026">2026</option>
-            <option value="2025">2025</option>
-            <option value="2024">2024</option>
-            <option value="2023">2023</option>
-          </select>
+    <!-- HEADER & FILTER -->
+    <div class="glass border border-slate-900 rounded-3xl p-6 no-print relative z-10 flex flex-col gap-4">
+      <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <h3 class="text-lg font-bold text-slate-200"><i class="fa-solid fa-chart-line text-indigo-400 mr-2"></i> Sasaran Kinerja Pegawai (E-Kinerja)</h3>
+          <p class="text-slate-500 text-xs mt-1">Sistem Pengarsipan dan Tanda Tangan Elektronik SKP Pengadilan Agama Indramayu.</p>
         </div>
-        <div class="flex items-center gap-2">
-          <label class="text-xs text-slate-400 font-semibold">Periode:</label>
-          <select id="filterKinerjaPeriode" onchange="renderKinerjaTable()" class="px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-slate-200 focus:ring-1 focus:ring-indigo-500">
-            <option value="all">Semua Periode</option>
-            <option value="Rencana Awal Tahun">Rencana Awal Tahun</option>
-            <option value="Triwulan I">Triwulan I</option>
-            <option value="Triwulan II">Triwulan II</option>
-            <option value="Triwulan III">Triwulan III</option>
-            <option value="Triwulan IV">Triwulan IV</option>
-            <option value="Tahunan">Tahunan Akhir</option>
-          </select>
-        </div>
-      </div>
-
-      <!-- Search Box -->
-      <div class="relative w-full md:w-64">
-        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-          <i class="fa-solid fa-magnifying-glass text-slate-500 text-xs"></i>
-        </div>
-        <input type="text" id="kinerjaSearchInput" onkeyup="renderKinerjaTable()" placeholder="Cari Nama / Jabatan..." 
-          class="w-full pl-9 pr-3 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500 placeholder-slate-500">
-      </div>
-    </div>
-  </div>
-
-  <!-- AREA TABEL -->
-  <div class="glass border border-slate-900 rounded-3xl p-6 flex flex-col min-h-[500px]">
-    <div class="flex-1 overflow-auto border border-slate-900 rounded-2xl bg-slate-950/40">
-      <table class="w-full text-left text-xs border-collapse">
-        <thead>
-          <tr class="border-b border-slate-900 bg-slate-900 text-slate-400 font-semibold sticky top-0 z-10 whitespace-nowrap">
-            <th class="p-4 w-12 text-center">No</th>
-            <th class="p-4">Identitas Pegawai</th>
-            <th class="p-4 text-center">Periode & Tahun</th>
-            <th class="p-4 text-center">Predikat</th>
-            <th class="p-4">Status Pengesahan</th>
-            <th class="p-4 text-center">Aksi (File)</th>
-          </tr>
-        </thead>
-        <tbody id="tblKinerjaBody">
-          <!-- Dipopulasi JS -->
-        </tbody>
-      </table>
-    </div>
-  </div>
-
-  <!-- MODAL TAMBAH SKP -->
-  <div id="modalFormKinerja" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-[200] flex items-center justify-center p-4 hidden">
-    <div class="w-full max-w-2xl glass border border-slate-800 p-6 rounded-3xl shadow-2xl h-[95vh] flex flex-col scale-95 transition-all">
-      <div class="flex items-center justify-between pb-4 border-b border-slate-800 shrink-0">
-        <h3 class="text-lg font-bold text-white"><i class="fa-solid fa-cloud-arrow-up text-indigo-400 mr-2"></i> Tambah / Upload SKP Baru</h3>
-        <button onclick="closeKinerjaModal()" class="text-slate-400 hover:text-slate-100"><i class="fa-solid fa-xmark text-lg"></i></button>
-      </div>
-
-      <form id="formKinerja" onsubmit="submitKinerja(event)" class="flex-1 overflow-y-auto py-4 space-y-4 text-xs pr-2 custom-scrollbar">
         
-        <!-- Identitas (Otomatis & Terkunci) -->
-        <div class="bg-slate-900/50 p-4 rounded-xl border border-slate-800 mb-2">
-           <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Pengunggah Dokumen</label>
-           <div class="font-bold text-slate-200 text-sm" id="knjNamaDisplay">-</div>
-           <div class="font-mono text-slate-400 text-xs mt-0.5" id="knjNipDisplay">-</div>
-        </div>
+        <button @click="openModal" class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl shadow-lg shadow-indigo-600/20 transition flex items-center justify-center gap-2 text-xs tracking-wider w-full md:w-auto">
+          <i class="fa-solid fa-plus"></i> Tambah SKP
+        </button>
+      </div>
 
-        <div class="grid grid-cols-2 gap-4">
-          <div>
-            <label class="block font-semibold text-slate-400 uppercase mb-1.5">Tahun SKP</label>
-            <select id="knjTahun" required class="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500">
+      <div class="flex flex-col md:flex-row items-center justify-between gap-4 mt-2 border-t border-slate-800 pt-4">
+        <div class="flex flex-wrap items-center gap-3 w-full md:w-auto">
+          <div class="flex items-center gap-2">
+            <label class="text-xs text-slate-400 font-semibold">Tahun:</label>
+            <select v-model="filters.tahun" class="px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-slate-200 focus:ring-1 focus:ring-indigo-500">
+              <option value="all">Semua</option>
               <option value="2026">2026</option>
               <option value="2025">2025</option>
               <option value="2024">2024</option>
               <option value="2023">2023</option>
             </select>
           </div>
-          <div>
-            <label class="block font-semibold text-slate-400 uppercase mb-1.5">Periode SKP</label>
-            <select id="knjPeriode" required class="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500">
-              <option value="" disabled selected>-- Pilih Periode --</option>
+          <div class="flex items-center gap-2">
+            <label class="text-xs text-slate-400 font-semibold">Periode:</label>
+            <select v-model="filters.periode" class="px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-slate-200 focus:ring-1 focus:ring-indigo-500">
+              <option value="all">Semua Periode</option>
               <option value="Rencana Awal Tahun">Rencana Awal Tahun</option>
               <option value="Triwulan I">Triwulan I</option>
               <option value="Triwulan II">Triwulan II</option>
@@ -113,52 +40,204 @@
           </div>
         </div>
 
-        <div class="grid grid-cols-2 gap-4">
-          <div>
-            <label class="block font-semibold text-slate-400 uppercase mb-1.5">Predikat Kinerja</label>
-            <select id="knjPredikat" required class="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500">
-              <option value="" disabled selected>-- Pilih Predikat --</option>
-              <option value="Sangat Baik">Sangat Baik</option>
-              <option value="Baik">Baik</option>
-              <option value="Butuh Perbaikan">Butuh Perbaikan</option>
-              <option value="Kurang">Kurang</option>
-              <option value="Sangat Kurang">Sangat Kurang</option>
-            </select>
+        <div class="relative w-full md:w-64">
+          <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <i class="fa-solid fa-magnifying-glass text-slate-500 text-xs"></i>
           </div>
-          <div>
-            <label class="block font-semibold text-slate-400 uppercase mb-1.5">Pilih Pejabat Penilai</label>
-            <select id="knjPejabat" required class="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500">
-              <option value="" disabled selected>-- Pilih Atasan --</option>
-              <!-- Dipopulasi JS -->
-            </select>
-          </div>
+          <input type="text" v-model="filters.search" placeholder="Cari Nama / Jabatan..." 
+            class="w-full pl-9 pr-3 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500 placeholder-slate-500">
         </div>
-
-        <div class="border-t border-slate-800 pt-4 mt-2">
-           <h4 class="font-bold text-indigo-400 mb-3 text-xs uppercase tracking-widest"><i class="fa-solid fa-file-pdf mr-1"></i> Upload Dokumen PDF</h4>
-           
-           <div class="space-y-4">
-              <div class="bg-slate-900/40 p-4 rounded-xl border border-slate-700/50">
-                <label class="block font-bold text-slate-300 mb-1">1. Dokumen Rencana/Penilaian SKP</label>
-                <p class="text-[10px] text-slate-500 mb-2">Format PDF (Maksimal 2 MB).</p>
-                <input type="file" id="knjFilePenilaian" accept=".pdf" required
-                  class="w-full text-slate-300 text-xs file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-indigo-500/20 file:text-indigo-400 hover:file:bg-indigo-500/30 transition">
-              </div>
-
-              <div class="bg-slate-900/40 p-4 rounded-xl border border-slate-700/50">
-                <label class="block font-bold text-slate-300 mb-1">2. Dokumen Evaluasi SKP</label>
-                <p class="text-[10px] text-slate-500 mb-2">Format PDF (Maksimal 2 MB).</p>
-                <input type="file" id="knjFileEvaluasi" accept=".pdf" required
-                  class="w-full text-slate-300 text-xs file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-indigo-500/20 file:text-indigo-400 hover:file:bg-indigo-500/30 transition">
-              </div>
-           </div>
-        </div>
-
-        <button type="submit" class="w-full py-4 mt-4 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl shadow-lg transition tracking-wider uppercase">
-          Upload & Kirim ke Penilai <i class="fa-solid fa-paper-plane ml-1"></i>
-        </button>
-      </form>
+      </div>
     </div>
-  </div>
 
+    <!-- AREA TABEL REAKTIF VUE -->
+    <div class="glass border border-slate-900 rounded-3xl p-6 flex flex-col min-h-[500px]">
+      <div class="flex-1 overflow-auto border border-slate-900 rounded-2xl bg-slate-950/40 custom-scrollbar">
+        <table class="w-full text-left text-xs border-collapse">
+          <thead>
+            <tr class="border-b border-slate-900 bg-slate-900 text-slate-400 font-semibold sticky top-0 z-10 whitespace-nowrap">
+              <th class="p-4 w-12 text-center">No</th>
+              <th class="p-4">Identitas Pegawai</th>
+              <th class="p-4 text-center">Periode & Tahun</th>
+              <th class="p-4 text-center">Predikat</th>
+              <th class="p-4">Status Pengesahan</th>
+              <th class="p-4 text-center">Aksi (File)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-if="filteredKinerja.length === 0">
+               <td colspan="6" class="text-center p-12 text-slate-500 italic">
+                  <i class="fa-regular fa-folder-open text-3xl mb-3 block opacity-50"></i>Tidak ada dokumen E-Kinerja yang ditemukan.
+               </td>
+            </tr>
+            
+            <tr v-for="(k, index) in filteredKinerja" :key="k.id" class="border-b border-slate-900 hover:bg-slate-900/10 transition">
+              <td class="p-4 text-center font-mono text-slate-500">{{ index + 1 }}</td>
+              <td class="p-4">
+                 <div class="font-bold text-slate-200">{{ k._pegawai.nama }}</div>
+                 <div class="text-[10px] text-slate-500 mt-0.5">NIP: {{ k.nip }} | {{ k._pegawai.jabatan }}</div>
+                 <div class="text-[9px] text-slate-400 mt-1"><span class="text-slate-600">Penilai:</span> {{ k._pejabat.nama }}</div>
+              </td>
+              <td class="p-4 text-center">
+                 <div class="font-bold text-slate-300 text-xs">{{ k.periode }}</div>
+                 <div class="font-mono text-indigo-400 text-xs font-bold">{{ k.tahun }}</div>
+              </td>
+              <td class="p-4 text-center text-xs font-bold text-slate-300">{{ k.predikat }}</td>
+              
+              <td class="p-4">
+                 <span v-if="k.status === 'Menunggu TTE'" class="inline-flex px-2 py-1 rounded bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[10px] font-bold uppercase">
+                    <i class="fa-solid fa-clock mr-1"></i> Menunggu Penilai
+                 </span>
+                 <template v-else>
+                    <span class="inline-flex px-2 py-1 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-bold uppercase">
+                       <i class="fa-solid fa-check-double mr-1"></i> Telah Disahkan
+                    </span>
+                    <div class="text-[9px] text-slate-500 mt-1 font-mono">{{ k.tgl_tte }}</div>
+                 </template>
+              </td>
+              
+              <td class="p-4">
+                 <div class="flex flex-col items-center gap-2">
+                    <template v-if="k.status === 'Menunggu TTE'">
+                        <button v-if="k._canApprove" @click="sahkanKinerja(k.id)" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition shadow-lg shadow-emerald-500/20">
+                            <i class="fa-solid fa-signature mr-1"></i> Sahkan & TTE
+                        </button>
+                        <span v-else class="text-xs text-slate-500 italic">Diproses...</span>
+                    </template>
+                    <a v-else :href="k.file_pengesahan" target="_blank" class="px-3 py-1.5 bg-indigo-500/10 hover:bg-indigo-500 text-indigo-400 hover:text-white border border-indigo-500/30 hover:border-indigo-500 rounded-lg text-xs font-bold transition flex items-center gap-1.5 shadow-sm whitespace-nowrap">
+                        <i class="fa-solid fa-file-pdf"></i> Unduh Pengesahan
+                    </a>
+
+                    <div class="flex gap-2">
+                       <a :href="k.file_penilaian" target="_blank" title="Buka File Penilaian Asli" class="text-[10px] text-slate-400 hover:text-indigo-400 transition underline underline-offset-2"><i class="fa-solid fa-paperclip"></i> Penilaian</a>
+                       <a :href="k.file_evaluasi" target="_blank" title="Buka File Evaluasi Asli" class="text-[10px] text-slate-400 hover:text-indigo-400 transition underline underline-offset-2"><i class="fa-solid fa-paperclip"></i> Evaluasi</a>
+                    </div>
+                 </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- MODAL VUE: TAMBAH SKP -->
+    <teleport to="body">
+      <div v-if="isModalOpen" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-[9999] flex items-center justify-center p-4 animate-fade-in">
+        <div class="w-full max-w-2xl glass border border-slate-800 p-6 rounded-3xl shadow-2xl h-[95vh] flex flex-col transition-all">
+          <div class="flex items-center justify-between pb-4 border-b border-slate-800 shrink-0">
+            <h3 class="text-lg font-bold text-white"><i class="fa-solid fa-cloud-arrow-up text-indigo-400 mr-2"></i> Tambah / Upload SKP Baru</h3>
+            <button @click="closeModal" class="text-slate-400 hover:text-slate-100"><i class="fa-solid fa-xmark text-lg"></i></button>
+          </div>
+
+          <form @submit.prevent="submitKinerja" class="flex-1 overflow-y-auto py-4 space-y-4 text-xs pr-2 custom-scrollbar">
+            
+            <div class="bg-slate-900/50 p-4 rounded-xl border border-slate-800 mb-2">
+               <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Pengunggah Dokumen</label>
+               <div class="font-bold text-slate-200 text-sm">{{ globalState.user?.nama }}</div>
+               <div class="font-mono text-slate-400 text-xs mt-0.5">{{ globalState.user?.nip }}</div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block font-semibold text-slate-400 uppercase mb-1.5">Tahun SKP</label>
+                <select v-model="form.tahun" required class="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500">
+                  <option value="2026">2026</option>
+                  <option value="2025">2025</option>
+                  <option value="2024">2024</option>
+                  <option value="2023">2023</option>
+                </select>
+              </div>
+              <div>
+                <label class="block font-semibold text-slate-400 uppercase mb-1.5">Periode SKP</label>
+                <select v-model="form.periode" required class="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500">
+                  <option value="" disabled selected>-- Pilih Periode --</option>
+                  <option value="Rencana Awal Tahun">Rencana Awal Tahun</option>
+                  <option value="Triwulan I">Triwulan I</option>
+                  <option value="Triwulan II">Triwulan II</option>
+                  <option value="Triwulan III">Triwulan III</option>
+                  <option value="Triwulan IV">Triwulan IV</option>
+                  <option value="Tahunan">Tahunan Akhir</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block font-semibold text-slate-400 uppercase mb-1.5">Predikat Kinerja</label>
+                <select v-model="form.predikat" required class="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500">
+                  <option value="" disabled selected>-- Pilih Predikat --</option>
+                  <option value="Sangat Baik">Sangat Baik</option>
+                  <option value="Baik">Baik</option>
+                  <option value="Butuh Perbaikan">Butuh Perbaikan</option>
+                  <option value="Kurang">Kurang</option>
+                  <option value="Sangat Kurang">Sangat Kurang</option>
+                </select>
+              </div>
+              
+              <!-- ZETTBOT FIX: Custom Searchable Dropdown Pejabat Penilai -->
+              <div id="knjPejabatContainer" class="relative">
+                <label class="block font-semibold text-slate-400 uppercase mb-1.5">Pilih Pejabat Penilai</label>
+                <div class="relative">
+                    <input type="text" v-model="searchPejabatQuery" 
+                        @focus="showDropdownPejabat = true"
+                        @keydown.down.prevent="highlightNextPejabat" 
+                        @keydown.up.prevent="highlightPrevPejabat" 
+                        @keydown.enter.prevent="selectHighlightedPejabat"
+                        placeholder="Cari nama pejabat penilai..." autocomplete="off" required
+                        class="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 pr-10 shadow-inner text-xs">
+                    
+                    <!-- Tombol X Hapus Pencarian -->
+                    <button type="button" v-show="searchPejabatQuery.length > 0" @click="clearPejabatSearch" class="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-500 hover:text-rose-400 transition z-[102]">
+                        <i class="fa-solid fa-xmark text-sm"></i>
+                    </button>
+                    <!-- Ikon Chevron jika kosong -->
+                    <div v-show="searchPejabatQuery.length === 0" class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                        <i class="fa-solid fa-chevron-down text-slate-500 text-xs"></i>
+                    </div>
+                </div>
+                
+                <div v-show="showDropdownPejabat" class="absolute left-0 right-0 mt-2 bg-slate-800 border border-slate-700 rounded-xl max-h-48 overflow-y-auto shadow-2xl z-[1000] custom-scrollbar">
+                    <div v-if="filteredPejabatSearch.length > 0">
+                        <div v-for="(sup, index) in filteredPejabatSearch" :key="sup.nip" 
+                            @click="selectPejabat(sup)" 
+                            :class="['w-full text-left px-4 py-2 border-b border-slate-700/50 transition cursor-pointer', index === highlightedIndexPejabat ? 'bg-blue-600/40 border-l-4 border-l-blue-400' : 'hover:bg-indigo-600/30']">
+                            <div class="font-bold text-xs text-slate-200">{{ sup.nama }}</div>
+                            <div class="text-[10px] text-slate-400 mt-0.5">{{ sup.jabatan }}</div>
+                        </div>
+                    </div>
+                    <div v-else class="p-3 text-center text-xs text-slate-500 italic">Pejabat tidak ditemukan.</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="border-t border-slate-800 pt-4 mt-2">
+               <h4 class="font-bold text-indigo-400 mb-3 text-xs uppercase tracking-widest"><i class="fa-solid fa-file-pdf mr-1"></i> Upload Dokumen PDF</h4>
+               
+               <div class="space-y-4">
+                  <div class="bg-slate-900/40 p-4 rounded-xl border border-slate-700/50">
+                    <label class="block font-bold text-slate-300 mb-1">1. Dokumen Rencana/Penilaian SKP</label>
+                    <p class="text-[10px] text-slate-500 mb-2">Format PDF (Maksimal 2 MB).</p>
+                    <input type="file" accept=".pdf" required @change="handleFileUpload('penilaian', $event)"
+                      class="w-full text-slate-300 text-xs file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-indigo-500/20 file:text-indigo-400 hover:file:bg-indigo-500/30 transition">
+                  </div>
+
+                  <div class="bg-slate-900/40 p-4 rounded-xl border border-slate-700/50">
+                    <label class="block font-bold text-slate-300 mb-1">2. Dokumen Evaluasi SKP</label>
+                    <p class="text-[10px] text-slate-500 mb-2">Format PDF (Maksimal 2 MB).</p>
+                    <input type="file" accept=".pdf" required @change="handleFileUpload('evaluasi', $event)"
+                      class="w-full text-slate-300 text-xs file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-indigo-500/20 file:text-indigo-400 hover:file:bg-indigo-500/30 transition">
+                  </div>
+               </div>
+            </div>
+
+            <button type="submit" :disabled="isUploading" class="w-full py-4 mt-4 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl shadow-lg transition tracking-wider uppercase">
+              <i v-if="isUploading" class="fa-solid fa-spinner fa-spin mr-2"></i>
+              {{ isUploading ? 'Memproses Berkas...' : 'Upload & Kirim ke Penilai' }} <i v-if="!isUploading" class="fa-solid fa-paper-plane ml-1"></i>
+            </button>
+          </form>
+        </div>
+      </div>
+    </teleport>
+    
+  </div>
 </div>

@@ -3,7 +3,8 @@
 // Deskripsi: Script inisialisasi database & Migrasi Data
 // ==========================================
 
-function setupDatabase() {
+// ZETTBOT PRIVAT: Akhiran underscore mencegah fungsi ini dipanggil publik dari klien via google.script.run
+function setupDatabase_() {
   try {
     let ss = null;
     
@@ -55,6 +56,17 @@ function setupDatabase() {
         userSheet.getRange("A:A").setNumberFormat('@'); 
     }
     
+    // =====================================
+    // SETUP TABEL E-OFFICE (SAFE MIGRATION)
+    // =====================================
+    try {
+      if (typeof initEofficeDatabase_ === 'function') {
+        initEofficeDatabase_();
+      }
+    } catch(eoffErr) {
+      Logger.log("Warning initEofficeDatabase: " + eoffErr.toString());
+    }
+
     SpreadsheetApp.flush();
     Logger.log("SUKSES: Database siap dan 100% AMAN. ID Database: " + ss.getId());
   } catch (e) {

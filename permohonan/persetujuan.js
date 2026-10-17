@@ -1,11 +1,13 @@
 // ==========================================
 // FILE: persetujuan.gs
-// Deskripsi: Backend Controller untuk Persetujuan Atasan
+// Deskripsi: Backend Controller untuk Persetujuan Atasan (Aman & Terpusat)
 // ==========================================
 
-function updateCutiStatus(id, decision, notes, userNip, bypassMode = null) {
+function updateCutiStatus(id, decision, notes, userNip, bypassMode, clientToken) {
   try {
-    const ss = SpreadsheetApp.openById(PropertiesService.getScriptProperties().getProperty("TRANSKEP_DB_ID"));
+    if (!cekOtorisasi(userNip, clientToken)) return { status: 'error', message: 'Akses Ditolak: Sesi tidak valid.' };
+
+    const ss = getDB();
     const sheetCuti = ss.getSheetByName('cuti_log');
     const sheetUser = ss.getSheetByName('user_data');
     
@@ -41,7 +43,6 @@ function updateCutiStatus(id, decision, notes, userNip, bypassMode = null) {
 
     if (!isAtasan && !isPejabat && !isBypassAtasan && !isBypassPejabat) throw new Error("Akses Ditolak. Anda bukan atasan/pejabat terkait.");
     
-    // ZETTBOT: Handler Khusus Usulan Pembatalan
     if (cFinal === 'Menunggu Pembatalan') {
        if (!isPejabat && !isBypassPejabat) throw new Error("Hanya Pejabat Berwenang yang dapat memproses Usulan Pembatalan Cuti.");
        
@@ -77,23 +78,20 @@ function updateCutiStatus(id, decision, notes, userNip, bypassMode = null) {
        return { status: 'success', message: `Usulan Pembatalan telah di-${decision.toLowerCase()}.` };
     }
 
-    // ZETTBOT FIX: Handler Cuti Normal & Dual Role
     let updated = false;
     let finalNotes = notes;
     
-    // Jika user adalah Atasan DAN Pejabat sekaligus (Dual Role Ketua)
     if ((isAtasan && isPejabat) || (isBypassAtasan && isBypassPejabat)) {
         if (isBypassAtasan) finalNotes += "\n\n*(Disetujui via Bypass Dual-Role oleh " + namaPenyetuju + ")*";
         
         cAtasan = decision;
         cPejabat = decision;
-        sheetCuti.getRange(rowIndex, 9).setValue(finalNotes); // catatan atasan
-        sheetCuti.getRange(rowIndex, 14).setValue(decision);  // status atasan
-        sheetCuti.getRange(rowIndex, 13).setValue(finalNotes); // catatan pejabat
-        sheetCuti.getRange(rowIndex, 15).setValue(decision);  // status pejabat
+        sheetCuti.getRange(rowIndex, 9).setValue(finalNotes); 
+        sheetCuti.getRange(rowIndex, 14).setValue(decision);  
+        sheetCuti.getRange(rowIndex, 13).setValue(finalNotes);
+        sheetCuti.getRange(rowIndex, 15).setValue(decision);  
         updated = true;
     } 
-    // Logika Normal Tunggal
     else {
         if (isAtasan || isBypassAtasan) {
             if (cAtasan !== 'Menunggu') throw new Error("Berkas ini sudah diproses di tingkat Atasan.");
@@ -124,7 +122,6 @@ function updateCutiStatus(id, decision, notes, userNip, bypassMode = null) {
     
     sheetCuti.getRange(rowIndex, 8).setValue(finalStatus);
     
-    // Reverse Saldo Jika Penolakan Baru Terjadi
     if (finalStatus === 'Ditolak' || finalStatus === 'Perubahan') {
         const historyStr = String(logRecord[16] || "");
         let h24 = 0, h25 = 0, h26 = 0, hLain = 0;
@@ -149,20 +146,21 @@ function updateCutiStatus(id, decision, notes, userNip, bypassMode = null) {
   } catch (err) { return { status: 'error', message: err.toString() }; }
 }
 
-// ZETTBOT: MESIN UTAMA BULK APPROVAL (DI-LOOPING DI DALAM SERVER)
-function processBulkApproval(bulkItems, decision, notes, userNip, bypassMode) {
+function processBulkApproval(bulkItems, decision, notes, userNip, bypassMode, clientToken) {
     try {
+        if (!cekOtorisasi(userNip, clientToken)) return { status: 'error', message: 'Akses Ditolak: Sesi tidak valid.' };
+        
         let successCount = 0;
         let failCount = 0;
         
-        // Loop setiap ID dan teruskan ke fungsi persetujuan spesifiknya
         for (let i = 0; i < bulkItems.length; i++) {
             let item = bulkItems[i];
             try {
-                if (item.type === 'Cuti') updateCutiStatus(item.id, decision, notes, userNip, bypassMode);
-                else if (item.type === 'IK') updateIkStatus(item.id, decision, notes, userNip, bypassMode);
-                else if (item.type === 'IP') updateIpStatus(item.id, decision, notes, userNip, bypassMode);
-                else if (item.type === 'WFH') updateWfhStatus(item.id, item.stage, decision, notes, userNip, bypassMode);
+                // Di sini kita sudah siapkan injeksi token untuk fungsi-fungsi IK, IP, WFH (akan diselesaikan di Fase 4B)
+                if (item.type === 'Cuti') updateCutiStatus(item.id, decision, notes, userNip, bypassMode, clientToken);
+                else if (item.type === 'IK') updateIkStatus(item.id, decision, notes, userNip, bypassMode, clientToken);
+                else if (item.type === 'IP') updateIpStatus(item.id, decision, notes, userNip, bypassMode, clientToken);
+                else if (item.type === 'WFH') updateWfhStatus(item.id, item.stage, decision, notes, userNip, bypassMode, clientToken);
                 successCount++;
             } catch(err) {
                 failCount++;

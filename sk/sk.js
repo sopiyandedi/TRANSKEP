@@ -1,5 +1,5 @@
 // ==========================================
-// FILE: sk.gs (Backend Controller Khusus SK)
+// FILE: sk.gs (Backend Controller Khusus SK Aman & Terpusat)
 // ==========================================
 
 function autoInitSkSheets(ss) {
@@ -8,7 +8,6 @@ function autoInitSkSheets(ss) {
   let skSheet = ss.getSheetByName('sk_data');
   if (!skSheet) {
      skSheet = ss.insertSheet('sk_data');
-     // ZETTBOT FIX: 9 Header Kolom Baru sesuai permintaan
      const headers = ['ID_SK', 'Judul_SK', 'No_SK', 'PJ_SK', 'Link_Drive', 'Tugas_SK_JSON', 'Tgl_Input', 'Timestamp', 'NIP_Pegawai'];
      skSheet.appendRow(headers);
      skSheet.getRange("A1:I1").setFontWeight("bold").setBackground("#312e81").setFontColor("#ffffff");
@@ -16,7 +15,6 @@ function autoInitSkSheets(ss) {
      isCreated = true;
   }
   
-  // ZETTBOT FIX: Memasukkan kembali blok ackSheet ke dalam fungsi agar tidak error 'ss is not defined'
   let ackSheet = ss.getSheetByName('sk_ack');
   if (!ackSheet) {
      ackSheet = ss.insertSheet('sk_ack');
@@ -24,7 +22,7 @@ function autoInitSkSheets(ss) {
      ackSheet.appendRow(ackHeaders);
      ackSheet.getRange("A1:D1").setFontWeight("bold").setBackground("#065f46").setFontColor("#ffffff");
      ackSheet.setFrozenRows(1);
-     ackSheet.getRange("C:C").setNumberFormat('@'); // Mengamankan format teks NIP
+     ackSheet.getRange("C:C").setNumberFormat('@'); 
      isCreated = true;
   }
   
@@ -33,13 +31,78 @@ function autoInitSkSheets(ss) {
   return isCreated;
 }
 
-// ZETTBOT FIX: Fungsi saveSk yang dipaksa selaras dengan 9 Kolom Database
-function saveSk(payload) {
+// ZETTBOT: Fungsi Pintasan Mengambil URL Root Folder "TRANSKEP SK"
+function getSkDriveFolderUrl(userNip, clientToken) {
   try {
-    let ss;
-    try { ss = SpreadsheetApp.getActiveSpreadsheet(); } catch(e) {}
-    if(!ss) ss = SpreadsheetApp.openById(PropertiesService.getScriptProperties().getProperty("TRANSKEP_DB_ID"));
-    
+    if (!cekOtorisasi(userNip, clientToken)) return { status: 'error', message: 'Akses Ditolak: Sesi tidak valid.' };
+    const rootFolderName = "TRANSKEP SK";
+    let rootFolder;
+    const rootFolders = DriveApp.getFoldersByName(rootFolderName);
+    if (rootFolders.hasNext()) {
+      rootFolder = rootFolders.next();
+    } else {
+      rootFolder = DriveApp.createFolder(rootFolderName);
+    }
+    return { status: 'success', url: rootFolder.getUrl() };
+  } catch (e) {
+    return { status: 'error', message: 'Gagal membuka Folder Drive SK: ' + e.toString() };
+  }
+}
+
+function saveSk(payload, userNip, clientToken) {
+  try {
+    if (!cekOtorisasi(userNip, clientToken)) return { status: 'error', message: 'Akses Ditolak: Sesi tidak valid.' };
+
+    // ========================================================
+    // ZETTBOT FIX: PROSES AUTO-UPLOAD KE FOLDER "TRANSKEP SK"
+    // ========================================================
+    if (payload.fileBase64) {
+       try {
+           // 1. Inisialisasi Root Folder Khusus SK
+           const rootFolderName = "TRANSKEP SK";
+           let rootFolder;
+           const rootFolders = DriveApp.getFoldersByName(rootFolderName);
+           if (rootFolders.hasNext()) { rootFolder = rootFolders.next(); }
+           else { rootFolder = DriveApp.createFolder(rootFolderName); }
+           
+           // 2. Ekstrak Tahun dari Tanggal SK
+           let yearFolderStr = new Date().getFullYear().toString();
+           if (payload.tgl_sk) {
+               const d = new Date(payload.tgl_sk);
+               if (!isNaN(d.getTime())) yearFolderStr = d.getFullYear().toString();
+           }
+           
+           let yearFolder;
+           const yearFolders = rootFolder.getFoldersByName(yearFolderStr);
+           if (yearFolders.hasNext()) { yearFolder = yearFolders.next(); }
+           else { yearFolder = rootFolder.createFolder(yearFolderStr); }
+           
+           // 3. Masuk ke Folder PJ (Penanggung Jawab)
+           const pjFolderStr = payload.pj_sk || "PJ. Manajemen";
+           let pjFolder;
+           const pjFolders = yearFolder.getFoldersByName(pjFolderStr);
+           if (pjFolders.hasNext()) { pjFolder = pjFolders.next(); }
+           else { pjFolder = yearFolder.createFolder(pjFolderStr); }
+           
+           // 4. Decode File dan Rename sesuai Judul SK (Bersihkan karakter ilegal)
+           const decodedData = Utilities.base64Decode(payload.fileBase64);
+           let safeFileName = String(payload.judul_sk).replace(/[\\/:*?"<>|]/g, "_") + ".pdf";
+           const blob = Utilities.newBlob(decodedData, "application/pdf", safeFileName);
+           
+           // 5. Buat File & Set Izin Public (Agar Flipbook bisa baca)
+           const file = pjFolder.createFile(blob);
+           file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+           
+           // 6. Timpa payload Link Drive dengan URL asli file baru
+           payload.link_drive = file.getUrl();
+           
+       } catch (uploadError) {
+           return { status: 'error', message: 'Gagal merakit Folder Google Drive: ' + uploadError.toString() };
+       }
+    }
+    // ========================================================
+
+    let ss = getDB();
     let sheet = ss.getSheetByName('sk_data');
     if (!sheet) {
         autoInitSkSheets(ss);
@@ -69,8 +132,6 @@ function saveSk(payload) {
            peran: m.peran
         });
 
-        // URUTAN WAJIB SESUAI HEADER BARU (9 Kolom): 
-        // 0:ID_SK, 1:Judul_SK, 2:No_SK, 3:PJ_SK, 4:Link_Drive, 5:Tugas_SK_JSON, 6:Tgl_Input, 7:Timestamp, 8:NIP_Pegawai
         rowsToInsert.push([
            uniqueId, payload.judul_sk, payload.no_sk, payload.pj_sk, payload.link_drive, 
            tugasSkJson, tglInput, timestamp, m.nip
@@ -88,9 +149,11 @@ function saveSk(payload) {
   }
 }
 
-function deleteSk(id) {
+function deleteSk(id, userNip, clientToken) {
   try {
-    const ss = SpreadsheetApp.openById(PropertiesService.getScriptProperties().getProperty("TRANSKEP_DB_ID"));
+    if (!cekOtorisasi(userNip, clientToken)) return { status: 'error', message: 'Akses Ditolak: Sesi tidak valid.' };
+
+    const ss = getDB();
     const sheet = ss.getSheetByName('sk_data');
     if(!sheet) throw new Error("Tabel sk_data tidak ditemukan.");
 
@@ -122,13 +185,11 @@ function deleteSk(id) {
   }
 }
 
-function acknowledgeSk(skId, nip) {
+function acknowledgeSk(skId, nip, clientToken) {
   try {
-    // ZETTBOT FIX: Direct Connection & Bypass Init untuk performa instan
-    let ss;
-    try { ss = SpreadsheetApp.getActiveSpreadsheet(); } catch(e) {}
-    if(!ss) ss = SpreadsheetApp.openById(PropertiesService.getScriptProperties().getProperty("TRANSKEP_DB_ID"));
-    
+    if (!cekOtorisasi(nip, clientToken)) return { status: 'error', message: 'Akses Ditolak: Sesi tidak valid.' };
+
+    let ss = getDB();
     let sheet = ss.getSheetByName('sk_ack');
     if(!sheet) {
        autoInitSkSheets(ss);
@@ -137,7 +198,6 @@ function acknowledgeSk(skId, nip) {
 
     const data = sheet.getDataRange().getDisplayValues();
     for(let i=1; i<data.length; i++) {
-        // Cek agar tidak double ack
         if(String(data[i][1]).trim() === String(skId).trim() && String(data[i][2]).trim() === String(nip).trim()) {
             return { status: 'success', message: 'Sudah ditandai sebelumnya.' };
         }
@@ -154,10 +214,6 @@ function acknowledgeSk(skId, nip) {
   }
 }
 
-
-// ==========================================
-// FUNGSI PENARIK DATA KHUSUS SK (Modular)
-// ==========================================
 function fetchSkData(ss) {
   let skList = [];
   try {

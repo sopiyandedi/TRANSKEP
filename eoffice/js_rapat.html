@@ -1,0 +1,303 @@
+<script>
+  // ==========================================
+  // FILE: eoffice/js_rapat.html
+  // DESKRIPSI: Logika Frontend Form Paket Rapat & Multi-Select Peserta
+  // ENGINE: ZettBOT Core v1.0.0 (by Zettbos)
+  // ==========================================
+
+  var selectedRapatPesertaNips = [];
+
+  function generateNomorUndanganOtomatis() {
+    var now = new Date();
+    var romawi = formatBulanRomawi(now.getMonth());
+    var tahun = now.getFullYear();
+    return ".../KPA.W10-A2/OT.01.1/" + romawi + "/" + tahun;
+  }
+
+  // ==========================================
+  // RENDER DAFTAR CHECKBOX PESERTA RAPAT
+  // ==========================================
+  function renderPesertaRapatCheckboxes(searchKw) {
+    var container = document.getElementById('rapatListPesertaContainer');
+    if (!container) return;
+
+    var uList = (window.vueState && window.vueState.usersList) ? window.vueState.usersList : (typeof state !== 'undefined' ? state.usersList : []);
+    if (!Array.isArray(uList)) uList = [];
+
+    // Filter non-admin dan non-operator
+    var listPegawai = uList.filter(function(u) {
+      return u.role !== 'Admin' && u.role !== 'Operator';
+    });
+
+    if (searchKw) {
+      var q = searchKw.toLowerCase();
+      listPegawai = listPegawai.filter(function(u) {
+        return (u.nama && u.nama.toLowerCase().includes(q)) || (u.jabatan && u.jabatan.toLowerCase().includes(q));
+      });
+    }
+
+    var html = '';
+    listPegawai.forEach(function(u) {
+      var nipStr = String(u.nip || '');
+      var isChecked = selectedRapatPesertaNips.indexOf(nipStr) !== -1;
+      html += 
+        '<label class="flex items-start gap-2.5 p-2 rounded-xl border cursor-pointer transition ' + 
+        (isChecked ? 'bg-cyan-500/10 border-cyan-500/30 text-white' : 'bg-slate-900 border-slate-800 text-slate-300 hover:bg-slate-800/60') + 
+        '">' +
+          '<input type="checkbox" onchange="togglePesertaRapatCheck(\'' + nipStr + '\')" ' + (isChecked ? 'checked' : '') + ' class="mt-0.5 rounded border-slate-700 text-cyan-500 focus:ring-0 bg-slate-950">' +
+          '<div class="min-w-0 flex-1 leading-tight">' +
+            '<div class="font-bold text-[11px] truncate">' + (u.nama || '-') + '</div>' +
+            '<div class="text-[9px] text-slate-500 truncate">' + (u.jabatan || '-') + '</div>' +
+          '</div>' +
+        '</label>';
+    });
+
+    container.innerHTML = html || '<div class="col-span-3 text-center py-4 text-slate-500 text-xs">Tidak ada pegawai yang cocok.</div>';
+    updateCountPesertaBadge();
+  }
+
+  function togglePesertaRapatCheck(nip) {
+    var idx = selectedRapatPesertaNips.indexOf(nip);
+    if (idx === -1) {
+      selectedRapatPesertaNips.push(nip);
+    } else {
+      selectedRapatPesertaNips.splice(idx, 1);
+    }
+    updateCountPesertaBadge();
+    // Render ulang tampilan agar warna berubah
+    var kw = document.getElementById('rapatSearchPesertaInput') ? document.getElementById('rapatSearchPesertaInput').value : '';
+    renderPesertaRapatCheckboxes(kw);
+  }
+
+  function updateCountPesertaBadge() {
+    var badge = document.getElementById('rapatCountPeserta');
+    if (badge) {
+      badge.innerText = selectedRapatPesertaNips.length + " Terpilih";
+    }
+  }
+
+  function pilihSemuaPesertaRapat(pilihSemua) {
+    var uList = (window.vueState && window.vueState.usersList) ? window.vueState.usersList : (typeof state !== 'undefined' ? state.usersList : []);
+    if (!Array.isArray(uList)) return;
+
+    if (pilihSemua) {
+      selectedRapatPesertaNips = uList
+        .filter(function(u) { return u.role !== 'Admin' && u.role !== 'Operator'; })
+        .map(function(u) { return String(u.nip || ''); });
+    } else {
+      selectedRapatPesertaNips = [];
+    }
+    var kw = document.getElementById('rapatSearchPesertaInput') ? document.getElementById('rapatSearchPesertaInput').value : '';
+    renderPesertaRapatCheckboxes(kw);
+  }
+
+  function filterPesertaListModal(val) {
+    renderPesertaRapatCheckboxes(val);
+  }
+
+  // ==========================================
+  // BUKA & TUTUP MODAL AGENDA RAPAT
+  // ==========================================
+  window.openRapatModalForm = function(rapatData) {
+    var modal = document.getElementById('modalAgendaRapat');
+    if (!modal) return;
+
+    rapatData = rapatData || {};
+    selectedRapatPesertaNips = [];
+
+    // Jika ada daftar peserta lama (misal saat edit/detail)
+    if (rapatData.peserta_json) {
+      try {
+        var parsed = JSON.parse(rapatData.peserta_json);
+        if (Array.isArray(parsed)) {
+          selectedRapatPesertaNips = parsed.map(function(p) { return String(p.nip || ''); });
+        }
+      } catch(e) {}
+    }
+
+    document.getElementById('rapatFieldIdRapat').value = rapatData.id_rapat || '';
+    document.getElementById('rapatFieldAgenda').value = rapatData.agenda || '';
+    document.getElementById('rapatFieldNomorUndangan').value = rapatData.nomor_undangan || generateNomorUndanganOtomatis();
+    document.getElementById('rapatFieldHariTanggal').value = rapatData.hari_tanggal || formatTanggalIndoKgb(new Date());
+    document.getElementById('rapatFieldWaktuMulai').value = rapatData.waktu_mulai || '09:00 WIB';
+    document.getElementById('rapatFieldWaktuSelesai').value = rapatData.waktu_selesai || '11:30 WIB';
+    document.getElementById('rapatFieldTempat').value = rapatData.tempat || 'Ruang Sidang Utama Pengadilan Agama Indramayu';
+    document.getElementById('rapatFieldPemimpin').value = rapatData.pemimpin || 'Ketua Pengadilan Agama Indramayu';
+    document.getElementById('rapatFieldNotulis').value = rapatData.notulis || '';
+    document.getElementById('rapatFieldTamuLuar').value = '';
+    document.getElementById('rapatFieldPembahasan').value = rapatData.pembahasan || '';
+    document.getElementById('rapatFieldKesimpulan').value = rapatData.kesimpulan || '';
+
+    if (document.getElementById('rapatSearchPesertaInput')) {
+      document.getElementById('rapatSearchPesertaInput').value = '';
+    }
+
+    // Render checkbox
+    renderPesertaRapatCheckboxes('');
+
+    modal.classList.remove('hidden');
+    setTimeout(function() {
+      modal.classList.remove('opacity-0');
+      modal.firstElementChild.classList.remove('scale-95');
+    }, 10);
+  };
+  window.openRapatDetailModal = window.openRapatModalForm;
+
+  function closeRapatModalForm() {
+    var modal = document.getElementById('modalAgendaRapat');
+    if (!modal) return;
+    modal.classList.add('opacity-0');
+    modal.firstElementChild.classList.add('scale-95');
+    setTimeout(function() {
+      modal.classList.add('hidden');
+    }, 300);
+  }
+
+  // ==========================================
+  // MODAL SUKSES HASIL 3 DOKUMEN RAPAT
+  // ==========================================
+  function showRapatSuccessResultModal(agenda, docUndangan, docAbsen, docNotulen) {
+    var modal = document.getElementById('modalRapatSuccessResult');
+    if (!modal) return;
+
+    document.getElementById('rapatSuccessAgendaTitle').innerText = agenda || 'Agenda Rapat Dinas';
+    document.getElementById('rapatLinkDocUndangan').href = docUndangan || '#';
+    document.getElementById('rapatLinkDocAbsen').href = docAbsen || '#';
+    document.getElementById('rapatLinkDocNotulen').href = docNotulen || '#';
+
+    modal.classList.remove('hidden');
+    setTimeout(function() {
+      modal.classList.remove('opacity-0');
+      modal.firstElementChild.classList.remove('scale-95');
+    }, 10);
+  }
+
+  function closeRapatSuccessModal() {
+    var modal = document.getElementById('modalRapatSuccessResult');
+    if (!modal) return;
+    modal.classList.add('opacity-0');
+    modal.firstElementChild.classList.add('scale-95');
+    setTimeout(function() {
+      modal.classList.add('hidden');
+    }, 300);
+  }
+
+  // ==========================================
+  // SUBMIT FORM RAPAT KE GOOGLE APPS SCRIPT
+  // ==========================================
+  function submitRapatForm() {
+    var agenda = document.getElementById('rapatFieldAgenda').value;
+    var nomorUndangan = document.getElementById('rapatFieldNomorUndangan').value;
+    var hariTanggal = document.getElementById('rapatFieldHariTanggal').value;
+    var tempat = document.getElementById('rapatFieldTempat').value;
+    var pemimpin = document.getElementById('rapatFieldPemimpin').value;
+
+    if (!agenda) {
+      if (typeof showNotify === 'function') showNotify("Peringatan", "Agenda / Judul Rapat wajib diisi.", "warning");
+      return;
+    }
+    if (!hariTanggal) {
+      if (typeof showNotify === 'function') showNotify("Peringatan", "Hari & Tanggal Rapat wajib diisi.", "warning");
+      return;
+    }
+
+    // Kumpulkan objek peserta dari NIP yang dipilih
+    var uList = (window.vueState && window.vueState.usersList) ? window.vueState.usersList : (typeof state !== 'undefined' ? state.usersList : []);
+    var pesertaObjList = [];
+    selectedRapatPesertaNips.forEach(function(nip) {
+      var u = uList.find(function(user) { return String(user.nip) === String(nip); });
+      if (u) {
+        pesertaObjList.push({
+          nip: String(u.nip || ''),
+          nama: u.nama || '',
+          pangkat: u.pangkat || '',
+          jabatan: u.jabatan || ''
+        });
+      }
+    });
+
+    var tamuLuar = document.getElementById('rapatFieldTamuLuar').value;
+    if (tamuLuar && tamuLuar.trim()) {
+      var arrTamu = tamuLuar.split(',');
+      arrTamu.forEach(function(t) {
+        var tTrim = t.trim();
+        if (tTrim) {
+          pesertaObjList.push({
+            nip: '-',
+            nama: tTrim,
+            pangkat: '-',
+            jabatan: 'Tamu / Eksternal'
+          });
+        }
+      });
+    }
+
+    if (pesertaObjList.length === 0) {
+      if (typeof showNotify === 'function') showNotify("Peringatan", "Pilih minimal 1 orang peserta rapat.", "warning");
+      return;
+    }
+
+    var payload = {
+      id_rapat: document.getElementById('rapatFieldIdRapat').value,
+      nomor_undangan: nomorUndangan,
+      agenda: agenda,
+      hari_tanggal: hariTanggal,
+      waktu_mulai: document.getElementById('rapatFieldWaktuMulai').value,
+      waktu_selesai: document.getElementById('rapatFieldWaktuSelesai').value,
+      tempat: tempat,
+      pemimpin: pemimpin,
+      notulis: document.getElementById('rapatFieldNotulis').value,
+      peserta_json: JSON.stringify(pesertaObjList),
+      pembahasan: document.getElementById('rapatFieldPembahasan').value,
+      kesimpulan: document.getElementById('rapatFieldKesimpulan').value
+    };
+
+    var token = localStorage.getItem('transkep_session_token') || '';
+    var currentUser = (window.vueState && window.vueState.user) ? window.vueState.user : (typeof state !== 'undefined' ? state.user : null);
+    var adminNip = (currentUser && currentUser.nip) || localStorage.getItem('transkep_active_nip') || '';
+
+    var btnSubmit = document.getElementById('btnRapatGenerateDoc');
+    if (btnSubmit) btnSubmit.disabled = true;
+
+    if (typeof showLoading === 'function') {
+      showLoading("Menerbitkan 3 Dokumen Rapat ke Google Docs...");
+    }
+
+    google.script.run
+      .withSuccessHandler(function(res) {
+        if (typeof hideLoading === 'function') hideLoading();
+        if (btnSubmit) btnSubmit.disabled = false;
+
+        if (res && res.status === 'success') {
+          closeRapatModalForm();
+          if (typeof showNotify === 'function') {
+            showNotify("Sukses", "3 Dokumen Rapat berhasil dibuat di Google Drive!", "success");
+          }
+          // Tampilkan Modal Hasil Link Dokumen
+          showRapatSuccessResultModal(
+            agenda, 
+            res.data.doc_undangan_url, 
+            res.data.doc_absen_url, 
+            res.data.doc_notulen_url
+          );
+          // Refresh list E-Office
+          if (typeof window.refreshEofficeData === 'function') {
+            window.refreshEofficeData();
+          }
+        } else {
+          if (typeof showNotify === 'function') {
+            showNotify("Gagal", (res ? res.message : "Terjadi kendala saat menerbitkan dokumen rapat."), "error");
+          }
+        }
+      })
+      .withFailureHandler(function(err) {
+        if (typeof hideLoading === 'function') hideLoading();
+        if (btnSubmit) btnSubmit.disabled = false;
+        console.error("Error submit rapat: ", err);
+        if (typeof showNotify === 'function') {
+          showNotify("Error Sistem", err.toString(), "error");
+        }
+      })
+      .createPaketRapatDocs(payload, adminNip, token);
+  }
+</script>

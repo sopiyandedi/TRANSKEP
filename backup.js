@@ -2,7 +2,8 @@
 // FILE: backup.gs (Sistem Auto Backup & Cleanup)
 // ==========================================
 
-function runDailyBackup() {
+// ZETTBOT PRIVAT: Akhiran underscore mencegah fungsi ini dipanggil publik dari klien via google.script.run
+function runDailyBackup_() {
   try {
     // 1. Ambil ID Database Utama
     const dbId = PropertiesService.getScriptProperties().getProperty("TRANSKEP_DB_ID");
@@ -30,14 +31,14 @@ function runDailyBackup() {
     Logger.log(`Backup harian sukses dibuat: ${backupFileName}`);
     
     // 4. Auto-Cleanup (Menghapus backup yang usianya sudah lebih dari 30 Hari)
-    cleanupOldBackups(backupFolder);
+    cleanupOldBackups_(backupFolder);
     
   } catch (e) {
     Logger.log("ERROR Sistem Backup: " + e.toString());
   }
 }
 
-function cleanupOldBackups(folder) {
+function cleanupOldBackups_(folder) {
   const files = folder.getFiles();
   const now = new Date();
   const thirtyDaysInMs = 30 * 24 * 60 * 60 * 1000; // 30 Hari dalam hitungan Milidetik

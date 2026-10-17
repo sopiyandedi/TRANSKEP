@@ -316,10 +316,17 @@
 
 /* --- TAMBAHAN BARU: PERBAIKAN MENU PERMOHONAN & MODAL --- */
   
-  /* 1. Backdrop Hitam pada Modal menjadi lebih bening */
+  /* 1. Backdrop Overlay Modal di Light Mode */
   .light-mode .fixed.inset-0.bg-black\/70,
-  .light-mode .fixed.inset-0.bg-slate-950\/80 {
-      background-color: rgba(15, 23, 42, 0.25) !important; 
+  .light-mode .fixed.inset-0.bg-black\/80,
+  .light-mode .fixed.inset-0.bg-black\/60,
+  .light-mode .fixed.inset-0.bg-slate-950\/80,
+  .light-mode .fixed.inset-0.bg-slate-950\/90,
+  .light-mode .fixed.inset-0[class*="bg-black"],
+  .light-mode .fixed.inset-0[class*="bg-slate-950"] {
+      background-color: rgba(15, 23, 42, 0.5) !important; 
+      backdrop-filter: blur(8px) !important;
+      -webkit-backdrop-filter: blur(8px) !important;
   }
 
   /* 2. Menargetkan semua Panel/Card Container yang menggunakan warna slate gelap (Filter Area, dll) */
@@ -348,32 +355,212 @@
       color: #64748b !important; 
   }
 
-  /* 4. Mempercantik Modal Dinamis (Informasi Sisa Cuti & Form Pengajuan) */
-  .light-mode [id^="modal"] .glass {
-      background-color: rgba(255, 255, 255, 0.95) !important;
-      border: 1px solid rgba(226, 232, 240, 1) !important;
-      box-shadow: 0 20px 40px -5px rgba(0, 0, 0, 0.1) !important;
-  }
-  /* Header Modal */
-  .light-mode [id^="modal"] .border-b {
-      background-color: rgba(241, 245, 249, 0.9) !important; 
-      border-bottom-color: rgba(226, 232, 240, 1) !important;
-  }
-  /* Kotak-kotak informasi di dalam Modal */
-  .light-mode [id^="modal"] div.bg-slate-950,
-  .light-mode [id^="modal"] div[class*="bg-slate-900"] {
+  /* ===========================================================================
+     4. ZETTBOT FIX: SOLID POPUP & MODAL DI LIGHT MODE (ANTI-TEMBUS PANDANG)
+     Mencegah elemen background bocor ke dalam modal popup agar nyaman dibaca
+     =========================================================================== */
+  /* Wadah Utama Kartu Modal (Modal Dialog Box) */
+  .light-mode .fixed.inset-0 .glass,
+  .light-mode #app-container .fixed.inset-0 .glass,
+  .light-mode .fixed.inset-0 > div.glass,
+  .light-mode .fixed.inset-0 > div > .glass,
+  .light-mode [id*="modal"] .glass,
+  .light-mode [id*="Modal"] .glass,
+  .light-mode #app-container [id*="modal"] .glass,
+  .light-mode #app-container [id*="Modal"] .glass,
+  .light-mode #vue-global-modals .glass,
+  .light-mode #app-container #vue-global-modals .glass,
+  .light-mode .fixed.inset-0 [class*="bg-slate-900/95"],
+  .light-mode .fixed.inset-0 [class*="bg-slate-900/90"],
+  .light-mode .fixed.inset-0 > [class*="bg-slate-900"],
+  .light-mode .fixed.inset-0 > div[class*="bg-slate-900"] {
+      background: #ffffff !important;
       background-color: #ffffff !important;
-      border: 1px solid rgba(226, 232, 240, 1) !important; 
-      box-shadow: 0 1px 3px rgba(0,0,0,0.05) !important;
+      backdrop-filter: blur(25px) !important;
+      -webkit-backdrop-filter: blur(25px) !important;
+      border: 1px solid rgba(203, 213, 225, 0.8) !important;
+      box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.05) !important;
+      color: #1e293b !important;
   }
-  /* Menghitamkan kembali teks-teks pucat di dalam modal */
-  .light-mode [id^="modal"] p.text-slate-300,
-  .light-mode [id^="modal"] span.text-slate-300 {
-      color: #1e293b !important; 
+
+  /* Header Modal: Latar belakang bersih & garis batas */
+  .light-mode .fixed.inset-0 .border-b,
+  .light-mode [id*="modal"] .border-b,
+  .light-mode [id*="Modal"] .border-b,
+  .light-mode #vue-global-modals .border-b {
+      background-color: #f8fafc !important; 
+      border-bottom: 1px solid #e2e8f0 !important;
   }
-  .light-mode [id^="modal"] p.text-slate-500,
-  .light-mode [id^="modal"] span.text-slate-500 {
-      color: #64748b !important; 
+
+  /* Judul Heading Modal */
+  .light-mode .fixed.inset-0 h2,
+  .light-mode .fixed.inset-0 h3,
+  .light-mode .fixed.inset-0 h4,
+  .light-mode [id*="modal"] h2,
+  .light-mode [id*="modal"] h3,
+  .light-mode [id*="modal"] h4,
+  .light-mode [id*="Modal"] h2,
+  .light-mode [id*="Modal"] h3,
+  .light-mode [id*="Modal"] h4,
+  .light-mode #vue-global-modals h2,
+  .light-mode #vue-global-modals h3,
+  .light-mode #vue-global-modals h4 {
+      color: #0f172a !important;
+  }
+
+  /* Tombol Tutup (X) di Header Modal */
+  .light-mode .fixed.inset-0 button[class*="text-slate-400"],
+  .light-mode [id*="modal"] button[class*="text-slate-400"],
+  .light-mode [id*="Modal"] button[class*="text-slate-400"],
+  .light-mode #vue-global-modals button[class*="text-slate-400"] {
+      color: #64748b !important;
+      background-color: #f1f5f9 !important;
+      border: 1px solid #e2e8f0 !important;
+  }
+  .light-mode .fixed.inset-0 button[class*="text-slate-400"]:hover,
+  .light-mode [id*="modal"] button[class*="text-slate-400"]:hover,
+  .light-mode [id*="Modal"] button[class*="text-slate-400"]:hover,
+  .light-mode #vue-global-modals button[class*="text-slate-400"]:hover {
+      color: #e11d48 !important;
+      background-color: #ffe4e6 !important;
+  }
+
+  /* Form Input, Select, Textarea di dalam Modal */
+  .light-mode .fixed.inset-0 input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+  .light-mode .fixed.inset-0 select,
+  .light-mode .fixed.inset-0 textarea,
+  .light-mode [id*="modal"] input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+  .light-mode [id*="modal"] select,
+  .light-mode [id*="modal"] textarea,
+  .light-mode [id*="Modal"] input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+  .light-mode [id*="Modal"] select,
+  .light-mode [id*="Modal"] textarea,
+  .light-mode #vue-global-modals input,
+  .light-mode #vue-global-modals select,
+  .light-mode #vue-global-modals textarea {
+      background-color: #f8fafc !important;
+      color: #0f172a !important;
+      border: 1px solid #cbd5e1 !important;
+      box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.04) !important;
+  }
+  .light-mode .fixed.inset-0 input:focus,
+  .light-mode .fixed.inset-0 select:focus,
+  .light-mode .fixed.inset-0 textarea:focus,
+  .light-mode [id*="modal"] input:focus,
+  .light-mode [id*="modal"] select:focus,
+  .light-mode [id*="modal"] textarea:focus,
+  .light-mode [id*="Modal"] input:focus,
+  .light-mode [id*="Modal"] select:focus,
+  .light-mode [id*="Modal"] textarea:focus,
+  .light-mode #vue-global-modals input:focus,
+  .light-mode #vue-global-modals select:focus,
+  .light-mode #vue-global-modals textarea:focus {
+      background-color: #ffffff !important;
+      border-color: #6366f1 !important;
+      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15) !important;
+      outline: none !important;
+  }
+  .light-mode .fixed.inset-0 input::placeholder,
+  .light-mode .fixed.inset-0 textarea::placeholder,
+  .light-mode [id*="modal"] input::placeholder,
+  .light-mode [id*="modal"] textarea::placeholder,
+  .light-mode [id*="Modal"] input::placeholder,
+  .light-mode [id*="Modal"] textarea::placeholder,
+  .light-mode #vue-global-modals input::placeholder,
+  .light-mode #vue-global-modals textarea::placeholder {
+      color: #94a3b8 !important;
+  }
+
+  /* Label & Helper Text di dalam Modal */
+  .light-mode .fixed.inset-0 label,
+  .light-mode [id*="modal"] label,
+  .light-mode [id*="Modal"] label,
+  .light-mode #vue-global-modals label {
+      color: #334155 !important;
+      font-weight: 700 !important;
+  }
+
+  /* Kotak Info, Stat Cards & Sub-panel di dalam Modal (Termasuk Sisa Cuti, Panel SK, SOP) */
+  .light-mode .fixed.inset-0 div.bg-slate-950,
+  .light-mode .fixed.inset-0 div[class*="bg-slate-900"],
+  .light-mode .fixed.inset-0 div[class*="bg-slate-800"],
+  .light-mode [id*="modal"] div.bg-slate-950,
+  .light-mode [id*="modal"] div[class*="bg-slate-900"],
+  .light-mode [id*="Modal"] div.bg-slate-950,
+  .light-mode [id*="Modal"] div[class*="bg-slate-900"],
+  .light-mode #vue-global-modals div.bg-slate-950,
+  .light-mode #vue-global-modals div[class*="bg-slate-900"] {
+      background-color: #f8fafc !important;
+      border: 1px solid #e2e8f0 !important;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+  }
+
+  /* Teks Kontras di dalam Modal */
+  .light-mode .fixed.inset-0 p.text-slate-300,
+  .light-mode .fixed.inset-0 span.text-slate-300,
+  .light-mode .fixed.inset-0 p.text-slate-200,
+  .light-mode .fixed.inset-0 span.text-slate-200,
+  .light-mode [id*="modal"] p.text-slate-300,
+  .light-mode [id*="modal"] span.text-slate-300,
+  .light-mode [id*="Modal"] p.text-slate-300,
+  .light-mode [id*="Modal"] span.text-slate-300,
+  .light-mode #vue-global-modals p.text-slate-300,
+  .light-mode #vue-global-modals span.text-slate-300,
+  .light-mode #vue-global-modals p.text-slate-200,
+  .light-mode #vue-global-modals span.text-slate-200 {
+      color: #0f172a !important;
+  }
+  .light-mode .fixed.inset-0 p.text-slate-400,
+  .light-mode .fixed.inset-0 span.text-slate-400,
+  .light-mode .fixed.inset-0 p.text-slate-500,
+  .light-mode .fixed.inset-0 span.text-slate-500,
+  .light-mode [id*="modal"] p.text-slate-400,
+  .light-mode [id*="modal"] span.text-slate-400,
+  .light-mode [id*="modal"] p.text-slate-500,
+  .light-mode [id*="modal"] span.text-slate-500,
+  .light-mode [id*="Modal"] p.text-slate-400,
+  .light-mode [id*="Modal"] span.text-slate-400,
+  .light-mode [id*="Modal"] p.text-slate-500,
+  .light-mode [id*="Modal"] span.text-slate-500,
+  .light-mode #vue-global-modals p.text-slate-400,
+  .light-mode #vue-global-modals span.text-slate-400,
+  .light-mode #vue-global-modals p.text-slate-500,
+  .light-mode #vue-global-modals span.text-slate-500 {
+      color: #64748b !important;
+  }
+
+  /* Banner Info & Notifikasi di dalam Modal */
+  .light-mode .fixed.inset-0 div[class*="bg-emerald-500\/10"],
+  .light-mode [id*="modal"] div[class*="bg-emerald-500\/10"],
+  .light-mode [id*="Modal"] div[class*="bg-emerald-500\/10"],
+  .light-mode #vue-global-modals div[class*="bg-emerald-500\/10"] {
+      background-color: #ecfdf5 !important;
+      border: 1px solid #a7f3d0 !important;
+  }
+  .light-mode .fixed.inset-0 .text-emerald-400,
+  .light-mode .fixed.inset-0 [class*="text-emerald-400"],
+  .light-mode [id*="modal"] .text-emerald-400,
+  .light-mode [id*="modal"] [class*="text-emerald-400"],
+  .light-mode [id*="Modal"] .text-emerald-400,
+  .light-mode [id*="Modal"] [class*="text-emerald-400"],
+  .light-mode #vue-global-modals .text-emerald-400,
+  .light-mode #vue-global-modals [class*="text-emerald-400"] {
+      color: #047857 !important;
+  }
+
+  /* Kotak Upload & Empty Notice di dalam Modal */
+  .light-mode .fixed.inset-0 div[class*="border-dashed"],
+  .light-mode [id*="modal"] div[class*="border-dashed"],
+  .light-mode [id*="Modal"] div[class*="border-dashed"] {
+      background-color: #f8fafc !important;
+      border-color: #cbd5e1 !important;
+      color: #64748b !important;
+  }
+  .light-mode .fixed.inset-0 div[class*="border-dashed"]:hover,
+  .light-mode [id*="modal"] div[class*="border-dashed"]:hover,
+  .light-mode [id*="Modal"] div[class*="border-dashed"]:hover {
+      background-color: #f1f5f9 !important;
+      border-color: #6366f1 !important;
   }
 
   /* 5. Memperbaiki Tombol Tab Inaktif & Bypass yang berwarna abu-abu gelap */
@@ -473,6 +660,15 @@
       border-color: rgba(226, 232, 240, 1) !important; /* Border yang bersih */
   }
 
+  /* ==========================================================
+     9. ZETTBOT FIX: FULLSCREEN MODAL PK & PCK DI ATAS SIDEBAR & TOP BAR
+     (Memastikan z-index mutlak di atas seluruh navigasi sistem)
+     ========================================================== */
+  #modalFullScreenPK,
+  #modalFullScreenPCK {
+      z-index: 2000000 !important;
+  }
+
   /* ZETTBOT FIX: Memotong sudut bocor pada modal Sisa Cuti (Tingkat Lanjut WebKit) */
   #modalSisaCuti .glass {
       overflow: hidden !important;
@@ -480,6 +676,7 @@
       /* Trik khusus untuk memaksa browser Chrome/Safari memotong sudut elemen di dalamnya */
       transform: translateZ(0); 
       -webkit-mask-image: -webkit-radial-gradient(white, black);
+      mask-image: radial-gradient(white, black);
   }
 
   /* Memastikan elemen header (anak pertama) ikut melengkung secara paksa */

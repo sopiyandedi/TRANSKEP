@@ -1,10 +1,28 @@
 <!-- =========================================================================
-     ZETTBOS MODULAR UI: JAVASCRIPT CETAK LAPORAN WFH
+     FILE: permohonan/wfh/js_cetak_wfh_laporan.html
+     (UPDATE TAHAP 3: SERVER-SIDE PDF GENERATION VIA GOOGLE DOCS)
 ========================================================================== -->
 <script>
+    // Membaca format (YYYY-MM-DD) dan (DD/MM/YYYY) dengan benar
+    function formatDateFullIndo(dateStr) {
+        if (!dateStr) return "-";
+        const months = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+        
+        let parts = dateStr.split('-');
+        if (parts.length === 3) {
+            return parseInt(parts[2], 10) + " " + months[parseInt(parts[1], 10) - 1] + " " + parts[0];
+        }
+        
+        parts = dateStr.split('/');
+        if (parts.length === 3) {
+            return parseInt(parts[0], 10) + " " + months[parseInt(parts[1], 10) - 1] + " " + parts[2];
+        }
+        return dateStr;
+    }
+
     function cetakLaporanWFH(id) {
         if (window.isGlobalPrinting) {
-            showNotify("Proses Sibuk", "Sistem sedang menyiapkan dokumen. Harap tunggu.", "warning");
+            showNotify("Proses Sibuk", "Sistem sedang merakit dokumen PDF.", "warning");
             return; 
         }
         
@@ -14,118 +32,37 @@
         }
         
         window.isGlobalPrinting = true;
-        showLoading("Menyiapkan dokumen Laporan WFH...");
+        // Ubah teks loading agar pengguna tahu proses ini makan waktu sedikit lebih lama
+        showLoading("Merakit Laporan PDF dengan presisi tinggi... (Mohon tunggu sekitar 5 detik)");
+        
+        const token = localStorage.getItem('transkep_session_token');
         
         if (typeof google !== 'undefined') {
             google.script.run
                 .withSuccessHandler(function(res) {
+                    hideLoading(); 
+                    window.isGlobalPrinting = false;
+                    
                     if (res.status === 'success') {
-                        renderTemplateCetakLaporanWFH(res.data);
+                        showNotify("Berhasil", "Laporan PDF berhasil dibuat!", "success");
+                        // Membuka PDF asli dari Google Drive di tab baru
+                        window.open(res.url, '_blank');
                     } else {
-                        hideLoading();
-                        window.isGlobalPrinting = false;
-                        showNotify("Gagal", res.message, "error");
+                        showNotify("Gagal Mencetak", res.message, "error");
                     }
                 })
                 .withFailureHandler(function(err) {
-                    hideLoading();
+                    hideLoading(); 
                     window.isGlobalPrinting = false;
                     showNotify("Error Koneksi", err.toString(), "error");
                 })
-                .getRencanaWFHById(id);
+                .generatePdfLaporanWFH(id, state.user.nip, token); // Memanggil backend Docs to PDF
         } else {
-            setTimeout(() => {
-                hideLoading();
-                window.isGlobalPrinting = false;
-                alert("[CANVAS MODE] Simulasi cetak Laporan WFH untuk ID: " + id);
-            }, 1000);
-        }
-    }
-    
-    function renderTemplateCetakLaporanWFH(data) {
-        try {
-            const pemohon = state.usersList.find(u => String(u.nip) === String(data?.nip)) || { nama: '[Data Kosong]', jabatan: '-' };
-            const atasan = state.usersList.find(u => String(u.nip) === String(data?.atasan_nip)) || { nama: '[Data Kosong]', jabatan: '-' };
-            
-            document.getElementById('cetakWfhLaporanId').innerText = data?.id || '-';
-            document.getElementById('cetakWfhLaporanNama').innerText = pemohon.nama;
-            document.getElementById('cetakWfhLaporanNip').innerText = data?.nip || '-';
-            document.getElementById('cetakWfhLaporanJabatan').innerText = pemohon.jabatan;
-            
-            let tglMulai = data?.tanggal ? formatDateIndoRekap(data.tanggal) : '-';
-            document.getElementById('cetakWfhLaporanTanggal').innerText = tglMulai;
-            
-            const tglBuat = data?.waktu ? data.waktu.split(' ')[0] : '-';
-            document.getElementById('cetakWfhLaporanTanggalBuat').innerText = formatDateIndoRekap(tglBuat);
-            
-            document.getElementById('cetakWfhLaporanNamaPemohon').innerText = pemohon.nama;
-            document.getElementById('cetakWfhLaporanNipPemohon').innerText = data?.nip || '-';
-            
-            document.getElementById('cetakWfhLaporanNamaAtasan').innerText = atasan.nama;
-            document.getElementById('cetakWfhLaporanNipAtasan').innerText = data?.atasan_nip || '-';
-            
-            const tbody = document.getElementById('cetakWfhLaporanTabelBody');
-            tbody.innerHTML = '';
-            
-            try {
-                const hasilList = JSON.parse(data?.laporan_json || '[]');
-                if (hasilList.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="4" class="border border-black p-2 text-center italic text-slate-500">Laporan belum disusun atau data kosong.</td></tr>';
-                } else {
-                    hasilList.forEach((item, idx) => {
-                        let statusHtml = item.status_capaian || '-';
-                        if(statusHtml === "Selesai (Tercapai)") statusHtml = `<b>${statusHtml}</b>`;
-                        
-                        tbody.innerHTML += `
-                            <tr>
-                                <td class="border border-black p-2 text-center align-top">${idx + 1}</td>
-                                <td class="border border-black p-2 align-top">
-                                    <div class="font-bold">${item.deskripsi || '-'}</div>
-                                    <div class="text-xs text-slate-600 mt-1">Qty Target: ${item.kuantitas || '-'}</div>
-                                </td>
-                                <td class="border border-black p-2 align-top">${item.realisasi || '-'}</td>
-                                <td class="border border-black p-2 text-center align-top">${statusHtml}</td>
-                            </tr>
-                        `;
-                    });
-                }
-            } catch (e) {
-                tbody.innerHTML = '<tr><td colspan="4" class="border border-black p-2 text-center text-red-500 font-bold">Error membaca data laporan dari sistem.</td></tr>';
-            }
-            
-            const printArea = document.getElementById('printAreaLaporanWFH');
-            
-            // ZETTBOT FIX: Pastikan form cetak lenyap dari layar aplikasi (disembunyikan via CSS inline)
-            document.querySelectorAll('.print-only').forEach(el => {
-                el.classList.add('hidden');
-                el.style.display = 'none';
-            });
-            
-            if(printArea) {
-                printArea.classList.remove('hidden');
-                printArea.style.display = 'none'; 
-            }
-            
-            setTimeout(() => {
+            setTimeout(() => { 
                 hideLoading(); 
-                window.focus(); 
-                window.print();
-                
-                setTimeout(() => {
-                    if(printArea) {
-                        printArea.classList.add('hidden');
-                        printArea.style.display = '';
-                    }
-                    window.isGlobalPrinting = false;
-                }, 1500); 
-
-            }, 800);
-            
-        } catch(e) {
-            hideLoading();
-            window.isGlobalPrinting = false;
-            showNotify("Error Render", "Terjadi kesalahan saat memuat template cetak Laporan WFH.", "error");
-            console.error(e);
+                window.isGlobalPrinting = false; 
+                alert("[CANVAS MODE] Berhasil memanggil backend. PDF URL akan terbuka di sini."); 
+            }, 1500);
         }
     }
 </script>

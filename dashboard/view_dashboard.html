@@ -1,227 +1,372 @@
-<div id="section-dashboard" class="menu-section space-y-6 animate-fade-in">
-  
-  <!-- LOAD CHART.JS UNTUK GRAFIK -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<!-- ================================================== -->
+<!-- FILE: dashboard/view_dashboard.html -->
+<!-- ================================================== -->
 
-  <!-- HEADER DASHBOARD -->
-  <div class="glass border border-slate-900 rounded-3xl p-6 relative z-[60] flex flex-col md:flex-row justify-between items-start md:items-center gap-6 shadow-lg">
-    
+<style>[v-cloak] { display: none !important; }</style>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<div id="section-dashboard" class="menu-section space-y-6 animate-fade-in" v-cloak>
+  
+  <!-- HEADER DASHBOARD (VUE CONTROLLED) -->
+  <div v-show="currentUser" class="glass border border-slate-900 rounded-3xl p-6 relative z-[60] flex flex-col md:flex-row justify-between items-start md:items-center gap-6 shadow-lg">
     <div class="shrink-0">
       <h2 class="text-2xl font-bold text-white tracking-wide"><i class="fa-solid fa-house-chimney text-indigo-500 mr-2"></i>Dashboard</h2>
-      <p class="text-slate-400 text-sm mt-1" id="dashWelcomeText">Selamat datang di Sistem Kepegawaian TRANSKEP.</p>
+      <p class="text-slate-400 text-sm mt-1">Selamat datang, <span class="text-slate-200 font-bold">{{ currentUser ? currentUser.nama : 'Memuat data...' }}</span></p>
     </div>
     
-    <!-- FITUR CARI PEGAWAI & QUICK ACCESS -->
     <div class="w-full md:max-w-2xl relative flex items-center gap-3 shrink-0">
-      
-      <!-- Tombol Quick Access: Kamus Kode Surat (Hijau) -->
-      <button onclick="openModalKodeSurat()" class="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 hover:bg-emerald-500/20 hover:text-white transition-all shadow-[0_0_10px_rgba(16,185,129,0.2)] group" title="Kamus Kode Surat">
-        <i class="fa-solid fa-book-bookmark group-hover:scale-110 transition-transform"></i>
-      </button>
+      <button onclick="openModalKodeSurat()" class="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 hover:bg-emerald-500/20 hover:text-white transition-all shadow-[0_0_10px_rgba(16,185,129,0.2)] shrink-0" title="Kamus Kode Surat"><i class="fa-solid fa-floppy-disk"></i></button>
+      <button onclick="openModalReferensiAbsensi()" class="w-10 h-10 rounded-xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-center text-rose-400 hover:bg-rose-500/20 hover:text-white transition-all shadow-[0_0_10px_rgba(244,63,94,0.2)] shrink-0" title="Referensi Aturan Absensi"><i class="fa-solid fa-user-group"></i></button>
 
-      <!-- Tombol Quick Access: Referensi Absensi (Pink) -->
-      <button onclick="openModalReferensiAbsensi()" class="w-10 h-10 rounded-xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-center text-rose-400 hover:bg-rose-500/20 hover:text-white transition-all shadow-[0_0_10px_rgba(244,63,94,0.2)] group" title="Referensi Aturan Absensi">
-        <i class="fa-solid fa-user-clock group-hover:scale-110 transition-transform"></i>
-      </button>
-
-      <!-- Kotak Pencarian Global -->
+      <!-- VUE: Kotak Pencarian Global -->
       <div class="relative flex-1 group/search">
         <i class="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within/search:text-indigo-400 transition-colors"></i>
-        <!-- ZETTBOT FIX: Update Placeholder agar user tahu sekarang bisa cari Pangkat dan Gender -->
-        <input type="text" id="globalEmployeeSearch" oninput="handleEmployeeSearch(this.value)" autocomplete="off" placeholder="Cari Nama, NIP, Jabatan, Pangkat, Gender..." class="w-full pl-11 pr-10 py-2.5 bg-slate-950/50 border border-slate-700/50 focus:border-indigo-500/50 focus:bg-slate-900 rounded-xl text-sm outline-none transition-all text-slate-200 placeholder:text-slate-500 shadow-inner">
-        <button id="btnClearSearch" onclick="clearEmployeeSearch()" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-rose-400 hidden transition-colors"><i class="fa-solid fa-xmark"></i></button>
+        <input type="text" v-model="searchKeyword" autocomplete="off" placeholder="Cari Nama, NIP, Jabatan, Pangkat..." class="w-full pl-11 pr-10 py-2.5 bg-slate-950/50 border border-slate-700/50 focus:border-indigo-500/50 focus:bg-slate-900 rounded-xl text-sm outline-none transition-all text-slate-200 placeholder:text-slate-500 shadow-inner">
+        <button v-show="searchKeyword" @click="searchKeyword = ''" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-rose-400 transition-colors"><i class="fa-solid fa-xmark"></i></button>
       </div>
       
-      <!-- PANEL HASIL PENCARIAN -->
-      <div id="searchResultPanel" class="absolute left-10 right-0 top-full mt-2 glass border border-slate-700/50 rounded-xl shadow-2xl overflow-hidden hidden max-h-[400px] overflow-y-auto custom-scrollbar flex flex-col z-[70] bg-slate-900/95 backdrop-blur-xl">
-          <div id="searchResultContent" class="p-2 space-y-1">
-              <!-- Hasil render via JS -->
+      <!-- VUE: PANEL HASIL PENCARIAN -->
+      <div v-if="searchKeyword" class="absolute left-10 right-0 top-full mt-2 glass border border-slate-700/50 rounded-xl shadow-2xl overflow-hidden max-h-[400px] overflow-y-auto custom-scrollbar flex flex-col z-[70] bg-slate-900/95 backdrop-blur-xl">
+          <div class="p-2 space-y-1">
+              <div v-if="searchResults.length === 0" class="p-4 text-center text-slate-500 text-xs">Pencarian untuk <span class="text-white font-bold">"{{ searchKeyword }}"</span> tidak ditemukan.</div>
+              <div v-for="u in searchResults" :key="u.nip" class="p-3 border-b border-slate-800/50 hover:bg-slate-800/80 transition rounded-lg flex items-center justify-between gap-3 group">
+                 <div class="w-full">
+                     <div @click="copyTeks(u.nama, 'Nama Lengkap')" title="Salin" class="font-bold text-slate-200 text-sm hover:text-indigo-400 transition cursor-pointer inline-block w-fit">{{ u.nama }}</div>
+                     <div class="text-[10px] text-slate-400 mt-1.5 flex flex-wrap items-center gap-1.5 leading-relaxed">
+                         <span v-if="u.pangkat" @click="copyTeks(u.pangkat, 'Pangkat')" class="px-1.5 py-0.5 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded mr-1 cursor-pointer">{{ u.pangkat }}</span>
+                         <span @click="copyTeks(u.nip, 'NIP')" class="font-mono text-indigo-400 hover:bg-indigo-500/10 px-1 py-0.5 rounded cursor-pointer border border-transparent">{{ u.nip }}</span>
+                         <span class="text-slate-600 px-0.5">•</span>
+                         <span @click="copyTeks(u.jabatan, 'Jabatan')" class="hover:text-indigo-400 hover:bg-slate-800 px-1.5 py-0.5 rounded cursor-pointer border border-transparent">{{ u.jabatan }}</span>
+                     </div>
+                 </div>
+              </div>
           </div>
       </div>
     </div>
-
   </div>
 
-  <!-- ========================================== -->
   <!-- TAMPILAN KHUSUS ADMIN / ATASAN -->
-  <!-- ========================================== -->
-  <div id="dashAdminView" class="hidden space-y-6">
-    
-    <!-- BARIS 1: DATA OPERASIONAL (ABSENSI & PERINGATAN DINI) -->
+  <div v-if="isAdmin" class="space-y-6">
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
        
-       <!-- KARTU ABSENSI HARI INI -->
-       <div class="glass border border-slate-800 rounded-3xl p-6 relative z-10 flex flex-col h-[450px] lg:col-span-5">
-          <div class="flex justify-between items-end mb-4 border-b border-slate-800 pb-2 shrink-0">
-             <h3 class="text-sm font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
-               <i class="fa-solid fa-calendar-check text-emerald-400"></i> Ketidakhadiran Hari Ini
-               <span class="relative flex h-2.5 w-2.5" title="Data dipantau Real-Time">
-                 <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                 <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]"></span>
-               </span>
-             </h3>
-             <span id="dateTodayBadge" class="text-[10px] bg-emerald-500/10 text-emerald-400 px-2 py-1 rounded font-bold border border-emerald-500/20">-</span>
+       <!-- KARTU ABSENSI HARI INI (VUE VERSION) -->
+<div class="glass border border-slate-800 rounded-3xl p-6 relative z-10 flex flex-col h-[450px] lg:col-span-5">
+  <div class="flex justify-between items-end mb-4 border-b border-slate-800 pb-2 shrink-0">
+     <h3 class="text-sm font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+       <i class="fa-solid fa-calendar-check text-emerald-400"></i> Ketidakhadiran
+       <span class="relative flex h-2.5 w-2.5" title="Data dipantau Real-Time">
+         <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+         <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]"></span>
+       </span>
+     </h3>
+     <!-- VUE: Tanggal Hari Ini -->
+     <span class="text-[10px] bg-emerald-500/10 text-emerald-400 px-2 py-1 rounded font-bold border border-emerald-500/20">{{ tanggalHariIni }}</span>
+  </div>
+  
+  <div class="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-3">
+     <!-- VUE: State Loading -->
+     <div v-if="!isBgSyncDone" class="flex flex-col items-center justify-center h-full text-center p-6 mt-12 animate-pulse">
+         <div class="w-16 h-16 bg-slate-800/50 rounded-full flex items-center justify-center mb-4 border border-slate-700/50">
+             <i class="fa-solid fa-satellite-dish text-2xl text-indigo-400 opacity-80"></i>
+         </div>
+         <h4 class="text-indigo-400 font-bold text-sm tracking-wide">Memindai Radar...</h4>
+         <p class="text-slate-500 text-[10px] mt-2 leading-relaxed max-w-[200px]">Menarik data kehadiran terbaru di latar belakang.</p>
+     </div>
+
+     <!-- VUE: State Kosong (Semua Hadir) -->
+     <div v-else-if="absensiHariIni.length === 0" class="flex flex-col items-center justify-center h-full text-center p-6 mt-12 animate-fade-in">
+         <div class="w-20 h-20 bg-emerald-500/10 rounded-full flex items-center justify-center mb-4 border border-emerald-500/30 shadow-[0_0_30px_rgba(16,185,129,0.2)] relative">
+             <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-20"></span>
+             <i class="fa-solid fa-trophy text-3xl text-emerald-400 relative z-10"></i>
+         </div>
+         <h4 class="text-emerald-400 font-bold text-base tracking-wide">Luar Biasa!</h4>
+         <p class="text-slate-400 text-xs mt-2 leading-relaxed max-w-[200px]">100% Personel Hadir dan Siap Bertugas Hari Ini.</p>
+     </div>
+
+     <!-- VUE: Looping Daftar Absensi -->
+     <div v-else v-for="item in absensiHariIni" :key="item.user.nip" class="flex items-center justify-between p-3 rounded-2xl border border-slate-800/60 bg-slate-900/40 hover:bg-slate-800/80 transition gap-3 mb-2 animate-fade-in">
+       <div class="flex items-center gap-3 overflow-hidden">
+          <div class="w-10 h-10 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-center shrink-0 shadow-inner">
+             <span class="text-sm font-black text-slate-300 uppercase">{{ item.user.nama ? item.user.nama.charAt(0) : '-' }}</span>
           </div>
-          <div class="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-3" id="adminAbsensiList">
-             <div class="text-center text-slate-500 text-xs italic mt-10">Menganalisa data absensi...</div>
+          <div class="flex flex-col min-w-0">
+             <h4 class="text-xs font-bold text-slate-200 truncate" :title="item.user.nama">{{ formatNama(item.user.nama) }}</h4>
+             <p class="text-[9px] text-slate-500 mt-0.5 truncate" :title="item.user.jabatan">{{ item.user.jabatan }}</p>
+             
+             <div v-if="item.tempat" class="text-[9px] text-slate-400 mt-1 truncate" :title="item.tempat">
+                <i class="fa-solid fa-location-dot text-slate-500 mr-1"></i>{{ item.tempat }}
+             </div>
+             
+             <div v-if="item.plh" class="text-[9px] font-bold text-rose-400 bg-rose-500/10 border border-rose-500/20 px-2 py-0.5 rounded flex w-fit items-center gap-1 animate-pulse mt-1.5 shadow-[0_0_8px_rgba(244,63,94,0.3)]">
+                <i class="fa-solid fa-user-shield"></i> Plh: {{ item.plh }}
+             </div>
           </div>
        </div>
+       <div class="text-right shrink-0 pl-2">
+          <div :class="['text-[9px] font-bold px-2.5 py-1 rounded-lg border uppercase tracking-widest mb-1 inline-block', item.badgeColor]">{{ item.type }}</div>
+          <div class="text-[8px] text-slate-500 font-medium">s.d {{ formatDate(item.end) }}</div>
+       </div>
+     </div>
+  </div>
+</div>
 
        <!-- KARTU PERINGATAN DINI (ADMIN) -->
-       <div class="glass border border-slate-800 rounded-3xl p-6 relative z-10 flex flex-col h-[450px] lg:col-span-7">
-          <div class="flex justify-between items-end mb-4 border-b border-slate-800 pb-2 shrink-0">
-            <h3 class="text-sm font-bold text-slate-300 uppercase tracking-wider">
-              <i class="fa-solid fa-bell text-amber-400 mr-2"></i> Peringatan Dini (KGB, KP & Pensiun)
-            </h3>
-            <span class="text-[10px] bg-indigo-500/20 text-indigo-300 px-2 py-1 rounded font-bold border border-indigo-500/30 hidden md:block">Target: Deadline Berkas</span>
-          </div>
+      <div class="glass border border-slate-800 rounded-3xl p-6 relative z-10 flex flex-col h-[450px] lg:col-span-7">
+      <div class="flex justify-between items-end mb-4 border-b border-slate-800 pb-2 shrink-0">
+      <h3 class="text-sm font-bold text-slate-300 uppercase tracking-wider">
+      <i class="fa-solid fa-bell text-amber-400 mr-2"></i> Peringatan Dini (KGB, KP & Pensiun)
+      </h3>
+      <span class="text-[10px] bg-indigo-500/20 text-indigo-300 px-2 py-1 rounded font-bold border border-indigo-500/30 hidden md:block">Target: Deadline Berkas</span>
+      </div>
           
-          <div class="flex flex-col md:flex-row gap-2 mb-3 shrink-0">
-            <div class="relative flex-1 group min-w-[150px]">
-               <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs"></i>
-               <input type="text" id="adminFilterName" oninput="applyAdminFilters(); document.getElementById('btnClearAdminFilter').classList.toggle('hidden', this.value === '')" placeholder="Cari Nama..." class="w-full pl-8 pr-8 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs focus:ring-1 focus:ring-indigo-500 outline-none transition text-slate-300 placeholder:text-slate-600">
-               <button id="btnClearAdminFilter" onclick="document.getElementById('adminFilterName').value=''; applyAdminFilters(); this.classList.add('hidden')" class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-rose-400 hidden transition-colors"><i class="fa-solid fa-xmark text-xs"></i></button>
-            </div>
-            <select id="adminFilterJenis" onchange="applyAdminFilters()" class="py-1.5 px-2 bg-slate-900 border border-slate-700 rounded-lg text-xs focus:ring-1 focus:ring-indigo-500 outline-none text-slate-300 w-full md:w-auto shrink-0">
-               <option value="">Semua Kategori</option>
-               <option value="KGB">Berkala (KGB)</option>
-               <option value="Pangkat">Pangkat (KP)</option>
-               <option value="Pensiun">Pensiun</option>
-            </select>
-            <select id="adminFilterBulan" onchange="applyAdminFilters()" class="py-1.5 px-2 bg-slate-900 border border-slate-700 rounded-lg text-xs focus:ring-1 focus:ring-indigo-500 outline-none text-slate-300 w-full md:w-auto shrink-0">
-               <option value="">Semua Bulan</option>
-               <option value="0">Januari</option><option value="1">Februari</option>
-               <option value="2">Maret</option><option value="3">April</option>
-               <option value="4">Mei</option><option value="5">Juni</option>
-               <option value="6">Juli</option><option value="7">Agustus</option>
-               <option value="8">September</option><option value="9">Oktober</option>
-               <option value="10">November</option><option value="11">Desember</option>
-            </select>
-            <select id="adminFilterTahun" onchange="applyAdminFilters()" class="py-1.5 px-2 bg-slate-900 border border-slate-700 rounded-lg text-xs focus:ring-1 focus:ring-indigo-500 outline-none text-slate-300 w-full md:w-auto shrink-0">
-               <option value="">Semua Tahun</option>
-               <option value="2024">2024</option><option value="2025">2025</option>
-               <option value="2026">2026</option><option value="2027">2027</option>
-               <option value="2028">2028</option><option value="2029">2029</option>
-               <option value="2030">2030</option>
-            </select>
-          </div>
+          <!-- VUE: FILTER REAL-TIME -->
+    <div class="flex flex-col md:flex-row gap-2 mb-3 shrink-0">
+    <div class="relative flex-1 group min-w-[150px]">
+       <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs"></i>
+       <input type="text" v-model="filterWarning.name" placeholder="Cari Nama..." class="w-full pl-8 pr-8 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs focus:ring-1 focus:ring-indigo-500 outline-none transition text-slate-300 placeholder:text-slate-600">
+       <button v-show="filterWarning.name" @click="filterWarning.name = ''" class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-rose-400 transition-colors"><i class="fa-solid fa-xmark text-xs"></i></button>
+    </div>
+    <select v-model="filterWarning.jenis" class="py-1.5 px-2 bg-slate-900 border border-slate-700 rounded-lg text-xs focus:ring-1 focus:ring-indigo-500 outline-none text-slate-300 w-full md:w-auto shrink-0">
+       <option value="">Semua Kategori</option>
+       <option value="KGB">Berkala (KGB)</option>
+       <option value="Pangkat">Pangkat (KP)</option>
+       <option value="Pensiun">Pensiun</option>
+    </select>
+    <select v-model="filterWarning.bulan" class="py-1.5 px-2 bg-slate-900 border border-slate-700 rounded-lg text-xs focus:ring-1 focus:ring-indigo-500 outline-none text-slate-300 w-full md:w-auto shrink-0">
+       <option value="">Bulan</option>
+       <option value="0">Januari</option><option value="1">Februari</option>
+       <option value="2">Maret</option><option value="3">April</option>
+       <option value="4">Mei</option><option value="5">Juni</option>
+       <option value="6">Juli</option><option value="7">Agustus</option>
+       <option value="8">September</option><option value="9">Oktober</option>
+       <option value="10">November</option><option value="11">Desember</option>
+    </select>
+    <select v-model="filterWarning.tahun" class="py-1.5 px-2 bg-slate-900 border border-slate-700 rounded-lg text-xs focus:ring-1 focus:ring-indigo-500 outline-none text-slate-300 w-full md:w-auto shrink-0">
+       <option value="">Tahun</option>
+       <option value="2024">2024</option><option value="2025">2025</option>
+       <option value="2026">2026</option><option value="2027">2027</option>
+       <option value="2028">2028</option><option value="2029">2029</option>
+       <option value="2030">2030</option>
+    </select>
+  </div>
 
-          <div class="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-3" id="adminWarningList">
-             <div class="text-center text-slate-500 text-xs italic mt-10">Menganalisa data pegawai...</div>
-          </div>
-       </div>
+          <!-- VUE: LIST PERINGATAN ADMIN -->
+  <div class="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-3">
+     <div v-if="filteredAdminWarnings.length === 0" class="text-center p-8 text-slate-500 text-xs italic border border-dashed border-slate-700/50 rounded-xl mt-4">
+         Tidak ada jadwal pemberkasan yang cocok dengan filter.
+     </div>
+     
+     <div v-for="item in filteredAdminWarnings" :key="item.user.nip + item.type" :class="['flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-2xl border hover:bg-slate-800/80 transition gap-4 mb-3', item.status === 'Terlewat' ? 'border-rose-500/30 bg-rose-950/20' : 'border-slate-800/60 bg-slate-900/40']">
+        <div class="flex items-center gap-3 overflow-hidden">
+           <div class="w-10 h-10 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-center shrink-0 shadow-inner">
+              <i :class="['fa-solid', item.type === 'Pensiun' ? 'fa-person-walking-luggage text-purple-400' : (item.type === 'KGB' ? 'fa-money-bill-trend-up text-blue-400' : 'fa-angles-up text-emerald-400')]"></i>
+           </div>
+           <div class="flex flex-col min-w-0">
+              <h4 class="text-xs font-bold text-slate-200 truncate" :title="item.user.nama">{{ item.user.nama }}</h4>
+              <p class="text-[9px] text-slate-400 mt-0.5">{{ item.type }} • TMT: <span class="font-bold text-slate-300">{{ item.dateStr }}</span></p>
+           </div>
+        </div>
+        <div class="flex items-center gap-4 shrink-0 sm:justify-end border-t sm:border-t-0 border-slate-800 pt-2 sm:pt-0 pl-2">
+           <div class="text-right">
+              <div class="text-[8px] uppercase font-bold text-slate-500 mb-0.5">Target</div>
+              <div :class="['text-[10px] font-bold', item.targetClass || 'text-indigo-400']">{{ item.targetText }}</div>
+           </div>
+           <div class="w-28 text-center flex flex-col justify-center">
+              <div class="text-[8px] uppercase font-bold text-slate-500 mb-0.5">Status</div>
+              <button @click="openModalStatus(item)" :class="['px-2 py-1.5 rounded-lg text-[9px] font-bold border uppercase tracking-wider hover:scale-105 transition w-full flex items-center justify-between gap-1 group', item.statusClass]" title="Klik untuk Ubah Status Berkas">
+                 <span class="truncate">{{ item.status }}</span>
+                 <i class="fa-solid fa-chevron-down text-[8px] opacity-50 group-hover:opacity-100 transition-opacity"></i>
+              </button>
+           </div>
+        </div>
+     </div>
+  </div>
+</div>
 
     </div>
   </div>
 
 
-  <!-- ========================================== -->
   <!-- TAMPILAN KHUSUS PEGAWAI BIASA -->
-  <!-- ========================================== -->
-  <div id="dashPegawaiView" class="hidden space-y-6">
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+  <div v-if="!isAdmin" class="space-y-6">
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
       
-       <!-- KARTU ABSENSI HARI INI (DI-MIRROR AGAR PEGAWAI JUGA BISA LIHAT) -->
-       <div class="glass border border-slate-800 rounded-3xl p-6 relative z-10 flex flex-col h-[450px]">
+       <div class="glass border border-slate-800 rounded-3xl p-6 relative z-10 flex flex-col h-[450px] lg:col-span-5">
           <div class="flex justify-between items-end mb-4 border-b border-slate-800 pb-2 shrink-0">
-             <h3 class="text-sm font-bold text-slate-300 uppercase tracking-wider">
-               <i class="fa-solid fa-calendar-check text-emerald-400 mr-2"></i> Ketidakhadiran Hari Ini
-             </h3>
+             <h3 class="text-sm font-bold text-slate-300 uppercase tracking-wider"><i class="fa-solid fa-calendar-check text-emerald-400 mr-2"></i> Ketidakhadiran Hari Ini</h3>
           </div>
-          <div class="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-3" id="pegawaiAbsensiList">
-             <!-- Render sama persis dengan Admin -->
+          <!-- Gunakan logic yang persis sama dengan Admin di atas -->
+          <div class="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-3">
+             <div v-if="!isBgSyncDone" class="flex flex-col items-center justify-center h-full text-center p-6 mt-12 animate-pulse"><div class="w-16 h-16 bg-slate-800/50 rounded-full flex items-center justify-center mb-4 border border-slate-700/50"><i class="fa-solid fa-satellite-dish text-2xl text-indigo-400 opacity-80"></i></div></div>
+             <div v-else-if="absensiHariIni.length === 0" class="text-center p-6 mt-12 animate-fade-in text-emerald-400 font-bold">Luar Biasa! 100% Hadir.</div>
+             <div v-else v-for="item in absensiHariIni" :key="item.user.nip" class="flex items-center justify-between p-3 rounded-2xl border border-slate-800/60 bg-slate-900/40 transition gap-3 mb-2 animate-fade-in">
+                <div class="flex items-center gap-3 overflow-hidden">
+                   <!-- ZETTBOT FIX: charAt safety -->
+                   <div class="w-10 h-10 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-center shrink-0 shadow-inner"><span class="text-sm font-black text-slate-300 uppercase">{{ item.user.nama ? item.user.nama.charAt(0) : '-' }}</span></div>
+                   <div class="flex flex-col min-w-0">
+                      <!-- ZETTBOT FIX: Mengubah formatNamaBersih menjadi formatNama (terdaftar di Vue methods) -->
+                      <h4 class="text-xs font-bold text-slate-200 truncate">{{ formatNama(item.user.nama) }}</h4>
+                      <p class="text-[9px] text-slate-500 mt-0.5 truncate">{{ item.user.jabatan }}</p>
+                   </div>
+                </div>
+                <div class="text-right shrink-0 pl-2">
+                   <div :class="['text-[9px] font-bold px-2.5 py-1 rounded-lg border uppercase tracking-widest mb-1 inline-block', item.badgeColor]">{{ item.type }}</div>
+                </div>
+             </div>
           </div>
        </div>
 
-      <!-- KARTU PERINGATAN DINI PERSONAL -->
-      <div class="glass border border-slate-800 rounded-3xl p-6 relative z-10 flex flex-col h-[450px]">
+      <div class="glass border border-slate-800 rounded-3xl p-6 relative z-10 flex flex-col h-[450px] lg:col-span-7">
         <div class="flex justify-between items-end mb-4 border-b border-slate-800 pb-2 shrink-0">
-          <h3 class="text-sm font-bold text-slate-300 uppercase tracking-wider">
-            <i class="fa-solid fa-bell text-amber-400 mr-2"></i> Jadwal Pemberkasan Anda
-          </h3>
-          <span class="text-[10px] bg-indigo-500/20 text-indigo-300 px-2 py-1 rounded font-bold border border-indigo-500/30">Target: Deadline</span>
+          <h3 class="text-sm font-bold text-slate-300 uppercase tracking-wider"><i class="fa-solid fa-bell text-amber-400 mr-2"></i> Jadwal Pemberkasan Anda</h3>
         </div>
         
-        <div class="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-3" id="pegawaiWarningList">
-           <div class="text-center text-slate-500 text-xs italic mt-10">Memuat jadwal pemberkasan Anda...</div>
-        </div>
+        <div class="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-3">
+   <div v-if="filteredPegawaiWarnings.length === 0" class="text-center p-8 text-slate-500 text-xs italic border border-dashed border-slate-700/50 rounded-xl mt-4">
+       Tidak ada jadwal pemberkasan Anda saat ini.
+   </div>
+   
+   <!-- VUE: LIST PERINGATAN PEGAWAI (Tanpa Tombol Klik Modal) -->
+   <div v-for="item in filteredPegawaiWarnings" :key="item.type" :class="['flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-2xl border hover:bg-slate-800/80 transition gap-4 mb-3', item.status === 'Terlewat' ? 'border-rose-500/30 bg-rose-950/20' : 'border-slate-800/60 bg-slate-900/40']">
+      <div class="flex items-center gap-3 overflow-hidden">
+         <div class="w-10 h-10 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-center shrink-0 shadow-inner">
+            <i :class="['fa-solid', item.type === 'Pensiun' ? 'fa-person-walking-luggage text-purple-400' : (item.type === 'KGB' ? 'fa-money-bill-trend-up text-blue-400' : 'fa-angles-up text-emerald-400')]"></i>
+         </div>
+         <div class="flex flex-col min-w-0">
+            <h4 class="text-xs font-bold text-slate-200 truncate" :title="item.user.nama">{{ item.user.nama }}</h4>
+            <p class="text-[9px] text-slate-400 mt-0.5">{{ item.type }} • TMT: <span class="font-bold text-slate-300">{{ item.dateStr }}</span></p>
+         </div>
       </div>
-
+      <div class="flex items-center gap-4 shrink-0 sm:justify-end border-t sm:border-t-0 border-slate-800 pt-2 sm:pt-0 pl-2">
+         <div class="text-right">
+            <div class="text-[8px] uppercase font-bold text-slate-500 mb-0.5">Target</div>
+            <div :class="['text-[10px] font-bold', item.targetClass || 'text-indigo-400']">{{ item.targetText }}</div>
+         </div>
+         <div class="w-28 text-center flex flex-col justify-center">
+            <div class="text-[8px] uppercase font-bold text-slate-500 mb-0.5">Status</div>
+            <div :class="['px-2 py-1.5 rounded-lg text-[9px] font-bold border uppercase tracking-wider flex justify-center', item.statusClass]">{{ item.status }}</div>
+         </div>
+      </div>
+   </div>
+</div>
+      </div>
     </div>
   </div>
   
-  
-  <!-- ========================================== -->
-  <!-- BARIS 2: DATA ANALITIK & GRAFIK (INTERACTIVE MASKING) -->
-  <!-- ========================================== -->
-  
-  <div class="relative w-full overflow-hidden transition-all duration-300 [mask-image:linear-gradient(to_right,transparent,black_5%,black_95%,transparent)] hover:[mask-image:none]">
-      <div id="chartCarousel" class="flex overflow-x-auto gap-6 snap-x snap-mandatory custom-scrollbar pb-6 pt-2 animate-fade-in mt-8 cursor-grab select-none group">
-           
-        <!-- 1. GRAFIK KOMPOSISI GENDER -->
-        <div class="shrink-0 w-[85vw] sm:w-[400px] md:w-[480px] snap-center glass border border-slate-800 rounded-3xl p-6 flex flex-col h-[450px] transition-all duration-300 hover:scale-[1.02] hover:border-indigo-500/30 group-hover:opacity-40 hover:!opacity-100 relative group/card">
-           
-           <!-- Tombol Download PNG -->
-           <button onclick="downloadChartImage('genderChartAdmin', 'Grafik_Jenis_Kelamin')" class="absolute top-4 right-4 text-slate-500 hover:text-white bg-slate-900/80 hover:bg-indigo-500/80 p-2 rounded-lg opacity-0 group-hover/card:opacity-100 transition-all z-20 border border-slate-700/50 shadow-lg" title="Unduh Grafik (.png)">
-              <i class="fa-solid fa-download"></i>
-           </button>
+  <!-- ==================================================== -->
+  <!-- AREA GRAFIK ANALITIK & DEMOGRAFI (ZETTBOT ENGINE) -->
+  <!-- ==================================================== -->
+  <div class="space-y-4 pt-4">
 
-           <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider mb-2 text-center pointer-events-none"><i class="fa-solid fa-venus-mars text-indigo-400 mr-1"></i> Jenis Kelamin</h3>
-           <div class="flex-1 flex items-center justify-center relative w-full h-full pointer-events-none">
-             <canvas id="genderChartAdmin" class="pointer-events-auto bg-transparent rounded-lg cursor-pointer"></canvas>
-             <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-               <span class="text-3xl font-bold text-slate-200" id="chartTotalUserAdmin">0</span>
-               <span class="text-[9px] text-slate-500 font-bold uppercase">Total</span>
-             </div>
-           </div>
+    <!-- Kontainer Kartu-Kartu Grafik -->
+    <div class="relative w-full overflow-hidden transition-all duration-300">
+      <div id="chartCarousel" class="flex overflow-x-auto gap-6 snap-x snap-mandatory custom-scrollbar pb-6 pt-2 animate-fade-in cursor-grab select-none group transition-all duration-300">
+        
+        <!-- KARTU 1: JENIS KELAMIN -->
+        <div class="chart-card shrink-0 w-[85vw] sm:w-[420px] md:w-[480px] lg:w-[500px] snap-center glass border border-slate-800/80 rounded-3xl p-6 flex flex-col h-[460px] transition-all duration-300 hover:border-indigo-500/40 relative group/card shadow-xl">
+          <button onclick="downloadChartImage('genderChartAdmin', 'Grafik_Jenis_Kelamin')" class="absolute top-4 right-4 text-slate-400 hover:text-white bg-slate-900/90 hover:bg-indigo-600 p-2.5 rounded-xl transition-all z-20 border border-slate-700/60 shadow-lg" title="Unduh Gambar (.png)">
+            <i class="fa-solid fa-download text-xs"></i>
+          </button>
+          <div class="flex items-center gap-2 mb-3 pointer-events-none">
+            <div class="w-7 h-7 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 text-xs">
+              <i class="fa-solid fa-venus-mars"></i>
+            </div>
+            <h4 class="text-xs font-bold text-slate-200 uppercase tracking-wider">Jenis Kelamin</h4>
+          </div>
+          <div class="flex-1 flex items-center justify-center relative w-full h-full pointer-events-none">
+            <canvas id="genderChartAdmin" class="pointer-events-auto bg-transparent rounded-lg cursor-pointer"></canvas>
+            <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+              <span class="text-3xl font-black text-slate-100 drop-shadow-md" id="chartTotalUserAdmin">0</span>
+              <span class="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Pegawai</span>
+            </div>
+          </div>
+          <div class="text-center text-[10px] text-slate-500 font-medium mt-2 pointer-events-none flex items-center justify-center gap-1.5">
+            <i class="fa-solid fa-arrow-pointer text-indigo-400 text-[9px]"></i> Klik irisan donat untuk filter pegawai
+          </div>
         </div>
 
-        <!-- 2. GRAFIK TINGKAT GOLONGAN -->
-        <div class="shrink-0 w-[85vw] sm:w-[400px] md:w-[480px] snap-center glass border border-slate-800 rounded-3xl p-6 flex flex-col h-[450px] transition-all duration-300 hover:scale-[1.02] hover:border-emerald-500/30 group-hover:opacity-40 hover:!opacity-100 relative group/card">
-           
-           <!-- Tombol Download PNG -->
-           <button onclick="downloadChartImage('golonganChart', 'Grafik_Pangkat_Golongan')" class="absolute top-4 right-4 text-slate-500 hover:text-white bg-slate-900/80 hover:bg-emerald-500/80 p-2 rounded-lg opacity-0 group-hover/card:opacity-100 transition-all z-20 border border-slate-700/50 shadow-lg" title="Unduh Grafik (.png)">
-              <i class="fa-solid fa-download"></i>
-           </button>
-
-           <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider mb-2 text-center pointer-events-none"><i class="fa-solid fa-ranking-star text-emerald-400 mr-1"></i> Pangkat & Gol.</h3>
-           <div class="flex-1 relative w-full h-full pb-4 pointer-events-none">
-             <canvas id="golonganChart" class="pointer-events-auto bg-transparent rounded-lg cursor-pointer"></canvas>
-           </div>
-           <div id="totalPangkatText" class="text-center text-[10px] text-slate-400 font-medium mt-1 pointer-events-none"></div>
+        <!-- KARTU 2: PANGKAT & GOLONGAN -->
+        <div class="chart-card shrink-0 w-[85vw] sm:w-[420px] md:w-[480px] lg:w-[500px] snap-center glass border border-slate-800/80 rounded-3xl p-6 flex flex-col h-[460px] transition-all duration-300 hover:border-emerald-500/40 relative group/card shadow-xl">
+          <button onclick="downloadChartImage('golonganChart', 'Grafik_Pangkat_Golongan')" class="absolute top-4 right-4 text-slate-400 hover:text-white bg-slate-900/90 hover:bg-emerald-600 p-2.5 rounded-xl transition-all z-20 border border-slate-700/60 shadow-lg" title="Unduh Gambar (.png)">
+            <i class="fa-solid fa-download text-xs"></i>
+          </button>
+          <div class="flex items-center gap-2 mb-3 pointer-events-none">
+            <div class="w-7 h-7 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 text-xs">
+              <i class="fa-solid fa-ranking-star"></i>
+            </div>
+            <h4 class="text-xs font-bold text-slate-200 uppercase tracking-wider">Pangkat & Ruang Golongan</h4>
+          </div>
+          <div class="flex-1 relative w-full h-full pb-2 pointer-events-none">
+            <canvas id="golonganChart" class="pointer-events-auto bg-transparent rounded-lg cursor-pointer"></canvas>
+          </div>
+          <div id="totalPangkatText" class="text-center text-[10px] text-slate-400 font-medium mt-1 pointer-events-none"></div>
         </div>
 
-        <!-- 3. GRAFIK JABATAN -->
-        <div class="shrink-0 w-[85vw] sm:w-[400px] md:w-[480px] snap-center glass border border-slate-800 rounded-3xl p-6 flex flex-col h-[450px] transition-all duration-300 hover:scale-[1.02] hover:border-amber-500/30 group-hover:opacity-40 hover:!opacity-100 relative group/card">
-           
-           <!-- Tombol Download PNG -->
-           <button onclick="downloadChartImage('jabatanChart', 'Grafik_Posisi_Jabatan')" class="absolute top-4 right-4 text-slate-500 hover:text-white bg-slate-900/80 hover:bg-amber-500/80 p-2 rounded-lg opacity-0 group-hover/card:opacity-100 transition-all z-20 border border-slate-700/50 shadow-lg" title="Unduh Grafik (.png)">
-              <i class="fa-solid fa-download"></i>
-           </button>
-
-           <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider mb-2 text-center pointer-events-none"><i class="fa-solid fa-briefcase text-amber-400 mr-1"></i> Posisi Jabatan</h3>
-           <div class="flex-1 relative w-full h-full pb-4 pointer-events-none">
-             <canvas id="jabatanChart" class="pointer-events-auto bg-transparent rounded-lg cursor-pointer"></canvas>
-           </div>
-           <div id="totalJabatanText" class="text-center text-[10px] text-slate-400 font-medium mt-1 pointer-events-none"></div>
+        <!-- KARTU 3: POSISI JABATAN -->
+        <div class="chart-card shrink-0 w-[85vw] sm:w-[420px] md:w-[480px] lg:w-[500px] snap-center glass border border-slate-800/80 rounded-3xl p-6 flex flex-col h-[460px] transition-all duration-300 hover:border-amber-500/40 relative group/card shadow-xl">
+          <button onclick="downloadChartImage('jabatanChart', 'Grafik_Posisi_Jabatan')" class="absolute top-4 right-4 text-slate-400 hover:text-white bg-slate-900/90 hover:bg-amber-600 p-2.5 rounded-xl transition-all z-20 border border-slate-700/60 shadow-lg" title="Unduh Gambar (.png)">
+            <i class="fa-solid fa-download text-xs"></i>
+          </button>
+          <div class="flex items-center gap-2 mb-3 pointer-events-none">
+            <div class="w-7 h-7 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 text-xs">
+              <i class="fa-solid fa-briefcase"></i>
+            </div>
+            <h4 class="text-xs font-bold text-slate-200 uppercase tracking-wider">Posisi Jabatan</h4>
+          </div>
+          <div class="flex-1 relative w-full h-full pb-2 pointer-events-none">
+            <canvas id="jabatanChart" class="pointer-events-auto bg-transparent rounded-lg cursor-pointer"></canvas>
+          </div>
+          <div id="totalJabatanText" class="text-center text-[10px] text-slate-400 font-medium mt-1 pointer-events-none"></div>
         </div>
 
-        <!-- 4. GRAFIK STATISTIK USIA -->
-        <div class="shrink-0 w-[85vw] sm:w-[400px] md:w-[480px] snap-center glass border border-slate-800 rounded-3xl p-6 flex flex-col h-[450px] transition-all duration-300 hover:scale-[1.02] hover:border-rose-500/30 group-hover:opacity-40 hover:!opacity-100 relative group/card">
-           
-           <!-- Tombol Download PNG -->
-           <button onclick="downloadChartImage('usiaChart', 'Grafik_Statistik_Usia')" class="absolute top-4 right-4 text-slate-500 hover:text-white bg-slate-900/80 hover:bg-rose-500/80 p-2 rounded-lg opacity-0 group-hover/card:opacity-100 transition-all z-20 border border-slate-700/50 shadow-lg" title="Unduh Grafik (.png)">
-              <i class="fa-solid fa-download"></i>
-           </button>
-
-           <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider mb-2 text-center pointer-events-none"><i class="fa-solid fa-cake-candles text-rose-400 mr-1"></i> Statistik Usia</h3>
-           <div class="flex-1 relative w-full h-full pb-4 pointer-events-none">
-             <canvas id="usiaChart" class="pointer-events-auto bg-transparent rounded-lg cursor-pointer"></canvas>
-           </div>
-           <div id="totalUsiaText" class="text-center text-[10px] text-slate-400 font-medium mt-1 pointer-events-none"></div>
+        <!-- KARTU 4: STATISTIK USIA -->
+        <div class="chart-card shrink-0 w-[85vw] sm:w-[420px] md:w-[480px] lg:w-[500px] snap-center glass border border-slate-800/80 rounded-3xl p-6 flex flex-col h-[460px] transition-all duration-300 hover:border-rose-500/40 relative group/card shadow-xl">
+          <button onclick="downloadChartImage('usiaChart', 'Grafik_Statistik_Usia')" class="absolute top-4 right-4 text-slate-400 hover:text-white bg-slate-900/90 hover:bg-rose-600 p-2.5 rounded-xl transition-all z-20 border border-slate-700/60 shadow-lg" title="Unduh Gambar (.png)">
+            <i class="fa-solid fa-download text-xs"></i>
+          </button>
+          <div class="flex items-center gap-2 mb-3 pointer-events-none">
+            <div class="w-7 h-7 rounded-lg bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400 text-xs">
+              <i class="fa-solid fa-cake-candles"></i>
+            </div>
+            <h4 class="text-xs font-bold text-slate-200 uppercase tracking-wider">Statistik Usia</h4>
+          </div>
+          <div class="flex-1 relative w-full h-full pb-2 pointer-events-none">
+            <canvas id="usiaChart" class="pointer-events-auto bg-transparent rounded-lg cursor-pointer"></canvas>
+          </div>
+          <div id="totalUsiaText" class="text-center text-[10px] text-slate-400 font-medium mt-1 pointer-events-none"></div>
         </div>
 
       </div>
+    </div>
+  </div>
+
+  <!-- ZETTBOT FIX: MODAL UPDATE STATUS TMT (MIGRATED TO VUE) -->
+  <div v-if="showModalStatus" class="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm transition-opacity animate-fade-in">
+     <div class="glass border border-slate-800 bg-slate-900/95 rounded-3xl w-full max-w-sm flex flex-col shadow-2xl mx-4 overflow-hidden">
+        <div class="p-5 border-b border-slate-800/60 bg-slate-900/80 flex items-center justify-between">
+           <h3 class="text-base font-bold text-white flex items-center gap-2"><i class="fa-solid fa-list-check text-indigo-400"></i> Update Status Berkas</h3>
+           <button type="button" @click="closeModalStatus" class="text-slate-400 hover:text-rose-400 transition"><i class="fa-solid fa-xmark text-lg"></i></button>
+        </div>
+        <div class="p-6 space-y-4">
+           <div class="text-center mb-2">
+               <p class="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Atas Nama</p>
+               <p class="text-sm font-bold text-slate-200 mt-0.5">{{ modalTmt.nama }}</p>
+               <p class="text-xs text-indigo-400 font-bold mt-1 bg-indigo-500/10 inline-block px-2 py-0.5 rounded border border-indigo-500/20">Berkas {{ modalTmt.type }}</p>
+           </div>
+           <div class="grid grid-cols-1 gap-2">
+              <button @click="submitTmtStatus('Menunggu')" class="py-3 px-4 rounded-xl text-xs font-bold transition flex items-center justify-between group border border-slate-700 bg-slate-800 text-slate-300 hover:bg-slate-700">
+                 <span class="flex items-center gap-2"><i class="fa-regular fa-clock text-slate-400"></i> Reset Status (Tarik Kembali)</span>
+              </button>
+              <button @click="submitTmtStatus('Proses')" class="py-3 px-4 rounded-xl text-xs font-bold transition flex items-center justify-between group border border-blue-500/30 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 shadow-lg shadow-blue-500/5">
+                 <span class="flex items-center gap-2"><i class="fa-solid fa-gears text-blue-400 group-hover:animate-spin"></i> Tandai Sedang Diproses</span>
+              </button>
+              <button @click="submitTmtStatus('Selesai')" class="py-3 px-4 rounded-xl text-xs font-bold transition flex items-center justify-between group border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 shadow-lg shadow-emerald-500/5">
+                 <span class="flex items-center gap-2"><i class="fa-solid fa-check-double text-emerald-400"></i> Tandai Selesai / Terbit</span>
+                 <span class="text-[9px] text-emerald-500/60 font-normal">Auto-maju stlh 1 bln</span>
+              </button>
+           </div>
+        </div>
+     </div>
   </div>
 
 </div>

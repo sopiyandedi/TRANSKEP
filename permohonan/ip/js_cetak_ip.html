@@ -2,6 +2,27 @@
      ZETTBOS MODULAR UI: JAVASCRIPT CETAK IZIN PRIBADI
 ========================================================================== -->
 <script>
+    // FUNGSI BARU: Mengubah format tanggal (Misal: 2026-09-26 menjadi 26 September 2026)
+    function formatTanggalCetakFullIP(dateStr) {
+        if (!dateStr || dateStr === "-") return "-";
+        let d, m, y;
+        if (dateStr.includes('/')) {
+            let p = dateStr.split(' ')[0].split('/'); 
+            d = p[0]; m = p[1]; y = p[2];
+        } else if (dateStr.includes('-')) {
+            let p = dateStr.split(' ')[0].split('-');
+            if (p[0].length === 4) { y = p[0]; m = p[1]; d = p[2]; } 
+            else { d = p[0]; m = p[1]; y = p[2]; }
+        } else { return dateStr; }
+        
+        const months = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+        let mIdx = parseInt(m, 10) - 1;
+        if (mIdx >= 0 && mIdx < 12) {
+            return `${parseInt(d, 10)} ${months[mIdx]} ${y}`; 
+        }
+        return dateStr;
+    }
+
     function cetakIzinPribadi(id) {
         if (window.isGlobalPrinting) {
             showNotify("Proses Sibuk", "Sistem sedang menyiapkan dokumen. Harap tunggu.", "warning");
@@ -44,29 +65,49 @@
     
     function renderTemplateCetakIP(data) {
         try {
+            // Data Pegawai (Pemohon, Atasan Langsung, Pejabat Berwenang)
             const pemohon = state.usersList.find(u => String(u.nip) === String(data.nip)) || { nama: 'Tidak Diketahui', jabatan: '-' };
             const atasan = state.usersList.find(u => String(u.nip) === String(data.atasan_nip)) || { nama: 'Tidak Diketahui', jabatan: '-' };
+            const pejabat = state.usersList.find(u => String(u.nip) === String(data.pejabat_nip)) || { nama: 'Tidak Diketahui', jabatan: '-' };
             
-            document.getElementById('cetakIpId').innerText = data.id;
+            // Format Tanggal Titi Mangsa (Pojok Kanan Atas)
+            const tglBuat = data.waktu ? data.waktu.split(' ')[0] : '-';
+            document.getElementById('cetakIpTanggalBuat').innerText = formatTanggalCetakFullIP(tglBuat);
+            
+            // Tujuan Surat (Diisi Pejabat Berwenang)
+            document.getElementById('cetakIpJabatanYth').innerText = pejabat.jabatan;
+            document.getElementById('cetakIpJabatanSurat').innerText = pejabat.jabatan;
+            
+            // Biodata Pemohon
             document.getElementById('cetakIpNama').innerText = pemohon.nama;
             document.getElementById('cetakIpNip').innerText = data.nip;
             document.getElementById('cetakIpJabatan').innerText = pemohon.jabatan;
+            document.getElementById('cetakIpAlamat').innerText = data.alamat || "-";
             
-            document.getElementById('cetakIpMulai').innerText = formatDateIndoRekap(data.tgl_mulai);
-            document.getElementById('cetakIpSelesai').innerText = formatDateIndoRekap(data.tgl_selesai);
-            document.getElementById('cetakIpAlasan').innerText = data.alasan;
+            // Paragraf Isi
+            const dateObj = new Date(data.tanggal);
+            const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+            const dayName = isNaN(dateObj) ? "-" : days[dateObj.getDay()];
             
-            const tglBuat = data.waktu ? data.waktu.split(' ')[0] : '-';
-            document.getElementById('cetakIpTanggalBuat').innerText = formatDateIndoRekap(tglBuat);
+            document.getElementById('cetakIpHariSurat').innerText = dayName;
+            document.getElementById('cetakIpTanggalSurat').innerText = formatTanggalCetakFullIP(data.tanggal);
+            document.getElementById('cetakIpAlasanSurat').innerText = data.alasan;
             
-            document.getElementById('cetakIpNamaPemohon').innerText = pemohon.nama;
-            document.getElementById('cetakIpNipPemohon').innerText = data.nip;
-            
+            // TTD Pejabat Berwenang (Kiri)
+            document.getElementById('cetakIpJabatanPejabat').innerText = pejabat.jabatan;
+            document.getElementById('cetakIpNamaPejabat').innerText = pejabat.nama;
+            document.getElementById('cetakIpNipPejabat').innerText = data.pejabat_nip;
+
+            // TTD Atasan Langsung (Tengah)
+            document.getElementById('cetakIpJabatanAtasan').innerText = atasan.jabatan;
             document.getElementById('cetakIpNamaAtasan').innerText = atasan.nama;
             document.getElementById('cetakIpNipAtasan').innerText = data.atasan_nip;
             
-            const printArea = document.getElementById('printAreaIP');
+            // Tanda Tangan Pemohon (Kanan)
+            document.getElementById('cetakIpNamaPemohon').innerText = pemohon.nama;
+            document.getElementById('cetakIpNipPemohon').innerText = data.nip;
             
+            const printArea = document.getElementById('printAreaIP');
             document.querySelectorAll('.print-only').forEach(el => {
                 el.classList.add('hidden');
                 el.style.display = 'none';
@@ -94,7 +135,7 @@
         } catch(e) {
             hideLoading();
             window.isGlobalPrinting = false;
-            showNotify("Error Render", "Terjadi kesalahan saat memuat template cetak.", "error");
+            showNotify("Error Render", "Terjadi kesalahan saat memuat template cetak IP.", "error");
             console.error(e);
         }
     }

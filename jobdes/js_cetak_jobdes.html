@@ -2,11 +2,15 @@
   // ==========================================
   // FILE: js_cetak_jobdes.html
   // Deskripsi: Engine Cetak PDF via Hidden iFrame & Margin Hack
+  // ZETTBOT OPTIMIZATION: Terintegrasi penuh dengan State Vue 3
   // ==========================================
 
   window.cetakJobdes = function() {
-    var nama = document.getElementById('jdPrevNama').innerText;
-    if (nama === '-' || !nama) {
+    // 1. Ambil instance Vue Jobdes yang sedang aktif
+    var vm = window.vmJobdes;
+    
+    // 2. Validasi dari state Vue langsung
+    if (!vm || !vm.selectedNip || !vm.selectedUser) {
         window.zettbosAlert("Silakan pilih pegawai terlebih dahulu pada pencarian untuk dicetak.", "error");
         return;
     }
@@ -29,21 +33,25 @@
     // Clone template agar data aslinya tidak rusak saat diinjeksi
     var tempNode = template.cloneNode(true);
     
-    // Injeksi Data ke Clone Template
-    tempNode.querySelector('#prtJudulSk').innerText = window.jobdesConfigSk.dasar;
-    tempNode.querySelector('#prtNoSk').innerText = window.jobdesConfigSk.nomor;
-    tempNode.querySelector('#prtTglSk').innerText = window.jobdesConfigSk.tanggal;
-    tempNode.querySelector('#prtJabatan').innerText = document.getElementById('jdPrevNamaJabatan').innerText;
-    tempNode.querySelector('#prtAtasan').innerText = document.getElementById('jdPrevAtasan').innerText;
-    tempNode.querySelector('#prtNama').innerText = nama;
-    tempNode.querySelector('#prtNip').innerText = document.getElementById('jdPrevNip').innerText;
-    tempNode.querySelector('#prtPangkat').innerText = document.getElementById('jdPrevPangkat').innerText;
+    // =========================================================================
+    // 3. INJEKSI DATA MENGGUNAKAN VARIABEL REAKTIF VUE (Cepat & Anti Error)
+    // =========================================================================
+    tempNode.querySelector('#prtJudulSk').innerText = vm.configSk.dasar;
+    tempNode.querySelector('#prtNoSk').innerText = vm.configSk.nomor;
+    tempNode.querySelector('#prtTglSk').innerText = vm.configSk.tanggal;
     
-    tempNode.querySelector('#prtIkhtisar').innerHTML = document.getElementById('jdPrevIkhtisar').innerHTML;
-    tempNode.querySelector('#prtPokok').innerHTML = document.getElementById('jdPrevPokok').innerHTML;
-    tempNode.querySelector('#prtTambahan').innerHTML = document.getElementById('jdPrevTambahan').innerHTML;
-    tempNode.querySelector('#prtTanggung').innerHTML = document.getElementById('jdPrevTanggung').innerHTML;
-    tempNode.querySelector('#prtHasil').innerHTML = document.getElementById('jdPrevHasil').innerHTML;
+    tempNode.querySelector('#prtJabatan').innerText = vm.selectedUser.jabatan || "-";
+    tempNode.querySelector('#prtAtasan').innerText = vm.atasanUser.nama || "-";
+    tempNode.querySelector('#prtNama').innerText = vm.selectedUser.nama || "-";
+    tempNode.querySelector('#prtNip').innerText = vm.selectedUser.nip || "-";
+    tempNode.querySelector('#prtPangkat').innerText = vm.selectedUser.pangkat || "-";
+    
+    // Mengambil langsung HTML yang sudah diformat rapi dari Computed Vue
+    tempNode.querySelector('#prtIkhtisar').innerHTML = vm.fmtIkhtisar;
+    tempNode.querySelector('#prtPokok').innerHTML = vm.fmtPokok;
+    tempNode.querySelector('#prtTambahan').innerHTML = vm.fmtTambahan;
+    tempNode.querySelector('#prtTanggung').innerHTML = vm.fmtTanggung;
+    tempNode.querySelector('#prtHasil').innerHTML = vm.fmtHasil;
 
     var styleContent = document.getElementById('styleCetakJobdes').outerHTML;
     var innerContent = tempNode.querySelector('#contentCetakJobdes').innerHTML;
@@ -54,22 +62,17 @@
             /* Reset paksa margin dari template lama, dan aplikasikan hack margin */
             @page { 
                 size: A4 portrait; 
-                /* ⬇️ EDIT MARGIN KANAN & KIRI DI SINI ⬇️ */
-                /* Format: margin: 0 [KANAN] 0 [KIRI] */
                 margin: 0 1.5cm 0 2.5cm !important; 
             }
             body {
                 margin: 0 !important;
                 padding: 0 !important;
             }
-            /* Thead dan Tfoot ini yang bertugas menjadi Margin Atas dan Bawah di setiap halaman */
             table.print-margin-table { width: 100%; border-collapse: collapse; border: none; }
             
-            /* ⬇️ EDIT MARGIN ATAS & BAWAH DI SINI ⬇️ */
-            .spacer-top { height: 2cm; }    /* Jarak dari ujung kertas atas ke teks */
-            .spacer-bottom { height: 2cm; } /* Jarak dari ujung kertas bawah ke teks */
+            .spacer-top { height: 2cm; }    
+            .spacer-bottom { height: 2cm; } 
             
-            /* Mengakali cetak-kertas dari template.html agar tidak double padding */
             .cetak-kertas-override {
                 padding: 0 !important; 
                 min-height: auto !important; 
@@ -93,7 +96,7 @@
         </table>
     `;
 
-    var printHTML = '<!DOCTYPE html><html lang="id"><head><meta charset="UTF-8"><title>Uraian Tugas - ' + nama + '</title></head><body>' + magicWrapper + '</body></html>';
+    var printHTML = '<!DOCTYPE html><html lang="id"><head><meta charset="UTF-8"><title>Uraian Tugas - ' + vm.selectedUser.nama + '</title></head><body>' + magicWrapper + '</body></html>';
 
     var iframe = document.createElement('iframe');
     iframe.style.position = 'fixed';

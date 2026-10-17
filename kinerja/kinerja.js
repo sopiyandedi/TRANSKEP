@@ -1,11 +1,15 @@
 // ==========================================
 // FILE: kinerja.gs
-// Deskripsi: Backend Controller untuk E-Kinerja & TTE
+// Deskripsi: Backend Controller untuk E-Kinerja & TTE (Aman & Terpusat)
 // ==========================================
 
-function addKinerjaLog(payload) {
+function addKinerjaLog(payload, clientToken) {
   try {
-    const ss = SpreadsheetApp.openById(PropertiesService.getScriptProperties().getProperty("TRANSKEP_DB_ID"));
+    if (!cekOtorisasi(payload.nip, clientToken)) {
+        return { status: 'error', message: 'Akses Ditolak: Sesi tidak valid.' };
+    }
+
+    const ss = getDB();
     let sheet = ss.getSheetByName('ekinerja_data');
     if (!sheet) {
         sheet = ss.insertSheet('ekinerja_data');
@@ -43,32 +47,41 @@ function addKinerjaLog(payload) {
   }
 }
 
-function approveKinerja(id, userNip) {
+function approveKinerja(id, userNip, clientToken) {
   try {
-    const ss = SpreadsheetApp.openById(PropertiesService.getScriptProperties().getProperty("TRANSKEP_DB_ID"));
+    if (!cekOtorisasi(userNip, clientToken)) {
+        return { status: 'error', message: 'Akses Ditolak: Sesi tidak valid.' };
+    }
+
+    const ss = getDB();
     const sheetKinerja = ss.getSheetByName('ekinerja_data');
     const sheetUser = ss.getSheetByName('user_data');
     
     if(!sheetKinerja || !sheetUser) throw new Error("Database belum siap.");
 
     const kData = sheetKinerja.getDataRange().getValues();
-    let rowIndex = -1; let record = null;
-    for (let i = 1; i < kData.length; i++) {
-        if (String(kData[i][0]) === String(id)) { rowIndex = i + 1; record = kData[i]; break; }
-    }
     
-    if(rowIndex === -1) throw new Error("Data SKP tidak ditemukan.");
+    // ZETTBOT OPTIMIZATION 1: Menggunakan findIndex untuk mencari baris Kinerja dengan sangat cepat
+    const foundKnjIdx = kData.findIndex((row, idx) => idx > 0 && String(row[0]) === String(id));
+    
+    if(foundKnjIdx === -1) throw new Error("Data SKP tidak ditemukan.");
+    
+    const rowIndex = foundKnjIdx + 1;
+    const record = kData[foundKnjIdx];
+    
     if(String(record[8]) !== 'Menunggu TTE') throw new Error("Dokumen ini sudah disahkan sebelumnya.");
     
-    // Tarik data Pegawai & Pejabat
+    // ZETTBOT OPTIMIZATION 1: Menggunakan find untuk menarik data Pegawai & Pejabat
     const uData = sheetUser.getDataRange().getValues();
-    let pegawai = {}, pejabat = {}, isAdmin = false;
     
-    for (let i = 1; i < uData.length; i++) {
-        if (String(uData[i][0]) === String(record[1])) pegawai = { nama: uData[i][1], nip: uData[i][0], jabatan: uData[i][2] };
-        if (String(uData[i][0]) === String(record[2])) pejabat = { nama: uData[i][1], nip: uData[i][0], jabatan: uData[i][2] };
-        if (String(uData[i][0]) === String(userNip) && String(uData[i][3]).toLowerCase().includes('admin')) isAdmin = true;
-    }
+    const rowPegawai = uData.find((row, idx) => idx > 0 && String(row[0]) === String(record[1]));
+    const pegawai = rowPegawai ? { nama: rowPegawai[1], nip: rowPegawai[0], jabatan: rowPegawai[2] } : { nama: 'Unknown', nip: record[1], jabatan: '-' };
+    
+    const rowPejabat = uData.find((row, idx) => idx > 0 && String(row[0]) === String(record[2]));
+    const pejabat = rowPejabat ? { nama: rowPejabat[1], nip: rowPejabat[0], jabatan: rowPejabat[2] } : { nama: 'Unknown', nip: record[2], jabatan: '-' };
+    
+    const rowAdmin = uData.find((row, idx) => idx > 0 && String(row[0]) === String(userNip));
+    const isAdmin = rowAdmin ? String(rowAdmin[3]).toLowerCase().includes('admin') : false;
 
     if (String(userNip) !== String(record[2]) && !isAdmin) {
         throw new Error("Akses Ditolak: Anda bukan Pejabat Penilai untuk dokumen ini.");
@@ -120,11 +133,18 @@ function approveKinerja(id, userNip) {
     const fileTte = folder.createFile(pdfBlob);
     fileTte.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
 
-    // Update Database Status
+    // =========================================================================
+    // ZETTBOT OPTIMIZATION 2: BATCH UPDATE
+    // Menyimpan 3 data sekaligus ke dalam baris yang sama di kolom 9, 10, 11
+    // (Status, Tgl_TTE, File_Pengesahan) dalam 1x eksekusi
+    // =========================================================================
     const tglTteSimple = new Date().toLocaleDateString('id-ID');
-    sheetKinerja.getRange(rowIndex, 9).setValue('Telah Disahkan');
-    sheetKinerja.getRange(rowIndex, 10).setValue(tglTteSimple);
-    sheetKinerja.getRange(rowIndex, 11).setValue(fileTte.getUrl());
+    
+    sheetKinerja.getRange(rowIndex, 9, 1, 3).setValues([[
+        'Telah Disahkan', 
+        tglTteSimple, 
+        fileTte.getUrl()
+    ]]);
     
     SpreadsheetApp.flush();
     return { status: 'success', message: 'Tanda tangan elektronik berhasil dibubuhkan.' };

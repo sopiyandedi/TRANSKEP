@@ -1,9 +1,9 @@
 // ==========================================
 // FILE: jobdes.gs
-// Deskripsi: Backend Controller untuk Jobdes, PDF Engine, Auto-Trash & Notifikasi
+// Deskripsi: Backend Controller untuk Jobdes, PDF Engine, Auto-Trash & Notifikasi (Aman & Terpusat)
 // ==========================================
 
-function otorisasiSistem() {
+function otorisasiSistem_() {
   const folderTemp = DriveApp.createFolder("TEST_ZETTBOT_HAPUS_SAJA");
   const fileTemp = folderTemp.createFile("test.txt", "ZettBOT Test");
   fileTemp.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
@@ -13,11 +13,13 @@ function otorisasiSistem() {
   Logger.log("Otorisasi Google Drive Berhasil Terbuka Penuh!");
 }
 
-function searchJobdesBackend(keyword) {
+function searchJobdesBackend(keyword, userNip, clientToken) {
    try {
-      const ss = SpreadsheetApp.openById(PropertiesService.getScriptProperties().getProperty("TRANSKEP_DB_ID") || "ISI_ID_SPREADSHEET_JIKA_PROPERTIES_KOSONG");
-      let sheet = ss.getSheetByName('Master_Pegawai');
-      if(!sheet) return []; // Fallback aman
+      if (!cekOtorisasi(userNip, clientToken)) return [];
+
+      const ss = getDB();
+      let sheet = ss.getSheetByName('user_data') || ss.getSheetByName('Master_Pegawai');
+      if(!sheet) return []; 
       
       const data = sheet.getDataRange().getDisplayValues();
       if(data.length < 2) return [];
@@ -47,9 +49,11 @@ function searchJobdesBackend(keyword) {
    }
 }
 
-function saveJobdes(payload) { 
+function saveJobdes(payload, userNip, clientToken) { 
   try {
-    const ss = SpreadsheetApp.openById(PropertiesService.getScriptProperties().getProperty("TRANSKEP_DB_ID") || "ISI_ID_SPREADSHEET_JIKA_PROPERTIES_KOSONG");
+    if (!cekOtorisasi(userNip, clientToken)) return { status: 'error', message: 'Akses Ditolak: Sesi tidak valid.' };
+
+    const ss = getDB();
     let sheet = ss.getSheetByName('jobdes_data');
     if (!sheet) {
         sheet = ss.insertSheet('jobdes_data');
@@ -57,10 +61,11 @@ function saveJobdes(payload) {
     }
     
     const data = sheet.getDataRange().getDisplayValues();
-    let rowIndex = -1;
-    for (let i = 1; i < data.length; i++) {
-        if (String(data[i][0]) === String(payload.nip)) { rowIndex = i + 1; break; }
-    }
+    
+    // ZETTBOT OPTIMIZATION: Menggunakan metode native V8 findIndex 
+    // melewati index 0 (header) agar pencarian baris jauh lebih cepat
+    const foundIndex = data.findIndex((row, index) => index > 0 && String(row[0]) === String(payload.nip));
+    const rowIndex = foundIndex !== -1 ? foundIndex + 1 : -1;
     
     const rowData = [
         payload.nip, payload.atasan_nip, payload.dasar_lampiran, payload.ikhtisar_jabatan,
@@ -81,8 +86,10 @@ function saveJobdes(payload) {
   }
 }
 
-function createPdfJobdes(htmlContent, fileName) {
+function createPdfJobdes(htmlContent, fileName, userNip, clientToken) {
   try {
+    if (!cekOtorisasi(userNip, clientToken)) return { status: 'error', message: 'Akses Ditolak: Sesi tidak valid.' };
+
     const blob = Utilities.newBlob(htmlContent, MimeType.HTML, fileName + ".html");
     const pdfBlob = blob.getAs(MimeType.PDF);
     pdfBlob.setName(fileName + ".pdf");
@@ -100,7 +107,6 @@ function createPdfJobdes(htmlContent, fileName) {
   }
 }
 
-// PENTING: Pasang Trigger Waktu (Time-driven) pada fungsi ini di editor Apps Script agar jalan otomatis.
 function autoTrashJobdesPdfs() {
   try {
     const folderName = "Arsip Dokumen Jobdes TRANSKEP";
@@ -110,7 +116,6 @@ function autoTrashJobdesPdfs() {
     const folder = folders.next();
     const files = folder.getFiles();
     const now = new Date();
-    // 90 hari x 24 jam x 60 menit x 60 detik x 1000 milidetik
     const cutoffDate = new Date(now.getTime() - (90 * 24 * 60 * 60 * 1000)); 
     let countDeleted = 0;
     
@@ -127,9 +132,11 @@ function autoTrashJobdesPdfs() {
   }
 }
 
-function saveUsulanReposisi(payload) {
+function saveUsulanReposisi(payload, userNip, clientToken) {
   try {
-    const ss = SpreadsheetApp.openById(PropertiesService.getScriptProperties().getProperty("TRANSKEP_DB_ID") || "ISI_ID_SPREADSHEET_JIKA_PROPERTIES_KOSONG");
+    if (!cekOtorisasi(userNip, clientToken)) return { status: 'error', message: 'Akses Ditolak: Sesi tidak valid.' };
+
+    const ss = getDB();
     let sheet = ss.getSheetByName('usulan_jobdes_data');
     if (!sheet) {
         sheet = ss.insertSheet('usulan_jobdes_data');
@@ -153,9 +160,11 @@ function saveUsulanReposisi(payload) {
   }
 }
 
-function getUsulanMenunggu() {
+function getUsulanMenunggu(userNip, clientToken) {
   try {
-    const ss = SpreadsheetApp.openById(PropertiesService.getScriptProperties().getProperty("TRANSKEP_DB_ID") || "ISI_ID_SPREADSHEET_JIKA_PROPERTIES_KOSONG");
+    if (!cekOtorisasi(userNip, clientToken)) return [];
+
+    const ss = getDB();
     let sheet = ss.getSheetByName('usulan_jobdes_data');
     if (!sheet) return [];
     
@@ -163,7 +172,7 @@ function getUsulanMenunggu() {
     let usulan = [];
     
     for (let i = 1; i < data.length; i++) {
-       if (data[i][5] === 'Menunggu') { // Kolom Status
+       if (data[i][5] === 'Menunggu') { 
           usulan.push({
              id: data[i][0],
              nip: data[i][1],
@@ -179,16 +188,18 @@ function getUsulanMenunggu() {
   }
 }
 
-function tandaiUsulanSelesai(timestampId) {
+function tandaiUsulanSelesai(timestampId, userNip, clientToken) {
   try {
-    const ss = SpreadsheetApp.openById(PropertiesService.getScriptProperties().getProperty("TRANSKEP_DB_ID") || "ISI_ID_SPREADSHEET_JIKA_PROPERTIES_KOSONG");
+    if (!cekOtorisasi(userNip, clientToken)) return { status: 'error', message: 'Akses Ditolak: Sesi tidak valid.' };
+
+    const ss = getDB();
     let sheet = ss.getSheetByName('usulan_jobdes_data');
     if (!sheet) return {status: 'error'};
     
     const data = sheet.getDataRange().getDisplayValues();
     for (let i = 1; i < data.length; i++) {
        if (String(data[i][0]) === String(timestampId)) {
-          sheet.getRange(i + 1, 6).setValue('Selesai'); // Ubah status
+          sheet.getRange(i + 1, 6).setValue('Selesai'); 
           break;
        }
     }

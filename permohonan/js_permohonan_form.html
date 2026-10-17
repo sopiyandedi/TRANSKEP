@@ -1,403 +1,474 @@
 <script>
   // =========================================================================
-  // LOGIKA CLIENT-SIDE: FORM PENGAJUAN CUTI & BYPASS
+  // LOGIKA CLIENT-SIDE: FORM PENGAJUAN CUTI & BYPASS (VUE MIGRATED - TAHAP 5)
   // =========================================================================
 
-  let isBypassMode = false;
+  document.addEventListener("DOMContentLoaded", () => {
+      const { createApp } = Vue;
 
-  function toggleBuktiDukung() {
-      try {
-          const jenis = document.getElementById('cutiJenis').value;
-          const container = document.getElementById('containerBuktiDukung');
-          const inputBukti = document.getElementById('cutiBukti');
-          
-          if (jenis !== 'Tahunan') {
-              container.classList.remove('hidden');
-              inputBukti.required = true;
-          } else {
-              container.classList.add('hidden');
-              inputBukti.required = false;
-              inputBukti.value = '';
-          }
-      } catch (e) {}
-  }
+      window.vmFormCuti = createApp({
+          data() {
+              return {
+                  s: state, // Mengambil reference state global dari javascript.html
+                  isBypassMode: false,
+                  currentEditId: null,
+                  form: {
+                      bypassNip: '',
+                      jenis: 'Tahunan',
+                      mulai: '',
+                      selesai: '',
+                      alasan: '',
+                      alamat: '',
+                      plh: '',
+                      atasan: '',
+                      pejabat: ''
+                  },
+                  fileData: null,
+                  fileName: null,
+                  fileMimeType: null,
+                  
+                  // Variabel untuk Modal Pembatalan Cuti
+                  cancelForm: { id: '', alasan: '' },
 
-  function isPegawaiAbsent(nip) {
-      const today = new Date();
-      today.setHours(0,0,0,0);
-      return state.cutiLogs.some(log => {
-          if (String(log.nip) === String(nip) && log.status === 'Disetujui') {
-              const start = new Date(log.tgl_mulai);
-              start.setHours(0,0,0,0);
-              const end = new Date(log.tgl_selesai);
-              end.setHours(0,0,0,0);
-              return today >= start && today <= end;
-          }
-          return false;
-      });
-  }
+                  // ZETTBOT FIX: Variabel untuk Searchable Dropdown Bypass
+                  bypassSearchQuery: '',
+                  isBypassDropdownOpen: false
+              };
+          },
+          computed: {
+              targetUser() {
+                  if (this.isBypassMode && this.form.bypassNip) {
+                      return this.s.usersList.find(u => String(u.nip) === String(this.form.bypassNip));
+                  }
+                  return this.s.user;
+              },
+              // ZETTBOT FIX: Logika filtering untuk kolom pencarian bypass
+              filteredBypassUsers() {
+                  if (!this.s || !this.s.usersList) return [];
+                  let users = this.s.usersList;
+                  if (this.bypassSearchQuery) {
+                      const q = this.bypassSearchQuery.toLowerCase();
+                      users = users.filter(u => 
+                          u.nama.toLowerCase().includes(q) || 
+                          u.jabatan.toLowerCase().includes(q) ||
+                          String(u.nip).includes(q)
+                      );
+                  }
+                  return users;
+              },
+              opsi() {
+                  const u = this.targetUser;
+                  if (!u) return { atasanOpts: [], pejabatOpts: [], plhOpts: [], adaPlh: false };
 
-  function setupAtasanAndPejabat(targetUserObj) {
-      const u = targetUserObj || state.user; 
-      const j = u.jabatan.toLowerCase();
-      let atasanOpts = [];
-      let pejabatOpts = [];
-      let adaPlh = false;
+                  const j = u.jabatan.toLowerCase();
+                  let atasanOpts = [];
+                  let pejabatOpts = [];
+                  let plhOpts = [];
+                  let adaPlh = false;
 
-      function getPegawai(keyword) {
-          return state.usersList.filter(x => x.nip !== u.nip && x.jabatan.toLowerCase().includes(keyword));
-      }
+                  const getPegawai = (keyword) => this.s.usersList.filter(x => x.nip !== u.nip && x.jabatan.toLowerCase().includes(keyword));
 
-      let ketua = getPegawai("ketua").find(x => x.jabatan.toLowerCase() === "ketua");
-      if (ketua && !isPegawaiAbsent(ketua.nip)) {
-          pejabatOpts.push(ketua);
-      } else {
-          adaPlh = true;
-          let wakil = getPegawai("wakil ketua").find(x => x.jabatan.toLowerCase() === "wakil ketua");
-          if (wakil && !isPegawaiAbsent(wakil.nip)) pejabatOpts.push(wakil); 
-          else { let hakims = getPegawai("hakim").filter(x => !isPegawaiAbsent(x.nip)); pejabatOpts.push(...hakims); }
-      }
-
-      if (j === "ketua") { atasanOpts = state.usersList.filter(x => x.nip !== u.nip); }
-      else if (j.includes("wakil ketua") || j.includes("hakim") || (j.includes("panitera") && !j.includes("muda") && !j.includes("pengganti")) || j === "sekretaris") {
-          atasanOpts = [...pejabatOpts]; 
-      }
-      else if (j.includes("panitera muda") || j.includes("panitera pengganti") || j.includes("jurusita") || j.includes("juru sita")) {
-          let panitera = getPegawai("panitera").find(x => x.jabatan.toLowerCase() === "panitera");
-          if (panitera && !isPegawaiAbsent(panitera.nip)) { atasanOpts.push(panitera); } 
-          else {
-              adaPlh = true; let panmuds = getPegawai("panitera muda").filter(x => !isPegawaiAbsent(x.nip));
-              atasanOpts.push(...panmuds);
-          }
-      }
-      else if (j.includes("kepala sub bagian") || j.includes("kasubbag")) {
-          let sekretaris = getPegawai("sekretaris").find(x => x.jabatan.toLowerCase() === "sekretaris");
-          if (sekretaris && !isPegawaiAbsent(sekretaris.nip)) { atasanOpts.push(sekretaris); } 
-          else {
-              adaPlh = true; let kasubbags = getPegawai("kepala sub bagian").filter(x => !isPegawaiAbsent(x.nip));
-              if(kasubbags.length === 0) kasubbags = getPegawai("kasubbag").filter(x => !isPegawaiAbsent(x.nip));
-              atasanOpts.push(...kasubbags);
-          }
-      }
-      else {
-          let panmuds = getPegawai("panitera muda").filter(x => !isPegawaiAbsent(x.nip));
-          let kasubbags = getPegawai("kepala sub bagian").filter(x => !isPegawaiAbsent(x.nip));
-          if(kasubbags.length === 0) kasubbags = getPegawai("kasubbag").filter(x => !isPegawaiAbsent(x.nip));
-          atasanOpts.push(...panmuds); atasanOpts.push(...kasubbags);
-          let panitera = getPegawai("panitera").find(x => x.jabatan.toLowerCase() === "panitera");
-          if (panitera && !isPegawaiAbsent(panitera.nip)) atasanOpts.push(panitera);
-          let sekretaris = getPegawai("sekretaris").find(x => x.jabatan.toLowerCase() === "sekretaris");
-          if (sekretaris && !isPegawaiAbsent(sekretaris.nip)) atasanOpts.push(sekretaris);
-      }
-
-      atasanOpts = [...new Map(atasanOpts.map(item => [item.nip, item])).values()];
-      pejabatOpts = [...new Map(pejabatOpts.map(item => [item.nip, item])).values()];
-
-      const selAtasan = document.getElementById('cutiAtasan');
-      const selPejabat = document.getElementById('cutiPejabat');
-      const alertPlh = document.getElementById('alertPlh');
-      
-      const selPlhCuti = document.getElementById('cutiPlh');
-      const containerPlhCuti = document.getElementById('containerPlhCuti');
-      if (selPlhCuti) selPlhCuti.innerHTML = '<option value="">-- Pilih Pejabat Plh --</option>';
-      
-      let opsiPlhCuti = [];
-      let isPanitera = j === "panitera";
-      let isSekretaris = j === "sekretaris";
-
-      if (isPanitera) {
-           opsiPlhCuti = getPegawai("panitera muda").filter(x => !isPegawaiAbsent(x.nip));
-           if(containerPlhCuti) containerPlhCuti.classList.remove('hidden');
-      } else if (isSekretaris) {
-           opsiPlhCuti = getPegawai("kepala sub bagian").filter(x => !isPegawaiAbsent(x.nip));
-           if(opsiPlhCuti.length === 0) opsiPlhCuti = getPegawai("kasubbag").filter(x => !isPegawaiAbsent(x.nip));
-           if(containerPlhCuti) containerPlhCuti.classList.remove('hidden');
-      } else {
-           if(containerPlhCuti) containerPlhCuti.classList.add('hidden');
-      }
-
-      if (selPlhCuti) {
-           opsiPlhCuti.forEach(o => { selPlhCuti.innerHTML += `<option value="${o.nip}">${o.nama} (${o.jabatan})</option>`; });
-      }
-      
-      selAtasan.innerHTML = '<option value="">-- Pilih Atasan --</option>';
-      atasanOpts.forEach(o => { selAtasan.innerHTML += `<option value="${o.nip}">${o.nama} (${o.jabatan})</option>`; });
-
-      selPejabat.innerHTML = '<option value="">-- Pilih Pejabat Berwenang --</option>';
-      pejabatOpts.forEach(o => { selPejabat.innerHTML += `<option value="${o.nip}">${o.nama} (${o.jabatan})</option>`; });
-      
-      if(atasanOpts.length === 1) selAtasan.value = atasanOpts[0].nip;
-      if(pejabatOpts.length === 1) selPejabat.value = pejabatOpts[0].nip;
-      if (adaPlh) alertPlh.classList.remove('hidden'); else alertPlh.classList.add('hidden');
-  }
-
-  function openFormCutiModal(isBypass = false) {
-    try {
-      if (!state || !state.user) {
-          if(typeof showNotify === 'function') showNotify("Sistem Memuat", "Silakan tunggu, data belum siap.", "error");
-          return;
-      }
-      
-      isBypassMode = isBypass;
-      const form = document.getElementById('formCuti');
-      if (form) form.reset();
-      if(typeof toggleBuktiDukung === 'function') toggleBuktiDukung();
-      
-      const containerBypass = document.getElementById('containerBypassPegawai');
-      const selectBypass = document.getElementById('cutiBypassNip');
-      const titleModal = document.getElementById('modalFormCutiTitle');
-      
-      if (isBypass) {
-          titleModal.innerHTML = '<i class="fa-solid fa-user-shield text-indigo-400 mr-2"></i> Mode Bypass: Usulan Cuti';
-          containerBypass.classList.remove('hidden');
-          selectBypass.innerHTML = '<option value="">-- Pilih Pegawai --</option>';
-          state.usersList.forEach(u => {
-             selectBypass.innerHTML += `<option value="${u.nip}">${u.nama} (${u.jabatan})</option>`;
-          });
-          selectBypass.required = true;
-          document.getElementById('cutiAlamat').value = '';
-          document.getElementById('cutiAtasan').innerHTML = '<option value="">-- Pilih Atasan --</option>';
-          document.getElementById('cutiPejabat').innerHTML = '<option value="">-- Pilih Pejabat --</option>';
-      } else {
-          titleModal.innerHTML = '<i class="fa-solid fa-file-signature text-indigo-400 mr-2"></i> Usulkan Permohonan Cuti Baru';
-          containerBypass.classList.add('hidden');
-          selectBypass.required = false;
-          
-          const alamatInput = document.getElementById('cutiAlamat');
-          if (alamatInput) alamatInput.value = state.user.alamat || "";
-          setupAtasanAndPejabat(state.user); 
-      }
-      
-      const modal = document.getElementById('modalFormCuti');
-      if (modal) {
-          if (modal.parentNode !== document.body) {
-              document.body.appendChild(modal);
-          }
-          modal.classList.remove('hidden');
-          setTimeout(function() { if (modal.firstElementChild) modal.firstElementChild.classList.remove('scale-95'); }, 10);
-      }
-    } catch(e) { console.error(e); }
-  }
-  
-  function triggerBypassNipChange() {
-      const nip = document.getElementById('cutiBypassNip').value;
-      if (!nip) {
-          document.getElementById('cutiAlamat').value = '';
-          return;
-      }
-      const targetUser = state.usersList.find(u => String(u.nip) === String(nip));
-      if (targetUser) {
-          document.getElementById('cutiAlamat').value = targetUser.alamat || "";
-          setupAtasanAndPejabat(targetUser); 
-      }
-  }
-
-  function closeFormCutiModal() {
-    isBypassMode = false;
-    const modal = document.getElementById('modalFormCuti');
-    if (modal) {
-        if (modal.firstElementChild) modal.firstElementChild.classList.add('scale-95');
-        setTimeout(function() { modal.classList.add('hidden'); }, 200);
-    }
-  }
-
-  function readFileAsBase64(file) {
-      return new Promise(function(resolve, reject) {
-          const reader = new FileReader();
-          reader.onload = function() { resolve(reader.result); };
-          reader.onerror = function(error) { reject(error); };
-          reader.readAsDataURL(file);
-      });
-  }
-
-  async function submitCuti(e) {
-    e.preventDefault();
-    if(!state.user) { showNotify("Error Sesi", "Harap login ulang", "error"); return; }
-    
-    const fileInput = document.getElementById('cutiBukti');
-    let fileData = null, fileName = null, fileMimeType = null;
-    
-    if (document.getElementById('cutiJenis').value !== 'Tahunan') {
-        if (fileInput.files.length === 0) { showNotify("Validasi", "Bukti dukung wajib dilampirkan!", "error"); return; }
-        const file = fileInput.files[0];
-        if (file.size > 2 * 1024 * 1024) { showNotify("File Besar", "Maksimal 2MB.", "error"); return; }
-        
-        showLoading("Membaca dokumen lampiran...");
-        try {
-           const base64Str = await readFileAsBase64(file);
-           fileData = base64Str.split(',')[1];
-           fileName = file.name;
-           fileMimeType = file.type;
-        } catch(err) {
-           hideLoading(); showNotify("Error", "Gagal memproses file.", "error"); return;
-        }
-    }
-
-    let finalNip = state.user.nip;
-    if (isBypassMode) {
-        finalNip = document.getElementById('cutiBypassNip').value;
-        if (!finalNip) { hideLoading(); showNotify("Validasi", "Pilih pegawai pemohon terlebih dahulu!", "error"); return; }
-    }
-
-    const payload = {
-        nip: finalNip,
-        jenis: document.getElementById('cutiJenis').value,
-        tgl_mulai: document.getElementById('cutiMulai').value,
-        tgl_selesai: document.getElementById('cutiSelesai').value,
-        alasan: document.getElementById('cutiAlasan').value,
-        alamat: document.getElementById('cutiAlamat').value,
-        atasan_nip: document.getElementById('cutiAtasan').value,
-        pejabat_nip: document.getElementById('cutiPejabat').value,
-        plh_nip: document.getElementById('containerPlhCuti') && !document.getElementById('containerPlhCuti').classList.contains('hidden') ? document.getElementById('cutiPlh').value : "",
-        fileData: fileData, fileName: fileName, fileMimeType: fileMimeType
-    };
-
-    if (new Date(payload.tgl_selesai) < new Date(payload.tgl_mulai)) {
-       hideLoading();
-       showNotify("Tanggal Invalid", "Selesai pelaksanaan tidak boleh sebelum tanggal mulai.", "error");
-       return;
-    }
-
-    const newStart = new Date(payload.tgl_mulai);
-    newStart.setHours(0,0,0,0);
-    const newEnd = new Date(payload.tgl_selesai);
-    newEnd.setHours(0,0,0,0);
-
-    const isOverlap = state.cutiLogs.some(log => {
-        if (String(log.nip) === String(payload.nip) && log.status !== 'Ditolak' && log.status !== 'DIBATALKAN') {
-            const existingStart = new Date(log.tgl_mulai);
-            existingStart.setHours(0,0,0,0);
-            const existingEnd = new Date(log.tgl_selesai);
-            existingEnd.setHours(0,0,0,0);
-            return (newStart <= existingEnd && newEnd >= existingStart);
-        }
-        return false;
-    });
-
-    if (isOverlap) {
-        hideLoading();
-        showNotify("Tanggal Bentrok", "Pengajuan gagal! Anda (atau pegawai ini) sudah memiliki izin/cuti yang aktif pada rentang tanggal tersebut.", "warning");
-        return;
-    }
-
-    // ZETTBOT FIX: Validasi Saldo Cuti di sisi Klien (Front-end)
-    let d1 = new Date(payload.tgl_mulai);
-    let d2 = new Date(payload.tgl_selesai);
-    let durasi = 0;
-    for (let d = new Date(d1); d <= d2; d.setDate(d.getDate() + 1)) {
-        if (d.getDay() !== 0 && d.getDay() !== 6) durasi++;
-    }
-
-    let targetUser = state.user;
-    if (isBypassMode) {
-        targetUser = state.usersList.find(u => String(u.nip) === String(finalNip));
-    }
-
-    if (targetUser && payload.jenis !== 'Dinas Luar' && payload.jenis !== 'CLTN') {
-        if (payload.jenis === 'Tahunan') {
-            let totalTahunan = Number(targetUser.s_tahunan_2024 || 0) + Number(targetUser.s_tahunan_2025 || 0) + Number(targetUser.s_tahunan_2026 || 0);
-            if (totalTahunan < durasi) {
-                hideLoading();
-                showNotify("Saldo Habis/Kurang", "Maaf, sisa kuota Cuti Tahunan Anda ("+totalTahunan+" Hari) tidak mencukupi untuk pengajuan durasi "+durasi+" Hari.", "error");
-                return;
-            }
-        } else {
-            let field = "";
-            if(payload.jenis === 'Sakit') field = 's_sakit';
-            else if(payload.jenis === 'Alasan Penting' || payload.jenis === 'Penting') field = 's_penting';
-            else if(payload.jenis === 'Besar') field = 's_besar';
-            else if(payload.jenis === 'Melahirkan') field = 's_melahirkan';
-            
-            if (field !== "") {
-                let sisa = Number(targetUser[field] || 0);
-                if (sisa < durasi) {
-                    hideLoading();
-                    showNotify("Saldo Habis/Kurang", "Maaf, sisa kuota Cuti " + payload.jenis + " ("+sisa+" Hari) tidak mencukupi untuk pengajuan "+durasi+" Hari.", "error");
-                    return;
-                }
-            }
-        }
-    }
-
-    showLoading("Memverifikasi ketersediaan Pejabat...");
-    
-    google.script.run
-        .withSuccessHandler(function(routeRes) {
-            if (routeRes && routeRes.status === 'success') {
-                payload.atasan_nip = routeRes.data.atasan_nip;
-                payload.pejabat_nip = routeRes.data.pejabat_nip;
-                let routingMsg = routeRes.data.pesan;
-                
-                showLoading("Mengirimkan usulan cuti...");
-                google.script.run
-                  .withSuccessHandler(function(res) {
-                    hideLoading();
-                    closeFormCutiModal();
-                    if (res.status === 'success') {
-                      if(routingMsg) {
-                          showNotify("Berhasil Terkirim", res.message + "<br><br><span class='text-[10px] text-amber-400'>Info Pengalihan:</span><br><span class='text-[10px] leading-relaxed'>" + routingMsg + "</span>", "success");
-                      } else {
-                          showNotify("Berhasil Terkirim", res.message, "success");
+                  let ketua = getPegawai("ketua").find(x => x.jabatan.toLowerCase() === "ketua");
+                  if (ketua && !this.isPegawaiAbsent(ketua.nip)) {
+                      pejabatOpts.push(ketua);
+                  } else {
+                      adaPlh = true;
+                      let wakil = getPegawai("wakil ketua").find(x => x.jabatan.toLowerCase() === "wakil ketua");
+                      if (wakil && !this.isPegawaiAbsent(wakil.nip)) pejabatOpts.push(wakil);
+                      else {
+                          let hakims = getPegawai("hakim").filter(x => !this.isPegawaiAbsent(x.nip));
+                          pejabatOpts.push(...hakims);
                       }
-                      
-                      if (res.data) {
-                          const logVirtual = {
-                              id: res.data.id, tgl_pengajuan: res.data.tgl_pengajuan, nip: payload.nip,
-                              jenis: payload.jenis, tgl_mulai: payload.tgl_mulai, tgl_selesai: payload.tgl_selesai,
-                              alasan: payload.alasan, status: res.data.status, status_atasan: res.data.status,
-                              atasan_nip: payload.atasan_nip, pejabat_nip: payload.pejabat_nip, sisa_cuti: res.data.durasi,
-                              status_pejabat: res.data.status, alamat: payload.alamat, history: res.data.history, bukti_url: res.data.fileUrl,
-                              plh_nip: payload.plh_nip
-                          };
-                          if (state && state.cutiLogs) state.cutiLogs.unshift(logVirtual);
+                  }
 
-                          if (state.usersList) {
-                              const targetUserIdx = state.usersList.findIndex(u => String(u.nip) === String(payload.nip));
-                              if (targetUserIdx !== -1) {
-                                  let targetUser = state.usersList[targetUserIdx];
-                                  if (payload.jenis === 'Tahunan') {
-                                      try {
-                                          let h = JSON.parse(res.data.history);
-                                          targetUser.s_tahunan_2024 = Number(targetUser.s_tahunan_2024 || 0) - (h.y24 || 0);
-                                          targetUser.s_tahunan_2025 = Number(targetUser.s_tahunan_2025 || 0) - (h.y25 || 0);
-                                          targetUser.s_tahunan_2026 = Number(targetUser.s_tahunan_2026 || 0) - (h.y26 || 0);
-                                      } catch(e) {}
-                                  } else {
-                                      let field = "";
-                                      if(payload.jenis === 'Sakit') field = 's_sakit';
-                                      else if(payload.jenis === 'Alasan Penting' || payload.jenis === 'Penting') field = 's_penting';
-                                      else if(payload.jenis === 'Besar') field = 's_besar';
-                                      else if(payload.jenis === 'Melahirkan') field = 's_melahirkan';
-                                      else if(payload.jenis === 'CLTN') field = 's_cltn';
-                                      if (field !== "") targetUser[field] = Number(targetUser[field] || 0) - res.data.durasi;
-                                  }
-                                  
-                                  if (String(payload.nip) === String(state.user.nip)) {
-                                      state.user = Object.assign({}, targetUser);
-                                  }
+                  if (j === "ketua") { atasanOpts = this.s.usersList.filter(x => x.nip !== u.nip); }
+                  else if (j.includes("wakil ketua") || j.includes("hakim") || (j.includes("panitera") && !j.includes("muda") && !j.includes("pengganti")) || j === "sekretaris") {
+                      atasanOpts = [...pejabatOpts];
+                  }
+                  else if (j.includes("panitera muda") || j.includes("panitera pengganti") || j.includes("jurusita") || j.includes("juru sita")) {
+                      let panitera = getPegawai("panitera").find(x => x.jabatan.toLowerCase() === "panitera");
+                      if (panitera && !this.isPegawaiAbsent(panitera.nip)) { atasanOpts.push(panitera); }
+                      else {
+                          adaPlh = true;
+                          let panmuds = getPegawai("panitera muda").filter(x => !this.isPegawaiAbsent(x.nip));
+                          atasanOpts.push(...panmuds);
+                      }
+                  }
+                  else if (j.includes("kepala sub bagian") || j.includes("kasubbag")) {
+                      let sekretaris = getPegawai("sekretaris").find(x => x.jabatan.toLowerCase() === "sekretaris");
+                      if (sekretaris && !this.isPegawaiAbsent(sekretaris.nip)) { atasanOpts.push(sekretaris); }
+                      else {
+                          adaPlh = true;
+                          let kasubbags = getPegawai("kepala sub bagian").filter(x => !this.isPegawaiAbsent(x.nip));
+                          if(kasubbags.length === 0) kasubbags = getPegawai("kasubbag").filter(x => !this.isPegawaiAbsent(x.nip));
+                          atasanOpts.push(...kasubbags);
+                      }
+                  }
+                  else {
+                      let panmuds = getPegawai("panitera muda").filter(x => !this.isPegawaiAbsent(x.nip));
+                      let kasubbags = getPegawai("kepala sub bagian").filter(x => !this.isPegawaiAbsent(x.nip));
+                      if(kasubbags.length === 0) kasubbags = getPegawai("kasubbag").filter(x => !this.isPegawaiAbsent(x.nip));
+                      atasanOpts.push(...panmuds); atasanOpts.push(...kasubbags);
+                      let panitera = getPegawai("panitera").find(x => x.jabatan.toLowerCase() === "panitera");
+                      if (panitera && !this.isPegawaiAbsent(panitera.nip)) atasanOpts.push(panitera);
+                      let sekretaris = getPegawai("sekretaris").find(x => x.jabatan.toLowerCase() === "sekretaris");
+                      if (sekretaris && !this.isPegawaiAbsent(sekretaris.nip)) atasanOpts.push(sekretaris);
+                  }
+
+                  atasanOpts = [...new Map(atasanOpts.map(item => [item.nip, item])).values()];
+                  pejabatOpts = [...new Map(pejabatOpts.map(item => [item.nip, item])).values()];
+
+                  let isPanitera = j === "panitera";
+                  let isSekretaris = j === "sekretaris";
+
+                  if (isPanitera) {
+                       plhOpts = getPegawai("panitera muda").filter(x => !this.isPegawaiAbsent(x.nip));
+                  } else if (isSekretaris) {
+                       plhOpts = getPegawai("kepala sub bagian").filter(x => !this.isPegawaiAbsent(x.nip));
+                       if(plhOpts.length === 0) plhOpts = getPegawai("kasubbag").filter(x => !this.isPegawaiAbsent(x.nip));
+                  }
+
+                  return { atasanOpts, pejabatOpts, plhOpts, adaPlh };
+              }
+          },
+          watch: {
+              'opsi.atasanOpts'(newVal) {
+                  if (newVal.length === 1 && !this.form.atasan) this.form.atasan = newVal[0].nip;
+              },
+              'opsi.pejabatOpts'(newVal) {
+                  if (newVal.length === 1 && !this.form.pejabat) this.form.pejabat = newVal[0].nip;
+              },
+              targetUser(newVal) {
+                  if (newVal && !this.currentEditId) this.form.alamat = newVal.alamat || '';
+                  else if (!newVal) this.form.alamat = '';
+              }
+          },
+          methods: {
+              // ZETTBOT FIX: Fungsi interaksi Searchable Dropdown Bypass
+              openBypassDropdown() {
+                  this.isBypassDropdownOpen = true;
+                  // Jika pengguna ingin mencari orang lain, kosongkan query tapi simpan NIP lama sementara
+                  if (this.form.bypassNip !== '') {
+                      this.bypassSearchQuery = ''; 
+                  }
+              },
+              closeBypassDropdown() {
+                  setTimeout(() => { 
+                      this.isBypassDropdownOpen = false; 
+                      // Kembalikan nama ke input jika tidak jadi mengganti
+                      if (this.form.bypassNip) {
+                          const u = this.s.usersList.find(x => String(x.nip) === String(this.form.bypassNip));
+                          if(u) this.bypassSearchQuery = u.nama;
+                      } else {
+                          this.bypassSearchQuery = '';
+                      }
+                  }, 200);
+              },
+              selectBypassUser(user) {
+                  this.form.bypassNip = user.nip;
+                  this.bypassSearchQuery = user.nama;
+                  this.isBypassDropdownOpen = false;
+              },
+              clearBypassSearch() {
+                  this.form.bypassNip = '';
+                  this.bypassSearchQuery = '';
+                  if (this.$refs.bypassSearchInput) this.$refs.bypassSearchInput.focus();
+              },
+
+              isPegawaiAbsent(nip) {
+                  const today = new Date();
+                  today.setHours(0,0,0,0);
+                  return this.s.cutiLogs.some(log => {
+                      if (String(log.nip) === String(nip) && log.status === 'Disetujui') {
+                          const start = new Date(log.tgl_mulai);
+                          start.setHours(0,0,0,0);
+                          const end = new Date(log.tgl_selesai);
+                          end.setHours(0,0,0,0);
+                          return today >= start && today <= end;
+                      }
+                      return false;
+                  });
+              },
+              resetForm() {
+                  this.form = { bypassNip: '', jenis: 'Tahunan', mulai: '', selesai: '', alasan: '', alamat: '', plh: '', atasan: '', pejabat: '' };
+                  this.fileData = null; this.fileName = null; this.fileMimeType = null;
+                  
+                  // Reset search bypass
+                  this.bypassSearchQuery = '';
+                  this.isBypassDropdownOpen = false;
+
+                  const fileInput = document.getElementById('cutiBukti');
+                  if (fileInput) fileInput.value = '';
+              },
+              handleFileUpload(e) {
+                  const file = e.target.files[0];
+                  if (!file) return;
+                  if (file.size > 2 * 1024 * 1024) { 
+                      if(window.showNotify) window.showNotify("File Besar", "Maksimal 2MB.", "error"); 
+                      e.target.value = ''; return; 
+                  }
+                  if(window.showLoading) window.showLoading("Membaca dokumen lampiran...");
+                  try {
+                      const reader = new FileReader();
+                      reader.onload = () => {
+                          this.fileData = reader.result.split(',')[1];
+                          this.fileName = file.name;
+                          this.fileMimeType = file.type;
+                          if(window.hideLoading) window.hideLoading();
+                      };
+                      reader.readAsDataURL(file);
+                  } catch(err) {
+                      if(window.hideLoading) window.hideLoading();
+                      if(window.showNotify) window.showNotify("Error", "Gagal memproses file.", "error");
+                  }
+              },
+              openModal(isBypass = false, editLog = null) {
+                  if (!this.s || !this.s.user) {
+                      if(window.showNotify) window.showNotify("Sistem Memuat", "Silakan tunggu, data belum siap.", "error"); return;
+                  }
+
+                  this.resetForm();
+                  this.isBypassMode = isBypass;
+                  
+                  if (editLog) {
+                      this.currentEditId = editLog.id;
+                      this.form.jenis = editLog.jenis;
+                      this.form.mulai = editLog.tgl_mulai;
+                      this.form.selesai = editLog.tgl_selesai;
+                      this.form.alasan = editLog.alasan;
+                      this.form.alamat = editLog.alamat;
+                      
+                      setTimeout(() => {
+                         this.form.atasan = editLog.atasan_nip;
+                         this.form.pejabat = editLog.pejabat_nip;
+                         if(editLog.plh_nip) this.form.plh = editLog.plh_nip;
+                      }, 50); 
+                  } else {
+                      this.currentEditId = null;
+                      if (!isBypass && this.s.user) this.form.alamat = this.s.user.alamat || "";
+                  }
+
+                  const modal = document.getElementById('modalFormCuti');
+                  if (modal) {
+                      if (modal.parentNode !== document.body) document.body.appendChild(modal);
+                      modal.classList.remove('hidden');
+                      setTimeout(() => { if (modal.firstElementChild) modal.firstElementChild.classList.remove('scale-95'); }, 10);
+                  }
+              },
+              closeModal() {
+                  const modal = document.getElementById('modalFormCuti');
+                  if (modal) {
+                      if (modal.firstElementChild) modal.firstElementChild.classList.add('scale-95');
+                      setTimeout(() => { modal.classList.add('hidden'); }, 200);
+                  }
+              },
+              submitCuti() {
+                  if(!this.s.user) { if(window.showNotify) window.showNotify("Error Sesi", "Harap login ulang", "error"); return; }
+                  
+                  let isEditMode = (this.currentEditId !== null);
+                  if (this.form.jenis !== 'Tahunan' && !isEditMode && !this.fileData) {
+                      if(window.showNotify) window.showNotify("Validasi", "Bukti dukung wajib dilampirkan!", "error"); return;
+                  }
+
+                  let finalNip = this.s.user.nip;
+                  if (this.isBypassMode) {
+                      finalNip = this.form.bypassNip;
+                      if (!finalNip) { if(window.showNotify) window.showNotify("Validasi", "Pilih pegawai pemohon terlebih dahulu!", "error"); return; }
+                  }
+
+                  const payload = {
+                      id: this.currentEditId, nip: finalNip, jenis: this.form.jenis,
+                      tgl_mulai: this.form.mulai, tgl_selesai: this.form.selesai, alasan: this.form.alasan,
+                      alamat: this.form.alamat, atasan_nip: this.form.atasan, pejabat_nip: this.form.pejabat,
+                      plh_nip: this.opsi.plhOpts.length > 0 ? this.form.plh : "",
+                      fileData: this.fileData, fileName: this.fileName, fileMimeType: this.fileMimeType
+                  };
+
+                  if (new Date(payload.tgl_selesai) < new Date(payload.tgl_mulai)) {
+                     if(window.showNotify) window.showNotify("Tanggal Invalid", "Selesai pelaksanaan tidak boleh sebelum tanggal mulai.", "error"); return;
+                  }
+
+                  const newStart = new Date(payload.tgl_mulai); newStart.setHours(0,0,0,0);
+                  const newEnd = new Date(payload.tgl_selesai); newEnd.setHours(0,0,0,0);
+
+                  const isOverlap = this.s.cutiLogs.some(log => {
+                      if (String(log.nip) === String(payload.nip) && log.status !== 'Ditolak' && log.status !== 'DIBATALKAN' && String(log.id) !== String(payload.id)) {
+                          const existingStart = new Date(log.tgl_mulai); existingStart.setHours(0,0,0,0);
+                          const existingEnd = new Date(log.tgl_selesai); existingEnd.setHours(0,0,0,0);
+                          return (newStart <= existingEnd && newEnd >= existingStart);
+                      }
+                      return false;
+                  });
+
+                  if (isOverlap) {
+                      if(window.showNotify) window.showNotify("Tanggal Bentrok", "Pengajuan gagal! Anda (atau pegawai ini) sudah memiliki izin/cuti yang aktif pada rentang tanggal tersebut.", "warning"); return;
+                  }
+
+                  let d1 = new Date(payload.tgl_mulai); let d2 = new Date(payload.tgl_selesai);
+                  let durasi = 0;
+                  for (let d = new Date(d1); d <= d2; d.setDate(d.getDate() + 1)) {
+                      if (d.getDay() !== 0 && d.getDay() !== 6) durasi++;
+                  }
+
+                  let tUser = this.targetUser;
+                  if (tUser && payload.jenis !== 'Dinas Luar' && payload.jenis !== 'CLTN') {
+                      let refundDurasiLama = 0;
+                      if (payload.id) {
+                          let logLama = this.s.cutiLogs.find(l => String(l.id) === String(payload.id));
+                          if (logLama) refundDurasiLama = Number(logLama.sisa_cuti || 0);
+                      }
+
+                      if (payload.jenis === 'Tahunan') {
+                          let totalTahunan = Number(tUser.s_tahunan_2024 || 0) + Number(tUser.s_tahunan_2025 || 0) + Number(tUser.s_tahunan_2026 || 0) + refundDurasiLama;
+                          if (totalTahunan < durasi) {
+                              if(window.showNotify) window.showNotify("Saldo Habis/Kurang", "Maaf, sisa kuota Cuti Tahunan Anda ("+totalTahunan+" Hari) tidak mencukupi untuk pengajuan durasi "+durasi+" Hari.", "error"); return;
+                          }
+                      } else {
+                          let field = "";
+                          if(payload.jenis === 'Sakit') field = 's_sakit'; else if(payload.jenis === 'Alasan Penting' || payload.jenis === 'Penting') field = 's_penting';
+                          else if(payload.jenis === 'Besar') field = 's_besar'; else if(payload.jenis === 'Melahirkan') field = 's_melahirkan';
+                          
+                          if (field !== "") {
+                              let sisa = Number(tUser[field] || 0) + refundDurasiLama;
+                              if (sisa < durasi) {
+                                  if(window.showNotify) window.showNotify("Saldo Habis/Kurang", "Maaf, sisa kuota Cuti " + payload.jenis + " ("+sisa+" Hari) tidak mencukupi untuk pengajuan "+durasi+" Hari.", "error"); return;
                               }
                           }
-                          if (typeof renderPermohonanView === 'function') renderPermohonanView();
                       }
-                    } else {
-                      showNotify("Pengajuan Gagal", res.message, "error");
-                    }
-                  })
-                  .withFailureHandler(function(err) {
-                    hideLoading();
-                    showNotify("Error Koneksi", err.toString(), "error");
-                  })
-                  .addCutiLog(payload);
+                  }
+
+                  if(window.showLoading) window.showLoading("Memverifikasi ketersediaan Pejabat...");
+                  const token = localStorage.getItem('transkep_session_token');
+
+                  google.script.run
+                      .withSuccessHandler((routeRes) => {
+                          if (routeRes && routeRes.status === 'success') {
+                              payload.atasan_nip = routeRes.data.atasan_nip; payload.pejabat_nip = routeRes.data.pejabat_nip;
+                              let routingMsg = routeRes.data.pesan;
+                              
+                              if(window.showLoading) window.showLoading(payload.id ? "Memperbarui data cuti..." : "Mengirimkan usulan cuti...");
+                              
+                              const runner = google.script.run
+                                .withSuccessHandler((res) => {
+                                  if(window.hideLoading) window.hideLoading();
+                                  this.closeModal();
+                                  if (res.status === 'success') {
+                                    if(routingMsg) window.showNotify("Berhasil Disimpan", res.message + "<br><br><span class='text-[10px] text-amber-400'>Info Pengalihan:</span><br><span class='text-[10px] leading-relaxed'>" + routingMsg + "</span>", "success");
+                                    else window.showNotify("Berhasil Disimpan", res.message, "success");
+                                    
+                                    if (res.data) {
+                                        if (payload.id) {
+                                            const existIdx = this.s.cutiLogs.findIndex(l => String(l.id) === String(payload.id));
+                                            if (existIdx > -1) {
+                                                this.s.cutiLogs[existIdx].jenis = payload.jenis; this.s.cutiLogs[existIdx].tgl_mulai = payload.tgl_mulai;
+                                                this.s.cutiLogs[existIdx].tgl_selesai = payload.tgl_selesai; this.s.cutiLogs[existIdx].alasan = payload.alasan;
+                                                this.s.cutiLogs[existIdx].alamat = payload.alamat; this.s.cutiLogs[existIdx].atasan_nip = payload.atasan_nip;
+                                                this.s.cutiLogs[existIdx].pejabat_nip = payload.pejabat_nip; this.s.cutiLogs[existIdx].plh_nip = payload.plh_nip;
+                                                if (res.data.fileUrl) this.s.cutiLogs[existIdx].bukti_url = res.data.fileUrl;
+                                            }
+                                        } else {
+                                            const logVirtual = {
+                                                id: res.data.id, tgl_pengajuan: res.data.tgl_pengajuan, nip: payload.nip,
+                                                jenis: payload.jenis, tgl_mulai: payload.tgl_mulai, tgl_selesai: payload.tgl_selesai,
+                                                alasan: payload.alasan, status: res.data.status, status_atasan: res.data.status,
+                                                atasan_nip: payload.atasan_nip, pejabat_nip: payload.pejabat_nip, sisa_cuti: res.data.durasi,
+                                                status_pejabat: res.data.status, alamat: payload.alamat, history: res.data.history, bukti_url: res.data.fileUrl,
+                                                plh_nip: payload.plh_nip
+                                            };
+                                            if (this.s && this.s.cutiLogs) this.s.cutiLogs.unshift(logVirtual);
+                                        }
+                                        if (typeof syncAllServerData === 'function') syncAllServerData();
+                                    }
+                                  } else { if(window.showNotify) window.showNotify("Gagal", res.message, "error"); }
+                                })
+                                .withFailureHandler((err) => { if(window.hideLoading) window.hideLoading(); if(window.showNotify) window.showNotify("Error Koneksi", err.toString(), "error"); });
+                              
+                              if (payload.id) runner.updateCutiLog(payload, this.s.user.nip, token);
+                              else runner.addCutiLog(payload, this.s.user.nip, token);
+                                
+                          } else {
+                              if(window.hideLoading) window.hideLoading();
+                              if(window.showNotify) window.showNotify("Error Routing", routeRes.message, "error");
+                          }
+                      })
+                      .withFailureHandler((err) => {
+                          if(window.hideLoading) window.hideLoading();
+                          if(window.showNotify) window.showNotify("Error Koneksi", "Gagal memindai ketersediaan pejabat: " + err.toString(), "error");
+                      })
+                      .getSmartRouting(payload.atasan_nip, payload.pejabat_nip, payload.tgl_mulai, payload.tgl_selesai, this.s.user.nip, token);
+              },
+              
+              // ===============================================
+              // FUNGSI MODAL PEMBATALAN CUTI
+              // ===============================================
+              openCancelModal(id) {
+                  this.cancelForm.id = id;
+                  this.cancelForm.alasan = '';
+                  const modal = document.getElementById('modalCancelCuti');
+                  if (modal) {
+                      if (modal.parentNode !== document.body) document.body.appendChild(modal);
+                      modal.classList.remove('hidden');
+                      setTimeout(() => { if(modal.firstElementChild) modal.firstElementChild.classList.remove('scale-95'); }, 10);
+                  }
+              },
+              closeCancelModal() {
+                  const modal = document.getElementById('modalCancelCuti');
+                  if (modal) {
+                      if(modal.firstElementChild) modal.firstElementChild.classList.add('scale-95');
+                      setTimeout(() => { modal.classList.add('hidden'); }, 200);
+                  }
+              },
+              submitCancelCuti() {
+                  const id = this.cancelForm.id;
+                  const alasanBatal = this.cancelForm.alasan;
                   
-            } else {
-                hideLoading();
-                showNotify("Error Routing", routeRes.message, "error");
-            }
-        })
-        .withFailureHandler(function(err) {
-            hideLoading();
-            showNotify("Error Koneksi", "Gagal memindai ketersediaan pejabat: " + err.toString(), "error");
-        })
-        .getSmartRouting(payload.atasan_nip, payload.pejabat_nip, payload.tgl_mulai, payload.tgl_selesai);
-  }
+                  if (!alasanBatal.trim()) { 
+                      if(window.showNotify) window.showNotify("Validasi", "Alasan pembatalan wajib diisi!", "error"); 
+                      return; 
+                  }
+
+                  const token = localStorage.getItem('transkep_session_token');
+                  if(window.showLoading) window.showLoading("Mengajukan pembatalan ke Pejabat...");
+                  
+                  google.script.run
+                    .withSuccessHandler((res) => {
+                        if(window.hideLoading) window.hideLoading();
+                        this.closeCancelModal();
+                        if (res.status === 'success') {
+                            if(window.showNotify) window.showNotify("Berhasil Diajukan", "Usulan pembatalan menunggu persetujuan Pejabat.", "success");
+                            if (this.s && this.s.cutiLogs) {
+                                const logIndex = this.s.cutiLogs.findIndex(l => String(l.id) === String(id));
+                                if (logIndex !== -1) {
+                                    this.s.cutiLogs[logIndex].status = 'Menunggu Pembatalan';
+                                    this.s.cutiLogs[logIndex].alasan += "\n\n[USULAN PEMBATALAN]: " + alasanBatal;
+                                }
+                            }
+                        } else { 
+                            if(window.showNotify) window.showNotify("Gagal", res.message, "error"); 
+                        }
+                    })
+                    .withFailureHandler((err) => { 
+                        if(window.hideLoading) window.hideLoading(); 
+                        if(window.showNotify) window.showNotify("Error", err.toString(), "error"); 
+                    })
+                    .requestCancelCuti(id, alasanBatal, this.s.user.nip, token);
+              }
+          }
+      }).mount('#vue-form-cuti-wrapper');
+
+      // ---------------------------------------------------------
+      // BRIDGING KE TOMBOL VANILLA HTML
+      // ---------------------------------------------------------
+      window.openFormCutiModal = function(isBypass = false) {
+          if (window.vmFormCuti) window.vmFormCuti.openModal(isBypass, null);
+      };
+      
+      window.closeFormCutiModal = function() {
+          if (window.vmFormCuti) window.vmFormCuti.closeModal();
+      };
+      
+      window.openCancelModal = function(id) {
+          if (window.vmFormCuti) window.vmFormCuti.openCancelModal(id);
+      };
+  });
 </script>

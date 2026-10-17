@@ -5,16 +5,14 @@
 
 function initDashboardDB() {
   try {
-    const ss = SpreadsheetApp.openById(PropertiesService.getScriptProperties().getProperty("TRANSKEP_DB_ID"));
+    const ss = getDB(); // ZETTBOT: Menggunakan konektor terpusat
     const sheet = ss.getSheetByName('user_data');
     if (!sheet) throw new Error("Sheet user_data tidak ditemukan.");
     
     const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
     
-    // ZETTBOT FIX: Cek apakah kolom Pensiun sudah dibuat di ujung database
     let colStatusPensiun = headers.indexOf('Status_Pensiun');
     if (colStatusPensiun === -1) {
-      // Jika belum ada, tambahkan kolom baru
       const newHeaders = [['Status_Pensiun', 'Tgl_Selesai_Pensiun']];
       const startCol = headers.length + 1; 
       sheet.getRange(1, startCol, 1, 2).setValues(newHeaders)
@@ -35,16 +33,23 @@ function initDashboardDB() {
   }
 }
 
-function updateTmtStatus(nip, type, newStatus) {
+// Ubah signature fungsi menjadi seperti ini:
+function updateTmtStatus(actorNip, targetNip, type, newStatus, clientToken) {
   try {
-    const ss = SpreadsheetApp.openById(PropertiesService.getScriptProperties().getProperty("TRANSKEP_DB_ID"));
+    // 1. Validasi keamanan menggunakan NIP admin (actorNip)
+    if (!cekOtorisasi(actorNip, clientToken)) {
+        return { status: 'error', message: 'Akses Ditolak: Sesi kedaluwarsa atau manipulasi terdeteksi.' };
+    }
+
+    const ss = getDB();
     const sheet = ss.getSheetByName('user_data');
     const data = sheet.getDataRange().getValues();
     const headers = data[0];
 
     let rowIndex = -1;
+    // 2. Cari baris database menggunakan NIP pegawai target (targetNip)
     for(let i=1; i<data.length; i++) {
-      if(String(data[i][0]) === String(nip)) { rowIndex = i+1; break; }
+      if(String(data[i][0]) === String(targetNip)) { rowIndex = i+1; break; }
     }
     if(rowIndex === -1) throw new Error("Pegawai tidak ditemukan di database.");
 
@@ -55,7 +60,7 @@ function updateTmtStatus(nip, type, newStatus) {
     } else if(type === 'Pangkat' || type === 'KNP') {
       colStatus = headers.indexOf('Status_KNP') + 1;
       colTgl = headers.indexOf('Tgl_Selesai_KNP') + 1;
-    } else if(type === 'Pensiun') { // ZETTBOT FIX: Dukungan Status Pensiun
+    } else if(type === 'Pensiun') { 
       colStatus = headers.indexOf('Status_Pensiun') + 1;
       colTgl = headers.indexOf('Tgl_Selesai_Pensiun') + 1;
     } else {
@@ -78,9 +83,13 @@ function updateTmtStatus(nip, type, newStatus) {
   }
 }
 
-function forwardTmtDateByFrontend(nip, type, newDateStr) {
+function forwardTmtDateByFrontend(actorNip, targetNip, type, newDateStr, clientToken) {
   try {
-    const ss = SpreadsheetApp.openById(PropertiesService.getScriptProperties().getProperty("TRANSKEP_DB_ID"));
+    if (!cekOtorisasi(actorNip, clientToken)) {
+        return { status: 'error', message: 'Akses Ditolak: Sesi kedaluwarsa atau manipulasi terdeteksi.' };
+    }
+
+    const ss = getDB(); // ZETTBOT: Menggunakan konektor terpusat
     const sheet = ss.getSheetByName('user_data');
     const data = sheet.getDataRange().getValues();
     const headers = data[0];

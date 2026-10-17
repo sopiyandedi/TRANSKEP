@@ -1,0 +1,59 @@
+<!-- =========================================================
+     ZETTBOT MOBILE UI: TOP APP BAR & BOTTOM NAVIGATION
+     Hanya muncul di layar Mobile/Tablet (di bawah breakpoint 'lg')
+     ========================================================= -->
+
+<!-- 1. TOP APP BAR (Sticky Header HP - VUE MIGRATED) -->
+<div id="mobile-top-bar" class="hidden lg:hidden fixed top-0 left-0 right-0 h-16 z-[80] glass border-b border-slate-800/60 bg-slate-900/90 backdrop-blur-xl flex items-center justify-between px-4 shadow-sm transition-all duration-300" v-cloak>
+    
+    <!-- Profil Singkat & Info (Diurus oleh Vue) -->
+    <div class="flex items-center gap-3 overflow-hidden cursor-pointer" onclick="switchMenu('dashboard')">
+        <div id="mobile-avatar" class="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-black shadow-md border border-indigo-400/30 bg-gradient-to-br from-indigo-500 to-purple-600 shrink-0">
+            {{ userInitials }}
+        </div>
+        <div class="flex flex-col min-w-0">
+            <h2 id="mobile-user-name" class="text-sm font-bold text-slate-200 truncate leading-tight">{{ cleanName }}</h2>
+            <p id="mobile-user-role" class="text-[9px] text-indigo-400 font-medium truncate uppercase tracking-wider">{{ currentUser ? currentUser.jabatan : 'Tunggu sebentar...' }}</p>
+        </div>
+    </div>
+
+    <!-- Tombol Aksi Kanan (PASTIKAN HANYA ADA 3 TOMBOL INI) -->
+    <div class="flex items-center gap-1.5 shrink-0">
+        <button onclick="toggleThemeMode()" class="w-9 h-9 rounded-xl text-slate-400 hover:text-amber-400 hover:bg-slate-800/80 flex items-center justify-center transition-colors" title="Mode Terang/Gelap"><i class="fa-solid fa-moon"></i></button>
+        <button onclick="openChangePasswordModal()" class="w-9 h-9 rounded-xl text-slate-400 hover:text-purple-400 hover:bg-purple-500/10 flex items-center justify-center transition-colors border border-transparent hover:border-purple-500/30" title="Ganti Kata Sandi"><i class="fa-solid fa-key"></i></button>
+        <button onclick="handleLogout()" class="w-9 h-9 rounded-xl text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 flex items-center justify-center transition-colors border border-transparent hover:border-rose-500/30" title="Keluar Sistem"><i class="fa-solid fa-power-off"></i></button>
+    </div>
+</div>
+
+<!-- 2. BOTTOM NAVIGATION BAR (Navigasi Jempol) -->
+<div id="mobile-bottom-nav" style="bottom: 0 !important; top: auto !important; position: fixed !important;" class="lg:hidden fixed bottom-0 left-0 right-0 h-[68px] z-[9999] glass border-t border-slate-800/60 bg-slate-900/95 backdrop-blur-xl flex items-center justify-around px-2 shadow-[0_-4px_20px_rgba(0,0,0,0.5)]">
+    
+    <!-- Tombol 1: Dashboard -->
+    <button onclick="switchMobileMenu('dashboard')" id="mob-nav-dashboard" class="mobile-nav-btn relative flex flex-col items-center justify-center w-16 h-full text-indigo-400 group">
+        <div class="absolute -top-1 w-8 h-1 bg-indigo-500 rounded-b-md transition-all duration-300 opacity-100 scale-x-100"></div>
+        <i class="fa-solid fa-house text-lg mb-1 transition-transform group-active:scale-90"></i>
+        <span class="text-[9px] font-bold tracking-wide">Home</span>
+    </button>
+
+    <!-- Tombol 2: Cuti & Izin -->
+    <button onclick="switchMobileMenu('permohonan')" id="mob-nav-permohonan" class="mobile-nav-btn relative flex flex-col items-center justify-center w-16 h-full text-slate-500 hover:text-slate-300 group transition-colors">
+        <div class="absolute -top-1 w-8 h-1 bg-indigo-500 rounded-b-md transition-all duration-300 opacity-0 scale-x-0"></div>
+        <i class="fa-solid fa-file-signature text-lg mb-1 transition-transform group-active:scale-90"></i>
+        <span class="text-[9px] font-bold tracking-wide">Cuti</span>
+    </button>
+
+    <!-- Tombol 3: PKP / Kinerja -->
+    <button onclick="switchMobileMenu('pkp')" id="mob-nav-pkp" class="mobile-nav-btn relative flex flex-col items-center justify-center w-16 h-full text-slate-500 hover:text-slate-300 group transition-colors">
+        <div class="absolute -top-1 w-8 h-1 bg-indigo-500 rounded-b-md transition-all duration-300 opacity-0 scale-x-0"></div>
+        <i class="fa-solid fa-file-invoice text-lg mb-1 transition-transform group-active:scale-90"></i>
+        <span class="text-[9px] font-bold tracking-wide">Kinerja</span>
+        <!-- Badge Notifikasi PKP Mobile -->
+        <span id="badge-pkp-mob" class="absolute top-1 right-2 w-3 h-3 bg-rose-500 border border-slate-900 rounded-full hidden"></span>
+    </button>
+
+    <!-- Tombol 4: Menu Lainnya (Membuka Sidebar Utama) -->
+    <button onclick="openMobileSidebar()" id="mob-nav-lainnya" class="relative flex flex-col items-center justify-center w-16 h-full text-slate-500 hover:text-slate-300 group transition-colors">
+        <i class="fa-solid fa-bars text-lg mb-1 transition-transform group-active:scale-90"></i>
+        <span class="text-[9px] font-bold tracking-wide">Menu</span>
+    </button>
+</div>

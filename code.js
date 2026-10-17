@@ -2,7 +2,13 @@
 // FILE: code.gs (Core Controller & API)
 // ==========================================
 
-function doGet() {
+function doGet(e) {
+  // 1. ZETTBOT ADAPTOR: Cek apakah pemanggil adalah API (GitHub Pages / Domain Luar)
+  if (e && e.parameter && (e.parameter.api === 'true' || e.parameter.format === 'json')) {
+    return handleApiGet_(e);
+  }
+
+  // 2. Default: Tetap render Web App Google Apps Script (Google Sites Legacy 100% Utuh)
   return HtmlService.createTemplateFromFile('index')
     .evaluate()
     .setTitle('TRANSKEP v2.1')
@@ -15,63 +21,158 @@ function include(filename) {
 }
 
 // ------------------------------------------
+// FUNGSI PEMBANTU KONEKSI & KEAMANAN (ZETTBOT)
+// ------------------------------------------
+
+// 1. Sentralisasi Koneksi Database (DRY)
+function getDB() {
+  let ss;
+  try { ss = SpreadsheetApp.getActiveSpreadsheet(); } catch(e) {}
+  if(!ss) ss = SpreadsheetApp.openById(PropertiesService.getScriptProperties().getProperty("TRANSKEP_DB_ID"));
+  return ss;
+}
+
+// 2. Sentralisasi Validasi Token Sesi (DRY)
+function cekOtorisasi(nip, clientToken) {
+  if (!clientToken) return false;
+  const cache = CacheService.getScriptCache();
+  const serverNipOwner = cache.get(clientToken);
+  // Cek apakah token ada dan NIP peminta cocok dengan pemilik token
+  if (!serverNipOwner || serverNipOwner !== String(nip)) return false;
+  return true;
+}
+
+// 3. Sentralisasi Validasi Role Admin (DRY & RBAC)
+function cekOtorisasiAdmin(nip, clientToken) {
+  if (!cekOtorisasi(nip, clientToken)) return false;
+  const cache = CacheService.getScriptCache();
+  const cachedRole = cache.get(clientToken + "_role");
+  if (cachedRole && cachedRole.toLowerCase() === 'admin') return true;
+  
+  // Fallback verifikasi database jika cache role ter-evict
+  const ss = getDB();
+  const sheet = ss.getSheetByName('user_data');
+  if (!sheet) return false;
+  const data = sheet.getDataRange().getDisplayValues();
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][0]) === String(nip)) {
+      const isAdm = String(data[i][3]).toLowerCase() === 'admin';
+      if (isAdm) cache.put(clientToken + "_role", 'Admin', 28800);
+      return isAdm;
+    }
+  }
+  return false;
+}
+
+// 4. Sentralisasi Sanitasi Anti Formula / CSV Injection (CWE-1236)
+function sanitizeFormulaInput(val) {
+  if (typeof val === 'string') {
+    const trimmed = val.trim();
+    if (trimmed.startsWith('=') || trimmed.startsWith('+') || trimmed.startsWith('@') || (trimmed.startsWith('-') && !/^-?\d+(\.\d+)?$/.test(trimmed))) {
+      return "'" + val;
+    }
+  }
+  return val;
+}
+
+function sanitizeRowArray(row) {
+  if (!Array.isArray(row)) return row;
+  return row.map(cell => sanitizeFormulaInput(cell));
+}
+
+// 5. Sentralisasi Hashing Kriptografis Salted SHA-256 (Anti-Rainbow Table & Plaintext Leak)
+function hashPassword_(plainPassword, salt) {
+  if (!salt) salt = Utilities.getUuid().substring(0, 8);
+  const rawBytes = Utilities.computeDigest(
+    Utilities.DigestAlgorithm.SHA_256,
+    salt + ":" + plainPassword,
+    Utilities.Charset.UTF_8
+  );
+  let hashHex = '';
+  for (let i = 0; i < rawBytes.length; i++) {
+    let byteVal = rawBytes[i];
+    if (byteVal < 0) byteVal += 256;
+    let byteHex = byteVal.toString(16);
+    if (byteHex.length === 1) byteHex = '0' + byteHex;
+    hashHex += byteHex;
+  }
+  return "SHA256$" + salt + "$" + hashHex;
+}
+
+function verifyPasswordHash_(storedValue, inputPassword) {
+  if (!storedValue || !inputPassword) return false;
+  const storedStr = String(storedValue);
+  // Format hash Salted SHA-256
+  if (storedStr.startsWith("SHA256$")) {
+    const parts = storedStr.split("$");
+    if (parts.length === 3) {
+      const salt = parts[1];
+      const expectedHash = hashPassword_(inputPassword, salt);
+      return storedStr === expectedHash;
+    }
+  }
+  // Mode transisi legacy plaintext
+  return storedStr === String(inputPassword);
+}
+
+// 6. Revokasi Sesi Server-Side (CWE-613)
+function logoutSession(nip, clientToken) {
+  try {
+    if (clientToken) {
+      const cache = CacheService.getScriptCache();
+      cache.remove(clientToken);
+      cache.remove(clientToken + "_role");
+    }
+    return { status: 'success' };
+  } catch (e) {
+    return { status: 'error', message: e.toString() };
+  }
+}
+
+// ------------------------------------------
 // 1. AUTENTIKASI & TARIK DATA (CORE)
 // ------------------------------------------
 function verifyLogin(nip, pass) {
   try {
-    // ZETTBOT FIX: Direct Connection untuk mempercepat akses baca database
-    let ss;
-    try { ss = SpreadsheetApp.getActiveSpreadsheet(); } catch(e) {}
-    if(!ss) ss = SpreadsheetApp.openById(PropertiesService.getScriptProperties().getProperty("TRANSKEP_DB_ID"));
+    // Memanggil koneksi database terpusat
+    const ss = getDB();
     
     const sheet = ss.getSheetByName('user_data');
     const data = sheet.getDataRange().getDisplayValues();
     for (let i = 1; i < data.length; i++) {
-      if (String(data[i][0]) === String(nip) && String(data[i][5]) === String(pass)) {
-        const user = {
-          nip: data[i][0], nama: data[i][1], jabatan: data[i][2], role: data[i][3],
-          no_hp: data[i][4], s_tahunan_2024: data[i][6], s_tahunan_2025: data[i][7],
-          s_tahunan_2026: data[i][8], s_sakit: data[i][9], s_penting: data[i][10],
-          s_besar: data[i][11], s_melahirkan: data[i][12], s_cltn: data[i][13],
-          pangkat: data[i][14], alamat: data[i][15]
-        };
+      if (String(data[i][0]) === String(nip)) {
+        const storedPass = String(data[i][5]);
+        if (verifyPasswordHash_(storedPass, pass)) {
+          const user = {
+            nip: data[i][0], nama: data[i][1], jabatan: data[i][2], role: data[i][3],
+            no_hp: data[i][4], s_tahunan_2024: data[i][6], s_tahunan_2025: data[i][7],
+            s_tahunan_2026: data[i][8], s_sakit: data[i][9], s_penting: data[i][10],
+            s_besar: data[i][11], s_melahirkan: data[i][12], s_cltn: data[i][13],
+            pangkat: data[i][14], alamat: data[i][15]
+          };
 
-        // ZETTBOT SECURITY PATCH: GENERATE SESSION TOKEN
-        const sessionToken = Utilities.getUuid(); // Buat UUID unik
-        const cache = CacheService.getScriptCache();
-        // Simpan token di server Google selama 8 Jam (28800 detik). Value-nya adalah NIP pemilik.
-        cache.put(sessionToken, String(nip), 28800); 
+          const sessionToken = Utilities.getUuid();
+          const cache = CacheService.getScriptCache();
+          cache.put(sessionToken, String(nip), 28800); 
+          cache.put(sessionToken + "_role", String(user.role), 28800);
 
-        // Kembalikan token ke client
-        return { status: 'success', data: user, token: sessionToken };
+          return { status: 'success', data: user, token: sessionToken };
+        }
       }
     }
     return { status: 'error', message: 'NIP atau Sandi tidak valid' };
   } catch (e) { return { status: 'error', message: e.toString() }; }
 }
 
-// ZETTBOT SECURITY PATCH: Fungsi getBulkData SEKARANG WAJIB MEMBAWA TOKEN
-// ZETTBOT PERFORMANCE PATCH: Hanya menarik data Super Ringan di awal
 function getBulkData(nip, clientToken) {
   try {
-    // === VALIDASI KEAMANAN (ANTI BYPASS CONSOLE) ===
-    if (!clientToken) {
-        return { status: 'error', message: 'Akses Ditolak: Sesi tidak valid (Token Kosong).' };
-    }
-    
-    const cache = CacheService.getScriptCache();
-    const serverNipOwner = cache.get(clientToken);
-    
-    // Cek apakah token ada di memori, dan apakah NIP peminta sama dengan NIP pemilik token
-    if (!serverNipOwner || serverNipOwner !== String(nip)) {
+    // === VALIDASI KEAMANAN TERPUSAT ===
+    if (!cekOtorisasi(nip, clientToken)) {
         return { status: 'error', message: 'Akses Ditolak: Sesi kedaluwarsa atau manipulasi terdeteksi. Silakan login ulang.' };
     }
-    // ===============================================
     
-    // ZETTBOT FIX: Mempercepat sinkronisasi saat Login pertama kali
-    let ss;
-    try { ss = SpreadsheetApp.getActiveSpreadsheet(); } catch(e) {}
-    if(!ss) ss = SpreadsheetApp.openById(PropertiesService.getScriptProperties().getProperty("TRANSKEP_DB_ID"));
+    // Memanggil koneksi database terpusat
+    const ss = getDB();
 
     const data = { user: null, usersList: [], pendingPkpCount: 0 };
     
@@ -92,10 +193,24 @@ function getBulkData(nip, clientToken) {
     const sheetUser = ss.getSheetByName('user_data');
     if(sheetUser) {
        const uData = sheetUser.getDataRange().getDisplayValues();
+
+       // ZETTBOT HOTFIX KREDENSIAL: Cek apakah user yang login berhak melihat sandi (Admin saja)
+       let isRequesterAdmin = false;
+       for (let i = 1; i < uData.length; i++) {
+          if (String(uData[i][0]) === String(nip) && String(uData[i][3]).toLowerCase() === 'admin') {
+             isRequesterAdmin = true;
+             break;
+          }
+       }
+
        for(let i=1; i<uData.length; i++) {
+          const isCurrentUser = (String(uData[i][0]) === String(nip));
+          // Password HANYA disertakan jika peminta adalah Admin, atau untuk akun user itu sendiri
+          const userPassword = (isRequesterAdmin || isCurrentUser) ? uData[i][5] : '';
+
           const u = {
             nip: uData[i][0], nama: uData[i][1], jabatan: uData[i][2], role: uData[i][3],
-            no_hp: uData[i][4], pass: uData[i][5],
+            no_hp: uData[i][4], pass: userPassword,
             s_tahunan_2024: uData[i][6], s_tahunan_2025: uData[i][7], s_tahunan_2026: uData[i][8],
             s_sakit: uData[i][9], s_penting: uData[i][10], s_besar: uData[i][11], s_melahirkan: uData[i][12], s_cltn: uData[i][13],
             pangkat: uData[i][14], alamat: uData[i][15], 
@@ -104,14 +219,13 @@ function getBulkData(nip, clientToken) {
             bup: uData[i][18], status_kgb: uData[i][19] || '', tgl_selesai_kgb: uData[i][20] || '',
             status_knp: uData[i][21] || '', tgl_selesai_knp: uData[i][22] || '',
             status_pensiun: uData[i][23] || '', tgl_selesai_pensiun: uData[i][24] || '',
-            jenis_jabatan: uData[i][25] || 'Fungsional Umum' // Menarik Data Jenis Jabatan dari indeks ke-25
+            jenis_jabatan: uData[i][25] || 'Fungsional Umum'
         };
           data.usersList.push(u);
-          if (String(uData[i][0]) === String(nip)) data.user = u;
+          if (isCurrentUser) data.user = u;
        }
     }
 
-    // ZETTBOT FIX: Quick count data PKP khusus untuk Badge Sidebar
     data.pendingPkpCount = 0;
     const sheetPkpDoc = ss.getSheetByName('pkp_dokumen');
     const sheetPckDoc = ss.getSheetByName('pck_dokumen');
@@ -119,16 +233,15 @@ function getBulkData(nip, clientToken) {
     
     if (sheetPkpDoc) {
         const pkpData = sheetPkpDoc.getDataRange().getDisplayValues();
-        const bawahanMap = {}; // Untuk memetakan atasan di PCK
+        const bawahanMap = {}; 
         
         for(let i=1; i<pkpData.length; i++) {
-            bawahanMap[pkpData[i][1] + "-" + pkpData[i][3]] = pkpData[i][2]; // nip-tahun = penilai
+            bawahanMap[pkpData[i][1] + "-" + pkpData[i][3]] = pkpData[i][2]; 
             
             let dbPenilai = String(pkpData[i][2]).replace(/'/g, "").trim();
             let dbAtasan = String(pkpData[i][7] || "").replace(/'/g, "").trim();
             let status = pkpData[i][4];
             
-            // Hitung PK yang butuh validasi saya
             if ((dbPenilai === String(nip) && status === "Menunggu Penilai") || 
                 (dbAtasan === String(nip) && status === "Menunggu Atasan Penilai")) {
                 pendingCount++;
@@ -143,7 +256,6 @@ function getBulkData(nip, clientToken) {
                 let status = pckData[j][6];
                 let penilai = String(bawahanMap[nipPemilik + "-" + tahun] || "").replace(/'/g, "").trim();
                 
-                // Hitung PCK yang butuh validasi saya (Hanya Atasan Langsung)
                 if (penilai === String(nip) && status === "Menunggu Penilai") {
                     pendingCount++;
                 }
@@ -156,24 +268,18 @@ function getBulkData(nip, clientToken) {
   } catch (e) { return { status: 'error', message: e.toString() }; }
 }
 
-// ==========================================
-// ZETTBOT: FUNGSI BACKGROUND SYNC (LAZY LOADING)
-// Menarik data berat ke memori lokal tanpa mengganggu UX
-// ==========================================
 function getBackgroundData(nip, clientToken) {
   try {
-    // === VALIDASI KEAMANAN ===
-    if (!clientToken) return { status: 'error', message: 'Sesi tidak valid.' };
-    const cache = CacheService.getScriptCache();
-    if (cache.get(clientToken) !== String(nip)) return { status: 'error', message: 'Sesi kedaluwarsa.' };
+    // === VALIDASI KEAMANAN TERPUSAT ===
+    if (!cekOtorisasi(nip, clientToken)) {
+        return { status: 'error', message: 'Sesi kedaluwarsa atau tidak valid.' };
+    }
     
-    let ss;
-    try { ss = SpreadsheetApp.getActiveSpreadsheet(); } catch(e) {}
-    if(!ss) ss = SpreadsheetApp.openById(PropertiesService.getScriptProperties().getProperty("TRANSKEP_DB_ID"));
+    // Memanggil koneksi database terpusat
+    const ss = getDB();
 
     const data = { cutiLogs: [], jobdesList: [], skList: [], skAckList: [], masterKinerjaList: [], ikLogs: [], ipLogs: [], wfhLogs: [], kinerjaList: [], stList: [], sopList: [], sopAckList: [] };
 
-    // 1. Sedot Master Kinerja
     const sheetMasterKinerja = ss.getSheetByName('master_kinerja');
     if(sheetMasterKinerja) {
        const mkData = sheetMasterKinerja.getDataRange().getDisplayValues();
@@ -184,7 +290,6 @@ function getBackgroundData(nip, clientToken) {
        }
     }
 
-    // 2. Sedot Cuti Log
     const sheetCuti = ss.getSheetByName('cuti_log');
     if(sheetCuti) {
        const cData = sheetCuti.getDataRange().getDisplayValues();
@@ -193,7 +298,6 @@ function getBackgroundData(nip, clientToken) {
        }
     }
     
-    // 3. Sedot Jobdes
     const sheetJobdes = ss.getSheetByName('jobdes_data');
     if(sheetJobdes) {
        const jData = sheetJobdes.getDataRange().getDisplayValues();
@@ -202,7 +306,6 @@ function getBackgroundData(nip, clientToken) {
        }
     }
 
-    // 4. Sedot Kinerja
     const sheetKinerja = ss.getSheetByName('ekinerja_data');
     if(sheetKinerja) {
        const kData = sheetKinerja.getDataRange().getDisplayValues();
@@ -211,7 +314,6 @@ function getBackgroundData(nip, clientToken) {
        }
     }
 
-    // 5. Sedot ST
     const sheetST = ss.getSheetByName('st_log');
     if(sheetST) {
        const stData = sheetST.getDataRange().getDisplayValues();
@@ -220,7 +322,6 @@ function getBackgroundData(nip, clientToken) {
        }
     }
 
-    // 6. Sedot Izin Keluar
     const sheetIK = ss.getSheetByName('izin_keluar_log');
     if(sheetIK) {
        const ikData = sheetIK.getDataRange().getDisplayValues();
@@ -229,7 +330,6 @@ function getBackgroundData(nip, clientToken) {
        }
     }
 
-    // 7. Sedot Izin Pribadi
     const sheetIP = ss.getSheetByName('izin_pribadi_log');
     if(sheetIP) {
        const ipData = sheetIP.getDataRange().getDisplayValues();
@@ -238,7 +338,6 @@ function getBackgroundData(nip, clientToken) {
        }
     }
 
-    // 8. Sedot WFH
     const sheetWFH = ss.getSheetByName('wfh_log');
     if(sheetWFH) {
        const wfhData = sheetWFH.getDataRange().getDisplayValues();
@@ -247,11 +346,9 @@ function getBackgroundData(nip, clientToken) {
        }
     }
 
-    // 9. Sedot SK
     data.skList = typeof fetchSkData === 'function' ? fetchSkData(ss) : [];
     data.skAckList = typeof fetchSkAckData === 'function' ? fetchSkAckData(ss) : [];
 
-    // 10. Sedot SOP
     const sheetSop = ss.getSheetByName('sop_data');
     if(sheetSop) {
        const sopData = sheetSop.getDataRange().getDisplayValues();
@@ -277,7 +374,7 @@ function getBackgroundData(nip, clientToken) {
 // BACKEND FITUR LUPA PASSWORD
 // ==========================================
 function initResetPasswordSheet() {
-  const ss = SpreadsheetApp.openById(PropertiesService.getScriptProperties().getProperty("TRANSKEP_DB_ID"));
+  const ss = getDB(); // Menggunakan koneksi database terpusat
   let sheet = ss.getSheetByName('log_reset_pass');
   if (!sheet) {
     sheet = ss.insertSheet('log_reset_pass');
@@ -295,7 +392,7 @@ function requestPasswordReset(no_wa) {
       phone = '62' + phone.substring(1);
     }
 
-    const ss = SpreadsheetApp.openById(PropertiesService.getScriptProperties().getProperty("TRANSKEP_DB_ID"));
+    const ss = getDB(); // Menggunakan koneksi database terpusat
     const userSheet = ss.getSheetByName('user_data');
     if(!userSheet) throw new Error("Database user tidak ditemukan");
     
@@ -318,13 +415,17 @@ function requestPasswordReset(no_wa) {
 
     if (!userFound) return { status: 'error', message: 'Nomor WhatsApp ini tidak terdaftar di dalam sistem pegawai. Silakan periksa kembali atau hubungi Admin.' };
 
-    const logSheet = ss.getSheetByName('log_reset_pass');
-    if(!logSheet) throw new Error("Database antrean belum siap. Minta Super Admin menjalankan initResetPasswordSheet() terlebih dahulu.");
+    let logSheet = ss.getSheetByName('log_reset_pass');
+    if (!logSheet) {
+      initResetPasswordSheet();
+      logSheet = ss.getSheetByName('log_reset_pass');
+    }
     
     const uniqueId = 'REQ-' + new Date().getTime();
     const timestamp = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'dd/MM/yyyy HH:mm:ss');
 
-    logSheet.appendRow([uniqueId, timestamp, userFound.nip, userFound.nama, userFound.no_wa, userFound.pass]);
+    // ZETTBOT HOTFIX KREDENSIAL: Jangan simpan password plaintext ke sheet log_reset_pass
+    logSheet.appendRow([uniqueId, timestamp, userFound.nip, userFound.nama, userFound.no_wa, '-']);
     SpreadsheetApp.flush();
 
     return { status: 'success', message: 'Permintaan berhasil dikirim. Admin akan segera memverifikasi dan mengirimkan kata sandi ke WA Anda.' };
@@ -333,19 +434,38 @@ function requestPasswordReset(no_wa) {
   }
 }
 
-function getResetPasswordQueue() {
+function getResetPasswordQueue(adminNip, clientToken) {
   try {
-    const ss = SpreadsheetApp.openById(PropertiesService.getScriptProperties().getProperty("TRANSKEP_DB_ID"));
+    // ZETTBOT HOTFIX KREDENSIAL: Proteksi RBAC wajib Admin
+    if (!cekOtorisasiAdmin(adminNip, clientToken)) {
+      throw new Error("Akses Ditolak: Anda tidak memiliki izin Admin untuk mengakses antrean ini.");
+    }
+    const ss = getDB(); // Menggunakan koneksi database terpusat
     const sheet = ss.getSheetByName('log_reset_pass');
     if (!sheet) return [];
     
+    // Tarik mapping password terkini dari user_data untuk diberikan ke Admin via WA secara aman
+    const userSheet = ss.getSheetByName('user_data');
+    const userMap = {};
+    if (userSheet) {
+      const uData = userSheet.getDataRange().getDisplayValues();
+      for (let u = 1; u < uData.length; u++) {
+        userMap[String(uData[u][0])] = uData[u][5];
+      }
+    }
+
     const data = sheet.getDataRange().getDisplayValues();
     const queue = [];
     for(let i = 1; i < data.length; i++) {
       if(data[i][0] && String(data[i][0]).trim() !== '') { 
+        const uNip = String(data[i][2]);
+        let currentPass = userMap[uNip] || data[i][5] || '-';
+        if (currentPass && String(currentPass).startsWith("SHA256$")) {
+          currentPass = "[Telah Dienkripsi - Reset di Edit Pegawai]";
+        }
         queue.push({
-          id: data[i][0], waktu: data[i][1], nip: data[i][2],
-          nama: data[i][3], no_wa: data[i][4], pass: data[i][5]
+          id: data[i][0], waktu: data[i][1], nip: uNip,
+          nama: data[i][3], no_wa: data[i][4], pass: currentPass
         });
       }
     }
@@ -353,10 +473,15 @@ function getResetPasswordQueue() {
   } catch (err) { throw new Error(err.toString()); }
 }
 
-function markResetAsDone(reqId) {
+function markResetAsDone(reqId, adminNip, clientToken) {
   try {
-    const ss = SpreadsheetApp.openById(PropertiesService.getScriptProperties().getProperty("TRANSKEP_DB_ID"));
+    // ZETTBOT HOTFIX KREDENSIAL: Proteksi RBAC wajib Admin
+    if (!cekOtorisasiAdmin(adminNip, clientToken)) {
+      return { status: 'error', message: 'Akses Ditolak: Hanya Admin yang dapat memproses antrean ini.' };
+    }
+    const ss = getDB(); // Menggunakan koneksi database terpusat
     const sheet = ss.getSheetByName('log_reset_pass');
+    if (!sheet) throw new Error("Sheet antrean tidak ditemukan.");
     const data = sheet.getDataRange().getValues();
     
     let rowIndex = -1;
@@ -376,4 +501,122 @@ function markResetAsDone(reqId) {
   } catch(e) {
     return { status: 'error', message: e.toString() };
   }
+}
+
+
+// ==========================================
+// ZETTBOT FASE 2: FUNGSI GANTI KATA SANDI (AMAN)
+// ==========================================
+function changeMyPassword(nip, oldPass, newPass, clientToken) {
+  try {
+    // 1. Validasi Token Sesi (Mencegah Bypass)
+    if (!cekOtorisasi(nip, clientToken)) {
+        return { status: 'error', message: 'Akses Ditolak: Sesi tidak valid atau kedaluwarsa. Silakan login ulang.' };
+    }
+
+    // 2. Gunakan koneksi database terpusat
+    const ss = getDB();
+    const sheet = ss.getSheetByName('user_data');
+    const data = sheet.getDataRange().getDisplayValues();
+
+    // 3. Cari pegawai dan verifikasi sandi lama
+    for (let i = 1; i < data.length; i++) {
+      if (String(data[i][0]) === String(nip)) {
+        if (!verifyPasswordHash_(data[i][5], oldPass)) {
+          return { status: 'error', message: 'Kata sandi lama yang Anda masukkan salah.' };
+        }
+        
+        // 4. Timpa dengan sandi baru berformat Salted SHA-256
+        const hashedNewPass = hashPassword_(newPass);
+        sheet.getRange(i + 1, 6).setValue(hashedNewPass);
+        return { status: 'success' };
+      }
+    }
+    return { status: 'error', message: 'Data pengguna tidak ditemukan di sistem.' };
+  } catch (e) {
+    return { status: 'error', message: e.toString() };
+  }
+}
+
+// ==========================================
+// UNIVERSAL POST ENDPOINT (n8n / WA & HEADLESS API)
+// ==========================================
+function doPost(e) {
+  try {
+    if (!e || !e.postData || !e.postData.contents) {
+      return jsonResponse_({ status: 'error', message: "Tidak ada data JSON yang diterima." });
+    }
+    
+    var payload = JSON.parse(e.postData.contents);
+    
+    // JALUR 1: Jika request memuat atribut 'action' -> Alihkan ke Router API Frontend Baru
+    if (payload && payload.action) {
+      return handleApiPost_(payload, e);
+    }
+    
+    // JALUR 2: Webhook Legacy n8n / Bot WA Surat Tugas (TETAP 100% AMAN & UTUH)
+    return handleWebhookST_(payload);
+
+  } catch (error) {
+    return jsonResponse_({
+      status: "error",
+      message: error.toString()
+    });
+  }
+}
+
+/**
+ * Handler Webhook n8n / WA Surat Tugas (Preservasi Penuh)
+ */
+function handleWebhookST_(payload) {
+  // 1. Validasi Keamanan (Secret Key dari ScriptProperties)
+  const scriptProps = PropertiesService.getScriptProperties();
+  let configuredKey = scriptProps.getProperty("TRANSKEP_WEBHOOK_KEY");
+  if (!configuredKey) {
+    configuredKey = "TRANSKEP_WA_BOT_2026";
+    scriptProps.setProperty("TRANSKEP_WEBHOOK_KEY", configuredKey);
+  }
+  
+  if (!payload.secret_key || payload.secret_key !== configuredKey) {
+    throw new Error("Akses ditolak: Secret Key tidak valid.");
+  }
+
+  // 2. Masukkan ke database st_log
+  const ss = getDB();
+  const sheetST = ss.getSheetByName('st_log');
+  if (!sheetST) throw new Error("Sheet st_log tidak ditemukan.");
+
+  // Generate ID & Waktu
+  const idST = "ST-WA-" + new Date().getTime() + Math.floor(Math.random() * 1000);
+  const waktuDibuat = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'dd/MM/yyyy HH:mm:ss');
+  
+  // Format JSON peserta dan data ekstra dari payload n8n
+  var pesertaJson = JSON.stringify(payload.peserta || []);
+  var dataEkstraJson = JSON.stringify(payload.data_ekstra || {});
+
+  // Pastikan urutan kolom sesuai dengan setup sheet st_log (disanitasi dari formula injection)
+  sheetST.appendRow(sanitizeRowArray([
+    idST, 
+    waktuDibuat, 
+    payload.nomor_surat || '', 
+    payload.menimbang || 'Bahwa untuk kepentingan dinas...', 
+    payload.dasar || 'Berdasarkan surat undangan...',
+    payload.tujuan || '', 
+    payload.tempat || '', 
+    payload.tgl_mulai || '', 
+    payload.tgl_selesai || '', 
+    payload.jam || '', 
+    pesertaJson, 
+    payload.pejabat_ttd || '', // NIP Pimpinan (Ketua/Wakil)
+    'DISETUJUI', 
+    dataEkstraJson 
+  ]));
+  
+  SpreadsheetApp.flush();
+
+  return jsonResponse_({
+    status: "success",
+    message: "Surat Tugas " + idST + " berhasil diterbitkan via WhatsApp.",
+    id_st: idST
+  });
 }

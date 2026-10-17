@@ -1,0 +1,9 @@
+# ==========================================
+# .claspignore (ZettBOT Safety Isolation)
+# ==========================================
+# Mencegah berkas repositori frontend baru atau dokumentasi
+# ikut terunggah ke Google Apps Script saat 'clasp push'
+
+transkep-web/**
+.git/**
+*.md

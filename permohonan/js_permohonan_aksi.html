@@ -4,6 +4,7 @@
   // =========================================================================
 
   function deleteCutiRecord(id) {
+    const token = localStorage.getItem('transkep_session_token'); 
     showCustomConfirm("Tarik Pengajuan", "Batalkan dan tarik pengajuan ini? Saldo cuti Anda akan dikembalikan utuh.", function() {
       showLoading("Menarik data...");
       google.script.run
@@ -37,18 +38,20 @@
                         const uIdx = state.usersList.findIndex(function(u) { return String(u.nip) === String(state.user.nip); });
                         if (uIdx !== -1) state.usersList[uIdx] = Object.assign({}, state.user);
                     }
+                    
+                    // Cukup hapus dari State Array. Vue Proxy akan mengurus tampilan UI secara instan.
                     state.cutiLogs.splice(logIndex, 1);
-                    if (typeof renderPermohonanView === 'function') renderPermohonanView();
                 }
             }
           } else { showNotify("Gagal Membatalkan", res.message, "error"); }
         })
         .withFailureHandler(function(err) { hideLoading(); showNotify("Error", err.toString(), "error"); })
-        .deleteCutiLog(id);
+        .deleteCutiLog(id, false, state.user.nip, token); 
     });
   }
 
   function deleteIK(id) {
+    const token = localStorage.getItem('transkep_session_token'); 
     showCustomConfirm("Tarik Pengajuan", "Batalkan dan tarik pengajuan Izin Keluar ini?", function() {
       showLoading("Menarik data...");
       google.script.run
@@ -59,16 +62,16 @@
             if (state && state.ikLogs) {
                 const idx = state.ikLogs.findIndex(l => String(l.id) === String(id));
                 if (idx !== -1) state.ikLogs.splice(idx, 1);
-                if (typeof renderPermohonanView === 'function') renderPermohonanView();
             }
           } else { showNotify("Gagal Membatalkan", res.message, "error"); }
         })
         .withFailureHandler(function(err) { hideLoading(); showNotify("Error", err.toString(), "error"); })
-        .deleteIzinKeluarLog(id);
+        .deleteIzinKeluarLog(id, false, state.user.nip, token); 
     });
   }
 
   function deleteIP(id) {
+    const token = localStorage.getItem('transkep_session_token'); 
     showCustomConfirm("Tarik Pengajuan", "Batalkan dan tarik pengajuan Izin Pribadi ini?", function() {
       showLoading("Menarik data...");
       google.script.run
@@ -79,16 +82,16 @@
             if (state && state.ipLogs) {
                 const idx = state.ipLogs.findIndex(l => String(l.id) === String(id));
                 if (idx !== -1) state.ipLogs.splice(idx, 1);
-                if (typeof renderPermohonanView === 'function') renderPermohonanView();
             }
           } else { showNotify("Gagal Membatalkan", res.message, "error"); }
         })
         .withFailureHandler(function(err) { hideLoading(); showNotify("Error", err.toString(), "error"); })
-        .deleteIzinPribadiLog(id);
+        .deleteIzinPribadiLog(id, false, state.user.nip, token); 
     });
   }
 
   function deleteWFH(id) {
+    const token = localStorage.getItem('transkep_session_token'); 
     showCustomConfirm("Tarik Pengajuan", "Batalkan dan tarik pengajuan WFH ini?", function() {
       showLoading("Menarik data...");
       google.script.run
@@ -99,64 +102,36 @@
             if (state && state.wfhLogs) {
                 const idx = state.wfhLogs.findIndex(l => String(l.id) === String(id));
                 if (idx !== -1) state.wfhLogs.splice(idx, 1);
-                if (typeof renderPermohonanView === 'function') renderPermohonanView();
             }
           } else { showNotify("Gagal Membatalkan", res.message, "error"); }
         })
         .withFailureHandler(function(err) { hideLoading(); showNotify("Error", err.toString(), "error"); })
-        .deleteWfhLog(id);
+        .deleteWfhLog(id, false, state.user.nip, token); 
     });
   }
 
-  function editCuti(id) { showNotify("Segera Hadir", "Fitur Edit sedang dikembangkan di Tahap 3.", "warning"); }
+  function editCuti(id) {
+      const log = state.cutiLogs.find(l => String(l.id) === String(id));
+      if (!log) {
+          showNotify("Error", "Data pengajuan cuti tidak ditemukan.", "error");
+          return;
+      }
+      if (window.vmFormCuti) {
+          window.vmFormCuti.openModal(false, log);
+      } else {
+          showNotify("Error Modul", "Sistem Vue Form belum termuat. Coba muat ulang halaman.", "error");
+      }
+  }
+  
   function editIK(id) { openModalIK(id); }
   function editIP(id) { openModalIP(id); }
   function editWFHPlan(id) { openModalWFH(id); }
   function editWFHLap(id) { openModalLaporanWFH(id); }
-
+  
   function openCancelModal(id) {
-     document.getElementById('cancelCutiId').value = id;
-     document.getElementById('cancelAlasan').value = '';
-     const modal = document.getElementById('modalCancelCuti');
-     
-     if (modal.parentNode !== document.body) {
-         document.body.appendChild(modal);
-     }
-     
-     modal.classList.remove('hidden');
-     setTimeout(() => { modal.firstElementChild.classList.remove('scale-95'); }, 10);
+      if (window.vmFormCuti) {
+          window.vmFormCuti.openCancelModal(id);
+      }
   }
 
-  function closeCancelModal() {
-     const modal = document.getElementById('modalCancelCuti');
-     modal.firstElementChild.classList.add('scale-95');
-     setTimeout(() => { modal.classList.add('hidden'); }, 200);
-  }
-
-  function submitCancelCuti() {
-      const id = document.getElementById('cancelCutiId').value;
-      const alasanBatal = document.getElementById('cancelAlasan').value;
-      if (!alasanBatal.trim()) { showNotify("Validasi", "Alasan pembatalan wajib diisi!", "error"); return; }
-
-      showLoading("Mengajukan pembatalan ke Pejabat...");
-      google.script.run
-        .withSuccessHandler(function(res) {
-            hideLoading();
-            closeCancelModal();
-            if (res.status === 'success') {
-                showNotify("Berhasil Diajukan", "Usulan pembatalan menunggu persetujuan Pejabat.", "success");
-                
-                if (state && state.cutiLogs) {
-                    const logIndex = state.cutiLogs.findIndex(l => String(l.id) === String(id));
-                    if (logIndex !== -1) {
-                        state.cutiLogs[logIndex].status = 'Menunggu Pembatalan';
-                        state.cutiLogs[logIndex].alasan += "\n\n[USULAN PEMBATALAN]: " + alasanBatal;
-                        if (typeof renderPermohonanView === 'function') renderPermohonanView();
-                    }
-                }
-            } else { showNotify("Gagal", res.message, "error"); }
-        })
-        .withFailureHandler(function(err) { hideLoading(); showNotify("Error", err.toString(), "error"); })
-        .requestCancelCuti(id, alasanBatal);
-  }
 </script>

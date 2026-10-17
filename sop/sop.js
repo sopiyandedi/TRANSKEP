@@ -1,8 +1,7 @@
 // ==========================================
-// FILE: sop.gs (Backend Controller Khusus SOP)
+// FILE: sop.gs (Backend Controller Khusus SOP Aman & Terpusat)
 // ==========================================
 
-// ZETTBOT FIX: Update Header karena penambahan kolom Tanggal Pembuatan & Revisi
 function autoInitSopSheets(ss) {
   let isCreated = false;
   
@@ -23,19 +22,86 @@ function autoInitSopSheets(ss) {
      ackSheet.appendRow(ackHeaders);
      ackSheet.getRange("A1:D1").setFontWeight("bold").setBackground("#065f46").setFontColor("#ffffff");
      ackSheet.setFrozenRows(1);
-     ackSheet.getRange("C:C").setNumberFormat('@'); // NIP sbg text
+     ackSheet.getRange("C:C").setNumberFormat('@'); 
      isCreated = true;
   }
   
   if (isCreated) SpreadsheetApp.flush();
 }
 
-
-function saveSopData(payload) {
+// ZETTBOT: Fungsi Pintasan Mengambil URL Root Folder "TRANSKEP SOP"
+function getSopDriveFolderUrl(userNip, clientToken) {
   try {
-    const ss = SpreadsheetApp.openById(PropertiesService.getScriptProperties().getProperty("TRANSKEP_DB_ID"));
-    
-    // Panggil fungsi auto-create sebelum melakukan operasi
+    if (!cekOtorisasi(userNip, clientToken)) return { status: 'error', message: 'Akses Ditolak: Sesi tidak valid.' };
+    const rootFolderName = "TRANSKEP SOP";
+    let rootFolder;
+    const rootFolders = DriveApp.getFoldersByName(rootFolderName);
+    if (rootFolders.hasNext()) {
+      rootFolder = rootFolders.next();
+    } else {
+      rootFolder = DriveApp.createFolder(rootFolderName);
+    }
+    return { status: 'success', url: rootFolder.getUrl() };
+  } catch (e) {
+    return { status: 'error', message: 'Gagal membuka Folder Drive SOP: ' + e.toString() };
+  }
+}
+
+function saveSopData(payload, userNip, clientToken) {
+  try {
+    if (!cekOtorisasi(userNip, clientToken)) return { status: 'error', message: 'Akses Ditolak: Sesi tidak valid.' };
+
+    // ========================================================
+    // ZETTBOT FIX: PROSES AUTO-UPLOAD SOP KE FOLDER "TRANSKEP SOP"
+    // ========================================================
+    if (payload.fileBase64) {
+       try {
+           // 1. Inisialisasi Root Folder Khusus SOP
+           const rootFolderName = "TRANSKEP SOP";
+           let rootFolder;
+           const rootFolders = DriveApp.getFoldersByName(rootFolderName);
+           if (rootFolders.hasNext()) { rootFolder = rootFolders.next(); }
+           else { rootFolder = DriveApp.createFolder(rootFolderName); }
+           
+           // 2. Ekstrak Tahun dari Tanggal Efektif atau Tanggal Pembuatan SOP
+           let yearFolderStr = new Date().getFullYear().toString();
+           const refDate = payload.tanggal_efektif || payload.tanggal_pembuatan;
+           if (refDate) {
+               const d = new Date(refDate);
+               if (!isNaN(d.getTime())) yearFolderStr = d.getFullYear().toString();
+           }
+           
+           let yearFolder;
+           const yearFolders = rootFolder.getFoldersByName(yearFolderStr);
+           if (yearFolders.hasNext()) { yearFolder = yearFolders.next(); }
+           else { yearFolder = rootFolder.createFolder(yearFolderStr); }
+           
+           // 3. Masuk ke Folder PJ (Kategori Penanggung Jawab)
+           const pjFolderStr = payload.kategori_pj || "PJ. Kesekretariatan";
+           let pjFolder;
+           const pjFolders = yearFolder.getFoldersByName(pjFolderStr);
+           if (pjFolders.hasNext()) { pjFolder = pjFolders.next(); }
+           else { pjFolder = yearFolder.createFolder(pjFolderStr); }
+           
+           // 4. Decode File dan Rename sesuai Judul SOP (Bersihkan karakter ilegal)
+           const decodedData = Utilities.base64Decode(payload.fileBase64);
+           let safeFileName = String(payload.judul_sop).replace(/[\\/:*?"<>|]/g, "_") + ".pdf";
+           const blob = Utilities.newBlob(decodedData, "application/pdf", safeFileName);
+           
+           // 5. Buat File & Set Izin Public (Agar Flipbook bisa baca)
+           const file = pjFolder.createFile(blob);
+           file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+           
+           // 6. Timpa payload Link Drive dengan URL asli file baru
+           payload.link_drive = file.getUrl();
+           
+       } catch (uploadError) {
+           return { status: 'error', message: 'Gagal merakit Folder Google Drive SOP: ' + uploadError.toString() };
+       }
+    }
+    // ========================================================
+
+    const ss = getDB();
     autoInitSopSheets(ss);
     
     const sheet = ss.getSheetByName('sop_data');
@@ -43,16 +109,12 @@ function saveSopData(payload) {
 
     const now = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'dd/MM/yyyy HH:mm:ss');
     
-    // Format tiga tanggal
     const tglPembuatan = payload.tanggal_pembuatan; 
     const tglRevisi = payload.tanggal_revisi || '-'; 
     const tglEfektif = payload.tanggal_efektif; 
-
-    // Konversi array object pelaksana menjadi JSON String
     const pelaksanaStr = JSON.stringify(payload.pelaksana || []);
 
     if (payload.id) {
-      // UPDATE DATA (Edit)
       const data = sheet.getDataRange().getValues();
       let rowIndex = -1;
       for (let i = 1; i < data.length; i++) {
@@ -63,37 +125,20 @@ function saveSopData(payload) {
       }
       
       if (rowIndex !== -1) {
-        // ZETTBOT FIX: Update rentang setValues karena jumlah kolom bertambah jadi 8 (mulai dari kolom ke-2 sampai ke-9)
         sheet.getRange(rowIndex, 2, 1, 8).setValues([[
-          payload.judul_sop,
-          payload.kategori_pj,
-          payload.nomor_sop,
-          tglPembuatan,
-          tglRevisi,
-          tglEfektif,
-          payload.link_drive,
-          pelaksanaStr
+          payload.judul_sop, payload.kategori_pj, payload.nomor_sop,
+          tglPembuatan, tglRevisi, tglEfektif, payload.link_drive, pelaksanaStr
         ]]);
         SpreadsheetApp.flush();
         return { status: 'success', message: 'Dokumen SOP berhasil diperbarui.' };
       } else {
         throw new Error("SOP tidak ditemukan di database.");
       }
-
     } else {
-      // INSERT DATA BARU
       const newId = 'SOP-' + new Date().getTime();
       sheet.appendRow([
-        newId,
-        payload.judul_sop,
-        payload.kategori_pj,
-        payload.nomor_sop,
-        tglPembuatan,
-        tglRevisi,
-        tglEfektif,
-        payload.link_drive,
-        pelaksanaStr,
-        now
+        newId, payload.judul_sop, payload.kategori_pj, payload.nomor_sop,
+        tglPembuatan, tglRevisi, tglEfektif, payload.link_drive, pelaksanaStr, now
       ]);
       SpreadsheetApp.flush();
       return { status: 'success', message: 'Dokumen SOP baru berhasil ditambahkan.' };
@@ -103,19 +148,19 @@ function saveSopData(payload) {
   }
 }
 
-function deleteSopData(id) {
+function deleteSopData(id, userNip, clientToken) {
   try {
-    const ss = SpreadsheetApp.openById(PropertiesService.getScriptProperties().getProperty("TRANSKEP_DB_ID"));
+    if (!cekOtorisasi(userNip, clientToken)) return { status: 'error', message: 'Akses Ditolak: Sesi tidak valid.' };
+
+    const ss = getDB();
     const sheet = ss.getSheetByName('sop_data');
     if(!sheet) throw new Error("Tabel sop_data belum siap.");
 
     const data = sheet.getDataRange().getValues();
-    
     for (let i = 1; i < data.length; i++) {
       if (String(data[i][0]) === String(id)) {
         sheet.deleteRow(i + 1);
         
-        // Hapus juga riwayat acknowledgment SOP ini
         const ackSheet = ss.getSheetByName('sop_ack');
         if(ackSheet) {
            const ackData = ackSheet.getDataRange().getValues();
@@ -136,17 +181,16 @@ function deleteSopData(id) {
   }
 }
 
-function acknowledgeSop(sopId, nip) {
+function acknowledgeSop(sopId, nip, clientToken) {
   try {
-    const ss = SpreadsheetApp.openById(PropertiesService.getScriptProperties().getProperty("TRANSKEP_DB_ID"));
-    
-    // Auto-create just in case
+    if (!cekOtorisasi(nip, clientToken)) return { status: 'error', message: 'Akses Ditolak: Sesi tidak valid.' };
+
+    const ss = getDB();
     autoInitSopSheets(ss);
     
     const sheet = ss.getSheetByName('sop_ack');
     if(!sheet) throw new Error("Tabel sop_ack belum siap.");
 
-    // Cek apakah sudah pernah ack sebelumnya
     const data = sheet.getDataRange().getDisplayValues();
     for(let i=1; i<data.length; i++) {
         if(String(data[i][1]) === String(sopId) && String(data[i][2]) === String(nip)) {
