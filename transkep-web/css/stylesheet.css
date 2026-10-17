@@ -4,6 +4,10 @@
    ORIGIN: Ekstrak murni dari stylesheet.html tanpa tag <style>
    ========================================================================= */
 
+[v-cloak] {
+  display: none !important;
+}
+
 body {
   font-family: 'Plus Jakarta Sans', sans-serif;
 }

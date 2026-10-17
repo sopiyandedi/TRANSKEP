@@ -4,6 +4,28 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>TRANSKEP v2.1 - Zettbos</title>
+  <!-- ZETTBOT: Pelindung Anti-FOUC & Anti-Bocor Modal Vue -->
+  <style>
+    [v-cloak] {
+      display: none !important;
+    }
+  </style>
+
+  <!-- ZETTBOT: Smart Gateway Router (GitHub Pages & Subdomain Kantor -> transkep-web) -->
+  <script>
+    (function() {
+      var host = window.location.hostname || '';
+      var isGoogleHost = host.indexOf('google.com') !== -1 || host.indexOf('googleusercontent.com') !== -1;
+      if (!isGoogleHost && !window.location.pathname.includes('/transkep-web')) {
+        var target = './transkep-web/' + window.location.search + window.location.hash;
+        window.location.replace(target);
+      }
+    })();
+  </script>
+  <noscript>
+    <meta http-equiv="refresh" content="0;url=./transkep-web/">
+  </noscript>
+
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
