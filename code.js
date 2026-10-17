@@ -580,7 +580,17 @@ function getResetPasswordQueue(adminNip, clientToken) {
   } catch (err) { throw new Error(err.toString()); }
 }
 
-// Fungsi Pengujian & Trigger Otorisasi Satu Kali (1-Click Authorization Trigger)
+// Fungsi Pengujian & Trigger Otorisasi Satu Kali (Wajib Tanpa Try-Catch agar Google memunculkan dialog Otorisasi)
+function mintaIzinUrlFetch() {
+  const res = UrlFetchApp.fetch("https://supernova-endpoint-unsubtly.ngrok-free.dev/api/sessions", {
+    headers: {
+      'X-Api-Key': '192167ce5e0147dcb4eaaaff7eccfc18',
+      'ngrok-skip-browser-warning': 'true'
+    }
+  });
+  Logger.log("Koneksi Berhasil: " + res.getContentText());
+}
+
 function testKoneksiWAHA() {
   const result = sendWhatsAppMessage_('6285139811819', 'TRANSKEP - Tes Otorisasi Gateway WAHA Berhasil Aktif! 🚀');
   Logger.log("Hasil Uji WAHA: " + JSON.stringify(result));
