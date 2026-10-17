@@ -484,19 +484,6 @@ function requestPasswordReset(no_wa) {
     const newHashedPass = hashPassword_(tempPass);
     userSheet.getRange(userRowIndex, 6).setValue(newHashedPass);
 
-    let logSheet = ss.getSheetByName('log_reset_pass');
-    if (!logSheet) {
-      initResetPasswordSheet();
-      logSheet = ss.getSheetByName('log_reset_pass');
-    }
-    
-    const uniqueId = 'REQ-' + new Date().getTime();
-    const timestamp = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'dd/MM/yyyy HH:mm:ss');
-
-    // Catat password sementara ke antrean agar admin tetap bisa klik manual sebagai Plan B
-    logSheet.appendRow([uniqueId, timestamp, userFound.nip, userFound.nama, userFound.no_wa, tempPass]);
-    SpreadsheetApp.flush();
-
     // 2. Kirim otomatis via WhatsApp Gateway WAHA
     const waText = "*TRANSKEP - RESET SANDI SEMENTARA* 🏢\n\n" +
       "Halo *" + userFound.nama + "*,\n\n" +
@@ -508,12 +495,46 @@ function requestPasswordReset(no_wa) {
       "🔗 *Link Login Portal:* https://transkep.github.io/";
 
     let waResult = sendWhatsAppMessage_(userFound.no_wa, waText);
-    let msgFeedback = 'Kata sandi sementara telah berhasil dikirim otomatis ke nomor WhatsApp Anda (' + userFound.no_wa + ').';
-    if (!waResult || waResult.status !== 'success') {
-      msgFeedback = 'Permintaan reset berhasil dicatat. Admin telah menerima pemberitahuan dan akan segera mengirimkan sandi ke WA Anda.';
-    }
 
-    return { status: 'success', message: msgFeedback };
+    // 3. Evaluasi Hasil Kirim WAHA
+    if (waResult && waResult.status === 'success') {
+      // Jika berhasil kirim WA otomatis:
+      // Bersihkan antrean lama di log_reset_pass untuk user ini agar tidak masuk manual ke admin
+      try {
+        let logSheet = ss.getSheetByName('log_reset_pass');
+        if (logSheet) {
+          const lData = logSheet.getDataRange().getDisplayValues();
+          for (let r = lData.length - 1; r >= 1; r--) {
+            if (String(lData[r][2]).trim() === String(userFound.nip).trim()) {
+              logSheet.deleteRow(r + 1);
+            }
+          }
+        }
+      } catch(e) {}
+      
+      SpreadsheetApp.flush();
+      return { 
+        status: 'success', 
+        message: 'Kata sandi sementara telah berhasil dikirim otomatis ke nomor WhatsApp Anda (' + userFound.no_wa + ').' 
+      };
+    } else {
+      // 4. PLAN B (CADANGAN): Hanya jika WAHA GAGAL / OFFLINE, catat ke antrean manual Admin!
+      let logSheet = ss.getSheetByName('log_reset_pass');
+      if (!logSheet) {
+        initResetPasswordSheet();
+        logSheet = ss.getSheetByName('log_reset_pass');
+      }
+      
+      const uniqueId = 'REQ-' + new Date().getTime();
+      const timestamp = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'dd/MM/yyyy HH:mm:ss');
+      logSheet.appendRow([uniqueId, timestamp, userFound.nip, userFound.nama, userFound.no_wa, tempPass]);
+      SpreadsheetApp.flush();
+
+      return { 
+        status: 'success', 
+        message: 'Layanan WhatsApp otomatis sedang sibuk/offline. Permintaan reset berhasil dicatat dan Admin akan segera mengirimkannya secara manual.' 
+      };
+    }
   } catch (err) {
     return { status: 'error', message: err.toString() };
   }
