@@ -150,7 +150,14 @@ ZONA BAWAH: MASTER CONTEXT & STATUS MIGRASI TERKINI (LIVING CONTEXT)
       * Atasan mengklik Magic Link -> Popup review cuti terbuka instan tanpa login -> Atasan menyetujui -> Sistem otomatis meneruskan Magic Link ke Pejabat Berwenang via WAHA.
       * Pejabat menyetujui -> Cuti resmi berstatus Disetujui, saldo terpotong resmi, dan notifikasi konfirmasi dikirimkan ke WhatsApp pemohon.
     - **Tombol Kirim Ulang WA Cuti (Admin & Operator):** Tersedia tombol WhatsApp berwarna emerald pada kolom Aksi tabel Rekapitulasi khusus untuk baris cuti yang berstatus Menunggu, memungkinkan pengiriman ulang notifikasi kapan saja.
-    - **UI Magic Link Approval Modal:** Terintegrasi di 	ranskep-web/modules/permohonan/view_magic_approval.html dan magic_approval.js, didaftarkan pada PWA Service Worker sw.js versi **	ranskep-v2.8.0**.
+    - **UI Magic Link Approval Modal:** Terintegrasi di transkep-web/modules/permohonan/view_magic_approval.html dan magic_approval.js, didaftarkan pada PWA Service Worker sw.js versi **transkep-v2.8.0**.
+11. **Auto Force Pop-up Modal Ganti Kata Sandi pada Login Sandi Sementara (Tahap 34):**
+    - Deteksi sandi sementara: Server `verifyLogin` menandai `must_change_password: true` jika input password berformat `TR-XXXXXX`.
+    - Auto pop-up frontend: Client langsung membuka modal Ganti Kata Sandi (`window.openChangePasswordModal(pass, true)`) secara otomatis dengan jeda 1.2s setelah data profil tersinkronisasi.
+    - Pre-fill sandi lama: Field kata sandi lama otomatis terisi dengan kata sandi sementara `TR-XXXXXX` sehingga pengguna tidak perlu mengetik atau menghafalnya.
+    - Warning banner & konfirmasi keamanan: Modal menampilkan banner peringatan amber bahwa akun sedang menggunakan sandi sementara dari WhatsApp, tombol aksi adaptif *"Simpan & Amankan"*, dan dialog konfirmasi proteksi jika pengguna mencoba memilih *"Nanti Saja"*.
+    - PWA Service Worker `sw.js` diperbarui ke versi **transkep-v2.8.1**.
+
 
 
 

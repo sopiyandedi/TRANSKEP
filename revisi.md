@@ -1458,3 +1458,29 @@ Mengintegrasikan gateway otomatisasi pesan WhatsApp self-hosted menggunakan **WA
 - Melakukan push seluruh kode backend ke Google Apps Script via Clasp dan mempublikasikan versi baru **Deployment `@276`**.
 - Sinkronisasi repositori ganda (`origin/main` dan `prod/main`) tetap bersih dan terjaga.
 
+---
+
+### Tahap 34: Auto Force Pop-up Modal Ganti Kata Sandi Saat Login Sandi Sementara (TR-XXXXXX)
+**Tanggal**: 17 Oktober 2026  
+**Status**: [SELESAI & DIVERIFIKASI]  
+**Lead Architect**: ZettBOT (by Zettbos)
+
+#### 1. Kebutuhan & Problem Statement
+- Setelah fitur Reset Sandi Otomatis WhatsApp (WAHA) berhasil mengirimkan kata sandi acak sementara (`TR-XXXXXX`), pengguna yang berhasil login menggunakan sandi sementara tersebut harus langsung disodori modal Ganti Kata Sandi (Change Password) otomatis.
+- Pengguna tidak boleh dibiarkan tetap menggunakan kata sandi sementara yang rentan, dan harus dimudahkan dengan pre-fill otomatis kolom "Kata Sandi Lama".
+
+#### 2. Tindakan Rekayasa & Implementasi
+1. **Deteksi Sandi Sementara di Backend (`code.js`):**
+   - Pada `verifyLogin(nip, pass)`, jika `pass` cocok dengan pola regex `/^TR-\d{6}$/`, server menyertakan atribut `must_change_password: true` pada response sukses autentikasi.
+2. **Auto-Trigger & Pre-fill di Frontend (`transkep-web/core/core.js` & `javascript.html`):**
+   - `handleLogin()` mendeteksi flag `must_change_password` atau pola sandi sementara `TR-XXXXXX`.
+   - Menjalankan timer tertunda 1.2 detik setelah sinkronisasi data profil selesai untuk memanggil `window.openChangePasswordModal(pass, true)`.
+   - Mengisi otomatis `formPass.old` dengan kata sandi sementara tersebut, sehingga pengguna tidak perlu mengetik ulang sandi sementara yang rumit.
+3. **UI Enhancements Modal Keamanan (`transkep-web/core/view_global_modals.html` & `index.html`):**
+   - Menambahkan banner peringatan dinamis (`v-if="isMandatory"`):
+     *"Anda masuk menggunakan kata sandi sementara dari WhatsApp. Demi keamanan akun, silakan buat kata sandi baru Anda sekarang."*
+   - Meremajakan header modal dengan warna amber keemasan dan ikon kunci saat mode `isMandatory` aktif.
+   - Tombol batal berubah menjadi *"Nanti Saja"* yang dilengkapi dialog konfirmasi proteksi (`confirm(...)`), dan tombol submit menjadi *"Simpan & Amankan"*.
+4. **Penyelarasan PWA Service Worker (`transkep-web/sw.js`):**
+   - Menaikkan cache version ke **`transkep-v2.8.1`** agar klien web browser segera memperbarui template modal dan controller terbaru.
+

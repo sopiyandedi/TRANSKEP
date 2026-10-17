@@ -218,7 +218,8 @@ function verifyLogin(nip, pass) {
           cache.put(sessionToken, String(nip), 28800); 
           cache.put(sessionToken + "_role", String(user.role), 28800);
 
-          return { status: 'success', data: user, token: sessionToken };
+          const isTempPass = typeof pass === 'string' && /^TR-\d{6}$/.test(pass.trim());
+          return { status: 'success', data: user, token: sessionToken, must_change_password: isTempPass };
         }
       }
     }

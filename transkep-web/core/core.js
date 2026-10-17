@@ -117,6 +117,15 @@ function handleLogin(event) {
         toggleAppVisibility(true);
         syncAllServerData();
         showNotify("Login Berhasil", `Selamat datang kembali, ${response.data.nama}`, "success");
+
+        const isTemporary = !!(response.must_change_password || (typeof pass === 'string' && /^TR-\d{6}$/.test(pass.trim())));
+        if (isTemporary) {
+          setTimeout(() => {
+            if (typeof window.openChangePasswordModal === 'function') {
+              window.openChangePasswordModal(pass, true);
+            }
+          }, 1200);
+        }
       } else {
         hideLoading();
         showNotify("Akses Ditolak", response ? response.message : "Tidak ada respon server", "error");
@@ -563,11 +572,21 @@ document.addEventListener("DOMContentLoaded", () => {
           currentUser: null,
           showModalSisaCuti: false,
           showModalPassword: false,
+          isMandatory: false,
           formPass: { old: '', new: '', confirm: '' },
           showOldPass: false, showNewPass: false, showConfirmPass: false
         };
       },
       methods: {
+        cancelPasswordModal() {
+          if (this.isMandatory) {
+            if (confirm("Perhatian: Akun Anda masih menggunakan sandi sementara WhatsApp yang rentan. Yakin ingin menunda pembuatan sandi baru?")) {
+              this.showModalPassword = false;
+            }
+          } else {
+            this.showModalPassword = false;
+          }
+        },
         submitPassword() {
           if (this.formPass.new !== this.formPass.confirm) {
             showNotify("Validasi Gagal", "Konfirmasi sandi baru tidak sama.", "error");
@@ -592,6 +611,7 @@ document.addEventListener("DOMContentLoaded", () => {
               hideLoading();
               if (res && res.status === 'success') {
                 this.showModalPassword = false;
+                this.isMandatory = false;
                 showNotify("Keamanan Diperbarui", "Sandi Anda telah berhasil diubah.", "success");
                 this.formPass = { old: '', new: '', confirm: '' };
               } else {
@@ -620,11 +640,12 @@ window.openModalSisaCuti = function () {
   }
 };
 
-window.openChangePasswordModal = function () {
+window.openChangePasswordModal = function (oldPass, isMandatory) {
   if (!state || !state.user) return;
   if (window.vmGlobalModals) {
     window.vmGlobalModals.currentUser = state.user;
-    window.vmGlobalModals.formPass = { old: '', new: '', confirm: '' };
+    window.vmGlobalModals.formPass = { old: oldPass || '', new: '', confirm: '' };
+    window.vmGlobalModals.isMandatory = !!isMandatory;
     window.vmGlobalModals.showOldPass = false;
     window.vmGlobalModals.showNewPass = false;
     window.vmGlobalModals.showConfirmPass = false;

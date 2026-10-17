@@ -63,14 +63,21 @@
     <div v-if="showModalPassword && currentUser" class="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm animate-fade-in">
       <div class="glass border border-slate-800 bg-slate-900/95 rounded-3xl w-full max-w-sm flex flex-col shadow-2xl mx-4 overflow-hidden">
         
-        <div class="bg-purple-600 p-6 text-center relative overflow-hidden">
+        <div :class="isMandatory ? 'bg-amber-600' : 'bg-purple-600'" class="p-6 text-center relative overflow-hidden transition-colors duration-300">
            <div class="absolute inset-0 bg-gradient-to-t from-slate-900/90 to-transparent"></div>
-           <i class="fa-solid fa-shield-halved text-4xl text-purple-200 mb-2 relative z-10 drop-shadow-md"></i>
-           <h3 class="text-lg font-bold text-white relative z-10 tracking-wide">Pembaruan Keamanan</h3>
-           <p class="text-xs text-purple-200/70 relative z-10 mt-1">Lindungi akun Anda dengan sandi kuat.</p>
+           <i :class="isMandatory ? 'fa-solid fa-key text-amber-200' : 'fa-solid fa-shield-halved text-purple-200'" class="text-4xl mb-2 relative z-10 drop-shadow-md"></i>
+           <h3 class="text-lg font-bold text-white relative z-10 tracking-wide">{{ isMandatory ? 'Ganti Sandi Sementara' : 'Pembaruan Keamanan' }}</h3>
+           <p class="text-xs relative z-10 mt-1" :class="isMandatory ? 'text-amber-200/90' : 'text-purple-200/70'">{{ isMandatory ? 'Demi keamanan, buat sandi baru permanen Anda.' : 'Lindungi akun Anda dengan sandi kuat.' }}</p>
         </div>
         
         <form @submit.prevent="submitPassword" class="p-6 space-y-4">
+          <div v-if="isMandatory" class="bg-amber-500/10 border border-amber-500/20 p-3 rounded-2xl flex items-start gap-2.5">
+             <i class="fa-solid fa-triangle-exclamation text-amber-400 mt-0.5 text-xs"></i>
+             <p class="text-[11px] text-amber-200/90 leading-relaxed font-medium">
+                Anda masuk menggunakan kata sandi sementara dari WhatsApp. Demi keamanan akun, silakan buat kata sandi baru Anda sekarang.
+             </p>
+          </div>
+
           <div>
              <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Kata Sandi Lama</label>
              <div class="relative">
@@ -102,9 +109,11 @@
           </div>
           
           <div class="flex gap-3 pt-4">
-             <button type="button" @click="showModalPassword = false" class="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-xl transition">Batal</button>
-             <button type="submit" class="flex-1 py-3 bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-purple-600/20 transition flex items-center justify-center gap-2">
-                Simpan <i class="fa-solid fa-check"></i>
+             <button type="button" @click="cancelPasswordModal" class="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-xl transition">
+                {{ isMandatory ? 'Nanti Saja' : 'Batal' }}
+             </button>
+             <button type="submit" :class="isMandatory ? 'bg-amber-600 hover:bg-amber-500 shadow-amber-600/20' : 'bg-purple-600 hover:bg-purple-500 shadow-purple-600/20'" class="flex-1 py-3 text-white text-xs font-bold rounded-xl shadow-lg transition flex items-center justify-center gap-2">
+                {{ isMandatory ? 'Simpan & Amankan' : 'Simpan' }} <i class="fa-solid fa-check"></i>
              </button>
           </div>
         </form>
