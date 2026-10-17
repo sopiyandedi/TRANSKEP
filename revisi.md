@@ -1482,5 +1482,16 @@ Mengintegrasikan gateway otomatisasi pesan WhatsApp self-hosted menggunakan **WA
    - Meremajakan header modal dengan warna amber keemasan dan ikon kunci saat mode `isMandatory` aktif.
    - Tombol batal berubah menjadi *"Nanti Saja"* yang dilengkapi dialog konfirmasi proteksi (`confirm(...)`), dan tombol submit menjadi *"Simpan & Amankan"*.
 4. **Penyelarasan PWA Service Worker (`transkep-web/sw.js`):**
-   - Menaikkan cache version ke **`transkep-v2.8.1`** agar klien web browser segera memperbarui template modal dan controller terbaru.
+   - Menaikkan cache version ke **`transkep-v2.8.2`** agar klien web browser segera memperbarui template modal dan controller terbaru.
+
+#### 3. Root Cause Analysis & Hardening (Bug Resolution)
+- **Akar Masalah Pop-up Tidak Muncul:**
+  1. *Race Condition:* `setTimeout(1200)` berjalan sebelum pemanggilan asynchronous `getBulkData` selesai (memakan waktu 2.5-4 detik). Akibatnya `state.user` masih `null`, memicu `if (!state || !state.user) return;` yang membatalkan pemunculan modal secara diam-diam.
+  2. *Bypass pada Sesi Aktif:* Jika pengguna me-refresh browser saat sesi login sudah tersimpan di `localStorage`, alur `handleLogin` dilewati total, dan `syncAllServerData` tidak memiliki pemicu pembukaan modal.
+- **Solusi Rekayasa:**
+  1. *Instant User State Population:* `handleLogin` seketika mengisi `window.vueState.user = response.data` tanpa menunggu RPC selesai.
+  2. *Fallback Resilient User:* `openChangePasswordModal` tidak lagi membatalkan proses jika `state.user` belum lengkap, melainkan mengambil fallback dari `localStorage.getItem('transkep_active_nip')`.
+  3. *Dual-Trigger Lifecycle:* Modal dipicu langsung dari `handleLogin` (300ms) DAN dievaluasi ulang saat `syncAllServerData` selesai (500ms) jika ada flag `transkep_force_change_password` atau `must_change_password` dari server.
+  4. *Persistent Server-Side Cache Tracking:* `requestPasswordReset` dan `verifyLogin` menyimpan penanda `force_reset_<nip>` ke `CacheService` selama 24 jam, sehingga `getBulkData` selalu mengetahui jika akun sedang dalam mandat ganti kata sandi bahkan setelah browser di-refresh.
+
 

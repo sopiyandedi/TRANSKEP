@@ -113,19 +113,25 @@ function handleLogin(event) {
       if (response && response.status === 'success') {
         localStorage.setItem('transkep_active_nip', response.data.nip);
         localStorage.setItem('transkep_session_token', response.token);
+        localStorage.setItem('transkep_user_nama', response.data.nama || '');
+
+        // Set user di state seketika agar tidak null saat sync berlangsung
+        window.vueState.user = response.data;
+        if (typeof state !== 'undefined') state.user = response.data;
+
+        const isTemporary = !!(response.must_change_password || (typeof pass === 'string' && /^TR-\d{6}$/.test(pass.trim())));
+        if (isTemporary) {
+          localStorage.setItem('transkep_force_change_password', pass.trim());
+          setTimeout(() => {
+            if (typeof window.openChangePasswordModal === 'function') {
+              window.openChangePasswordModal(pass.trim(), true);
+            }
+          }, 300);
+        }
 
         toggleAppVisibility(true);
         syncAllServerData();
         showNotify("Login Berhasil", `Selamat datang kembali, ${response.data.nama}`, "success");
-
-        const isTemporary = !!(response.must_change_password || (typeof pass === 'string' && /^TR-\d{6}$/.test(pass.trim())));
-        if (isTemporary) {
-          setTimeout(() => {
-            if (typeof window.openChangePasswordModal === 'function') {
-              window.openChangePasswordModal(pass, true);
-            }
-          }, 1200);
-        }
       } else {
         hideLoading();
         showNotify("Akses Ditolak", response ? response.message : "Tidak ada respon server", "error");
@@ -206,6 +212,18 @@ function syncAllServerData() {
 
         updateSidebarBadges();
         syncBackgroundData();
+
+        // Mandat ganti sandi sementara jika terdeteksi dari server atau storage
+        const tempPass = (response.data && response.data.temp_pass) || localStorage.getItem('transkep_force_change_password') || '';
+        const isMustChange = !!((response.data && response.data.must_change_password) || tempPass);
+        if (isMustChange) {
+          if (tempPass) localStorage.setItem('transkep_force_change_password', tempPass);
+          setTimeout(() => {
+            if (typeof window.openChangePasswordModal === 'function') {
+              window.openChangePasswordModal(tempPass, true);
+            }
+          }, 500);
+        }
 
       } else {
         showNotify("Gagal Sinkronisasi", response ? response.message : "Data bermasalah", "error");
@@ -582,6 +600,7 @@ document.addEventListener("DOMContentLoaded", () => {
           if (this.isMandatory) {
             if (confirm("Perhatian: Akun Anda masih menggunakan sandi sementara WhatsApp yang rentan. Yakin ingin menunda pembuatan sandi baru?")) {
               this.showModalPassword = false;
+              localStorage.removeItem('transkep_force_change_password');
             }
           } else {
             this.showModalPassword = false;
@@ -603,7 +622,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
           showLoading("Mencocokkan kredensial di database...");
 
-          const nip = this.currentUser.nip;
+          const nip = (this.currentUser && this.currentUser.nip) || localStorage.getItem('transkep_active_nip');
           const token = localStorage.getItem('transkep_session_token');
 
           google.script.run
@@ -612,6 +631,7 @@ document.addEventListener("DOMContentLoaded", () => {
               if (res && res.status === 'success') {
                 this.showModalPassword = false;
                 this.isMandatory = false;
+                localStorage.removeItem('transkep_force_change_password');
                 showNotify("Keamanan Diperbarui", "Sandi Anda telah berhasil diubah.", "success");
                 this.formPass = { old: '', new: '', confirm: '' };
               } else {
@@ -641,11 +661,18 @@ window.openModalSisaCuti = function () {
 };
 
 window.openChangePasswordModal = function (oldPass, isMandatory) {
-  if (!state || !state.user) return;
+  const currentUser = (state && state.user) || (window.vueState && window.vueState.user) || {
+    nip: localStorage.getItem('transkep_active_nip') || '',
+    nama: localStorage.getItem('transkep_user_nama') || 'Pegawai'
+  };
+
+  const storedTemp = localStorage.getItem('transkep_force_change_password') || '';
+  const finalOldPass = oldPass || storedTemp || '';
+
   if (window.vmGlobalModals) {
-    window.vmGlobalModals.currentUser = state.user;
-    window.vmGlobalModals.formPass = { old: oldPass || '', new: '', confirm: '' };
-    window.vmGlobalModals.isMandatory = !!isMandatory;
+    window.vmGlobalModals.currentUser = currentUser;
+    window.vmGlobalModals.formPass = { old: finalOldPass, new: '', confirm: '' };
+    window.vmGlobalModals.isMandatory = (isMandatory !== undefined) ? !!isMandatory : Boolean(storedTemp);
     window.vmGlobalModals.showOldPass = false;
     window.vmGlobalModals.showNewPass = false;
     window.vmGlobalModals.showConfirmPass = false;

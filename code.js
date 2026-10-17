@@ -218,7 +218,17 @@ function verifyLogin(nip, pass) {
           cache.put(sessionToken, String(nip), 28800); 
           cache.put(sessionToken + "_role", String(user.role), 28800);
 
-          const isTempPass = typeof pass === 'string' && /^TR-\d{6}$/.test(pass.trim());
+          let cachedTemp = null;
+          try {
+            cachedTemp = CacheService.getScriptCache().get("force_reset_" + nip);
+          } catch(e) {}
+
+          const isTempPass = (typeof pass === 'string' && /^TR-\d{6}$/.test(pass.trim())) || !!cachedTemp;
+          if (typeof pass === 'string' && /^TR-\d{6}$/.test(pass.trim())) {
+            try {
+              CacheService.getScriptCache().put("force_reset_" + nip, pass.trim(), 86400);
+            } catch(e) {}
+          }
           return { status: 'success', data: user, token: sessionToken, must_change_password: isTempPass };
         }
       }
@@ -237,7 +247,18 @@ function getBulkData(nip, clientToken) {
     // Memanggil koneksi database terpusat
     const ss = getDB();
 
-    const data = { user: null, usersList: [], pendingPkpCount: 0 };
+    let cachedTempPass = null;
+    try {
+      cachedTempPass = CacheService.getScriptCache().get("force_reset_" + nip);
+    } catch(e) {}
+
+    const data = { 
+      user: null, 
+      usersList: [], 
+      pendingPkpCount: 0,
+      must_change_password: !!cachedTempPass,
+      temp_pass: cachedTempPass || ''
+    };
     
     function normalizeDateDB(dateStr) {
        if (!dateStr) return "";
@@ -485,6 +506,10 @@ function requestPasswordReset(no_wa) {
     const newHashedPass = hashPassword_(tempPass);
     userSheet.getRange(userRowIndex, 6).setValue(newHashedPass);
 
+    try {
+      CacheService.getScriptCache().put("force_reset_" + userFound.nip, tempPass, 86400);
+    } catch(e) {}
+
     // 2. Kirim otomatis via WhatsApp Gateway WAHA
     const waText = "*TRANSKEP - RESET SANDI SEMENTARA* 🏢\n\n" +
       "Halo *" + userFound.nama + "*,\n\n" +
@@ -654,6 +679,9 @@ function changeMyPassword(nip, oldPass, newPass, clientToken) {
         // 4. Timpa dengan sandi baru berformat Salted SHA-256
         const hashedNewPass = hashPassword_(newPass);
         sheet.getRange(i + 1, 6).setValue(hashedNewPass);
+        try {
+          CacheService.getScriptCache().remove("force_reset_" + nip);
+        } catch(e) {}
         return { status: 'success' };
       }
     }
