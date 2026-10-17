@@ -1435,3 +1435,26 @@ Mengintegrasikan gateway otomatisasi pesan WhatsApp self-hosted menggunakan **WA
 - [x] UI Magic Link Approval Modal: Dibuat di `transkep-web/modules/permohonan/view_magic_approval.html` dan `magic_approval.js`, terdaftar di `index.html`.
 - [x] PWA Service Worker `sw.js` diperbarui ke cache **`transkep-v2.8.0`** dengan precache aset magic approval baru.
 - [x] Verifikasi sintaks JavaScript 100% valid (`node --check` 0 error di seluruh berkas).
+
+---
+
+### Tahap 33: Resolusi Otomasi Reset Sandi WAHA & Penyelarasan GAS Deployment @276
+**Tanggal**: 17 Oktober 2026  
+**Status**: [SELESAI]  
+**Lead Architect**: ZettBOT (by Zettbos)
+
+#### 1. Akar Masalah (Root Causes)
+1. **GAS Deployment Stale (@274):** Web App Google Apps Script sebelumnya masih mengarah pada versi `@274` yang belum memuat fungsi `sendWhatsAppMessage_` dan update WAHA.
+2. **Ghost Multiplexing Tunnel Ngrok:** Ekstensi Docker Ngrok mempertahankan sesi tunnel lama ke container `n8n:5678` pada domain statis yang sama (`supernova-endpoint-unsubtly.ngrok-free.dev`), mengakibatkan pembagian beban 50/50 secara bergantian (round-robin) antara WAHA dan n8n (yang mengembalikan HTML 404).
+3. **Logika Antrean Manual Tidak Kondisional:** Pada kode sebelumnya, `requestPasswordReset` selalu menambahkan baris ke sheet `log_reset_pass` sebelum memanggil WAHA, sehingga modal "Permintaan Reset Sandi" selalu muncul di sisi Admin sekalipun pesan otomatis sedang diproses.
+
+#### 2. Tindakan Perbaikan
+- Menghentikan container `n8n` dan me-restart container ekstensi ngrok (`6dfa09bb2e3d`). Pengujian loop memastikan 100% request kini langsung menuju WAHA (`status: WORKING`).
+- Memperbarui logika `requestPasswordReset` di [`code.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/code.js):
+  - Sandi sementara di-generate dan di-hash ke `user_data`.
+  - Sistem langsung mengirimkan kredensial via WAHA ke nomor WhatsApp pemohon.
+  - **Jika WAHA Berhasil:** Membersihkan antrean lama untuk user tersebut di `log_reset_pass` sehingga tidak membebani Admin dengan tugas manual.
+  - **Jika WAHA Gagal / Offline:** Hanya dalam kondisi inilah sistem memasukkan permintaan ke `log_reset_pass` sebagai **Plan B (Cadangan Manual)** bagi Admin.
+- Melakukan push seluruh kode backend ke Google Apps Script via Clasp dan mempublikasikan versi baru **Deployment `@276`**.
+- Sinkronisasi repositori ganda (`origin/main` dan `prod/main`) tetap bersih dan terjaga.
+
