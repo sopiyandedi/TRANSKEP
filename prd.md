@@ -164,12 +164,7 @@ ZONA BAWAH: MASTER CONTEXT & STATUS MIGRASI TERKINI (LIVING CONTEXT)
     - Menyimpan atribut peran pengguna `transkep_user_role` ke `localStorage` secara persisten saat autentikasi dan sinkronisasi agar client-side authorization check berjalan 0ms tanpa lag.
     - PWA Service Worker `sw.js` diperbarui ke versi **transkep-v2.8.3**.
 
-
-
-
-
-
-
-
-
-
+13. **Standardisasi Opsi Golongan PPPK ke Angka Romawi (XVII s.d I) (Tahap 36):**
+    - Mengganti pilihan dropdown Pangkat/Golongan untuk PPPK dari angka Arab (`17` s.d `1`) menjadi angka Romawi resmi (`PPPK Golongan XVII` s.d `PPPK Golongan I`) pada `view_pegawai.html` dan `view_manajemen_pegawai.html`.
+    - Menyediakan auto-normalization helper `normalizePangkat` pada controller `pegawai.js` dan `js_manajemen_pegawai.html` agar data lama dengan format angka biasa otomatis dikonversi ke Romawi saat dibuka dan disimpan.
+    - PWA Service Worker `sw.js` diperbarui ke versi **transkep-v2.8.4**.

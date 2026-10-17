@@ -1530,5 +1530,31 @@ Mengintegrasikan gateway otomatisasi pesan WhatsApp self-hosted menggunakan **WA
    - Berhasil dipush dan dideploy ke Google Apps Script via Clasp (**Deployment `@283`**).
    - Seluruh perubahan disinkronkan ke dual Git remotes (`origin` dan `prod`).
 
+---
 
+### Tahap 36: Standardisasi Opsi Golongan PPPK ke Angka Romawi (XVII s.d I)
+**Tanggal**: 18 Oktober 2026  
+**Status**: [SELESAI & DIVERIFIKASI]  
+**Lead Architect**: ZettBOT (by Zettbos)
 
+#### 1. Masalah & Feedback Pengguna
+- Pada modal Tambah / Edit Pegawai di modul Manajemen Pegawai ([view_pegawai.html](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/modules/pegawai/view_pegawai.html)), dropdown *Pangkat / Ruang Golongan* untuk kategori PPPK menampilkan angka biasa (Arab):
+  `PPPK Golongan 17`, `PPPK Golongan 16`, ..., `PPPK Golongan 1`.
+- Pengguna meminta agar penulisan golongan PPPK distandarisasi menggunakan **angka Romawi** (`XVII` s.d `I`) sesuai nomenklatur resmi BKN dan regulasi kepegawaian.
+
+#### 2. Root Cause Analysis (RCA)
+- Pada template `view_pegawai.html` dan `view_manajemen_pegawai.html`, opsi PPPK dibuat menggunakan looping angka:
+  `<option v-for="n in 17" :value="'PPPK Golongan ' + (18-n)">PPPK Golongan {{ 18-n }}</option>`.
+  Hal ini menghasilkan nilai dan teks angka biasa (1-17), padahal di database dan profil pengguna (misalnya Dedi Sopiyan) golongan tersimpan dengan format Romawi: `PPPK Golongan IX`.
+
+#### 3. Solusi & Tindakan Rekayasa
+1. **Pembaruan Opsi Dropdown ke Angka Romawi:**
+   - Mengganti opsi dinamis looping angka dengan 17 pilihan statis angka Romawi berurutan dari tertinggi ke terendah (`PPPK Golongan XVII` hingga `PPPK Golongan I`) pada `transkep-web/modules/pegawai/view_pegawai.html` dan `pegawai/view_manajemen_pegawai.html`.
+2. **Auto-Normalization Helper (`normalizePangkat`):**
+   - Menambahkan method `normalizePangkat(pangkat)` pada controller Vue `transkep-web/modules/pegawai/pegawai.js` dan `pegawai/js_manajemen_pegawai.html`.
+   - Saat modal edit dibuka (`openPegawaiModal`) atau data disimpan (`submitPegawai`), nilai pangkat berangka biasa (misal `"PPPK Golongan 9"`) secara otomatis dikonversi menjadi `"PPPK Golongan IX"`, memastikan kompatibilitas 100% dua arah dengan data lama di Google Sheets.
+3. **PWA Service Worker Update:**
+   - Menaikkan versi cache pada `transkep-web/sw.js` ke **`transkep-v2.8.4`**.
+4. **Deployment & Sinkronisasi:**
+   - Berhasil dipush dan dideploy ke Google Apps Script via Clasp (**Deployment `@284`**).
+   - Seluruh perubahan disinkronkan ke dual Git remotes (`origin` dan `prod`).

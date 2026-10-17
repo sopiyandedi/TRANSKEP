@@ -124,10 +124,28 @@
           if (index === -1) this.visiblePasswords.push(nip);
           else this.visiblePasswords.splice(index, 1);
         },
+        normalizePangkat(pangkat) {
+          if (!pangkat) return "";
+          const romanMap = {
+            "17": "XVII", "16": "XVI", "15": "XV", "14": "XIV", "13": "XIII",
+            "12": "XII", "11": "XI", "10": "X", "9": "IX", "8": "VIII",
+            "7": "VII", "6": "VI", "5": "V", "4": "IV", "3": "III",
+            "2": "II", "1": "I"
+          };
+          const clean = pangkat.trim();
+          for (const [arabic, roman] of Object.entries(romanMap)) {
+            const regex = new RegExp(`^PPPK\\s+Golongan\\s+${arabic}$`, 'i');
+            if (regex.test(clean)) {
+              return `PPPK Golongan ${roman}`;
+            }
+          }
+          return clean;
+        },
         openPegawaiModal(mode, user = null) {
           this.modalPegMode = mode;
           if (mode === 'edit' && user) {
             this.formPegawai = { ...user, originalNip: user.nip };
+            this.formPegawai.pangkat = this.normalizePangkat(user.pangkat);
             this.formPegawai.tmt_kgb = this.parseDateToHTML5(user.tmt_kgb);
             this.formPegawai.tmt_knp = this.parseDateToHTML5(user.tmt_knp);
           } else {
@@ -139,6 +157,7 @@
           this.showModalPegawai = false;
         },
         async submitPegawai() {
+          this.formPegawai.pangkat = this.normalizePangkat(this.formPegawai.pangkat);
           const token = localStorage.getItem('transkep_session_token');
           if(window.showLoading) window.showLoading("Mencatat perubahan profil ke database...");
           const adminNip = (this.currentUser && this.currentUser.nip) || localStorage.getItem('transkep_active_nip');
