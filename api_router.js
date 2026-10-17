@@ -100,6 +100,9 @@ function handleApiPost_(payload, e) {
           timestamp: new Date().toISOString()
         });
 
+      case 'testWaha':
+        return jsonResponse_(sendWhatsAppMessage_(payload.phone || '6285139811819', payload.text || 'Test WAHA diagnostic'));
+
       // Autentikasi & Sesi
       case 'verifyLogin':
       case 'login':

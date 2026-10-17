@@ -565,7 +565,8 @@ function getResetPasswordQueue(adminNip, clientToken) {
     for(let i = 1; i < data.length; i++) {
       if(data[i][0] && String(data[i][0]).trim() !== '') { 
         const uNip = String(data[i][2]);
-        let currentPass = userMap[uNip] || data[i][5] || '-';
+        // Prioritaskan password sementara (TR-XXXXXX) yang tercatat di antrean log_reset_pass
+        let currentPass = data[i][5] || userMap[uNip] || '-';
         if (currentPass && String(currentPass).startsWith("SHA256$")) {
           currentPass = "[Telah Dienkripsi - Reset di Edit Pegawai]";
         }
@@ -577,6 +578,13 @@ function getResetPasswordQueue(adminNip, clientToken) {
     }
     return queue;
   } catch (err) { throw new Error(err.toString()); }
+}
+
+// Fungsi Pengujian & Trigger Otorisasi Satu Kali (1-Click Authorization Trigger)
+function testKoneksiWAHA() {
+  const result = sendWhatsAppMessage_('6285139811819', 'TRANSKEP - Tes Otorisasi Gateway WAHA Berhasil Aktif! 🚀');
+  Logger.log("Hasil Uji WAHA: " + JSON.stringify(result));
+  return result;
 }
 
 function markResetAsDone(reqId, adminNip, clientToken) {
