@@ -114,6 +114,7 @@ function handleLogin(event) {
         localStorage.setItem('transkep_active_nip', response.data.nip);
         localStorage.setItem('transkep_session_token', response.token);
         localStorage.setItem('transkep_user_nama', response.data.nama || '');
+        localStorage.setItem('transkep_user_role', response.data.role || '');
 
         // Set user di state seketika agar tidak null saat sync berlangsung
         window.vueState.user = response.data;
@@ -159,6 +160,9 @@ function handleLogout() {
   localStorage.removeItem('transkep_active_nip');
   localStorage.removeItem('transkep_last_menu');
   localStorage.removeItem('transkep_session_token');
+  localStorage.removeItem('transkep_user_nama');
+  localStorage.removeItem('transkep_user_role');
+  localStorage.removeItem('transkep_force_change_password');
 
   window.vueState.currentMenu = 'dashboard';
   window.vueState.user = null;
@@ -184,6 +188,9 @@ function syncAllServerData() {
       hideLoading();
       if (response && response.status === 'success') {
         window.vueState.user = response.data.user;
+        if (response.data.user && response.data.user.role) {
+          localStorage.setItem('transkep_user_role', response.data.user.role);
+        }
         window.vueState.usersList = response.data.usersList;
         window.vueState.pendingPkpCount = response.data.pendingPkpCount || 0;
         window.vueState.isBgSyncDone = false;

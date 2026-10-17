@@ -1494,4 +1494,41 @@ Mengintegrasikan gateway otomatisasi pesan WhatsApp self-hosted menggunakan **WA
   3. *Dual-Trigger Lifecycle:* Modal dipicu langsung dari `handleLogin` (300ms) DAN dievaluasi ulang saat `syncAllServerData` selesai (500ms) jika ada flag `transkep_force_change_password` atau `must_change_password` dari server.
   4. *Persistent Server-Side Cache Tracking:* `requestPasswordReset` dan `verifyLogin` menyimpan penanda `force_reset_<nip>` ke `CacheService` selama 24 jam, sehingga `getBulkData` selalu mengetahui jika akun sedang dalam mandat ganti kata sandi bahkan setelah browser di-refresh.
 
+---
+
+### Tahap 35: Eliminasi Notifikasi E-Office & Penguncian Otorisasi Admin di Client-Side
+**Tanggal**: 18 Oktober 2026  
+**Status**: [SELESAI & DIVERIFIKASI]  
+**Lead Architect**: ZettBOT (by Zettbos)
+
+#### 1. Masalah & Feedback Pengguna
+- Pengguna dengan peran non-Admin (seperti Penata Layanan Operasional, Pegawai biasa, dll.) mendapati toast pop-up peringatan berwarna oranye yang mengganggu di pojok kanan atas Dashboard saat login atau me-refresh aplikasi:
+  *"Perhatian E-Office: Akses Ditolak: Fitur E-Office hanya dapat diakses oleh Admin."*
+- Pengguna meminta agar notifikasi E-Office ini ditiadakan karena fitur E-Office memang dikhususkan untuk Administrator saja.
+
+#### 2. Root Cause Analysis (RCA)
+1. **Unconditional Auto-Fetch pada `mounted()`:**
+   - Komponen Vue E-Office pada [`transkep-web/modules/eoffice/eoffice.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/modules/eoffice/eoffice.js) dan [`eoffice/js_eoffice.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/js_eoffice.html) memanggil `this.loadData()` secara otomatis saat hook `mounted()` dieksekusi, meskipun pengguna berada di menu Dashboard.
+2. **Ketiadaan Pengecekan Hak Akses Sebelum RPC:**
+   - Method `loadData()` langsung mengambil NIP & Session Token dari `localStorage` dan menembak RPC backend `getEofficeData(nip, token)` tanpa mengevaluasi `this.isAdmin`.
+3. **Backend Access Rejection Menghasilkan Toast:**
+   - Backend `eoffice.js` merespons dengan `{ status: 'error', message: 'Akses Ditolak: Fitur E-Office hanya dapat diakses oleh Admin.' }` yang kemudian ditangkap oleh blok response `loadData()` dan memicu `showNotify("Perhatian E-Office", res.message, "warning")`.
+
+#### 3. Solusi & Tindakan Rekayasa
+1. **Guard Otorisasi Ketat pada `loadData()`:**
+   - Menyematkan pengecekan dini `if (!this.isAdmin) { this.isLoading = false; return; }`. Jika pengguna bukan Administrator, pemanggilan RPC dibatalkan seketika.
+2. **Kondisional `mounted()` & Window Methods:**
+   - Hook `mounted()` kini hanya memuat data jika menu aktif adalah `'eoffice'` DAN pengguna berstatus Admin.
+   - Fungsi `window.renderEofficeView` dan `window.refreshEofficeData` dikawal ketat dengan validasi `window.vmEoffice && window.vmEoffice.isAdmin`.
+3. **Peredaman Notifikasi Error (Silent Rejection):**
+   - Jika terjadi respons bermuatan `"Akses Ditolak"` atau `!this.isAdmin`, frontend hanya mencatat peringatan via `console.warn` tanpa pernah memunculkan toast `showNotify` ke layar antarmuka pengguna.
+4. **Persistensi State Peran Pengguna (`transkep_user_role`):**
+   - Memperbarui alur login (`verifyLogin`) dan sinkronisasi data (`syncAllServerData`) di [`core.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/core/core.js) dan [`javascript.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/javascript.html) untuk menyimpan `transkep_user_role` ke `localStorage`, sehingga evaluasi `this.isAdmin` instan (0ms) bahkan sebelum pemanggilan profil selesai.
+5. **PWA Service Worker Update:**
+   - Menaikkan versi cache pada [`transkep-web/sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/sw.js) ke **`transkep-v2.8.3`**.
+6. **Deployment & Sinkronisasi:**
+   - Berhasil dipush dan dideploy ke Google Apps Script via Clasp (**Deployment `@283`**).
+   - Seluruh perubahan disinkronkan ke dual Git remotes (`origin` dan `prod`).
+
+
 

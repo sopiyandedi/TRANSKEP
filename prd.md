@@ -157,6 +157,12 @@ ZONA BAWAH: MASTER CONTEXT & STATUS MIGRASI TERKINI (LIVING CONTEXT)
     - Pre-fill sandi lama: Field kata sandi lama otomatis terisi dengan kata sandi sementara `TR-XXXXXX` sehingga pengguna tidak perlu mengetik atau menghafalnya.
     - Warning banner & konfirmasi keamanan: Modal menampilkan banner peringatan amber bahwa akun sedang menggunakan sandi sementara dari WhatsApp, tombol aksi adaptif *"Simpan & Amankan"*, dan dialog konfirmasi proteksi jika pengguna mencoba memilih *"Nanti Saja"*.
     - PWA Service Worker `sw.js` diperbarui ke versi **transkep-v2.8.1**.
+12. **Eliminasi Notifikasi E-Office & Penguncian Otorisasi Admin di Client-Side (Tahap 35):**
+    - Meredam dan mengeliminasi notifikasi peringatan pop-up *"Akses Ditolak: Fitur E-Office hanya dapat diakses oleh Admin"* bagi seluruh pengguna non-Admin saat login atau memuat Dashboard.
+    - Menambahkan guard otorisasi dini di `loadData()` pada `modules/eoffice/eoffice.js` dan `eoffice/js_eoffice.html` sehingga pemanggilan data KGB & Rapat hanya dieksekusi bila `isAdmin === true`.
+    - Menghapus pemanggilan data otomatis tanpa syarat di hook `mounted()`; data E-Office kini hanya dimuat secara lazy saat Admin membuka menu E-Office.
+    - Menyimpan atribut peran pengguna `transkep_user_role` ke `localStorage` secara persisten saat autentikasi dan sinkronisasi agar client-side authorization check berjalan 0ms tanpa lag.
+    - PWA Service Worker `sw.js` diperbarui ke versi **transkep-v2.8.3**.
 
 
 

@@ -6,13 +6,13 @@
   // ==========================================
 
   window.renderEofficeView = function() {
-    if (window.vmEoffice) {
+    if (window.vmEoffice && window.vmEoffice.isAdmin) {
       window.vmEoffice.loadData();
     }
   };
 
   window.refreshEofficeData = function() {
-    if (window.vmEoffice) {
+    if (window.vmEoffice && window.vmEoffice.isAdmin) {
       window.vmEoffice.loadData(true);
     }
   };
@@ -41,13 +41,22 @@
 
       computed: {
         currentUser() {
-          return (this.s && this.s.user) ? this.s.user : null;
+          if (this.s && this.s.user) return this.s.user;
+          if (typeof state !== 'undefined' && state.user) return state.user;
+          if (window.vueState && window.vueState.user) return window.vueState.user;
+          return null;
         },
 
         isAdmin() {
-          if (!this.currentUser) return false;
-          const role = this.currentUser.role;
-          return role === 'Admin';
+          const user = this.currentUser;
+          if (user && user.role) {
+            return user.role === 'Admin';
+          }
+          const storedRole = localStorage.getItem('transkep_user_role');
+          if (storedRole) {
+            return storedRole === 'Admin';
+          }
+          return false;
         },
 
         availableUsers() {
@@ -151,6 +160,12 @@
             this.s.user = state.user;
           }
 
+          // GUARD: Fitur E-Office hanya untuk Administrator
+          if (!this.isAdmin) {
+            this.isLoading = false;
+            return;
+          }
+
           const nip = (this.currentUser && this.currentUser.nip) || localStorage.getItem('transkep_active_nip') || '';
           const token = localStorage.getItem('transkep_session_token') || '';
 
@@ -165,7 +180,10 @@
                 this.rawKgbList = res.data.kgb || [];
                 this.rawRapatList = res.data.rapat || [];
               } else if (res && res.message) {
-                if (typeof showNotify === 'function') {
+                // Jika bukan admin atau respon akses ditolak, abaikan secara silent (tanpa toast notifikasi)
+                if (res.message.includes('Akses Ditolak') || !this.isAdmin) {
+                  console.warn("[E-Office] Akses dibatasi untuk Administrator:", res.message);
+                } else if (typeof showNotify === 'function') {
                   showNotify("Perhatian E-Office", res.message, "warning");
                 }
               }
@@ -242,7 +260,11 @@
       },
 
       mounted() {
-        this.loadData();
+        // Hanya muat data otomatis jika menu saat ini adalah E-Office dan pengguna adalah Admin
+        const currentMenu = (window.vueState && window.vueState.currentMenu) || localStorage.getItem('transkep_last_menu');
+        if (currentMenu === 'eoffice' && this.isAdmin) {
+          this.loadData();
+        }
       }
     }).mount('#vue-eoffice-app');
   });
