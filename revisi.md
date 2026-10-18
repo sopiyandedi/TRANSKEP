@@ -1730,4 +1730,45 @@ Berdasarkan audit menyeluruh terhadap arsitektur frontend dan backend (`transkep
 2. **Verifikasi Batas Halaman (1 Lembar A4)**: Dokumen tercetak utuh dalam 1 halaman tanpa tumpah (*zero spill*).
 3. **Verifikasi Keterbacaan Scanner**: Barcode berlogo ukuran 55×55px tetap terbaca instan dan akurat oleh pemindai kamera HP.
 
+---
+
+### Tahap 40: Pembersihan Redundansi Keterangan TTE & Desain Area Tanda Tangan Super Lega
+**Tanggal**: 18 Oktober 2026  
+**Status**: [SELESAI & DIVERIFIKASI]  
+**Lead Architect**: ZettBOT (by Zettbos)
+
+#### 1. Masalah & Arahan Pengguna
+- Teks *"Ditandatangani secara elektronik"* yang sebelumnya disematkan di bawah barcode pada 3 tempat (Pemohon, Atasan Langsung, dan Pejabat Berwenang) terasa repetitif dan mempersempit ruang tanda tangan.
+- Pengguna meminta agar teks tersebut **dihilangkan saja** sehingga area tanda tangan menjadi lebih luas, lega, dan bersih.
+- Menunda pencantuman catatan kaki/disclaimer BSrE BSSN karena aplikasi TRANSKEP belum terintegrasi secara formal dengan SSO SIMARI BSSN (integritas hukum dan keterbukaan sistem).
+- Pengguna mendiskusikan mekanisme masa depan untuk auto-deteksi Digital Signatures pada file PDF (Rev 1: Pemohon, Rev 2: Atasan, Rev 3: Pejabat) persis seperti pada aplikasi Adobe Acrobat di lingkungan Ditjen Badilag / Mahkamah Agung RI.
+
+#### 2. Implementasi & Penyesuaian Antarmuka
+1. **Pembersihan Teks Redundan**:
+   - Menghapus teks `<div style="font-size: 6.5pt ...">Ditandatangani secara elektronik</div>` dari template Pemohon di `cetak_cuti.html` dan `template_cetak_cuti.html`.
+   - Menghapus penyisipan string teks tersebut dari generator tanda tangan Atasan Langsung (`atasanSig`) dan Pejabat Berwenang (`pejabatSig`) di `cetak_cuti.js` dan `js_cetak_cuti.html`.
+2. **Tata Letak Bersih & Lega (*Minimalist Government Signature*)**:
+   - Struktur tanda tangan kini sangat bersih:
+     * **Jabatan** (Hormat Saya, / Panitera / Ketua)
+     * **Barcode Mandiri Berlogo PA Indramayu** (55×55px)
+     * **Nama Terang** (Tebal & Bergaris Bawah)
+     * **NIP**
+   - Barcode berlogo Pengadilan Agama Indramayu yang disematkan langsung di tengah secara visual dan fungsional telah merepresentasikan keabsahan Tanda Tangan Elektronik instansi tanpa perlu teks redundan yang mempersempit ruang.
+3. **PWA Service Worker Cache**:
+   - Menaikkan versi cache pada `transkep-web/sw.js` ke **`transkep-v2.8.8`**.
+
+#### 3. Berkas yang Diubah
+| Berkas | Peran / Layer | Detail Perubahan |
+| :--- | :--- | :--- |
+| [`transkep-web/modules/permohonan/cetak/cetak_cuti.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/modules/permohonan/cetak/cetak_cuti.html) | Print Template | Menghapus teks "Ditandatangani secara elektronik" pada blok Pemohon. |
+| [`transkep-web/modules/permohonan/cetak/cetak_cuti.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/modules/permohonan/cetak/cetak_cuti.js) | Print Controller | Menghapus teks "Ditandatangani secara elektronik" pada `atasanSig` dan `pejabatSig`. |
+| [`permohonan/template_cetak_cuti.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/template_cetak_cuti.html) | GAS Print Template | Sinkronisasi penghapusan teks TTE pada blok Pemohon. |
+| [`permohonan/js_cetak_cuti.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/js_cetak_cuti.html) | GAS Print Controller | Sinkronisasi penghapusan teks TTE pada `atasanSig` dan `pejabatSig`. |
+| [`transkep-web/sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/sw.js) | PWA Cache | Menaikkan versi cache ke `transkep-v2.8.8`. |
+
+#### 4. Hasil Verifikasi
+1. **Verifikasi Tampilan Visual**: Area tanda tangan Pemohon, Atasan, dan Pejabat kini sangat lega, rapi, dan estetis tanpa ada teks kecil yang menumpuk canggung di bawah barcode.
+2. **Verifikasi Kertas A4 1 Halaman**: Dokumen semakin longgar dan 100% aman terkunci dalam 1 lembar A4.
+
+
 

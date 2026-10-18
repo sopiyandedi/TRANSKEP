@@ -148,8 +148,7 @@
                               "</div>" +
                               
                               viewQrAtasan +
-                              (log.status_atasan === 'Disetujui' ? "<div style='font-size: 6.5pt !important; color: #555; font-style: italic; line-height: 1.1; margin-bottom: 2px;'>Ditandatangani secara elektronik</div>" : "") +
-                              "<div style='font-size: 10pt !important; line-height: 1.2; font-family: \"Times New Roman\", Times, serif;'>" +
+                              "<div style='font-size: 10pt !important; line-height: 1.2; font-family: \"Times New Roman\", Times, serif; margin-top: 2px;'>" +
                                 "<span style='text-decoration: underline; font-weight: bold;'>" + atasan.nama + "</span><br>" +
                                 "NIP. " + atasan.nip +
                               "</div>" +
@@ -165,8 +164,7 @@
                                "</div>" +
                                
                                viewQrPejabat +
-                               (log.status_pejabat === 'Disetujui' ? "<div style='font-size: 6.5pt !important; color: #555; font-style: italic; line-height: 1.1; margin-bottom: 2px;'>Ditandatangani secara elektronik</div>" : "") +
-                               "<div style='font-size: 10pt !important; line-height: 1.2; font-family: \"Times New Roman\", Times, serif;'>" +
+                               "<div style='font-size: 10pt !important; line-height: 1.2; font-family: \"Times New Roman\", Times, serif; margin-top: 2px;'>" +
                                  "<span style='text-decoration: underline; font-weight: bold;'>" + pejabat.nama + "</span><br>" +
                                  "NIP. " + pejabat.nip +
                                "</div>" +

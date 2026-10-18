@@ -193,5 +193,12 @@ ZONA BAWAH: MASTER CONTEXT & STATUS MIGRASI TERKINI (LIVING CONTEXT)
     - **Zero-Spill Protection (Kunci 1 Lembar A4):** Memangkas margin dan padding berlebih di seluruh formulir (spasi judul -9px, margin antar tabel -12px, padding sel tabel -12px, spasi tanda tangan atasan -10px, dan spasi alamat -3px, total hemat ~47px) untuk menjamin dokumen **100% terkunci dalam 1 lembar A4**.
     - PWA Service Worker `sw.js` diperbarui ke versi **transkep-v2.8.7**.
 
+17. **Pembersihan Redundansi Keterangan TTE & Desain Area Tanda Tangan Super Lega (Tahap 40):**
+    - **Eliminasi Teks Redundan:** Menghapus teks repetitif *"Ditandatangani secara elektronik"* pada 3 blok tanda tangan (Pemohon, Atasan Langsung, dan Pejabat Berwenang).
+    - **Visual TTE Mandiri:** Barcode berlogo resmi Pengadilan Agama Indramayu di antara Jabatan dan Nama Terang telah sepenuhnya mewakili tanda tangan elektronik instansi yang sah, memberikan estetika dokumen yang lapang, proporsional, dan elegan.
+    - **Menunda Catatan Kaki BSrE:** Menjaga integritas data dengan menunda catatan kaki/disclaimer BSrE BSSN hingga terintegrasi secara teknis dengan SSO SIMARI.
+    - PWA Service Worker `sw.js` diperbarui ke versi **transkep-v2.8.8**.
+
+
 
 
