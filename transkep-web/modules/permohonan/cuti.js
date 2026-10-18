@@ -230,7 +230,10 @@
                           atasanDot = log.status_atasan === 'Disetujui' ? 'text-emerald-500' : (log.status_atasan === 'Ditolak' ? 'text-rose-500' : 'text-amber-500');
                           pejabatDot = log.status_pejabat === 'Disetujui' ? 'text-emerald-500' : (log.status_pejabat === 'Ditolak' ? 'text-rose-500' : 'text-amber-500');
                           
-                          if (log.jenis !== 'Dinas Luar') actions.push({ actionType: 'cetakCuti', icon: 'fa-print', text: 'Cetak', css: 'px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-lg transition shadow-md shadow-slate-900/30', tooltip: 'Cetak Berkas' });
+                          if (log.jenis !== 'Dinas Luar') {
+                              actions.push({ actionType: 'cetakCuti', icon: 'fa-print', text: 'Cetak', css: 'px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-lg transition shadow-md shadow-slate-900/30', tooltip: 'Cetak Formulir' });
+                              actions.push({ actionType: 'unduhSignedCuti', icon: 'fa-file-shield', text: 'TTE PDF', css: 'px-3 py-1.5 bg-indigo-950/70 hover:bg-indigo-800 text-indigo-300 hover:text-white border border-indigo-700/60 rounded-lg transition shadow-md shadow-indigo-950/40', tooltip: 'Unduh PDF Ber-TTE Digital (X.509 PAdES)' });
+                          }
                           
                           const sNorm = String(log.status || '').trim().toLowerCase();
                           if (sNorm === 'menunggu' || sNorm === 'perubahan') {
@@ -368,6 +371,7 @@
                   
                   // --- FUNGSI CETAK ---
                   if (actionType === 'cetakCuti') window.printCutiForm && window.printCutiForm(id);
+                  if (actionType === 'unduhSignedCuti') window.downloadSignedCutiPdf && window.downloadSignedCutiPdf(id);
                   if (actionType === 'cetakIK') window.cetakIzinKeluar && window.cetakIzinKeluar(id);
                   if (actionType === 'cetakIP') window.cetakIzinPribadi && window.cetakIzinPribadi(id);
                   if (actionType === 'cetakWFHPlan') window.cetakRencanaWFH && window.cetakRencanaWFH(id);

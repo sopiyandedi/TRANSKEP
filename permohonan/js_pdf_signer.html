@@ -1,0 +1,170 @@
+<script>
+// =========================================================================
+// FILE: js_pdf_signer.html (Google Apps Script Version)
+// DESKRIPSI: Mesin Pembuat PDF Biner & Penyuntik Tanda Tangan Digital X.509
+// STANDAR: PAdES / PKCS#7 Detached (ISO 32000-1 / Adobe Acrobat Signatures)
+// ENGINE: ZettBOT Digital Signature Engine v1.0.0 (by Zettbos)
+// =========================================================================
+
+(function(global) {
+  'use strict';
+
+  const TranskepPdfSigner = {
+    SIGNATURE_SLOT_SIZE: 8192,
+
+    isReady() {
+      return (typeof global.PDFLib !== 'undefined') && (typeof global.forge !== 'undefined');
+    },
+
+    generateCertificate(user) {
+      if (!global.forge) throw new Error('Pustaka forge.js belum dimuat.');
+      const forge = global.forge;
+      const pki = forge.pki;
+      const keys = pki.rsa.generateKeyPair(2048);
+      const cert = pki.createCertificate();
+
+      cert.publicKey = keys.publicKey;
+      cert.serialNumber = '01' + forge.util.bytesToHex(forge.random.getBytesSync(8));
+
+      cert.validity.notBefore = new Date();
+      cert.validity.notAfter = new Date();
+      cert.validity.notAfter.setFullYear(cert.validity.notBefore.getFullYear() + 3);
+
+      const subjectName = user.nama || 'Aparatur PA Indramayu';
+      const subjectNip = user.nip || '-';
+      const subjectJabatan = user.jabatan || 'Aparatur Sipil Negara';
+
+      const attrs = [
+        { name: 'commonName', value: subjectName },
+        { name: 'countryName', value: 'ID' },
+        { name: 'stateOrProvinceName', value: 'Jawa Barat' },
+        { name: 'localityName', value: 'Indramayu' },
+        { name: 'organizationName', value: 'Pengadilan Agama Indramayu' },
+        { name: 'organizationalUnitName', value: `${subjectJabatan} (NIP. ${subjectNip})` }
+      ];
+
+      cert.setSubject(attrs);
+      cert.setIssuer(attrs);
+
+      cert.setExtensions([
+        { name: 'basicConstraints', cA: false },
+        {
+          name: 'keyUsage',
+          digitalSignature: true,
+          nonRepudiation: true,
+          keyEncipherment: true
+        },
+        {
+          name: 'extKeyUsage',
+          clientAuth: true,
+          emailProtection: true
+        }
+      ]);
+
+      cert.sign(keys.privateKey, forge.md.sha256.create());
+
+      return {
+        cert: cert,
+        keys: keys,
+        pemCert: pki.certificateToPem(cert),
+        pemKey: pki.privateKeyToPem(keys.privateKey)
+      };
+    },
+
+    signPdfBytes(pdfBytes, certObj, sigMetadata) {
+      if (!global.forge) throw new Error('Pustaka forge.js belum dimuat.');
+      const forge = global.forge;
+
+      let pdfString = '';
+      const CHUNK_SIZE = 8192;
+      for (let i = 0; i < pdfBytes.length; i += CHUNK_SIZE) {
+        pdfString += String.fromCharCode.apply(null, pdfBytes.subarray(i, Math.min(i + CHUNK_SIZE, pdfBytes.length)));
+      }
+
+      const byteRangeKeyword = '/ByteRange [';
+      const byteRangePos = pdfString.indexOf(byteRangeKeyword);
+      const byteRangeEnd = pdfString.indexOf(']', byteRangePos);
+
+      const contentsKeyword = '/Contents <';
+      const contentsPos = pdfString.indexOf(contentsKeyword);
+      const contentsStart = contentsPos + contentsKeyword.length;
+      const contentsEnd = contentsStart + this.SIGNATURE_SLOT_SIZE;
+
+      if (byteRangePos === -1 || contentsPos === -1) {
+        throw new Error('Placeholder tanda tangan tidak ditemukan dalam PDF.');
+      }
+
+      const offset1 = contentsStart - 1;
+      const offset2 = contentsEnd + 1;
+      const offset3 = pdfBytes.length - offset2;
+
+      const actualByteRange = `[ 0 ${offset1} ${offset2} ${offset3} ]`;
+      const origRangeLength = byteRangeEnd - byteRangePos + 1;
+      const paddedByteRange = `/ByteRange ${actualByteRange}`.padEnd(origRangeLength, ' ');
+
+      for (let i = 0; i < paddedByteRange.length; i++) {
+        pdfBytes[byteRangePos + i] = paddedByteRange.charCodeAt(i);
+      }
+
+      const part1 = pdfBytes.subarray(0, offset1);
+      const part2 = pdfBytes.subarray(offset2, offset2 + offset3);
+
+      let signedBinary = '';
+      for (let i = 0; i < part1.length; i += CHUNK_SIZE) {
+        signedBinary += String.fromCharCode.apply(null, part1.subarray(i, Math.min(i + CHUNK_SIZE, part1.length)));
+      }
+      for (let i = 0; i < part2.length; i += CHUNK_SIZE) {
+        signedBinary += String.fromCharCode.apply(null, part2.subarray(i, Math.min(i + CHUNK_SIZE, part2.length)));
+      }
+
+      const p7 = forge.pkcs7.createSignedData();
+      p7.content = forge.util.createBuffer(signedBinary);
+      p7.addCertificate(certObj.cert);
+      p7.addSigner({
+        key: certObj.keys.privateKey,
+        certificate: certObj.cert,
+        digestAlgorithm: forge.pki.oids.sha256,
+        authenticatedAttributes: [
+          {
+            type: forge.pki.oids.contentType,
+            value: forge.pki.oids.data
+          },
+          {
+            type: forge.pki.oids.messageDigest
+          },
+          {
+            type: forge.pki.oids.signingTime,
+            value: new Date()
+          }
+        ]
+      });
+
+      p7.sign({ detached: true });
+
+      const rawDer = forge.asn1.toDer(p7.toAsn1()).getBytes();
+      const hexSignature = forge.util.bytesToHex(rawDer);
+      const paddedHex = hexSignature.padEnd(this.SIGNATURE_SLOT_SIZE, '0');
+
+      for (let i = 0; i < paddedHex.length; i++) {
+        pdfBytes[contentsStart + i] = paddedHex.charCodeAt(i);
+      }
+
+      return pdfBytes;
+    },
+
+    async downloadSignedCutiPdf(id) {
+      if (global.TranskepPdfSigner) {
+        return global.TranskepPdfSigner.downloadSignedCutiPdf(id);
+      }
+    }
+  };
+
+  global.TranskepPdfSigner = TranskepPdfSigner;
+  global.downloadSignedCutiPdf = function(id) {
+    if (global.TranskepPdfSigner) {
+      global.TranskepPdfSigner.downloadSignedCutiPdf(id);
+    }
+  };
+
+})(typeof window !== 'undefined' ? window : this);
+</script>

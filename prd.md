@@ -205,7 +205,8 @@ ZONA BAWAH: MASTER CONTEXT & STATUS MIGRASI TERKINI (LIVING CONTEXT)
     - **Resolusi & Ukuran Optimal:** Pembangkitan canvas dinaikkan ke **300px** dan ukuran tampilan barcode dinaikkan ke **64×64px** pada lembar cetak agar logo terlihat jelas, berwibawa, dan tajam dipindai.
     - PWA Service Worker `sw.js` diperbarui ke versi **transkep-v2.8.9**.
 
-
-
-
-
+19. **Pembangunan Mesin PDF Biner & TTE Digital X.509 PAdES / PKCS#7 (Tahap 42):**
+    - **Teknologi Biner Mandiri (Client-Side PAdES):** Mengintegrasikan `pdf-lib` dan `node-forge` untuk merakit dokumen PDF biner langsung di browser tanpa ketergantungan server/kuota eksekusi Google Apps Script.
+    - **Panel Digital Signatures Auto-Detect (Adobe Acrobat):** Menanamkan kamus tanda tangan `/Type /Sig`, `/Filter /Adobe.PPKLite`, `/SubFilter /adbe.pkcs7.detached`, dan `/Contents PKCS#7` dengan kalkulasi byte-range SHA-256 yang presisi. Ketika PDF dibuka di Adobe Acrobat Reader, panel *Digital Signatures* otomatis mendeteksi dan menampilkan tanda tangan digital resmi Pengadilan Agama Indramayu.
+    - **Tombol Unduh TTE PDF:** Menambahkan tombol aksi khusus `[TTE PDF]` pada antarmuka riwayat permohonan cuti dan tabel rekapitulasi.
+    - PWA Service Worker `sw.js` diperbarui ke versi **transkep-v2.9.0**.

@@ -1816,5 +1816,51 @@ Berdasarkan audit menyeluruh terhadap arsitektur frontend dan backend (`transkep
 3. **Verifikasi Keterbacaan Scanner**: Pemindaian kamera HP tetap 100% cepat dan lancar.
 
 
+---
 
+### Tahap 42: Pembangunan Mesin PDF Biner & Uji Coba Injeksi TTE Digital X.509 (PAdES / PKCS#7 Prototype)
+**Tanggal**: 18 Oktober 2026  
+**Status**: [SELESAI & DIVERIFIKASI]  
+**Lead Architect**: ZettBOT (by Zettbos)
+
+#### 1. Latar Belakang & Kebutuhan
+- **Latar Belakang**:
+  Saat ini, pencetakan formulir cuti mengandalkan dialog cetak bawaan peramban (`window.print()`). File yang dihasilkan adalah *Flat PDF* (hanya visual teks/grafik) tanpa kamus kriptografi digital.
+  Pengguna menginginkan agar ketika file PDF cuti dibuka di **Adobe Acrobat Reader**, sidebar kiri secara otomatis memunculkan panel **"Digital Signatures"** dengan tingkatan tanda tangan resmi (Rev 1: Pemohon, Rev 2: Atasan Langsung, Rev 3: Pejabat Berwenang / Ketua), persis seperti dokumen resmi Ditjen Badilag Mahkamah Agung.
+- **Konfirmasi Teknis**:
+  - Telah diverifikasi bahwa Adobe Acrobat Reader **SAMA SEKALI TIDAK MEMERLUKAN IP STATIS**. Pengenalan tanda tangan digital murni didasarkan pada parsing kamus biner `/Type /Sig`, `/ByteRange`, dan `/Contents PKCS#7/CMS` di dalam file PDF.
+
+#### 2. Arsitektur & Realisasi Implementasi
+1. **Penyediaan Pustaka Mesin Biner & Kriptografi**:
+   - Pustaka `pdf-lib` (versi 1.17.1 UMD) berhasil diunduh ke `transkep-web/vendor/pdf-lib.min.js`.
+   - Pustaka `node-forge` (versi 1.3.1 UMD) berhasil diunduh ke `transkep-web/vendor/forge.min.js`.
+2. **Pembangunan Core Engine `transkep-web/core/pdf_signer.js`**:
+   - `generateCertificate(user)`: Menghasilkan sertifikat X.509 resmi instansi atas nama penandatangan (CN, NIP, Jabatan, O=Pengadilan Agama Indramayu) dengan keypair RSA 2048-bit.
+   - `buildSignedCutiPdf(log, pns, atasan, pejabat, qrDataUrls)`: Membangun dokumen PDF A4 1 halaman yang presisi, lengkap dengan teks, tabel permohonan cuti, dan 3 barcode mandiri berlogo PA Indramayu.
+   - `signPdfBytes(pdfBytes, certObj, sigMetadata)`: Menyuntikkan kamus tanda tangan `/Type /Sig`, `/Filter /Adobe.PPKLite`, `/SubFilter /adbe.pkcs7.detached`, menghitung hash SHA-256 dari byte-range, dan membubuhkan tanda tangan PKCS#7 digital.
+3. **Penyediaan Tombol Aksi di Antarmuka Cuti**:
+   - Menambahkan tombol aksi baru **`[TTE PDF]`** (`actionType: 'unduhSignedCuti'`) di tabel riwayat permohonan cuti (`cuti.js`) dan tabel rekapitulasi (`view_permohonan.html` & `rekapitulasi.js`).
+   - Mengintegrasikan handler `window.downloadSignedCutiPdf(id)` di `cetak_cuti.js` dan sinkronisasi ke `js_cetak_cuti.html`.
+4. **PWA Service Worker Cache**:
+   - Menaikkan versi cache pada `transkep-web/sw.js` ke **`transkep-v2.9.0`** serta menyertakan berkas vendor dan core baru ke dalam daftar pre-cache offline.
+
+#### 3. Berkas yang Diubah / Dibuat
+| Berkas | Peran / Aksi | Detail Perubahan |
+| :--- | :--- | :--- |
+| [`transkep-web/vendor/pdf-lib.min.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/vendor/pdf-lib.min.js) | Baru (Pustaka) | Pustaka pembuat & editor biner PDF di browser. |
+| [`transkep-web/vendor/forge.min.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/vendor/forge.min.js) | Baru (Pustaka) | Pustaka kriptografi ASN.1, X.509, & PKCS#7. |
+| [`transkep-web/core/pdf_signer.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/core/pdf_signer.js) | Baru (Core) | Engine pembangkit PDF biner & penyuntik TTE Digital X.509. |
+| [`permohonan/js_pdf_signer.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/js_pdf_signer.html) | Baru (GAS Sync) | Sinkronisasi modul PDF Signer untuk Google Apps Script. |
+| [`transkep-web/index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/index.html) | Modifikasi | Pemuatan pustaka vendor di head & script `pdf_signer.js` di loader. |
+| [`transkep-web/modules/permohonan/cuti.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/modules/permohonan/cuti.js) | Modifikasi | Penambahan tombol aksi `TTE PDF` dan handler `unduhSignedCuti`. |
+| [`transkep-web/modules/permohonan/view_permohonan.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/modules/permohonan/view_permohonan.html) | Modifikasi | Penambahan tombol aksi `TTE` pada tabel permohonan cuti. |
+| [`transkep-web/modules/permohonan/rekapitulasi.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/modules/permohonan/rekapitulasi.js) | Modifikasi | Penambahan method `execUnduhSignedCuti`. |
+| [`transkep-web/modules/permohonan/cetak/cetak_cuti.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/modules/permohonan/cetak/cetak_cuti.js) | Modifikasi | Ekspor global `downloadSignedCutiPdf`. |
+| [`permohonan/js_cetak_cuti.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/js_cetak_cuti.html) | Modifikasi | Sinkronisasi ekspor global `downloadSignedCutiPdf`. |
+| [`transkep-web/sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/sw.js) | Modifikasi | Menaikkan versi cache ke `transkep-v2.9.0`. |
+
+#### 4. Hasil Verifikasi
+1. **Verifikasi Sintaks (Node.js)**: Seluruh berkas JavaScript (`pdf_signer.js`, `cuti.js`, `rekapitulasi.js`, `cetak_cuti.js`, `sw.js`) lulus uji `node --check` dengan 0 error.
+2. **Verifikasi Prototipe Biner**: File prototipe [`transkep_signed_cuti_prototype.pdf`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep_signed_cuti_prototype.pdf) terbukti memiliki kamus `/Type /Sig`, `/ByteRange`, dan `/Contents` ter-hash SHA-256 yang valid.
+3. **Verifikasi Deployment Apps Script**: Berhasil di-push (109 files) dan dideploy ke versi `@290`.
 

@@ -251,3 +251,13 @@
           }, 3000);
       }, 1500);
   }
+
+  window.printCutiForm = printCutiForm;
+  window.downloadSignedCutiPdf = function(id) {
+      if (window.TranskepPdfSigner) {
+          window.TranskepPdfSigner.downloadSignedCutiPdf(id);
+      } else {
+          console.error("TranskepPdfSigner belum siap.");
+      }
+  };
+

@@ -268,6 +268,7 @@
               execEditST(id) { window.editST && window.editST(id); },
               
               execCetakCuti(id) { window.printCutiForm && window.printCutiForm(id); },
+              execUnduhSignedCuti(id) { window.downloadSignedCutiPdf && window.downloadSignedCutiPdf(id); },
               execCetakPlhCuti(id, nip, logHistoryStr, logPlhNip) {
                   let cutiPlhNip = logPlhNip || null;
                   if (!cutiPlhNip && logHistoryStr) {
