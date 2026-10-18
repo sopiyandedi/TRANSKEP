@@ -232,9 +232,12 @@
                           
                           if (log.jenis !== 'Dinas Luar') actions.push({ actionType: 'cetakCuti', icon: 'fa-print', text: 'Cetak', css: 'px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-lg transition shadow-md shadow-slate-900/30', tooltip: 'Cetak Berkas' });
                           
-                          if (log.status === 'Menunggu') {
+                          const sNorm = String(log.status || '').trim().toLowerCase();
+                          if (sNorm === 'menunggu' || sNorm === 'perubahan') {
                               actions.push({ actionType: 'editCuti', icon: 'fa-pen-to-square', text: '', css: 'px-2 py-1.5 bg-indigo-500/10 hover:bg-indigo-500 border border-indigo-500/20 hover:border-indigo-500 text-indigo-400 hover:text-white rounded-lg transition', tooltip: 'Ubah Pengajuan' });
                               actions.push({ actionType: 'batalCuti', icon: 'fa-trash-can', text: '', css: 'px-2 py-1.5 bg-rose-500/10 hover:bg-rose-500 border border-rose-500/20 hover:border-rose-500 text-rose-400 hover:text-white rounded-lg transition', tooltip: 'Tarik Pengajuan' });
+                          } else if (sNorm === 'disetujui') {
+                              actions.push({ actionType: 'usulBatalCuti', icon: 'fa-ban', text: 'Usul Batal', css: 'px-2.5 py-1.5 bg-rose-500/10 hover:bg-rose-500 border border-rose-500/20 hover:border-rose-500 text-rose-400 hover:text-white rounded-lg transition text-xs font-semibold', tooltip: 'Usulkan Pembatalan Resmi' });
                           }
                       } 
                       // --- LOGIKA IZIN KELUAR ---
@@ -355,6 +358,13 @@
                   if (actionType === 'batalIK') this.deleteIK(id);
                   if (actionType === 'batalIP') this.deleteIP(id);
                   if (actionType === 'batalWFH') this.deleteWFH(id);
+                  if (actionType === 'usulBatalCuti') {
+                      if (typeof window.openCancelModal === 'function') {
+                          window.openCancelModal(id);
+                      } else if (window.vmFormCuti && typeof window.vmFormCuti.openCancelModal === 'function') {
+                          window.vmFormCuti.openCancelModal(id);
+                      }
+                  }
                   
                   // --- FUNGSI CETAK ---
                   if (actionType === 'cetakCuti') window.printCutiForm && window.printCutiForm(id);
@@ -383,170 +393,183 @@
               deleteCutiRecord(id) {
                   const token = localStorage.getItem('transkep_session_token');
                   const currentNip = this.s && this.s.user ? this.s.user.nip : '';
-                  if (window.showCustomConfirm) {
-                      window.showCustomConfirm("Tarik Pengajuan", "Batalkan dan tarik pengajuan ini? Saldo cuti Anda akan dikembalikan utuh.", () => {
-                          if (window.showLoading) window.showLoading("Menarik data...");
-                          const delPromise = (typeof CutiDataService !== 'undefined')
-                              ? CutiDataService.deleteCutiLog(id, false, currentNip, token)
-                              : new Promise((resolve, reject) => {
-                                  if (typeof google !== 'undefined' && google.script) {
-                                      google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).deleteCutiLog(id, false, currentNip, token);
-                                  } else {
-                                      resolve({ status: 'success', message: 'Pengajuan ditarik [Demo]' });
-                                  }
-                              });
+                  const confirmFn = window.showCustomConfirm || function(t, m, cb) {
+                      if (confirm(`${t}\n\n${m}`)) cb();
+                  };
 
-                          delPromise
-                              .then((res) => {
-                                  if (window.hideLoading) window.hideLoading();
-                                  if (res && res.status === 'success') {
-                                      if (window.showNotify) window.showNotify("Ditarik", res.message, "success");
-                                      
-                                      const logIndex = this.s.cutiLogs.findIndex(l => String(l.id) === String(id));
-                                      if (logIndex !== -1) {
-                                          const logToCancel = this.s.cutiLogs[logIndex];
-                                          // Proses Refund Saldo
-                                          if (logToCancel.jenis === 'Tahunan') {
-                                              try {
-                                                  let h = JSON.parse(logToCancel.history || "{}");
-                                                  this.s.user.s_tahunan_2024 = Number(this.s.user.s_tahunan_2024 || 0) + (Number(h.y24) || 0);
-                                                  this.s.user.s_tahunan_2025 = Number(this.s.user.s_tahunan_2025 || 0) + (Number(h.y25) || 0);
-                                                  this.s.user.s_tahunan_2026 = Number(this.s.user.s_tahunan_2026 || 0) + (Number(h.y26) || 0);
-                                              } catch(e) {}
-                                          } else {
-                                              let field = "";
-                                              if(logToCancel.jenis === 'Sakit') field = 's_sakit';
-                                              else if(logToCancel.jenis === 'Alasan Penting' || logToCancel.jenis === 'Penting') field = 's_penting';
-                                              else if(logToCancel.jenis === 'Besar') field = 's_besar';
-                                              else if(logToCancel.jenis === 'Melahirkan') field = 's_melahirkan';
-                                              else if(logToCancel.jenis === 'CLTN') field = 's_cltn';
-                                              if (field !== "") this.s.user[field] = Number(this.s.user[field] || 0) + Number(logToCancel.sisa_cuti || 0);
-                                          }
-                                          
-                                          // Update juga referensi di usersList agar data admin tidak desinkronisasi
-                                          if (this.s.usersList) {
-                                              const uIdx = this.s.usersList.findIndex(u => String(u.nip) === String(this.s.user.nip));
-                                              if (uIdx !== -1) this.s.usersList[uIdx] = Object.assign({}, this.s.user);
-                                          }
-                                          
-                                          // Secara Reaktif hapus dari UI
-                                          this.s.cutiLogs.splice(logIndex, 1);
+                  confirmFn("Tarik Pengajuan", "Batalkan dan tarik pengajuan ini? Saldo cuti Anda akan dikembalikan utuh.", () => {
+                      if (window.showLoading) window.showLoading("Menarik data...");
+                      const delPromise = (typeof CutiDataService !== 'undefined')
+                          ? CutiDataService.deleteCutiLog(id, false, currentNip, token)
+                          : new Promise((resolve, reject) => {
+                              if (typeof google !== 'undefined' && google.script) {
+                                  google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).deleteCutiLog(id, false, currentNip, token);
+                              } else {
+                                  resolve({ status: 'success', message: 'Pengajuan ditarik [Demo]' });
+                              }
+                          });
+
+                      delPromise
+                          .then((res) => {
+                              if (window.hideLoading) window.hideLoading();
+                              if (res && res.status === 'success') {
+                                  if (window.showNotify) window.showNotify("Ditarik", res.message, "success");
+                                  
+                                  const logIndex = this.s.cutiLogs.findIndex(l => String(l.id) === String(id));
+                                  if (logIndex !== -1) {
+                                      const logToCancel = this.s.cutiLogs[logIndex];
+                                      // Proses Refund Saldo
+                                      if (logToCancel.jenis === 'Tahunan') {
+                                          try {
+                                              let h = JSON.parse(logToCancel.history || "{}");
+                                              this.s.user.s_tahunan_2024 = Number(this.s.user.s_tahunan_2024 || 0) + (Number(h.y24) || 0);
+                                              this.s.user.s_tahunan_2025 = Number(this.s.user.s_tahunan_2025 || 0) + (Number(h.y25) || 0);
+                                              this.s.user.s_tahunan_2026 = Number(this.s.user.s_tahunan_2026 || 0) + (Number(h.y26) || 0);
+                                          } catch(e) {}
+                                      } else {
+                                          let field = "";
+                                          if(logToCancel.jenis === 'Sakit') field = 's_sakit';
+                                          else if(logToCancel.jenis === 'Alasan Penting' || logToCancel.jenis === 'Penting') field = 's_penting';
+                                          else if(logToCancel.jenis === 'Besar') field = 's_besar';
+                                          else if(logToCancel.jenis === 'Melahirkan') field = 's_melahirkan';
+                                          else if(logToCancel.jenis === 'CLTN') field = 's_cltn';
+                                          if (field !== "") this.s.user[field] = Number(this.s.user[field] || 0) + Number(logToCancel.sisa_cuti || 0);
                                       }
-                                  } else { 
-                                      if (window.showNotify) window.showNotify("Gagal Membatalkan", res ? res.message : "Gagal membatalkan cuti.", "error"); 
+                                      
+                                      // Update juga referensi di usersList agar data admin tidak desinkronisasi
+                                      if (this.s.usersList) {
+                                          const uIdx = this.s.usersList.findIndex(u => String(u.nip) === String(this.s.user.nip));
+                                          if (uIdx !== -1) this.s.usersList[uIdx] = Object.assign({}, this.s.user);
+                                      }
+                                      
+                                      // Secara Reaktif hapus dari UI
+                                      this.s.cutiLogs.splice(logIndex, 1);
                                   }
-                              })
-                              .catch((err) => {
-                                  if (window.hideLoading) window.hideLoading();
-                                  if (window.showNotify) window.showNotify("Error Jaringan", err.message || err.toString(), "error");
-                              });
-                      });
-                  }
+
+                                  // Background server sync jika fungsi tersedia
+                                  if (typeof syncAllServerData === 'function') {
+                                      syncAllServerData();
+                                  }
+                              } else { 
+                                  if (window.showNotify) window.showNotify("Gagal Membatalkan", res ? res.message : "Gagal membatalkan cuti.", "error"); 
+                              }
+                          })
+                          .catch((err) => {
+                              if (window.hideLoading) window.hideLoading();
+                              if (window.showNotify) window.showNotify("Error Jaringan", err.message || err.toString(), "error");
+                          });
+                  });
               },
               
               deleteIK(id) {
                   const token = localStorage.getItem('transkep_session_token'); 
                   const currentNip = this.s && this.s.user ? this.s.user.nip : '';
-                  if (window.showCustomConfirm) {
-                      window.showCustomConfirm("Tarik Pengajuan", "Batalkan dan tarik pengajuan Izin Keluar ini?", () => {
-                          if (window.showLoading) window.showLoading("Menarik data...");
-                          const delPromise = (typeof CutiDataService !== 'undefined')
-                              ? CutiDataService.deleteIzinKeluarLog(id, false, currentNip, token)
-                              : new Promise((resolve, reject) => {
-                                  if (typeof google !== 'undefined' && google.script) {
-                                      google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).deleteIzinKeluarLog(id, false, currentNip, token);
-                                  } else {
-                                      resolve({ status: 'success', message: 'Izin Keluar ditarik [Demo]' });
-                                  }
-                              });
+                  const confirmFn = window.showCustomConfirm || function(t, m, cb) {
+                      if (confirm(`${t}\n\n${m}`)) cb();
+                  };
+                  confirmFn("Tarik Pengajuan", "Batalkan dan tarik pengajuan Izin Keluar ini?", () => {
+                      if (window.showLoading) window.showLoading("Menarik data...");
+                      const delPromise = (typeof CutiDataService !== 'undefined')
+                          ? CutiDataService.deleteIzinKeluarLog(id, false, currentNip, token)
+                          : new Promise((resolve, reject) => {
+                              if (typeof google !== 'undefined' && google.script) {
+                                  google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).deleteIzinKeluarLog(id, false, currentNip, token);
+                              } else {
+                                  resolve({ status: 'success', message: 'Izin Keluar ditarik [Demo]' });
+                              }
+                          });
 
-                          delPromise
-                              .then((res) => {
-                                  if (window.hideLoading) window.hideLoading();
-                                  if (res && res.status === 'success') {
-                                      if (window.showNotify) window.showNotify("Ditarik", res.message, "success");
-                                      const idx = this.s.ikLogs.findIndex(l => String(l.id) === String(id));
-                                      if (idx !== -1) this.s.ikLogs.splice(idx, 1);
-                                  } else { 
-                                      if (window.showNotify) window.showNotify("Gagal Membatalkan", res ? res.message : "Gagal membatalkan IK.", "error"); 
-                                  }
-                              })
-                              .catch((err) => {
-                                  if (window.hideLoading) window.hideLoading();
-                                  if (window.showNotify) window.showNotify("Error Jaringan", err.message || err.toString(), "error");
-                              });
-                      });
-                  }
+                      delPromise
+                          .then((res) => {
+                              if (window.hideLoading) window.hideLoading();
+                              if (res && res.status === 'success') {
+                                  if (window.showNotify) window.showNotify("Ditarik", res.message, "success");
+                                  const idx = this.s.ikLogs.findIndex(l => String(l.id) === String(id));
+                                  if (idx !== -1) this.s.ikLogs.splice(idx, 1);
+                                  if (typeof syncAllServerData === 'function') syncAllServerData();
+                              } else { 
+                                  if (window.showNotify) window.showNotify("Gagal Membatalkan", res ? res.message : "Gagal membatalkan IK.", "error"); 
+                              }
+                          })
+                          .catch((err) => {
+                              if (window.hideLoading) window.hideLoading();
+                              if (window.showNotify) window.showNotify("Error Jaringan", err.message || err.toString(), "error");
+                          });
+                  });
               },
               
               deleteIP(id) {
                   const token = localStorage.getItem('transkep_session_token'); 
                   const currentNip = this.s && this.s.user ? this.s.user.nip : '';
-                  if (window.showCustomConfirm) {
-                      window.showCustomConfirm("Tarik Pengajuan", "Batalkan dan tarik pengajuan Izin Pribadi ini?", () => {
-                          if (window.showLoading) window.showLoading("Menarik data...");
-                          const delPromise = (typeof CutiDataService !== 'undefined')
-                              ? CutiDataService.deleteIzinPribadiLog(id, false, currentNip, token)
-                              : new Promise((resolve, reject) => {
-                                  if (typeof google !== 'undefined' && google.script) {
-                                      google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).deleteIzinPribadiLog(id, false, currentNip, token);
-                                  } else {
-                                      resolve({ status: 'success', message: 'Izin Pribadi ditarik [Demo]' });
-                                  }
-                              });
+                  const confirmFn = window.showCustomConfirm || function(t, m, cb) {
+                      if (confirm(`${t}\n\n${m}`)) cb();
+                  };
+                  confirmFn("Tarik Pengajuan", "Batalkan dan tarik pengajuan Izin Pribadi ini?", () => {
+                      if (window.showLoading) window.showLoading("Menarik data...");
+                      const delPromise = (typeof CutiDataService !== 'undefined')
+                          ? CutiDataService.deleteIzinPribadiLog(id, false, currentNip, token)
+                          : new Promise((resolve, reject) => {
+                              if (typeof google !== 'undefined' && google.script) {
+                                  google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).deleteIzinPribadiLog(id, false, currentNip, token);
+                              } else {
+                                  resolve({ status: 'success', message: 'Izin Pribadi ditarik [Demo]' });
+                              }
+                          });
 
-                          delPromise
-                              .then((res) => {
-                                  if (window.hideLoading) window.hideLoading();
-                                  if (res && res.status === 'success') {
-                                      if (window.showNotify) window.showNotify("Ditarik", res.message, "success");
-                                      const idx = this.s.ipLogs.findIndex(l => String(l.id) === String(id));
-                                      if (idx !== -1) this.s.ipLogs.splice(idx, 1);
-                                  } else { 
-                                      if (window.showNotify) window.showNotify("Gagal Membatalkan", res ? res.message : "Gagal membatalkan IP.", "error"); 
-                                  }
-                              })
-                              .catch((err) => {
-                                  if (window.hideLoading) window.hideLoading();
-                                  if (window.showNotify) window.showNotify("Error Jaringan", err.message || err.toString(), "error");
-                              });
-                      });
-                  }
+                      delPromise
+                          .then((res) => {
+                              if (window.hideLoading) window.hideLoading();
+                              if (res && res.status === 'success') {
+                                  if (window.showNotify) window.showNotify("Ditarik", res.message, "success");
+                                  const idx = this.s.ipLogs.findIndex(l => String(l.id) === String(id));
+                                  if (idx !== -1) this.s.ipLogs.splice(idx, 1);
+                                  if (typeof syncAllServerData === 'function') syncAllServerData();
+                              } else { 
+                                  if (window.showNotify) window.showNotify("Gagal Membatalkan", res ? res.message : "Gagal membatalkan IP.", "error"); 
+                              }
+                          })
+                          .catch((err) => {
+                              if (window.hideLoading) window.hideLoading();
+                              if (window.showNotify) window.showNotify("Error Jaringan", err.message || err.toString(), "error");
+                          });
+                  });
               },
               
               deleteWFH(id) {
                   const token = localStorage.getItem('transkep_session_token'); 
                   const currentNip = this.s && this.s.user ? this.s.user.nip : '';
-                  if (window.showCustomConfirm) {
-                      window.showCustomConfirm("Tarik Pengajuan", "Batalkan dan tarik pengajuan WFH ini?", () => {
-                          if (window.showLoading) window.showLoading("Menarik data...");
-                          const delPromise = (typeof CutiDataService !== 'undefined')
-                              ? CutiDataService.deleteWfhLog(id, false, currentNip, token)
-                              : new Promise((resolve, reject) => {
-                                  if (typeof google !== 'undefined' && google.script) {
-                                      google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).deleteWfhLog(id, false, currentNip, token);
-                                  } else {
-                                      resolve({ status: 'success', message: 'WFH ditarik [Demo]' });
-                                  }
-                              });
+                  const confirmFn = window.showCustomConfirm || function(t, m, cb) {
+                      if (confirm(`${t}\n\n${m}`)) cb();
+                  };
+                  confirmFn("Tarik Pengajuan", "Batalkan dan tarik pengajuan WFH ini?", () => {
+                      if (window.showLoading) window.showLoading("Menarik data...");
+                      const delPromise = (typeof CutiDataService !== 'undefined')
+                          ? CutiDataService.deleteWfhLog(id, false, currentNip, token)
+                          : new Promise((resolve, reject) => {
+                              if (typeof google !== 'undefined' && google.script) {
+                                  google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).deleteWfhLog(id, false, currentNip, token);
+                              } else {
+                                  resolve({ status: 'success', message: 'WFH ditarik [Demo]' });
+                              }
+                          });
 
-                          delPromise
-                              .then((res) => {
-                                  if (window.hideLoading) window.hideLoading();
-                                  if (res && res.status === 'success') {
-                                      if (window.showNotify) window.showNotify("Ditarik", res.message, "success");
-                                      const idx = this.s.wfhLogs.findIndex(l => String(l.id) === String(id));
-                                      if (idx !== -1) this.s.wfhLogs.splice(idx, 1);
-                                  } else { 
-                                      if (window.showNotify) window.showNotify("Gagal Membatalkan", res ? res.message : "Gagal membatalkan WFH.", "error"); 
-                                  }
-                              })
-                              .catch((err) => {
-                                  if (window.hideLoading) window.hideLoading();
-                                  if (window.showNotify) window.showNotify("Error Jaringan", err.message || err.toString(), "error");
-                              });
-                      });
-                  }
+                      delPromise
+                          .then((res) => {
+                              if (window.hideLoading) window.hideLoading();
+                              if (res && res.status === 'success') {
+                                  if (window.showNotify) window.showNotify("Ditarik", res.message, "success");
+                                  const idx = this.s.wfhLogs.findIndex(l => String(l.id) === String(id));
+                                  if (idx !== -1) this.s.wfhLogs.splice(idx, 1);
+                                  if (typeof syncAllServerData === 'function') syncAllServerData();
+                              } else { 
+                                  if (window.showNotify) window.showNotify("Gagal Membatalkan", res ? res.message : "Gagal membatalkan WFH.", "error"); 
+                              }
+                          })
+                          .catch((err) => {
+                              if (window.hideLoading) window.hideLoading();
+                              if (window.showNotify) window.showNotify("Error Jaringan", err.message || err.toString(), "error");
+                          });
+                  });
               }
           }
       }).mount('#vue-riwayat-permohonan');

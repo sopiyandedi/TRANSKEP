@@ -105,14 +105,20 @@ const CutiDataService = {
    */
   deleteCutiLog(id, isHard = false, nip, token) {
     const authToken = token || (typeof localStorage !== 'undefined' ? localStorage.getItem('transkep_session_token') : '') || '';
+    const activeNip = nip || (typeof localStorage !== 'undefined' ? (localStorage.getItem('transkep_active_nip') || localStorage.getItem('transkep_user_nip')) : '') || '';
+
+    if (typeof TranskepAPI !== 'undefined' && typeof TranskepAPI.call === 'function') {
+      return TranskepAPI.call('deleteCutiLog', id, isHard, activeNip, authToken);
+    }
+
     return new Promise((resolve, reject) => {
       if (typeof google === 'undefined' || !google.script || !google.script.run) {
-        return reject(new Error("Koneksi google.script.run tidak tersedia."));
+        return reject(new Error("Koneksi TranskepAPI / google.script.run tidak tersedia."));
       }
       google.script.run
         .withSuccessHandler((res) => resolve(res))
         .withFailureHandler((err) => reject(err))
-        .deleteCutiLog(id, isHard, nip, authToken);
+        .deleteCutiLog(id, isHard, activeNip, authToken);
     });
   },
 
@@ -126,14 +132,20 @@ const CutiDataService = {
    */
   deleteIzinKeluarLog(id, isHard = false, nip, token) {
     const authToken = token || (typeof localStorage !== 'undefined' ? localStorage.getItem('transkep_session_token') : '') || '';
+    const activeNip = nip || (typeof localStorage !== 'undefined' ? (localStorage.getItem('transkep_active_nip') || localStorage.getItem('transkep_user_nip')) : '') || '';
+
+    if (typeof TranskepAPI !== 'undefined' && typeof TranskepAPI.call === 'function') {
+      return TranskepAPI.call('deleteIzinKeluarLog', id, isHard, activeNip, authToken);
+    }
+
     return new Promise((resolve, reject) => {
       if (typeof google === 'undefined' || !google.script || !google.script.run) {
-        return reject(new Error("Koneksi google.script.run tidak tersedia."));
+        return reject(new Error("Koneksi TranskepAPI / google.script.run tidak tersedia."));
       }
       google.script.run
         .withSuccessHandler((res) => resolve(res))
         .withFailureHandler((err) => reject(err))
-        .deleteIzinKeluarLog(id, isHard, nip, authToken);
+        .deleteIzinKeluarLog(id, isHard, activeNip, authToken);
     });
   },
 
@@ -147,14 +159,20 @@ const CutiDataService = {
    */
   deleteIzinPribadiLog(id, isHard = false, nip, token) {
     const authToken = token || (typeof localStorage !== 'undefined' ? localStorage.getItem('transkep_session_token') : '') || '';
+    const activeNip = nip || (typeof localStorage !== 'undefined' ? (localStorage.getItem('transkep_active_nip') || localStorage.getItem('transkep_user_nip')) : '') || '';
+
+    if (typeof TranskepAPI !== 'undefined' && typeof TranskepAPI.call === 'function') {
+      return TranskepAPI.call('deleteIzinPribadiLog', id, isHard, activeNip, authToken);
+    }
+
     return new Promise((resolve, reject) => {
       if (typeof google === 'undefined' || !google.script || !google.script.run) {
-        return reject(new Error("Koneksi google.script.run tidak tersedia."));
+        return reject(new Error("Koneksi TranskepAPI / google.script.run tidak tersedia."));
       }
       google.script.run
         .withSuccessHandler((res) => resolve(res))
         .withFailureHandler((err) => reject(err))
-        .deleteIzinPribadiLog(id, isHard, nip, authToken);
+        .deleteIzinPribadiLog(id, isHard, activeNip, authToken);
     });
   },
 
@@ -168,14 +186,20 @@ const CutiDataService = {
    */
   deleteWfhLog(id, isHard = false, nip, token) {
     const authToken = token || (typeof localStorage !== 'undefined' ? localStorage.getItem('transkep_session_token') : '') || '';
+    const activeNip = nip || (typeof localStorage !== 'undefined' ? (localStorage.getItem('transkep_active_nip') || localStorage.getItem('transkep_user_nip')) : '') || '';
+
+    if (typeof TranskepAPI !== 'undefined' && typeof TranskepAPI.call === 'function') {
+      return TranskepAPI.call('deleteWfhLog', id, isHard, activeNip, authToken);
+    }
+
     return new Promise((resolve, reject) => {
       if (typeof google === 'undefined' || !google.script || !google.script.run) {
-        return reject(new Error("Koneksi google.script.run tidak tersedia."));
+        return reject(new Error("Koneksi TranskepAPI / google.script.run tidak tersedia."));
       }
       google.script.run
         .withSuccessHandler((res) => resolve(res))
         .withFailureHandler((err) => reject(err))
-        .deleteWfhLog(id, isHard, nip, authToken);
+        .deleteWfhLog(id, isHard, activeNip, authToken);
     });
   },
 
@@ -189,14 +213,20 @@ const CutiDataService = {
    */
   requestCancelCuti(id, alasan, nip, token) {
     const authToken = token || (typeof localStorage !== 'undefined' ? localStorage.getItem('transkep_session_token') : '') || '';
+    const activeNip = nip || (typeof localStorage !== 'undefined' ? (localStorage.getItem('transkep_active_nip') || localStorage.getItem('transkep_user_nip')) : '') || '';
+
+    if (typeof TranskepAPI !== 'undefined' && typeof TranskepAPI.call === 'function') {
+      return TranskepAPI.call('requestCancelCuti', id, alasan, activeNip, authToken);
+    }
+
     return new Promise((resolve, reject) => {
       if (typeof google === 'undefined' || !google.script || !google.script.run) {
-        return reject(new Error("Koneksi google.script.run tidak tersedia."));
+        return reject(new Error("Koneksi TranskepAPI / google.script.run tidak tersedia."));
       }
       google.script.run
         .withSuccessHandler((res) => resolve(res))
         .withFailureHandler((err) => reject(err))
-        .requestCancelCuti(id, alasan, nip, authToken);
+        .requestCancelCuti(id, alasan, activeNip, authToken);
     });
   }
 };

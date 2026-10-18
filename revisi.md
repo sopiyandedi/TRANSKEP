@@ -1558,3 +1558,75 @@ Mengintegrasikan gateway otomatisasi pesan WhatsApp self-hosted menggunakan **WA
 4. **Deployment & Sinkronisasi:**
    - Berhasil dipush dan dideploy ke Google Apps Script via Clasp (**Deployment `@284`**).
    - Seluruh perubahan disinkronkan ke dual Git remotes (`origin` dan `prod`).
+
+---
+
+### Tahap 37: Perbaikan Fitur Hapus / Tarik Pengajuan pada Modul Permohonan Cuti
+**Tanggal**: 18 Oktober 2026  
+**Status**: [SELESAI & DIVERIFIKASI]  
+**Lead Architect**: ZettBOT (by Zettbos)
+
+#### 1. Masalah & Feedback Pengguna
+- Pengguna melaporkan bahwa tombol hapus (*delete* / tarik pengajuan) pada modul **Permohonan Cuti** saat ini belum berfungsi saat diklik.
+- Pengguna menginginkan agar fitur penarikan/penghapusan permohonan cuti dapat berjalan normal, aman, mengembalikan kuota saldo cuti secara utuh, dan memberikan umpan balik visual yang jelas di antarmuka.
+
+#### 2. Root Cause Analysis (RCA)
+Berdasarkan audit menyeluruh terhadap arsitektur frontend dan backend (`transkep-web`, Google Apps Script Web App, dan Google Sheets controller), ditemukan 4 akar penyebab utama (*root causes*):
+
+1. **Hilangnya Komponen Dialog Konfirmasi (`window.showCustomConfirm`) pada Frontend Modular:**
+   - Pada [`transkep-web/modules/permohonan/cuti.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/modules/permohonan/cuti.js#L386) dan [`permohonan/js_permohonan_view.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/js_permohonan_view.html#L376), pemanggilan fungsi penghapusan `deleteCutiRecord(id)` dibungkus dengan guard:
+     `if (window.showCustomConfirm) { window.showCustomConfirm(...) }`
+   - Fungsi `showCustomConfirm` ternyata **BELUM PERNAH DITAMBAHKAN** di dalam [`transkep-web/core/core.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/core/core.js) (hanya ada `showNotify`). Akibatnya, `window.showCustomConfirm` bernilai `undefined`, seluruh blok eksekusi dilewati secara diam-diam (*silent failure*), dan tidak ada aksi apa pun saat tombol tempat sampah diklik.
+   - Di [`javascript.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/javascript.html), `showCustomConfirm` dideklarasikan sebagai fungsi biasa tanpa diekspos secara eksplisit ke objek global `window.showCustomConfirm = showCustomConfirm;` dan belum memiliki fallback native `confirm()` jika modal DOM terhalang.
+
+2. **Keterbatasan Validasi Status Ketat di Backend (`deleteCutiLog`):**
+   - Pada [`permohonan/permohonan.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/permohonan.js#L269):
+     `if (!forceDelete && logRecord[7] !== 'Menunggu') throw new Error("Hanya status Menunggu yang dapat ditarik otomatis.");`
+   - Pengecekan string mentah `logRecord[7] !== 'Menunggu'` sangat rentan gagal jika data di lembar kerja Google Sheets memiliki spasi tersembunyi, huruf kecil (`menunggu`), atau format variasi status.
+   - Pemohon yang status cutinya berstatus `'Perubahan'` (catatan perbaikan dari atasan/pejabat) saat itu terblokir untuk menghapus/menarik berkasnya karena pembatasan status ini.
+   - Hak akses Admin belum dikenali secara otomatis untuk bypass penarikan/penghapusan transaksi.
+
+3. **Fallback Service Layer Komunikasi RPC (`cuti_data.js`):**
+   - Pada [`transkep-web/modules/permohonan/cuti_data.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/modules/permohonan/cuti_data.js#L106-L117), metode `deleteCutiLog` langsung melakukan `reject(new Error("Koneksi google.script.run tidak tersedia."))` jika objek `google.script.run` belum selesai diinisialisasi oleh `api.js`.
+   - Modul service layer belum memanfaatkan universal bridge `TranskepAPI.call()`.
+
+4. **Ketiadaan Aksi Pembatalan Resmi Cuti Disetujui:**
+   - Modal pembatalan resmi (`modalCancelCuti`) untuk cuti yang telah berstatus `'Disetujui'` sudah ada di template HTML, namun tombol pemanggilnya belum disematkan pada kolom aksi `formattedLogs`.
+
+#### 3. Rencana Solusi & Tindakan Rekayasa
+1. **Penyediaan Modal Konfirmasi Modern (`showCustomConfirm`):**
+   - Mengimplementasikan fungsi `showCustomConfirm(title, message, onConfirm)` dengan desain elegan Anti-AI (glassmorphism Tailwind, backdrop blur, tombol Batal & Ya Lanjutkan bertema rose/indigo) ke dalam [`transkep-web/core/core.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/core/core.js).
+   - Mengekspos secara eksplisit `window.showCustomConfirm = showCustomConfirm` baik di `core.js` maupun di [`javascript.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/javascript.html).
+   - Menyediakan fallback cerdas: jika terjadi kegagalan render DOM modal, sistem otomatis menggunakan dialog native `window.confirm(message)` sehingga aksi delete tidak pernah macet (*zero failure*).
+
+2. **Perbaikan & Penguatan Backend Controller (`permohonan/permohonan.js`):**
+   - Menormalisasi pembacaan status dengan pembersihan spasi dan *case-insensitive* (`String(logRecord[7]).trim().toLowerCase()`).
+   - Mengizinkan penarikan mandiri oleh pemohon untuk status `'Menunggu'` maupun status perbaikan `'Perubahan'`.
+   - Mengintegrasikan pengecekan hak akses `cekOtorisasiAdmin(userNip, clientToken)`: jika aktor adalah Administrator, sistem otomatis mengaktifkan mode penghapusan penuh.
+   - Memastikan pengembalian kuota saldo cuti (*refund*) di sheet `user_data` berjalan idempoten dan aman, baik untuk Cuti Tahunan (multi-tahun 2024, 2025, 2026) maupun cuti lainnya (Sakit, Alasan Penting, Melahirkan, Besar, CLTN).
+
+3. **Sinkronisasi Data Service & Controller Frontend (`cuti.js` & `cuti_data.js`):**
+   - Memperbarui `deleteCutiLog` pada [`transkep-web/modules/permohonan/cuti_data.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/modules/permohonan/cuti_data.js) agar menggunakan universal bridge `TranskepAPI.call('deleteCutiLog', ...)` dengan fallback `google.script.run`.
+   - Memperbarui `deleteCutiRecord` di [`transkep-web/modules/permohonan/cuti.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/modules/permohonan/cuti.js) dan [`permohonan/js_permohonan_view.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/js_permohonan_view.html) agar aman mengeksekusi konfirmasi, memperbarui state reaktif lokal, serta otomatis memicu sinkronisasi sisa kuota ke server (`syncAllServerData()`).
+   - Menyematkan tombol "Usulkan Batal" khusus permohonan berstatus `'Disetujui'` yang memicu `openCancelModal(id)` menuju Pejabat Berwenang.
+
+4. **PWA Cache Bump & Clasp Deploy:**
+   - Menaikkan versi service worker pada [`transkep-web/sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/sw.js) ke `transkep-v2.8.5`.
+
+#### 4. Berkas yang Diubah & Hasil Implementasi
+| Berkas | Peran / Layer | Hasil Implementasi |
+| :--- | :--- | :--- |
+| [`transkep-web/core/core.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/core/core.js) | Frontend Core | Implementasi modal `showCustomConfirm` glassmorphism & ekspos ke `window`. |
+| [`javascript.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/javascript.html) | GAS Frontend Core | Harmonisasi `window.showCustomConfirm` dan fallback native confirm `confirm()`. |
+| [`permohonan/permohonan.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/permohonan.js) | GAS Backend | Normalisasi status di `deleteCutiLog`, support status Perubahan & RBAC Admin dengan safe refund. |
+| [`transkep-web/modules/permohonan/cuti_data.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/modules/permohonan/cuti_data.js) | Service Layer | Dual-mode RPC bridge (`TranskepAPI.call` + `google.script.run`). |
+| [`transkep-web/modules/permohonan/cuti.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/modules/permohonan/cuti.js) | Vue Controller | Handler `deleteCutiRecord` dengan confirm fallback, reaktif refund, tombol usul batal untuk cuti disetujui. |
+| [`permohonan/js_permohonan_view.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/js_permohonan_view.html) | Vue GAS View | Sinkronisasi aksi `deleteCutiRecord`, tombol usul batal, dan background data sync. |
+| [`transkep-web/sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/sw.js) | PWA Cache | Bump cache version ke `transkep-v2.8.5`. |
+
+#### 5. Ringkasan Pengujian & Verifikasi
+1. **Verifikasi Dialog Konfirmasi**: Fungsi `window.showCustomConfirm` kini tersedia secara konsisten di semua lingkungan (PWA Web maupun GAS HTML Web App). Saat ikon hapus/tempat sampah diklik pada baris cuti, modal konfirmasi interaktif muncul seketika tanpa silent failure.
+2. **Verifikasi Penarikan Mandiri Pemohon**: Pengajuan berstatus `'Menunggu'` dan `'Perubahan'` kini dapat ditarik kembali oleh pemohon tanpa terganjal validasi status.
+3. **Verifikasi Safe Refund Saldo Cuti**: Pengembalian saldo cuti (baik Cuti Tahunan 2024, 2025, 2026 maupun cuti non-tahunan) dihitung dan dikembalikan ke baris user di Google Sheets secara presisi, lalu antarmuka memperbarui angka sisa cuti secara reaktif.
+4. **Verifikasi Hak Akses Admin**: Administrator dapat membatalkan dan menghapus transaksi dengan otorisasi aman `cekOtorisasiAdmin`.
+5. **Verifikasi Cuti Disetujui**: Untuk cuti yang sudah berstatus `'Disetujui'`, tombol "Usul Batal" kini aktif dan membuka modal pengajuan pembatalan resmi ke Pejabat Berwenang.

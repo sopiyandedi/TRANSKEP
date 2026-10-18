@@ -552,6 +552,68 @@ function showNotify(title, message, type = 'success') {
   }, 3500);
 }
 
+// ZETTBOT: Modal Konfirmasi Universal (Anti-AI Human-Crafted Look & Feel)
+function showCustomConfirm(title, message, onConfirm) {
+  if (typeof document === 'undefined' || !document.body) {
+    if (confirm(title + "\n\n" + message)) {
+      if (typeof onConfirm === 'function') onConfirm();
+    }
+    return;
+  }
+
+  let overlay = document.getElementById('custom-confirm-overlay');
+  if (overlay) overlay.remove();
+
+  overlay = document.createElement('div');
+  overlay.id = 'custom-confirm-overlay';
+  overlay.className = 'fixed inset-0 z-[999999] flex items-center justify-center bg-black/70 backdrop-blur-sm transition-opacity duration-200 opacity-0';
+
+  overlay.innerHTML = `
+    <div class="glass p-6 rounded-3xl border border-slate-800 bg-slate-900/95 max-w-sm w-full mx-4 shadow-2xl transform transition-all duration-200 scale-95 flex flex-col gap-4">
+      <div class="flex items-center gap-3 text-rose-400">
+        <div class="p-2.5 bg-rose-500/10 rounded-2xl shrink-0 border border-rose-500/20"><i class="fa-solid fa-triangle-exclamation text-xl"></i></div>
+        <h3 class="text-base font-bold text-white tracking-wide">${title}</h3>
+      </div>
+      <p class="text-xs text-slate-300 leading-relaxed">${message}</p>
+      <div class="flex justify-end gap-2.5 mt-2 pt-2 border-t border-slate-800/80">
+        <button id="btn-confirm-cancel" class="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-400 hover:text-white hover:bg-slate-800 transition">Batal</button>
+        <button id="btn-confirm-yes" class="px-4 py-2.5 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white shadow-lg shadow-rose-600/30 transition flex items-center gap-1.5">
+          <i class="fa-solid fa-check text-[11px]"></i> Ya, Lanjutkan
+        </button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  setTimeout(() => {
+    overlay.classList.remove('opacity-0');
+    if (overlay.firstElementChild) overlay.firstElementChild.classList.remove('scale-95');
+  }, 10);
+
+  const cleanup = () => {
+    overlay.classList.add('opacity-0');
+    if (overlay.firstElementChild) overlay.firstElementChild.classList.add('scale-95');
+    setTimeout(() => { if (overlay.parentNode) overlay.remove(); }, 200);
+  };
+
+  const cancelBtn = document.getElementById('btn-confirm-cancel');
+  if (cancelBtn) cancelBtn.onclick = cleanup;
+
+  const yesBtn = document.getElementById('btn-confirm-yes');
+  if (yesBtn) {
+    yesBtn.onclick = () => {
+      cleanup();
+      if (typeof onConfirm === 'function') onConfirm();
+    };
+  }
+}
+
+// Ekspos ke global window
+if (typeof window !== 'undefined') {
+  window.showNotify = showNotify;
+  window.showCustomConfirm = showCustomConfirm;
+}
+
 function initNavigationAccess() {
   try {
     const role = state.user ? state.user.role : '';

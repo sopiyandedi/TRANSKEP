@@ -260,47 +260,94 @@ function deleteCutiLog(id, forceDelete, userNip, clientToken) {
     
     const cutiData = sheetCuti.getDataRange().getValues();
     let rowIndex = -1; let logRecord = null;
+    const targetId = String(id || '').trim();
+
     for (let i = 1; i < cutiData.length; i++) {
-      if (String(cutiData[i][0]) === String(id)) { rowIndex = i + 1; logRecord = cutiData[i]; break; }
+      if (String(cutiData[i][0]).trim() === targetId) { 
+        rowIndex = i + 1; 
+        logRecord = cutiData[i]; 
+        break; 
+      }
     }
     
-    if (rowIndex === -1) throw new Error("Data tidak ditemukan.");
+    if (rowIndex === -1) throw new Error("Data transaksi cuti tidak ditemukan.");
     
-    if (!forceDelete && logRecord[7] !== 'Menunggu') throw new Error("Hanya status Menunggu yang dapat ditarik otomatis.");
+    const ownerNip = String(logRecord[2] || '').trim();
+    const callerNip = String(userNip || '').trim();
+    const isOwner = (ownerNip === callerNip);
+    const isAdmin = (typeof cekOtorisasiAdmin === 'function' && cekOtorisasiAdmin(userNip, clientToken));
+
+    if (!isOwner && !isAdmin) {
+      throw new Error("Akses Ditolak: Anda hanya berwenang menarik atau menghapus permohonan cuti milik sendiri.");
+    }
+
+    const statusSekarang = String(logRecord[7] || '').trim();
+    const statusClean = statusSekarang.toLowerCase();
+    let isHardDelete = Boolean(forceDelete);
+
+    if (!isHardDelete && !isAdmin) {
+      // Pemohon hanya boleh menarik jika statusnya Menunggu atau Perubahan
+      if (statusClean !== 'menunggu' && statusClean !== 'perubahan') {
+        throw new Error("Hanya pengajuan dengan status 'Menunggu' atau 'Perubahan' yang dapat ditarik kembali.");
+      }
+    }
     
-    const nip = String(logRecord[2]); const jenis = String(logRecord[3]);
-    const statusSekarang = String(logRecord[7]);
+    const nip = ownerNip; 
+    const jenis = String(logRecord[3] || '').trim();
     
-    if (jenis !== 'Dinas Luar' && statusSekarang !== 'Ditolak' && statusSekarang !== 'DIBATALKAN') {
+    // Kembalikan saldo kuota jika cuti belum pernah ditolak atau dibatalkan sebelumnya
+    if (jenis !== 'Dinas Luar' && statusClean !== 'ditolak' && statusClean !== 'dibatalkan') {
         const historyStr = String(logRecord[16] || "");
         let h24 = 0, h25 = 0, h26 = 0, hLain = 0;
-        if (historyStr) { try { const h = JSON.parse(historyStr); h24 = h.y24 || 0; h25 = h.y25 || 0; h26 = h.y26 || 0; hLain = h.dur || 0; } catch(e) {} }
+        if (historyStr) { 
+          try { 
+            const h = JSON.parse(historyStr); 
+            h24 = h.y24 || 0; 
+            h25 = h.y25 || 0; 
+            h26 = h.y26 || 0; 
+            hLain = h.dur || 0; 
+          } catch(e) {} 
+        }
         
         const userData = sheetUser.getDataRange().getValues();
         let userRowIndex = -1;
-        for (let i = 1; i < userData.length; i++) { if (String(userData[i][0]) === nip) { userRowIndex = i + 1; break; } }
+        for (let i = 1; i < userData.length; i++) { 
+          if (String(userData[i][0]).trim() === nip) { 
+            userRowIndex = i + 1; 
+            break; 
+          } 
+        }
         
         if (userRowIndex !== -1) {
            if (jenis === 'Tahunan') {
-              const c24 = Number(sheetUser.getRange(userRowIndex, 7).getValue() || 0); const c25 = Number(sheetUser.getRange(userRowIndex, 8).getValue() || 0); const c26 = Number(sheetUser.getRange(userRowIndex, 9).getValue() || 0);
-              sheetUser.getRange(userRowIndex, 7).setValue(c24 + h24); sheetUser.getRange(userRowIndex, 8).setValue(c25 + h25); sheetUser.getRange(userRowIndex, 9).setValue(c26 + h26);
+              const c24 = Number(sheetUser.getRange(userRowIndex, 7).getValue() || 0); 
+              const c25 = Number(sheetUser.getRange(userRowIndex, 8).getValue() || 0); 
+              const c26 = Number(sheetUser.getRange(userRowIndex, 9).getValue() || 0);
+              sheetUser.getRange(userRowIndex, 7).setValue(c24 + h24); 
+              sheetUser.getRange(userRowIndex, 8).setValue(c25 + h25); 
+              sheetUser.getRange(userRowIndex, 9).setValue(c26 + h26);
            } else {
               const mapKolom = { 'Sakit': 10, 'Alasan Penting': 11, 'Besar': 12, 'Melahirkan': 13, 'CLTN': 14 };
               const col = mapKolom[jenis];
-              if (col) { const cVal = Number(sheetUser.getRange(userRowIndex, col).getValue() || 0); sheetUser.getRange(userRowIndex, col).setValue(cVal + hLain); }
+              if (col) { 
+                const cVal = Number(sheetUser.getRange(userRowIndex, col).getValue() || 0); 
+                sheetUser.getRange(userRowIndex, col).setValue(cVal + hLain); 
+              }
            }
         }
     }
     
     let finalMessage = "";
-    if (forceDelete) {
+    if (isHardDelete && (statusClean === 'disetujui' || statusClean === 'menunggu pembatalan')) {
+        // Jika sudah disahkan dan dibatalkan secara administratif oleh Admin, tandai DIBATALKAN
         sheetCuti.getRange(rowIndex, 8).setValue('DIBATALKAN');
         sheetCuti.getRange(rowIndex, 14).setValue('DIBATALKAN');
         sheetCuti.getRange(rowIndex, 15).setValue('DIBATALKAN');
-        finalMessage = 'Status cuti telah diubah menjadi DIBATALKAN dan saldo telah dikembalikan.';
+        finalMessage = 'Status cuti telah diubah menjadi DIBATALKAN dan saldo kuota telah dikembalikan.';
     } else {
+        // Jika status Menunggu / Perubahan ditarik atau dihapus, hapus baris transaksi sepenuhnya
         sheetCuti.deleteRow(rowIndex);
-        finalMessage = 'Transaksi berhasil ditarik dan dihapus sepenuhnya dari sistem.';
+        finalMessage = 'Transaksi permohonan berhasil ditarik dan dihapus sepenuhnya dari sistem.';
     }
     
     SpreadsheetApp.flush();

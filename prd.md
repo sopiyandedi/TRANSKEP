@@ -168,3 +168,12 @@ ZONA BAWAH: MASTER CONTEXT & STATUS MIGRASI TERKINI (LIVING CONTEXT)
     - Mengganti pilihan dropdown Pangkat/Golongan untuk PPPK dari angka Arab (`17` s.d `1`) menjadi angka Romawi resmi (`PPPK Golongan XVII` s.d `PPPK Golongan I`) pada `view_pegawai.html` dan `view_manajemen_pegawai.html`.
     - Menyediakan auto-normalization helper `normalizePangkat` pada controller `pegawai.js` dan `js_manajemen_pegawai.html` agar data lama dengan format angka biasa otomatis dikonversi ke Romawi saat dibuka dan disimpan.
     - PWA Service Worker `sw.js` diperbarui ke versi **transkep-v2.8.4**.
+
+14. **Perbaikan & Pemulihan Fitur Hapus / Tarik Pengajuan Permohonan Cuti (Tahap 37):**
+    - **Dialog Konfirmasi Interaktif (`showCustomConfirm`):** Mengimplementasikan modal dialog konfirmasi modern berbasis glassmorphism di `transkep-web/core/core.js` serta mengeksposnya ke `window.showCustomConfirm` dengan fallback native `confirm()` di seluruh frontend.
+    - **Normalisasi Status & Dukungan Status Perubahan:** Memperbarui backend `deleteCutiLog` di `permohonan/permohonan.js` agar membersihkan spasi, *case-insensitive*, dan mengizinkan pemohon menarik mandiri berkas dengan status `'Menunggu'` maupun `'Perubahan'`.
+    - **Safe Quota Refund:** Mengembalikan saldo cuti (Tahunan multi-tahun 2024, 2025, 2026 maupun cuti lainnya) secara utuh ke `user_data` dan menyinkronkan state reaktif frontend seketika.
+    - **Universal RPC Bridge:** Memperbarui `cuti_data.js` untuk memanfaatkan `TranskepAPI.call` dengan fallback `google.script.run`.
+    - **Usulan Pembatalan Cuti Disetujui:** Menyematkan tombol *"Usul Batal"* pada kolom aksi riwayat khusus permohonan berstatus `'Disetujui'` yang memicu modal pembatalan resmi ke Pejabat Berwenang.
+    - PWA Service Worker `sw.js` diperbarui ke versi **transkep-v2.8.5**.
+
