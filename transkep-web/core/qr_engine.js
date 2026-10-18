@@ -677,11 +677,10 @@
    */
   async function generateQRCodeWithLogo(textOrUrl, options) {
     options = options || {};
-    const size = options.size || 240;
+    const size = options.size || 300;
     const margin = options.margin !== undefined ? options.margin : 2;
     const logoSrc = options.logoSrc || 'img/Logo_PA_Imy.png';
-    const logoRatio = options.logoRatio || 0.22; // 22% dari lebar QR (Aman di bawah 30% Level H)
-    const bufferRatio = options.bufferRatio || 0.26; // Radius buffer pemisah putih
+    const logoRatio = options.logoRatio || 0.28; // Ukuran logo proporsional (~28% tinggi QR)
     const colorDark = options.colorDark || '#000000';
     const colorLight = options.colorLight || '#ffffff';
 
@@ -716,34 +715,57 @@
       }
     }
 
-    // 5. Render Buffer Putih & Logo Pengadilan Agama di Titik Tengah
+    // 5. Render Buffer Putih & Logo Pengadilan Agama di Titik Tengah (Mempertahankan Aspek Rasio Asli Oval)
     const cx = size / 2;
     const cy = size / 2;
-    const badgeRadius = (size * bufferRatio) / 2;
-    const logoSize = size * logoRatio;
-
-    // Masking Lingkaran Putih (White Circular Badge Mask)
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(cx, cy, badgeRadius, 0, Math.PI * 2, false);
-    ctx.fillStyle = '#ffffff';
-    ctx.fill();
-    ctx.lineWidth = Math.max(1, Math.round(size * 0.008));
-    ctx.strokeStyle = '#ffffff';
-    ctx.stroke();
-    ctx.restore();
 
     // Gambar Logo (Jika logoSrc tersedia)
     if (logoSrc) {
       try {
         const img = await loadLogoImage(logoSrc);
         if (img) {
+          // Hitung proporsi asli logo agar tidak pipih/terdistorsi bulat
+          let targetW = size * logoRatio;
+          let targetH = size * logoRatio;
+          if (img.width && img.height) {
+            const aspect = img.width / img.height;
+            if (aspect < 1) { // Portrait / Oval (seperti emblem PA Indramayu 752x1024)
+              targetH = size * logoRatio;
+              targetW = targetH * aspect;
+            } else {
+              targetW = size * logoRatio;
+              targetH = targetW / aspect;
+            }
+          }
+
+          // Buffer Putih pelindung sekeliling logo (Rounded Card Badge)
+          const padX = Math.max(4, Math.round(size * 0.02));
+          const padY = Math.max(4, Math.round(size * 0.02));
+          const badgeW = targetW + (padX * 2);
+          const badgeH = targetH + (padY * 2);
+          const badgeX = cx - (badgeW / 2);
+          const badgeY = cy - (badgeH / 2);
+          const badgeRadius = Math.min(badgeW, badgeH) * 0.35;
+
           ctx.save();
-          // Circular clip agar logo bulat presisi di tengah
+          ctx.fillStyle = '#ffffff';
           ctx.beginPath();
-          ctx.arc(cx, cy, logoSize / 2, 0, Math.PI * 2, false);
-          ctx.clip();
-          ctx.drawImage(img, cx - (logoSize / 2), cy - (logoSize / 2), logoSize, logoSize);
+          ctx.moveTo(badgeX + badgeRadius, badgeY);
+          ctx.lineTo(badgeX + badgeW - badgeRadius, badgeY);
+          ctx.quadraticCurveTo(badgeX + badgeW, badgeY, badgeX + badgeW, badgeY + badgeRadius);
+          ctx.lineTo(badgeX + badgeW, badgeY + badgeH - badgeRadius);
+          ctx.quadraticCurveTo(badgeX + badgeW, badgeY + badgeH, badgeX + badgeW - badgeRadius, badgeY + badgeH);
+          ctx.lineTo(badgeX + badgeRadius, badgeY + badgeH);
+          ctx.quadraticCurveTo(badgeX, badgeY + badgeH, badgeX, badgeY + badgeH - badgeRadius);
+          ctx.lineTo(badgeX, badgeY + badgeRadius);
+          ctx.quadraticCurveTo(badgeX, badgeY, badgeX + badgeRadius, badgeY);
+          ctx.closePath();
+          ctx.fill();
+          ctx.restore();
+
+          // Gambar Logo Pengadilan Agama dengan bentuk perisai/oval aslinya tanpa dipotong bulat
+          ctx.save();
+          ctx.drawImage(img, cx - (targetW / 2), cy - (targetH / 2), targetW, targetH);
           ctx.restore();
         }
       } catch (err) {

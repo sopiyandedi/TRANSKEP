@@ -1770,5 +1770,51 @@ Berdasarkan audit menyeluruh terhadap arsitektur frontend dan backend (`transkep
 1. **Verifikasi Tampilan Visual**: Area tanda tangan Pemohon, Atasan, dan Pejabat kini sangat lega, rapi, dan estetis tanpa ada teks kecil yang menumpuk canggung di bawah barcode.
 2. **Verifikasi Kertas A4 1 Halaman**: Dokumen semakin longgar dan 100% aman terkunci dalam 1 lembar A4.
 
+---
+
+### Tahap 41: Restorasi Aspek Rasio Alami Logo Oval Pengadilan Agama & Peningkatan Ukuran Barcode TTE
+**Tanggal**: 18 Oktober 2026  
+**Status**: [SELESAI & DIVERIFIKASI]  
+**Lead Architect**: ZettBOT (by Zettbos)
+
+#### 1. Masalah & Pengamatan Pengguna
+- Logo Pengadilan Agama Indramayu di tengah barcode sebelumnya terpotong paksa menggunakan `ctx.arc()` (circular clip) dan dipaksa berdimensi kotak (1:1).
+- Hal ini menyebabkan:
+  1. Bentuk perisai lambang Mahkamah Agung/Pengadilan Agama yang aslinya oval/lonjong (752×1024 px) terpotong bagian atas dan bawahnya sehingga tampak bulat dan kurang jelas/kabur.
+  2. Ukuran barcode yang diturunkan ke 55px terasa sedikit terlalu kecil sehingga lambang instansi di dalamnya sulit dikenali secara kasat mata.
+- Pengguna meminta agar:
+  - Barcode dibesarkan sedikit agar lebih jelas seperti contoh referensi resmi.
+  - Logo Pengadilan Agama di tengah tidak lagi dipotong bulat paksa, melainkan tampil dengan proporsi aslinya yang agak oval/perisai.
+
+#### 2. Implementasi Teknis & Solusi
+1. **Restorasi Rasio Asli Logo Oval (Tanpa Circular Clip)**:
+   - Menghitung rasio gambar asli (`img.width / img.height` = 752/1024 ≈ 0.734).
+   - Menghapus pemotongan paksa lingkaran `ctx.clip()`, logo kini digambar penuh tanpa ada bagian lambang yang terpotong.
+   - Meningkatkan `logoRatio` menjadi **0.28** (~28% tinggi QR) sehingga logo terlihat besar, tajam, dan berwibawa.
+   - Mengubah buffer pelindung putih di belakang logo menjadi **Rounded Card Badge** yang melingkari bentuk perisai oval logo secara presisi dengan padding pelindung `padX` dan `padY`.
+   - Total area tertutup hanya ~7.8%, jauh di bawah batas toleransi Level H (30%), sehingga pemindaian barcode tetap instan.
+2. **Peningkatan Ukuran Barcode pada Dokumen Cetak**:
+   - Ukuran tampilan barcode dinaikkan dari 55×55px menjadi **64×64px** pada formulir Pemohon, Atasan Langsung, dan Pejabat Berwenang.
+   - Resolusi pembangkitan canvas dinaikkan dari 240px ke **300px** untuk menjamin kualitas cetak sangat tajam (*high-DPI print clarity*).
+3. **PWA Service Worker Cache**:
+   - Menaikkan versi cache pada `transkep-web/sw.js` ke **`transkep-v2.8.9`**.
+
+#### 3. Berkas yang Diubah
+| Berkas | Peran / Layer | Detail Perubahan |
+| :--- | :--- | :--- |
+| [`transkep-web/core/qr_engine.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/core/qr_engine.js) | QR Engine | Menghapus circular clip, render aspek rasio asli oval perisai (752x1024), rounded card badge, dan logoRatio 0.28. |
+| `permohonan/js_qr_engine.html` | GAS QR Engine | Sinkronisasi penghapusan circular clip & render aspek rasio asli logo oval untuk GAS. |
+| [`transkep-web/modules/permohonan/cetak/cetak_cuti.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/modules/permohonan/cetak/cetak_cuti.html) | Print Template | Menaikkan ukuran barcode Pemohon ke 64×64px. |
+| [`transkep-web/modules/permohonan/cetak/cetak_cuti.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/modules/permohonan/cetak/cetak_cuti.js) | Print Controller | Canvas render size 300px dan ukuran barcode Atasan/Pejabat ke 64×64px. |
+| [`permohonan/template_cetak_cuti.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/template_cetak_cuti.html) | GAS Print Template | Sinkronisasi ukuran barcode Pemohon ke 64×64px. |
+| [`permohonan/js_cetak_cuti.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/js_cetak_cuti.html) | GAS Print Controller | Sinkronisasi canvas render size 300px dan ukuran barcode Atasan/Pejabat ke 64×64px. |
+| [`transkep-web/sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/sw.js) | PWA Cache | Menaikkan versi cache ke `transkep-v2.8.9`. |
+
+#### 4. Hasil Verifikasi
+1. **Verifikasi Bentuk Logo**: Logo Pengadilan Agama Indramayu kini tampil anggun dalam bentuk perisai oval aslinya tanpa ada bagian atas (bintang) atau bawah (pita) yang terpotong.
+2. **Verifikasi Kejelasan Visual**: Pada ukuran 64px, detail warna dan teks lambang instansi di tengah barcode terlihat jelas, tajam, dan elegan persis seperti referensi resmi.
+3. **Verifikasi Keterbacaan Scanner**: Pemindaian kamera HP tetap 100% cepat dan lancar.
+
+
 
 

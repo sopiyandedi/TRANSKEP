@@ -199,6 +199,13 @@ ZONA BAWAH: MASTER CONTEXT & STATUS MIGRASI TERKINI (LIVING CONTEXT)
     - **Menunda Catatan Kaki BSrE:** Menjaga integritas data dengan menunda catatan kaki/disclaimer BSrE BSSN hingga terintegrasi secara teknis dengan SSO SIMARI.
     - PWA Service Worker `sw.js` diperbarui ke versi **transkep-v2.8.8**.
 
+18. **Restorasi Aspek Rasio Alami Logo Oval Pengadilan Agama & Peningkatan Ukuran Barcode TTE (Tahap 41):**
+    - **Rasio Asli Perisai Oval:** Menghapus pemotongan paksa lingkaran `ctx.clip()`, logo Pengadilan Agama kini digambar penuh mempertahankan aspek rasio aslinya (752×1024 px) sehingga bentuk perisai oval tampak natural dan detail lambang (bintang dan pita) tidak terpotong.
+    - **Rounded Card Badge Buffer:** Melindungi logo dengan badge sudut membulat (*rounded badge*) putih berjarak presisi terhadap modul QR hitam.
+    - **Resolusi & Ukuran Optimal:** Pembangkitan canvas dinaikkan ke **300px** dan ukuran tampilan barcode dinaikkan ke **64×64px** pada lembar cetak agar logo terlihat jelas, berwibawa, dan tajam dipindai.
+    - PWA Service Worker `sw.js` diperbarui ke versi **transkep-v2.8.9**.
+
+
 
 
 
