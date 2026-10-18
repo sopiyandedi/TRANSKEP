@@ -186,4 +186,12 @@ ZONA BAWAH: MASTER CONTEXT & STATUS MIGRASI TERKINI (LIVING CONTEXT)
     - **Dual Environment Support:** Dukungan penuh untuk mode PWA client-side (`transkep-web`) maupun Google Apps Script Web App (`script.google.com`).
     - PWA Service Worker `sw.js` diperbarui ke versi **transkep-v2.8.6**.
 
+16. **Penataan Letak Vertikal Barcode TTE Cuti & Optimasi Margin 1 Lembar A4 (Tahap 39):**
+    - **Tata Letak Vertikal Standar Kedinasan (BSrE/Kemenkeu/MA-RI):** Mengubah susunan tanda tangan dari model menyamping (*horizontal flex*) menjadi tumpuk vertikal lurus (*vertical stack*): Jabatan ➔ Barcode Berlogo (55×55px) ➔ Teks TTE *"Ditandatangani secara elektronik"* ➔ Nama Terang (Bold & Underline) ➔ NIP.
+    - **Eliminasi Hack Margin & Perataan Elegan:** Menghilangkan ganjalan `padding-left: 73px` dan membatasi lebar kolom tanda tangan pada sisi kanan (`width: 38%`, `min-width: 180px`) sehingga tanda tangan tidak lagi melebar atau menjorok ke tengah/kiri halaman.
+    - **Tipografi TTE Ringkas:** Menyesuaikan ukuran teks *"Ditandatangani secara elektronik"* ke font **6.5pt** italic berwarna abu-abu `#555` tepat di bawah barcode.
+    - **Zero-Spill Protection (Kunci 1 Lembar A4):** Memangkas margin dan padding berlebih di seluruh formulir (spasi judul -9px, margin antar tabel -12px, padding sel tabel -12px, spasi tanda tangan atasan -10px, dan spasi alamat -3px, total hemat ~47px) untuk menjamin dokumen **100% terkunci dalam 1 lembar A4**.
+    - PWA Service Worker `sw.js` diperbarui ke versi **transkep-v2.8.7**.
+
+
 

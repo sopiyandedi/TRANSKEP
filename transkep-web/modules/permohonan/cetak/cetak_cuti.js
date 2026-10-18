@@ -131,48 +131,44 @@
       let pejabatJabatanStr = formatJabatanSingkat(pejabat.jabatan);
 
       // ZETTBOT: Logika penampakan Barcode hanya jika status Disetujui
-      // Jika belum disetujui, cetak kotak kosong 65x65px agar layout tidak bergeser
+      // Jika belum disetujui, cetak kotak kosong vertikal agar layout tidak bergeser
       let viewQrAtasan = (log.status_atasan === 'Disetujui') 
-          ? "<img src='" + qrAtasan + "' width='65' height='65' alt='QR Atasan' style='flex-shrink: 0;' />" 
-          : "<div style='width: 65px; height: 65px; flex-shrink: 0;'></div>";
+          ? "<img src='" + qrAtasan + "' width='55' height='55' alt='QR Atasan' style='display: block; margin: 2px 0 3px 0;' />" 
+          : "<div style='height: 45px;'></div>";
           
       let viewQrPejabat = (log.status_pejabat === 'Disetujui') 
-          ? "<img src='" + qrPejabat + "' width='65' height='65' alt='QR Pejabat' style='flex-shrink: 0;' />" 
-          : "<div style='width: 65px; height: 65px; flex-shrink: 0;'></div>";
+          ? "<img src='" + qrPejabat + "' width='55' height='55' alt='QR Pejabat' style='display: block; margin: 2px 0 3px 0;' />" 
+          : "<div style='height: 45px;'></div>";
 
       let atasanSig = "<div style='width: 100%; display: flex; justify-content: flex-end;'>" +
-                            "<div style='width: 42%; display: flex; flex-direction: column; align-items: flex-start; text-align: left;'>" +
+                            "<div style='width: 38%; display: flex; flex-direction: column; align-items: flex-start; text-align: left; min-width: 180px;'>" +
                               
-                              "<div style='font-size: 11pt !important; font-family: \"Times New Roman\", Times, serif; font-weight: bold; padding-left: 73px; flex-shrink: 0;'>" + 
+                              "<div style='font-size: 10pt !important; font-family: \"Times New Roman\", Times, serif; font-weight: bold; margin-bottom: 2px;'>" + 
                                 atasanJabatanStr + 
                               "</div>" +
                               
-                              "<div style='display: flex; gap: 8px; align-items: flex-start; flex-shrink: 0; margin-top: 4px;'>" +
-                                viewQrAtasan +
-                                "<div style='font-size: 11pt !important; line-height: 1.15; font-family: \"Times New Roman\", Times, serif; padding-top: " + JARAK_TANDA_TANGAN + ";'>" +
-                                  (log.status_atasan === 'Disetujui' ? "<div style='font-size: 7.5pt !important; color: #555; font-style: italic; line-height: 1.1; margin-bottom: 2px;'>Ditandatangani secara elektronik</div>" : "") +
-                                  "<span style='text-decoration: underline; font-weight: bold;'>" + atasan.nama + "</span><br>" +
-                                  "NIP. " + atasan.nip +
-                                "</div>" +
+                              viewQrAtasan +
+                              (log.status_atasan === 'Disetujui' ? "<div style='font-size: 6.5pt !important; color: #555; font-style: italic; line-height: 1.1; margin-bottom: 2px;'>Ditandatangani secara elektronik</div>" : "") +
+                              "<div style='font-size: 10pt !important; line-height: 1.2; font-family: \"Times New Roman\", Times, serif;'>" +
+                                "<span style='text-decoration: underline; font-weight: bold;'>" + atasan.nama + "</span><br>" +
+                                "NIP. " + atasan.nip +
                               "</div>" +
 
                             "</div>" +
                           "</div>";
 
       let pejabatSig = "<div style='width: 100%; display: flex; justify-content: flex-end;'>" +
-                             "<div style='width: 42%; display: flex; flex-direction: column; align-items: flex-start; text-align: left;'>" +
+                             "<div style='width: 38%; display: flex; flex-direction: column; align-items: flex-start; text-align: left; min-width: 180px;'>" +
                                
-                               "<div style='font-size: 11pt !important; font-family: \"Times New Roman\", Times, serif; font-weight: bold; padding-left: 73px; flex-shrink: 0;'>" + 
+                               "<div style='font-size: 10pt !important; font-family: \"Times New Roman\", Times, serif; font-weight: bold; margin-bottom: 2px;'>" + 
                                  pejabatJabatanStr + 
                                "</div>" +
                                
-                               "<div style='display: flex; gap: 8px; align-items: flex-start; flex-shrink: 0; margin-top: 4px;'>" +
-                                 viewQrPejabat +
-                                 "<div style='font-size: 11pt !important; line-height: 1.15; font-family: \"Times New Roman\", Times, serif; padding-top: " + JARAK_TANDA_TANGAN + ";'>" +
-                                   (log.status_pejabat === 'Disetujui' ? "<div style='font-size: 7.5pt !important; color: #555; font-style: italic; line-height: 1.1; margin-bottom: 2px;'>Ditandatangani secara elektronik</div>" : "") +
-                                   "<span style='text-decoration: underline; font-weight: bold;'>" + pejabat.nama + "</span><br>" +
-                                   "NIP. " + pejabat.nip +
-                                 "</div>" +
+                               viewQrPejabat +
+                               (log.status_pejabat === 'Disetujui' ? "<div style='font-size: 6.5pt !important; color: #555; font-style: italic; line-height: 1.1; margin-bottom: 2px;'>Ditandatangani secara elektronik</div>" : "") +
+                               "<div style='font-size: 10pt !important; line-height: 1.2; font-family: \"Times New Roman\", Times, serif;'>" +
+                                 "<span style='text-decoration: underline; font-weight: bold;'>" + pejabat.nama + "</span><br>" +
+                                 "NIP. " + pejabat.nip +
                                "</div>" +
 
                              "</div>" +

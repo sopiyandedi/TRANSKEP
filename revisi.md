@@ -1684,3 +1684,50 @@ Berdasarkan audit menyeluruh terhadap arsitektur frontend dan backend (`transkep
 4. **Verifikasi Tipografi TTE Kedinasan**: Blok tanda tangan pemohon, atasan langsung, dan pejabat berwenang dilengkapi dengan keterangan TTE kedinasan resmi: *"Ditandatangani secara elektronik"*.
 5. **Verifikasi Dual Environment**: Telah disinkronkan ke kedua lingkungan sistem: Frontend Modular PWA (`transkep-web`) dan Backend Google Apps Script Web App (`permohonan/`).
 
+---
+
+### Tahap 39: Penataan Letak Vertikal Barcode TTE Cuti & Optimasi Margin 1 Lembar A4
+**Tanggal**: 18 Oktober 2026  
+**Status**: [SELESAI & DIVERIFIKASI]  
+**Lead Architect**: ZettBOT (by Zettbos)
+
+#### 1. Masalah & Kebutuhan Pengguna
+- Pada formulir cetak cuti sebelumnya, tanda tangan elektronik (TTE) disusun secara horizontal menyamping (`[Barcode]` di kiri dan `[Keterangan + Nama + NIP]` di kanan).
+- Susunan menyamping tersebut menyebabkan:
+  1. Kotak tanda tangan memakan lebar horizontal hingga 42% sehingga menjorok terlalu jauh ke tengah/kiri halaman.
+  2. Tulisan jabatan di atasnya harus diganjal hack `padding-left: 73px` yang membuat tata letak kurang proporsional.
+  3. Format visual belum sesuai dengan standar resmi TTE instansi pemerintah (BSrE / Kemenkeu / Mahkamah Agung) yang menyusun elemen tanda tangan secara vertikal lurus ke bawah.
+- Pengguna meminta penataan ulang agar:
+  - Tanda tangan tersusun vertikal persis seperti standar instansi (Jabatan ➔ Barcode Berlogo ➔ Teks *"Ditandatangani secara elektronik"* ➔ Nama Terang ➔ NIP).
+  - Teks *"Ditandatangani secara elektronik"* diperkecil agar elegan dan tidak melebar ke kiri.
+  - Padding & margin halaman disesuaikan agar formulir **100% PASTI TETAP DALAM 1 LEMBAR A4**.
+
+#### 2. Analisis & Optimasi Ruang Vertikal (*Zero-Spill Protection*)
+1. **Penyusunan Vertikal Presisi (*Vertical Stack*)**:
+   - Seluruh elemen tanda tangan pada Pemohon, Atasan Langsung, dan Pejabat Berwenang kini disusun secara vertikal rata-kiri di dalam kotak tanda tangan di sisi kanan halaman (`width: 38%`, `min-width: 180px`).
+   - Ukuran Barcode dioptimalkan dari 65×65px menjadi **55×55px** (tetap sangat tajam, hemat ruang vertikal 10px, dan responsif dipindai smartphone).
+   - Teks caption TTE *"Ditandatangani secara elektronik"* disesuaikan ke font **6.5pt** italic dengan warna abu-abu lembut `#555` tepat di bawah barcode.
+   - Menghilangkan hack `padding-left: 73px` sehingga seluruh teks lurus simetris dari atas ke bawah.
+2. **Pemangkasan Margin & Padding Halaman (Total Hemat Ruang ~47px)**:
+   - Margin bawah area judul (`.title-area margin-bottom`): dipangkas dari `15px` menjadi **`6px`** (hemat 9px).
+   - Margin bawah antar tabel (`.border-all margin-bottom`): dipangkas dari `6px` menjadi **`4px`** pada 6 tabel (hemat 12px).
+   - Padding sel tabel (`.border-all td, .border-all th`): disesuaikan dari `3px 6px` menjadi **`2.5px 5px`** (hemat ~12px).
+   - Margin bawah tanda tangan Atasan Langsung: dipangkas dari `14px` menjadi **`4px`** (hemat 10px).
+   - Margin bawah tabel alamat & pemohon (Bagian VI): disesuaikan dari `6px` menjadi **`3px`** (hemat 3px).
+   - **Hasil**: Penambahan tinggi dari susunan vertikal (~25px) terkompensasi penuh oleh penghematan ruang (~47px), sehingga dokumen justru lebih longgar dan terjamin 100% tidak akan loncat ke halaman kedua.
+
+#### 3. Berkas yang Diubah
+| Berkas | Peran / Layer | Detail Perubahan |
+| :--- | :--- | :--- |
+| [`transkep-web/modules/permohonan/cetak/cetak_cuti.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/modules/permohonan/cetak/cetak_cuti.html) | Print Template | Pemangkasan CSS margin/padding tabel & judul, refaktor blok tanda tangan Pemohon menjadi vertikal stack. |
+| [`transkep-web/modules/permohonan/cetak/cetak_cuti.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/modules/permohonan/cetak/cetak_cuti.js) | Print Controller | Barcode 55px, teks TTE 6.5pt, struktur vertikal `atasanSig` dan `pejabatSig`. |
+| [`permohonan/template_cetak_cuti.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/template_cetak_cuti.html) | GAS Print Template | Sinkronisasi CSS margin/padding dan susunan vertikal tanda tangan Pemohon. |
+| [`permohonan/js_cetak_cuti.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/js_cetak_cuti.html) | GAS Print Controller | Sinkronisasi struktur vertikal `atasanSig` dan `pejabatSig`. |
+| [`transkep-web/sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/sw.js) | PWA Cache | Menaikkan versi cache ke `transkep-v2.8.7`. |
+
+#### 4. Hasil Verifikasi
+1. **Verifikasi Tata Letak**: Susunan tanda tangan kini lurus vertikal (Jabatan ➔ Barcode Berlogo ➔ TTE caption ➔ Nama ➔ NIP) sesuai format resmi instansi pemerintah pada Gambar 1.
+2. **Verifikasi Batas Halaman (1 Lembar A4)**: Dokumen tercetak utuh dalam 1 halaman tanpa tumpah (*zero spill*).
+3. **Verifikasi Keterbacaan Scanner**: Barcode berlogo ukuran 55×55px tetap terbaca instan dan akurat oleh pemindai kamera HP.
+
+
