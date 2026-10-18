@@ -36,7 +36,7 @@
       return dateStr;
   }
 
-  function printCutiForm(id) {
+  async function printCutiForm(id) {
       // =========================================================================
       // PENGATURAN CETAK (UBAH DI SINI)
       // =========================================================================
@@ -59,7 +59,7 @@
           return;
       }
 
-      showLoading("Menyiapkan dokumen cetak...");
+      showLoading("Menyiapkan dokumen cetak & TTE...");
 
       let htmlContent = templateContainer.innerHTML;
 
@@ -96,9 +96,36 @@
       let sisaAk25 = sisaAw25 - Number(hist.y25 || 0);
       let sisaAk26 = sisaAw26 - Number(hist.y26 || 0);
 
-      const qrPegawai = "https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=Diajukan%20oleh:%20" + encodeURIComponent(pns.nama);
-      const qrAtasan = "https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=Diketahui%20oleh:%20" + encodeURIComponent(atasan.nama);
-      const qrPejabat = "https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=Disetujui%20oleh:%20" + encodeURIComponent(pejabat.nama);
+      // ZETTBOT: Generator Barcode Mandiri Berlogo Pengadilan Agama (TTE In-House)
+      const baseUrl = window.location.origin + window.location.pathname;
+      const verifyUrlPegawai = baseUrl + '?action=verifyCuti&id=' + encodeURIComponent(log.id) + '&type=pemohon&nip=' + encodeURIComponent(pns.nip);
+      const verifyUrlAtasan = baseUrl + '?action=verifyCuti&id=' + encodeURIComponent(log.id) + '&type=atasan&nip=' + encodeURIComponent(atasan.nip);
+      const verifyUrlPejabat = baseUrl + '?action=verifyCuti&id=' + encodeURIComponent(log.id) + '&type=pejabat&nip=' + encodeURIComponent(pejabat.nip);
+
+      let qrPegawai = "";
+      let qrAtasan = "";
+      let qrPejabat = "";
+      let qrParaf = "";
+
+      try {
+          if (window.generateQRCodeWithLogo) {
+              qrPegawai = await window.generateQRCodeWithLogo(verifyUrlPegawai, { size: 240, logoSrc: 'img/Logo_PA_Imy.png' });
+              if (log.status_atasan === 'Disetujui') {
+                  qrAtasan = await window.generateQRCodeWithLogo(verifyUrlAtasan, { size: 240, logoSrc: 'img/Logo_PA_Imy.png' });
+              }
+              if (log.status_pejabat === 'Disetujui') {
+                  qrPejabat = await window.generateQRCodeWithLogo(verifyUrlPejabat, { size: 240, logoSrc: 'img/Logo_PA_Imy.png' });
+              }
+          }
+          if (window.generateQRCodeDataURL) {
+              qrParaf = window.generateQRCodeDataURL("Sudah diparaf oleh Petugas Cuti PA Indramayu", { size: 100 });
+          }
+      } catch (errEngine) {
+          console.warn("⚠️ [Cetak Cuti] Gagal merender QR Mandiri:", errEngine);
+      }
+
+      if (!qrPegawai) qrPegawai = "img/Logo_PA_Imy.png";
+      if (!qrParaf) qrParaf = "img/Logo_PA_Imy.png";
 
       let atasanJabatanStr = formatJabatanSingkat(atasan.jabatan);
       let pejabatJabatanStr = formatJabatanSingkat(pejabat.jabatan);
@@ -123,6 +150,7 @@
                               "<div style='display: flex; gap: 8px; align-items: flex-start; flex-shrink: 0; margin-top: 4px;'>" +
                                 viewQrAtasan +
                                 "<div style='font-size: 11pt !important; line-height: 1.15; font-family: \"Times New Roman\", Times, serif; padding-top: " + JARAK_TANDA_TANGAN + ";'>" +
+                                  (log.status_atasan === 'Disetujui' ? "<div style='font-size: 7.5pt !important; color: #555; font-style: italic; line-height: 1.1; margin-bottom: 2px;'>Ditandatangani secara elektronik</div>" : "") +
                                   "<span style='text-decoration: underline; font-weight: bold;'>" + atasan.nama + "</span><br>" +
                                   "NIP. " + atasan.nip +
                                 "</div>" +
@@ -141,6 +169,7 @@
                                "<div style='display: flex; gap: 8px; align-items: flex-start; flex-shrink: 0; margin-top: 4px;'>" +
                                  viewQrPejabat +
                                  "<div style='font-size: 11pt !important; line-height: 1.15; font-family: \"Times New Roman\", Times, serif; padding-top: " + JARAK_TANDA_TANGAN + ";'>" +
+                                   (log.status_pejabat === 'Disetujui' ? "<div style='font-size: 7.5pt !important; color: #555; font-style: italic; line-height: 1.1; margin-bottom: 2px;'>Ditandatangani secara elektronik</div>" : "") +
                                    "<span style='text-decoration: underline; font-weight: bold;'>" + pejabat.nama + "</span><br>" +
                                    "NIP. " + pejabat.nip +
                                  "</div>" +
@@ -183,6 +212,7 @@
           "{{cuti_cltn}}": (pns.s_cltn || 0),
           
           "{{qrPegawaiUrl}}": qrPegawai,
+          "{{qrParafUrl}}": qrParaf,
           "{{atasanSignatureContent}}": atasanSig,
           "{{pejabatSignatureContent}}": pejabatSig,
           

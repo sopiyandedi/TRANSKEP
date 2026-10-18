@@ -4,7 +4,7 @@
 // ENGINE: ZettBOT PWA Engine v1.0.0 (by Zettbos)
 // =========================================================================
 
-const CACHE_NAME = 'transkep-v2.8.5';
+const CACHE_NAME = 'transkep-v2.8.6';
 
 // Daftar aset inti yang di-cache saat Service Worker dipasang (Install)
 const PRECACHE_ASSETS = [
@@ -17,10 +17,12 @@ const PRECACHE_ASSETS = [
   './css/custom.css',
   './img/logo.png',
   './img/logo_pengadilan.png',
+  './img/Logo_PA_Imy.png',
   './core/view_login.html',
   './core/view_sidebar.html',
   './core/view_mobile_nav.html',
   './core/view_global_modals.html',
+  './core/qr_engine.js',
   './core/api.js',
   './core/particles.js',
   './core/sidebar.js',

@@ -177,3 +177,13 @@ ZONA BAWAH: MASTER CONTEXT & STATUS MIGRASI TERKINI (LIVING CONTEXT)
     - **Usulan Pembatalan Cuti Disetujui:** Menyematkan tombol *"Usul Batal"* pada kolom aksi riwayat khusus permohonan berstatus `'Disetujui'` yang memicu modal pembatalan resmi ke Pejabat Berwenang.
     - PWA Service Worker `sw.js` diperbarui ke versi **transkep-v2.8.5**.
 
+15. **Generator Barcode Mandiri Berlogo Pengadilan Agama Indramayu & Standarisasi TTE (Tahap 38):**
+    - **Eliminasi Total Pihak Ketiga (Zero External Dependency):** Menghapus seluruh dependensi eksternal terhadap API `api.qrserver.com` dan `quickchart.io` pada formulir cetak cuti.
+    - **In-House Pure JS QR Code Engine:** Membangun engine QR mandiri berbasis spesifikasi ISO/IEC 18004 dengan Error Correction Level H (30% damage/overlay recovery) dan auto-version selection (1–40) di `transkep-web/core/qr_engine.js` dan `permohonan/js_qr_engine.html`.
+    - **Sematkan Logo Resmi Berwarna PA Indramayu:** Meletakkan logo berwarna Pengadilan Agama Indramayu (`Logo_PA_Imy.png`) di pusat barcode secara proporsional (~22% ukuran QR) dengan lapisan pelindung lingkaran putih (*white circular buffer mask*) untuk menjamin estetika kedinasan tanpa merusak keterbacaan scanner kamera HP.
+    - **Direct Web Verification URL:** Hasil pemindaian barcode langsung mengarah ke URL permohonan web dinas resmi (`https://.../?page=permohonan_cuti&id=...`) untuk verifikasi integritas dokumen secara instan.
+    - **Label Kedinasan Tanda Tangan Elektronik (TTE):** Menambahkan caption resmi *"Ditandatangani secara elektronik"* di bawah tanda tangan barcode pada kolom Pemohon, Atasan Langsung, dan Pejabat Berwenang.
+    - **Dual Environment Support:** Dukungan penuh untuk mode PWA client-side (`transkep-web`) maupun Google Apps Script Web App (`script.google.com`).
+    - PWA Service Worker `sw.js` diperbarui ke versi **transkep-v2.8.6**.
+
+
