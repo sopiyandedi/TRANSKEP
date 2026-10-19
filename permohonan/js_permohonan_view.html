@@ -428,7 +428,7 @@
                                   }
 
                                   if (typeof syncAllServerData === 'function') {
-                                      syncAllServerData();
+                                      syncAllServerData(true);
                                   }
                               } else { 
                                   if (window.showNotify) window.showNotify("Gagal Membatalkan", res.message, "error"); 
@@ -457,7 +457,7 @@
                                   if (window.showNotify) window.showNotify("Ditarik", res.message, "success");
                                   const idx = this.s.ikLogs.findIndex(l => String(l.id) === String(id));
                                   if (idx !== -1) this.s.ikLogs.splice(idx, 1);
-                                  if (typeof syncAllServerData === 'function') syncAllServerData();
+                                  if (typeof syncAllServerData === 'function') syncAllServerData(true);
                               } else { 
                                   if (window.showNotify) window.showNotify("Gagal Membatalkan", res.message, "error"); 
                               }
@@ -485,7 +485,7 @@
                                   if (window.showNotify) window.showNotify("Ditarik", res.message, "success");
                                   const idx = this.s.ipLogs.findIndex(l => String(l.id) === String(id));
                                   if (idx !== -1) this.s.ipLogs.splice(idx, 1);
-                                  if (typeof syncAllServerData === 'function') syncAllServerData();
+                                  if (typeof syncAllServerData === 'function') syncAllServerData(true);
                               } else { 
                                   if (window.showNotify) window.showNotify("Gagal Membatalkan", res.message, "error"); 
                               }
@@ -513,7 +513,7 @@
                                   if (window.showNotify) window.showNotify("Ditarik", res.message, "success");
                                   const idx = this.s.wfhLogs.findIndex(l => String(l.id) === String(id));
                                   if (idx !== -1) this.s.wfhLogs.splice(idx, 1);
-                                  if (typeof syncAllServerData === 'function') syncAllServerData();
+                                  if (typeof syncAllServerData === 'function') syncAllServerData(true);
                               } else { 
                                   if (window.showNotify) window.showNotify("Gagal Membatalkan", res.message, "error"); 
                               }

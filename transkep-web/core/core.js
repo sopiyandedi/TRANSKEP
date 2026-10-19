@@ -173,8 +173,9 @@ function handleLogout() {
   showNotify("Sesi Berakhir", "Anda telah berhasil keluar dari sistem.", "success");
 }
 
-function syncAllServerData() {
-  showLoading("Menyinkronkan profil & data inti...");
+function syncAllServerData(silent) {
+  const isSilent = (silent === true);
+  if (!isSilent) showLoading("Menyinkronkan profil & data inti...");
   const loginNip = localStorage.getItem('transkep_active_nip');
   const sessionToken = localStorage.getItem('transkep_session_token');
 
@@ -185,7 +186,7 @@ function syncAllServerData() {
 
   google.script.run
     .withSuccessHandler(function (response) {
-      hideLoading();
+      if (!isSilent) hideLoading();
       if (response && response.status === 'success') {
         window.vueState.user = response.data.user;
         if (response.data.user && response.data.user.role) {
@@ -195,18 +196,19 @@ function syncAllServerData() {
         window.vueState.pendingPkpCount = response.data.pendingPkpCount || 0;
         window.vueState.isBgSyncDone = false;
 
-        window.vueState.cutiLogs = [];
-        window.vueState.jobdesList = [];
-        window.vueState.skList = [];
-        window.vueState.skAckList = [];
-        window.vueState.kinerjaList = [];
-        window.vueState.sopList = [];
-        window.vueState.sopAckList = [];
-        window.vueState.stList = [];
-        window.vueState.masterKinerjaList = [];
-        window.vueState.ikLogs = [];
-        window.vueState.ipLogs = [];
-        window.vueState.wfhLogs = [];
+        // ZETTBOT TAHAP 37: Pertahankan data in-memory jika sudah ada (Anti-Wiping / Non-Destructive Cache)
+        window.vueState.cutiLogs = window.vueState.cutiLogs || [];
+        window.vueState.jobdesList = window.vueState.jobdesList || [];
+        window.vueState.skList = window.vueState.skList || [];
+        window.vueState.skAckList = window.vueState.skAckList || [];
+        window.vueState.kinerjaList = window.vueState.kinerjaList || [];
+        window.vueState.sopList = window.vueState.sopList || [];
+        window.vueState.sopAckList = window.vueState.sopAckList || [];
+        window.vueState.stList = window.vueState.stList || [];
+        window.vueState.masterKinerjaList = window.vueState.masterKinerjaList || [];
+        window.vueState.ikLogs = window.vueState.ikLogs || [];
+        window.vueState.ipLogs = window.vueState.ipLogs || [];
+        window.vueState.wfhLogs = window.vueState.wfhLogs || [];
 
         if (typeof renderGlobalHeader === 'function') {
           renderGlobalHeader();
@@ -214,8 +216,10 @@ function syncAllServerData() {
 
         initNavigationAccess();
 
-        const lastMenu = localStorage.getItem('transkep_last_menu') || 'dashboard';
-        switchMenu(lastMenu);
+        if (!isSilent) {
+          const lastMenu = localStorage.getItem('transkep_last_menu') || 'dashboard';
+          switchMenu(lastMenu);
+        }
 
         updateSidebarBadges();
         syncBackgroundData();
@@ -233,14 +237,18 @@ function syncAllServerData() {
         }
 
       } else {
-        showNotify("Gagal Sinkronisasi", response ? response.message : "Data bermasalah", "error");
-        handleLogout();
+        if (!isSilent) {
+          showNotify("Gagal Sinkronisasi", response ? response.message : "Data bermasalah", "error");
+          handleLogout();
+        }
       }
     })
     .withFailureHandler(function (error) {
-      hideLoading();
-      showNotify("Terputus dari Server", error.message || "Gagal sinkronisasi", "error");
-      handleLogout();
+      if (!isSilent) {
+        hideLoading();
+        showNotify("Terputus dari Server", error.message || "Gagal sinkronisasi", "error");
+        handleLogout();
+      }
     })
     .getBulkData(loginNip, sessionToken);
 }

@@ -121,7 +121,7 @@ document.addEventListener("DOMContentLoaded", () => {
                       if (res.status === 'success') {
                           window.showNotify("Berhasil Disimpan", res.message, "success");
                           // Panggil ulang sinkronisasi Vanilla agar state global terbaru didapat
-                          if (typeof window.syncAllServerData === 'function') window.syncAllServerData();
+                          if (typeof window.syncAllServerData === 'function') window.syncAllServerData(true);
                       } else {
                           window.showNotify("Gagal", res.message, "error");
                       }

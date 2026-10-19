@@ -1864,3 +1864,68 @@ Berdasarkan audit menyeluruh terhadap arsitektur frontend dan backend (`transkep
 2. **Verifikasi Prototipe Biner**: File prototipe [`transkep_signed_cuti_prototype.pdf`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep_signed_cuti_prototype.pdf) terbukti memiliki kamus `/Type /Sig`, `/ByteRange`, dan `/Contents` ter-hash SHA-256 yang valid.
 3. **Verifikasi Deployment Apps Script**: Berhasil di-push (109 files) dan dideploy ke versi `@290`.
 
+---
+
+### REVISI TAHAP 37: Eliminasi Glitch Refresh Riwayat Cuti & Pembaruan Instan (0 Detik) Pasca Pengajuan
+
+#### 1. Diagnosa & Akar Masalah (Root Cause Analysis)
+Berdasarkan investigasi menyeluruh pada alur pengajuan cuti (`submitCuti`), ditemukan 2 akar masalah teknis utama yang menyebabkan data tabel riwayat cuti sempat hilang beberapa detik dan terasa lambat/berkedip:
+
+1. **Destruksi Cache State di `syncAllServerData` (`core.js:L186-210` & `javascript.html:L186-198`)**:
+   - Begitu data profil kembali dari `getBulkData()`, fungsi `syncAllServerData()` secara sepihak mengeksekusi reset:
+     ```javascript
+     window.vueState.cutiLogs = []; // <-- Seluruh log cuti dihapus paksa menjadi array kosong
+     window.vueState.jobdesList = [];
+     window.vueState.skList = [];
+     // ... (array modul lainnya di-reset)
+     switchMenu(lastMenu); // <-- UI di-render ulang dengan kondisi tabel cuti kosong melompong!
+     syncBackgroundData(); // <-- Background sync baru mulai jalan
+     ```
+   - `syncBackgroundData()` membutuhkan waktu **2 hingga 5 detik** untuk menarik data dari Google Sheets.
+   - Selama durasi 2–5 detik tersebut, pengguna disuguhkan tabel riwayat cuti yang kosong melompong (seolah datanya hilang total). Baru setelah background sync selesai, tabel kembali terisi.
+
+2. **Dual-Loading & Pembatalan Optimistic UI di `submitCuti` (`cuti.js:L972-994` & `js_permohonan_form.html:L359-381`)**:
+   - Di sisi form, fungsi pengajuan sebenarnya sudah menyisipkan data virtual ke baris paling atas tabel:
+     ```javascript
+     this.s.cutiLogs.unshift(logVirtual);
+     ```
+   - Namun tepat di baris berikutnya, dipanggil:
+     ```javascript
+     if (typeof syncAllServerData === 'function') syncAllServerData();
+     ```
+   - Pemanggilan `syncAllServerData()` ini menimbulkan efek domino buruk:
+     - Membuka popup loading kedua bertuliskan *"Menyinkronkan profil & data inti..."* yang menghalangi pandangan pengguna sebelum mata sempat melihat baris baru.
+     - Menghapus array `this.s.cutiLogs = []`, sehingga `logVirtual` yang baru saja dimasukkan langsung lenyap.
+     - Menutup loading dan menampilkan tabel kosong selama beberapa detik hingga `syncBackgroundData` selesai.
+
+#### 2. Rencana Solusi Arsitektur (Zero-Flicker & Seamless Reactive Update)
+1. **Penerapan Prinsip *Non-Destructive Cache* pada `syncAllServerData`**:
+   - Menghapus baris pembersihan array (`cutiLogs = []`, dll.) di `core.js` dan `javascript.html` jika data state sudah ada di memori.
+   - Data lama dan data baru dipertahankan di layar pengguna. Pembaruan dari server akan menimpa array secara instan dan mulus (*seamless patch*) tanpa kedip atau jeda kosong.
+2. **Optimistic Local Saldo Deduction di `submitCuti`**:
+   - Saat `addCutiLog` sukses, selain memasukkan `logVirtual` ke `this.s.cutiLogs`, perbarui sisa saldo cuti pada `this.s.user` secara reaktif di browser (menggunakan `res.data.history` atau `durasi` pengajuan).
+   - Selaraskan juga nilai tersebut ke `this.s.usersList` agar sinkron dengan data pegawai.
+3. **Eliminasi Pemanggilan Blocking `syncAllServerData()` Pasca Submit**:
+   - Menghapus pemanggilan blocking `syncAllServerData()` setelah `addCutiLog` dan `updateCutiLog`.
+   - Menggantinya dengan **Silent Background Sync** (tanpa `showLoading` dan tanpa me-reset view), sehingga pengajuan cuti baru langsung tampil **detik itu juga (0 detik)** di baris teratas riwayat, modal tertutup rapi, dan notifikasi sukses muncul mulus tanpa gangguan loading tambahan.
+
+#### 3. Berkas yang Diubah
+| Berkas | Peran | Detail Perubahan |
+| :--- | :--- | :--- |
+| [`transkep-web/core/core.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/core/core.js) | Core State Engine | Menambahkan parameter `silent` pada `syncAllServerData`, mempertahankan cache in-memory (`cutiLogs = cutiLogs \|\| []`), dan menonaktifkan paksa switchMenu saat silent sync. |
+| [`javascript.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/javascript.html) | GAS Core Script | Sinkronisasi parameter `silent` dan non-destructive in-memory caching di `syncAllServerData`. |
+| [`transkep-web/modules/permohonan/cuti.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/modules/permohonan/cuti.js) | Cuti Controller | Pengurangan kuota saldo pemohon lokal secara reaktif, unshift `logVirtual`, eliminasi blocking loading, dan pemanggilan `syncAllServerData(true)`. |
+| [`permohonan/js_permohonan_form.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/js_permohonan_form.html) | GAS Permohonan Form | Sinkronisasi local saldo reduction dan silent sync pasca submit cuti. |
+| [`permohonan/js_permohonan_view.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/js_permohonan_view.html) | GAS Permohonan View | Sinkronisasi pemanggilan `syncAllServerData(true)` pada aksi penarikan / pembatalan pengajuan. |
+| [`permohonan/js_permohonan.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/js_permohonan.html) | GAS Permohonan Controller | Sinkronisasi pemanggilan `syncAllServerData(true)`. |
+| [`transkep-web/sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/sw.js) | PWA Service Worker | Menaikkan versi cache ke `transkep-v2.9.1`. |
+
+#### 4. Hasil Verifikasi
+1. **Verifikasi Sintaks (Node.js)**: Berkas `core.js` dan `cuti.js` lulus uji `node --check` dengan 0 error.
+2. **Eliminasi Glitch**: Seluruh pembersihan array destruktif telah digantikan dengan guard aman `window.vueState.cutiLogs || []`, sehingga data tabel tidak pernah hilang atau menjadi 0 baris selama proses refresh.
+3. **Pembaruan Instan (0 Detik)**: Data usulan langsung muncul di baris paling atas tabel seketika tombol kirim berhasil merespons dari backend, tanpa jeda loading modal kedua.
+4. **Verifikasi Deployment Apps Script**: Berhasil di-push (109 files) dan dideploy ke versi `@291` (Production URL) & `@292` (Backup URL).
+
+
+
+

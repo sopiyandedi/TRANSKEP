@@ -367,17 +367,49 @@
                                                 if (res.data.fileUrl) this.s.cutiLogs[existIdx].bukti_url = res.data.fileUrl;
                                             }
                                         } else {
+                                            // ZETTBOT TAHAP 37: Potong kuota cuti lokal secara reaktif & instan
+                                            const durasiNumber = Number(res.data.durasi || durasi || 0);
+                                            const targetPegawai = (String(payload.nip) === String(this.s.user.nip)) ? this.s.user : (this.s.usersList ? this.s.usersList.find(u => String(u.nip) === String(payload.nip)) : null);
+                                            if (targetPegawai && payload.jenis !== 'Dinas Luar' && payload.jenis !== 'CLTN') {
+                                                if (payload.jenis === 'Tahunan') {
+                                                    try {
+                                                        let h = (typeof res.data.history === 'string') ? JSON.parse(res.data.history || '{}') : (res.data.history || {});
+                                                        targetPegawai.s_tahunan_2024 = Math.max(0, Number(targetPegawai.s_tahunan_2024 || 0) - (Number(h.y24) || 0));
+                                                        targetPegawai.s_tahunan_2025 = Math.max(0, Number(targetPegawai.s_tahunan_2025 || 0) - (Number(h.y25) || 0));
+                                                        targetPegawai.s_tahunan_2026 = Math.max(0, Number(targetPegawai.s_tahunan_2026 || 0) - (Number(h.y26) || 0));
+                                                    } catch(e) {}
+                                                } else {
+                                                    let field = "";
+                                                    if (payload.jenis === 'Sakit') field = 's_sakit';
+                                                    else if (payload.jenis === 'Alasan Penting' || payload.jenis === 'Penting') field = 's_penting';
+                                                    else if (payload.jenis === 'Besar') field = 's_besar';
+                                                    else if (payload.jenis === 'Melahirkan') field = 's_melahirkan';
+                                                    if (field !== "" && targetPegawai[field] !== undefined) {
+                                                        targetPegawai[field] = Math.max(0, Number(targetPegawai[field] || 0) - durasiNumber);
+                                                    }
+                                                }
+                                                if (this.s.usersList && targetPegawai.nip) {
+                                                    const uIdx = this.s.usersList.findIndex(u => String(u.nip) === String(targetPegawai.nip));
+                                                    if (uIdx !== -1) this.s.usersList[uIdx] = Object.assign({}, targetPegawai);
+                                                }
+                                            }
+
                                             const logVirtual = {
                                                 id: res.data.id, tgl_pengajuan: res.data.tgl_pengajuan, nip: payload.nip,
                                                 jenis: payload.jenis, tgl_mulai: payload.tgl_mulai, tgl_selesai: payload.tgl_selesai,
                                                 alasan: payload.alasan, status: res.data.status, status_atasan: res.data.status,
-                                                atasan_nip: payload.atasan_nip, pejabat_nip: payload.pejabat_nip, sisa_cuti: res.data.durasi,
+                                                atasan_nip: payload.atasan_nip, pejabat_nip: payload.pejabat_nip, sisa_cuti: durasiNumber,
                                                 status_pejabat: res.data.status, alamat: payload.alamat, history: res.data.history, bukti_url: res.data.fileUrl,
                                                 plh_nip: payload.plh_nip
                                             };
                                             if (this.s && this.s.cutiLogs) this.s.cutiLogs.unshift(logVirtual);
                                         }
-                                        if (typeof syncAllServerData === 'function') syncAllServerData();
+                                        // ZETTBOT TAHAP 37: Jalankan silent sync tanpa dialog blocking & tanpa kedip
+                                        if (typeof syncAllServerData === 'function') {
+                                            syncAllServerData(true);
+                                        } else if (typeof syncBackgroundData === 'function') {
+                                            syncBackgroundData();
+                                        }
                                     }
                                   } else { if(window.showNotify) window.showNotify("Gagal", res.message, "error"); }
                                 })

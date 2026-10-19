@@ -210,3 +210,10 @@ ZONA BAWAH: MASTER CONTEXT & STATUS MIGRASI TERKINI (LIVING CONTEXT)
     - **Panel Digital Signatures Auto-Detect (Adobe Acrobat):** Menanamkan kamus tanda tangan `/Type /Sig`, `/Filter /Adobe.PPKLite`, `/SubFilter /adbe.pkcs7.detached`, dan `/Contents PKCS#7` dengan kalkulasi byte-range SHA-256 yang presisi. Ketika PDF dibuka di Adobe Acrobat Reader, panel *Digital Signatures* otomatis mendeteksi dan menampilkan tanda tangan digital resmi Pengadilan Agama Indramayu.
     - **Tombol Unduh TTE PDF:** Menambahkan tombol aksi khusus `[TTE PDF]` pada antarmuka riwayat permohonan cuti dan tabel rekapitulasi.
     - PWA Service Worker `sw.js` diperbarui ke versi **transkep-v2.9.0**.
+
+20. **Pencegahan Glitch Refresh & Pembaruan Instan (0 Detik) Pasca Pengajuan Cuti (Tahap 43 / Revisi 37):**
+    - **Non-Destructive In-Memory Cache:** Mengganti pengosongan array destruktif `cutiLogs = []` pada `syncAllServerData()` di `core.js` dan `javascript.html` dengan penjaga aman `cutiLogs = cutiLogs || []`, sehingga data riwayat tidak pernah hilang atau menjadi 0 baris selama proses refresh.
+    - **Silent Background Sync:** Menambahkan parameter `silent` pada `syncAllServerData` untuk menghindari pemunculan popup loading blocking kedua pasca pengajuan atau penarikan cuti/izin/wfh.
+    - **Optimistic Local Quota Deduction:** Mengurangkan kuota saldo cuti pegawai di objek lokal `user` secara instan menggunakan rincian `res.data.history` saat usulan cuti baru dikirim, sehingga sisa kuota dan baris riwayat cuti baru tampil detik itu juga (0 detik) di tabel tanpa jeda refresh.
+    - PWA Service Worker `sw.js` diperbarui ke versi **transkep-v2.9.1**.
+
