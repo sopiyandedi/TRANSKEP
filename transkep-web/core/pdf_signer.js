@@ -252,6 +252,41 @@
       const contentWidth = width - (marginX * 2); // 531.28 points
       let currentY = height - 28;
 
+      // Helper Menggambar Tanda Centang Vektor Presisi (Anti-Error WinAnsi Encoding)
+      function drawCheckmark(cx, cy, size = 7.5) {
+        const x1 = cx - size * 0.35;
+        const y1 = cy + size * 0.05;
+        const x2 = cx - size * 0.05;
+        const y2 = cy - size * 0.35;
+        const x3 = cx + size * 0.45;
+        const y3 = cy + size * 0.45;
+
+        page.drawLine({
+          start: { x: x1, y: y1 },
+          end: { x: x2, y: y2 },
+          thickness: 1.3,
+          color: black
+        });
+        page.drawLine({
+          start: { x: x2, y: y2 },
+          end: { x: x3, y: y3 },
+          thickness: 1.3,
+          color: black
+        });
+      }
+
+      // Sanitasi Teks dari Karakter di Luar WinAnsi (Windows-1252)
+      function safeWinAnsi(str) {
+        if (str === null || str === undefined) return '';
+        return String(str)
+          .replace(/[\u2018\u2019]/g, "'")
+          .replace(/[\u201C\u201D]/g, '"')
+          .replace(/[\u2013\u2014]/g, '-')
+          .replace(/\u2022/g, '-')
+          .replace(/\u2026/g, '...')
+          .replace(/[^\x00-\xFF]/g, '');
+      }
+
       // Helper Menggambar Kotak Tabel Presisi
       function drawTableRow(x, y, w, h, cols, bg = null) {
         if (bg) {
@@ -276,26 +311,33 @@
               color: black, thickness: 0.5
             });
           }
-          if (col.text !== undefined && col.text !== null && col.text !== '') {
-            const fontSize = col.size || 8.5;
-            const font = col.bold ? fontBold : fontRegular;
-            const text = String(col.text);
-            let textX = curX + (col.padX !== undefined ? col.padX : 4);
-            let textY = y + (col.padY !== undefined ? col.padY : (h / 2 - fontSize / 2.5));
-            if (col.align === 'center') {
-              const tw = font.widthOfTextAtSize(text, fontSize);
-              textX = curX + (col.w - tw) / 2;
-            } else if (col.align === 'right') {
-              const tw = font.widthOfTextAtSize(text, fontSize);
-              textX = curX + col.w - tw - 4;
+          if (col.check) {
+            drawCheckmark(curX + col.w / 2, y + h / 2, col.checkSize || 7.5);
+          } else if (col.text !== undefined && col.text !== null && col.text !== '') {
+            const rawText = String(col.text);
+            if (rawText.includes('✓') || rawText.includes('\u2713')) {
+              drawCheckmark(curX + col.w / 2, y + h / 2, 7.5);
+            } else {
+              const fontSize = col.size || 8.5;
+              const font = col.bold ? fontBold : fontRegular;
+              const text = safeWinAnsi(rawText);
+              let textX = curX + (col.padX !== undefined ? col.padX : 4);
+              let textY = y + (col.padY !== undefined ? col.padY : (h / 2 - fontSize / 2.5));
+              if (col.align === 'center') {
+                const tw = font.widthOfTextAtSize(text, fontSize);
+                textX = curX + (col.w - tw) / 2;
+              } else if (col.align === 'right') {
+                const tw = font.widthOfTextAtSize(text, fontSize);
+                textX = curX + col.w - tw - 4;
+              }
+              page.drawText(text, {
+                x: textX,
+                y: textY,
+                size: fontSize,
+                font: font,
+                color: black
+              });
             }
-            page.drawText(text, {
-              x: textX,
-              y: textY,
-              size: fontSize,
-              font: font,
-              color: black
-            });
           }
           curX += col.w;
         }
@@ -388,34 +430,34 @@
       const jColW3 = 212;
       const jColW4 = contentWidth - jColW1 - jColW2 - jColW3;
 
-      const chkTahunan = (log.jenis === 'Tahunan') ? '✓' : '';
-      const chkBesar = (log.jenis === 'Besar') ? '✓' : '';
-      const chkSakit = (log.jenis === 'Sakit') ? '✓' : '';
-      const chkMelahirkan = (log.jenis === 'Melahirkan') ? '✓' : '';
-      const chkPenting = (log.jenis === 'Alasan Penting' || log.jenis === 'Penting') ? '✓' : '';
-      const chkCltn = (log.jenis === 'CLTN') ? '✓' : '';
+      const chkTahunan = (log.jenis === 'Tahunan');
+      const chkBesar = (log.jenis === 'Besar');
+      const chkSakit = (log.jenis === 'Sakit');
+      const chkMelahirkan = (log.jenis === 'Melahirkan');
+      const chkPenting = (log.jenis === 'Alasan Penting' || log.jenis === 'Penting');
+      const chkCltn = (log.jenis === 'CLTN');
 
       drawTableRow(marginX, currentY - 13, contentWidth, 13, [
         { text: '1. Cuti Tahunan', w: jColW1 },
-        { text: chkTahunan, w: jColW2, align: 'center', bold: true, size: 9.5 },
+        { check: chkTahunan, w: jColW2 },
         { text: '4. Cuti Melahirkan', w: jColW3 },
-        { text: chkMelahirkan, w: jColW4, align: 'center', bold: true, size: 9.5 }
+        { check: chkMelahirkan, w: jColW4 }
       ]);
       currentY -= 13;
 
       drawTableRow(marginX, currentY - 13, contentWidth, 13, [
         { text: '2. Cuti Besar', w: jColW1 },
-        { text: chkBesar, w: jColW2, align: 'center', bold: true, size: 9.5 },
+        { check: chkBesar, w: jColW2 },
         { text: '5. Cuti Karena Alasan Penting', w: jColW3 },
-        { text: chkPenting, w: jColW4, align: 'center', bold: true, size: 9.5 }
+        { check: chkPenting, w: jColW4 }
       ]);
       currentY -= 13;
 
       drawTableRow(marginX, currentY - 13, contentWidth, 13, [
         { text: '3. Cuti Sakit', w: jColW1 },
-        { text: chkSakit, w: jColW2, align: 'center', bold: true, size: 9.5 },
+        { check: chkSakit, w: jColW2 },
         { text: '6. Cuti di Luar Tanggungan Negara', w: jColW3 },
-        { text: chkCltn, w: jColW4, align: 'center', bold: true, size: 9.5 }
+        { check: chkCltn, w: jColW4 }
       ]);
       currentY -= 13 + 3;
 
@@ -617,7 +659,7 @@
       currentY -= 12;
 
       drawTableRow(marginX, currentY - 12, contentWidth, 12, [
-        { text: isSetujuAtasan ? '✓' : '', w: col4W, align: 'center', bold: true, size: 9.5 },
+        { check: isSetujuAtasan, w: col4W },
         { text: '', w: col4W, align: 'center' },
         { text: '', w: col4W, align: 'center' },
         { text: '', w: col4W, align: 'center' }
@@ -627,7 +669,7 @@
       // Area TTD Atasan di Kanan
       const atasanBlockH = 54;
       const atasanX = marginX + contentWidth - 200;
-      const atasanJabatan = this.formatJabatanSingkat(atasan.jabatan) || 'Atasan Langsung';
+      const atasanJabatan = safeWinAnsi(this.formatJabatanSingkat(atasan.jabatan) || 'Atasan Langsung');
       page.drawText(atasanJabatan, { x: atasanX, y: currentY - 10, size: 9, font: fontBold, color: black });
 
       if (isSetujuAtasan && qrAtasanImg) {
@@ -639,11 +681,11 @@
         });
       }
 
-      const atasanNama = atasan.nama || '-';
+      const atasanNama = safeWinAnsi(atasan.nama || '-');
       const atasanNamaW = fontBold.widthOfTextAtSize(atasanNama, 9);
       page.drawText(atasanNama, { x: atasanX, y: currentY - 50, size: 9, font: fontBold, color: black });
       page.drawLine({ start: { x: atasanX, y: currentY - 51 }, end: { x: atasanX + atasanNamaW, y: currentY - 51 }, color: black, thickness: 0.5 });
-      page.drawText(`NIP. ${atasan.nip || '-'}`, { x: atasanX, y: currentY - 59, size: 8.5, font: fontRegular, color: black });
+      page.drawText(safeWinAnsi(`NIP. ${atasan.nip || '-'}`), { x: atasanX, y: currentY - 59, size: 8.5, font: fontRegular, color: black });
 
       currentY -= atasanBlockH + 3;
 
@@ -667,7 +709,7 @@
       currentY -= 12;
 
       drawTableRow(marginX, currentY - 12, contentWidth, 12, [
-        { text: isSetujuPejabat ? '✓' : '', w: col4W, align: 'center', bold: true, size: 9.5 },
+        { check: isSetujuPejabat, w: col4W },
         { text: '', w: col4W, align: 'center' },
         { text: '', w: col4W, align: 'center' },
         { text: '', w: col4W, align: 'center' }
@@ -677,7 +719,7 @@
       // Area TTD Pejabat di Kanan
       const pejabatBlockH = 54;
       const pejabatX = marginX + contentWidth - 200;
-      page.drawText(pejabat.jabatan || 'Ketua', { x: pejabatX, y: currentY - 10, size: 9, font: fontBold, color: black });
+      page.drawText(safeWinAnsi(pejabat.jabatan || 'Ketua'), { x: pejabatX, y: currentY - 10, size: 9, font: fontBold, color: black });
 
       if (isSetujuPejabat && qrPejabatImg) {
         page.drawImage(qrPejabatImg, {
@@ -688,11 +730,11 @@
         });
       }
 
-      const pejabatNama = pejabat.nama || '-';
+      const pejabatNama = safeWinAnsi(pejabat.nama || '-');
       const pejabatNamaW = fontBold.widthOfTextAtSize(pejabatNama, 9);
       page.drawText(pejabatNama, { x: pejabatX, y: currentY - 50, size: 9, font: fontBold, color: black });
       page.drawLine({ start: { x: pejabatX, y: currentY - 51 }, end: { x: pejabatX + pejabatNamaW, y: currentY - 51 }, color: black, thickness: 0.5 });
-      page.drawText(`NIP. ${pejabat.nip || '-'}`, { x: pejabatX, y: currentY - 59, size: 8.5, font: fontRegular, color: black });
+      page.drawText(safeWinAnsi(`NIP. ${pejabat.nip || '-'}`), { x: pejabatX, y: currentY - 59, size: 8.5, font: fontRegular, color: black });
 
       // =============================================================
       // PEMBUATAN KAMUS TANDA TANGAN DIGITAL X.509 PAdES
