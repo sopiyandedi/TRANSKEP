@@ -4,7 +4,7 @@
 // ENGINE: ZettBOT PWA Engine v1.0.0 (by Zettbos)
 // =========================================================================
 
-const CACHE_NAME = 'transkep-v2.9.4';
+const CACHE_NAME = 'transkep-v2.9.5';
 
 // Daftar aset inti yang di-cache saat Service Worker dipasang (Install)
 const PRECACHE_ASSETS = [
@@ -149,7 +149,26 @@ self.addEventListener('fetch', (event) => {
     return; // Serahkan sepenuhnya ke jaringan langsung (Network Only)
   }
 
-  // B. Stale-While-Revalidate untuk aset lokal & CDN eksternal
+  // B. NETWORK-FIRST untuk Berkas Skrip (.js) dan Tampilan (.html)
+  // Menjamin perubahan kode JavaScript dan HTML selalu diambil segar dari server saat online
+  if (reqUrl.pathname.endsWith('.js') || reqUrl.pathname.endsWith('.html') || reqUrl.search.includes('v=')) {
+    event.respondWith(
+      fetch(event.request)
+        .then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200 && networkResponse.type !== 'opaque') {
+            const clone = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+          }
+          return networkResponse;
+        })
+        .catch(() => {
+          return caches.match(event.request);
+        })
+    );
+    return;
+  }
+
+  // C. Stale-While-Revalidate untuk aset statis (gambar, font, css)
   event.respondWith(
     caches.open(CACHE_NAME).then((cache) => {
       return cache.match(event.request).then((cachedResponse) => {
@@ -161,9 +180,7 @@ self.addEventListener('fetch', (event) => {
             return networkResponse;
           })
           .catch((err) => {
-            // Jika offline dan aset ada di cache, cachedResponse akan digunakan
             if (cachedResponse) return cachedResponse;
-            // Jika navigasi halaman gagal saat offline, kembalikan index.html
             if (event.request.mode === 'navigate') {
               return caches.match('./index.html');
             }

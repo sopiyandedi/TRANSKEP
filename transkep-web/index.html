@@ -57,6 +57,29 @@
 
 <body class="bg-slate-950 text-slate-200 min-h-screen overflow-hidden flex selection:bg-indigo-500/30">
   
+  <!-- ZETTBOT: Auto-Bust PWA Cache & Stale Service Worker Guard -->
+  <script>
+    (async function() {
+      const CURRENT_APP_BUILD = 'transkep-v2.9.5';
+      if (localStorage.getItem('transkep_active_build') !== CURRENT_APP_BUILD) {
+        localStorage.setItem('transkep_active_build', CURRENT_APP_BUILD);
+        try {
+          if ('caches' in window) {
+            const keys = await caches.keys();
+            await Promise.all(keys.map(k => caches.delete(k)));
+          }
+          if ('serviceWorker' in navigator) {
+            const regs = await navigator.serviceWorker.getRegistrations();
+            for (const r of regs) {
+              await r.unregister();
+            }
+          }
+        } catch(e) {}
+        window.location.reload(true);
+      }
+    })();
+  </script>
+
   <!-- ZETTBOT FIX: Script Eksekusi Instan Anti-Kedip (Anti-FOUC) -->
   <script>
     document.body.classList.add('preload-theme');
@@ -222,9 +245,10 @@
       ];
 
       try {
+        const APP_BUILD_VER = '2.9.5';
         console.log('🔄 [ZettBOT Loader] Memuat komponen tampilan views/ secara paralel...');
         await Promise.all(VIEW_SLOTS.map(async item => {
-          const res = await fetch(item.file);
+          const res = await fetch(item.file + '?v=' + APP_BUILD_VER);
           if (!res.ok) throw new Error(`HTTP ${res.status} saat memuat ${item.file}`);
           const html = await res.text();
           const el = document.getElementById(item.slot);
@@ -235,7 +259,7 @@
         const cetakSlot = document.getElementById('slot-templates-cetak');
         if (cetakSlot) {
           const cetakHtmls = await Promise.all(CETAK_TEMPLATES.map(async file => {
-            const res = await fetch(file);
+            const res = await fetch(file + '?v=' + APP_BUILD_VER);
             if (!res.ok) throw new Error(`HTTP ${res.status} saat memuat ${file}`);
             return await res.text();
           }));
@@ -247,7 +271,7 @@
         for (const src of [...SCRIPTS, ...CETAK_SCRIPTS]) {
           await new Promise((resolve, reject) => {
             const s = document.createElement('script');
-            s.src = src;
+            s.src = src + '?v=' + APP_BUILD_VER;
             s.onload = resolve;
             s.onerror = (e) => {
               console.error(`Gagal memuat script: ${src}`, e);
