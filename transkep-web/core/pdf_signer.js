@@ -85,29 +85,59 @@
     },
 
     /**
+     * Konversi Uint8Array ke String Latin1 biner secara cepat & aman
+     */
+    bytesToString(bytes) {
+      let str = '';
+      const CHUNK_SIZE = 8192;
+      for (let i = 0; i < bytes.length; i += CHUNK_SIZE) {
+        str += String.fromCharCode.apply(null, bytes.subarray(i, Math.min(i + CHUNK_SIZE, bytes.length)));
+      }
+      return str;
+    },
+
+    /**
+     * Konversi String Latin1 ke Uint8Array secara presisi
+     */
+    stringToBytes(str) {
+      const bytes = new Uint8Array(str.length);
+      for (let i = 0; i < str.length; i++) {
+        bytes[i] = str.charCodeAt(i) & 0xFF;
+      }
+      return bytes;
+    },
+
+    /**
      * Menyuntikkan kamus tanda tangan digital PKCS#7 ke dalam Uint8Array PDF
      * @param {Uint8Array} pdfBytes
      * @param {Object} certObj { cert, keys }
      * @param {Object} sigMetadata { reason, location, signerName }
+     * @param {number} [targetByteRangePos]
+     * @param {number} [targetContentsPos]
      * @returns {Uint8Array}
      */
-    signPdfBytes(pdfBytes, certObj, sigMetadata) {
+    signPdfBytes(pdfBytes, certObj, sigMetadata, targetByteRangePos, targetContentsPos) {
       if (!global.forge) throw new Error('Pustaka forge.js belum dimuat.');
       const forge = global.forge;
 
-      // Cari posisi /ByteRange dan /Contents di dalam byte array
-      let pdfString = '';
-      const CHUNK_SIZE = 8192;
-      for (let i = 0; i < pdfBytes.length; i += CHUNK_SIZE) {
-        pdfString += String.fromCharCode.apply(null, pdfBytes.subarray(i, Math.min(i + CHUNK_SIZE, pdfBytes.length)));
+      const pdfString = this.bytesToString(pdfBytes);
+
+      let byteRangePos = targetByteRangePos;
+      if (byteRangePos === undefined || byteRangePos === null) {
+        byteRangePos = pdfString.indexOf('/ByteRange [');
       }
 
-      const byteRangeKeyword = '/ByteRange [';
-      const byteRangePos = pdfString.indexOf(byteRangeKeyword);
-      const byteRangeEnd = pdfString.indexOf(']', byteRangePos);
+      let byteRangeEnd = byteRangePos;
+      while (pdfBytes[byteRangeEnd] !== 93 /* ']' */ && byteRangeEnd < pdfBytes.length) {
+        byteRangeEnd++;
+      }
+
+      let contentsPos = targetContentsPos;
+      if (contentsPos === undefined || contentsPos === null) {
+        contentsPos = pdfString.indexOf('/Contents <');
+      }
 
       const contentsKeyword = '/Contents <';
-      const contentsPos = pdfString.indexOf(contentsKeyword);
       const contentsStart = contentsPos + contentsKeyword.length;
       const contentsEnd = contentsStart + this.SIGNATURE_SLOT_SIZE;
 
@@ -134,6 +164,7 @@
       const part2 = pdfBytes.subarray(offset2, offset2 + offset3);
 
       let signedBinary = '';
+      const CHUNK_SIZE = 8192;
       for (let i = 0; i < part1.length; i += CHUNK_SIZE) {
         signedBinary += String.fromCharCode.apply(null, part1.subarray(i, Math.min(i + CHUNK_SIZE, part1.length)));
       }
@@ -176,6 +207,110 @@
       }
 
       return pdfBytes;
+    },
+
+    /**
+     * Membubuhkan Tanda Tangan Digital Tambahan via Incremental Update (ISO 32000-1 PAdES)
+     * Menjaga integritas revisi sebelumnya dan memunculkan semua penandatangan di Adobe Acrobat
+     */
+    appendSignatureRevision(currentBytes, widgetRefObjNum, rectCoords, signerUser, fieldName, reasonText, pageRefStr) {
+      const certObj = this.generateCertificate(signerUser);
+      const str = this.bytesToString(currentBytes);
+
+      const startxrefPos = str.lastIndexOf('startxref');
+      const prevXrefStr = str.slice(startxrefPos + 9, str.indexOf('%%EOF', startxrefPos)).trim();
+      const prevXref = parseInt(prevXrefStr, 10);
+
+      const sizeMatch = str.match(/\/Size\s+(\d+)/g);
+      const lastSizeMatch = sizeMatch[sizeMatch.length - 1];
+      const curSize = parseInt(lastSizeMatch.replace(/[^0-9]/g, ''), 10);
+
+      const rootMatch = str.match(/\/Root\s+(\d+\s+\d+\s+R)/);
+      const rootRef = rootMatch ? rootMatch[1] : '2 0 R';
+
+      const infoMatch = str.match(/\/Info\s+(\d+\s+\d+\s+R)/);
+      const infoRef = infoMatch ? infoMatch[1] : null;
+
+      const newSigObjNum = curSize;
+      const newSize = curSize + 1;
+      const baseLen = currentBytes.length;
+
+      let appendStr = '\n';
+
+      // 1. Sig object
+      const sigOffsetInAppend = appendStr.length;
+      appendStr += `${newSigObjNum} 0 obj\n`;
+      const dummyZeros = '0'.repeat(this.SIGNATURE_SLOT_SIZE);
+      const dateFormatted = `D:${new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14)}+07'00'`;
+      appendStr += `<<
+/Type /Sig
+/Filter /Adobe.PPKLite
+/SubFilter /adbe.pkcs7.detached
+/ByteRange [ 0 1000000000 1000000000 1000000000 ]
+/Contents <${dummyZeros}>
+/Reason (${reasonText})
+/M (${dateFormatted})
+/Name (${signerUser.nama || 'Aparatur PA Indramayu'})
+/Location (Indramayu)
+>>
+endobj\n`;
+
+      // 2. Updated Widget object
+      const widgetOffsetInAppend = appendStr.length;
+      appendStr += `${widgetRefObjNum} 0 obj\n`;
+      appendStr += `<<
+/Type /Annot
+/Subtype /Widget
+/FT /Sig
+/Rect [ ${rectCoords.join(' ')} ]
+/V ${newSigObjNum} 0 R
+/T (${fieldName})
+/F 132
+/P ${pageRefStr}
+>>
+endobj\n`;
+
+      // 3. xref table
+      const xrefOffsetInAppend = appendStr.length;
+      const absXrefOffset = baseLen + xrefOffsetInAppend;
+
+      const entries = [
+        { num: widgetRefObjNum, offset: baseLen + widgetOffsetInAppend },
+        { num: newSigObjNum, offset: baseLen + sigOffsetInAppend }
+      ].sort((a, b) => a.num - b.num);
+
+      let xrefStr = 'xref\n';
+      for (const ent of entries) {
+        xrefStr += `${ent.num} 1\n`;
+        xrefStr += String(ent.offset).padStart(10, '0') + ' 00000 n \n';
+      }
+      appendStr += xrefStr;
+
+      // 4. trailer
+      appendStr += `trailer
+<<
+/Size ${newSize}
+/Root ${rootRef}
+${infoRef ? `/Info ${infoRef}\n` : ''}/Prev ${prevXref}
+>>
+startxref
+${absXrefOffset}
+%%EOF`;
+
+      const appendBytes = this.stringToBytes(appendStr);
+      let newPdfBytes = new Uint8Array(baseLen + appendBytes.length);
+      newPdfBytes.set(currentBytes, 0);
+      newPdfBytes.set(appendBytes, baseLen);
+
+      const fullStr = this.bytesToString(newPdfBytes);
+      const brPos = fullStr.lastIndexOf('/ByteRange [');
+      const ctPos = fullStr.lastIndexOf('/Contents <');
+
+      return this.signPdfBytes(newPdfBytes, certObj, {
+        reason: reasonText,
+        location: 'Indramayu',
+        signerName: signerUser.nama
+      }, brPos, ctPos);
     },
 
     /**
@@ -619,6 +754,7 @@
 
       // Area Kanan: TTD Pemohon
       const pemohonX = marginX + viLeftW + 20;
+      const pemohonY = currentY;
       page.drawText('Hormat Saya,', { x: pemohonX, y: currentY - 10, size: 9, font: fontRegular, color: black });
 
       if (qrPemohonImg) {
@@ -669,6 +805,7 @@
       // Area TTD Atasan di Kanan
       const atasanBlockH = 54;
       const atasanX = marginX + contentWidth - 200;
+      const atasanY = currentY;
       const atasanJabatan = safeWinAnsi(this.formatJabatanSingkat(atasan.jabatan) || 'Atasan Langsung');
       page.drawText(atasanJabatan, { x: atasanX, y: currentY - 10, size: 9, font: fontBold, color: black });
 
@@ -719,6 +856,7 @@
       // Area TTD Pejabat di Kanan
       const pejabatBlockH = 54;
       const pejabatX = marginX + contentWidth - 200;
+      const pejabatY = currentY;
       page.drawText(safeWinAnsi(pejabat.jabatan || 'Ketua'), { x: pejabatX, y: currentY - 10, size: 9, font: fontBold, color: black });
 
       if (isSetujuPejabat && qrPejabatImg) {
@@ -737,7 +875,7 @@
       page.drawText(safeWinAnsi(`NIP. ${pejabat.nip || '-'}`), { x: pejabatX, y: currentY - 59, size: 8.5, font: fontRegular, color: black });
 
       // =============================================================
-      // PEMBUATAN KAMUS TANDA TANGAN DIGITAL X.509 PAdES
+      // PEMBUATAN KAMUS TANDA TANGAN DIGITAL MULTI-TIER X.509 PAdES
       // =============================================================
       const byteRangePlaceholder = [
         PDFNumber.of(0),
@@ -748,56 +886,108 @@
       const byteRangeArray = pdfDoc.context.obj(byteRangePlaceholder);
       const dummyContents = PDFHexString.of('0'.repeat(this.SIGNATURE_SLOT_SIZE));
 
-      const signerName = (isSetujuPejabat && pejabat.nama) ? pejabat.nama : (pns.nama || 'Aparatur PA Indramayu');
-      const sigReason = 'Pengesahan Formulir Cuti Pegawai Pengadilan Agama Indramayu';
+      // Koordinat Area Tanda Tangan Fisik Presisi
+      const pemohonRect = [Math.round(pemohonX), Math.round(pemohonY - 68), Math.round(pemohonX + 130), Math.round(pemohonY)];
+      const atasanRect = [Math.round(atasanX), Math.round(atasanY - 60), Math.round(atasanX + 160), Math.round(atasanY)];
+      const pejabatRect = [Math.round(pejabatX), Math.round(pejabatY - 60), Math.round(pejabatX + 160), Math.round(pejabatY)];
 
-      const sigDict = pdfDoc.context.obj({
+      // 1. Signature Field 1: Pemohon (Pegawai yang mengajukan cuti)
+      const sig1Reason = 'Pengajuan Permohonan Cuti Pegawai Pengadilan Agama Indramayu';
+      const sig1Dict = pdfDoc.context.obj({
         Type: 'Sig',
         Filter: 'Adobe.PPKLite',
         SubFilter: 'adbe.pkcs7.detached',
         ByteRange: byteRangeArray,
         Contents: dummyContents,
-        Reason: PDFString.of(sigReason),
+        Reason: PDFString.of(sig1Reason),
         M: PDFString.of(`D:${new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14)}+07'00'`),
-        Name: PDFString.of(signerName),
+        Name: PDFString.of(pns.nama || 'Pemohon Cuti'),
         Location: PDFString.of('Indramayu')
       });
-      const sigDictRef = pdfDoc.context.register(sigDict);
+      const sig1DictRef = pdfDoc.context.register(sig1Dict);
 
-      // Signature Widget
-      const widgetDict = pdfDoc.context.obj({
+      const widget1Dict = pdfDoc.context.obj({
         Type: 'Annot',
         Subtype: 'Widget',
         FT: 'Sig',
-        Rect: [50, 50, 150, 100],
-        V: sigDictRef,
+        Rect: pemohonRect,
+        V: sig1DictRef,
         T: PDFString.of('Signature1'),
         F: 132,
         P: page.ref
       });
-      const widgetRef = pdfDoc.context.register(widgetDict);
+      const widget1Ref = pdfDoc.context.register(widget1Dict);
 
-      page.node.set(PDFName.of('Annots'), pdfDoc.context.obj([widgetRef]));
+      // 2. Signature Field 2: Atasan Langsung
+      const widget2Dict = pdfDoc.context.obj({
+        Type: 'Annot',
+        Subtype: 'Widget',
+        FT: 'Sig',
+        Rect: atasanRect,
+        T: PDFString.of('Signature2'),
+        F: 132,
+        P: page.ref
+      });
+      const widget2Ref = pdfDoc.context.register(widget2Dict);
+
+      // 3. Signature Field 3: Pejabat Yang Berwenang
+      const widget3Dict = pdfDoc.context.obj({
+        Type: 'Annot',
+        Subtype: 'Widget',
+        FT: 'Sig',
+        Rect: pejabatRect,
+        T: PDFString.of('Signature3'),
+        F: 132,
+        P: page.ref
+      });
+      const widget3Ref = pdfDoc.context.register(widget3Dict);
+
+      page.node.set(PDFName.of('Annots'), pdfDoc.context.obj([widget1Ref, widget2Ref, widget3Ref]));
 
       const acroFormDict = pdfDoc.context.obj({
-        Fields: [widgetRef],
+        Fields: [widget1Ref, widget2Ref, widget3Ref],
         SigFlags: 3
       });
       pdfDoc.catalog.set(PDFName.of('AcroForm'), acroFormDict);
 
-      // Simpan PDF mentah dengan placeholder
-      const rawPdfBytes = await pdfDoc.save({ useObjectStreams: false });
+      // Simpan PDF mentah (Rev 1 Base)
+      let signedBytes = await pdfDoc.save({ useObjectStreams: false });
 
-      // Bangkitkan Sertifikat X.509 atas nama Penandatangan Sah
-      const signerUser = (isSetujuPejabat && pejabat.nama) ? pejabat : pns;
-      const certObj = this.generateCertificate(signerUser);
-
-      // Suntikkan tanda tangan kriptografis ke dalam biner
-      const signedBytes = this.signPdfBytes(rawPdfBytes, certObj, {
-        reason: sigReason,
+      // Bangkitkan Sertifikat & Tanda Tangani Rev 1: Pemohon (Pegawai)
+      const certPemohon = this.generateCertificate(pns);
+      signedBytes = this.signPdfBytes(signedBytes, certPemohon, {
+        reason: sig1Reason,
         location: 'Indramayu',
-        signerName: signerName
+        signerName: pns.nama || 'Pemohon Cuti'
       });
+
+      const pageRefStr = (page.ref && page.ref.tag) ? page.ref.tag : `${page.ref.objectNumber} ${page.ref.generationNumber || 0} R`;
+
+      // Rev 2: Atasan Langsung (Jika sudah disetujui atasan)
+      if (isSetujuAtasan) {
+        signedBytes = this.appendSignatureRevision(
+          signedBytes,
+          widget2Ref.objectNumber,
+          atasanRect,
+          atasan,
+          'Signature2',
+          'Persetujuan Cuti Pegawai oleh Atasan Langsung',
+          pageRefStr
+        );
+      }
+
+      // Rev 3: Pejabat Yang Berwenang (Jika sudah disetujui pejabat)
+      if (isSetujuPejabat) {
+        signedBytes = this.appendSignatureRevision(
+          signedBytes,
+          widget3Ref.objectNumber,
+          pejabatRect,
+          pejabat,
+          'Signature3',
+          'Pengesahan Formulir Cuti oleh Pejabat Yang Berwenang',
+          pageRefStr
+        );
+      }
 
       return signedBytes;
     },
