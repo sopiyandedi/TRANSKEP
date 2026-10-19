@@ -1974,3 +1974,26 @@ Berdasarkan investigasi menyeluruh pada alur pengajuan cuti (`submitCuti`), dite
   - Pustaka CDN `pdf-lib` dan `forge` dipasang di [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html).
   - Versi Service Worker dinaikkan ke **`transkep-v2.9.2`** di [`transkep-web/sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/sw.js).
 - [x] **Verifikasi Sintaks**: Seluruh berkas JavaScript lolos uji validasi `node --check` dengan 0 error.
+
+---
+
+### REVISI TAHAP 38.1: Resolusi Exception WinAnsi Encoding Checkmark (✓ 0x2713) & Vector Engine
+**Tanggal**: 19 Oktober 2026  
+**Status**: [SELESAI]  
+**Lead Architect**: ZettBOT (by Zettbos)
+
+#### 1. Masalah
+Saat tombol `[ TTE ]` (Unduh PDF) diklik, muncul error toast merah:
+`Gagal TTE Digital: WinAnsi cannot encode "✓" (0x2713)`.
+Akar penyebab: Font bawaan PDF (Times-Roman / Helvetica / Courier) pada pustaka `pdf-lib` menggunakan standar encoding WinAnsi (Windows-1252) yang tidak mendukung karakter Unicode centang `✓` (0x2713).
+
+#### 2. Solusi Arsitektur
+1. **Engine Centang Vektor Mandiri (`drawCheckmark`)**:
+   - Menghapus karakter string `✓` dari pemanggilan `page.drawText`.
+   - Menggantikannya dengan fungsi gambar vektor 2-stroke presisi menggunakan `page.drawLine` yang digambar tepat di tengah sel tabel. Hasilnya 100% tajam (*lossless vector*), elegan, dan bebas dari ketergantungan encoding font.
+2. **Sanitasi String WinAnsi Global (`safeWinAnsi`)**:
+   - Menambahkan filter pengaman otomatis yang menormalisasi karakter non-Latin1 / curly apostrophe (`’`, `“`, `”`, `—`, `…`) menjadi karakter ASCII kompatibel sebelum digambar ke PDF.
+3. **Penyelarasan & Deployment**:
+   - Berkas [`transkep-web/core/pdf_signer.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/core/pdf_signer.js) dan [`permohonan/js_pdf_signer.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/js_pdf_signer.html) disinkronkan 1:1.
+   - Service Worker cache dinaikkan ke **`transkep-v2.9.4`**.
+   - Berhasil di-push ke `origin`, `prod` (`transkep.github.io`), dan dideploy ke Google Apps Script versi `@296` & `@297`.
