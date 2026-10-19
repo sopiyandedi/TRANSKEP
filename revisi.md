@@ -1923,9 +1923,54 @@ Berdasarkan investigasi menyeluruh pada alur pengajuan cuti (`submitCuti`), dite
 #### 4. Hasil Verifikasi
 1. **Verifikasi Sintaks (Node.js)**: Berkas `core.js` dan `cuti.js` lulus uji `node --check` dengan 0 error.
 2. **Eliminasi Glitch**: Seluruh pembersihan array destruktif telah digantikan dengan guard aman `window.vueState.cutiLogs || []`, sehingga data tabel tidak pernah hilang atau menjadi 0 baris selama proses refresh.
-3. **Pembaruan Instan (0 Detik)**: Data usulan langsung muncul di baris paling atas tabel seketika tombol kirim berhasil merespons dari backend, tanpa jeda loading modal kedua.
 4. **Verifikasi Deployment Apps Script**: Berhasil di-push (109 files) dan dideploy ke versi `@291` (Production URL) & `@292` (Backup URL).
 
+---
 
+### REVISI TAHAP 38: Smart Morphing Button (Cetak ➔ Unduh PDF) & Alur Progressive 3-Tier TTE Signatures
 
+#### 1. Masukan & Diagnosa Arsitektur
+1. **Eliminasi Dual Button (Smart Morphing Button)**:
+   - Keberadaan 2 tombol berdampingan (`[ CUTI ]` cetak pop-up dan `[ TTE ]` unduh PDF) di kolom aksi memakan ruang visual tabel dan menimbulkan ambiguitas operasional.
+   - Solusi: Menerapkan **1 Tombol Cerdas Adaptif (Morphing Button)**:
+     - **Status Belum Disetujui Pejabat Berwenang** (`Menunggu` / `Proses Atasan`): Tombol berfungsi sebagai **`Cetak`** (`execCetakCuti`) yang membuka modal preview cetak HTML formulir cuti (draft usulan).
+     - **Status Telah Disetujui Pejabat Berwenang** (`Disetujui`): Tombol secara otomatis bertransformasi menjadi **`Unduh PDF`** / `TTE PDF` (`execUnduhSignedCuti`), dengan aksen visual khusus (indigo/perisai) yang sekali klik langsung mengunduh berkas PDF biner ber-TTE resmi X.509 PAdES.
+2. **Alur TTE Bertingkat 3 Pihak (Progressive 3-Tier Digital Signature)**:
+   - **Tingkat 1 (Pegawai/Pemohon)**: Saat usul cuti dikirimkan, form otomatis memuat QR Barcode dan TTE biner atas nama Pegawai bersangkutan.
+   - **Tingkat 2 (Atasan Langsung)**: Saat atasan langsung menyetujui (`status_atasan === 'Disetujui'`), sistem membubuhkan QR Barcode, nama, NIP, serta tanda tangan digital Atasan Langsung.
+   - **Tingkat 3 (Pejabat Berwenang)**: Saat pejabat berwenang (Ketua) menyetujui (`status_pejabat === 'Disetujui'` / final `Disetujui`), dokumen dinyatakan sah paripurna dengan QR Barcode dan stempel TTE digital Ketua.
+   - Saat diunduh di status `Disetujui`, PDF memuat **lengkap 3 QR Barcode dan 3 Tanda Tangan Digital**.
+3. **Standarisasi Penamaan File Berkas**:
+   - Berkas PDF yang diunduh diformat otomatis mengikuti pola: `TRANSKEP_[NamaPegawai]_sign_sign_sign.pdf` (nama dibersihkan dari spasi/karakter khusus).
 
+#### 2. Rencana Berkas yang Dimodifikasi
+| Berkas | Peran | Rencana Modifikasi |
+| :--- | :--- | :--- |
+| [`transkep-web/modules/permohonan/cuti.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/modules/permohonan/cuti.js) | Cuti Controller (Riwayat Cuti Saya) | Modifikasi `formattedLogs`: Render 1 tombol dinamis. Jika belum `Disetujui` gunakan `cetakCuti`, jika sudah `Disetujui` gunakan `unduhSignedCuti`. |
+| [`transkep-web/modules/permohonan/view_permohonan.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/modules/permohonan/view_permohonan.html) | Rekapitulasi Global View | Ganti dual button `CUTI` + `TTE` menjadi single conditional button: `v-if="log.status !== 'Disetujui'"` (Cetak) vs `v-else` (Unduh PDF). |
+| [`permohonan/view_rekapitulasi.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/view_rekapitulasi.html) | GAS Rekapitulasi View | Sinkronisasi single conditional button pada template GAS. |
+| [`transkep-web/core/pdf_signer.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/core/pdf_signer.js) | Engine PDF Signer | Pastikan QR dan TTE Atasan & Pejabat digambar kondisional berdasarkan approval, format nama file `TRANSKEP_[Nama]_sign_sign_sign.pdf`. |
+| [`permohonan/js_pdf_signer.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/js_pdf_signer.html) | GAS PDF Signer | Sinkronisasi penuh kode generator PDF biner & TTE signer ke GAS. |
+| [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) | GAS Main Index | Pemuatan pustaka CDN `pdf-lib`, `forge`, dan skrip `permohonan/js_pdf_signer`. |
+| [`transkep-web/sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/sw.js) | PWA Service Worker | Menaikkan versi cache ke `transkep-v2.9.2`. |
+
+#### 3. Status Eksekusi: [SELESAI]
+- [x] **Smart Morphing Action Button**:
+  - Kolom aksi tabel riwayat cuti kini hanya menampilkan **1 tombol adaptif tunggal**:
+    - Status belum disetujui penuh (`Menunggu` / `Proses`): Tombol **`Cetak`** (`cetakCuti`) membuka preview HTML cetak usulan.
+    - Status telah disetujui penuh (`Disetujui`): Tombol otomatis bertransformasi menjadi **`Unduh PDF`** (`unduhSignedCuti`) berikon perisai/download yang langsung mengunduh berkas PDF biner ber-TTE.
+  - Diterapkan secara reaktif di [`transkep-web/modules/permohonan/cuti.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/modules/permohonan/cuti.js), [`transkep-web/modules/permohonan/view_permohonan.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/modules/permohonan/view_permohonan.html), [`permohonan/js_permohonan_view.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/js_permohonan_view.html), [`permohonan/view_rekapitulasi.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/view_rekapitulasi.html), dan [`permohonan/js_rekapitulasi.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/js_rekapitulasi.html).
+- [x] **Alur Progressive 3-Tier TTE Signatures**:
+  - TTE Tingkat 1 (Pemohon): Otomatis dibubuhkan (QR Code + sertifikat biner) pada Bagian VI saat usul diajukan.
+  - TTE Tingkat 2 (Atasan Langsung): Dibubuhkan pada Bagian VII hanya jika Atasan Langsung telah menyetujui (`status_atasan === 'Disetujui'`).
+  - TTE Tingkat 3 (Pejabat Berwenang): Dibubuhkan pada Bagian VIII hanya jika Pejabat Berwenang telah menyetujui (`status_pejabat === 'Disetujui'`).
+  - PDF yang diunduh pada status `Disetujui` memuat **lengkap 3 tanda tangan & 3 QR Code**.
+- [x] **Standarisasi Penamaan File Berkas**:
+  - Format berkas PDF yang dihasilkan: `TRANSKEP_${cleanName}_sign_sign_sign.pdf`.
+- [x] **Layout Presisi 1:1 Blanko Resmi A4**:
+  - Kalibrasi dimensi A4 (595.28 x 841.89 pt), grid margin 32 pt, baris header shading `#f2f2f2`, tabel catatan cuti 3 tahun (2024, 2025, 2026), paraf pejabat, dan proporsi vertikal yang menjamin 100% pas dalam 1 halaman tunggal (single page).
+- [x] **Penyelarasan Apps Script & PWA**:
+  - Berkas [`permohonan/js_pdf_signer.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/js_pdf_signer.html) disinkronkan 1:1 dengan engine [`transkep-web/core/pdf_signer.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/core/pdf_signer.js).
+  - Pustaka CDN `pdf-lib` dan `forge` dipasang di [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html).
+  - Versi Service Worker dinaikkan ke **`transkep-v2.9.2`** di [`transkep-web/sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/sw.js).
+- [x] **Verifikasi Sintaks**: Seluruh berkas JavaScript lolos uji validasi `node --check` dengan 0 error.

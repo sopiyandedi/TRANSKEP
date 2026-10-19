@@ -230,12 +230,15 @@
                           atasanDot = log.status_atasan === 'Disetujui' ? 'text-emerald-500' : (log.status_atasan === 'Ditolak' ? 'text-rose-500' : 'text-amber-500');
                           pejabatDot = log.status_pejabat === 'Disetujui' ? 'text-emerald-500' : (log.status_pejabat === 'Ditolak' ? 'text-rose-500' : 'text-amber-500');
                           
+                          const sNorm = String(log.status || '').trim().toLowerCase();
                           if (log.jenis !== 'Dinas Luar') {
-                              actions.push({ actionType: 'cetakCuti', icon: 'fa-print', text: 'Cetak', css: 'px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-lg transition shadow-md shadow-slate-900/30', tooltip: 'Cetak Formulir' });
-                              actions.push({ actionType: 'unduhSignedCuti', icon: 'fa-file-shield', text: 'TTE PDF', css: 'px-3 py-1.5 bg-indigo-950/70 hover:bg-indigo-800 text-indigo-300 hover:text-white border border-indigo-700/60 rounded-lg transition shadow-md shadow-indigo-950/40', tooltip: 'Unduh PDF Ber-TTE Digital (X.509 PAdES)' });
+                              if (sNorm === 'disetujui') {
+                                  actions.push({ actionType: 'unduhSignedCuti', icon: 'fa-file-shield', text: 'Unduh PDF', css: 'px-3 py-1.5 bg-indigo-950/80 hover:bg-indigo-700 text-indigo-300 hover:text-white border border-indigo-700/60 rounded-lg transition shadow-md shadow-indigo-950/40 text-xs font-semibold', tooltip: 'Unduh Dokumen Ber-TTE Digital Resmi (X.509 PAdES)' });
+                              } else {
+                                  actions.push({ actionType: 'cetakCuti', icon: 'fa-print', text: 'Cetak', css: 'px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-lg transition shadow-md shadow-slate-900/30 text-xs font-semibold', tooltip: 'Cetak Formulir' });
+                              }
                           }
                           
-                          const sNorm = String(log.status || '').trim().toLowerCase();
                           if (sNorm === 'menunggu' || sNorm === 'perubahan') {
                               actions.push({ actionType: 'editCuti', icon: 'fa-pen-to-square', text: '', css: 'px-2 py-1.5 bg-indigo-500/10 hover:bg-indigo-500 border border-indigo-500/20 hover:border-indigo-500 text-indigo-400 hover:text-white rounded-lg transition', tooltip: 'Ubah Pengajuan' });
                               actions.push({ actionType: 'batalCuti', icon: 'fa-trash-can', text: '', css: 'px-2 py-1.5 bg-rose-500/10 hover:bg-rose-500 border border-rose-500/20 hover:border-rose-500 text-rose-400 hover:text-white rounded-lg transition', tooltip: 'Tarik Pengajuan' });

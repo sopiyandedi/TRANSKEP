@@ -1,6 +1,6 @@
 <script>
 // =========================================================================
-// FILE: js_pdf_signer.html (Google Apps Script Version)
+// FILE: pdf_signer.js
 // DESKRIPSI: Mesin Pembuat PDF Biner & Penyuntik Tanda Tangan Digital X.509
 // STANDAR: PAdES / PKCS#7 Detached (ISO 32000-1 / Adobe Acrobat Signatures)
 // ENGINE: ZettBOT Digital Signature Engine v1.0.0 (by Zettbos)
@@ -10,20 +10,31 @@
   'use strict';
 
   const TranskepPdfSigner = {
-    SIGNATURE_SLOT_SIZE: 8192,
+    SIGNATURE_SLOT_SIZE: 8192, // 8192 hex chars = 4096 bytes slot
 
+    /**
+     * Memeriksa kesiapan pustaka PDF-Lib dan Forge
+     */
     isReady() {
       return (typeof global.PDFLib !== 'undefined') && (typeof global.forge !== 'undefined');
     },
 
+    /**
+     * Menghasilkan Sertifikat Digital Internal X.509 resmi Pengadilan Agama Indramayu
+     * @param {Object} user { nama, nip, jabatan }
+     * @returns {Object} { cert, keys, pemCert, pemKey }
+     */
     generateCertificate(user) {
       if (!global.forge) throw new Error('Pustaka forge.js belum dimuat.');
       const forge = global.forge;
+
       const pki = forge.pki;
+      // Gunakan RSA 2048-bit standar resmi keamanan digital
       const keys = pki.rsa.generateKeyPair(2048);
       const cert = pki.createCertificate();
 
       cert.publicKey = keys.publicKey;
+      // Nomor seri unik berbasis waktu & random hex
       cert.serialNumber = '01' + forge.util.bytesToHex(forge.random.getBytesSync(8));
 
       cert.validity.notBefore = new Date();
@@ -44,8 +55,10 @@
       ];
 
       cert.setSubject(attrs);
+      // Self-signed Certificate Otoritas PA Indramayu
       cert.setIssuer(attrs);
 
+      // Extensions
       cert.setExtensions([
         { name: 'basicConstraints', cA: false },
         {
@@ -61,6 +74,7 @@
         }
       ]);
 
+      // Tandatangani sertifikat dengan kunci privat menggunakan SHA-256
       cert.sign(keys.privateKey, forge.md.sha256.create());
 
       return {
@@ -71,10 +85,18 @@
       };
     },
 
+    /**
+     * Menyuntikkan kamus tanda tangan digital PKCS#7 ke dalam Uint8Array PDF
+     * @param {Uint8Array} pdfBytes
+     * @param {Object} certObj { cert, keys }
+     * @param {Object} sigMetadata { reason, location, signerName }
+     * @returns {Uint8Array}
+     */
     signPdfBytes(pdfBytes, certObj, sigMetadata) {
       if (!global.forge) throw new Error('Pustaka forge.js belum dimuat.');
       const forge = global.forge;
 
+      // Cari posisi /ByteRange dan /Contents di dalam byte array
       let pdfString = '';
       const CHUNK_SIZE = 8192;
       for (let i = 0; i < pdfBytes.length; i += CHUNK_SIZE) {
@@ -91,21 +113,24 @@
       const contentsEnd = contentsStart + this.SIGNATURE_SLOT_SIZE;
 
       if (byteRangePos === -1 || contentsPos === -1) {
-        throw new Error('Placeholder tanda tangan tidak ditemukan dalam PDF.');
+        throw new Error('Placeholder tanda tangan (/ByteRange atau /Contents) tidak ditemukan dalam PDF.');
       }
 
-      const offset1 = contentsStart - 1;
-      const offset2 = contentsEnd + 1;
+      const offset1 = contentsStart - 1; // posisi karakter '<'
+      const offset2 = contentsEnd + 1; // byte tepat setelah '>'
       const offset3 = pdfBytes.length - offset2;
 
+      // Susun string ByteRange aktual
       const actualByteRange = `[ 0 ${offset1} ${offset2} ${offset3} ]`;
       const origRangeLength = byteRangeEnd - byteRangePos + 1;
       const paddedByteRange = `/ByteRange ${actualByteRange}`.padEnd(origRangeLength, ' ');
 
+      // Tuliskan paddedByteRange langsung ke Uint8Array (in-place)
       for (let i = 0; i < paddedByteRange.length; i++) {
         pdfBytes[byteRangePos + i] = paddedByteRange.charCodeAt(i);
       }
 
+      // Ambil byte yang dicakup oleh ByteRange untuk di-hash
       const part1 = pdfBytes.subarray(0, offset1);
       const part2 = pdfBytes.subarray(offset2, offset2 + offset3);
 
@@ -117,6 +142,7 @@
         signedBinary += String.fromCharCode.apply(null, part2.subarray(i, Math.min(i + CHUNK_SIZE, part2.length)));
       }
 
+      // Buat struktur CMS/PKCS#7 Detached
       const p7 = forge.pkcs7.createSignedData();
       p7.content = forge.util.createBuffer(signedBinary);
       p7.addCertificate(certObj.cert);
@@ -145,6 +171,7 @@
       const hexSignature = forge.util.bytesToHex(rawDer);
       const paddedHex = hexSignature.padEnd(this.SIGNATURE_SLOT_SIZE, '0');
 
+      // Tuliskan hex signature ke dalam placeholder /Contents
       for (let i = 0; i < paddedHex.length; i++) {
         pdfBytes[contentsStart + i] = paddedHex.charCodeAt(i);
       }
@@ -152,19 +179,690 @@
       return pdfBytes;
     },
 
+    /**
+     * Memformat singkatan jabatan resmi PA Indramayu
+     */
+    formatJabatanSingkat(jab) {
+      if (!jab) return '-';
+      const j = String(jab).toUpperCase();
+      if (j.includes('KEPALA SUB BAGIAN PERENCANAAN, TI DAN PELAPORAN')) return 'Kasubbag PTIP';
+      if (j.includes('KEPALA SUB BAGIAN UMUM DAN KEUANGAN')) return 'Kasubbag Umum dan Keuangan';
+      if (j.includes('KEPALA SUB BAGIAN KEPEGAWAIAN, ORTALA') || j.includes('KEPALA SUB BAGIAN KEPEGAWAIAN DAN ORTALA')) return 'Kasubbag Kepegawaian & ORTALA';
+      return jab;
+    },
+
+    /**
+     * Memformat tanggal cetak resmi Indonesia (contoh: 18 Oktober 2026)
+     */
+    formatDateIndoCetak(dateStr) {
+      if (!dateStr) return '-';
+      const months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+      let parts = String(dateStr).split('-');
+      if (parts.length === 3) {
+        return parseInt(parts[2], 10) + ' ' + months[parseInt(parts[1], 10) - 1] + ' ' + parts[0];
+      }
+      parts = String(dateStr).split('/');
+      if (parts.length === 3) {
+        return parseInt(parts[0], 10) + ' ' + months[parseInt(parts[1], 10) - 1] + ' ' + parts[2];
+      }
+      return String(dateStr);
+    },
+
+    /**
+     * Membangun file PDF Formulir Cuti A4 Utuh yang 1:1 Identik dengan Blanko Resmi
+     * @param {Object} log Data Cuti
+     * @param {Object} pns Data Pemohon
+     * @param {Object} atasan Data Atasan
+     * @param {Object} pejabat Data Pejabat
+     * @param {Object} qrDataUrls { pemohon, atasan, pejabat, paraf }
+     * @returns {Promise<Uint8Array>}
+     */
+    async buildSignedCutiPdf(log, pns, atasan, pejabat, qrDataUrls) {
+      if (!this.isReady()) throw new Error('Pustaka pdf-lib atau forge belum siap.');
+      const PDFLib = global.PDFLib;
+      const { PDFDocument, StandardFonts, rgb, PDFName, PDFNumber, PDFHexString, PDFString } = PDFLib;
+
+      const pdfDoc = await PDFDocument.create();
+      // Kertas A4: 595.28 x 841.89 points
+      const page = pdfDoc.addPage([595.28, 841.89]);
+      const { width, height } = page.getSize();
+
+      const fontRegular = await pdfDoc.embedFont(StandardFonts.TimesRoman);
+      const fontBold = await pdfDoc.embedFont(StandardFonts.TimesRomanBold);
+
+      // Warna
+      const black = rgb(0, 0, 0);
+      const headerBg = rgb(0.95, 0.95, 0.95); // Shading abu-abu resmi #f2f2f2
+
+      // Embed Barcodes PNG
+      let qrPemohonImg = null;
+      let qrAtasanImg = null;
+      let qrPejabatImg = null;
+      let qrParafImg = null;
+
+      try {
+        if (qrDataUrls && qrDataUrls.pemohon) qrPemohonImg = await pdfDoc.embedPng(qrDataUrls.pemohon);
+        if (qrDataUrls && qrDataUrls.atasan) qrAtasanImg = await pdfDoc.embedPng(qrDataUrls.atasan);
+        if (qrDataUrls && qrDataUrls.pejabat) qrPejabatImg = await pdfDoc.embedPng(qrDataUrls.pejabat);
+        if (qrDataUrls && qrDataUrls.paraf) qrParafImg = await pdfDoc.embedPng(qrDataUrls.paraf);
+      } catch (err) {
+        console.warn('⚠️ Gagal embed barcode PNG:', err);
+      }
+
+      const marginX = 32;
+      const contentWidth = width - (marginX * 2); // 531.28 points
+      let currentY = height - 28;
+
+      // Helper Menggambar Kotak Tabel Presisi
+      function drawTableRow(x, y, w, h, cols, bg = null) {
+        if (bg) {
+          page.drawRectangle({
+            x: x, y: y, width: w, height: h,
+            color: bg,
+            borderColor: black, borderWidth: 0.5
+          });
+        } else {
+          page.drawRectangle({
+            x: x, y: y, width: w, height: h,
+            borderColor: black, borderWidth: 0.5
+          });
+        }
+        let curX = x;
+        for (let i = 0; i < cols.length; i++) {
+          const col = cols[i];
+          if (i > 0) {
+            page.drawLine({
+              start: { x: curX, y: y },
+              end: { x: curX, y: y + h },
+              color: black, thickness: 0.5
+            });
+          }
+          if (col.text !== undefined && col.text !== null && col.text !== '') {
+            const fontSize = col.size || 8.5;
+            const font = col.bold ? fontBold : fontRegular;
+            const text = String(col.text);
+            let textX = curX + (col.padX !== undefined ? col.padX : 4);
+            let textY = y + (col.padY !== undefined ? col.padY : (h / 2 - fontSize / 2.5));
+            if (col.align === 'center') {
+              const tw = font.widthOfTextAtSize(text, fontSize);
+              textX = curX + (col.w - tw) / 2;
+            } else if (col.align === 'right') {
+              const tw = font.widthOfTextAtSize(text, fontSize);
+              textX = curX + col.w - tw - 4;
+            }
+            page.drawText(text, {
+              x: textX,
+              y: textY,
+              size: fontSize,
+              font: font,
+              color: black
+            });
+          }
+          curX += col.w;
+        }
+      }
+
+      // =============================================================
+      // HEADER KIRI & KANAN (TUJUAN & TANGGAL DINAS)
+      // =============================================================
+      page.drawText('Kepada Yth.', { x: marginX, y: currentY, size: 9, font: fontRegular, color: black });
+      currentY -= 11;
+      page.drawText('Ketua Pengadilan Agama Indramayu', { x: marginX, y: currentY, size: 9, font: fontBold, color: black });
+      currentY -= 11;
+      page.drawText('Di-', { x: marginX, y: currentY, size: 9, font: fontRegular, color: black });
+      currentY -= 11;
+      page.drawText('    Indramayu', { x: marginX, y: currentY, size: 9, font: fontRegular, color: black });
+
+      // Header Kanan (Tanggal)
+      const tglLengkapStr = this.formatDateIndoCetak(log.tgl_pengajuan || '');
+      const tglText = `Indramayu, ${tglLengkapStr}`;
+      const tglWidth = fontRegular.widthOfTextAtSize(tglText, 9);
+      page.drawText(tglText, { x: width - marginX - tglWidth, y: height - 28, size: 9, font: fontRegular, color: black });
+
+      currentY -= 14;
+
+      // =============================================================
+      // JUDUL RESMI BLANKO
+      // =============================================================
+      const titleText = 'PERMINTAAN DAN PEMBERIAN CUTI';
+      const titleW = fontBold.widthOfTextAtSize(titleText, 11);
+      const titleX = (width - titleW) / 2;
+      page.drawText(titleText, { x: titleX, y: currentY, size: 11, font: fontBold, color: black });
+      page.drawLine({ start: { x: titleX, y: currentY - 1.5 }, end: { x: titleX + titleW, y: currentY - 1.5 }, color: black, thickness: 0.8 });
+
+      currentY -= 12;
+      const partsTgl = String(log.tgl_pengajuan || '').split('/');
+      const romawiArr = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
+      const romawiCetak = (partsTgl[1] ? romawiArr[parseInt(partsTgl[1], 10) - 1] : 'X') || 'X';
+      const tahunCetak = partsTgl[2] || new Date().getFullYear();
+      const noSurat = `Nomor :          /KPA.W10-A/KP5.3/${romawiCetak}/${tahunCetak}`;
+      const noW = fontRegular.widthOfTextAtSize(noSurat, 9);
+      page.drawText(noSurat, { x: (width - noW) / 2, y: currentY, size: 9, font: fontRegular, color: black });
+
+      currentY -= 12;
+
+      // =============================================================
+      // I. DATA PEGAWAI
+      // =============================================================
+      drawTableRow(marginX, currentY - 13, contentWidth, 13, [
+        { text: 'I. DATA PEGAWAI', w: contentWidth, bold: true, size: 8.5 }
+      ], headerBg);
+      currentY -= 13;
+
+      const c1 = 80;
+      const c2 = 239;
+      const c3 = 96;
+      const c4 = contentWidth - c1 - c2 - c3;
+
+      drawTableRow(marginX, currentY - 13, contentWidth, 13, [
+        { text: 'Nama', w: c1 },
+        { text: pns.nama || '-', w: c2, bold: true, size: 9 },
+        { text: 'NIP', w: c3 },
+        { text: pns.nip || '-', w: c4, bold: true, size: 9 }
+      ]);
+      currentY -= 13;
+
+      drawTableRow(marginX, currentY - 13, contentWidth, 13, [
+        { text: 'Jabatan', w: c1 },
+        { text: this.formatJabatanSingkat(pns.jabatan) || '-', w: c2, size: 8.5 },
+        { text: 'Masa Kerja', w: c3 },
+        { text: '-', w: c4, align: 'center' }
+      ]);
+      currentY -= 13;
+
+      drawTableRow(marginX, currentY - 13, contentWidth, 13, [
+        { text: 'Unit Kerja', w: c1 },
+        { text: 'Pengadilan Agama Indramayu', w: contentWidth - c1 }
+      ]);
+      currentY -= 13 + 3;
+
+      // =============================================================
+      // II. JENIS CUTI YANG DIAMBIL
+      // =============================================================
+      drawTableRow(marginX, currentY - 13, contentWidth, 13, [
+        { text: 'II. JENIS CUTI YANG DIAMBIL', w: contentWidth, bold: true, size: 8.5 }
+      ], headerBg);
+      currentY -= 13;
+
+      const jColW1 = 212;
+      const jColW2 = 53.64;
+      const jColW3 = 212;
+      const jColW4 = contentWidth - jColW1 - jColW2 - jColW3;
+
+      const chkTahunan = (log.jenis === 'Tahunan') ? '✓' : '';
+      const chkBesar = (log.jenis === 'Besar') ? '✓' : '';
+      const chkSakit = (log.jenis === 'Sakit') ? '✓' : '';
+      const chkMelahirkan = (log.jenis === 'Melahirkan') ? '✓' : '';
+      const chkPenting = (log.jenis === 'Alasan Penting' || log.jenis === 'Penting') ? '✓' : '';
+      const chkCltn = (log.jenis === 'CLTN') ? '✓' : '';
+
+      drawTableRow(marginX, currentY - 13, contentWidth, 13, [
+        { text: '1. Cuti Tahunan', w: jColW1 },
+        { text: chkTahunan, w: jColW2, align: 'center', bold: true, size: 9.5 },
+        { text: '4. Cuti Melahirkan', w: jColW3 },
+        { text: chkMelahirkan, w: jColW4, align: 'center', bold: true, size: 9.5 }
+      ]);
+      currentY -= 13;
+
+      drawTableRow(marginX, currentY - 13, contentWidth, 13, [
+        { text: '2. Cuti Besar', w: jColW1 },
+        { text: chkBesar, w: jColW2, align: 'center', bold: true, size: 9.5 },
+        { text: '5. Cuti Karena Alasan Penting', w: jColW3 },
+        { text: chkPenting, w: jColW4, align: 'center', bold: true, size: 9.5 }
+      ]);
+      currentY -= 13;
+
+      drawTableRow(marginX, currentY - 13, contentWidth, 13, [
+        { text: '3. Cuti Sakit', w: jColW1 },
+        { text: chkSakit, w: jColW2, align: 'center', bold: true, size: 9.5 },
+        { text: '6. Cuti di Luar Tanggungan Negara', w: jColW3 },
+        { text: chkCltn, w: jColW4, align: 'center', bold: true, size: 9.5 }
+      ]);
+      currentY -= 13 + 3;
+
+      // =============================================================
+      // III. ALASAN CUTI
+      // =============================================================
+      drawTableRow(marginX, currentY - 13, contentWidth, 13, [
+        { text: 'III. ALASAN CUTI', w: contentWidth, bold: true, size: 8.5 }
+      ], headerBg);
+      currentY -= 13;
+
+      let alasanText = log.alasan || '-';
+      if (alasanText.includes('[USULAN PEMBATALAN]:')) {
+        const p = alasanText.split('[USULAN PEMBATALAN]:');
+        alasanText = p[0].trim() + ' [USULAN PEMBATALAN]: ' + p[1].trim();
+      }
+      drawTableRow(marginX, currentY - 16, contentWidth, 16, [
+        { text: alasanText, w: contentWidth, size: 8.5, padY: 4 }
+      ]);
+      currentY -= 16 + 3;
+
+      // =============================================================
+      // IV. LAMANYA CUTI
+      // =============================================================
+      drawTableRow(marginX, currentY - 13, contentWidth, 13, [
+        { text: 'IV. LAMANYA CUTI', w: contentWidth, bold: true, size: 8.5 }
+      ], headerBg);
+      currentY -= 13;
+
+      const durasiStr = String(log.sisa_cuti || log.durasi || '1');
+      const tglMulaiStr = this.formatDateIndoCetak(log.tgl_mulai);
+      const tglSelesaiStr = this.formatDateIndoCetak(log.tgl_selesai);
+
+      drawTableRow(marginX, currentY - 13, contentWidth, 13, [
+        { text: 'Selama', w: 53 },
+        { text: durasiStr, w: 42, align: 'center', bold: true },
+        { text: 'Hari', w: 106, align: 'center' },
+        { text: 'mulai tanggal', w: 90 },
+        { text: tglMulaiStr, w: 106, align: 'center' },
+        { text: 's.d', w: 27, align: 'center' },
+        { text: tglSelesaiStr, w: contentWidth - 53 - 42 - 106 - 90 - 106 - 27, align: 'center' }
+      ]);
+      currentY -= 13 + 3;
+
+      // =============================================================
+      // V. CATATAN CUTI
+      // =============================================================
+      drawTableRow(marginX, currentY - 13, contentWidth, 13, [
+        { text: 'V. CATATAN CUTI', w: contentWidth, bold: true, size: 8.5 }
+      ], headerBg);
+      currentY -= 13;
+
+      let hist = { y24: 0, y25: 0, y26: 0 };
+      if (log.jenis === 'Tahunan' && log.history) {
+        try { hist = typeof log.history === 'string' ? JSON.parse(log.history) : log.history; } catch (e) {}
+      }
+      const sAw24 = Number(pns.s_tahunan_2024 || 0) + Number(hist.y24 || 0);
+      const sAw25 = Number(pns.s_tahunan_2025 || 0) + Number(hist.y25 || 0);
+      const sAw26 = Number(pns.s_tahunan_2026 || 0) + Number(hist.y26 || 0);
+
+      const sAk24 = sAw24 - Number(hist.y24 || 0);
+      const sAk25 = sAw25 - Number(hist.y25 || 0);
+      const sAk26 = sAw26 - Number(hist.y26 || 0);
+
+      const vW1 = 42;
+      const vW2 = 68;
+      const vW3 = 100;
+      const vW4 = 95;
+      const vW5 = 184;
+      const vW6 = contentWidth - vW1 - vW2 - vW3 - vW4 - vW5;
+
+      // Baris Sub-Header 1
+      drawTableRow(marginX, currentY - 12, contentWidth, 12, [
+        { text: '1. Cuti Tahunan', w: vW1 + vW2 + vW3, bold: true },
+        { text: 'Paraf Petugas Cuti', w: vW4, align: 'center', bold: true },
+        { text: '2. Cuti Besar', w: vW5 },
+        { text: String(pns.s_besar || '0'), w: vW6, align: 'center', bold: true }
+      ]);
+      currentY -= 12;
+
+      // Baris Sub-Header 2
+      drawTableRow(marginX, currentY - 12, contentWidth, 12, [
+        { text: 'Tahun', w: vW1, align: 'center', bold: true },
+        { text: 'Sisa (Awal)', w: vW2, align: 'center', bold: true },
+        { text: 'Keterangan (Sisa)', w: vW3, align: 'center', bold: true },
+        { text: '', w: vW4 },
+        { text: '3. Cuti Sakit', w: vW5 },
+        { text: String(pns.s_sakit || '0'), w: vW6, align: 'center', bold: true }
+      ]);
+      currentY -= 12;
+
+      // Baris Data 2024
+      drawTableRow(marginX, currentY - 12, contentWidth, 12, [
+        { text: '2024', w: vW1, align: 'center' },
+        { text: String(sAw24), w: vW2, align: 'center' },
+        { text: String(sAk24), w: vW3, align: 'center' },
+        { text: '', w: vW4 },
+        { text: '4. Cuti Melahirkan', w: vW5 },
+        { text: String(pns.s_melahirkan || '0'), w: vW6, align: 'center', bold: true }
+      ]);
+      currentY -= 12;
+
+      // Baris Data 2025
+      drawTableRow(marginX, currentY - 12, contentWidth, 12, [
+        { text: '2025', w: vW1, align: 'center' },
+        { text: String(sAw25), w: vW2, align: 'center' },
+        { text: String(sAk25), w: vW3, align: 'center' },
+        { text: '', w: vW4 },
+        { text: '5. Cuti Karena Alasan Penting', w: vW5 },
+        { text: String(pns.s_penting || '0'), w: vW6, align: 'center', bold: true }
+      ]);
+      currentY -= 12;
+
+      // Baris Data 2026
+      drawTableRow(marginX, currentY - 12, contentWidth, 12, [
+        { text: '2026', w: vW1, align: 'center' },
+        { text: String(sAw26), w: vW2, align: 'center' },
+        { text: String(sAk26), w: vW3, align: 'center' },
+        { text: '', w: vW4 },
+        { text: '6. Cuti di Luar Tanggungan Negara', w: vW5 },
+        { text: String(pns.s_cltn || '0'), w: vW6, align: 'center', bold: true }
+      ]);
+
+      // Gambar QR Paraf Petugas Cuti (Menempati Col 4 vertikal)
+      if (qrParafImg) {
+        page.drawImage(qrParafImg, {
+          x: marginX + vW1 + vW2 + vW3 + (vW4 - 32) / 2,
+          y: currentY + 3,
+          width: 32,
+          height: 32
+        });
+      }
+      currentY -= 12 + 3;
+
+      // =============================================================
+      // VI. ALAMAT SELAMA MENJALANKAN CUTI & SIGNATURE PEMOHON
+      // =============================================================
+      const viLeftW = 328;
+      const viBlockH = 70;
+
+      // Kotak Kiri: Alamat & Telp
+      page.drawRectangle({
+        x: marginX, y: currentY - viBlockH, width: viLeftW, height: viBlockH,
+        borderColor: black, borderWidth: 0.5
+      });
+      // Header Sub-Tabel Alamat
+      page.drawRectangle({
+        x: marginX, y: currentY - 13, width: viLeftW, height: 13,
+        color: headerBg, borderColor: black, borderWidth: 0.5
+      });
+      page.drawText('VI. ALAMAT SELAMA MENJALANKAN CUTI', { x: marginX + 4, y: currentY - 10, size: 8.5, font: fontBold, color: black });
+      page.drawLine({ start: { x: marginX + 246, y: currentY - 13 }, end: { x: marginX + 246, y: currentY - viBlockH }, color: black, thickness: 0.5 });
+      page.drawText('TELPON / HP', { x: marginX + 252, y: currentY - 10, size: 8.5, font: fontBold, color: black });
+
+      // Isi Alamat & No HP
+      const alamatVal = log.alamat || '-';
+      page.drawText(alamatVal.length > 50 ? alamatVal.substring(0, 48) + '...' : alamatVal, { x: marginX + 4, y: currentY - 26, size: 8.5, font: fontRegular, color: black });
+      page.drawText(pns.no_hp || log.no_hp || '-', { x: marginX + 250, y: currentY - 38, size: 8.5, font: fontBold, color: black });
+
+      // Area Kanan: TTD Pemohon
+      const pemohonX = marginX + viLeftW + 20;
+      page.drawText('Hormat Saya,', { x: pemohonX, y: currentY - 10, size: 9, font: fontRegular, color: black });
+
+      if (qrPemohonImg) {
+        page.drawImage(qrPemohonImg, {
+          x: pemohonX,
+          y: currentY - 48,
+          width: 36,
+          height: 36
+        });
+      }
+
+      const pnsNama = pns.nama || '-';
+      const pnsNamaW = fontBold.widthOfTextAtSize(pnsNama, 9);
+      page.drawText(pnsNama, { x: pemohonX, y: currentY - 57, size: 9, font: fontBold, color: black });
+      page.drawLine({ start: { x: pemohonX, y: currentY - 58 }, end: { x: pemohonX + pnsNamaW, y: currentY - 58 }, color: black, thickness: 0.5 });
+      page.drawText(`NIP. ${pns.nip || '-'}`, { x: pemohonX, y: currentY - 66, size: 8.5, font: fontRegular, color: black });
+
+      currentY -= viBlockH + 3;
+
+      // =============================================================
+      // VII. PERTIMBANGAN ATASAN LANGSUNG
+      // =============================================================
+      drawTableRow(marginX, currentY - 13, contentWidth, 13, [
+        { text: 'VII. PERTIMBANGAN ATASAN LANGSUNG', w: contentWidth, bold: true, size: 8.5 }
+      ], headerBg);
+      currentY -= 13;
+
+      const col4W = contentWidth / 4;
+      const statusAtasan = (log.status_atasan || log.status || '').toUpperCase();
+      const isSetujuAtasan = statusAtasan.includes('SETUJU') || statusAtasan.includes('ACC') || statusAtasan.includes('SELESAI');
+
+      drawTableRow(marginX, currentY - 12, contentWidth, 12, [
+        { text: 'DISETUJUI', w: col4W, align: 'center', bold: true },
+        { text: 'PERUBAHAN', w: col4W, align: 'center', bold: true },
+        { text: 'DITANGGUHKAN', w: col4W, align: 'center', bold: true },
+        { text: 'TIDAK DISETUJUI', w: col4W, align: 'center', bold: true }
+      ]);
+      currentY -= 12;
+
+      drawTableRow(marginX, currentY - 12, contentWidth, 12, [
+        { text: isSetujuAtasan ? '✓' : '', w: col4W, align: 'center', bold: true, size: 9.5 },
+        { text: '', w: col4W, align: 'center' },
+        { text: '', w: col4W, align: 'center' },
+        { text: '', w: col4W, align: 'center' }
+      ]);
+      currentY -= 12;
+
+      // Area TTD Atasan di Kanan
+      const atasanBlockH = 54;
+      const atasanX = marginX + contentWidth - 200;
+      const atasanJabatan = this.formatJabatanSingkat(atasan.jabatan) || 'Atasan Langsung';
+      page.drawText(atasanJabatan, { x: atasanX, y: currentY - 10, size: 9, font: fontBold, color: black });
+
+      if (isSetujuAtasan && qrAtasanImg) {
+        page.drawImage(qrAtasanImg, {
+          x: atasanX,
+          y: currentY - 44,
+          width: 32,
+          height: 32
+        });
+      }
+
+      const atasanNama = atasan.nama || '-';
+      const atasanNamaW = fontBold.widthOfTextAtSize(atasanNama, 9);
+      page.drawText(atasanNama, { x: atasanX, y: currentY - 50, size: 9, font: fontBold, color: black });
+      page.drawLine({ start: { x: atasanX, y: currentY - 51 }, end: { x: atasanX + atasanNamaW, y: currentY - 51 }, color: black, thickness: 0.5 });
+      page.drawText(`NIP. ${atasan.nip || '-'}`, { x: atasanX, y: currentY - 59, size: 8.5, font: fontRegular, color: black });
+
+      currentY -= atasanBlockH + 3;
+
+      // =============================================================
+      // VIII. KEPUTUSAN PEJABAT YANG BERWENANG MEMBERIKAN CUTI
+      // =============================================================
+      drawTableRow(marginX, currentY - 13, contentWidth, 13, [
+        { text: 'VIII. KEPUTUSAN PEJABAT YANG BERWENANG MEMBERIKAN CUTI', w: contentWidth, bold: true, size: 8.5 }
+      ], headerBg);
+      currentY -= 13;
+
+      const statusPejabat = (log.status_pejabat || log.status || '').toUpperCase();
+      const isSetujuPejabat = statusPejabat.includes('SETUJU') || statusPejabat.includes('ACC') || statusPejabat.includes('SELESAI');
+
+      drawTableRow(marginX, currentY - 12, contentWidth, 12, [
+        { text: 'DISETUJUI', w: col4W, align: 'center', bold: true },
+        { text: 'PERUBAHAN', w: col4W, align: 'center', bold: true },
+        { text: 'DITANGGUHKAN', w: col4W, align: 'center', bold: true },
+        { text: 'TIDAK DISETUJUI', w: col4W, align: 'center', bold: true }
+      ]);
+      currentY -= 12;
+
+      drawTableRow(marginX, currentY - 12, contentWidth, 12, [
+        { text: isSetujuPejabat ? '✓' : '', w: col4W, align: 'center', bold: true, size: 9.5 },
+        { text: '', w: col4W, align: 'center' },
+        { text: '', w: col4W, align: 'center' },
+        { text: '', w: col4W, align: 'center' }
+      ]);
+      currentY -= 12;
+
+      // Area TTD Pejabat di Kanan
+      const pejabatBlockH = 54;
+      const pejabatX = marginX + contentWidth - 200;
+      page.drawText(pejabat.jabatan || 'Ketua', { x: pejabatX, y: currentY - 10, size: 9, font: fontBold, color: black });
+
+      if (isSetujuPejabat && qrPejabatImg) {
+        page.drawImage(qrPejabatImg, {
+          x: pejabatX,
+          y: currentY - 44,
+          width: 32,
+          height: 32
+        });
+      }
+
+      const pejabatNama = pejabat.nama || '-';
+      const pejabatNamaW = fontBold.widthOfTextAtSize(pejabatNama, 9);
+      page.drawText(pejabatNama, { x: pejabatX, y: currentY - 50, size: 9, font: fontBold, color: black });
+      page.drawLine({ start: { x: pejabatX, y: currentY - 51 }, end: { x: pejabatX + pejabatNamaW, y: currentY - 51 }, color: black, thickness: 0.5 });
+      page.drawText(`NIP. ${pejabat.nip || '-'}`, { x: pejabatX, y: currentY - 59, size: 8.5, font: fontRegular, color: black });
+
+      // =============================================================
+      // PEMBUATAN KAMUS TANDA TANGAN DIGITAL X.509 PAdES
+      // =============================================================
+      const byteRangePlaceholder = [
+        PDFNumber.of(0),
+        PDFNumber.of(1000000000),
+        PDFNumber.of(1000000000),
+        PDFNumber.of(1000000000)
+      ];
+      const byteRangeArray = pdfDoc.context.obj(byteRangePlaceholder);
+      const dummyContents = PDFHexString.of('0'.repeat(this.SIGNATURE_SLOT_SIZE));
+
+      const signerName = (isSetujuPejabat && pejabat.nama) ? pejabat.nama : (pns.nama || 'Aparatur PA Indramayu');
+      const sigReason = 'Pengesahan Formulir Cuti Pegawai Pengadilan Agama Indramayu';
+
+      const sigDict = pdfDoc.context.obj({
+        Type: 'Sig',
+        Filter: 'Adobe.PPKLite',
+        SubFilter: 'adbe.pkcs7.detached',
+        ByteRange: byteRangeArray,
+        Contents: dummyContents,
+        Reason: PDFString.of(sigReason),
+        M: PDFString.of(`D:${new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14)}+07'00'`),
+        Name: PDFString.of(signerName),
+        Location: PDFString.of('Indramayu')
+      });
+      const sigDictRef = pdfDoc.context.register(sigDict);
+
+      // Signature Widget
+      const widgetDict = pdfDoc.context.obj({
+        Type: 'Annot',
+        Subtype: 'Widget',
+        FT: 'Sig',
+        Rect: [50, 50, 150, 100],
+        V: sigDictRef,
+        T: PDFString.of('Signature1'),
+        F: 132,
+        P: page.ref
+      });
+      const widgetRef = pdfDoc.context.register(widgetDict);
+
+      page.node.set(PDFName.of('Annots'), pdfDoc.context.obj([widgetRef]));
+
+      const acroFormDict = pdfDoc.context.obj({
+        Fields: [widgetRef],
+        SigFlags: 3
+      });
+      pdfDoc.catalog.set(PDFName.of('AcroForm'), acroFormDict);
+
+      // Simpan PDF mentah dengan placeholder
+      const rawPdfBytes = await pdfDoc.save({ useObjectStreams: false });
+
+      // Bangkitkan Sertifikat X.509 atas nama Penandatangan Sah
+      const signerUser = (isSetujuPejabat && pejabat.nama) ? pejabat : pns;
+      const certObj = this.generateCertificate(signerUser);
+
+      // Suntikkan tanda tangan kriptografis ke dalam biner
+      const signedBytes = this.signPdfBytes(rawPdfBytes, certObj, {
+        reason: sigReason,
+        location: 'Indramayu',
+        signerName: signerName
+      });
+
+      return signedBytes;
+    },
+
+    /**
+     * Membangun dan mengunduh file PDF ber-TTE Digital berdasarkan ID Cuti
+     * @param {string|number} id
+     */
     async downloadSignedCutiPdf(id) {
-      if (global.TranskepPdfSigner) {
-        return global.TranskepPdfSigner.downloadSignedCutiPdf(id);
+      try {
+        if (!this.isReady()) {
+          throw new Error('Pustaka kriptografi belum siap. Silakan muat ulang halaman.');
+        }
+
+        const notify = global.showNotify || console.log;
+        notify('Memproses TTE Digital', 'Sedang merakit dokumen PDF biner & membubuhkan TTE 3 pihak...', 'info');
+
+        const stateObj = global.state || (global.window && global.window.state) || {};
+        const cutiLogs = stateObj.cutiLogs || [];
+        const usersList = stateObj.usersList || [];
+
+        const log = cutiLogs.find(l => String(l.id) === String(id));
+        if (!log) throw new Error('Data transaksi cuti tidak ditemukan.');
+
+        const pns = usersList.find(u => String(u.nip) === String(log.nip)) || { nama: log.nama || '-', nip: log.nip || '-', jabatan: log.jabatan || '-' };
+        const atasan = usersList.find(u => String(u.nip) === String(log.atasan_nip)) || { nama: log.atasan_nama || '-', nip: log.atasan_nip || '-', jabatan: log.atasan_jabatan || 'Atasan Langsung' };
+        const pejabat = usersList.find(u => String(u.nip) === String(log.pejabat_nip)) || { nama: log.pejabat_nama || 'H. Zulkifli, S.Ag., S.H., M.H.', nip: log.pejabat_nip || '197309081998031001', jabatan: 'Ketua' };
+
+        const baseUrl = (global.window && global.window.location) ? (global.window.location.origin + global.window.location.pathname) : '';
+        const verifyUrlPemohon = baseUrl + '?action=verifyCuti&id=' + encodeURIComponent(log.id) + '&type=pemohon&nip=' + encodeURIComponent(pns.nip);
+        const verifyUrlAtasan = baseUrl + '?action=verifyCuti&id=' + encodeURIComponent(log.id) + '&type=atasan&nip=' + encodeURIComponent(atasan.nip);
+        const verifyUrlPejabat = baseUrl + '?action=verifyCuti&id=' + encodeURIComponent(log.id) + '&type=pejabat&nip=' + encodeURIComponent(pejabat.nip);
+
+        const statusAtasan = (log.status_atasan || log.status || '').toUpperCase();
+        const isSetujuAtasan = statusAtasan.includes('SETUJU') || statusAtasan.includes('ACC') || statusAtasan.includes('SELESAI');
+
+        const statusPejabat = (log.status_pejabat || log.status || '').toUpperCase();
+        const isSetujuPejabat = statusPejabat.includes('SETUJU') || statusPejabat.includes('ACC') || statusPejabat.includes('SELESAI');
+
+        let qrPemohonDataUrl = '';
+        let qrAtasanDataUrl = '';
+        let qrPejabatDataUrl = '';
+        let qrParafDataUrl = '';
+
+        if (global.generateQRCodeWithLogo) {
+          qrPemohonDataUrl = await global.generateQRCodeWithLogo(verifyUrlPemohon, { size: 300, logoSrc: 'img/Logo_PA_Imy.png' });
+          if (isSetujuAtasan) {
+            qrAtasanDataUrl = await global.generateQRCodeWithLogo(verifyUrlAtasan, { size: 300, logoSrc: 'img/Logo_PA_Imy.png' });
+          }
+          if (isSetujuPejabat) {
+            qrPejabatDataUrl = await global.generateQRCodeWithLogo(verifyUrlPejabat, { size: 300, logoSrc: 'img/Logo_PA_Imy.png' });
+          }
+        } else if (global.TranskepQrEngine) {
+          qrPemohonDataUrl = await global.TranskepQrEngine.generateQrDataUrl(verifyUrlPemohon, { size: 300, logoRatio: 0.28 });
+          if (isSetujuAtasan) {
+            qrAtasanDataUrl = await global.TranskepQrEngine.generateQrDataUrl(verifyUrlAtasan, { size: 300, logoRatio: 0.28 });
+          }
+          if (isSetujuPejabat) {
+            qrPejabatDataUrl = await global.TranskepQrEngine.generateQrDataUrl(verifyUrlPejabat, { size: 300, logoRatio: 0.28 });
+          }
+        }
+
+        if (global.generateQRCodeDataURL) {
+          qrParafDataUrl = global.generateQRCodeDataURL('Sudah diparaf oleh Petugas Cuti PA Indramayu', { size: 100 });
+        } else if (global.TranskepQrEngine) {
+          qrParafDataUrl = await global.TranskepQrEngine.generateQrDataUrl('Sudah diparaf oleh Petugas Cuti PA Indramayu', { size: 100 });
+        }
+
+        const signedBytes = await this.buildSignedCutiPdf(log, pns, atasan, pejabat, {
+          pemohon: qrPemohonDataUrl,
+          atasan: qrAtasanDataUrl,
+          pejabat: qrPejabatDataUrl,
+          paraf: qrParafDataUrl
+        });
+
+        // Trigger browser file download dengan nama terstandarisasi
+        const blob = new Blob([signedBytes], { type: 'application/pdf' });
+        const rawName = pns.nama || 'Pegawai';
+        const cleanName = rawName
+          .replace(/[^a-zA-Z0-9\s]/g, '')
+          .trim()
+          .replace(/\s+/g, '_');
+        const fileName = `TRANSKEP_${cleanName}_sign_sign_sign.pdf`;
+
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(link.href);
+
+        notify('Sukses', `Dokumen PDF Ber-TTE Digital (${fileName}) berhasil diunduh!`, 'success');
+      } catch (err) {
+        console.error('❌ Gagal memproses TTE Digital:', err);
+        const notify = global.showNotify || alert;
+        notify('Gagal TTE Digital', err.message || 'Terjadi kesalahan sistem saat membuat PDF.', 'error');
       }
     }
   };
 
   global.TranskepPdfSigner = TranskepPdfSigner;
   global.downloadSignedCutiPdf = function(id) {
-    if (global.TranskepPdfSigner) {
-      global.TranskepPdfSigner.downloadSignedCutiPdf(id);
-    }
+    TranskepPdfSigner.downloadSignedCutiPdf(id);
   };
 
 })(typeof window !== 'undefined' ? window : this);
+
 </script>
