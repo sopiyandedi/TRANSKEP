@@ -36,7 +36,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 
                 showModalWaPegawaiSk: false,
                 waTargetPegawaiObj: null,
-                waPegawaiSkSelected: []
+                waPegawaiSkSelected: [],
+                firestoreSks: [],
+                isFirebaseConnected: false
             };
         },
         computed: {
@@ -75,6 +77,26 @@ document.addEventListener("DOMContentLoaded", () => {
                    
                    mapGroup[baseId].members.push({ nip: sk.nip, peran: peran });
                 });
+
+                // ZETTBOT TAHAP 44: Integrasi & Realtime Sync dari Cloud Firestore
+                (this.firestoreSks || []).forEach(fSk => {
+                    const docId = String(fSk.id).trim();
+                    mapGroup[docId] = {
+                        id: docId,
+                        judul_sk: fSk.judul_sk || '-',
+                        link_drive: fSk.link_drive || '-',
+                        tgl_input: fSk.tgl_input || '-',
+                        no_sk: fSk.no_sk || '-',
+                        tgl_sk: fSk.tgl_sk || '-',
+                        pj_sk: fSk.pj_sk || 'PJ. Kesekretariatan',
+                        status: fSk.status || 'Aktif',
+                        versi_aktif: fSk.versi_aktif || 1,
+                        members: Array.isArray(fSk.members) ? fSk.members : [],
+                        revisi_history: Array.isArray(fSk.revisi_history) ? fSk.revisi_history : [],
+                        is_firebase: true
+                    };
+                });
+
                 return Object.values(mapGroup).reverse();
             },
             filteredSkData() {
@@ -548,7 +570,79 @@ document.addEventListener("DOMContentLoaded", () => {
                 this.showModalWaPegawaiSk = false;
                 
                 if(window.showNotify) window.showNotify("WhatsApp Dibuka", "Silakan klik tombol kirim di aplikasi WhatsApp Anda.", "success");
+            },
+
+            // ==========================================
+            // ZETTBOT TAHAP 44: CLOUD FIRESTORE METHODS
+            // ==========================================
+            initFirebaseSkListener() {
+                if (typeof TranskepFirebase !== 'undefined' && TranskepFirebase.isReady()) {
+                    this.isFirebaseConnected = true;
+                    console.log("🔥 [ZettBOT SK] Menghubungkan listener realtime Firestore SK...");
+                    TranskepFirebase.subscribeFirestoreSks((list) => {
+                        this.firestoreSks = list || [];
+                        console.log(`🔥 [ZettBOT SK] Realtime Sync: ${this.firestoreSks.length} dokumen SK aktif di Firestore.`);
+                    });
+                }
+            },
+            async migrateSingleSkToFirestore(sk) {
+                if (!this.isAdminOrOperator) return;
+                if (!sk) {
+                    if (window.showNotify) window.showNotify("Data Kosong", "Pilih dokumen SK yang ingin dimigrasikan.", "warning");
+                    return;
+                }
+
+                const confirmFn = window.showCustomConfirm || ((title, msg, cb) => { if(confirm(title + "\n" + msg)) cb(); });
+                confirmFn(
+                    "Migrasi ke Cloud Firestore",
+                    `Migrasikan dokumen "${sk.judul_sk}" (${sk.members ? sk.members.length : 0} personil) ke Cloud Firestore (transkep-314c0)?`,
+                    async () => {
+                        if (window.showLoading) window.showLoading("Mengirim dokumen ke Firestore...");
+                        try {
+                            if (typeof TranskepFirebase === 'undefined' || !TranskepFirebase.isReady()) {
+                                throw new Error("Koneksi Firebase belum siap. Pastikan Firestore aktif.");
+                            }
+                            await TranskepFirebase.saveSkToFirestore({
+                                id: sk.id,
+                                no_sk: sk.no_sk,
+                                judul_sk: sk.judul_sk,
+                                pj_sk: sk.pj_sk,
+                                tgl_sk: sk.tgl_sk,
+                                tgl_input: sk.tgl_input,
+                                link_drive: sk.link_drive,
+                                status: "Aktif",
+                                versi_aktif: 1,
+                                members: sk.members || [],
+                                revisi_history: [{
+                                    versi: 1,
+                                    tgl_revisi: sk.tgl_sk || new Date().toISOString().split('T')[0],
+                                    catatan: "Migrasi perdana dari Google Sheets",
+                                    oleh: (this.globalState.user ? this.globalState.user.nama : "Admin")
+                                }]
+                            });
+                            if (window.hideLoading) window.hideLoading();
+                            if (window.showNotify) {
+                                window.showNotify("Sukses ke Firestore! 🔥", "Dokumen SK berhasil tersimpan di Cloud Firestore transkep-314c0.", "success");
+                            }
+                        } catch (err) {
+                            if (window.hideLoading) window.hideLoading();
+                            if (window.showNotify) window.showNotify("Gagal Migrasi", err.message || err.toString(), "error");
+                        }
+                    }
+                );
+            },
+            migrateFirstSkToFirestore() {
+                const list = this.groupedSkData;
+                if (!list || list.length === 0) {
+                    if (window.showNotify) window.showNotify("Data Kosong", "Belum ada dokumen SK untuk dimigrasikan.", "warning");
+                    return;
+                }
+                const targetSk = list.find(s => !s.is_firebase) || list[0];
+                this.migrateSingleSkToFirestore(targetSk);
             }
+        },
+        mounted() {
+            this.initFirebaseSkListener();
         }
     }).mount('#vue-sk-app');
 });

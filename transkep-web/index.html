@@ -31,6 +31,10 @@
   <!-- SheetJS (Excel Importer/Exporter) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   
+  <!-- Firebase SDK v10 (Cloud Firestore Compat Library) -->
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+
   <!-- PDF-Lib & Node-Forge (Digital Signature PAdES Engine) -->
   <script src="vendor/pdf-lib.min.js"></script>
   <script src="vendor/forge.min.js"></script>
@@ -187,6 +191,7 @@
       ];
 
       const SCRIPTS = [
+        'core/firebase.js',
         'core/qr_engine.js',
         'core/pdf_signer.js',
         'core/api.js',
@@ -245,7 +250,7 @@
       ];
 
       try {
-        const APP_BUILD_VER = '2.9.7';
+        const APP_BUILD_VER = '2.9.8';
         console.log('🔄 [ZettBOT Loader] Memuat komponen tampilan views/ secara paralel...');
         await Promise.all(VIEW_SLOTS.map(async item => {
           const res = await fetch(item.file + '?v=' + APP_BUILD_VER);

@@ -2048,3 +2048,42 @@ Akar penyebab: Font bawaan PDF (Times-Roman / Helvetica / Courier) pada pustaka 
 3. **Verifikasi Dropdown 2 Opsi**: Saat tombol diklik pada status `Disetujui`, popover menu mengambang muncul dengan 2 opsi berikon SVG tajam: `Cetak Permohonan` dan `Download Persetujuan` (TTE).
 4. **Verifikasi Click-Outside**: Popover menu otomatis tertutup mulus saat pengguna mengklik sembarang tempat di luar kontainer tombol.
 
+
+---
+
+### TAHAP 44: Integrasi Firebase Cloud Firestore & Pilot Migrasi 1 Data SK ke Firestore
+
+#### 1. Masalah & Kebutuhan Pengguna
+- **Konteks**: Menu Surat Keputusan (SK) selama ini menggunakan basis data Google Sheets (`sk_data` & `sk_ack`), di mana personil multi-pegawai dipecah baris per baris. Struktur ini kaku dan sulit untuk mendukung **fitur revisi otomatis SK** secara dinamis langsung di Web App.
+- **Tujuan**: Mengintegrasikan **Google Cloud Firestore (`transkep-314c0`)** ke dalam TRANSKEP dan menyediakan mekanisme **Pilot Migrasi 1 Dokumen SK** dari Google Sheets ke Firestore dengan struktur dokumen NoSQL lengkap (`members: [...]`, `revisi_history: [...]`), tanpa mengganggu data operasional yang sedang berjalan (Zero Risk Hybrid Bridge).
+
+#### 2. Arsitektur & Solusi Teknis ZettBOT
+1. **Pemasangan SDK Firebase v10 Compat**:
+   - Memuat `firebase-app-compat.js` dan `firebase-firestore-compat.js` via CDN resmi Google di [`transkep-web/index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/index.html) dan [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) (GAS).
+2. **Konektor Inti Firebase (`TranskepFirebase`)**:
+   - Dibuat di [`transkep-web/core/firebase.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/core/firebase.js) dan [`javascript_firebase.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/javascript_firebase.html).
+   - Mengelola koleksi `sk_documents`, menyediakan method: `saveSkToFirestore`, `getFirestoreSks`, dan `subscribeFirestoreSks` (Realtime Listener).
+3. **Penyatuan Data Hybrid & Visual Badge Firestore**:
+   - Di [`transkep-web/modules/sk/sk.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/modules/sk/sk.js) dan [`sk/js_sk.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sk/js_sk.html):
+     - Listener realtime `subscribeFirestoreSks` aktif saat komponen di-mount.
+     - `groupedSkData` secara cerdas menggabungkan data Google Sheets dan Cloud Firestore. Dokumen dari Firestore otomatis diprioritaskan dan ditandai dengan `is_firebase: true`.
+   - Di [`transkep-web/modules/sk/view_sk.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/modules/sk/view_sk.html) dan [`sk/view_sk.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sk/view_sk.html):
+     - Ditambahkan badge elegan `[ 🔥 Firestore ]` pada baris judul SK yang telah tersimpan di Cloud Firestore.
+     - Ditambahkan tombol aksi Admin di toolbar: `[ 🚀 Migrasi 1 SK ke Firebase ]` dan tombol cepat per baris.
+
+#### 3. Berkas yang Dimodifikasi & Ditambahkan
+| Berkas | Peran / Layer | Detail Modifikasi |
+| :--- | :--- | :--- |
+| [`transkep-web/core/firebase.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/core/firebase.js) | Core Firebase Service | Inisialisasi Firebase project `transkep-314c0` & CRUD operations Firestore. |
+| [`javascript_firebase.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/javascript_firebase.html) | GAS Firebase Scriptlet | Sinkronisasi konektor Firebase untuk ekosistem Google Apps Script. |
+| [`transkep-web/index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/index.html) | PWA Shell | Inject CDN Firebase v10 Compat & `core/firebase.js`, bump build ke `2.9.8`. |
+| [`transkep-web/sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/sw.js) | PWA Service Worker | Menaikkan versi cache ke `transkep-v2.9.8`. |
+| [`transkep-web/modules/sk/sk.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/modules/sk/sk.js) | SK Controller | State `firestoreSks`, merger NoSQL, `subscribeFirestoreSks`, & method migrasi. |
+| [`transkep-web/modules/sk/view_sk.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/modules/sk/view_sk.html) | SK View | Toolbar button "Migrasi 1 SK ke Firebase", row badge `[ 🔥 Firestore ]`. |
+| [`sk/js_sk.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sk/js_sk.html) | GAS SK Controller | Sinkronisasi 1:1 controller SK dengan Firestore realtime sync. |
+| [`sk/view_sk.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sk/view_sk.html) | GAS SK View | Sinkronisasi 1:1 view SK dengan badge dan tombol migrasi. |
+| [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) | GAS Main View | Inject CDN Firebase & scriptlet `javascript_firebase`. |
+
+#### 4. Hasil Verifikasi
+1. **Verifikasi Sintaks**: Seluruh modul (`firebase.js`, `sk.js`, `sw.js`) lulus uji `node --check` dengan 0 syntax error.
+2. **Keamanan Data**: Bersifat non-destruktif. Data di Google Sheets tetap utuh dan berfungsi normal; Firebase bertindak sebagai lapisan modern paralel untuk pilot revisi otomatis.
