@@ -2084,6 +2084,103 @@ Akar penyebab: Font bawaan PDF (Times-Roman / Helvetica / Courier) pada pustaka 
 | [`sk/view_sk.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sk/view_sk.html) | GAS SK View | Sinkronisasi 1:1 view SK dengan badge dan tombol migrasi. |
 | [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) | GAS Main View | Inject CDN Firebase & scriptlet `javascript_firebase`. |
 
-#### 4. Hasil Verifikasi
-1. **Verifikasi Sintaks**: Seluruh modul (`firebase.js`, `sk.js`, `sw.js`) lulus uji `node --check` dengan 0 syntax error.
-2. **Keamanan Data**: Bersifat non-destruktif. Data di Google Sheets tetap utuh dan berfungsi normal; Firebase bertindak sebagai lapisan modern paralel untuk pilot revisi otomatis.
+#### 4. Hasil Verifikasi & Pembersihan
+1. **Verifikasi Sintaks & Migrasi 100%**: Seluruh 14 dokumen SK Pengadilan Agama Indramayu telah berhasil dimigrasikan ke Cloud Firestore `transkep-314c0` (koleksi `sk_documents`).
+2. **Pembersihan Tanda Firebase di Menu SK**:
+   - Menghapus tombol toolbar *Migrasi 1 SK ke Firebase* dari [`transkep-web/modules/sk/view_sk.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/modules/sk/view_sk.html) dan [`sk/view_sk.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sk/view_sk.html).
+   - Menghapus badge `[ 🔥 Firestore ]` dari judul baris SK.
+   - Menghapus tombol migrasi per-baris dari kolom aksi.
+   - Menaikkan PWA Service Worker cache ke **`transkep-v2.9.9`** di [`transkep-web/sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/sw.js).
+3. **Hasil Akhir**: Tampilan Menu SK bersih murni (*clean native UI*), sedangkan sinkronisasi realtime Cloud Firestore tetap aktif senyap di latar belakang.
+
+---
+
+### TAHAP 45: Perancangan Form Pop-up Input Dokumen SK Modular & Lampiran Fleksibel Multi-Halaman (Next Phase Blueprint)
+
+#### 1. Masalah & Kebutuhan Pengguna
+- **Latar Belakang**:
+  Setiap Dokumen SK memiliki struktur dan isi yang sangat berbeda (contoh: SK Petugas Apel vs SK Tim IT vs SK Hakim Pengawas). Saat ini, SK hanya menyimpan data umum dan baris anggota tim di spreadsheet.
+- **Visi Pengguna**:
+  1. Setiap SK harus memiliki form isian dokumen mandiri yang tersimpan di baris dokumennya masing-masing di Cloud Firestore (`sk_documents`).
+  2. Dibutuhkan **Form Pop-up Fleksibel Multi-Halaman (Stepper / Tabbed Modal)**:
+     - **Halaman 1 (Naskah Utama SK)**: Otomatis berbentuk naskah teks yuridis kedinasan (Kop, No. SK, Judul/Tentang, Menimbang [butir a, b, c], Mengingat [butir 1, 2, 3], Diktum Memutuskan [KESATU, KEDUA, dst.], Tanggal & TTD Ketua Pengadilan).
+     - **Halaman 2 s.d Seterusnya (Lampiran Fleksibel Dinamis)**: Pengguna dapat menambah lampiran secara dinamis (`[ + Tambah Lampiran ]`) dan memilih jenis alat/tampilan (Tool Selector):
+       - `📊 Tipe Tabel`: Tabel susunan personil tim kerja (kolom Jabatan Tim, Nama Pegawai terkoneksi otomatis ke `usersList`, NIP, Jabatan Dinas, Keterangan).
+       - `📄 Tipe Teks`: Editor artikel/uraian tugas (Job Description, SOP, uraian wewenang tim).
+       - `🏢 Tipe Bagan Struktur`: Bagan hierarki organisasi (Smart Auto-Hierarchy Tree) berbasis CSS Box Grid bertingkat (Level 1 Pembina ➔ Level 2 Pimpinan/Ketua ➔ Level 3 Sekretariat ➔ Level 4 Anggota) yang otomatis digambar rapi, simetris, dan 100% ramah cetak.
+  3. **Mesin Revisi Otomatis (Auto-Revision Engine)**:
+     - Tombol `[ 🔄 Revisi SK Ini ]` pada dokumen SK aktif.
+     - Otomatis membuat draf baru (`versi_aktif: 2`), mengarsipkan versi 1 ke `revisi_history`.
+     - Otomatis menyisipkan klausul amandemen di konsiderans Menimbang (*"bahwa sehubungan dengan adanya mutasi/perubahan susunan personil..."*).
+     - Tool penggantian personil tim kerja (*personnel switcher*) dengan 1 klik.
+
+#### 2. Skema Data Dokumen NoSQL (`sk_documents`)
+```json
+{
+  "id": "SK-2026-001",
+  "no_sk": "W10-A11/123/OT.01.2/I/2026",
+  "judul_sk": "TIM PENGELOLA WEBSITE DAN MEDIA SOSIAL TAHUN 2026",
+  "pj_sk": "Sekretaris",
+  "tgl_sk": "2026-01-02",
+  "status": "Aktif",
+  "versi_aktif": 1,
+  "naskah_utama": {
+    "kop": "PENGADILAN AGAMA INDRAMAYU KELAS I A",
+    "menimbang": [
+      "bahwa dalam rangka meningkatkan keterbukaan informasi publik...",
+      "bahwa untuk kelancaran tugas pengelolaan website dan media sosial..."
+    ],
+    "mengingat": [
+      "Undang-Undang Nomor 7 Tahun 1989...",
+      "Undang-Undang Nomor 14 Tahun 2008 tentang Keterbukaan Informasi Publik...",
+      "Keputusan Ketua Mahkamah Agung RI Nomor 2-144/KMA/SK/VIII/2022..."
+    ],
+    "diktum": [
+      { "label": "KESATU", "isi": "Membentuk Tim Pengelola Website dan Media Sosial Tahun 2026..." },
+      { "label": "KEDUA", "isi": "Uraian tugas dan susunan tim sebagaimana tercantum dalam Lampiran..." },
+      { "label": "KETIGA", "isi": "Keputusan ini berlaku sejak tanggal ditetapkan..." }
+    ],
+    "pejabat": {
+      "jabatan": "Ketua Pengadilan Agama Indramayu",
+      "nama": "Drs. H. M. YAHYA, M.H.",
+      "nip": "196512311994031011"
+    }
+  },
+  "lampiran": [
+    {
+      "id": "lamp-1",
+      "judul": "SUSUNAN TIM PENGELOLA WEBSITE",
+      "tipe": "tabel",
+      "data": [
+        { "jabatan_tim": "Pengarah", "nama": "Drs. H. M. YAHYA, M.H.", "nip": "...", "jabatan_dinas": "Ketua" },
+        { "jabatan_tim": "Ketua Tim", "nama": "Ahmad Fauzi, S.H.", "nip": "...", "jabatan_dinas": "Sekretaris" }
+      ]
+    },
+    {
+      "id": "lamp-2",
+      "judul": "URAIAN TUGAS TIM PENGELOLA WEBSITE",
+      "tipe": "teks",
+      "data": "1. Mengelola dan memperbarui konten portal resmi secara berkala.\n2. Mempublikasikan berita dan informasi terkini pengadilan ke media sosial resmi."
+    },
+    {
+      "id": "lamp-3",
+      "judul": "BAGAN STRUKTUR ORGANISASI TIM",
+      "tipe": "bagan_struktur",
+      "data": {
+        "level_1": [{ "role": "Pengarah / Pembina", "nama": "Ketua PA Indramayu" }],
+        "level_2": [{ "role": "Ketua Tim", "nama": "Sekretaris PA Indramayu" }],
+        "level_3": [{ "role": "Sekretaris Tim", "nama": "Kasubbag PTIP" }],
+        "level_4": [{ "role": "Koordinator Konten", "nama": "Pranata Komputer" }]
+      }
+    }
+  ],
+  "revisi_history": []
+}
+```
+
+#### 3. Rencana Tahapan Eksekusi (Step-by-Step Execution Plan)
+- [ ] **Sub-Tahap 45.A**: Pembuatan Komponen Pop-up Modal Stepper / Tabbed di `view_sk.html` & `sk.js` (Tab 1: Naskah Utama, Tab Lampiran Dinamis dengan Selector Tipe `Tabel`, `Teks`, `Bagan Struktur`).
+- [ ] **Sub-Tahap 45.B**: Implementasi Tool Editor Lampiran (Tabel Personil Interaktif, Editor Teks Multi-Line, Smart Box Tree Struktur CSS).
+- [ ] **Sub-Tahap 45.C**: Integrasi Simpan & Baca Payload Lengkap ke Cloud Firestore via `TranskepFirebase.saveSkToFirestore`.
+- [ ] **Sub-Tahap 45.D**: Generator Cetak Naskah Hukum Standar Pengadilan (Cetak Naskah Utama + Lampiran A4).
+- [ ] **Sub-Tahap 45.E**: Mesin Auto-Revisi SK (`[ 🔄 Revisi SK ]`, auto-increment versi, klausul amandemen Menimbang, personil switcher).

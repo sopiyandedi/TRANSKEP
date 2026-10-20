@@ -211,7 +211,7 @@ ZONA BAWAH: MASTER CONTEXT & STATUS MIGRASI TERKINI (LIVING CONTEXT)
     - **Tombol Unduh TTE PDF:** Menambahkan tombol aksi khusus `[TTE PDF]` pada antarmuka riwayat permohonan cuti dan tabel rekapitulasi.
     - PWA Service Worker `sw.js` diperbarui ke versi **transkep-v2.9.0**.
 
-21. **Tombol Aksi Dropdown Adaptif Cuti Disetujui (Tahap 43):**
+20. **Tombol Aksi Dropdown Adaptif Cuti Disetujui (Tahap 43):**
     - **Trigger Button Ringkas Berbasis Logo Saja:** Pada tabel riwayat permohonan cuti dan rekapitulasi, tombol aksi didesain ramping tanpa teks panjang (`[ ≡ ▾ ]` atau `[ 🖨️ ▾ ]`), menjaga kerapian kolom aksi agar tabel hemat ruang dan ramah layar ponsel (*mobile-friendly*).
     - **Dropdown 2 Opsi Ber-TTE Paripurna:** Saat dokumen cuti berstatus `Disetujui` (sah ditandatangani Pejabat Berwenang), tombol memunculkan menu mengambang dengan 2 pilihan berlabel jelas dan berikon SVG:
       1. `🖨️ Cetak Permohonan`: Format formulir permohonan cuti HTML untuk dicetak langsung ke printer fisik.
@@ -219,4 +219,23 @@ ZONA BAWAH: MASTER CONTEXT & STATUS MIGRASI TERKINI (LIVING CONTEXT)
     - **Guard Dokumen Belum Disetujui:** Dokumen berstatus `Menunggu` atau `Perubahan` hanya menampilkan tombol ikon cetak biasa tanpa dropdown karena berkas persetujuan TTE belum sah secara hukum kedinasan.
     - **Auto Close Click-Outside:** Menu popover otomatis tertutup saat pengguna mengklik area luar tabel.
     - PWA Service Worker `sw.js` diperbarui ke versi **transkep-v2.9.7**.
+
+21. **Integrasi Firebase Cloud Firestore & Migrasi Total SK (Tahap 44):**
+    - **Infrastruktur Cloud NoSQL:** Menghubungkan Google Cloud Firestore (`transkep-314c0`) region `asia-southeast2` (Jakarta) menggunakan SDK Firebase v10 Compat (`firebase-app-compat.js` dan `firebase-firestore-compat.js`) via file konektor resmi [`transkep-web/core/firebase.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/core/firebase.js) dan [`javascript_firebase.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/javascript_firebase.html).
+    - **Migrasi 100% Selesai:** Seluruh 14 dokumen SK Pengadilan Agama Indramayu yang sebelumnya tersebar di baris Google Sheets telah berhasil dimigrasikan secara utuh ke koleksi Firestore `sk_documents` dengan format dokumen terstruktur (`members: [...]`, `revisi_history: [...]`, `status: "Aktif"`, `versi_aktif: 1`).
+    - **Pembersihan Antarmuka (Clean Native UI):** Seluruh tanda visual sementara dan tombol migrasi pengembang telah dibersihkan dari tampilan Menu SK. Sistem kini berjalan senyap di latar belakang menggunakan listener realtime (`subscribeFirestoreSks`) yang instan dan reaktif.
+    - PWA Service Worker `sw.js` diperbarui ke versi **transkep-v2.9.9**.
+
+22. **Master Blueprint: Mesin Pembuat Dokumen SK Modular & Lampiran Dinamis Multi-Halaman (Tahap 45 - Next Phase):**
+    - **Filosofi Dokumen SK Modular:** Setiap SK memiliki konten mandiri yang tersimpan per-dokumen di Cloud Firestore. Tidak ada lagi konten yang tercampur antar SK.
+    - **Form Input Pop-Up Multi-Halaman Fleksibel (Stepper / Tabbed Modal):**
+      * **Halaman 1 (Naskah Utama SK):** Editor naskah hukum kedinasan formal (Kop Satker, Nomor SK, Judul/Tentang SK, Konsiderans Menimbang [butir a, b, c], Dasar Hukum Mengingat [butir 1, 2, 3], Diktum Memutuskan [KESATU, KEDUA, dst.], serta Tanggal dan Penandatanganan resmi oleh Ketua PA Indramayu).
+      * **Halaman Berikutnya (Lampiran Fleksibel / Dynamic Appendices):** Pengguna dapat menambah lampiran tanpa batas (`[ + Tambah Lampiran ]`) dan memilih alat/tipe konten untuk tiap lampiran:
+        1. `📊 Tipe Tabel`: Tabel susunan tim kerja interaktif (Jabatan Tim, Nama Pegawai terkoneksi otomatis ke `usersList`, NIP, Jabatan Dinas, Keterangan).
+        2. `📄 Tipe Teks`: Editor artikel/uraian tugas kedinasan (Job Description, SOP, pembagian wilayah kerja, pedoman teknis tim).
+        3. `🏢 Tipe Bagan Struktur`: Struktur pohon organisasi (Smart Auto-Hierarchy Tree) berbasis CSS Box Grid bertingkat (Level 1 Pembina ➔ Level 2 Pengarah/Ketua ➔ Level 3 Sekretaris ➔ Level 4 Anggota) yang otomatis menghasilkan bagan kotak bergaris hubung simetris, rapi, dan 100% ramah cetak tanpa risiko bergeser di HP.
+    - **Mesin Auto-Revisi Dokumen SK:**
+      * Tombol `[ 🔄 Revisi SK ]` menduplikasi naskah utama & lampiran SK aktif menjadi draf versi baru (`versi_aktif: 2`), mengarsipkan versi lama ke `revisi_history`.
+      * Otomatis menyisipkan konsiderans amandemen pada Menimbang (*"bahwa sehubungan dengan mutasi/perubahan susunan personil..."*).
+      * Menyediakan tool penggantian personil tim (*personnel switcher*) dengan 1 klik.
 
