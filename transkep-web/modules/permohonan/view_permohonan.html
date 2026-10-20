@@ -5,7 +5,7 @@
                      <i class="fa-solid fa-clock-rotate-left"></i> Riwayat Saya
                    </button>
                    <button onclick="switchCutiTab('verifikasi')" id="btn-tab-verifikasi" class="relative px-5 py-2.5 rounded-xl text-sm font-bold text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition flex items-center gap-2 hidden">
-                     <i class="fa-solid fa-list-check"></i> Kotak Verifikasi
+                     <i class="fa-solid fa-list-ul"></i> Kotak Verifikasi
                      <span id="badge-verifikasi" class="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-rose-500 text-[10px] text-white font-bold hidden shadow-lg shadow-rose-500/50 border-2 border-slate-900">0</span>
                    </button>
                    <button onclick="switchCutiTab('rekapitulasi')" id="btn-tab-rekapitulasi" class="px-5 py-2.5 rounded-xl text-sm font-bold text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition flex items-center gap-2">
@@ -99,6 +99,33 @@
               </td>
               <td class="p-4 text-center">
                  <div class="flex items-center justify-center gap-1.5">
+                    <!-- ZETTBOT TAHAP 43: Dropdown Aksi Cuti Disetujui (1 Tombol Ikon Ringkas ➔ 2 Opsi) -->
+                    <div v-if="log.hasDropdown" class="relative inline-block text-left dropdown-action-container">
+                       <button @click.stop="toggleActionDropdown(log.id)" type="button" class="px-2.5 py-1.5 bg-slate-800/90 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 rounded-lg transition shadow-md flex items-center gap-1 text-xs" title="Opsi Cetak & Unduh Dokumen">
+                          <i class="fa-solid fa-list-ul text-xs"></i>
+                          <i class="fa-solid fa-caret-down text-[9px] text-slate-400"></i>
+                       </button>
+                       
+                       <!-- Popover Menu Mengambang -->
+                       <div v-show="activeDropdownId === log.id" class="absolute right-0 mt-1.5 w-52 bg-slate-900/95 backdrop-blur-md border border-slate-700/80 rounded-xl shadow-2xl z-[90] py-1.5 overflow-hidden text-left">
+                          <button @click.stop="executeAction('cetakCuti', log.id)" type="button" class="w-full px-3 py-2 text-left text-xs text-slate-300 hover:text-white hover:bg-indigo-600/20 flex items-center gap-2.5 transition group">
+                             <i class="fa-solid fa-print text-indigo-400 group-hover:scale-110 transition-transform text-sm w-4 text-center"></i>
+                             <div class="leading-tight">
+                                <div class="font-semibold text-slate-200 group-hover:text-white">Cetak Permohonan</div>
+                                <div class="text-[10px] text-slate-500 group-hover:text-indigo-300">Format formulir cetak</div>
+                             </div>
+                          </button>
+                          <div class="border-t border-slate-800/80 my-1"></div>
+                          <button @click.stop="executeAction('unduhSignedCuti', log.id)" type="button" class="w-full px-3 py-2 text-left text-xs text-slate-300 hover:text-white hover:bg-emerald-600/20 flex items-center gap-2.5 transition group">
+                             <i class="fa-solid fa-download text-emerald-400 group-hover:scale-110 transition-transform text-sm w-4 text-center"></i>
+                             <div class="leading-tight">
+                                <div class="font-semibold text-slate-200 group-hover:text-white">Download Persetujuan</div>
+                                <div class="text-[10px] text-slate-500 group-hover:text-emerald-300">PDF ber-TTE digital resmi</div>
+                             </div>
+                          </button>
+                       </div>
+                    </div>
+
                     <button v-for="btn in log.actions" :class="btn.css" :title="btn.tooltip" @click="executeAction(btn.actionType, log.id)">
                        <i v-if="btn.icon" :class="['fa-solid', btn.icon, btn.text ? 'text-xs' : '']"></i>
                        <span v-if="btn.text" class="ml-1">{{ btn.text }}</span>
@@ -276,7 +303,7 @@
 <div id="vue-persetujuan-wrapper" class="glass border border-slate-900 rounded-3xl p-6 flex flex-col h-[580px] relative overflow-hidden" v-cloak>
   <div class="mb-4 flex flex-col md:flex-row md:items-end justify-between gap-4">
     <div>
-      <h3 class="text-lg font-bold text-slate-200"><i class="fa-solid fa-list-check text-indigo-400 mr-2"></i> Kotak Masuk Verifikasi</h3>
+      <h3 class="text-lg font-bold text-slate-200"><i class="fa-solid fa-list-ul text-indigo-400 mr-2"></i> Kotak Masuk Verifikasi</h3>
       <p class="text-slate-500 text-xs mt-1">Daftar berkas pengajuan dan usulan pembatalan yang membutuhkan verifikasi Anda.</p>
     </div>
     
@@ -639,8 +666,34 @@
                         <!-- Buttons: CUTI -->
                         <template v-else-if="log.z_type === 'Cuti'">
                             <div class="flex gap-1 justify-center items-center">
-                                <button v-if="String(log.status || '').trim().toLowerCase() !== 'disetujui'" @click="execCetakCuti(log.id)" class="px-2 py-1.5 bg-slate-800 hover:bg-indigo-600 text-slate-400 hover:text-white rounded-md transition border border-slate-700 text-[9px] font-bold tracking-wider" title="Cetak Formulir Cuti">CUTI</button>
-                                <button v-else @click="execUnduhSignedCuti(log.id)" class="px-2 py-1.5 bg-indigo-950/80 hover:bg-indigo-600 text-indigo-300 hover:text-white rounded-md transition border border-indigo-700/60 text-[9px] font-bold tracking-wider" title="Unduh PDF Ber-TTE Digital Resmi (X.509 PAdES)"><i class="fa-solid fa-file-shield mr-0.5"></i>TTE</button>
+                                <!-- ZETTBOT TAHAP 43: Jika belum disetujui, tombol ikon cetak biasa -->
+                                <button v-if="String(log.status || '').trim().toLowerCase() !== 'disetujui'" @click="execCetakCuti(log.id)" class="px-2.5 py-1.5 bg-slate-800 hover:bg-indigo-600 text-slate-400 hover:text-white rounded-md transition border border-slate-700 text-xs" title="Cetak Formulir Cuti"><i class="fa-solid fa-print"></i></button>
+                                
+                                <!-- ZETTBOT TAHAP 43: Jika sudah disetujui, tombol ikon dropdown mengeluarkan 2 opsi -->
+                                <div v-else class="relative inline-block text-left dropdown-rekap-container">
+                                    <button @click.stop="toggleRekapDropdown(log.id)" type="button" class="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-md transition border border-slate-700 text-xs font-bold flex items-center gap-1 shadow-sm" title="Opsi Cetak & Unduh Dokumen">
+                                        <i class="fa-solid fa-list-ul text-xs"></i>
+                                        <i class="fa-solid fa-caret-down text-[8px] text-slate-400"></i>
+                                    </button>
+                                    <div v-show="activeRekapDropdownId === log.id" class="absolute right-0 mt-1.5 w-52 bg-slate-900/95 backdrop-blur-md border border-slate-700/80 rounded-xl shadow-2xl z-[90] py-1.5 overflow-hidden text-left">
+                                        <button @click.stop="execCetakCuti(log.id); activeRekapDropdownId = null" type="button" class="w-full px-3 py-2 text-left text-xs text-slate-300 hover:text-white hover:bg-indigo-600/20 flex items-center gap-2.5 transition group">
+                                            <i class="fa-solid fa-print text-indigo-400 group-hover:scale-110 transition-transform text-sm w-4 text-center"></i>
+                                            <div class="leading-tight">
+                                                <div class="font-semibold text-slate-200 group-hover:text-white">Cetak Permohonan</div>
+                                                <div class="text-[10px] text-slate-500 group-hover:text-indigo-300">Format formulir cetak</div>
+                                            </div>
+                                        </button>
+                                        <div class="border-t border-slate-800/80 my-1"></div>
+                                        <button @click.stop="execUnduhSignedCuti(log.id); activeRekapDropdownId = null" type="button" class="w-full px-3 py-2 text-left text-xs text-slate-300 hover:text-white hover:bg-emerald-600/20 flex items-center gap-2.5 transition group">
+                                            <i class="fa-solid fa-download text-emerald-400 group-hover:scale-110 transition-transform text-sm w-4 text-center"></i>
+                                            <div class="leading-tight">
+                                                <div class="font-semibold text-slate-200 group-hover:text-white">Download Persetujuan</div>
+                                                <div class="text-[10px] text-slate-500 group-hover:text-emerald-300">PDF ber-TTE digital resmi</div>
+                                            </div>
+                                        </button>
+                                    </div>
+                                </div>
+
                                 <button v-if="log.plh_nip || (log.history && log.history.includes('plh_nip'))" @click="execCetakPlhCuti(log.id, log.nip, log.history, log.plh_nip)" class="px-2 py-1.5 bg-slate-800 hover:bg-purple-600 text-purple-400 hover:text-white rounded-md transition border border-purple-500/30 text-[9px] font-bold tracking-wider" title="Cetak Penunjukan Plh Cuti">PLH</button>
                                 <button v-if="isAdmin && log.status === 'Menunggu'" @click="resendCutiWA(log)" class="p-2 bg-emerald-500/10 hover:bg-emerald-500 text-emerald-400 hover:text-white rounded-lg transition border border-emerald-500/20" title="Kirim Ulang Notifikasi WA / Magic Link ke Atasan/Pejabat"><i class="fa-brands fa-whatsapp text-xs"></i></button>
                             </div>

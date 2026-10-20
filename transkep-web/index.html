@@ -245,7 +245,7 @@
       ];
 
       try {
-        const APP_BUILD_VER = '2.9.6';
+        const APP_BUILD_VER = '2.9.7';
         console.log('🔄 [ZettBOT Loader] Memuat komponen tampilan views/ secara paralel...');
         await Promise.all(VIEW_SLOTS.map(async item => {
           const res = await fetch(item.file + '?v=' + APP_BUILD_VER);

@@ -211,9 +211,12 @@ ZONA BAWAH: MASTER CONTEXT & STATUS MIGRASI TERKINI (LIVING CONTEXT)
     - **Tombol Unduh TTE PDF:** Menambahkan tombol aksi khusus `[TTE PDF]` pada antarmuka riwayat permohonan cuti dan tabel rekapitulasi.
     - PWA Service Worker `sw.js` diperbarui ke versi **transkep-v2.9.0**.
 
-20. **Pencegahan Glitch Refresh & Pembaruan Instan (0 Detik) Pasca Pengajuan Cuti (Tahap 43 / Revisi 37):**
-    - **Non-Destructive In-Memory Cache:** Mengganti pengosongan array destruktif `cutiLogs = []` pada `syncAllServerData()` di `core.js` dan `javascript.html` dengan penjaga aman `cutiLogs = cutiLogs || []`, sehingga data riwayat tidak pernah hilang atau menjadi 0 baris selama proses refresh.
-    - **Silent Background Sync:** Menambahkan parameter `silent` pada `syncAllServerData` untuk menghindari pemunculan popup loading blocking kedua pasca pengajuan atau penarikan cuti/izin/wfh.
-    - **Optimistic Local Quota Deduction:** Mengurangkan kuota saldo cuti pegawai di objek lokal `user` secara instan menggunakan rincian `res.data.history` saat usulan cuti baru dikirim, sehingga sisa kuota dan baris riwayat cuti baru tampil detik itu juga (0 detik) di tabel tanpa jeda refresh.
-    - PWA Service Worker `sw.js` diperbarui ke versi **transkep-v2.9.1**.
+21. **Tombol Aksi Dropdown Adaptif Cuti Disetujui (Tahap 43):**
+    - **Trigger Button Ringkas Berbasis Logo Saja:** Pada tabel riwayat permohonan cuti dan rekapitulasi, tombol aksi didesain ramping tanpa teks panjang (`[ ≡ ▾ ]` atau `[ 🖨️ ▾ ]`), menjaga kerapian kolom aksi agar tabel hemat ruang dan ramah layar ponsel (*mobile-friendly*).
+    - **Dropdown 2 Opsi Ber-TTE Paripurna:** Saat dokumen cuti berstatus `Disetujui` (sah ditandatangani Pejabat Berwenang), tombol memunculkan menu mengambang dengan 2 pilihan berlabel jelas dan berikon SVG:
+      1. `🖨️ Cetak Permohonan`: Format formulir permohonan cuti HTML untuk dicetak langsung ke printer fisik.
+      2. `📥 Download Persetujuan`: Berkas PDF biner resmi yang memuat 3 TTE Digital X.509 PAdES (`TRANSKEP_[Nama]_sign_sign_sign.pdf`).
+    - **Guard Dokumen Belum Disetujui:** Dokumen berstatus `Menunggu` atau `Perubahan` hanya menampilkan tombol ikon cetak biasa tanpa dropdown karena berkas persetujuan TTE belum sah secara hukum kedinasan.
+    - **Auto Close Click-Outside:** Menu popover otomatis tertutup saat pengguna mengklik area luar tabel.
+    - PWA Service Worker `sw.js` diperbarui ke versi **transkep-v2.9.7**.
 

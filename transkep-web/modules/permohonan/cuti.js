@@ -171,7 +171,8 @@
       window.vmRiwayatPermohonan = createApp({
           data() {
               return {
-                  s: state // Mengikat variabel global state ke dalam lokal Vue
+                  s: state, // Mengikat variabel global state ke dalam lokal Vue
+                  activeDropdownId: null // ZETTBOT TAHAP 43: ID Dropdown aksi yang sedang terbuka
               };
           },
           computed: {
@@ -231,11 +232,12 @@
                           pejabatDot = log.status_pejabat === 'Disetujui' ? 'text-emerald-500' : (log.status_pejabat === 'Ditolak' ? 'text-rose-500' : 'text-amber-500');
                           
                           const sNorm = String(log.status || '').trim().toLowerCase();
+                          let hasDropdown = false;
                           if (log.jenis !== 'Dinas Luar') {
                               if (sNorm === 'disetujui') {
-                                  actions.push({ actionType: 'unduhSignedCuti', icon: 'fa-file-shield', text: 'Unduh PDF', css: 'px-3 py-1.5 bg-indigo-950/80 hover:bg-indigo-700 text-indigo-300 hover:text-white border border-indigo-700/60 rounded-lg transition shadow-md shadow-indigo-950/40 text-xs font-semibold', tooltip: 'Unduh Dokumen Ber-TTE Digital Resmi (X.509 PAdES)' });
+                                  hasDropdown = true; // ZETTBOT TAHAP 43: 1 Tombol Ikon Compact mengeluarkan 2 opsi (Cetak & Unduh TTE)
                               } else {
-                                  actions.push({ actionType: 'cetakCuti', icon: 'fa-print', text: 'Cetak', css: 'px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-lg transition shadow-md shadow-slate-900/30 text-xs font-semibold', tooltip: 'Cetak Formulir' });
+                                  actions.push({ actionType: 'cetakCuti', icon: 'fa-print', text: '', css: 'p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 rounded-lg transition shadow-md shadow-slate-900/30 text-xs', tooltip: 'Cetak Formulir' });
                               }
                           }
                           
@@ -344,14 +346,24 @@
                           jenisText, tgl_1, tgl_2, tglDecor,
                           durasiObj, statusAkhir, statusColor,
                           atasanDot, pejabatDot, pejabatHtml,
+                          hasDropdown,
                           actions
                       };
                   });
               }
           },
           methods: {
+              // ZETTBOT TAHAP 43: Kontroler Dropdown Aksi Cuti Disetujui
+              toggleActionDropdown(id) {
+                  this.activeDropdownId = (this.activeDropdownId === id) ? null : id;
+              },
+              closeActionDropdown() {
+                  this.activeDropdownId = null;
+              },
+
               // ZETTBOT TAHAP 3: Membersihkan Pemanggil Eksternal (Safe Short-Circuit Standarisasi Vue)
               executeAction(actionType, id) {
+                  this.activeDropdownId = null;
                   // --- FUNGSI EDIT / TAMPIL ---
                   if (actionType === 'editCuti') this.editCuti(id);
                   if (actionType === 'editIK') window.openModalIK && window.openModalIK(id);
@@ -578,6 +590,14 @@
                           });
                   });
               }
+          },
+          mounted() {
+              // ZETTBOT TAHAP 43: Auto-close dropdown saat pengguna klik di luar container
+              document.addEventListener('click', (e) => {
+                  if (!e.target.closest('.dropdown-action-container')) {
+                      this.activeDropdownId = null;
+                  }
+              });
           }
       }).mount('#vue-riwayat-permohonan');
   });

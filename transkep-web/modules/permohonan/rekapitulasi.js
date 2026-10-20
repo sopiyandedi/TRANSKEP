@@ -28,7 +28,8 @@
                       end: ''
                   },
                   searchQuery: '',
-                  isDropdownOpen: false
+                  isDropdownOpen: false,
+                  activeRekapDropdownId: null // ZETTBOT TAHAP 43: ID Dropdown aksi rekap yang sedang terbuka
               };
           },
           computed: {
@@ -267,8 +268,20 @@
               execBuatST() { window.openModalST && window.openModalST(); },
               execEditST(id) { window.editST && window.editST(id); },
               
-              execCetakCuti(id) { window.printCutiForm && window.printCutiForm(id); },
-              execUnduhSignedCuti(id) { window.downloadSignedCutiPdf && window.downloadSignedCutiPdf(id); },
+              execCetakCuti(id) { 
+                  this.activeRekapDropdownId = null;
+                  window.printCutiForm && window.printCutiForm(id); 
+              },
+              execUnduhSignedCuti(id) { 
+                  this.activeRekapDropdownId = null;
+                  window.downloadSignedCutiPdf && window.downloadSignedCutiPdf(id); 
+              },
+              toggleRekapDropdown(id) {
+                  this.activeRekapDropdownId = (this.activeRekapDropdownId === id) ? null : id;
+              },
+              closeRekapDropdown() {
+                  this.activeRekapDropdownId = null;
+              },
               execCetakPlhCuti(id, nip, logHistoryStr, logPlhNip) {
                   let cutiPlhNip = logPlhNip || null;
                   if (!cutiPlhNip && logHistoryStr) {
@@ -436,6 +449,14 @@
                       );
                   }
               }
+          },
+          mounted() {
+              // ZETTBOT TAHAP 43: Auto-close dropdown rekap saat klik di luar
+              document.addEventListener('click', (e) => {
+                  if (!e.target.closest('.dropdown-rekap-container')) {
+                      this.activeRekapDropdownId = null;
+                  }
+              });
           }
       }).mount('#vue-rekapitulasi-wrapper');
   });

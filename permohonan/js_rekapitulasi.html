@@ -24,7 +24,8 @@
                       end: ''
                   },
                   searchQuery: '',
-                  isDropdownOpen: false
+                  isDropdownOpen: false,
+                  activeRekapDropdownId: null // ZETTBOT TAHAP 43: ID Dropdown aksi rekap yang sedang terbuka
               };
           },
           computed: {
@@ -263,8 +264,20 @@
               execBuatST() { window.openModalST && window.openModalST(); },
               execEditST(id) { window.editST && window.editST(id); },
               
-              execCetakCuti(id) { window.printCutiForm && window.printCutiForm(id); },
-              execUnduhSignedCuti(id) { window.downloadSignedCutiPdf && window.downloadSignedCutiPdf(id); },
+              execCetakCuti(id) { 
+                  this.activeRekapDropdownId = null;
+                  window.printCutiForm && window.printCutiForm(id); 
+              },
+              execUnduhSignedCuti(id) { 
+                  this.activeRekapDropdownId = null;
+                  window.downloadSignedCutiPdf && window.downloadSignedCutiPdf(id); 
+              },
+              toggleRekapDropdown(id) {
+                  this.activeRekapDropdownId = (this.activeRekapDropdownId === id) ? null : id;
+              },
+              closeRekapDropdown() {
+                  this.activeRekapDropdownId = null;
+              },
               execCetakPlhCuti(id, nip, logHistoryStr, logPlhNip) {
                   let cutiPlhNip = logPlhNip || null;
                   if (!cutiPlhNip && logHistoryStr) {
@@ -388,7 +401,44 @@
                           .withFailureHandler(err => { if(window.hideLoading) window.hideLoading(); if(window.showNotify) window.showNotify("Error", err.toString(), "error"); })
                           .deleteWfhLog(id, true, this.s.user.nip, token);
                   });
+              },
+              resendCutiWA(log) {
+                  if (!this.isAdmin) return;
+                  const token = localStorage.getItem('transkep_session_token');
+                  const adminNip = this.s.user ? this.s.user.nip : '';
+                  
+                  if (window.showCustomConfirm) {
+                      window.showCustomConfirm(
+                          "Kirim Ulang Notifikasi WA",
+                          `Kirim ulang notifikasi WhatsApp & Magic Link untuk pengajuan cuti ${log.pnsNama || log.nip} ke Atasan/Pejabat terkait?`,
+                          () => {
+                              if (window.showLoading) window.showLoading("Mengirim pesan WhatsApp via WAHA...");
+                              google.script.run
+                                  .withSuccessHandler(res => {
+                                      if (window.hideLoading) window.hideLoading();
+                                      if (res && res.status === 'success') {
+                                          if (window.showNotify) window.showNotify("WhatsApp Terkirim", res.message, "success");
+                                      } else {
+                                          if (window.showNotify) window.showNotify("Gagal Mengirim", res ? res.message : "Terjadi kesalahan.", "error");
+                                      }
+                                  })
+                                  .withFailureHandler(err => {
+                                      if (window.hideLoading) window.hideLoading();
+                                      if (window.showNotify) window.showNotify("Error Jaringan", err.toString(), "error");
+                                  })
+                                  .resendCutiWhatsApp(log.id, adminNip, token);
+                          }
+                      );
+                  }
               }
+          },
+          mounted() {
+              // ZETTBOT TAHAP 43: Auto-close dropdown rekap saat klik di luar
+              document.addEventListener('click', (e) => {
+                  if (!e.target.closest('.dropdown-rekap-container')) {
+                      this.activeRekapDropdownId = null;
+                  }
+              });
           }
       }).mount('#vue-rekapitulasi-wrapper');
   });

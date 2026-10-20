@@ -1997,3 +1997,54 @@ Akar penyebab: Font bawaan PDF (Times-Roman / Helvetica / Courier) pada pustaka 
    - Berkas [`transkep-web/core/pdf_signer.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/core/pdf_signer.js) dan [`permohonan/js_pdf_signer.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/js_pdf_signer.html) disinkronkan 1:1.
    - Service Worker cache dinaikkan ke **`transkep-v2.9.4`**.
    - Berhasil di-push ke `origin`, `prod` (`transkep.github.io`), dan dideploy ke Google Apps Script versi `@296` & `@297`.
+
+---
+
+### REVISI TAHAP 43: Tombol Aksi Dropdown Adaptif Cuti Disetujui (1 Tombol Ikon Ringkas ➔ 2 Opsi: Cetak Permohonan & Unduh Persetujuan TTE)
+**Tanggal**: 20 Oktober 2026  
+**Status**: [SELESAI & DIVERIFIKASI ✅]  
+**Lead Architect**: ZettBOT (by Zettbos)
+
+#### 1. Masalah & Feedback Pengguna
+- Pada Revisi Tahap 38 sebelumnya, diterapkan mekanisme *Smart Morphing* di mana saat cuti berstatus `Disetujui`, tombol langsung berubah menjadi `[ Unduh PDF ]` (TTE).
+- **Kelemahan Operasional**: Pegawai atau admin yang ingin mencetak fisik formulir permohonan HTML langsung via browser (misal untuk arsip lembar fisik) kehilangan opsi cetak tersebut karena tombol telah berubah sepihak menjadi unduh PDF.
+- **Kebutuhan Pengguna**:
+  - Ketika dokumen telah selesai ditandatangani oleh pejabat berwenang (`Status: Disetujui`), tombol aksi pada tabel cukup **1 tombol kompak berbasis logo/ikon saja** (tanpa teks panjang agar tabel tetap ramping).
+  - Ketika tombol ikon tersebut diklik, ia mengeluarkan **menu dropdown dengan 2 opsi**:
+    1. **`🖨️ Cetak Permohonan`**: Menampilkan formulir cetak cuti HTML untuk dicetak langsung ke printer.
+    2. **`📥 Download Persetujuan`**: Mengunduh berkas PDF biner resmi yang telah terinjeksi 3 Tanda Tangan Elektronik Digital X.509 PAdES (`TRANSKEP_[Nama]_sign_sign_sign.pdf`).
+
+#### 2. Analisis & Rencana Arsitektur UI/UX (Desain Anti-AI Human-Crafted)
+1. **Trigger Button di Kolom Aksi Tabel**:
+   - Dibuat ringkas (*compact* ~32px) dengan gaya Dark Glassmorphism:
+     `px-2.5 py-1.5 bg-slate-800/90 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 rounded-lg transition shadow-md flex items-center gap-1.5 text-xs font-medium`
+   - Ikon tajam: `fa-solid fa-list-check` + panah dropdown kecil `fa-solid fa-caret-down`.
+   - **Tanpa teks label di tombol utama** ("hanya logo saja"), sehingga kolom tabel sangat hemat ruang dan mobile-friendly.
+2. **Floating Popover / Dropdown Menu**:
+   - Diberi z-index tinggi (`z-[90]`), bayangan halus (`shadow-2xl`), dan backdrop blur (`bg-slate-900/95 backdrop-blur-md border border-slate-700/80 rounded-xl`).
+   - Dilengkapi *Click-Outside Listener* otomatis agar menu tertutup saat pengguna mengklik area luar tabel.
+   - Pilihan Menu:
+     - **Opsi 1**: `fa-print` (Indigo) ➔ **Cetak Permohonan** (*Format formulir cetak*).
+     - Divider garis halus `border-t border-slate-800/80`.
+     - **Opsi 2**: `fa-file-shield` (Emerald) ➔ **Download Persetujuan** (*PDF ber-TTE digital resmi*).
+3. **Logika Kondisional Dokumen Belum Disetujui**:
+   - Jika status dokumen masih `Menunggu` atau `Perubahan`, dropdown belum aktif dan sistem menampilkan tombol ikon cetak biasa `[ 🖨️ ]` (karena tanda tangan pejabat belum sah secara hukum kedinasan).
+
+#### 3. Berkas yang Dimodifikasi & Hasil Verifikasi
+| Berkas | Peran / Layer | Detail Modifikasi |
+| :--- | :--- | :--- |
+| [`transkep-web/modules/permohonan/cuti.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/modules/permohonan/cuti.js) | Frontend Cuti Controller | `activeDropdownId: null`, computed `hasDropdown`, `toggleActionDropdown`, & click-outside listener. |
+| [`transkep-web/modules/permohonan/view_permohonan.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/modules/permohonan/view_permohonan.html) | Frontend Permohonan View | Markup dropdown popover pada tabel Riwayat Cuti Saya dan tabel Rekapitulasi Global. |
+| [`transkep-web/modules/permohonan/rekapitulasi.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/modules/permohonan/rekapitulasi.js) | Frontend Rekap Controller | `activeRekapDropdownId: null`, `toggleRekapDropdown`, & click-outside listener. |
+| [`permohonan/js_permohonan_view.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/js_permohonan_view.html) | GAS Cuti Controller | Sinkronisasi 1:1 logika dropdown riwayat cuti ke Web App GAS. |
+| [`permohonan/view_permohonan.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/view_permohonan.html) | GAS Permohonan View | Sinkronisasi 1:1 markup dropdown riwayat cuti ke Web App GAS. |
+| [`permohonan/js_rekapitulasi.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/js_rekapitulasi.html) | GAS Rekap Controller | Sinkronisasi 1:1 logika dropdown rekapitulasi ke Web App GAS. |
+| [`permohonan/view_rekapitulasi.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/view_rekapitulasi.html) | GAS Rekap View | Sinkronisasi 1:1 markup dropdown rekapitulasi ke Web App GAS. |
+| [`transkep-web/sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/sw.js) | PWA Service Worker | Menaikkan versi cache ke `transkep-v2.9.7`. |
+
+#### 4. Hasil Verifikasi
+1. **Verifikasi Sintaks (Node.js)**: Seluruh berkas JavaScript (`cuti.js`, `rekapitulasi.js`, `sw.js`) lulus uji `node --check` dengan 0 syntax error.
+2. **Verifikasi Tombol Ringkas (Logo Saja)**: Tombol pemicu aksi di baris tabel kini 100% berupa ikon ringkas tanpa teks panjang (`[ ≡ ▾ ]`), menjaga kerapian kolom tabel.
+3. **Verifikasi Dropdown 2 Opsi**: Saat tombol diklik pada status `Disetujui`, popover menu mengambang muncul dengan 2 opsi berikon SVG tajam: `Cetak Permohonan` dan `Download Persetujuan` (TTE).
+4. **Verifikasi Click-Outside**: Popover menu otomatis tertutup mulus saat pengguna mengklik sembarang tempat di luar kontainer tombol.
+
