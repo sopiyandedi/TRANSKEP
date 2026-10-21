@@ -359,6 +359,8 @@ function processMagicLinkApproval(token, decision, notes) {
             "📅 *Periode:* " + periode + " (" + durasi + " hari kerja)\n" +
             "📝 *Alasan:* " + targetRow[6] + "\n\n" +
             "Silakan klik tautan di bawah ini untuk melihat detail dan memberikan persetujuan langsung (tanpa login):\n" +
+            "👉 " + magicLink;
+            
           sendWhatsAppMessage_(pejabat.no_wa, msgPejabat, {
             jenis_pesan: 'cuti_usulan',
             nama_tujuan: pejabat.nama,
@@ -598,6 +600,8 @@ function resendCutiWhatsApp(cutiId, adminNip, clientToken) {
         "📅 *Periode:* " + periode + " (" + targetRow[11] + " hari kerja)\n" +
         "📝 *Alasan:* " + targetRow[6] + "\n\n" +
         "Silakan klik tautan di bawah ini untuk melihat detail dan memberikan persetujuan langsung (tanpa login):\n" +
+        "👉 " + magicLink;
+        
       const res = sendWhatsAppMessage_(atasan.no_wa, msgWa, {
         jenis_pesan: 'cuti_usulan',
         nama_tujuan: atasan.nama,
@@ -631,6 +635,8 @@ function resendCutiWhatsApp(cutiId, adminNip, clientToken) {
         "📅 *Periode:* " + periode + " (" + targetRow[11] + " hari kerja)\n" +
         "📝 *Alasan:* " + targetRow[6] + "\n\n" +
         "Silakan klik tautan di bawah ini untuk melihat detail dan memberikan persetujuan langsung (tanpa login):\n" +
+        "👉 " + magicLink;
+        
       const res = sendWhatsAppMessage_(pejabat.no_wa, msgWa, {
         jenis_pesan: 'cuti_usulan',
         nama_tujuan: pejabat.nama,
