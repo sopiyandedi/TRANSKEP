@@ -29,10 +29,17 @@ document.addEventListener("DOMContentLoaded", () => {
                 this.currentUser = globalState.user;
                 this.usersList = globalState.usersList;
                 
-                const myNip = String(this.currentUser.nip);
+                const myNipClean = String(this.currentUser.nip || '').replace(/[^0-9]/g, '');
                 this.myLogs = (globalState.cutiLogs || [])
-                    .filter(l => String(l.nip) === myNip)
-                    .map(l => ({ ...l, z_sort: parseInt(l.id.split('-')[1]) || 0 }))
+                    .filter(l => String(l.nip || '').replace(/[^0-9]/g, '') === myNipClean)
+                    .map(l => {
+                        let idSort = 0;
+                        if (l.id) {
+                            const parts = String(l.id).split('-');
+                            idSort = parseInt(parts[1] || parts[0]) || 0;
+                        }
+                        return { ...l, z_sort: idSort };
+                    })
                     .sort((a, b) => b.z_sort - a.z_sort);
             },
             

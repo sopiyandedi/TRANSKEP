@@ -401,7 +401,27 @@ function getBackgroundData(nip, clientToken) {
     if(sheetCuti) {
        const cData = sheetCuti.getDataRange().getDisplayValues();
        for(let i=1; i<cData.length; i++) {
-          data.cutiLogs.push({ id: cData[i][0], tgl_pengajuan: cData[i][1], nip: cData[i][2], jenis: cData[i][3], tgl_mulai: cData[i][4], tgl_selesai: cData[i][5], alasan: cData[i][6], status: cData[i][7], catatan: cData[i][8], atasan_nip: cData[i][9], pejabat_nip: cData[i][10], sisa_cuti: cData[i][11], catatan_pejabat: cData[i][12], status_atasan: cData[i][13], status_pejabat: cData[i][14], alamat: cData[i][15], history: cData[i][16], bukti_url: cData[i][17] });
+          if (!cData[i][0]) continue;
+          data.cutiLogs.push({
+            id: cData[i][0],
+            tgl_pengajuan: cData[i][1],
+            nip: String(cData[i][2] || '').trim().replace(/'/g, ''),
+            jenis: cData[i][3],
+            tgl_mulai: cData[i][4],
+            tgl_selesai: cData[i][5],
+            alasan: cData[i][6],
+            status: cData[i][7],
+            catatan: cData[i][8],
+            atasan_nip: String(cData[i][9] || '').trim().replace(/'/g, ''),
+            pejabat_nip: String(cData[i][10] || '').trim().replace(/'/g, ''),
+            sisa_cuti: cData[i][11],
+            catatan_pejabat: cData[i][12],
+            status_atasan: cData[i][13],
+            status_pejabat: cData[i][14],
+            alamat: cData[i][15],
+            history: cData[i][16],
+            bukti_url: cData[i][17]
+          });
        }
     }
     
@@ -409,7 +429,7 @@ function getBackgroundData(nip, clientToken) {
     if(sheetJobdes) {
        const jData = sheetJobdes.getDataRange().getDisplayValues();
        for(let i=1; i<jData.length; i++) {
-          data.jobdesList.push({ nip: String(jData[i][0]), atasan_nip: String(jData[i][1]), dasar_lampiran: jData[i][2], ikhtisar_jabatan: jData[i][3], tugas_pokok: jData[i][4], tugas_tambahan: jData[i][5], tanggung_jawab: jData[i][6], hasil_kerja: jData[i][7] });
+          data.jobdesList.push({ nip: String(jData[i][0] || '').trim().replace(/'/g, ''), atasan_nip: String(jData[i][1] || '').trim().replace(/'/g, ''), dasar_lampiran: jData[i][2], ikhtisar_jabatan: jData[i][3], tugas_pokok: jData[i][4], tugas_tambahan: jData[i][5], tanggung_jawab: jData[i][6], hasil_kerja: jData[i][7] });
        }
     }
 
@@ -417,7 +437,7 @@ function getBackgroundData(nip, clientToken) {
     if(sheetKinerja) {
        const kData = sheetKinerja.getDataRange().getDisplayValues();
        for(let i=1; i<kData.length; i++) {
-          data.kinerjaList.push({ id: String(kData[i][0]), nip: String(kData[i][1]), pejabat_nip: String(kData[i][2]), tahun: kData[i][3], periode: kData[i][4], predikat: kData[i][5], file_penilaian: kData[i][6], file_evaluasi: kData[i][7], status: kData[i][8], tgl_tte: kData[i][9], file_pengesahan: kData[i][10], tgl_input: kData[i][11] });
+          data.kinerjaList.push({ id: String(kData[i][0]), nip: String(kData[i][1] || '').trim().replace(/'/g, ''), pejabat_nip: String(kData[i][2] || '').trim().replace(/'/g, ''), tahun: kData[i][3], periode: kData[i][4], predikat: kData[i][5], file_penilaian: kData[i][6], file_evaluasi: kData[i][7], status: kData[i][8], tgl_tte: kData[i][9], file_pengesahan: kData[i][10], tgl_input: kData[i][11] });
        }
     }
 
@@ -425,7 +445,7 @@ function getBackgroundData(nip, clientToken) {
     if(sheetST) {
        const stData = sheetST.getDataRange().getDisplayValues();
        for(let i=1; i<stData.length; i++) {
-          data.stList.push({ id: stData[i][0], waktu: stData[i][1], nomor: stData[i][2], menimbang: stData[i][3], dasar: stData[i][4], tujuan: stData[i][5], tempat: stData[i][6], tgl_mulai: stData[i][7], tgl_selesai: stData[i][8], jam: stData[i][9], peserta: stData[i][10], pejabat_ttd: stData[i][11], status: stData[i][12], data_ekstra: stData[i][13] || '{}' });
+          data.stList.push({ id: stData[i][0], waktu: stData[i][1], nomor: stData[i][2], menimbang: stData[i][3], dasar: stData[i][4], tujuan: stData[i][5], tempat: stData[i][6], tgl_mulai: stData[i][7], tgl_selesai: stData[i][8], jam: stData[i][9], peserta: stData[i][10], pejabat_ttd: String(stData[i][11] || '').trim().replace(/'/g, ''), status: stData[i][12], data_ekstra: stData[i][13] || '{}' });
        }
     }
 
@@ -433,7 +453,7 @@ function getBackgroundData(nip, clientToken) {
     if(sheetIK) {
        const ikData = sheetIK.getDataRange().getDisplayValues();
        for(let i=1; i<ikData.length; i++) {
-          data.ikLogs.push({ id: ikData[i][0], tgl_pengajuan: ikData[i][1], nip: ikData[i][2], tanggal: ikData[i][3], jam_keluar: ikData[i][4], jam_kembali: ikData[i][5], alasan: ikData[i][6], atasan_nip: ikData[i][7], status: ikData[i][8], catatan: ikData[i][9] });
+          data.ikLogs.push({ id: ikData[i][0], tgl_pengajuan: ikData[i][1], nip: String(ikData[i][2] || '').trim().replace(/'/g, ''), tanggal: ikData[i][3], jam_keluar: ikData[i][4], jam_kembali: ikData[i][5], alasan: ikData[i][6], atasan_nip: String(ikData[i][7] || '').trim().replace(/'/g, ''), status: ikData[i][8], catatan: ikData[i][9] });
        }
     }
 
@@ -441,7 +461,7 @@ function getBackgroundData(nip, clientToken) {
     if(sheetIP) {
        const ipData = sheetIP.getDataRange().getDisplayValues();
        for(let i=1; i<ipData.length; i++) {
-          data.ipLogs.push({ id: ipData[i][0], tgl_pengajuan: ipData[i][1], nip: ipData[i][2], tgl_mulai: ipData[i][3], tgl_selesai: ipData[i][4], alasan: ipData[i][5], atasan_nip: ipData[i][6], status: ipData[i][7], catatan: ipData[i][8] });
+          data.ipLogs.push({ id: ipData[i][0], tgl_pengajuan: ipData[i][1], nip: String(ipData[i][2] || '').trim().replace(/'/g, ''), tgl_mulai: ipData[i][3], tgl_selesai: ipData[i][4], alasan: ipData[i][5], atasan_nip: String(ipData[i][7] || '').trim().replace(/'/g, ''), status: ipData[i][7], catatan: ipData[i][8] });
        }
     }
 
@@ -449,7 +469,7 @@ function getBackgroundData(nip, clientToken) {
     if(sheetWFH) {
        const wfhData = sheetWFH.getDataRange().getDisplayValues();
        for(let i=1; i<wfhData.length; i++) {
-          data.wfhLogs.push({ id: wfhData[i][0], tgl_pengajuan: wfhData[i][1], nip: wfhData[i][2], tanggal: wfhData[i][3], rencana_json: wfhData[i][4], laporan_json: wfhData[i][5], atasan_nip: wfhData[i][6], status_rencana: wfhData[i][7], status_laporan: wfhData[i][8], catatan: wfhData[i][9] });
+          data.wfhLogs.push({ id: wfhData[i][0], tgl_pengajuan: wfhData[i][1], nip: String(wfhData[i][2] || '').trim().replace(/'/g, ''), tanggal: wfhData[i][3], rencana_json: wfhData[i][4], laporan_json: wfhData[i][5], atasan_nip: String(wfhData[i][6] || '').trim().replace(/'/g, ''), status_rencana: wfhData[i][7], status_laporan: wfhData[i][8], catatan: wfhData[i][9] });
        }
     }
 

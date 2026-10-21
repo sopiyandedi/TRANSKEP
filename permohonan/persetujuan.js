@@ -426,6 +426,8 @@ function processMagicLinkApproval(token, decision, notes) {
             "📅 *Periode:* " + periode + " (" + durasi + " hari kerja)\n" +
             "📄 *ID Transaksi:* " + targetRow[0] + "\n\n" +
             "Silakan unduh atau cetak surat permohonan cuti Anda melalui portal TRANSKEP:\n" +
+            "👉 https://transkep.github.io/";
+
           sendWhatsAppMessage_(pemohon.no_wa, msgAcc, {
             jenis_pesan: 'cuti_keputusan',
             nama_pemohon: pemohon.nama,

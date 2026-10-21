@@ -6,7 +6,26 @@
 
 console.log("🚀 ZETTBOT: Menginisialisasi sistem TRANSKEP core.js...");
 
-let state = {
+let state = (typeof Vue !== 'undefined' && Vue.reactive) ? Vue.reactive({
+  user: null,
+  usersList: [],
+  cutiLogs: [],
+  jobdesList: [],
+  skList: [],
+  skAckList: [],
+  kinerjaList: [],
+  sopList: [],
+  sopAckList: [],
+  stList: [],
+  masterKinerjaList: [],
+  ikLogs: [],
+  ipLogs: [],
+  wfhLogs: [],
+  currentMenu: 'dashboard',
+  rendered: {},
+  pendingPkpCount: 0,
+  isBgSyncDone: false
+}) : {
   user: null,
   usersList: [],
   cutiLogs: [],
@@ -29,7 +48,7 @@ let state = {
 
 // Mengekspos state ke window global
 window.state = state;
-window.vueState = Vue.reactive(state);
+window.vueState = state;
 
 const isGoogleEnv = (typeof google !== 'undefined' && google.script);
 
@@ -184,73 +203,76 @@ function syncAllServerData(silent) {
     return;
   }
 
-  google.script.run
-    .withSuccessHandler(function (response) {
-      if (!isSilent) hideLoading();
-      if (response && response.status === 'success') {
-        window.vueState.user = response.data.user;
-        if (response.data.user && response.data.user.role) {
-          localStorage.setItem('transkep_user_role', response.data.user.role);
-        }
-        window.vueState.usersList = response.data.usersList;
-        window.vueState.pendingPkpCount = response.data.pendingPkpCount || 0;
-        window.vueState.isBgSyncDone = false;
-
-        // ZETTBOT TAHAP 37: Pertahankan data in-memory jika sudah ada (Anti-Wiping / Non-Destructive Cache)
-        window.vueState.cutiLogs = window.vueState.cutiLogs || [];
-        window.vueState.jobdesList = window.vueState.jobdesList || [];
-        window.vueState.skList = window.vueState.skList || [];
-        window.vueState.skAckList = window.vueState.skAckList || [];
-        window.vueState.kinerjaList = window.vueState.kinerjaList || [];
-        window.vueState.sopList = window.vueState.sopList || [];
-        window.vueState.sopAckList = window.vueState.sopAckList || [];
-        window.vueState.stList = window.vueState.stList || [];
-        window.vueState.masterKinerjaList = window.vueState.masterKinerjaList || [];
-        window.vueState.ikLogs = window.vueState.ikLogs || [];
-        window.vueState.ipLogs = window.vueState.ipLogs || [];
-        window.vueState.wfhLogs = window.vueState.wfhLogs || [];
-
-        if (typeof renderGlobalHeader === 'function') {
-          renderGlobalHeader();
-        }
-
-        initNavigationAccess();
-
-        if (!isSilent) {
-          const lastMenu = localStorage.getItem('transkep_last_menu') || 'dashboard';
-          switchMenu(lastMenu);
-        }
-
-        updateSidebarBadges();
-        syncBackgroundData();
-
-        // Mandat ganti sandi sementara jika terdeteksi dari server atau storage
-        const tempPass = (response.data && response.data.temp_pass) || localStorage.getItem('transkep_force_change_password') || '';
-        const isMustChange = !!((response.data && response.data.must_change_password) || tempPass);
-        if (isMustChange) {
-          if (tempPass) localStorage.setItem('transkep_force_change_password', tempPass);
-          setTimeout(() => {
-            if (typeof window.openChangePasswordModal === 'function') {
-              window.openChangePasswordModal(tempPass, true);
-            }
-          }, 500);
-        }
-
-      } else {
-        if (!isSilent) {
-          showNotify("Gagal Sinkronisasi", response ? response.message : "Data bermasalah", "error");
-          handleLogout();
-        }
+  const handleSuccess = function (response) {
+    if (!isSilent) hideLoading();
+    if (response && response.status === 'success') {
+      state.user = response.data.user;
+      if (state.user && state.user.role) {
+        localStorage.setItem('transkep_user_role', state.user.role);
       }
-    })
-    .withFailureHandler(function (error) {
+      state.usersList = response.data.usersList;
+      state.pendingPkpCount = response.data.pendingPkpCount || 0;
+      state.isBgSyncDone = false;
+
+      if (window.vueState) {
+        window.vueState.user = state.user;
+        window.vueState.usersList = state.usersList;
+        window.vueState.pendingPkpCount = state.pendingPkpCount;
+        window.vueState.isBgSyncDone = false;
+      }
+
+      if (typeof renderGlobalHeader === 'function') {
+        renderGlobalHeader();
+      }
+
+      initNavigationAccess();
+
       if (!isSilent) {
-        hideLoading();
-        showNotify("Terputus dari Server", error.message || "Gagal sinkronisasi", "error");
+        const lastMenu = localStorage.getItem('transkep_last_menu') || 'dashboard';
+        switchMenu(lastMenu);
+      }
+
+      updateSidebarBadges();
+      syncBackgroundData();
+
+      // Mandat ganti sandi sementara jika terdeteksi dari server atau storage
+      const tempPass = (response.data && response.data.temp_pass) || localStorage.getItem('transkep_force_change_password') || '';
+      const isMustChange = !!((response.data && response.data.must_change_password) || tempPass);
+      if (isMustChange) {
+        if (tempPass) localStorage.setItem('transkep_force_change_password', tempPass);
+        setTimeout(() => {
+          if (typeof window.openChangePasswordModal === 'function') {
+            window.openChangePasswordModal(tempPass, true);
+          }
+        }, 500);
+      }
+
+    } else {
+      if (!isSilent) {
+        showNotify("Gagal Sinkronisasi", response ? response.message : "Data bermasalah", "error");
         handleLogout();
       }
-    })
-    .getBulkData(loginNip, sessionToken);
+    }
+  };
+
+  const handleFailure = function (error) {
+    if (!isSilent) {
+      hideLoading();
+      showNotify("Terputus dari Server", (error && error.message) ? error.message : "Gagal sinkronisasi", "error");
+      handleLogout();
+    }
+  };
+
+  if (typeof TranskepAPI !== 'undefined' && typeof TranskepAPI.call === 'function') {
+    TranskepAPI.call('getBulkData', loginNip, sessionToken)
+      .then(handleSuccess)
+      .catch(handleFailure);
+  } else if (typeof google !== 'undefined' && google.script && google.script.run) {
+    google.script.run
+      .withSuccessHandler(handleSuccess)
+      .withFailureHandler(handleFailure)
+      .getBulkData(loginNip, sessionToken);
+  }
 }
 
 function syncBackgroundData() {
@@ -258,47 +280,74 @@ function syncBackgroundData() {
   const sessionToken = localStorage.getItem('transkep_session_token');
   if (!loginNip || !sessionToken) return;
 
-  google.script.run
-    .withSuccessHandler(function (res) {
-      if (res && res.status === 'success') {
-        window.vueState.cutiLogs = res.data.cutiLogs || [];
-        window.vueState.stList = res.data.stList || [];
-        window.vueState.ikLogs = res.data.ikLogs || [];
-        window.vueState.ipLogs = res.data.ipLogs || [];
-        window.vueState.wfhLogs = res.data.wfhLogs || [];
-        window.vueState.jobdesList = res.data.jobdesList || [];
-        window.vueState.skList = res.data.skList || [];
-        window.vueState.skAckList = res.data.skAckList || [];
-        window.vueState.kinerjaList = res.data.kinerjaList || [];
-        window.vueState.sopList = res.data.sopList || [];
-        window.vueState.sopAckList = res.data.sopAckList || [];
-        window.vueState.masterKinerjaList = res.data.masterKinerjaList || [];
+  const handleSuccess = function (res) {
+    if (res && res.status === 'success' && res.data) {
+      const d = res.data;
+      state.cutiLogs = d.cutiLogs || [];
+      state.stList = d.stList || [];
+      state.ikLogs = d.ikLogs || [];
+      state.ipLogs = d.ipLogs || [];
+      state.wfhLogs = d.wfhLogs || [];
+      state.jobdesList = d.jobdesList || [];
+      state.skList = d.skList || [];
+      state.skAckList = d.skAckList || [];
+      state.kinerjaList = d.kinerjaList || [];
+      state.sopList = d.sopList || [];
+      state.sopAckList = d.sopAckList || [];
+      state.masterKinerjaList = d.masterKinerjaList || [];
 
+      if (window.vueState) {
+        window.vueState.cutiLogs = state.cutiLogs;
+        window.vueState.stList = state.stList;
+        window.vueState.ikLogs = state.ikLogs;
+        window.vueState.ipLogs = state.ipLogs;
+        window.vueState.wfhLogs = state.wfhLogs;
+        window.vueState.jobdesList = state.jobdesList;
+        window.vueState.skList = state.skList;
+        window.vueState.skAckList = state.skAckList;
+        window.vueState.kinerjaList = state.kinerjaList;
+        window.vueState.sopList = state.sopList;
+        window.vueState.sopAckList = state.sopAckList;
+        window.vueState.masterKinerjaList = state.masterKinerjaList;
         window.vueState.isBgSyncDone = true;
-
-        updateSidebarBadges();
-        if (typeof updateBadgePermohonan === 'function') updateBadgePermohonan();
-
-        const cm = state.currentMenu;
-        if (cm === 'dashboard' && typeof renderDashboardView === 'function') renderDashboardView();
-        if (cm === 'permohonan' && typeof renderPermohonanView === 'function') renderPermohonanView();
-        if (cm === 'persetujuan' && typeof renderPersetujuanView === 'function') renderPersetujuanView();
-        if (cm === 'rekapitulasi' && typeof renderRekapitulasiView === 'function') renderRekapitulasiView();
-        if (cm === 'sk' && typeof renderSkView === 'function') renderSkView();
-        if (cm === 'sop' && typeof renderSopView === 'function') renderSopView();
-        if (cm === 'jobdes' && typeof renderJobdesView === 'function') renderJobdesView();
-        if (cm === 'kinerja' && typeof renderKinerjaView === 'function') renderKinerjaView();
-        if (cm === 'pkp' && typeof initPkpModule === 'function') initPkpModule();
-        if (cm === 'eoffice' && typeof renderEofficeView === 'function') renderEofficeView();
-        if (cm === 'manajemen' && window.vmPegawai && typeof window.vmPegawai.fetchResetQueue === 'function') window.vmPegawai.fetchResetQueue();
       }
-    })
-    .withFailureHandler(function (err) {
-      console.warn("Background Sync Gagal: " + err.message);
       state.isBgSyncDone = true;
-      if (state.currentMenu === 'dashboard' && typeof renderDashboardView === 'function') renderDashboardView();
-    })
-    .getBackgroundData(loginNip, sessionToken);
+
+      updateSidebarBadges();
+      if (typeof updateBadgePermohonan === 'function') updateBadgePermohonan();
+
+      const cm = state.currentMenu;
+      if (cm === 'dashboard' && typeof renderDashboardView === 'function') renderDashboardView();
+      if (cm === 'permohonan' && typeof renderPermohonanView === 'function') renderPermohonanView();
+      if (cm === 'persetujuan' && typeof renderPersetujuanView === 'function') renderPersetujuanView();
+      if (cm === 'rekapitulasi' && typeof renderRekapitulasiView === 'function') renderRekapitulasiView();
+      if (cm === 'sk' && typeof renderSkView === 'function') renderSkView();
+      if (cm === 'sop' && typeof renderSopView === 'function') renderSopView();
+      if (cm === 'jobdes' && typeof renderJobdesView === 'function') renderJobdesView();
+      if (cm === 'kinerja' && typeof renderKinerjaView === 'function') renderKinerjaView();
+      if (cm === 'pkp' && typeof initPkpModule === 'function') initPkpModule();
+      if (cm === 'eoffice' && typeof renderEofficeView === 'function') renderEofficeView();
+      if (cm === 'manajemen' && window.vmPegawai && typeof window.vmPegawai.fetchResetQueue === 'function') window.vmPegawai.fetchResetQueue();
+    }
+  };
+
+  const handleFailure = function (err) {
+    console.warn("Background Sync Gagal: " + (err ? err.message : ""));
+    state.isBgSyncDone = true;
+    if (window.vueState) window.vueState.isBgSyncDone = true;
+    if (state.currentMenu === 'dashboard' && typeof renderDashboardView === 'function') renderDashboardView();
+  };
+
+  if (typeof TranskepAPI !== 'undefined' && typeof TranskepAPI.call === 'function') {
+    TranskepAPI.call('getBackgroundData', loginNip, sessionToken)
+      .then(handleSuccess)
+      .catch(handleFailure);
+  } else if (typeof google !== 'undefined' && google.script && google.script.run) {
+    google.script.run
+      .withSuccessHandler(handleSuccess)
+      .withFailureHandler(handleFailure)
+      .getBackgroundData(loginNip, sessionToken);
+  }
 }
 
 function switchMenu(menuId) {

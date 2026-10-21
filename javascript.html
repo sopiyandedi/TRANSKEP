@@ -6,14 +6,15 @@
   // memicu SyntaxError bentrokan dengan modul file JS lainnya.
   // =========================================================================
 
-  let state = {
+  const rawInitialState = {
     user: null, usersList: [], cutiLogs: [], jobdesList: [], skList: [], skAckList: [], kinerjaList: [], sopList: [], sopAckList: [], stList: [], masterKinerjaList: [], ikLogs: [], ipLogs: [], wfhLogs: [], currentMenu: 'dashboard', rendered: {}, pendingPkpCount: 0,
     isBgSyncDone: false 
   };
+  let state = (typeof Vue !== 'undefined' && Vue.reactive) ? Vue.reactive(rawInitialState) : rawInitialState;
   
-  // ZETTBOT FIX: Mengekspos state mentah ke window agar modul lama (seperti js_permohonan) tidak kehilangan data
+  // ZETTBOT FIX: Pastikan window.state dan window.vueState mengarah ke proxy reaktif yang sama
   window.state = state; 
-  window.vueState = Vue.reactive(state);
+  window.vueState = state;
   
   const isGoogleEnv = (typeof google !== 'undefined' && google.script);
 

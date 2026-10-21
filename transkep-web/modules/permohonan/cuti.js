@@ -171,36 +171,67 @@
       window.vmRiwayatPermohonan = createApp({
           data() {
               return {
-                  s: state, // Mengikat variabel global state ke dalam lokal Vue
+                  s: window.vueState || state, // Mengikat variabel global state/vueState ke dalam lokal Vue
                   activeDropdownId: null // ZETTBOT TAHAP 43: ID Dropdown aksi yang sedang terbuka
               };
           },
           computed: {
               // Engine Pengolah Data Otomatis
               formattedLogs() {
-                  if (!this.s || !this.s.user) return [];
+                  const userObj = (this.s && this.s.user) || (window.vueState && window.vueState.user) || state.user;
+                  if (!userObj || !userObj.nip) return [];
 
                   const myLogs = [];
-                  const myNipStr = String(this.s.user.nip);
+                  const myNipClean = String(userObj.nip).replace(/[^0-9]/g, '');
                   
-                  if (this.s.cutiLogs) {
-                      this.s.cutiLogs.filter(l => String(l.nip) === myNipStr).forEach(l => {
-                          myLogs.push(Object.assign({}, l, { z_type: 'Cuti', z_sort: parseInt(l.id.split('-')[1]) || 0 }));
+                  const cutiList = (this.s && this.s.cutiLogs && this.s.cutiLogs.length > 0) ? this.s.cutiLogs : ((window.vueState && window.vueState.cutiLogs) || state.cutiLogs || []);
+                  if (cutiList && cutiList.length > 0) {
+                      cutiList.filter(l => {
+                          const lNip = String(l.nip || '').replace(/[^0-9]/g, '');
+                          return lNip === myNipClean;
+                      }).forEach(l => {
+                          let idSort = 0;
+                          if (l.id) {
+                            const parts = String(l.id).split('-');
+                            idSort = parseInt(parts[1] || parts[0]) || 0;
+                          }
+                          myLogs.push(Object.assign({}, l, { z_type: 'Cuti', z_sort: idSort }));
                       });
                   }
-                  if (this.s.ikLogs) {
-                      this.s.ikLogs.filter(l => String(l.nip) === myNipStr).forEach(l => {
-                          myLogs.push(Object.assign({}, l, { z_type: 'IK', z_sort: parseInt(l.id.split('-')[1]) || 0 }));
+
+                  const ikList = (this.s && this.s.ikLogs && this.s.ikLogs.length > 0) ? this.s.ikLogs : ((window.vueState && window.vueState.ikLogs) || state.ikLogs || []);
+                  if (ikList && ikList.length > 0) {
+                      ikList.filter(l => String(l.nip || '').replace(/[^0-9]/g, '') === myNipClean).forEach(l => {
+                          let idSort = 0;
+                          if (l.id) {
+                            const parts = String(l.id).split('-');
+                            idSort = parseInt(parts[1] || parts[0]) || 0;
+                          }
+                          myLogs.push(Object.assign({}, l, { z_type: 'IK', z_sort: idSort }));
                       });
                   }
-                  if (this.s.ipLogs) {
-                      this.s.ipLogs.filter(l => String(l.nip) === myNipStr).forEach(l => {
-                          myLogs.push(Object.assign({}, l, { z_type: 'IP', z_sort: parseInt(l.id.split('-')[1]) || 0 }));
+
+                  const ipList = (this.s && this.s.ipLogs && this.s.ipLogs.length > 0) ? this.s.ipLogs : ((window.vueState && window.vueState.ipLogs) || state.ipLogs || []);
+                  if (ipList && ipList.length > 0) {
+                      ipList.filter(l => String(l.nip || '').replace(/[^0-9]/g, '') === myNipClean).forEach(l => {
+                          let idSort = 0;
+                          if (l.id) {
+                            const parts = String(l.id).split('-');
+                            idSort = parseInt(parts[1] || parts[0]) || 0;
+                          }
+                          myLogs.push(Object.assign({}, l, { z_type: 'IP', z_sort: idSort }));
                       });
                   }
-                  if (this.s.wfhLogs) {
-                      this.s.wfhLogs.filter(l => String(l.nip) === myNipStr).forEach(l => {
-                          myLogs.push(Object.assign({}, l, { z_type: 'WFH', z_sort: parseInt(l.id.split('-')[1]) || 0 }));
+
+                  const wfhList = (this.s && this.s.wfhLogs && this.s.wfhLogs.length > 0) ? this.s.wfhLogs : ((window.vueState && window.vueState.wfhLogs) || state.wfhLogs || []);
+                  if (wfhList && wfhList.length > 0) {
+                      wfhList.filter(l => String(l.nip || '').replace(/[^0-9]/g, '') === myNipClean).forEach(l => {
+                          let idSort = 0;
+                          if (l.id) {
+                            const parts = String(l.id).split('-');
+                            idSort = parseInt(parts[1] || parts[0]) || 0;
+                          }
+                          myLogs.push(Object.assign({}, l, { z_type: 'WFH', z_sort: idSort }));
                       });
                   }
 
