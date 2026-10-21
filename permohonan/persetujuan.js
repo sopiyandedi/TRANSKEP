@@ -359,9 +359,17 @@ function processMagicLinkApproval(token, decision, notes) {
             "📅 *Periode:* " + periode + " (" + durasi + " hari kerja)\n" +
             "📝 *Alasan:* " + targetRow[6] + "\n\n" +
             "Silakan klik tautan di bawah ini untuk melihat detail dan memberikan persetujuan langsung (tanpa login):\n" +
-            "👉 " + magicLink;
-            
-          sendWhatsAppMessage_(pejabat.no_wa, msgPejabat);
+          sendWhatsAppMessage_(pejabat.no_wa, msgPejabat, {
+            jenis_pesan: 'cuti_usulan',
+            nama_tujuan: pejabat.nama,
+            nama_pemohon: pemohon.nama,
+            nip: pemohonNip,
+            jenis_cuti: jenisCuti,
+            periode: periode,
+            durasi: durasi,
+            alasan: targetRow[6] || '-',
+            magic_link: magicLink
+          });
         }
         
         return { 
@@ -382,9 +390,14 @@ function processMagicLinkApproval(token, decision, notes) {
             "Halo *" + pemohon.nama + "*,\n\n" +
             "Pengajuan cuti " + jenisCuti + " Anda untuk periode *" + periode + "* tidak dapat disetujui oleh Atasan Langsung (" + atasan.nama + ").\n\n" +
             "📝 *Alasan Penolakan:* " + (catatanBersih || 'Tidak ada catatan khusus.') + "\n\n" +
-            "Saldo cuti Anda telah dikembalikan secara utuh ke sistem.";
-            
-          sendWhatsAppMessage_(pemohon.no_wa, msgReject);
+          sendWhatsAppMessage_(pemohon.no_wa, msgReject, {
+            jenis_pesan: 'cuti_keputusan',
+            nama_pemohon: pemohon.nama,
+            periode: periode,
+            status: 'Ditolak Atasan Langsung',
+            oleh: atasan.nama,
+            catatan: catatanBersih || 'Tidak ada catatan khusus.'
+          });
         }
         
         return { 
@@ -411,9 +424,14 @@ function processMagicLinkApproval(token, decision, notes) {
             "📅 *Periode:* " + periode + " (" + durasi + " hari kerja)\n" +
             "📄 *ID Transaksi:* " + targetRow[0] + "\n\n" +
             "Silakan unduh atau cetak surat permohonan cuti Anda melalui portal TRANSKEP:\n" +
-            "🔗 https://transkep.github.io/";
-            
-          sendWhatsAppMessage_(pemohon.no_wa, msgAcc);
+          sendWhatsAppMessage_(pemohon.no_wa, msgAcc, {
+            jenis_pesan: 'cuti_keputusan',
+            nama_pemohon: pemohon.nama,
+            periode: periode,
+            status: 'Resmi Disetujui',
+            oleh: pejabat.nama,
+            catatan: 'Disetujui oleh Pejabat Berwenang'
+          });
         }
         
         return { 
@@ -431,9 +449,14 @@ function processMagicLinkApproval(token, decision, notes) {
             "Halo *" + pemohon.nama + "*,\n\n" +
             "Pengajuan cuti " + jenisCuti + " Anda untuk periode *" + periode + "* tidak disetujui oleh Pejabat Berwenang (" + pejabat.nama + ").\n\n" +
             "📝 *Catatan:* " + (catatanBersih || 'Tidak ada catatan khusus.') + "\n\n" +
-            "Saldo cuti Anda telah dikembalikan secara utuh ke sistem.";
-            
-          sendWhatsAppMessage_(pemohon.no_wa, msgReject);
+          sendWhatsAppMessage_(pemohon.no_wa, msgReject, {
+            jenis_pesan: 'cuti_keputusan',
+            nama_pemohon: pemohon.nama,
+            periode: periode,
+            status: 'Ditolak Pejabat Berwenang',
+            oleh: pejabat.nama,
+            catatan: catatanBersih || 'Tidak ada catatan khusus.'
+          });
         }
         
         return { 
@@ -575,9 +598,17 @@ function resendCutiWhatsApp(cutiId, adminNip, clientToken) {
         "📅 *Periode:* " + periode + " (" + targetRow[11] + " hari kerja)\n" +
         "📝 *Alasan:* " + targetRow[6] + "\n\n" +
         "Silakan klik tautan di bawah ini untuk melihat detail dan memberikan persetujuan langsung (tanpa login):\n" +
-        "👉 " + magicLink;
-        
-      const res = sendWhatsAppMessage_(atasan.no_wa, msgWa);
+      const res = sendWhatsAppMessage_(atasan.no_wa, msgWa, {
+        jenis_pesan: 'cuti_usulan',
+        nama_tujuan: atasan.nama,
+        nama_pemohon: pemohon.nama,
+        nip: targetRow[2],
+        jenis_cuti: targetRow[3],
+        periode: periode,
+        durasi: targetRow[11],
+        alasan: targetRow[6] || '-',
+        magic_link: magicLink
+      });
       if (res && res.status === 'success') {
         return { status: 'success', message: 'Notifikasi WhatsApp berhasil dikirim ulang ke Atasan Langsung (' + atasan.nama + ').' };
       } else {
@@ -600,9 +631,17 @@ function resendCutiWhatsApp(cutiId, adminNip, clientToken) {
         "📅 *Periode:* " + periode + " (" + targetRow[11] + " hari kerja)\n" +
         "📝 *Alasan:* " + targetRow[6] + "\n\n" +
         "Silakan klik tautan di bawah ini untuk melihat detail dan memberikan persetujuan langsung (tanpa login):\n" +
-        "👉 " + magicLink;
-        
-      const res = sendWhatsAppMessage_(pejabat.no_wa, msgWa);
+      const res = sendWhatsAppMessage_(pejabat.no_wa, msgWa, {
+        jenis_pesan: 'cuti_usulan',
+        nama_tujuan: pejabat.nama,
+        nama_pemohon: pemohon.nama,
+        nip: targetRow[2],
+        jenis_cuti: targetRow[3],
+        periode: periode,
+        durasi: targetRow[11],
+        alasan: targetRow[6] || '-',
+        magic_link: magicLink
+      });
       if (res && res.status === 'success') {
         return { status: 'success', message: 'Notifikasi WhatsApp berhasil dikirim ulang ke Pejabat Berwenang (' + pejabat.nama + ').' };
       } else {

@@ -129,40 +129,55 @@ function logoutSession(nip, clientToken) {
   }
 }
 
-// 7. Gateway Otomatisasi WhatsApp (WAHA + Ngrok) - ZettBOT v2.1
-function getWahaConfig_() {
+// 7. Gateway Otomatisasi WhatsApp (n8n + WAHA Gateway) - ZettBOT Enterprise Engine v3.0
+function getGatewayConfig_() {
   const props = PropertiesService.getScriptProperties();
+  const rawUrl = props.getProperty('N8N_WEBHOOK_URL') || props.getProperty('WAHA_BASE_URL') || 'https://supernova-endpoint-unsubtly.ngrok-free.dev/webhook/transkep-gateway';
+  
+  let endpoint = rawUrl.trim().replace(/\/+$/, '');
+  if (!endpoint.includes('/webhook') && !endpoint.includes('/api/')) {
+    endpoint += '/webhook/transkep-gateway';
+  }
+  
   return {
-    baseUrl: props.getProperty('WAHA_BASE_URL') || 'https://supernova-endpoint-unsubtly.ngrok-free.dev',
+    endpoint: endpoint,
     apiKey: props.getProperty('WAHA_API_KEY') || '192167ce5e0147dcb4eaaaff7eccfc18',
     session: props.getProperty('WAHA_SESSION') || 'default'
   };
 }
 
-function sendWhatsAppMessage_(rawPhone, text) {
+function getWahaConfig_() {
+  return getGatewayConfig_();
+}
+
+function sendWhatsAppMessage_(rawPhone, text, metaPayload) {
   try {
-    if (!rawPhone || !text) return { status: 'error', message: 'Nomor atau pesan teks tidak boleh kosong.' };
+    if (!rawPhone) return { status: 'error', message: 'Nomor WhatsApp tidak boleh kosong.' };
     
     let phone = String(rawPhone).replace(/[^0-9]/g, '');
     if (phone.startsWith('0')) {
       phone = '62' + phone.substring(1);
     }
-    if (!phone.endsWith('@c.us') && !phone.endsWith('@lid')) {
-      phone = phone + '@c.us';
+    
+    if (phone.length < 10) { // Minimal 10 digit (628...)
+      return { status: 'error', message: 'Nomor WhatsApp tidak valid (minimal 10 digit).' };
     }
     
-    if (phone.length < 11) { // 628... @c.us minimal 11 karakter
-      return { status: 'error', message: 'Nomor WhatsApp tidak valid.' };
-    }
+    const config = getGatewayConfig_();
     
-    const config = getWahaConfig_();
-    const endpoint = config.baseUrl.replace(/\/+$/, '') + '/api/sendText';
-    
+    // Payload terpadu untuk n8n Gateway
     const payload = {
-      chatId: phone,
-      text: String(text),
-      session: config.session
+      jenis_pesan: (metaPayload && metaPayload.jenis_pesan) ? metaPayload.jenis_pesan : 'direct',
+      nomor_wa: phone,
+      pesan: String(text || '')
     };
+    
+    // Gabungkan meta data terstruktur tambahan jika ada
+    if (metaPayload && typeof metaPayload === 'object') {
+      for (let k in metaPayload) {
+        payload[k] = metaPayload[k];
+      }
+    }
     
     const options = {
       method: 'post',
@@ -175,14 +190,14 @@ function sendWhatsAppMessage_(rawPhone, text) {
       muteHttpExceptions: true
     };
     
-    const response = UrlFetchApp.fetch(endpoint, options);
+    const response = UrlFetchApp.fetch(config.endpoint, options);
     const respCode = response.getResponseCode();
     const respText = response.getContentText();
     
     if (respCode >= 200 && respCode < 300) {
       return { status: 'success', data: respText };
     } else {
-      Logger.log("WAHA sendText returned HTTP " + respCode + ": " + respText);
+      Logger.log("n8n Gateway returned HTTP " + respCode + ": " + respText);
       return { status: 'error', code: respCode, message: respText };
     }
   } catch (err) {
@@ -520,7 +535,12 @@ function requestPasswordReset(no_wa) {
       "⚠️ *Perhatian:* Segera login ke portal dan perbarui kata sandi Anda di menu profil demi keamanan akun.\n\n" +
       "🔗 *Link Login Portal:* https://transkep.github.io/";
 
-    let waResult = sendWhatsAppMessage_(userFound.no_wa, waText);
+    let waResult = sendWhatsAppMessage_(userFound.no_wa, waText, {
+      jenis_pesan: 'reset_password',
+      nama: userFound.nama,
+      nip: userFound.nip,
+      password_baru: tempPass
+    });
 
     // 3. Evaluasi Hasil Kirim WAHA
     if (waResult && waResult.status === 'success') {
@@ -618,8 +638,10 @@ function mintaIzinUrlFetch() {
 }
 
 function testKoneksiWAHA() {
-  const result = sendWhatsAppMessage_('6285139811819', 'TRANSKEP - Tes Otorisasi Gateway WAHA Berhasil Aktif! 🚀');
-  Logger.log("Hasil Uji WAHA: " + JSON.stringify(result));
+  const result = sendWhatsAppMessage_('6285139811819', 'TRANSKEP - Tes Koneksi n8n Gateway Berhasil Aktif! 🚀', {
+    jenis_pesan: 'direct'
+  });
+  Logger.log("Hasil Uji n8n Gateway: " + JSON.stringify(result));
   return result;
 }
 

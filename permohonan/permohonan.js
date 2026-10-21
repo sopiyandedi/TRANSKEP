@@ -112,9 +112,17 @@ function addCutiLog(payload, aktorNip, clientToken) {
             "📅 *Periode:* " + payload.tgl_mulai + " s.d " + payload.tgl_selesai + " (" + durasi + " hari kerja)\n" +
             "📝 *Alasan:* " + (payload.alasan || '-') + "\n\n" +
             "Silakan klik tautan di bawah ini untuk melihat detail lengkap dan memberikan persetujuan langsung (tanpa perlu login):\n" +
-            "👉 " + magicLink;
-            
-          sendWhatsAppMessage_(atasanPhone, msgWa);
+          sendWhatsAppMessage_(atasanPhone, msgWa, {
+            jenis_pesan: 'cuti_usulan',
+            nama_tujuan: namaAtasan,
+            nama_pemohon: namaPegawaiPemohon,
+            nip: payload.nip,
+            jenis_cuti: payload.jenis,
+            periode: payload.tgl_mulai + " s.d " + payload.tgl_selesai,
+            durasi: durasi,
+            alasan: payload.alasan || '-',
+            magic_link: magicLink
+          });
         }
       } catch (errWa) {
         Logger.log("Gagal kirim notif WA cuti ke atasan: " + errWa.toString());
