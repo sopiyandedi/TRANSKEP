@@ -58,32 +58,46 @@ function submitLupaPassword(e) {
     btn.disabled = true;
   }
 
-  google.script.run
-    .withSuccessHandler(function(res) {
-      if (btn) {
-        btn.innerHTML = originalBtnHtml;
-        btn.disabled = false;
-      }
+  const handleSuccess = function(res) {
+    if (btn) {
+      btn.innerHTML = originalBtnHtml;
+      btn.disabled = false;
+    }
+    
+    if (res && res.status === 'success') {
+      closeLupaPassword();
+      if (typeof showNotify === 'function') showNotify("Permintaan Terkirim", res.message, "success");
       
-      if (res && res.status === 'success') {
-        closeLupaPassword();
-        if (typeof showNotify === 'function') showNotify("Permintaan Terkirim", res.message, "success");
-        
-        // Aktifkan Cooldown 60 detik agar tidak spam klik ke sistem backend
-        cooldownResetPass = true;
-        setTimeout(() => {
-          cooldownResetPass = false;
-        }, 60000);
-      } else {
-        if (typeof showNotify === 'function') showNotify("Gagal Memproses", res ? res.message : "Gagal memproses", "error");
-      }
-    })
-    .withFailureHandler(function(err) {
-      if (btn) {
-        btn.innerHTML = originalBtnHtml;
-        btn.disabled = false;
-      }
-      if (typeof showNotify === 'function') showNotify("Kesalahan Jaringan", "Terjadi kesalahan saat menghubungi server Google. Muat ulang halaman.", "error");
-    })
-    .requestPasswordReset(no_wa);
+      // Aktifkan Cooldown 60 detik agar tidak spam klik ke sistem backend
+      cooldownResetPass = true;
+      setTimeout(() => {
+        cooldownResetPass = false;
+      }, 60000);
+    } else {
+      if (typeof showNotify === 'function') showNotify("Gagal Memproses", res ? res.message : "Gagal memproses", "error");
+    }
+  };
+
+  const handleFailure = function(err) {
+    if (btn) {
+      btn.innerHTML = originalBtnHtml;
+      btn.disabled = false;
+    }
+    const errMsg = err && err.message ? err.message : "Terjadi kesalahan saat menghubungi server. Muat ulang halaman.";
+    if (typeof showNotify === 'function') showNotify("Kesalahan Jaringan", errMsg, "error");
+  };
+
+  // ZETTBOT DUAL-ENGINE: Prioritaskan TranskepAPI (Headless PWA), fallback ke google.script.run (Iframe GAS)
+  if (typeof TranskepAPI !== 'undefined' && typeof TranskepAPI.call === 'function') {
+    TranskepAPI.call('requestPasswordReset', no_wa)
+      .then(handleSuccess)
+      .catch(handleFailure);
+  } else if (typeof google !== 'undefined' && google.script && google.script.run) {
+    google.script.run
+      .withSuccessHandler(handleSuccess)
+      .withFailureHandler(handleFailure)
+      .requestPasswordReset(no_wa);
+  } else {
+    handleFailure(new Error("Koneksi API TranskepAPI / google.script.run tidak tersedia."));
+  }
 }

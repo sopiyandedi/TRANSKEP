@@ -150,14 +150,22 @@ function getWahaConfig_() {
   return getGatewayConfig_();
 }
 
+function normalizePhone_(raw) {
+  if (!raw) return '';
+  let clean = String(raw).replace(/[^0-9]/g, '');
+  if (clean.startsWith('0')) {
+    clean = '62' + clean.substring(1);
+  } else if (clean.startsWith('8')) {
+    clean = '62' + clean;
+  }
+  return clean;
+}
+
 function sendWhatsAppMessage_(rawPhone, text, metaPayload) {
   try {
     if (!rawPhone) return { status: 'error', message: 'Nomor WhatsApp tidak boleh kosong.' };
     
-    let phone = String(rawPhone).replace(/[^0-9]/g, '');
-    if (phone.startsWith('0')) {
-      phone = '62' + phone.substring(1);
-    }
+    let phone = normalizePhone_(rawPhone);
     
     if (phone.length < 10) { // Minimal 10 digit (628...)
       return { status: 'error', message: 'Nomor WhatsApp tidak valid (minimal 10 digit).' };
@@ -486,9 +494,9 @@ function initResetPasswordSheet() {
 
 function requestPasswordReset(no_wa) {
   try {
-    let phone = String(no_wa).replace(/[^0-9]/g, '');
-    if (phone.startsWith('0')) {
-      phone = '62' + phone.substring(1);
+    let phone = normalizePhone_(no_wa);
+    if (!phone || phone.length < 9) {
+      return { status: 'error', message: 'Nomor WhatsApp tidak valid (minimal 9 digit).' };
     }
 
     const ss = getDB(); // Menggunakan koneksi database terpusat
@@ -500,12 +508,19 @@ function requestPasswordReset(no_wa) {
     let userFound = null;
     let userRowIndex = -1;
     for (let i = 1; i < userData.length; i++) {
-      let userPhoneRaw = String(userData[i][4] || '').replace(/[^0-9]/g, '');
-      if (userPhoneRaw.startsWith('0')) {
-         userPhoneRaw = '62' + userPhoneRaw.substring(1);
+      let userPhoneRaw = normalizePhone_(userData[i][4]);
+      
+      let isMatch = false;
+      if (userPhoneRaw === phone && phone.length > 8) {
+        isMatch = true;
+      } else if (phone.length >= 9 && userPhoneRaw.length >= 9) {
+        // Fallback kecocokan 9 digit terakhir (mengantisipasi variasi awalan 0 / 62 / 8)
+        if (phone.slice(-9) === userPhoneRaw.slice(-9)) {
+          isMatch = true;
+        }
       }
       
-      if (userPhoneRaw === phone && phone.length > 8) {
+      if (isMatch) {
         userFound = {
           nip: userData[i][0], nama: userData[i][1], no_wa: phone, pass: userData[i][5] 
         };
