@@ -1,0 +1,650 @@
+<!-- ============================================================== -->
+<!-- VIEW COMPONENT: sk/view_sk_builder.html                         -->
+<!-- MODAL STUDIO STEPPER: SMART SK BUILDER & ATTACHMENT ENGINE     -->
+<!-- ============================================================== -->
+<transition enter-active-class="transition-opacity duration-300" enter-from-class="opacity-0" enter-to-class="opacity-100" leave-active-class="transition-opacity duration-200" leave-from-class="opacity-100" leave-to-class="opacity-0">
+  <div v-if="showModalSkBuilder" class="fixed inset-0 bg-black/80 backdrop-blur-md z-[300] flex items-center justify-center p-2 sm:p-4">
+    <div class="w-full max-w-5xl glass border border-slate-800 p-5 sm:p-6 rounded-3xl shadow-2xl h-[94vh] flex flex-col transform transition-transform duration-300 scale-100">
+      
+      <!-- HEADER & STEPPER -->
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-800 shrink-0 gap-3">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-2xl bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 flex items-center justify-center shrink-0">
+            <i class="fa-solid fa-wand-magic-sparkles text-base"></i>
+          </div>
+          <div>
+            <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+              Smart SK Studio Builder
+              <span class="px-2 py-0.5 bg-indigo-500/20 text-indigo-300 text-[10px] font-bold rounded-full border border-indigo-500/30">Naskah Digital</span>
+            </h3>
+            <p class="text-[11px] text-slate-400">Rakit naskah kedinasan yuridis & lampiran otomatis standar pengadilan</p>
+          </div>
+        </div>
+
+        <!-- STEPPER TABS -->
+        <div class="flex items-center gap-1.5 bg-slate-950/70 p-1 rounded-2xl border border-slate-800/80">
+          <button type="button" @click="builderStep = 1" :class="builderStep === 1 ? 'sk-stepper-item active' : 'sk-stepper-item text-slate-400 hover:text-slate-200'">
+            <span class="sk-stepper-badge">1</span>
+            <span class="hidden md:inline">Naskah Utama</span>
+          </button>
+          <button type="button" @click="builderStep = 2" :class="builderStep === 2 ? 'sk-stepper-item active' : 'sk-stepper-item text-slate-400 hover:text-slate-200'">
+            <span class="sk-stepper-badge">2</span>
+            <span class="hidden md:inline">Lampiran (Tools)</span>
+            <span v-if="skBuilderDoc.lampiran.length > 0" class="text-[9px] bg-indigo-500/30 text-indigo-300 px-1.5 py-0.2 rounded-full">{{ skBuilderDoc.lampiran.length }}</span>
+          </button>
+          <button type="button" @click="builderStep = 3" :class="builderStep === 3 ? 'sk-stepper-item active' : 'sk-stepper-item text-slate-400 hover:text-slate-200'">
+            <span class="sk-stepper-badge">3</span>
+            <span class="hidden md:inline">Pratinjau & Simpan</span>
+          </button>
+        </div>
+
+        <button type="button" @click="closeSkBuilder" class="text-slate-400 hover:text-slate-100 p-2 hover:bg-slate-800/50 rounded-xl transition self-end sm:self-center">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <!-- BODY CONTENT -->
+      <div class="flex-1 overflow-y-auto py-4 space-y-6 text-xs pr-2 custom-scrollbar">
+
+        <!-- ======================================================== -->
+        <!-- STEP 1: NASKAH UTAMA YURIDIS                             -->
+        <!-- ======================================================== -->
+        <div v-show="builderStep === 1" class="space-y-5">
+          <!-- Data Pokok Dokumen -->
+          <div class="p-4 bg-slate-900/60 rounded-2xl border border-slate-800 space-y-4">
+            <h4 class="text-xs font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-2">
+              <i class="fa-solid fa-file-lines"></i> Informasi Pokok Dokumen SK
+            </h4>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-slate-400 font-semibold mb-1">Nomor Surat Keputusan</label>
+                <input type="text" v-model="skBuilderDoc.no_sk" placeholder="Contoh: W10-A11/123/OT.01.2/I/2026" class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+              </div>
+              <div>
+                <label class="block text-slate-400 font-semibold mb-1">Tanggal Ditetapkan</label>
+                <input type="date" v-model="skBuilderDoc.tgl_sk" class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 [color-scheme:dark]">
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-slate-400 font-semibold mb-1">Judul / Perihal Keputusan</label>
+              <input type="text" v-model="skBuilderDoc.judul_sk" placeholder="Contoh: TIM PENGELOLA WEBSITE DAN MEDIA SOSIAL TAHUN 2026" class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-bold uppercase tracking-wide">
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-slate-400 font-semibold mb-1">Penanggung Jawab (PJ Satker)</label>
+                <select v-model="skBuilderDoc.pj_sk" class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                  <option value="PJ. Manajemen">PJ. Manajemen</option>
+                  <option value="PJ. Kepaniteraan">PJ. Kepaniteraan</option>
+                  <option value="PJ. Kesekretariatan">PJ. Kesekretariatan</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-slate-400 font-semibold mb-1">Kop Satker</label>
+                <input type="text" v-model="skBuilderDoc.naskah_utama.kop" class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-semibold">
+              </div>
+            </div>
+          </div>
+
+          <!-- Konsiderans Menimbang -->
+          <div class="p-4 bg-slate-900/60 rounded-2xl border border-slate-800 space-y-3">
+            <div class="flex items-center justify-between">
+              <h4 class="text-xs font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-2">
+                <i class="fa-solid fa-scale-balanced"></i> Konsiderans (Menimbang)
+              </h4>
+              <button type="button" @click="addMenimbangItem" class="px-2.5 py-1 bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 font-bold rounded-lg transition text-[11px] flex items-center gap-1.5">
+                <i class="fa-solid fa-plus text-[10px]"></i> Tambah Butir
+              </button>
+            </div>
+
+            <div class="space-y-2.5">
+              <div v-for="(item, idx) in skBuilderDoc.naskah_utama.menimbang" :key="idx" class="flex items-start gap-2.5 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80">
+                <span class="w-6 h-6 rounded-lg bg-indigo-950/80 border border-indigo-500/30 text-indigo-300 font-mono font-bold flex items-center justify-center shrink-0 text-xs">
+                  {{ String.fromCharCode(97 + idx) }}.
+                </span>
+                <textarea v-model="skBuilderDoc.naskah_utama.menimbang[idx]" rows="2" placeholder="Ketik klausul pertimbangan..." class="flex-1 bg-transparent text-slate-200 border-0 focus:ring-0 text-xs resize-y focus:outline-none"></textarea>
+                <button type="button" @click="removeMenimbangItem(idx)" class="text-rose-400 hover:text-rose-300 p-1.5 hover:bg-rose-500/10 rounded-lg transition shrink-0" title="Hapus">
+                  <i class="fa-regular fa-trash-can"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Dasar Hukum Mengingat -->
+          <div class="p-4 bg-slate-900/60 rounded-2xl border border-slate-800 space-y-3">
+            <div class="flex items-center justify-between">
+              <h4 class="text-xs font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-2">
+                <i class="fa-solid fa-book-bookmark"></i> Dasar Hukum (Mengingat)
+              </h4>
+              <button type="button" @click="addMengingatItem" class="px-2.5 py-1 bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 font-bold rounded-lg transition text-[11px] flex items-center gap-1.5">
+                <i class="fa-solid fa-plus text-[10px]"></i> Tambah Dasar Hukum
+              </button>
+            </div>
+
+            <div class="space-y-2.5">
+              <div v-for="(item, idx) in skBuilderDoc.naskah_utama.mengingat" :key="idx" class="flex items-start gap-2.5 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80">
+                <span class="w-6 h-6 rounded-lg bg-slate-800 text-slate-300 font-mono font-bold flex items-center justify-center shrink-0 text-xs">
+                  {{ idx + 1 }}.
+                </span>
+                <textarea v-model="skBuilderDoc.naskah_utama.mengingat[idx]" rows="2" placeholder="Ketik dasar peraturan / perundang-undangan..." class="flex-1 bg-transparent text-slate-200 border-0 focus:ring-0 text-xs resize-y focus:outline-none"></textarea>
+                <button type="button" @click="removeMengingatItem(idx)" class="text-rose-400 hover:text-rose-300 p-1.5 hover:bg-rose-500/10 rounded-lg transition shrink-0" title="Hapus">
+                  <i class="fa-regular fa-trash-can"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Diktum Memutuskan -->
+          <div class="p-4 bg-slate-900/60 rounded-2xl border border-slate-800 space-y-3">
+            <div class="flex items-center justify-between">
+              <h4 class="text-xs font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-2">
+                <i class="fa-solid fa-gavel"></i> Diktum (MEMUTUSKAN)
+              </h4>
+              <button type="button" @click="addDiktumItem" class="px-2.5 py-1 bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 font-bold rounded-lg transition text-[11px] flex items-center gap-1.5">
+                <i class="fa-solid fa-plus text-[10px]"></i> Tambah Diktum
+              </button>
+            </div>
+
+            <div class="space-y-3">
+              <div v-for="(diktum, idx) in skBuilderDoc.naskah_utama.diktum" :key="idx" class="bg-slate-950/60 p-3 rounded-xl border border-slate-800/80 space-y-2">
+                <div class="flex items-center justify-between">
+                  <input type="text" v-model="diktum.label" class="w-32 px-2.5 py-1 bg-slate-900 border border-slate-800 rounded-lg text-xs font-bold text-indigo-300 uppercase">
+                  <button type="button" @click="removeDiktumItem(idx)" class="text-rose-400 hover:text-rose-300 p-1 hover:bg-rose-500/10 rounded-lg transition" title="Hapus Diktum">
+                    <i class="fa-regular fa-trash-can text-xs"></i>
+                  </button>
+                </div>
+                <textarea v-model="diktum.isi" rows="2" placeholder="Isi ketetapan diktum..." class="w-full bg-slate-900 border border-slate-800 rounded-xl p-2.5 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500"></textarea>
+              </div>
+            </div>
+          </div>
+
+          <!-- Pejabat Penandatangan -->
+          <div class="p-4 bg-slate-900/60 rounded-2xl border border-slate-800 space-y-3">
+            <h4 class="text-xs font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-2">
+              <i class="fa-solid fa-signature"></i> Penandatangan Dokumen
+            </h4>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div>
+                <label class="block text-slate-400 mb-1">Jabatan Penandatangan</label>
+                <input type="text" v-model="skBuilderDoc.naskah_utama.pejabat.jabatan" class="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-200">
+              </div>
+              <div>
+                <label class="block text-slate-400 mb-1">Nama Pejabat</label>
+                <input type="text" v-model="skBuilderDoc.naskah_utama.pejabat.nama" class="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 font-bold">
+              </div>
+              <div>
+                <label class="block text-slate-400 mb-1">NIP Pejabat</label>
+                <input type="text" v-model="skBuilderDoc.naskah_utama.pejabat.nip" class="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 font-mono">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ======================================================== -->
+        <!-- STEP 2: LAMPIRAN FLEKSIBEL DINAMIS (DYNAMIC TOOLS)      -->
+        <!-- ======================================================== -->
+        <div v-show="builderStep === 2" class="space-y-5">
+          <div class="flex items-center justify-between bg-slate-900/80 p-3.5 rounded-2xl border border-slate-800">
+            <div>
+              <h4 class="text-xs font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-2">
+                <i class="fa-solid fa-paperclip"></i> Daftar Lampiran Keputusan
+              </h4>
+              <p class="text-[11px] text-slate-400 mt-0.5">Setiap lampiran dapat berupa Tabel Personil, Uraian Tugas, atau Bagan Struktur</p>
+            </div>
+            <button type="button" @click="addLampiran" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-xs transition shadow-md flex items-center gap-1.5">
+              <i class="fa-solid fa-plus"></i> Tambah Lampiran Baru
+            </button>
+          </div>
+
+          <!-- Tab Bar Pilihan Lampiran -->
+          <div v-if="skBuilderDoc.lampiran.length > 0" class="flex gap-2 overflow-x-auto custom-scrollbar pb-1">
+            <button v-for="(lamp, lIdx) in skBuilderDoc.lampiran" :key="lamp.id" type="button" @click="activeLampiranIndex = lIdx" :class="activeLampiranIndex === lIdx ? 'px-3.5 py-2 bg-indigo-600 text-white font-bold rounded-xl shadow-md text-xs flex items-center gap-2 shrink-0' : 'px-3.5 py-2 bg-slate-900 text-slate-400 hover:text-slate-200 rounded-xl text-xs flex items-center gap-2 shrink-0 border border-slate-800'">
+              <i :class="lamp.tipe === 'tabel' ? 'fa-solid fa-table-list text-emerald-400' : (lamp.tipe === 'bagan_struktur' ? 'fa-solid fa-sitemap text-amber-400' : 'fa-solid fa-align-left text-sky-400')"></i>
+              <span>Lampiran {{ lIdx + 1 }}</span>
+            </button>
+          </div>
+
+          <!-- Empty State Lampiran -->
+          <div v-if="skBuilderDoc.lampiran.length === 0" class="p-8 text-center border border-dashed border-slate-800 rounded-2xl bg-slate-950/40 space-y-3">
+            <div class="w-12 h-12 rounded-2xl bg-slate-900 text-slate-500 flex items-center justify-center mx-auto text-xl">
+              <i class="fa-solid fa-folder-open"></i>
+            </div>
+            <div class="text-slate-300 font-bold text-xs">Belum Ada Lampiran yang Dibuat</div>
+            <p class="text-slate-500 text-[11px] max-w-md mx-auto">Klik tombol "Tambah Lampiran Baru" di atas untuk menambahkan tabel susunan tim, uraian wewenang tim, atau bagan hierarki organisasi.</p>
+          </div>
+
+          <!-- Active Lampiran Editor -->
+          <div v-else-if="currentLampiran" class="p-4 bg-slate-900/60 rounded-2xl border border-slate-800 space-y-4">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
+              <div class="flex-1">
+                <label class="block text-slate-400 mb-1 text-[11px]">Judul Lampiran</label>
+                <input type="text" v-model="currentLampiran.judul" class="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 font-bold uppercase text-xs">
+              </div>
+
+              <div class="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                <!-- Tool Selector -->
+                <div class="flex bg-slate-950 p-1 rounded-xl border border-slate-800">
+                  <button type="button" @click="currentLampiran.tipe = 'tabel'" :class="currentLampiran.tipe === 'tabel' ? 'px-2.5 py-1 bg-emerald-600 text-white font-bold rounded-lg text-[11px]' : 'px-2.5 py-1 text-slate-400 hover:text-slate-200 text-[11px]'">
+                    <i class="fa-solid fa-table-list mr-1"></i> Tabel
+                  </button>
+                  <button type="button" @click="currentLampiran.tipe = 'teks'" :class="currentLampiran.tipe === 'teks' ? 'px-2.5 py-1 bg-sky-600 text-white font-bold rounded-lg text-[11px]' : 'px-2.5 py-1 text-slate-400 hover:text-slate-200 text-[11px]'">
+                    <i class="fa-solid fa-align-left mr-1"></i> Teks
+                  </button>
+                  <button type="button" @click="currentLampiran.tipe = 'bagan_struktur'" :class="currentLampiran.tipe === 'bagan_struktur' ? 'px-2.5 py-1 bg-amber-600 text-white font-bold rounded-lg text-[11px]' : 'px-2.5 py-1 text-slate-400 hover:text-slate-200 text-[11px]'">
+                    <i class="fa-solid fa-sitemap mr-1"></i> Bagan
+                  </button>
+                </div>
+
+                <button type="button" @click="removeCurrentLampiran" class="p-2 text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 rounded-xl transition" title="Hapus Lampiran Ini">
+                  <i class="fa-regular fa-trash-can"></i>
+                </button>
+              </div>
+            </div>
+
+            <!-- TIPE A: TABEL PERSONIL -->
+            <div v-if="currentLampiran.tipe === 'tabel'" class="space-y-3">
+              <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-slate-950/70 p-3 rounded-xl border border-slate-800">
+                <div class="flex items-center gap-2">
+                  <span class="text-emerald-400 font-bold text-xs"><i class="fa-solid fa-users mr-1"></i> Susunan Personil Tim Kerja</span>
+                  <span class="text-[10px] px-2 py-0.5 bg-emerald-500/20 text-emerald-300 rounded-full font-bold">
+                    {{ (currentLampiran.data || []).length }} Anggota
+                  </span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <button type="button" @click="addLampiranTableRow" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg text-xs transition shadow flex items-center gap-1.5">
+                    <i class="fa-solid fa-user-plus text-[10px]"></i> Tambah Baris Personil
+                  </button>
+                </div>
+              </div>
+
+              <!-- Tabel Personil -->
+              <div class="overflow-x-auto border border-slate-800/80 rounded-xl">
+                <table class="w-full text-left border-collapse">
+                  <thead>
+                    <tr class="bg-slate-950 border-b border-slate-800 text-slate-400 text-[10px] uppercase tracking-wider">
+                      <th class="py-2.5 px-2 w-14 text-center">Urutan</th>
+                      <th class="py-2.5 px-3 w-1/4">Kedudukan Tim</th>
+                      <th class="py-2.5 px-3">Nama Pegawai & NIP</th>
+                      <th class="py-2.5 px-3 w-1/4">Jabatan Dinas</th>
+                      <th class="py-2.5 px-2 w-12 text-center">Hapus</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-slate-800/60 text-slate-200 text-xs bg-slate-900/40">
+                    <tr v-for="(row, rIdx) in currentLampiran.data" :key="rIdx" class="hover:bg-slate-800/30 transition-colors">
+                      <!-- Urutan / Reorder -->
+                      <td class="py-2 px-2 text-center">
+                        <div class="flex items-center justify-center gap-1">
+                          <button type="button" @click="moveLampiranRow(rIdx, -1)" :disabled="rIdx === 0" class="text-slate-400 hover:text-indigo-400 disabled:opacity-20 p-1" title="Geser Naik">
+                            <i class="fa-solid fa-chevron-up text-[10px]"></i>
+                          </button>
+                          <span class="text-slate-500 font-mono text-[11px] font-bold w-4">{{ rIdx + 1 }}</span>
+                          <button type="button" @click="moveLampiranRow(rIdx, 1)" :disabled="rIdx === currentLampiran.data.length - 1" class="text-slate-400 hover:text-indigo-400 disabled:opacity-20 p-1" title="Geser Turun">
+                            <i class="fa-solid fa-chevron-down text-[10px]"></i>
+                          </button>
+                        </div>
+                      </td>
+
+                      <!-- Kedudukan Tim & Quick Presets -->
+                      <td class="py-2 px-3 space-y-1.5">
+                        <input type="text" v-model="row.jabatan_tim" placeholder="Contoh: Pengarah / Anggota" class="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-xs text-indigo-300 font-bold focus:outline-none focus:ring-1 focus:ring-indigo-500">
+                        <!-- Quick Role Presets -->
+                        <div class="flex flex-wrap gap-1">
+                          <button type="button" @click="setRowRole(row, 'Pengarah')" class="text-[9px] px-1.5 py-0.5 bg-slate-800 hover:bg-indigo-600/30 hover:text-indigo-300 text-slate-400 rounded transition">Pengarah</button>
+                          <button type="button" @click="setRowRole(row, 'Ketua Tim')" class="text-[9px] px-1.5 py-0.5 bg-slate-800 hover:bg-indigo-600/30 hover:text-indigo-300 text-slate-400 rounded transition">Ketua</button>
+                          <button type="button" @click="setRowRole(row, 'Sekretaris')" class="text-[9px] px-1.5 py-0.5 bg-slate-800 hover:bg-indigo-600/30 hover:text-indigo-300 text-slate-400 rounded transition">Sekretaris</button>
+                          <button type="button" @click="setRowRole(row, 'Koordinator')" class="text-[9px] px-1.5 py-0.5 bg-slate-800 hover:bg-indigo-600/30 hover:text-indigo-300 text-slate-400 rounded transition">Koordinator</button>
+                          <button type="button" @click="setRowRole(row, 'Anggota')" class="text-[9px] px-1.5 py-0.5 bg-slate-800 hover:bg-indigo-600/30 hover:text-indigo-300 text-slate-400 rounded transition">Anggota</button>
+                        </div>
+                      </td>
+
+                      <!-- Nama Pegawai & NIP Autocomplete -->
+                      <td class="py-2 px-3 space-y-1">
+                        <input type="text" v-model="row.nama" list="builderPegawaiList" @change="onPegawaiSelected(row)" placeholder="Ketik / pilih nama pegawai..." class="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-xs font-semibold text-slate-100 focus:outline-none focus:ring-1 focus:ring-indigo-500">
+                        <div v-if="row.nip" class="text-[10px] text-slate-400 font-mono flex items-center gap-1">
+                          <i class="fa-solid fa-id-badge text-[9px] text-indigo-400"></i> NIP. {{ row.nip }}
+                        </div>
+                      </td>
+
+                      <!-- Jabatan Dinas -->
+                      <td class="py-2 px-3">
+                        <input type="text" v-model="row.jabatan_dinas" placeholder="Jabatan Dinas" class="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-xs text-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-500">
+                      </td>
+
+                      <!-- Tombol Hapus Baris -->
+                      <td class="py-2 px-2 text-center">
+                        <button type="button" @click="currentLampiran.data.splice(rIdx, 1)" class="text-rose-400 hover:text-rose-300 p-1.5 hover:bg-rose-500/10 rounded-lg transition" title="Hapus Baris">
+                          <i class="fa-regular fa-trash-can text-xs"></i>
+                        </button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- TIPE B: TEKS / ARTIKEL URAIAN TUGAS -->
+            <div v-else-if="currentLampiran.tipe === 'teks'" class="space-y-3">
+              <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-slate-950/70 p-3 rounded-xl border border-slate-800">
+                <div>
+                  <span class="text-sky-400 font-bold text-xs"><i class="fa-solid fa-pen-nib mr-1"></i> Editor Uraian Tugas & Wewenang Tim</span>
+                  <p class="text-[10px] text-slate-400">Gunakan format bernomor atau butir abjad untuk rincian tugas kedinasan</p>
+                </div>
+                <!-- Quick Toolbar -->
+                <div class="flex items-center gap-1.5 flex-wrap">
+                  <button type="button" @click="insertTextBullet('number')" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-mono text-[11px] rounded-lg transition" title="Sisipkan Nomor">
+                    1. Nomor
+                  </button>
+                  <button type="button" @click="insertTextBullet('alpha')" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-mono text-[11px] rounded-lg transition" title="Sisipkan Abjad">
+                    a. Abjad
+                  </button>
+                  <button type="button" @click="insertTextBullet('bullet')" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-mono text-[11px] rounded-lg transition" title="Sisipkan Butir">
+                    • Butir
+                  </button>
+                  <button type="button" @click="insertJobdescTemplate" class="px-2.5 py-1 bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 font-bold text-[11px] rounded-lg transition flex items-center gap-1" title="Template Jobdesc Standar">
+                    <i class="fa-regular fa-clipboard"></i> Template Standar
+                  </button>
+                </div>
+              </div>
+
+              <textarea v-model="currentLampiran.data" rows="10" placeholder="Tuliskan uraian tugas, SOP tim, pedoman kerja, atau ketentuan lain..." class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3.5 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-sky-500 leading-relaxed font-sans resize-y"></textarea>
+            </div>
+
+            <!-- TIPE C: BAGAN STRUKTUR HIERARKI (SMART BOX TREE) -->
+            <div v-else-if="currentLampiran.tipe === 'bagan_struktur'" class="space-y-4">
+              <div class="flex items-center justify-between bg-slate-950/70 p-3 rounded-xl border border-slate-800">
+                <div>
+                  <span class="text-amber-400 font-bold text-xs"><i class="fa-solid fa-sitemap mr-1"></i> Konfigurasi Box Tree Hierarki</span>
+                  <p class="text-[10px] text-slate-400">Bagan 4 tingkatan organisasi otomatis terhubung rapi dan ramah cetak</p>
+                </div>
+                <div class="flex items-center gap-2">
+                  <button type="button" @click="addTreeNode('level_3', 'Koordinator')" class="px-2.5 py-1 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 font-bold rounded-lg text-[10px] transition">
+                    + Kotak Level 3
+                  </button>
+                  <button type="button" @click="addTreeNode('level_4', 'Anggota Tim')" class="px-2.5 py-1 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 font-bold rounded-lg text-[10px] transition">
+                    + Kotak Level 4
+                  </button>
+                </div>
+              </div>
+
+              <!-- Interactive Box Tree Studio -->
+              <div class="p-4 bg-slate-950/90 rounded-2xl border border-slate-800/80 overflow-x-auto custom-scrollbar">
+                <div class="sk-tree-container min-w-[650px] py-4">
+                  <!-- Level 1: Pembina / Pengarah -->
+                  <div class="sk-tree-level">
+                    <div class="sk-tree-node shadow-lg">
+                      <input type="text" v-model="currentLampiran.data.level_1[0].role" placeholder="Role (Pembina/Pengarah)" class="w-full bg-transparent border-0 text-center font-bold text-[10px] text-indigo-400 p-0 focus:ring-0 uppercase tracking-wide">
+                      <input type="text" v-model="currentLampiran.data.level_1[0].nama" list="builderPegawaiList" @change="onTreeNodeSelected(currentLampiran.data.level_1[0])" placeholder="Nama Pejabat" class="w-full bg-transparent border-0 text-center font-bold text-xs text-white p-0 focus:ring-0 mt-1">
+                    </div>
+                  </div>
+                  <div class="sk-tree-connector"></div>
+
+                  <!-- Level 2: Ketua Tim -->
+                  <div class="sk-tree-level">
+                    <div class="sk-tree-node shadow-lg">
+                      <input type="text" v-model="currentLampiran.data.level_2[0].role" placeholder="Role (Ketua Tim)" class="w-full bg-transparent border-0 text-center font-bold text-[10px] text-indigo-400 p-0 focus:ring-0 uppercase tracking-wide">
+                      <input type="text" v-model="currentLampiran.data.level_2[0].nama" list="builderPegawaiList" @change="onTreeNodeSelected(currentLampiran.data.level_2[0])" placeholder="Nama Pejabat" class="w-full bg-transparent border-0 text-center font-bold text-xs text-white p-0 focus:ring-0 mt-1">
+                    </div>
+                  </div>
+                  <div class="sk-tree-connector"></div>
+
+                  <!-- Level 3: Sekretaris / Koordinator -->
+                  <div class="space-y-1">
+                    <div class="text-center text-[10px] text-slate-500 font-semibold uppercase tracking-wider mb-1">
+                      Tingkat 3: Sekretaris / Koordinator Tim
+                    </div>
+                    <div class="sk-tree-level">
+                      <div v-for="(node, nIdx) in currentLampiran.data.level_3" :key="'l3-' + nIdx" class="sk-tree-node relative group shadow-md">
+                        <button v-if="currentLampiran.data.level_3.length > 1" type="button" @click="removeTreeNode('level_3', nIdx)" class="absolute -top-2 -right-2 w-5 h-5 bg-rose-600 text-white rounded-full flex items-center justify-center text-[10px] opacity-0 group-hover:opacity-100 transition shadow" title="Hapus Kotak">
+                          <i class="fa-solid fa-xmark"></i>
+                        </button>
+                        <input type="text" v-model="node.role" placeholder="Role Level 3" class="w-full bg-transparent border-0 text-center font-bold text-[10px] text-indigo-400 p-0 focus:ring-0">
+                        <input type="text" v-model="node.nama" list="builderPegawaiList" @change="onTreeNodeSelected(node)" placeholder="Nama Pegawai" class="w-full bg-transparent border-0 text-center font-semibold text-xs text-slate-100 p-0 focus:ring-0 mt-1">
+                      </div>
+                    </div>
+                  </div>
+                  <div class="sk-tree-connector"></div>
+
+                  <!-- Level 4: Anggota Pelaksana -->
+                  <div class="space-y-1">
+                    <div class="text-center text-[10px] text-slate-500 font-semibold uppercase tracking-wider mb-1">
+                      Tingkat 4: Anggota / Tim Pelaksana
+                    </div>
+                    <div class="sk-tree-level">
+                      <div v-for="(node, nIdx) in currentLampiran.data.level_4" :key="'l4-' + nIdx" class="sk-tree-node relative group shadow-md">
+                        <button v-if="currentLampiran.data.level_4.length > 1" type="button" @click="removeTreeNode('level_4', nIdx)" class="absolute -top-2 -right-2 w-5 h-5 bg-rose-600 text-white rounded-full flex items-center justify-center text-[10px] opacity-0 group-hover:opacity-100 transition shadow" title="Hapus Kotak">
+                          <i class="fa-solid fa-xmark"></i>
+                        </button>
+                        <input type="text" v-model="node.role" placeholder="Role Level 4" class="w-full bg-transparent border-0 text-center font-bold text-[10px] text-indigo-400 p-0 focus:ring-0">
+                        <input type="text" v-model="node.nama" list="builderPegawaiList" @change="onTreeNodeSelected(node)" placeholder="Nama Pegawai" class="w-full bg-transparent border-0 text-center font-semibold text-xs text-slate-100 p-0 focus:ring-0 mt-1">
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ======================================================== -->
+        <!-- STEP 3: PRATINJAU NASKAH & SIMPAN                        -->
+        <!-- ======================================================== -->
+        <div v-show="builderStep === 3" class="space-y-5">
+          <div class="p-4 bg-slate-900/60 rounded-2xl border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h4 class="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                <i class="fa-solid fa-eye text-indigo-400"></i> Pratinjau Naskah Keputusan
+              </h4>
+              <p class="text-[11px] text-slate-400 mt-0.5">Periksa format naskah yuridis & cetak naskah standar A4 pengadilan</p>
+            </div>
+            <div class="flex items-center gap-2">
+              <button type="button" @click="printSkDocument" class="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-xl transition text-xs flex items-center gap-2 border border-slate-700 shadow">
+                <i class="fa-solid fa-print text-indigo-400"></i>
+                <span>Cetak / Unduh PDF</span>
+              </button>
+              <button type="button" @click="saveSkFromBuilder" :disabled="isSavingBuilder" class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl shadow-lg shadow-indigo-600/30 transition text-xs flex items-center gap-2 disabled:opacity-50">
+                <i v-if="isSavingBuilder" class="fa-solid fa-circle-notch fa-spin"></i>
+                <i v-else class="fa-solid fa-floppy-disk"></i>
+                <span>{{ isSavingBuilder ? 'Menyimpan...' : 'Simpan ke Firestore' }}</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Kertas Naskah Dinas Resmi (Preview) -->
+          <div class="sk-legal-naskah shadow-2xl border border-slate-300 max-w-3xl mx-auto space-y-4 text-xs">
+            <div class="text-center space-y-1 border-b-2 border-black pb-3">
+              <div class="font-bold tracking-wider text-sm">{{ skBuilderDoc.naskah_utama.kop }}</div>
+              <div class="font-serif italic text-[11px]">Jalan Jenderal Sudirman No. 123 Indramayu</div>
+            </div>
+
+            <div class="text-center pt-2 space-y-1">
+              <div class="font-bold underline text-sm tracking-wide">KEPUTUSAN KETUA PENGADILAN AGAMA INDRAMAYU</div>
+              <div class="font-mono text-xs font-semibold">NOMOR : {{ skBuilderDoc.no_sk || '[NOMOR BELUM DIISI]' }}</div>
+              <div class="pt-2 font-bold uppercase text-xs tracking-wider">TENTANG</div>
+              <div class="font-bold uppercase text-xs tracking-wide max-w-lg mx-auto">{{ skBuilderDoc.judul_sk || '[JUDUL KEPUTUSAN]' }}</div>
+            </div>
+
+            <div class="space-y-2 pt-2">
+              <div class="flex gap-4">
+                <div class="w-24 font-bold shrink-0">Menimbang</div>
+                <div class="flex-1 space-y-1">
+                  <div v-for="(m, idx) in skBuilderDoc.naskah_utama.menimbang" :key="idx" class="flex gap-2">
+                    <span class="font-bold shrink-0">{{ String.fromCharCode(97 + idx) }}.</span>
+                    <span>{{ m }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="flex gap-4">
+                <div class="w-24 font-bold shrink-0">Mengingat</div>
+                <div class="flex-1 space-y-1">
+                  <div v-for="(mg, idx) in skBuilderDoc.naskah_utama.mengingat" :key="idx" class="flex gap-2">
+                    <span class="font-bold shrink-0">{{ idx + 1 }}.</span>
+                    <span>{{ mg }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="text-center font-bold tracking-widest pt-3 pb-1">MEMUTUSKAN :</div>
+
+              <div class="flex gap-4">
+                <div class="w-24 font-bold shrink-0">Menetapkan</div>
+                <div class="flex-1 font-bold uppercase">{{ skBuilderDoc.judul_sk }}</div>
+              </div>
+
+              <div v-for="(d, idx) in skBuilderDoc.naskah_utama.diktum" :key="idx" class="flex gap-4">
+                <div class="w-24 font-bold shrink-0">{{ d.label }}</div>
+                <div class="flex-1">{{ d.isi }}</div>
+              </div>
+            </div>
+
+            <div class="pt-6 flex justify-end">
+              <div class="text-center w-64 space-y-1">
+                <div>Ditetapkan di Indramayu</div>
+                <div>Pada tanggal {{ skBuilderDoc.tgl_sk || '....................' }}</div>
+                <div class="font-bold pt-1">{{ skBuilderDoc.naskah_utama.pejabat.jabatan }}</div>
+                <div class="h-16 flex items-center justify-center font-serif italic text-slate-400 text-[10px]">[Tanda Tangan & Cap Dinas]</div>
+                <div class="font-bold underline">{{ skBuilderDoc.naskah_utama.pejabat.nama }}</div>
+                <div class="font-mono text-[10px]">NIP. {{ skBuilderDoc.naskah_utama.pejabat.nip }}</div>
+              </div>
+            </div>
+
+            <!-- ==================================================== -->
+            <!-- PREVIEW DYNAMIC LAMPIRAN (PAGE BREAK & JUDICIAL FORMAT) -->
+            <!-- ==================================================== -->
+            <div v-for="(lamp, lIdx) in skBuilderDoc.lampiran" :key="lamp.id || lIdx" class="border-t-2 border-dashed border-slate-400 my-8 pt-8 space-y-4">
+              <!-- Judul Lampiran Sesuai Kaidah Yudisial Mahkamah Agung -->
+              <div class="flex justify-end text-[11px] font-sans">
+                <div class="w-80 space-y-0.5 text-left">
+                  <div class="font-bold">LAMPIRAN {{ toRoman(lIdx + 1) }}</div>
+                  <div class="font-bold">KEPUTUSAN KETUA PENGADILAN AGAMA INDRAMAYU</div>
+                  <div class="flex"><span class="w-20 shrink-0">NOMOR</span><span>: {{ skBuilderDoc.no_sk || '....................' }}</span></div>
+                  <div class="flex"><span class="w-20 shrink-0">TANGGAL</span><span>: {{ skBuilderDoc.tgl_sk || '....................' }}</span></div>
+                  <div class="flex"><span class="w-20 shrink-0">TENTANG</span><span class="font-bold uppercase">: {{ skBuilderDoc.judul_sk }}</span></div>
+                </div>
+              </div>
+
+              <div class="text-center font-bold underline uppercase text-xs pt-3 tracking-wide">
+                {{ lamp.judul }}
+              </div>
+
+              <!-- RENDER LAMPIRAN: TABEL -->
+              <div v-if="lamp.tipe === 'tabel'" class="pt-2">
+                <table class="sk-legal-table w-full text-xs">
+                  <thead>
+                    <tr>
+                      <th class="w-10 text-center">NO</th>
+                      <th class="w-1/4">KEDUDUKAN DALAM TIM</th>
+                      <th>NAMA / NIP</th>
+                      <th class="w-1/4">JABATAN DINAS</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="(r, rIdx) in lamp.data" :key="rIdx">
+                      <td class="text-center">{{ rIdx + 1 }}</td>
+                      <td class="font-bold">{{ r.jabatan_tim }}</td>
+                      <td>
+                        <div class="font-bold">{{ r.nama }}</div>
+                        <div v-if="r.nip" class="text-[10px] text-slate-600 font-mono">NIP. {{ r.nip }}</div>
+                      </td>
+                      <td>{{ r.jabatan_dinas || '-' }}</td>
+                    </tr>
+                    <tr v-if="!lamp.data || lamp.data.length === 0">
+                      <td colspan="4" class="text-center italic text-slate-400 py-3">Belum ada anggota tim terdaftar.</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <!-- RENDER LAMPIRAN: TEKS -->
+              <div v-else-if="lamp.tipe === 'teks'" class="pt-2 leading-relaxed whitespace-pre-line text-xs font-sans text-justify px-2">
+                {{ lamp.data || 'Belum ada uraian tugas tertulis.' }}
+              </div>
+
+              <!-- RENDER LAMPIRAN: BAGAN STRUKTUR (BOX TREE) -->
+              <div v-else-if="lamp.tipe === 'bagan_struktur'" class="pt-3 overflow-x-auto">
+                <div class="sk-legal-tree py-2">
+                  <!-- Level 1 -->
+                  <div class="sk-tree-level">
+                    <div class="sk-tree-node">
+                      <div class="sk-tree-role">{{ (lamp.data.level_1 && lamp.data.level_1[0] && lamp.data.level_1[0].role) || 'Pembina / Pengarah' }}</div>
+                      <div class="sk-tree-name">{{ (lamp.data.level_1 && lamp.data.level_1[0] && lamp.data.level_1[0].nama) || 'Ketua PA Indramayu' }}</div>
+                    </div>
+                  </div>
+                  <div class="sk-tree-connector"></div>
+
+                  <!-- Level 2 -->
+                  <div class="sk-tree-level">
+                    <div class="sk-tree-node">
+                      <div class="sk-tree-role">{{ (lamp.data.level_2 && lamp.data.level_2[0] && lamp.data.level_2[0].role) || 'Ketua Tim' }}</div>
+                      <div class="sk-tree-name">{{ (lamp.data.level_2 && lamp.data.level_2[0] && lamp.data.level_2[0].nama) || 'Wakil Ketua / Sekretaris' }}</div>
+                    </div>
+                  </div>
+                  <div class="sk-tree-connector"></div>
+
+                  <!-- Level 3 -->
+                  <div class="sk-tree-level">
+                    <div v-for="(node, nIdx) in (lamp.data.level_3 || [])" :key="'p-l3-' + nIdx" class="sk-tree-node">
+                      <div class="sk-tree-role">{{ node.role || 'Koordinator' }}</div>
+                      <div class="sk-tree-name">{{ node.nama || '-' }}</div>
+                    </div>
+                  </div>
+                  <div class="sk-tree-connector"></div>
+
+                  <!-- Level 4 -->
+                  <div class="sk-tree-level">
+                    <div v-for="(node, nIdx) in (lamp.data.level_4 || [])" :key="'p-l4-' + nIdx" class="sk-tree-node">
+                      <div class="sk-tree-role">{{ node.role || 'Anggota Tim' }}</div>
+                      <div class="sk-tree-name">{{ node.nama || '-' }}</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Pejabat TTD Lampiran -->
+              <div class="pt-6 flex justify-end">
+                <div class="text-center w-64 space-y-1">
+                  <div class="font-bold">{{ skBuilderDoc.naskah_utama.pejabat.jabatan }}</div>
+                  <div class="h-14 flex items-center justify-center font-serif italic text-slate-400 text-[10px]">[Tanda Tangan & Cap Dinas]</div>
+                  <div class="font-bold underline">{{ skBuilderDoc.naskah_utama.pejabat.nama }}</div>
+                  <div class="font-mono text-[10px]">NIP. {{ skBuilderDoc.naskah_utama.pejabat.nip }}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- FOOTER BUTTONS -->
+      <div class="flex items-center justify-between pt-4 border-t border-slate-800 shrink-0">
+        <button type="button" v-if="builderStep > 1" @click="builderStep--" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl text-xs transition flex items-center gap-1.5">
+          <i class="fa-solid fa-arrow-left"></i> Kembali
+        </button>
+        <div v-else></div>
+
+        <div class="flex items-center gap-2">
+          <button type="button" @click="closeSkBuilder" class="px-4 py-2 text-slate-400 hover:text-slate-200 text-xs font-semibold">
+            Batal
+          </button>
+          <button type="button" v-if="builderStep < 3" @click="builderStep++" class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-xs transition flex items-center gap-1.5 shadow-md">
+            <span>Lanjut</span> <i class="fa-solid fa-arrow-right"></i>
+          </button>
+          <button type="button" v-else @click="saveSkFromBuilder" :disabled="isSavingBuilder" class="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs transition flex items-center gap-2 shadow-lg shadow-emerald-600/20 disabled:opacity-50">
+            <i v-if="isSavingBuilder" class="fa-solid fa-circle-notch fa-spin"></i>
+            <i v-else class="fa-solid fa-check"></i>
+            <span>{{ isSavingBuilder ? 'Menyimpan...' : 'Simpan & Publikasikan' }}</span>
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</transition>
+
+<!-- Datalist Pegawai untuk Autocomplete Form Builder -->
+<datalist id="builderPegawaiList">
+  <option v-for="u in globalState.usersList" :key="u.nip" :value="u.nama + ' (' + u.nip + ')'">{{ u.jabatan }}</option>
+</datalist>

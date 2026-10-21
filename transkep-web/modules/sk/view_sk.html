@@ -28,6 +28,9 @@
             <i v-else class="fa-brands fa-google-drive"></i>
             <span>Folder Drive</span>
           </button>
+          <button v-if="isAdminOrOperator && currentSkTab !== 'Pegawai'" @click="openSkBuilder()" class="w-full sm:w-auto px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold rounded-xl shadow-lg shadow-indigo-600/30 transition flex items-center justify-center gap-2 text-xs uppercase tracking-wider" title="Buka Studio Perancangan Dokumen Naskah SK">
+            <i class="fa-solid fa-wand-magic-sparkles"></i> Studio SK
+          </button>
           <button v-if="isAdminOrOperator && currentSkTab !== 'Pegawai'" @click="openSkFormModal('add')" class="w-full sm:w-auto px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl shadow-lg shadow-indigo-600/20 transition flex items-center justify-center gap-2 text-xs uppercase tracking-wider">
             <i class="fa-solid fa-square-plus"></i> Daftarkan SK Baru
           </button>
@@ -71,10 +74,14 @@
                 <tr class="border-b border-slate-900 hover:bg-slate-900/10 transition group">
                   <td class="p-4 text-center font-mono text-slate-500">{{ index + 1 }}</td>
                   <td class="p-4 max-w-[220px]">
-                    <div class="flex items-center gap-1.5">
+                    <div class="flex items-center gap-1.5 flex-wrap">
                       <div class="font-bold text-slate-200 truncate" :title="sk.judul_sk">{{ sk.judul_sk }}</div>
+                      <span v-if="sk.versi_aktif > 1" class="text-[9px] px-1.5 py-0.2 bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 rounded font-bold shrink-0">v{{ sk.versi_aktif }}</span>
                     </div>
-                    <div class="text-slate-500 text-[10px] mt-1"><i class="fa-solid fa-users mr-1"></i> {{ sk.members.length }} Anggota Tim</div>
+                    <div class="text-slate-500 text-[10px] mt-1 flex items-center gap-2">
+                      <span><i class="fa-solid fa-users mr-1"></i> {{ (sk.members || []).length }} Anggota</span>
+                      <span v-if="sk.lampiran && sk.lampiran.length > 0" class="text-emerald-400 font-medium"><i class="fa-solid fa-paperclip mr-0.5"></i> {{ sk.lampiran.length }} Lampiran</span>
+                    </div>
                   </td>
                   <td class="p-4"><span class="inline-flex px-2.5 py-1 rounded-md text-[10px] font-bold border tracking-wider" :class="getPjColorClass(sk.pj_sk)">{{ sk.pj_sk }}</span></td>
                   <td class="p-4 text-slate-300 font-mono text-xs truncate max-w-[150px]" :title="sk.no_sk">{{ sk.no_sk }}</td>
@@ -90,8 +97,10 @@
                         <i class="fa-solid fa-chevron-down text-[10px] transition-transform duration-300" :class="{'rotate-180': expandedSkRows.includes(sk.id)}"></i>
                     </button>
                     <template v-if="isAdminOrOperator">
+                        <button @click="openSkBuilder(sk)" class="text-indigo-400 hover:text-indigo-300 p-1.5 hover:bg-indigo-500/10 rounded-lg transition" title="Buka di Smart SK Studio Builder"><i class="fa-solid fa-wand-magic-sparkles"></i></button>
                         <button @click="openWaModal(sk.id)" class="text-emerald-500 hover:text-emerald-400 p-1.5 hover:bg-emerald-500/10 rounded-lg transition" title="Daftar WA per SK"><i class="fa-brands fa-whatsapp"></i></button>
-                        <button @click="openSkFormModal('edit', sk.id)" class="text-amber-500 hover:text-amber-400 p-1.5 hover:bg-amber-500/10 rounded-lg transition" title="Ubah SK"><i class="fa-solid fa-pen-to-square"></i></button>
+                        <button @click="openRevisiModal(sk)" class="text-cyan-400 hover:text-cyan-300 p-1.5 hover:bg-cyan-500/10 rounded-lg transition" title="Revisi SK (Amandemen)"><i class="fa-solid fa-code-branch"></i></button>
+                        <button @click="openSkFormModal('edit', sk.id)" class="text-amber-500 hover:text-amber-400 p-1.5 hover:bg-amber-500/10 rounded-lg transition" title="Ubah SK (Form Singkat)"><i class="fa-solid fa-pen-to-square"></i></button>
                         <button @click="deleteSkRecord(sk.id)" class="text-rose-500 hover:text-rose-400 p-1.5 hover:bg-rose-500/10 rounded-lg transition" title="Hapus SK"><i class="fa-regular fa-trash-can"></i></button>
                     </template>
                   </td>
@@ -266,6 +275,23 @@
                 </div>
 
               </div>
+
+              <!-- ZETTBOT: JEMBATAN KE SMART SK BUILDER -->
+              <div v-if="modalSkMode === 'add'" class="p-3 bg-gradient-to-r from-indigo-950/70 via-purple-950/40 to-slate-900 border border-indigo-500/30 rounded-2xl flex items-center justify-between gap-3 shadow-md">
+                <div class="flex items-center gap-2.5">
+                  <div class="w-8 h-8 rounded-xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 flex items-center justify-center shrink-0">
+                    <i class="fa-solid fa-wand-magic-sparkles text-xs"></i>
+                  </div>
+                  <div>
+                    <div class="font-bold text-slate-200 text-xs">Belum ada file PDF fisik?</div>
+                    <div class="text-[10px] text-slate-400">Rakit naskah yuridis & lampiran otomatis via Smart SK Studio</div>
+                  </div>
+                </div>
+                <button type="button" @click="openSkBuilderFromInput" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-[11px] shadow-lg shadow-indigo-600/30 transition shrink-0 flex items-center gap-1.5">
+                  <span>Buka Studio</span>
+                  <i class="fa-solid fa-arrow-right text-[10px]"></i>
+                </button>
+              </div>
   
               <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -394,5 +420,9 @@
         </div>
       </transition>
   
+      <!-- ZETTBOT: MODULAR BUILDER & REVISI SLOTS -->
+      <div id="slot-sk-builder"></div>
+      <div id="slot-sk-revisi"></div>
+
   </div>
 </div>

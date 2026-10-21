@@ -50,6 +50,7 @@
   <link rel="stylesheet" href="css/mobile.css">
   <link rel="stylesheet" href="css/animations.css">
   <link rel="stylesheet" href="css/custom.css">
+  <link rel="stylesheet" href="css/sk_builder.css">
 
   <!-- ZETTBOT: Pelindung Anti-FOUC & Anti-Bocor Modal Vue -->
   <style>
@@ -64,7 +65,7 @@
   <!-- ZETTBOT: Auto-Bust PWA Cache & Stale Service Worker Guard -->
   <script>
     (async function() {
-      const CURRENT_APP_BUILD = 'transkep-v2.9.5';
+      const CURRENT_APP_BUILD = 'transkep-v3.0.0';
       if (localStorage.getItem('transkep_active_build') !== CURRENT_APP_BUILD) {
         localStorage.setItem('transkep_active_build', CURRENT_APP_BUILD);
         try {
@@ -163,6 +164,8 @@
         { slot: 'slot-pkp', file: 'modules/pkp/view_pkp.html' },
         { slot: 'slot-jobdes', file: 'modules/jobdes/view_jobdes.html' },
         { slot: 'slot-sk', file: 'modules/sk/view_sk.html' },
+        { slot: 'slot-sk-builder', file: 'modules/sk/view_sk_builder.html' },
+        { slot: 'slot-sk-revisi', file: 'modules/sk/view_sk_revisi.html' },
         { slot: 'slot-sop', file: 'modules/sop/view_sop.html' },
         { slot: 'slot-kinerja', file: 'modules/kinerja/view_kinerja.html' },
         { slot: 'slot-eoffice', file: 'modules/eoffice/view_eoffice.html' },
@@ -219,6 +222,7 @@
         'modules/jobdes/jobdes_data.js',
         'modules/jobdes/jobdes.js',
         'modules/sk/sk_data.js',
+        'modules/sk/sk_builder.js',
         'modules/sk/sk.js',
         'modules/sop/sop_data.js',
         'modules/sop/sop.js',

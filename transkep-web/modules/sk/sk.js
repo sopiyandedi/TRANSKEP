@@ -112,6 +112,7 @@
 
 document.addEventListener("DOMContentLoaded", () => {
     window.vmSkApp = Vue.createApp({
+        mixins: [window.SkBuilderMixin || {}],
         data() {
             return {
                 globalState: window.vueState,
@@ -200,6 +201,8 @@ document.addEventListener("DOMContentLoaded", () => {
                         versi_aktif: fSk.versi_aktif || 1,
                         members: Array.isArray(fSk.members) ? fSk.members : [],
                         revisi_history: Array.isArray(fSk.revisi_history) ? fSk.revisi_history : [],
+                        naskah_utama: fSk.naskah_utama || null,
+                        lampiran: Array.isArray(fSk.lampiran) ? fSk.lampiran : [],
                         is_firebase: true
                     };
                 });
@@ -484,11 +487,39 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
                 
                 try {
-                    const res = await window.SkDataService.saveSk(payload, this.globalState.user.nip, token);
+                    let res = null;
+                    if (typeof TranskepFirebase !== 'undefined' && TranskepFirebase.isReady()) {
+                        const firestorePayload = {
+                            id: payload.id || ('SK-' + Date.now()),
+                            no_sk: payload.no_sk,
+                            judul_sk: payload.judul_sk,
+                            pj_sk: payload.pj_sk,
+                            tgl_sk: payload.tgl_sk,
+                            tgl_input: payload.tgl_input || new Date().toISOString().split('T')[0],
+                            link_drive: payload.link_drive || '',
+                            status: "Aktif",
+                            versi_aktif: 1,
+                            members: this.tempMembers || [],
+                            revisi_history: [{
+                                versi: 1,
+                                tgl_revisi: payload.tgl_sk || new Date().toISOString().split('T')[0],
+                                catatan: "Pendaftaran SK Baru via Form Input",
+                                oleh: (this.globalState.user ? this.globalState.user.nama : "Admin")
+                            }]
+                        };
+                        await TranskepFirebase.saveSkToFirestore(firestorePayload);
+                    }
+
+                    if (typeof google !== 'undefined' && google.script && google.script.run) {
+                        res = await window.SkDataService.saveSk(payload, this.globalState.user.nip, token);
+                    } else {
+                        res = { status: 'success', message: 'Data SK berhasil disimpan ke Cloud Firestore.' };
+                    }
+
                     this.isUploading = false;
                     if (res && res.status === 'success') {
                         this.showModalSkForm = false;
-                        if(window.showNotify) window.showNotify("SK Tersimpan", res.message, "success");
+                        if(window.showNotify) window.showNotify("SK Tersimpan 🔥", res.message, "success");
                         if(typeof syncAllServerData === 'function') syncAllServerData(); 
                     } else {
                         if(window.showNotify) window.showNotify("Gagal Simpan", res ? res.message : "Gagal menyimpan data", "error");
@@ -504,7 +535,19 @@ document.addEventListener("DOMContentLoaded", () => {
                     window.showCustomConfirm("Hapus Surat Keputusan", "Anda yakin ingin menghapus seluruh catatan keikutsertaan penugasan pada SK ini?", async () => {
                         if(window.showLoading) window.showLoading("Menghapus berkas SK...");
                         try {
-                            const res = await window.SkDataService.deleteSk(id, this.globalState.user.nip, token);
+                            if (typeof TranskepFirebase !== 'undefined' && TranskepFirebase.isReady()) {
+                                try {
+                                    await TranskepFirebase.deleteSkFromFirestore(id);
+                                } catch (e) {
+                                    console.warn("Firestore delete warning:", e);
+                                }
+                            }
+                            let res = null;
+                            if (typeof google !== 'undefined' && google.script && google.script.run) {
+                                res = await window.SkDataService.deleteSk(id, this.globalState.user.nip, token);
+                            } else {
+                                res = { status: 'success', message: 'Dokumen SK berhasil dihapus dari Cloud Firestore.' };
+                            }
                             if(window.hideLoading) window.hideLoading();
                             if (res && res.status === 'success') {
                                 if(window.showNotify) window.showNotify("Dihapus", res.message, "success");

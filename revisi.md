@@ -2178,9 +2178,52 @@ Akar penyebab: Font bawaan PDF (Times-Roman / Helvetica / Courier) pada pustaka 
 }
 ```
 
-#### 3. Rencana Tahapan Eksekusi (Step-by-Step Execution Plan)
-- [ ] **Sub-Tahap 45.A**: Pembuatan Komponen Pop-up Modal Stepper / Tabbed di `view_sk.html` & `sk.js` (Tab 1: Naskah Utama, Tab Lampiran Dinamis dengan Selector Tipe `Tabel`, `Teks`, `Bagan Struktur`).
-- [ ] **Sub-Tahap 45.B**: Implementasi Tool Editor Lampiran (Tabel Personil Interaktif, Editor Teks Multi-Line, Smart Box Tree Struktur CSS).
-- [ ] **Sub-Tahap 45.C**: Integrasi Simpan & Baca Payload Lengkap ke Cloud Firestore via `TranskepFirebase.saveSkToFirestore`.
-- [ ] **Sub-Tahap 45.D**: Generator Cetak Naskah Hukum Standar Pengadilan (Cetak Naskah Utama + Lampiran A4).
-- [ ] **Sub-Tahap 45.E**: Mesin Auto-Revisi SK (`[ 🔄 Revisi SK ]`, auto-increment versi, klausul amandemen Menimbang, personil switcher).
+#### 3. Arsitektur Berkas Modular (Separation of Concerns)
+Agar berkas kodingan tidak menumpuk ribuan baris di satu tempat (*anti-monolith*), fitur ini dibagi ke dalam modul berkas mandiri:
+1. **Pondasi Tampilan Modal**:
+   - `sk/view_sk_builder.html` & `transkep-web/modules/sk/view_sk_builder.html` (Modal Studio Stepper SK Builder).
+   - `sk/view_sk_revisi.html` & `transkep-web/modules/sk/view_sk_revisi.html` (Modal Khusus Amandemen & Personnel Switcher Revisi SK).
+2. **Logika & Controller**:
+   - `sk/js_sk_builder.html` & `transkep-web/modules/sk/sk_builder.js` (State management builder, manipulasi naskah/lampiran, integrasi Firestore).
+3. **Styling & Cetak**:
+   - `sk/css_sk_builder.html` & `transkep-web/css/sk_builder.css` (Styling Stepper, Smart Box Tree CSS hierarki organisasi, tata letak cetak A4).
+4. **Jembatan Integrasi Form**:
+   - Form input SK lama di `view_sk.html` dilengkapi tombol `[ 🪄 Susun via Smart SK Builder ]` (transfer data otomatis).
+   - Tabel SK aktif dilengkapi tombol `[ 📝 Revisi SK ]` (membuka form revisi amandemen khusus).
+
+#### 4. Rencana Tahapan Eksekusi (Step-by-Step Execution Plan)
+- [x] **Sub-Tahap 45.A (Selesai)**: Pembuatan Fondasi Berkas Modular & Komponen Pop-up Modal Stepper / Tabbed:
+  - [x] Pembuatan `sk/css_sk_builder.html` & `transkep-web/css/sk_builder.css` (CSS Stepper, Tab, Box Tree).
+  - [x] Pembuatan `sk/view_sk_builder.html` & `transkep-web/modules/sk/view_sk_builder.html` (Modal Studio Stepper: Tab Naskah Utama & Tab Lampiran Dinamis).
+  - [x] Pembuatan `sk/view_sk_revisi.html` & `transkep-web/modules/sk/view_sk_revisi.html` (Modal Khusus Amandemen Revisi).
+  - [x] Pembuatan `sk/js_sk_builder.html` & `transkep-web/modules/sk/sk_builder.js` (Pondasi state builder, method navigasi, dan integrasi mixin Vue).
+  - [x] Pemasangan tombol jembatan `[ 🪄 Susun via Smart SK Builder ]` dan `[ 📝 Revisi SK ]` di `sk/view_sk.html` & `transkep-web/modules/sk/view_sk.html`.
+  - [x] Pendaftaran berkas modular ke `index.html` dan `transkep-web/index.html` serta update PWA cache ke `transkep-v3.0.0`.
+- [x] **Sub-Tahap 45.B (Selesai ✅)**: Pemolesan Interaksi Tool Editor Lampiran (Tabel Personil Interaktif, Editor Teks Multi-Line, Smart Box Tree Struktur CSS):
+  - [x] Tabel Tool: Reorder baris personil `[▲]` / `[▼]`, quick role preset pills (`Pengarah`, `Ketua Tim`, `Sekretaris`, `Koordinator`, `Anggota`), autocompletion pegawai & badge NIP dinas.
+  - [x] Teks Tool: Quick toolbar formatting (`1. Nomor`, `a. Abjad`, `• Butir`, dan `📋 Template Standar`), responsive textarea.
+  - [x] Bagan Struktur Tool: Interactive Box Tree dengan penambahan kotak dinamis Level 3 & Level 4, tombol hapus kotak per node, dan auto-lookup identitas pejabat/pegawai.
+  - [x] Step 3 Live Preview: Pratinjau naskah yuridis lengkap beserta lampiran dinamis (tabel yuridis berbingkai resmi, uraian tugas terformat rapi, dan box tree hierarki).
+- [x] **Sub-Tahap 45.C (Selesai ✅)**: Integrasi Simpan & Baca Payload Lengkap ke Cloud Firestore via `TranskepFirebase.saveSkToFirestore`:
+  - [x] Sinkronisasi payload skema NoSQL lengkap: `naskah_utama`, `lampiran`, `members`, `versi_aktif`, dan `revisi_history` di `transkep-web/core/firebase.js` & `javascript_firebase.html`.
+  - [x] Otomatis ekstraksi personil tim dari lampiran tabel ke indeks `members` untuk filter dan pencarian pegawai-centric.
+  - [x] Integrasi tombol akses langsung `[ 🪄 ]` pada setiap baris tabel SK utama untuk membuka dokumen ke Studio Builder.
+- [x] **Sub-Tahap 45.D (Selesai ✅)**: Generator Cetak Naskah Hukum Standar Pengadilan (Cetak Naskah Utama + Lampiran A4):
+  - [x] Penyusunan stylesheet cetak dinas kedinasan (`@media print`) standar Mahkamah Agung (A4 portrait, margin yuridis 20-25mm, isolasi kertas putih dan sembunyikan UI interaktif).
+  - [x] Tombol cetak langsung `[ 🖨️ Cetak / Unduh PDF ]` di Step 3 Studio Builder dengan pemecah halaman otomatis (`page-break-before: always`) antar lampiran.
+- [x] **Sub-Tahap 45.E (Selesai ✅)**: Mesin Auto-Revisi SK (`[ 📝 Revisi SK ]`, auto-increment versi, klausul amandemen Menimbang, personil switcher):
+  - [x] Modal revisi amandemen terisolasi dengan auto-increment versi (`versi_aktif: n + 1`).
+  - [x] Otomatis injeksi klausul pertimbangan amandemen ke konsiderans *Menimbang* naskah utama.
+  - [x] Personnel Switcher interaktif untuk pergantian personil tim cepat, penambahan personil baru, dan perubahan peran/kedudukan dinas.
+  - [x] Auto-sinkronisasi perubahan personil switcher ke dalam lampiran tabel dan indeks anggota Firestore.
+  - [x] Audit trail tercatat rapi pada array `revisi_history` (versi, tanggal, catatan amandemen, dan nama operator).
+
+- [x] **Sub-Tahap 45.F (Selesai ✅)**: Direct Cloud Firestore Entry & Safe Cold Backup Policy:
+  - [x] Form input cepat modal SK (`submitSk`) dan fungsi hapus (`deleteSkRecord`) di `transkep-web/modules/sk/sk.js` dan `sk/js_sk.html` langsung tersambung ke Cloud Firestore (`saveSkToFirestore` & `deleteSkFromFirestore`).
+  - [x] Kebijakan Cold Storage Aman (Non-Destructive): Google Sheet `sk_data` dipertahankan 100% utuh tanpa dihapus sebagai cadangan arsip beku (Cold Backup), sementara operasional live berjalan di Cloud Firestore.
+  - [x] Peningkatan versi cache PWA ke `transkep-v3.0.1` pada `sw.js` untuk instan auto-refresh di browser klien.
+
+================================================================================
+STATUS TERKINI:
+TAHAP 45 (UNIVERSAL SMART SK BUILDER & DYNAMIC ATTACHMENT ENGINE) TELAH 100% SUKSES DIBANGUN, DIINTEGRASIKAN, DAN SIAP DEPLOY!
+================================================================================

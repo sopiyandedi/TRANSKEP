@@ -1,0 +1,259 @@
+<style>
+/* ======================================================== */
+/* FILE: sk/css_sk_builder.html                              */
+/* STYLING SMART SK BUILDER & AUTO-HIERARCHY BOX TREE       */
+/* ======================================================== */
+
+/* Stepper Indicator */
+.sk-stepper-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.sk-stepper-item.active {
+  background: rgba(99, 102, 241, 0.2);
+  color: #818cf8;
+  border: 1px solid rgba(99, 102, 241, 0.4);
+}
+
+.sk-stepper-item.completed {
+  color: #34d399;
+}
+
+.sk-stepper-badge {
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 9999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.65rem;
+  font-weight: 800;
+}
+
+.sk-stepper-item.active .sk-stepper-badge {
+  background: #6366f1;
+  color: #ffffff;
+}
+
+.sk-stepper-item.completed .sk-stepper-badge {
+  background: #10b981;
+  color: #ffffff;
+}
+
+/* Naskah Dinas Yuridis Preview Paper */
+.sk-legal-naskah {
+  font-family: 'Times New Roman', Times, serif;
+  color: #0f172a;
+  background: #ffffff;
+  padding: 3rem 2.5rem;
+  border-radius: 0.5rem;
+  line-height: 1.6;
+}
+
+/* Printable Legal Table */
+.sk-legal-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+  color: #000000;
+  margin-top: 1rem;
+}
+
+.sk-legal-table th, 
+.sk-legal-table td {
+  border: 1px solid #334155;
+  padding: 6px 10px;
+}
+
+.sk-legal-table th {
+  background-color: #f1f5f9;
+  font-weight: bold;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+/* Smart Box Tree (Bagan Struktur Organisasi) */
+.sk-tree-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
+  width: 100%;
+  padding: 1.5rem 0.5rem;
+  overflow-x: auto;
+}
+
+.sk-tree-level {
+  display: flex;
+  justify-content: center;
+  align-items: stretch;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+  width: 100%;
+  position: relative;
+}
+
+.sk-tree-node {
+  background: #0f172a;
+  border: 1.5px solid #334155;
+  border-radius: 0.75rem;
+  padding: 0.75rem 1rem;
+  min-width: 190px;
+  max-width: 260px;
+  text-align: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.sk-tree-node:hover {
+  border-color: #6366f1;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(99, 102, 241, 0.25);
+}
+
+.sk-tree-role {
+  font-size: 0.65rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #818cf8;
+  margin-bottom: 0.25rem;
+}
+
+.sk-tree-name {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #f1f5f9;
+}
+
+.sk-tree-nip {
+  font-size: 0.65rem;
+  font-family: monospace;
+  color: #94a3b8;
+  margin-top: 0.15rem;
+}
+
+/* Connector Line Between Levels */
+.sk-tree-connector {
+  width: 2px;
+  height: 1.25rem;
+  background: #64748b;
+  margin: 0 auto;
+}
+
+/* Printable Legal Tree in Preview Paper */
+.sk-legal-tree {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 1.5rem;
+  font-family: 'Times New Roman', Times, serif;
+}
+
+.sk-legal-tree-node {
+  border: 1.5px solid #000000;
+  padding: 6px 14px;
+  text-align: center;
+  min-width: 180px;
+  background: #ffffff;
+}
+
+.sk-legal-tree-role {
+  font-size: 10px;
+  font-weight: bold;
+  text-transform: uppercase;
+}
+
+.sk-legal-tree-name {
+  font-size: 11px;
+  font-weight: bold;
+}
+
+.sk-legal-tree-connector {
+  width: 1.5px;
+  height: 14px;
+  background: #000000;
+}
+
+/* ========================================== */
+/* CETAK DOKUMEN YURIDIS STANDAR MAHKAMAH AGUNG */
+/* ========================================== */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 20mm 20mm 20mm 25mm;
+  }
+
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Sembunyikan seluruh UI luar modal */
+  body > *:not(#app):not(#view-container):not(#slot-sk-builder),
+  #sidebar,
+  header,
+  nav,
+  .no-print,
+  .sk-stepper-item,
+  .sk-stepper-badge,
+  button {
+    display: none !important;
+  }
+
+  /* Reset pembungkus modal agar hanya naskah kertas yang tercetak */
+  .fixed.inset-0.bg-black\/80 {
+    position: static !important;
+    background: transparent !important;
+    padding: 0 !important;
+    display: block !important;
+  }
+
+  .glass {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    max-width: 100% !important;
+    height: auto !important;
+  }
+
+  .border-b.border-slate-800,
+  .border-t.border-slate-800,
+  .custom-scrollbar {
+    border: none !important;
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+
+  .sk-legal-naskah {
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    font-size: 11pt !important;
+    color: #000000 !important;
+    background: #ffffff !important;
+  }
+
+  .page-break-before {
+    page-break-before: always !important;
+    break-before: page !important;
+  }
+}
+</style>

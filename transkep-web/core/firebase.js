@@ -74,6 +74,8 @@ const TranskepFirebase = {
       status: skData.status || 'Aktif',
       versi_aktif: skData.versi_aktif || 1,
       members: Array.isArray(skData.members) ? skData.members : [],
+      naskah_utama: skData.naskah_utama || null,
+      lampiran: Array.isArray(skData.lampiran) ? skData.lampiran : [],
       revisi_history: Array.isArray(skData.revisi_history) ? skData.revisi_history : [{
         versi: 1,
         tgl_revisi: skData.tgl_input || new Date().toISOString().split('T')[0],
@@ -90,6 +92,16 @@ const TranskepFirebase = {
 
     await db.collection(this.SK_COLLECTION).doc(docId).set(payload, { merge: true });
     return { status: 'success', id: docId, data: payload };
+  },
+
+  /**
+   * Menghapus Dokumen SK dari Cloud Firestore
+   */
+  async deleteSkFromFirestore(docId) {
+    const db = this.getDb();
+    if (!db) throw new Error("Cloud Firestore belum siap terhubung.");
+    await db.collection(this.SK_COLLECTION).doc(String(docId).trim()).delete();
+    return { status: 'success', message: 'Dokumen SK berhasil dihapus dari Cloud Firestore.' };
   },
 
   /**
