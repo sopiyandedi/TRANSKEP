@@ -2327,5 +2327,50 @@ Uncaught (in promise) ReferenceError: hasDropdown is not defined
 
 ================================================================================
 STATUS TERKINI:
-TAHAP 47 (HOTFIX REFERENCEERROR HASDROPDOWN DI CUTI.JS) TELAH 100% SUKSES DIBANGUN, DIVERIFIKASI, DAN DIDEPLOY KE APPS SCRIPT & GITHUB PAGES!
+TAHAP 47 TELAH SELESAI. MEMBUKA TAHAP 48 (REVERSI TOMBOL BATAL KE IKON TONG SAMPAH & PROTEKSI CUTI DISETUJUI) - MENUNGGU PERSETUJUAN ⏳
 ================================================================================
+
+---
+
+### Tahap 48: Reversi Tombol Batal Cuti ke Ikon Tong Sampah & Proteksi Cuti Disetujui (MENUNGGU PERSETUJUAN ⏳)
+
+#### 1. Masalah & Temuan Akar Masalah (Root Cause Analysis)
+Pada antarmuka "Riwayat Pengajuan Cuti Anda", terdapat keluhan tampilan dan alur:
+1. **Tombol "Usul Batal" yang Terlalu Dominan & Kurang Ringkas**:
+   - Pada pembaruan sebelumnya (Tahap 43-46), permohonan berstatus `'Disetujui'` memunculkan tombol besar berteks *"Usul Batal"* dengan ikon `fa-ban` (`px-2.5 py-1.5 bg-rose-500/10 text-rose-400 font-semibold`).
+   - Akibatnya, pada akun pengguna di mana mayoritas riwayat cutinya berstatus `'DISETUJUI'`, seluruh baris tabel menampilkan tombol merah *"Usul Batal"* yang ramai dan tidak diinginkan oleh pengguna.
+2. **Kebutuhan Bisnis & Keinginan Pengguna**:
+   - **Kembalikan ke Tampilan Awal**: Tombol aksi batal/delete dikembalikan seperti semula menjadi **hanya ikon tong sampah** (`fa-trash-can`), tanpa teks label `"Usul Batal"`, sehingga baris tabel kembali bersih, minimalis, dan elegan.
+   - **Cuti Disetujui Bebas Aksi Batal/Delete**: Untuk permohonan cuti yang **sudah disetujui** (`status === 'Disetujui'`), seluruh tombol batal atau hapus **dihilangkan 100%**. Pada baris cuti yang disetujui, hanya menyisakan tombol dropdown compact (`fa-list-ul`) untuk opsi Cetak dan Download Persetujuan TTE.
+   - **Pertahankan Tombol Hapus untuk Pengajuan yang Belum Disetujui**: Untuk permohonan yang **belum di-acc** (seperti status `'Menunggu'`, `'Perubahan'`, maupun `'Ditolak'`), tombol delete (ikon tong sampah `fa-trash-can`) **tetap tersedia** agar pengguna dapat menarik kembali atau membersihkan berkas yang belum disetujui.
+
+#### 2. Target File yang Akan Dimodifikasi
+1. [`transkep-web/modules/permohonan/cuti.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/modules/permohonan/cuti.js):
+   - Di dalam fungsi `myLogs.map(...)` (blok Cuti):
+     - Hapus injeksi tombol `usulBatalCuti` (`fa-ban` dengan teks "Usul Batal") pada status `disetujui`.
+     - Untuk status `menunggu` dan `perubahan`: Tetap tampilkan tombol edit (`fa-pen-to-square`) dan tombol batal/delete (`fa-trash-can`).
+     - Untuk status belum di-acc lainnya (misal: `ditolak`): Sertakan tombol delete (`fa-trash-can`) tanpa tombol edit.
+     - Untuk status `disetujui`: `actions` dibiarkan kosong `[]` (hanya tombol dropdown compact dokumen yang tampil).
+   - Di dalam `deleteCutiRecord(id)`:
+     - Pastikan pengembalian saldo kuota (refund) hanya dieksekusi jika status permohonan bukan `'ditolak'` dan bukan `'dibatalkan'`.
+2. [`permohonan/js_permohonan_view.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/js_permohonan_view.html):
+   - Selaraskan logika `actions` Cuti agar tombol "Usul Batal" dihilangkan untuk status `disetujui`, dan tombol hapus tong sampah (`fa-trash-can`) tetap aktif untuk status yang belum di-acc.
+   - Sinkronisasi guard refund pada `deleteCutiRecord(id)`.
+3. [`permohonan/permohonan.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/permohonan.js):
+   - Pada fungsi `deleteCutiLog`:
+     - Izinkan pemohon menghapus riwayat yang berstatus `'Ditolak'` selain `'Menunggu'` dan `'Perubahan'` agar sinkron dengan tombol hapus frontend tanpa melempar pengecualian otoritas.
+4. [`transkep-web/index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/index.html) & [`transkep-web/sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/sw.js):
+   - Naikkan versi cache PWA ke `transkep-v3.0.7` agar browser pengguna langsung memuat perubahan tanpa tertahan cache lama.
+
+#### 3. Rencana Eksekusi Bertahap (Execution Plan)
+- [x] **Langkah 1**: Perbarui logika pemetaan `actions` pada Cuti di `transkep-web/modules/permohonan/cuti.js` & `permohonan/js_permohonan_view.html` (menghilangkan tombol "Usul Batal", mengembalikan icon tong sampah murni untuk yang belum di-acc).
+- [x] **Langkah 2**: Perbarui validasi status di backend `permohonan/permohonan.js` agar mendukung penghapusan riwayat yang belum di-acc / ditolak.
+- [x] **Langkah 3**: Naikkan nomor build aplikasi dan PWA Service Worker ke versi `transkep-v3.0.7`.
+- [x] **Langkah 4**: Sinkronisasi deploy Clasp ke Google Apps Script dan deploy Git (`origin/main` & `prod/main`).
+- [x] **Langkah 5**: Konfirmasi dan panduan pengujian visual di sisi pengguna.
+
+================================================================================
+STATUS TERKINI:
+TAHAP 48 (REVERSI TOMBOL BATAL KE IKON TONG SAMPAH & PROTEKSI CUTI DISETUJUI) TELAH 100% SUKSES DIBANGUN, DIVERIFIKASI, DAN DIDEPLOY KE APPS SCRIPT & GITHUB PAGES!
+================================================================================
+

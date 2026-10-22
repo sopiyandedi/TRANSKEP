@@ -277,8 +277,9 @@
                           if (sNorm === 'menunggu' || sNorm === 'perubahan') {
                               actions.push({ actionType: 'editCuti', icon: 'fa-pen-to-square', text: '', css: 'px-2 py-1.5 bg-indigo-500/10 hover:bg-indigo-500 border border-indigo-500/20 hover:border-indigo-500 text-indigo-400 hover:text-white rounded-lg transition', tooltip: 'Ubah Pengajuan' });
                               actions.push({ actionType: 'batalCuti', icon: 'fa-trash-can', text: '', css: 'px-2 py-1.5 bg-rose-500/10 hover:bg-rose-500 border border-rose-500/20 hover:border-rose-500 text-rose-400 hover:text-white rounded-lg transition', tooltip: 'Tarik Pengajuan' });
-                          } else if (sNorm === 'disetujui') {
-                              actions.push({ actionType: 'usulBatalCuti', icon: 'fa-ban', text: 'Usul Batal', css: 'px-2.5 py-1.5 bg-rose-500/10 hover:bg-rose-500 border border-rose-500/20 hover:border-rose-500 text-rose-400 hover:text-white rounded-lg transition text-xs font-semibold', tooltip: 'Usulkan Pembatalan Resmi' });
+                          } else if (sNorm !== 'disetujui' && sNorm !== 'dibatalkan') {
+                              // Pengajuan belum di-acc lainnya (misal: 'ditolak') hanya tombol hapus tong sampah
+                              actions.push({ actionType: 'batalCuti', icon: 'fa-trash-can', text: '', css: 'px-2 py-1.5 bg-rose-500/10 hover:bg-rose-500 border border-rose-500/20 hover:border-rose-500 text-rose-400 hover:text-white rounded-lg transition', tooltip: 'Hapus Pengajuan' });
                           }
                       } 
                       // --- LOGIKA IZIN KELUAR ---
@@ -488,22 +489,25 @@
                                   const logIndex = this.s.cutiLogs.findIndex(l => String(l.id) === String(id));
                                   if (logIndex !== -1) {
                                       const logToCancel = this.s.cutiLogs[logIndex];
-                                      // Proses Refund Saldo
-                                      if (logToCancel.jenis === 'Tahunan') {
-                                          try {
-                                              let h = JSON.parse(logToCancel.history || "{}");
-                                              this.s.user.s_tahunan_2024 = Number(this.s.user.s_tahunan_2024 || 0) + (Number(h.y24) || 0);
-                                              this.s.user.s_tahunan_2025 = Number(this.s.user.s_tahunan_2025 || 0) + (Number(h.y25) || 0);
-                                              this.s.user.s_tahunan_2026 = Number(this.s.user.s_tahunan_2026 || 0) + (Number(h.y26) || 0);
-                                          } catch(e) {}
-                                      } else {
-                                          let field = "";
-                                          if(logToCancel.jenis === 'Sakit') field = 's_sakit';
-                                          else if(logToCancel.jenis === 'Alasan Penting' || logToCancel.jenis === 'Penting') field = 's_penting';
-                                          else if(logToCancel.jenis === 'Besar') field = 's_besar';
-                                          else if(logToCancel.jenis === 'Melahirkan') field = 's_melahirkan';
-                                          else if(logToCancel.jenis === 'CLTN') field = 's_cltn';
-                                          if (field !== "") this.s.user[field] = Number(this.s.user[field] || 0) + Number(logToCancel.sisa_cuti || 0);
+                                      const logStatus = String(logToCancel.status || '').trim().toLowerCase();
+                                      // Proses Refund Saldo (Hanya jika belum pernah ditolak atau dibatalkan)
+                                      if (logStatus !== 'ditolak' && logStatus !== 'dibatalkan') {
+                                          if (logToCancel.jenis === 'Tahunan') {
+                                              try {
+                                                  let h = JSON.parse(logToCancel.history || "{}");
+                                                  this.s.user.s_tahunan_2024 = Number(this.s.user.s_tahunan_2024 || 0) + (Number(h.y24) || 0);
+                                                  this.s.user.s_tahunan_2025 = Number(this.s.user.s_tahunan_2025 || 0) + (Number(h.y25) || 0);
+                                                  this.s.user.s_tahunan_2026 = Number(this.s.user.s_tahunan_2026 || 0) + (Number(h.y26) || 0);
+                                              } catch(e) {}
+                                          } else {
+                                              let field = "";
+                                              if(logToCancel.jenis === 'Sakit') field = 's_sakit';
+                                              else if(logToCancel.jenis === 'Alasan Penting' || logToCancel.jenis === 'Penting') field = 's_penting';
+                                              else if(logToCancel.jenis === 'Besar') field = 's_besar';
+                                              else if(logToCancel.jenis === 'Melahirkan') field = 's_melahirkan';
+                                              else if(logToCancel.jenis === 'CLTN') field = 's_cltn';
+                                              if (field !== "") this.s.user[field] = Number(this.s.user[field] || 0) + Number(logToCancel.sisa_cuti || 0);
+                                          }
                                       }
                                       
                                       // Update juga referensi di usersList agar data admin tidak desinkronisasi

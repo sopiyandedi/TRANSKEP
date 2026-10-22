@@ -173,8 +173,7 @@ ZONA BAWAH: MASTER CONTEXT & STATUS MIGRASI TERKINI (LIVING CONTEXT)
     - **Dialog Konfirmasi Interaktif (`showCustomConfirm`):** Mengimplementasikan modal dialog konfirmasi modern berbasis glassmorphism di `transkep-web/core/core.js` serta mengeksposnya ke `window.showCustomConfirm` dengan fallback native `confirm()` di seluruh frontend.
     - **Normalisasi Status & Dukungan Status Perubahan:** Memperbarui backend `deleteCutiLog` di `permohonan/permohonan.js` agar membersihkan spasi, *case-insensitive*, dan mengizinkan pemohon menarik mandiri berkas dengan status `'Menunggu'` maupun `'Perubahan'`.
     - **Safe Quota Refund:** Mengembalikan saldo cuti (Tahunan multi-tahun 2024, 2025, 2026 maupun cuti lainnya) secara utuh ke `user_data` dan menyinkronkan state reaktif frontend seketika.
-    - **Universal RPC Bridge:** Memperbarui `cuti_data.js` untuk memanfaatkan `TranskepAPI.call` dengan fallback `google.script.run`.
-    - **Usulan Pembatalan Cuti Disetujui:** Menyematkan tombol *"Usul Batal"* pada kolom aksi riwayat khusus permohonan berstatus `'Disetujui'` yang memicu modal pembatalan resmi ke Pejabat Berwenang.
+    - **Proteksi Cuti Disetujui & Reversi Tombol Tong Sampah:** Menghapus tombol pembatalan pada permohonan berstatus 'Disetujui', dan mengembalikan tombol hapus/tarik permohonan yang belum disetujui ('Menunggu', 'Perubahan', 'Ditolak') ke ikon tong sampah murni (`fa-trash-can`).
     - PWA Service Worker `sw.js` diperbarui ke versi **transkep-v2.8.5**.
 
 15. **Generator Barcode Mandiri Berlogo Pengadilan Agama Indramayu & Standarisasi TTE (Tahap 38):**
@@ -238,4 +237,11 @@ ZONA BAWAH: MASTER CONTEXT & STATUS MIGRASI TERKINI (LIVING CONTEXT)
       * Tombol `[ 🔄 Revisi SK ]` menduplikasi naskah utama & lampiran SK aktif menjadi draf versi baru (`versi_aktif: 2`), mengarsipkan versi lama ke `revisi_history`.
       * Otomatis menyisipkan konsiderans amandemen pada Menimbang (*"bahwa sehubungan dengan mutasi/perubahan susunan personil..."*).
       * Menyediakan tool penggantian personil tim (*personnel switcher*) dengan 1 klik.
+
+23. **Reversi Tombol Aksi Batal Cuti ke Ikon Tong Sampah & Proteksi Total Cuti Disetujui (Tahap 48):**
+    - **Reversi ke Ikon Tong Sampah:** Mengembalikan tombol hapus/tarik permohonan cuti menjadi hanya ikon tong sampah murni (`fa-trash-can`) tanpa teks, menjaga kerapian dan konsistensi estetika tabel kedinasan.
+    - **Proteksi Cuti Disetujui (Zero Cancel/Delete Action):** Pada seluruh permohonan cuti yang telah disetujui (`status === 'Disetujui'`), tombol batal/hapus dihilangkan 100%. Hanya tombol dropdown compact (`fa-list-ul`) untuk opsi Cetak Formulir dan Download Dokumen TTE yang ditampilkan.
+    - **Dukungan Hapus Cuti Belum Di-ACC:** Permohonan yang belum disetujui (`'Menunggu'`, `'Perubahan'`, maupun `'Ditolak'`) tetap mempertahankan tombol delete/hapus dengan ikon tong sampah.
+    - **Backend & Refund Guard:** Memperbarui backend `deleteCutiLog` di `permohonan/permohonan.js` agar pemohon dapat menghapus berkas berstatus `'Ditolak'`, serta memastikan pengembalian saldo kuota (refund) hanya berjalan untuk status yang belum pernah ditolak atau dibatalkan.
+    - PWA Service Worker `sw.js` diperbarui ke versi **transkep-v3.0.7**.
 

@@ -296,9 +296,9 @@ function deleteCutiLog(id, forceDelete, userNip, clientToken) {
     let isHardDelete = Boolean(forceDelete);
 
     if (!isHardDelete && !isAdmin) {
-      // Pemohon hanya boleh menarik jika statusnya Menunggu atau Perubahan
-      if (statusClean !== 'menunggu' && statusClean !== 'perubahan') {
-        throw new Error("Hanya pengajuan dengan status 'Menunggu' atau 'Perubahan' yang dapat ditarik kembali.");
+      // Pemohon hanya boleh menarik/menghapus pengajuan yang belum disetujui (Menunggu, Perubahan, atau Ditolak)
+      if (statusClean !== 'menunggu' && statusClean !== 'perubahan' && statusClean !== 'ditolak') {
+        throw new Error("Hanya pengajuan yang belum disetujui ('Menunggu', 'Perubahan', atau 'Ditolak') yang dapat dihapus.");
       }
     }
     
