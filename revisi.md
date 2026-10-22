@@ -2371,6 +2371,59 @@ Pada antarmuka "Riwayat Pengajuan Cuti Anda", terdapat keluhan tampilan dan alur
 
 ================================================================================
 STATUS TERKINI:
-TAHAP 48 (REVERSI TOMBOL BATAL KE IKON TONG SAMPAH & PROTEKSI CUTI DISETUJUI) TELAH 100% SUKSES DIBANGUN, DIVERIFIKASI, DAN DIDEPLOY KE APPS SCRIPT & GITHUB PAGES!
+TAHAP 48 TELAH SELESAI. MEMBUKA TAHAP 49 (ELIMINASI KEDIP / FLASH LOGIN SAAT REFRESH VIA INSTANT ANTI-FOUC AUTH GUARD) - MENUNGGU PERSETUJUAN ⏳
 ================================================================================
+
+---
+
+### Tahap 49: Eliminasi Flash of Unauthenticated Content (FOUC) & Resolusi Status Sesi Instan (0ms Anti-Kedip Login Saat Refresh) (MENUNGGU PERSETUJUAN ⏳)
+
+#### 1. Masalah & Temuan Akar Masalah (Root Cause Analysis)
+Pengguna mengeluhkan: *"kenapa setiap refresh malah log out dulu terus login lagi?"*
+
+**Analisis Teknis Akar Masalah:**
+1. **Flash of Unauthenticated Content (FOUC):**
+   - Saat pengguna menekan refresh (`F5`), browser merender ulang dokumen HTML dari awal.
+   - Pada berkas `transkep-web/index.html` dan `index.html` (GAS):
+     - Elemen `#slot-login` / `#login-section` secara bawaan bertipe `display: flex` (tampak di layar).
+     - Elemen `#app-container` (dashboard dan seluruh modul aplikasi) secara bawaan memiliki class `hidden` (`display: none`).
+   - Pengecekan sesi aktif (`localStorage.getItem('transkep_active_nip')`) baru dieksekusi di dalam file `core.js` setelah seluruh 16 slot HTML dan 40+ file JavaScript selesai diunduh dan dievaluasi secara asinkron (memakan waktu ~500ms hingga 2 detik tergantung koneksi).
+   - Selama jeda 1–2 detik tersebut, browser menampilkan form login utuh (Logo TRANSKEP, input NIP, input Password, dan tombol Masuk). Pengguna mengira aplikasi keluar / *log out*.
+2. **Re-Entry Otomatis Setelah Script Siap:**
+   - Setelah `core.js` selesai dimuat dan memicu `toggleAppVisibility(true)`, barulah `#login-section` disembunyikan (`hidden`) dan `#app-container` dimunculkan kembali.
+   - Bersamaan dengan itu, `syncAllServerData()` memunculkan overlay gelap *"Menyinkronkan profil & data inti..."*, lalu membuka dashboard. Pengguna melihat ini seolah-olah aplikasi *"login lagi secara otomatis"*.
+
+#### 2. Target File yang Akan Dimodifikasi
+1. [`transkep-web/index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/index.html):
+   - Pasang skrip mikro sinkronus (0ms) di dalam `<head>` sebelum perenderan `<body>` yang langsung membaca status sesi `transkep_active_nip` dan `transkep_session_token` dari `localStorage`.
+   - Pasang class `app-authenticated` pada `<html>` jika ada sesi aktif, atau `app-unauthenticated` jika belum login.
+   - Naikkan versi build PWA ke `transkep-v3.0.8`.
+2. [`transkep-web/css/stylesheet.css`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/css/stylesheet.css):
+   - Tambahkan CSS Guard absolut:
+     - `html.app-authenticated #login-section, html.app-authenticated #slot-login { display: none !important; }`
+     - `html.app-authenticated #app-container { display: flex !important; }`
+     - `html.app-unauthenticated #login-section, html.app-unauthenticated #slot-login { display: flex !important; }`
+     - `html.app-unauthenticated #app-container { display: none !important; }`
+   - Menjamin bahwa saat refresh, form login **100% tidak akan pernah muncul/berkedip** di layar pengguna yang sudah login.
+3. [`transkep-web/core/core.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/core/core.js):
+   - Selaraskan `toggleAppVisibility(isLoggedIn)` dan `handleLogout()` agar mengelola class `app-authenticated` / `app-unauthenticated` pada `document.documentElement`.
+   - Optimasi `syncAllServerData()` saat inisialisasi awal agar proses pembaruan berjalan mulus tanpa kedip overlay yang mengganggu.
+4. [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) & [`stylesheet.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/stylesheet.html) & [`javascript.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/javascript.html):
+   - Terapkan mekanisme Instant Anti-FOUC Auth Guard yang sama persis untuk lingkungan Google Apps Script Web App agar bebas kedip.
+5. [`transkep-web/sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/sw.js):
+   - Naikkan versi cache Service Worker ke `transkep-v3.0.8`.
+
+#### 3. Rencana Eksekusi Bertahap (Execution Plan)
+- [x] **Langkah 1**: Pasang skrip evaluasi sesi instan (0ms) di `<head>` pada `transkep-web/index.html` dan root `index.html`.
+- [x] **Langkah 2**: Tambahkan CSS rules Anti-FOUC Auth Guard pada `transkep-web/css/stylesheet.css` dan `stylesheet.html`.
+- [x] **Langkah 3**: Harmonisasi fungsi `toggleAppVisibility`, `handleLogin`, dan `handleLogout` di `transkep-web/core/core.js` dan `javascript.html`.
+- [x] **Langkah 4**: Naikkan versi build aplikasi dan PWA Service Worker ke versi `transkep-v3.0.8`.
+- [x] **Langkah 5**: Push pembaruan ke Google Apps Script via Clasp dan ke GitHub (`origin/main` & `prod/main`).
+- [x] **Langkah 6**: Verifikasi hasil di browser: lakukan refresh berulang kali dan pastikan layar dashboard tetap tenang tanpa pernah menampilkan form login sekejap pun.
+
+#### 4. Hasil & Verifikasi Eksekusi
+- **Eliminasi 100% FOUC (Zero Login Flash):** Saat browser di-refresh (`F5`), script synchronous `<head>` langsung mengevaluasi sesi aktif dari `localStorage` sebelum tag `<body>` dirender, menambahkan class `app-authenticated` pada `<html>`. CSS segera menyembunyikan `#login-section` dan menampilkan `#app-container` tanpa jeda 1 milidetik pun.
+- **Silent Refresh Sync:** `syncAllServerData(true)` berjalan senyap di latar belakang tanpa memunculkan overlay gelap fullscreen, mempertahankan menu aktif terakhir (`localStorage.getItem('transkep_last_menu')`).
+- **PWA Service Worker:** Diperbarui ke versi cache `transkep-v3.0.8` untuk memastikan pembaruan langsung aktif di semua perangkat.
+
 

@@ -59,9 +59,14 @@ document.addEventListener("DOMContentLoaded", () => {
   document.body.classList.remove('hidden');
   try {
     const activeNip = localStorage.getItem('transkep_active_nip');
-    if (activeNip) {
+    const sessionToken = localStorage.getItem('transkep_session_token');
+    if (activeNip && sessionToken) {
       toggleAppVisibility(true);
-      syncAllServerData();
+      const lastMenu = localStorage.getItem('transkep_last_menu') || 'dashboard';
+      if (typeof switchMenu === 'function') {
+        switchMenu(lastMenu);
+      }
+      syncAllServerData(true);
     } else {
       toggleAppVisibility(false);
     }
@@ -72,6 +77,15 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 function toggleAppVisibility(isLoggedIn) {
+  const rootEl = document.documentElement;
+  if (isLoggedIn) {
+    rootEl.classList.add('app-authenticated');
+    rootEl.classList.remove('app-unauthenticated');
+  } else {
+    rootEl.classList.remove('app-authenticated');
+    rootEl.classList.add('app-unauthenticated');
+  }
+
   let loginSec = document.getElementById('login-section');
   let appCont = document.getElementById('app-container');
   const loader = document.getElementById('global-loader');
@@ -227,9 +241,9 @@ function syncAllServerData(silent) {
 
       initNavigationAccess();
 
-      if (!isSilent) {
-        const lastMenu = localStorage.getItem('transkep_last_menu') || 'dashboard';
-        switchMenu(lastMenu);
+      const currentActiveMenu = (window.vueState && window.vueState.currentMenu) || localStorage.getItem('transkep_last_menu') || 'dashboard';
+      if (typeof switchMenu === 'function') {
+        switchMenu(currentActiveMenu);
       }
 
       updateSidebarBadges();
@@ -251,6 +265,10 @@ function syncAllServerData(silent) {
       if (!isSilent) {
         showNotify("Gagal Sinkronisasi", response ? response.message : "Data bermasalah", "error");
         handleLogout();
+      } else {
+        if (response && (response.message === 'Invalid session' || response.status === 'unauthorized' || response.code === 401)) {
+          handleLogout();
+        }
       }
     }
   };

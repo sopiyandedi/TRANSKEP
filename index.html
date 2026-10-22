@@ -46,6 +46,19 @@
 
    <!-- ZETTBOT FIX: Script eksekusi instan (Anti-Kedip/FOUC) dipasang sebelum elemen body di-render -->
    <script>
+      // 0. Evaluasi Sesi Instan (0ms Anti-FOUC Auth Guard)
+      (function() {
+        try {
+          var nip = localStorage.getItem('transkep_active_nip');
+          var token = localStorage.getItem('transkep_session_token');
+          if (nip && token) {
+            document.documentElement.classList.add('app-authenticated');
+          } else {
+            document.documentElement.classList.add('app-unauthenticated');
+          }
+        } catch(e) {}
+      })();
+
       // 1. Tahan semua efek animasi CSS
       document.body.classList.add('preload-theme');
 

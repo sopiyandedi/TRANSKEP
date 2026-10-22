@@ -3,6 +3,24 @@
     display: none !important;
   }
 
+  /* =========================================================
+     ZETTBOT: Instant Anti-FOUC Session Guard (Zero-Flicker)
+     ========================================================= */
+  html.app-authenticated #login-section,
+  html.app-authenticated #slot-login {
+    display: none !important;
+  }
+  html.app-authenticated #app-container {
+    display: flex !important;
+  }
+  html.app-unauthenticated #login-section,
+  html.app-unauthenticated #slot-login {
+    display: flex !important;
+  }
+  html.app-unauthenticated #app-container {
+    display: none !important;
+  }
+
   body {
     font-family: 'Plus Jakarta Sans', sans-serif;
   }

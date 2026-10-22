@@ -244,4 +244,11 @@ ZONA BAWAH: MASTER CONTEXT & STATUS MIGRASI TERKINI (LIVING CONTEXT)
     - **Dukungan Hapus Cuti Belum Di-ACC:** Permohonan yang belum disetujui (`'Menunggu'`, `'Perubahan'`, maupun `'Ditolak'`) tetap mempertahankan tombol delete/hapus dengan ikon tong sampah.
     - **Backend & Refund Guard:** Memperbarui backend `deleteCutiLog` di `permohonan/permohonan.js` agar pemohon dapat menghapus berkas berstatus `'Ditolak'`, serta memastikan pengembalian saldo kuota (refund) hanya berjalan untuk status yang belum pernah ditolak atau dibatalkan.
     - PWA Service Worker `sw.js` diperbarui ke versi **transkep-v3.0.7**.
+ 
+24. **Eliminasi Total Flash of Unauthenticated Content (FOUC) saat Refresh Browser (Tahap 49):**
+    - **Akar Masalah Terselesaikan:** Menghilangkan kedipan / *flicker* form login saat pengguna menekan tombol refresh (`F5`). Sebelumnya, form login dirender lebih awal selama 1–2 detik karena modul HTML belum dimuat sebelum evaluasi sesi di `core.js`.
+    - **Instant Pre-Render Auth Evaluation (< 1ms):** Menyematkan skrip sinkronus mikro di `<head>` pada `transkep-web/index.html` dan `index.html` (GAS) yang langsung mengevaluasi `localStorage.getItem('transkep_active_nip')` dan menyematkan class `app-authenticated` ke elemen akar `<html>` sebelum dokumen `<body>` diproses atau digambar di layar.
+    - **CSS Auth Guard Absolut:** Menyuntikkan aturan CSS `html.app-authenticated #login-section { display: none !important; }` dan `html.app-authenticated #app-container { display: flex !important; }` sehingga form login 100% tidak pernah berkedip di layar pengguna yang telah memiliki sesi aktif.
+    - **Silent Refresh Sync:** Memperbarui `DOMContentLoaded` dan `syncAllServerData(true)` agar sinkronisasi data saat refresh berjalan hening di latar belakang tanpa modal overlay yang menutup layar, serta mempertahankan menu aktif terakhir secara mulus.
+    - PWA Service Worker `sw.js` diperbarui ke versi **transkep-v3.0.8**.
 

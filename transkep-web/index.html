@@ -52,9 +52,39 @@
   <link rel="stylesheet" href="css/custom.css">
   <link rel="stylesheet" href="css/sk_builder.css">
 
+  <!-- ZETTBOT: Instant Anti-FOUC Session Guard (0ms Auth State Resolution) -->
+  <script>
+    (function() {
+      try {
+        var nip = localStorage.getItem('transkep_active_nip');
+        var token = localStorage.getItem('transkep_session_token');
+        if (nip && token) {
+          document.documentElement.classList.add('app-authenticated');
+        } else {
+          document.documentElement.classList.add('app-unauthenticated');
+        }
+      } catch(e) {}
+    })();
+  </script>
+
   <!-- ZETTBOT: Pelindung Anti-FOUC & Anti-Bocor Modal Vue -->
   <style>
     [v-cloak] {
+      display: none !important;
+    }
+    /* Anti-FOUC Auth Guard: 0ms Eliminasi Kedip Layar Login Saat Refresh */
+    html.app-authenticated #login-section,
+    html.app-authenticated #slot-login {
+      display: none !important;
+    }
+    html.app-authenticated #app-container {
+      display: flex !important;
+    }
+    html.app-unauthenticated #login-section,
+    html.app-unauthenticated #slot-login {
+      display: flex !important;
+    }
+    html.app-unauthenticated #app-container {
       display: none !important;
     }
   </style>
@@ -65,7 +95,7 @@
   <!-- ZETTBOT: Auto-Bust PWA Cache & Stale Service Worker Guard -->
   <script>
     (async function() {
-      const CURRENT_APP_BUILD = 'transkep-v3.0.7';
+      const CURRENT_APP_BUILD = 'transkep-v3.0.8';
       if (localStorage.getItem('transkep_active_build') !== CURRENT_APP_BUILD) {
         localStorage.setItem('transkep_active_build', CURRENT_APP_BUILD);
         try {
@@ -254,7 +284,7 @@
       ];
 
       try {
-        const APP_BUILD_VER = '3.0.7';
+        const APP_BUILD_VER = '3.0.8';
         console.log('🔄 [ZettBOT Loader] Memuat komponen tampilan views/ secara paralel...');
         await Promise.all(VIEW_SLOTS.map(async item => {
           const res = await fetch(item.file + '?v=' + APP_BUILD_VER);
