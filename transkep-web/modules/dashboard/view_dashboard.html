@@ -132,10 +132,10 @@
                      <h3 class="text-sm font-bold text-slate-300 uppercase tracking-wider">
                        <i class="fa-solid fa-bell text-amber-400 mr-2"></i> Peringatan Dini (KGB, KP & Pensiun)
                      </h3>
-                     <span class="text-[10px] bg-indigo-500/20 text-indigo-300 px-2 py-1 rounded font-bold border border-indigo-500/30 hidden md:block">Target: Deadline Berkas</span>
+                     <span class="text-[10px] bg-indigo-500/20 text-indigo-300 px-2 py-1 rounded font-bold border border-indigo-500/30 hidden md:block">{{ isAdmin ? 'Target: Deadline Berkas' : 'Data Jadwal Pribadi' }}</span>
                   </div>
                   
-                  <div class="flex flex-col md:flex-row gap-2 mb-3 shrink-0">
+                  <div v-if="isAdmin" class="flex flex-col md:flex-row gap-2 mb-3 shrink-0">
                      <div class="relative flex-1 group min-w-[150px]">
                         <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs"></i>
                         <input type="text" v-model="filterWarning.name" placeholder="Cari Nama..." class="w-full pl-8 pr-8 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs focus:ring-1 focus:ring-indigo-500 outline-none transition text-slate-300 placeholder:text-slate-600">
@@ -166,11 +166,11 @@
                   </div>
 
                   <div class="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-3">
-                     <div v-if="filteredAdminWarnings.length === 0" class="text-center p-8 text-slate-500 text-xs italic border border-dashed border-slate-700/50 rounded-xl mt-4">
-                         Tidak ada jadwal pemberkasan yang cocok dengan filter.
+                     <div v-if="displayWarnings.length === 0" class="text-center p-8 text-slate-500 text-xs italic border border-dashed border-slate-700/50 rounded-xl mt-4">
+                         {{ isAdmin ? 'Tidak ada jadwal pemberkasan yang cocok dengan filter.' : 'Tidak ada jadwal peringatan aktif.' }}
                      </div>
                      
-                     <div v-for="item in filteredAdminWarnings" :key="item.user.nip + item.type" :class="['flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-2xl border hover:bg-slate-800/80 transition gap-4 mb-3', item.status === 'Terlewat' ? 'border-rose-500/30 bg-rose-950/20' : 'border-slate-800/60 bg-slate-900/40']">
+                     <div v-for="item in displayWarnings" :key="item.user.nip + item.type" :class="['flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-2xl border hover:bg-slate-800/80 transition gap-4 mb-3', item.status === 'Terlewat' ? 'border-rose-500/30 bg-rose-950/20' : 'border-slate-800/60 bg-slate-900/40']">
                         <div class="flex items-center gap-3 overflow-hidden">
                            <div class="w-10 h-10 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-center shrink-0 shadow-inner">
                               <i :class="['fa-solid', item.type === 'Pensiun' ? 'fa-person-walking-luggage text-purple-400' : (item.type === 'KGB' ? 'fa-money-bill-trend-up text-blue-400' : 'fa-angles-up text-emerald-400')]"></i>
@@ -187,10 +187,15 @@
                            </div>
                            <div class="w-28 text-center flex flex-col justify-center">
                               <div class="text-[8px] uppercase font-bold text-slate-500 mb-0.5">Status</div>
-                              <button type="button" @click="openModalStatus(item)" :class="['px-2 py-1.5 rounded-lg text-[9px] font-bold border uppercase tracking-wider hover:scale-105 hover:brightness-125 transition w-full flex items-center justify-center gap-1.5 group cursor-pointer shadow-sm', item.statusClass]" title="Klik untuk Ubah Status Berkas">
+                              <!-- Tombol Interaktif untuk Admin / Operator -->
+                              <button v-if="isAdmin" type="button" @click="openModalStatus(item)" :class="['px-2 py-1.5 rounded-lg text-[9px] font-bold border uppercase tracking-wider hover:scale-105 hover:brightness-125 transition w-full flex items-center justify-center gap-1.5 group cursor-pointer shadow-sm', item.statusClass]" title="Klik untuk Ubah Status Berkas">
                                  <span class="truncate">{{ item.status }}</span>
                                  <i class="fa-solid fa-chevron-down text-[8px] opacity-50 group-hover:opacity-100 transition-opacity"></i>
                               </button>
+                              <!-- Badge Statis Read-Only untuk Pegawai Biasa -->
+                              <div v-else :class="['px-2.5 py-1.5 rounded-lg text-[9px] font-bold border uppercase tracking-wider text-center w-full shadow-sm select-none', item.statusClass]" :title="'Status Berkas: ' + item.status">
+                                 <span class="truncate">{{ item.status }}</span>
+                              </div>
                            </div>
                         </div>
                      </div>

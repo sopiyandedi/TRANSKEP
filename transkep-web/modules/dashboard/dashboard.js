@@ -100,7 +100,9 @@ window.dashboardApp = Vue.createApp({
   },
   computed: {
     isAdmin() {
-      return this.currentUser && (this.currentUser.role === 'Admin' || this.currentUser.role === 'Operator');
+      if (!this.currentUser || !this.currentUser.role) return false;
+      const r = String(this.currentUser.role).toLowerCase().trim();
+      return r.includes('admin') || r.includes('operator');
     },
     tanggalHariIni() {
       return formatTanggalIndoDashboard(new Date());
@@ -321,7 +323,141 @@ window.dashboardApp = Vue.createApp({
     },
     filteredPegawaiWarnings() {
       if (!this.currentUser) return [];
-      return this.rawWarningsData.filter(item => String(item.user.nip) === String(this.currentUser.nip));
+      const u = this.currentUser;
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const safeNip = (n) => String(n || '').replace(/['"\s]/g, '').trim();
+      const myNip = safeNip(u.nip);
+      const myNama = String(u.nama || '').toLowerCase().trim();
+
+      // 1. Ambil data dari rawWarningsData yang sudah dihitung
+      const existing = (this.rawWarningsData || []).filter(item => {
+        if (!item || !item.user) return false;
+        const iNip = safeNip(item.user.nip);
+        const iNama = String(item.user.nama || '').toLowerCase().trim();
+        return (myNip && iNip === myNip) || (myNama && iNama === myNama);
+      });
+
+      // 2. Helper untuk membuat objek peringatan individual yang selalu memiliki status
+      const createCustomWarning = (type, targetDate, dbStatus, tmtAwal) => {
+        if (!targetDate || isNaN(targetDate.getTime())) {
+          return {
+            user: u,
+            type: type,
+            rawDate: new Date(2099, 11, 31),
+            dateStr: tmtAwal ? String(tmtAwal) : 'Belum Ditentukan',
+            status: 'Belum Terjadwal',
+            statusClass: 'text-slate-400 border-slate-700/60 bg-slate-800/40',
+            targetText: 'Belum Diatur',
+            targetClass: 'text-slate-500',
+            month: -1,
+            year: -1,
+            dbStatus: ''
+          };
+        }
+
+        let diffTime = targetDate.getTime() - today.getTime();
+        let diffDays = Math.ceil(diffTime / (1000 * 3600 * 24));
+        let status = 'Menunggu', statusClass = 'text-amber-400 border-amber-500/30 bg-amber-500/10', targetText = '', isCompleted = false, targetClass = 'text-indigo-400';
+        let checkStatus = (dbStatus || '').toUpperCase();
+
+        if (checkStatus === 'PROSES') {
+          status = 'Sedang Diproses';
+          statusClass = 'text-blue-400 border-blue-500/30 bg-blue-500/10 font-bold shadow-[0_0_10px_rgba(59,130,246,0.2)]';
+          isCompleted = true;
+          targetText = 'Berkas Terkirim';
+          targetClass = 'text-blue-400';
+        } else if (checkStatus === 'SELESAI') {
+          status = 'Selesai';
+          statusClass = 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10 font-bold shadow-[0_0_10px_rgba(16,185,129,0.2)]';
+          isCompleted = true;
+          targetText = 'Berkas Diterima';
+          targetClass = 'text-emerald-400';
+        } else {
+          if (diffDays < 0) {
+            status = 'Terlewat';
+            statusClass = 'text-rose-400 border-rose-500/50 bg-rose-500/10 font-bold';
+            targetClass = 'text-rose-400';
+          } else if (diffDays <= 30) {
+            status = 'Kritis';
+            statusClass = 'text-rose-100 border-rose-500 bg-rose-600 font-bold animate-pulse shadow-[0_0_15px_rgba(225,29,72,0.5)]';
+            targetClass = 'text-rose-500 font-extrabold animate-pulse';
+          } else if (diffDays <= 90) {
+            status = 'Segera';
+            statusClass = 'text-orange-400 border-orange-500/50 bg-orange-500/10 font-bold';
+          } else {
+            status = 'Terjadwal';
+            statusClass = 'text-slate-300 border-slate-700/60 bg-slate-800/40';
+            targetClass = 'text-indigo-300';
+          }
+        }
+
+        if (!isCompleted) {
+          if (diffDays < 0) targetText = 'OVERDUE';
+          else {
+            let diffY = Math.floor(diffDays / 365), diffM = Math.floor((diffDays % 365) / 30);
+            if (diffY > 0) targetText += diffY + ' Thn ';
+            if (diffM > 0) targetText += diffM + ' Bln';
+            if (!targetText) targetText = diffDays + ' Hari';
+          }
+        }
+
+        return {
+          user: u,
+          type: type,
+          rawDate: targetDate,
+          dateStr: formatTanggalIndoDashboard(targetDate),
+          status: status,
+          statusClass: statusClass,
+          targetText: targetText,
+          targetClass: targetClass,
+          month: targetDate.getMonth(),
+          year: targetDate.getFullYear(),
+          dbStatus: dbStatus || ''
+        };
+      };
+
+      // 3. Pastikan 3 pilar selalu ada
+      // Pangkat (KP / KNP)
+      let itemKnp = existing.find(i => i.type === 'Pangkat' || i.type === 'KNP');
+      if (!itemKnp) {
+        let knpDate = parseTanggalLokal(u.tmt_knp);
+        if (knpDate) {
+          let tambahanTahun = (String(u.jenis_jabatan || '').toUpperCase() === 'FUNGSIONAL') ? 2 : 4;
+          knpDate.setFullYear(knpDate.getFullYear() + tambahanTahun);
+        }
+        itemKnp = createCustomWarning('Pangkat', knpDate, u.status_knp, u.tmt_knp);
+      }
+
+      // KGB
+      let itemKgb = existing.find(i => i.type === 'KGB');
+      if (!itemKgb) {
+        let kgbDate = parseTanggalLokal(u.tmt_kgb);
+        if (kgbDate) {
+          kgbDate.setFullYear(kgbDate.getFullYear() + 2);
+        }
+        itemKgb = createCustomWarning('KGB', kgbDate, u.status_kgb, u.tmt_kgb);
+      }
+
+      // Pensiun
+      let itemPensiun = existing.find(i => i.type === 'Pensiun');
+      if (!itemPensiun) {
+        let nipClean = String(u.nip || '').replace(/[^0-9]/g, '');
+        let birthDate = null;
+        if (nipClean.length >= 15) {
+          birthDate = new Date(parseInt(nipClean.substring(0, 4)), parseInt(nipClean.substring(4, 6)) - 1, parseInt(nipClean.substring(6, 8)));
+          birthDate.setFullYear(birthDate.getFullYear() + (parseInt(u.bup) || 58));
+          birthDate.setMonth(birthDate.getMonth() + 1, 1);
+        }
+        itemPensiun = createCustomWarning('Pensiun', birthDate, u.status_pensiun, '');
+      }
+
+      return [itemKnp, itemKgb, itemPensiun].filter(Boolean);
+    },
+
+    displayWarnings() {
+      return this.isAdmin ? this.filteredAdminWarnings : this.filteredPegawaiWarnings;
     }
   },
 
@@ -375,6 +511,7 @@ window.dashboardApp = Vue.createApp({
     externalSearch(kw) { this.searchKeyword = kw; },
 
     openModalStatus(item) {
+      if (!this.isAdmin) return;
       this.modalTmt.nip = item.user.nip;
       this.modalTmt.type = item.type;
       this.modalTmt.nama = item.user.nama;
@@ -385,6 +522,10 @@ window.dashboardApp = Vue.createApp({
       this.showModalStatus = false;
     },
     submitTmtStatus(newStatus) {
+      if (!this.isAdmin) {
+        showNotify("Akses Ditolak", "Hanya Admin dan Operator yang berwenang mengubah status berkas.", "error");
+        return;
+      }
       const targetNip = this.modalTmt.nip;
       const typeStr = this.modalTmt.type;
       const token = localStorage.getItem('transkep_session_token') || localStorage.getItem('transkep_token') || '';

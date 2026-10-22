@@ -36,9 +36,9 @@ function initDashboardDB() {
 // Ubah signature fungsi menjadi seperti ini:
 function updateTmtStatus(actorNip, targetNip, type, newStatus, clientToken) {
   try {
-    // 1. Validasi keamanan menggunakan NIP admin (actorNip)
-    if (!cekOtorisasi(actorNip, clientToken)) {
-        return { status: 'error', message: 'Akses Ditolak: Sesi kedaluwarsa atau manipulasi terdeteksi.' };
+    // 1. Validasi keamanan RBAC: Hanya Admin dan Operator yang berwenang mengubah status berkas
+    if (!cekOtorisasiAdminOrOperator(actorNip, clientToken)) {
+        return { status: 'error', message: 'Akses Ditolak: Hanya Admin dan Operator yang berwenang mengubah status berkas.' };
     }
 
     const ss = getDB();

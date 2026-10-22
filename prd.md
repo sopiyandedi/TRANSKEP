@@ -266,3 +266,14 @@ ZONA BAWAH: MASTER CONTEXT & STATUS MIGRASI TERKINI (LIVING CONTEXT)
       Memastikan pemanggilan `renderDashboardView()` secara otomatis saat `syncAllServerData()` dan `syncBackgroundData()` selesai mengunduh data kehadiran dan peringatan dini pegawai.
     - PWA Service Worker `sw.js` dan `CURRENT_APP_BUILD` di `transkep-web/index.html` diperbarui ke versi **transkep-v3.0.9**.
 
+26. **Role-Based Access Control (RBAC) & Privatisasi Kartu Peringatan Dini Dashboard (Tahap 51):**
+    - **Dual-Mode Warning Card Presentation:**
+      - **Mode Admin & Operator (isAdmin === true):** Menampilkan seluruh jadwal peringatan dini (Kenaikan Gaji Berkala, Kenaikan Pangkat/KP, dan Pensiun) dari seluruh pegawai di satuan kerja. Dilengkapi toolbar pencarian real-time (Nama/NIP), kategori, filter bulan, dan tahun, serta tombol aksi interaktif dengan dropdown untuk mengubah status berkas (Menunggu, Proses, Selesai).
+      - **Mode Pegawai Biasa (isAdmin === false):** Menampilkan khusus data peringatan dini milik akun yang sedang login. Toolbar pencarian pegawai lain disembunyikan untuk menjaga privasi data personal dan merampingkan antarmuka.
+    - **Jaminan 3 Pilar Karir Selalu Tampil (Persistent 3-Pillar Warning States):**
+      Memastikan bahwa untuk pengguna non-admin, ketiga pilar karir (Kenaikan Pangkat, Kenaikan Gaji Berkala, dan Pensiun) selalu dirender secara persisten pada kartu antarmuka beserta target tanggal TMT, status berkas, dan hitung mundur sisa waktu (Tahun/Bulan/Hari) meskipun target waktunya masih jauh (beberapa tahun ke depan).
+    - **Read-Only Status Badge untuk Non-Admin:**
+      Kolom status untuk pegawai biasa dirender sebagai lencana statis non-interaktif (*read-only status badge*) tanpa ikon dropdown chevron dan tanpa event handler pengubah status, sehingga mencegah manipulasi status berkas dari antarmuka pengguna.
+    - **Defense-in-Depth Backend Security Hardening:**
+      Menambahkan fungsi validator cekOtorisasiAdminOrOperator(nip, clientToken) pada code.js dan memproteksi endpoint updateTmtStatus pada dashboard/dashboard.js sehingga hanya akun dengan peran Admin atau Operator yang diizinkan memutasi status berkas di database Spreadsheet.
+    - PWA Service Worker sw.js dan CURRENT_APP_BUILD di 	ranskep-web/index.html diperbarui ke versi **transkep-v3.1.0**.

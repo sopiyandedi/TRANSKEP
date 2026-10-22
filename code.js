@@ -64,6 +64,32 @@ function cekOtorisasiAdmin(nip, clientToken) {
   return false;
 }
 
+// 3b. Sentralisasi Validasi Role Admin / Operator (DRY & RBAC)
+function cekOtorisasiAdminOrOperator(nip, clientToken) {
+  if (!cekOtorisasi(nip, clientToken)) return false;
+  const cache = CacheService.getScriptCache();
+  const cachedRole = cache.get(clientToken + "_role");
+  if (cachedRole) {
+    const cr = cachedRole.toLowerCase().trim();
+    if (cr === 'admin' || cr === 'operator') return true;
+  }
+  
+  // Fallback verifikasi database jika cache role ter-evict
+  const ss = getDB();
+  const sheet = ss.getSheetByName('user_data');
+  if (!sheet) return false;
+  const data = sheet.getDataRange().getDisplayValues();
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][0]) === String(nip)) {
+      const roleStr = String(data[i][3] || '').toLowerCase().trim();
+      const isAuthorized = roleStr === 'admin' || roleStr === 'operator';
+      if (isAuthorized) cache.put(clientToken + "_role", data[i][3], 28800);
+      return isAuthorized;
+    }
+  }
+  return false;
+}
+
 // 4. Sentralisasi Sanitasi Anti Formula / CSV Injection (CWE-1236)
 function sanitizeFormulaInput(val) {
   if (typeof val === 'string') {
