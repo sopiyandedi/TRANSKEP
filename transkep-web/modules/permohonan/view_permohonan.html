@@ -69,11 +69,22 @@
         </thead>
         
         <tbody v-if="!s || !s.user">
-           <tr><td colspan="7" class="text-center p-8 text-slate-600 italic">Memuat data...</td></tr>
+           <tr><td colspan="7" class="text-center p-8 text-slate-600 italic">Memuat data pengguna...</td></tr>
+        </tbody>
+        
+        <tbody v-else-if="s && !s.isBgSyncDone">
+           <tr><td colspan="7" class="text-center p-8 text-slate-500 italic"><i class="fa-solid fa-spinner fa-spin mr-2 text-indigo-400"></i> Menyinkronkan riwayat pengajuan dari server...</td></tr>
         </tbody>
         
         <tbody v-else-if="formattedLogs.length === 0">
-           <tr><td colspan="7" class="text-center p-8 text-slate-600 italic">Belum ada riwayat pengajuan apapun.</td></tr>
+           <tr>
+              <td colspan="7" class="text-center p-8 text-slate-500">
+                 <div class="italic mb-3">Belum ada riwayat pengajuan apapun.</div>
+                 <button @click="refreshData" type="button" class="inline-flex items-center gap-2 px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl text-xs font-semibold border border-slate-700 transition shadow-sm">
+                    <i class="fa-solid fa-rotate text-[11px]" :class="{ 'fa-spin': isRefreshing }"></i> Muat Ulang Riwayat
+                 </button>
+              </td>
+           </tr>
         </tbody>
         
         <tbody v-else>

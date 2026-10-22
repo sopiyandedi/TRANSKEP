@@ -163,7 +163,8 @@
           data() {
               return {
                   s: window.vueState || state, // Mengikat variabel global state/vueState ke dalam lokal Vue
-                  activeDropdownId: null // ZETTBOT TAHAP 43: ID Dropdown aksi yang sedang terbuka
+                  activeDropdownId: null, // ZETTBOT TAHAP 43: ID Dropdown aksi yang sedang terbuka
+                  isRefreshing: false
               };
           },
           computed: {
@@ -372,6 +373,24 @@
               }
           },
           methods: {
+              // ZETTBOT TAHAP 46: Trigger Refresh Sinkronisasi Riwayat Cuti
+              async refreshData() {
+                  if (this.isRefreshing) return;
+                  this.isRefreshing = true;
+                  try {
+                      if (typeof syncBackgroundData === 'function') {
+                          syncBackgroundData();
+                      } else if (typeof syncAllServerData === 'function') {
+                          syncAllServerData(true);
+                      }
+                      setTimeout(() => {
+                          this.isRefreshing = false;
+                      }, 1500);
+                  } catch (err) {
+                      this.isRefreshing = false;
+                  }
+              },
+
               // ZETTBOT TAHAP 43: Kontroler Dropdown Aksi Cuti Disetujui
               toggleActionDropdown(id) {
                   this.activeDropdownId = (this.activeDropdownId === id) ? null : id;

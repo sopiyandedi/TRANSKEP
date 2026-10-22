@@ -44,14 +44,20 @@ const CutiDataService = {
    */
   getSmartRouting(atasanNip, pejabatNip, tglMulai, tglSelesai, nip, token) {
     const authToken = token || (typeof localStorage !== 'undefined' ? localStorage.getItem('transkep_session_token') : '') || '';
+    const activeNip = nip || (typeof localStorage !== 'undefined' ? (localStorage.getItem('transkep_active_nip') || localStorage.getItem('transkep_user_nip')) : '') || '';
+
+    if (typeof TranskepAPI !== 'undefined' && typeof TranskepAPI.call === 'function') {
+      return TranskepAPI.call('getSmartRouting', atasanNip, pejabatNip, tglMulai, tglSelesai, activeNip, authToken);
+    }
+
     return new Promise((resolve, reject) => {
       if (typeof google === 'undefined' || !google.script || !google.script.run) {
-        return reject(new Error("Koneksi google.script.run tidak tersedia."));
+        return reject(new Error("Koneksi TranskepAPI / google.script.run tidak tersedia."));
       }
       google.script.run
         .withSuccessHandler((res) => resolve(res))
         .withFailureHandler((err) => reject(err))
-        .getSmartRouting(atasanNip, pejabatNip, tglMulai, tglSelesai, nip, authToken);
+        .getSmartRouting(atasanNip, pejabatNip, tglMulai, tglSelesai, activeNip, authToken);
     });
   },
 
@@ -64,14 +70,20 @@ const CutiDataService = {
    */
   addCutiLog(payload, nip, token) {
     const authToken = token || (typeof localStorage !== 'undefined' ? localStorage.getItem('transkep_session_token') : '') || '';
+    const activeNip = nip || (typeof localStorage !== 'undefined' ? (localStorage.getItem('transkep_active_nip') || localStorage.getItem('transkep_user_nip')) : '') || '';
+
+    if (typeof TranskepAPI !== 'undefined' && typeof TranskepAPI.call === 'function') {
+      return TranskepAPI.call('addCutiLog', payload, activeNip, authToken);
+    }
+
     return new Promise((resolve, reject) => {
       if (typeof google === 'undefined' || !google.script || !google.script.run) {
-        return reject(new Error("Koneksi google.script.run tidak tersedia."));
+        return reject(new Error("Koneksi TranskepAPI / google.script.run tidak tersedia."));
       }
       google.script.run
         .withSuccessHandler((res) => resolve(res))
         .withFailureHandler((err) => reject(err))
-        .addCutiLog(payload, nip, authToken);
+        .addCutiLog(payload, activeNip, authToken);
     });
   },
 
@@ -84,14 +96,20 @@ const CutiDataService = {
    */
   updateCutiLog(payload, nip, token) {
     const authToken = token || (typeof localStorage !== 'undefined' ? localStorage.getItem('transkep_session_token') : '') || '';
+    const activeNip = nip || (typeof localStorage !== 'undefined' ? (localStorage.getItem('transkep_active_nip') || localStorage.getItem('transkep_user_nip')) : '') || '';
+
+    if (typeof TranskepAPI !== 'undefined' && typeof TranskepAPI.call === 'function') {
+      return TranskepAPI.call('updateCutiLog', payload, activeNip, authToken);
+    }
+
     return new Promise((resolve, reject) => {
       if (typeof google === 'undefined' || !google.script || !google.script.run) {
-        return reject(new Error("Koneksi google.script.run tidak tersedia."));
+        return reject(new Error("Koneksi TranskepAPI / google.script.run tidak tersedia."));
       }
       google.script.run
         .withSuccessHandler((res) => resolve(res))
         .withFailureHandler((err) => reject(err))
-        .updateCutiLog(payload, nip, authToken);
+        .updateCutiLog(payload, activeNip, authToken);
     });
   },
 

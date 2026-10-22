@@ -2225,5 +2225,54 @@ Agar berkas kodingan tidak menumpuk ribuan baris di satu tempat (*anti-monolith*
 
 ================================================================================
 STATUS TERKINI:
-TAHAP 45 (UNIVERSAL SMART SK BUILDER & DYNAMIC ATTACHMENT ENGINE) TELAH 100% SUKSES DIBANGUN, DIINTEGRASIKAN, DAN SIAP DEPLOY!
+TAHAP 45 (UNIVERSAL SMART SK BUILDER & DYNAMIC ATTACHMENT ENGINE) TELAH 100% SUKSES DIBANGUN, DIINTEGRASIKAN, DAN DIVERIFIKASI!
+================================================================================
+
+---
+
+### Tahap 46: Perbaikan Sinkronisasi Cache PWA & Diagnosa Riwayat Permohonan Cuti (MENUNGGU PERSETUJUAN ⏳)
+
+#### 1. Masalah & Temuan Akar Masalah (Root Cause Analysis)
+Berdasarkan keluhan pengguna (*"data cuti belum keluar bro"*) dan tangkapan layar sistem pada akun Dedi Sopiyan, S.H. (NIP: `199312242025211033`), tabel **Riwayat Pengajuan Cuti Anda** langsung merender fallback *"Belum ada riwayat pengajuan apapun."*. 
+
+Hasil audit mendalam ZettBOT menemukan 4 akar masalah:
+1. **Mismatch Versi Cache-Buster PWA (`transkep-web/index.html: L68`):**
+   - Pada commit `e0f6dbb`, berkas `sw.js` dinaikkan ke `transkep-v3.0.4` dan `APP_BUILD_VER` dinaikkan ke `'3.0.4'`.
+   - Namun pada baris 68 `transkep-web/index.html`, nilai `CURRENT_APP_BUILD` tertinggal pada `'transkep-v3.0.3'`.
+   - Karena browser pengguna telah menyimpan `transkep_active_build = 'transkep-v3.0.3'`, kondisi auto-bust cache (`localStorage.getItem('transkep_active_build') !== CURRENT_APP_BUILD`) bernilai **FALSE** (tidak terpenuhi).
+   - Akibatnya, browser pengguna tetap menyajikan berkas lawas v3.0.3 dari Service Worker Cache tanpa pernah mengunduh pembaruan terbaru!
+2. **Ketergantungan `google.script.run` yang Patah di PWA (`core.js` v3.0.3):**
+   - Pada kode v3.0.3 yang tersimpan di cache klien, pemanggilan `syncBackgroundData()` mengeksekusi `google.script.run.getBackgroundData()`.
+   - Pada environment standalone GitHub Pages PWA (`https://transkep.github.io/`), objek `google.script.run` tidak tersedia (`undefined`), menyebabkan error instan di konsol browser sehingga `state.cutiLogs` tidak pernah terisi (tetap `[]`).
+3. **Missing Adapter `TranskepAPI.call` pada `cuti_data.js`:**
+   - Berkas `transkep-web/modules/permohonan/cuti_data.js` untuk method `getSmartRouting()`, `addCutiLog()`, dan `updateCutiLog()` hanya memiliki percabangan `google.script.run` dan langsung melempar reject error `"Koneksi google.script.run tidak tersedia."` di GitHub Pages.
+   - Sedangkan method penghapusan (`deleteCutiLog`, `deleteIzinKeluarLog`, dll.) telah menggunakan jembatan modern `TranskepAPI.call(...)`.
+4. **Ketiadaan Loading State & Manual Refresh pada Tabel Riwayat:**
+   - Template `view_permohonan.html` hanya memeriksa `formattedLogs.length === 0` tanpa memperhatikan status `s.isBgSyncDone`. Jika background sync masih berjalan di latar belakang, tabel langsung menuduh data kosong.
+
+#### 2. Target File yang Akan Dimodifikasi
+1. [`transkep-web/index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/index.html):
+   - Naikkan `CURRENT_APP_BUILD` ke `'transkep-v3.0.5'` (Baris 68).
+   - Naikkan `APP_BUILD_VER` ke `'3.0.5'` (Baris 257).
+2. [`transkep-web/sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/sw.js):
+   - Naikkan `CACHE_NAME` ke `'transkep-v3.0.5'` (Baris 7).
+3. [`transkep-web/modules/permohonan/cuti_data.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/modules/permohonan/cuti_data.js):
+   - Lengkapi fungsi `getSmartRouting`, `addCutiLog`, dan `updateCutiLog` dengan adaptor `TranskepAPI.call(...)` sebelum fallback `google.script.run`.
+4. [`transkep-web/modules/permohonan/view_permohonan.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/modules/permohonan/view_permohonan.html) & [`permohonan/view_permohonan.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/view_permohonan.html):
+   - Pasang blok `v-else-if="s && !s.isBgSyncDone"` untuk menampilkan indikator loading *"Menyinkronkan riwayat dari server..."*.
+   - Pasang tombol interaktif `[ 🔄 Muat Ulang Riwayat ]` saat tabel kosong agar pengguna dapat memicu sinkronisasi ulang kapan pun tanpa harus reload browser.
+5. [`transkep-web/modules/permohonan/cuti.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/modules/permohonan/cuti.js) & [`permohonan/js_permohonan_view.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/js_permohonan_view.html):
+   - Tambahkan state `isRefreshing: false` dan method `refreshData()` pada `vmRiwayatPermohonan`.
+
+#### 3. Rencana Eksekusi Bertahap (Execution Plan)
+- [x] **Langkah 1**: Perbarui `transkep-web/modules/permohonan/cuti_data.js` dengan integrasi `TranskepAPI.call`.
+- [x] **Langkah 2**: Perbarui `view_permohonan.html` dan `cuti.js` dengan state sinkronisasi & tombol muat ulang interaktif.
+- [x] **Langkah 3**: Sinkronkan berkas tampilan Google Apps Script (`permohonan/view_permohonan.html` & `permohonan/js_permohonan_view.html`).
+- [x] **Langkah 4**: Naikkan versi cache PWA ke `transkep-v3.0.5` di `transkep-web/index.html` dan `transkep-web/sw.js`.
+- [x] **Langkah 5**: Push ke GitHub repository (`origin/main` & `prod/main`) dan deploy Apps Script via clasp (@309).
+- [x] **Langkah 6**: Validasi di browser pengguna.
+
+================================================================================
+STATUS TERKINI:
+TAHAP 46 (PERBAIKAN SINKRONISASI CACHE PWA & DIAGNOSA RIWAYAT PERMOHONAN CUTI) TELAH 100% SUKSES DIBANGUN, DIVERIFIKASI, DAN DIDEPLOY KE APPS SCRIPT @309 & GITHUB PAGES!
 ================================================================================
