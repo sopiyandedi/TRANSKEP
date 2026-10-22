@@ -448,6 +448,11 @@ function switchMenu(menuId) {
       }
     }
 
+    var skel = document.getElementById('dashboard-skeleton');
+    if (skel && menuId !== 'dashboard') {
+      skel.style.display = 'none';
+    }
+
     const navButtons = document.querySelectorAll('button[id^="nav-"]');
     navButtons.forEach(btn => {
       btn.classList.remove('w-[calc(100%+1rem)]', 'rounded-r-none', 'bg-gradient-to-r', 'from-transparent', 'to-cyan-500/10', 'text-white', 'border-r-4', 'border-cyan-400', 'border-r-cyan-400', 'shadow-[-8px_0_20px_rgba(34,211,238,0.15)]');

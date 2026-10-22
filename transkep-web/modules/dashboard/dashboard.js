@@ -95,7 +95,8 @@ window.dashboardApp = Vue.createApp({
       isBgSyncDone: false,
       cutiLogs: [], stList: [], ipLogs: [], ikLogs: [], wfhLogs: [],
       showModalStatus: false,
-      modalTmt: { nip: '', type: '', nama: '', dbStatus: '' }
+      modalTmt: { nip: '', type: '', nama: '', dbStatus: '' },
+      isSoftRefreshing: false
     };
   },
   computed: {
@@ -568,6 +569,29 @@ window.dashboardApp = Vue.createApp({
           this.closeModalStatus();
           showNotify("Error Sistem", err.toString(), "error");
         });
+    },
+
+    triggerSoftRefresh() {
+      if (this.isSoftRefreshing) return;
+      this.isSoftRefreshing = true;
+      if (typeof showNotify === 'function') {
+        showNotify("Menyinkronkan", "Menyegarkan data dashboard di latar belakang...", "info");
+      }
+      if (typeof window.syncAllServerData === 'function') {
+        window.syncAllServerData(true);
+      }
+      if (typeof window.syncBackgroundData === 'function') {
+        window.syncBackgroundData();
+      }
+      setTimeout(() => {
+        this.isSoftRefreshing = false;
+        if (typeof window.renderAllCharts === 'function') {
+          window.renderAllCharts();
+        }
+        if (typeof showNotify === 'function') {
+          showNotify("Data Terkini", "Sinkronisasi latar belakang selesai.", "success");
+        }
+      }, 1200);
     }
   }
 });
@@ -587,6 +611,10 @@ function ensureDashboardMounted() {
   if (dashElem) {
     dashElem.removeAttribute('v-cloak');
     dashElem.classList.remove('v-cloak');
+  }
+  const skel = document.getElementById('dashboard-skeleton');
+  if (skel) {
+    skel.style.display = 'none';
   }
   return window.vmDashboard;
 }

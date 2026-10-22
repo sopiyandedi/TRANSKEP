@@ -15,6 +15,7 @@
     </div>
     
     <div class="w-full md:max-w-2xl relative flex items-center gap-3 shrink-0">
+      <button type="button" @click="triggerSoftRefresh" :disabled="isSoftRefreshing" class="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center text-indigo-400 hover:bg-indigo-500/20 hover:text-white transition-all shadow-[0_0_10px_rgba(99,102,241,0.2)] shrink-0 group disabled:opacity-50" title="Segarkan Data Latar Belakang (Tanpa Reload Halaman)"><i :class="['fa-solid fa-arrows-rotate text-sm transition-transform duration-700', isSoftRefreshing ? 'animate-spin text-indigo-300' : 'group-hover:rotate-180']"></i></button>
       <button onclick="openModalKodeSurat()" class="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 hover:bg-emerald-500/20 hover:text-white transition-all shadow-[0_0_10px_rgba(16,185,129,0.2)] shrink-0" title="Kamus Kode Surat"><i class="fa-solid fa-floppy-disk"></i></button>
       <button onclick="openModalReferensiAbsensi()" class="w-10 h-10 rounded-xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-center text-rose-400 hover:bg-rose-500/20 hover:text-white transition-all shadow-[0_0_10px_rgba(244,63,94,0.2)] shrink-0" title="Referensi Aturan Absensi"><i class="fa-solid fa-user-group"></i></button>
 
