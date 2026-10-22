@@ -238,6 +238,7 @@
                       let statusColor = "text-amber-400 bg-amber-500/10 border-amber-500/20";
                       let atasanDot = "text-amber-500";
                       let pejabatDot = "text-slate-600";
+                      let hasDropdown = false;
                       let actions = [];
 
                       // --- LOGIKA CUTI ---
@@ -252,7 +253,7 @@
                           pejabatDot = log.status_pejabat === 'Disetujui' ? 'text-emerald-500' : (log.status_pejabat === 'Ditolak' ? 'text-rose-500' : 'text-amber-500');
                           
                           const sNorm = String(log.status || '').trim().toLowerCase();
-                          let hasDropdown = false;
+                          hasDropdown = false;
                           if (log.jenis !== 'Dinas Luar') {
                               if (sNorm === 'disetujui') {
                                   hasDropdown = true; // ZETTBOT TAHAP 43: 1 Tombol Ikon Compact mengeluarkan 2 opsi (Cetak & Unduh TTE)

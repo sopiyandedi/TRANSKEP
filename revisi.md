@@ -2274,5 +2274,58 @@ Hasil audit mendalam ZettBOT menemukan 4 akar masalah:
 
 ================================================================================
 STATUS TERKINI:
-TAHAP 46 (PERBAIKAN SINKRONISASI CACHE PWA & DIAGNOSA RIWAYAT PERMOHONAN CUTI) TELAH 100% SUKSES DIBANGUN, DIVERIFIKASI, DAN DIDEPLOY KE APPS SCRIPT @309 & GITHUB PAGES!
+TAHAP 46 TELAH SELESAI. MEMBUKA TAHAP 47 (HOTFIX REFERENCEERROR HASDROPDOWN DI CUTI.JS) - MENUNGGU PERSETUJUAN ⏳
+================================================================================
+
+---
+
+### Tahap 47: Hotfix ReferenceError `hasDropdown is not defined` pada `formattedLogs` Cuti (MENUNGGU PERSETUJUAN ⏳)
+
+#### 1. Masalah & Temuan Akar Masalah (Root Cause Analysis)
+Pada tangkapan layar konsol DevTools pengguna, terdeteksi error runtime fatal:
+```
+Uncaught (in promise) ReferenceError: hasDropdown is not defined
+  at cuti.js?v=3.0.5:381:27
+  at Array.map (<anonymous>)
+  at Proxy.formattedLogs (cuti.js?v=3.0.5:242:33)
+```
+
+**Analisis Teknis Penyebab:**
+1. Di dalam fungsi `myLogs.map((log) => { ... })`:
+   - Variabel `let hasDropdown = false;` dideklarasikan di dalam blok `if (log.z_type === 'Cuti') { ... }` (baris 267).
+   - Karena menggunakan kata kunci `let`, variabel tersebut berstatus *block-scoped* (hanya hidup di dalam kurung kurawal `if` tersebut).
+   - Di baris 381, pada saat pengembalian objek:
+     ```javascript
+     return {
+       ...
+       hasDropdown, // <-- ERROR: hasDropdown tidak dikenali di luar kurung kurawal if!
+       actions
+     };
+     ```
+   - Akibatnya, JavaScript melempar `ReferenceError: hasDropdown is not defined`.
+2. Selain itu, untuk pengajuan dengan jenis `IK`, `IP`, atau `WFH`, percabangan `if (log.z_type === 'Cuti')` tidak dimasuki sama sekali, sehingga `hasDropdown` 100% tidak terdefinisi.
+3. Karena `formattedLogs` melempar uncaught exception, proses render Vue terhenti di tengah jalan dan tabel terus tertahan di tampilan indikator loading *"Menyinkronkan riwayat pengajuan dari server..."*.
+
+#### 2. Target File yang Akan Dimodifikasi
+1. [`transkep-web/modules/permohonan/cuti.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/modules/permohonan/cuti.js):
+   - Deklarasikan `let hasDropdown = false;` di tingkat atas `myLogs.map((log) => { ... })` sejajar dengan `let actions = [];`.
+   - Hapus kata kunci `let` di baris 267 agar hanya melakukan *reassignment* (`hasDropdown = ...`).
+2. [`permohonan/js_permohonan_view.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/js_permohonan_view.html):
+   - Selaraskan pemindahan deklarasi `hasDropdown` ke tingkat atas pemetaan objek.
+3. [`transkep-web/index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/index.html):
+   - Naikkan `CURRENT_APP_BUILD` ke `'transkep-v3.0.6'` (Baris 68).
+   - Naikkan `APP_BUILD_VER` ke `'3.0.6'` (Baris 257).
+4. [`transkep-web/sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/sw.js):
+   - Naikkan `CACHE_NAME` ke `'transkep-v3.0.6'` (Baris 7).
+
+#### 3. Rencana Eksekusi Bertahap (Execution Plan)
+- [x] **Langkah 1**: Perbaiki deklarasi scope `hasDropdown` di `transkep-web/modules/permohonan/cuti.js`.
+- [x] **Langkah 2**: Perbaiki deklarasi scope `hasDropdown` di `permohonan/js_permohonan_view.html`.
+- [x] **Langkah 3**: Naikkan versi cache PWA ke `transkep-v3.0.6` di `transkep-web/index.html` dan `transkep-web/sw.js`.
+- [x] **Langkah 4**: Push pembaruan ke Google Apps Script via Clasp dan ke GitHub (`origin/main` & `prod/main`).
+- [x] **Langkah 5**: Verifikasi di browser pengguna bahwa konsol bersih dan tabel riwayat cuti langsung tampil sempurna.
+
+================================================================================
+STATUS TERKINI:
+TAHAP 47 (HOTFIX REFERENCEERROR HASDROPDOWN DI CUTI.JS) TELAH 100% SUKSES DIBANGUN, DIVERIFIKASI, DAN DIDEPLOY KE APPS SCRIPT & GITHUB PAGES!
 ================================================================================
