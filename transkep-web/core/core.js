@@ -6,8 +6,14 @@
 
 console.log("🚀 ZETTBOT: Menginisialisasi sistem TRANSKEP core.js...");
 
+let savedProfile = null;
+try {
+  const rawProfile = localStorage.getItem('transkep_user_profile') || localStorage.getItem('transkep_user');
+  if (rawProfile) savedProfile = JSON.parse(rawProfile);
+} catch(e) {}
+
 let state = (typeof Vue !== 'undefined' && Vue.reactive) ? Vue.reactive({
-  user: null,
+  user: savedProfile,
   usersList: [],
   cutiLogs: [],
   jobdesList: [],
@@ -26,7 +32,7 @@ let state = (typeof Vue !== 'undefined' && Vue.reactive) ? Vue.reactive({
   pendingPkpCount: 0,
   isBgSyncDone: false
 }) : {
-  user: null,
+  user: savedProfile,
   usersList: [],
   cutiLogs: [],
   jobdesList: [],
@@ -61,7 +67,21 @@ document.addEventListener("DOMContentLoaded", () => {
     const activeNip = localStorage.getItem('transkep_active_nip');
     const sessionToken = localStorage.getItem('transkep_session_token');
     if (activeNip && sessionToken) {
+      if (!state.user) {
+        try {
+          const rawProfile = localStorage.getItem('transkep_user_profile') || localStorage.getItem('transkep_user');
+          if (rawProfile) {
+            state.user = JSON.parse(rawProfile);
+            if (window.vueState) window.vueState.user = state.user;
+          }
+        } catch(e) {}
+      }
       toggleAppVisibility(true);
+
+      if (state.user && typeof renderGlobalHeader === 'function') {
+        renderGlobalHeader();
+      }
+
       const lastMenu = localStorage.getItem('transkep_last_menu') || 'dashboard';
       if (typeof switchMenu === 'function') {
         switchMenu(lastMenu);
@@ -148,10 +168,19 @@ function handleLogin(event) {
         localStorage.setItem('transkep_session_token', response.token);
         localStorage.setItem('transkep_user_nama', response.data.nama || '');
         localStorage.setItem('transkep_user_role', response.data.role || '');
+        try {
+          localStorage.setItem('transkep_user_profile', JSON.stringify(response.data));
+          localStorage.setItem('transkep_user', JSON.stringify(response.data));
+        } catch (e) {
+          console.warn("Gagal menyimpan transkep_user_profile ke localStorage:", e);
+        }
 
         // Set user di state seketika agar tidak null saat sync berlangsung
         window.vueState.user = response.data;
         if (typeof state !== 'undefined') state.user = response.data;
+        if (typeof renderGlobalHeader === 'function') {
+          renderGlobalHeader();
+        }
 
         const isTemporary = !!(response.must_change_password || (typeof pass === 'string' && /^TR-\d{6}$/.test(pass.trim())));
         if (isTemporary) {
@@ -195,6 +224,8 @@ function handleLogout() {
   localStorage.removeItem('transkep_session_token');
   localStorage.removeItem('transkep_user_nama');
   localStorage.removeItem('transkep_user_role');
+  localStorage.removeItem('transkep_user_profile');
+  localStorage.removeItem('transkep_user');
   localStorage.removeItem('transkep_force_change_password');
 
   window.vueState.currentMenu = 'dashboard';
@@ -221,8 +252,16 @@ function syncAllServerData(silent) {
     if (!isSilent) hideLoading();
     if (response && response.status === 'success') {
       state.user = response.data.user;
-      if (state.user && state.user.role) {
-        localStorage.setItem('transkep_user_role', state.user.role);
+      if (state.user) {
+        if (state.user.role) {
+          localStorage.setItem('transkep_user_role', state.user.role);
+        }
+        try {
+          localStorage.setItem('transkep_user_profile', JSON.stringify(state.user));
+          localStorage.setItem('transkep_user', JSON.stringify(state.user));
+        } catch (e) {
+          console.warn("Gagal menyimpan transkep_user_profile ke localStorage:", e);
+        }
       }
       state.usersList = response.data.usersList;
       state.pendingPkpCount = response.data.pendingPkpCount || 0;
@@ -244,6 +283,9 @@ function syncAllServerData(silent) {
       const currentActiveMenu = (window.vueState && window.vueState.currentMenu) || localStorage.getItem('transkep_last_menu') || 'dashboard';
       if (typeof switchMenu === 'function') {
         switchMenu(currentActiveMenu);
+      }
+      if (currentActiveMenu === 'dashboard' && typeof renderDashboardView === 'function') {
+        renderDashboardView();
       }
 
       updateSidebarBadges();
@@ -334,7 +376,7 @@ function syncBackgroundData() {
       updateSidebarBadges();
       if (typeof updateBadgePermohonan === 'function') updateBadgePermohonan();
 
-      const cm = state.currentMenu;
+      const cm = (window.vueState && window.vueState.currentMenu) || state.currentMenu || 'dashboard';
       if (cm === 'dashboard' && typeof renderDashboardView === 'function') renderDashboardView();
       if (cm === 'permohonan' && typeof renderPermohonanView === 'function') renderPermohonanView();
       if (cm === 'persetujuan' && typeof renderPersetujuanView === 'function') renderPersetujuanView();
@@ -353,7 +395,8 @@ function syncBackgroundData() {
     console.warn("Background Sync Gagal: " + (err ? err.message : ""));
     state.isBgSyncDone = true;
     if (window.vueState) window.vueState.isBgSyncDone = true;
-    if (state.currentMenu === 'dashboard' && typeof renderDashboardView === 'function') renderDashboardView();
+    const cm = (window.vueState && window.vueState.currentMenu) || state.currentMenu || 'dashboard';
+    if (cm === 'dashboard' && typeof renderDashboardView === 'function') renderDashboardView();
   };
 
   if (typeof TranskepAPI !== 'undefined' && typeof TranskepAPI.call === 'function') {
@@ -438,7 +481,9 @@ function switchMenu(menuId) {
       else if (menuId === 'manajemen' && window.vmPegawai && typeof window.vmPegawai.fetchResetQueue === 'function') window.vmPegawai.fetchResetQueue();
       window.vueState.rendered[menuId] = true;
     } else {
-      if (menuId === 'eoffice' && typeof window.refreshEofficeData === 'function') {
+      if (menuId === 'dashboard' && typeof renderDashboardView === 'function') {
+        renderDashboardView();
+      } else if (menuId === 'eoffice' && typeof window.refreshEofficeData === 'function') {
         window.refreshEofficeData();
       } else if (menuId === 'manajemen' && window.vmPegawai && typeof window.vmPegawai.fetchResetQueue === 'function') {
         window.vmPegawai.fetchResetQueue();
@@ -828,6 +873,15 @@ window.openChangePasswordModal = function (oldPass, isMandatory) {
 // KOMPONEN: GLOBAL HEADER PROFIL
 // =========================================================
 function renderGlobalHeader() {
+  if (!state.user) {
+    try {
+      const rawUser = localStorage.getItem('transkep_user_profile') || localStorage.getItem('transkep_user');
+      if (rawUser) {
+        state.user = JSON.parse(rawUser);
+        if (window.vueState) window.vueState.user = state.user;
+      }
+    } catch (e) {}
+  }
   if (!state.user) return;
   const viewContainer = document.getElementById('view-container');
   if (!viewContainer) return;
@@ -897,10 +951,12 @@ function renderGlobalHeader() {
         logout() { if (window.handleLogout) window.handleLogout(); }
       }
     }).mount('#global-profile-header');
+    headerDiv.removeAttribute('v-cloak');
 
   } else {
     if (window.vmGlobalHeader) {
       window.vmGlobalHeader.currentUser = state.user;
     }
+    headerDiv.removeAttribute('v-cloak');
   }
 }

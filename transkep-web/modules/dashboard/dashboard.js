@@ -80,9 +80,16 @@ function copyDataAndNotify(text, type) {
 // Inisialisasi Aplikasi Vue untuk Section Dashboard
 window.dashboardApp = Vue.createApp({
   data() {
+    let initialUser = (window.state && window.state.user) || null;
+    if (!initialUser) {
+      try {
+        const rawU = localStorage.getItem('transkep_user_profile') || localStorage.getItem('transkep_user');
+        if (rawU) initialUser = JSON.parse(rawU);
+      } catch (e) {}
+    }
     return {
-      currentUser: null,
-      usersList: [],
+      currentUser: initialUser,
+      usersList: (window.state && window.state.usersList) || [],
       searchKeyword: '',
       filterWarning: { name: '', jenis: '', bulan: '', tahun: '' },
       isBgSyncDone: false,
@@ -325,7 +332,7 @@ window.dashboardApp = Vue.createApp({
 
     syncFromGlobal(globalState) {
       this.currentUser = globalState.user;
-      this.usersList = globalState.usersList;
+      this.usersList = globalState.usersList || [];
       this.isBgSyncDone = globalState.isBgSyncDone;
 
       this.cutiLogs = globalState.cutiLogs || [];
@@ -424,16 +431,63 @@ window.dashboardApp = Vue.createApp({
   }
 });
 
-document.addEventListener("DOMContentLoaded", () => {
+function ensureDashboardMounted() {
+  if (!window.vmDashboard && window.dashboardApp) {
+    const dashElem = document.getElementById('section-dashboard');
+    if (dashElem) {
+      try {
+        window.vmDashboard = window.dashboardApp.mount('#section-dashboard');
+      } catch (e) {
+        console.warn("Mounting dashboardApp error:", e);
+      }
+    }
+  }
   const dashElem = document.getElementById('section-dashboard');
   if (dashElem) {
-    window.vmDashboard = window.dashboardApp.mount('#section-dashboard');
+    dashElem.removeAttribute('v-cloak');
+    dashElem.classList.remove('v-cloak');
   }
+  return window.vmDashboard;
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  ensureDashboardMounted();
 });
 
 function renderDashboardView() {
-  if (!state.user) return;
-  if (window.vmDashboard) window.vmDashboard.syncFromGlobal(state);
+  ensureDashboardMounted();
+
+  let curState = (typeof state !== 'undefined') ? state : window.vueState;
+  if (!curState || !curState.user) {
+    try {
+      const rawUser = localStorage.getItem('transkep_user_profile') || localStorage.getItem('transkep_user');
+      if (rawUser) {
+        const parsed = JSON.parse(rawUser);
+        if (typeof state !== 'undefined') state.user = parsed;
+        if (window.vueState) window.vueState.user = parsed;
+        curState = (typeof state !== 'undefined') ? state : window.vueState;
+      }
+    } catch (e) {
+      console.warn("Rehidrasi user gagal di dashboard:", e);
+    }
+  }
+
+  if (!curState || !curState.user) return;
+
+  if (window.vmDashboard && typeof window.vmDashboard.syncFromGlobal === 'function') {
+    window.vmDashboard.syncFromGlobal(curState);
+  }
+
+  const activeMenu = (window.vueState && window.vueState.currentMenu) || localStorage.getItem('transkep_last_menu');
+  if (activeMenu === 'dashboard') {
+    const dashElem = document.getElementById('section-dashboard');
+    if (dashElem) {
+      dashElem.classList.remove('hidden');
+      dashElem.classList.add('block');
+      dashElem.removeAttribute('v-cloak');
+    }
+  }
+
   if (typeof renderAllCharts === 'function') {
     setTimeout(renderAllCharts, 100);
   }

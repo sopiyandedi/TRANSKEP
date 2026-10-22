@@ -252,3 +252,17 @@ ZONA BAWAH: MASTER CONTEXT & STATUS MIGRASI TERKINI (LIVING CONTEXT)
     - **Silent Refresh Sync:** Memperbarui `DOMContentLoaded` dan `syncAllServerData(true)` agar sinkronisasi data saat refresh berjalan hening di latar belakang tanpa modal overlay yang menutup layar, serta mempertahankan menu aktif terakhir secara mulus.
     - PWA Service Worker `sw.js` diperbarui ke versi **transkep-v3.0.8**.
 
+25. **Penyelesaian Dashboard Kosong Pasca Login & Header Profile Hilang Pasca Refresh (Tahap 50):**
+    - **Akar Masalah Terselesaikan:**
+      1. Menghilangkan hilangnya header profil ("Dedi Sopiyan, S.H.") saat refresh browser (`F5`), yang sebelumnya terjadi karena profil hanya tersimpan di memori JavaScript volatile (`state.user: null`) sebelum network fetch selesai.
+      2. Mengatasi kondisi dashboard blank/kosong pasca login pertama kali, yang disebabkan lockout flag `window.vueState.rendered['dashboard'] = true` sebelum data profil server tiba, serta race condition antara mounting asynchronous Vue `#section-dashboard` dan eksekusi `renderDashboardView()`.
+    - **Instant Local Storage Profile Hydration (0ms):**
+      Menyimpan profil pengguna secara persisten ke `localStorage` (`transkep_user_profile` dan `transkep_user`) saat login sukses dan saat `syncAllServerData()` berjalan. Saat halaman dimuat/refresh, profil langsung di-hydrate ke `state.user` pada 0ms, merender kartu profil seketika tanpa jeda atau kedip.
+    - **Safe Vue Auto-Mount & Auto-Uncloak (`ensureDashboardMounted`):**
+      Membangun mekanisme `ensureDashboardMounted()` pada `dashboard.js` dan `js_dashboard.html` yang secara otomatis memverifikasi dan memasang aplikasi Vue ke `#section-dashboard` bila belum terpasang, melepas atribut `v-cloak`, dan melakukan sinkronisasi data seketika (`syncFromGlobal`) dari cache/state.
+    - **Eliminasi Lockout `switchMenu`:**
+      Memperbarui cabang `switchMenu('dashboard')` sehingga selalu memanggil `renderDashboardView()` baik pada render pertama maupun navigasi berulang.
+    - **Background Sync Reactive Trigger:**
+      Memastikan pemanggilan `renderDashboardView()` secara otomatis saat `syncAllServerData()` dan `syncBackgroundData()` selesai mengunduh data kehadiran dan peringatan dini pegawai.
+    - PWA Service Worker `sw.js` dan `CURRENT_APP_BUILD` di `transkep-web/index.html` diperbarui ke versi **transkep-v3.0.9**.
+

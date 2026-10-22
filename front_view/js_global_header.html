@@ -4,6 +4,15 @@
   // =========================================================
   
   function renderGlobalHeader() {
+    if(!state.user) {
+      try {
+        const rawUser = localStorage.getItem('transkep_user_profile') || localStorage.getItem('transkep_user');
+        if (rawUser) {
+          state.user = JSON.parse(rawUser);
+          if (window.vueState) window.vueState.user = state.user;
+        }
+      } catch (e) {}
+    }
     if(!state.user) return;
     const viewContainer = document.getElementById('view-container');
     if(!viewContainer) return;
@@ -78,12 +87,14 @@
                 logout() { if(window.handleLogout) window.handleLogout(); }
             }
         }).mount('#global-profile-header');
+        headerDiv.removeAttribute('v-cloak');
         
     } else {
         // Jika Vue sudah ada, cukup lempar update datanya saja, tidak perlu buat ulang DOM!
         if (window.vmGlobalHeader) {
             window.vmGlobalHeader.currentUser = state.user;
         }
+        headerDiv.removeAttribute('v-cloak');
     }
   }
 </script>
