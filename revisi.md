@@ -2318,3 +2318,41 @@ Hasil audit mendalam ZettBOT menemukan 4 akar masalah:
   2. Pemuatan skrip JavaScript dipercepat drastis dari 46 antrean serial berturut-turut menjadi 3 gelombang paralel terstruktur (Core sequential -> Data parallel -> Controller parallel), memangkas waktu inisialisasi modul dari ~800ms menjadi <80ms.
   3. Grafik Demografi (Jenis Kelamin, Pangkat/Golongan, Jabatan, dan Usia) langsung terhidrasi dari memori cache lokal `transkep_chart_cache` tanpa menunggu proses fetch server selesai, sehingga grafik tidak hilang atau kosong saat refresh.
   4. Tombol Soft Refresh di bilah alat header dashboard memungkinkan pengguna menyinkronkan data terbaru kapan pun tanpa reload penuh peramban.
+
+---
+
+### Tahap 53: Pilot Project SWR Non-Destructive Background Sync Dashboard & Eliminasi Tombol Soft Refresh Manual (MENUNGGU PERSETUJUAN ⏳)
+
+#### 1. Masalah & Kebutuhan Pengguna
+- **Eliminasi Tombol Refresh Manual**: Tombol manual soft refresh di header dashboard tidak lagi diperlukan karena sistem kini menjalankan sinkronisasi latar belakang secara otomatis. Tombol ini justru memadati toolbar header dan menuntut interaksi manual pengguna.
+- **Penerapan Stale-While-Revalidate (SWR) & Non-Destructive Loading**:
+  1. **Detik ke-0 (0ms)**: Grafik & metrik dashboard langsung terhidrasi dari memori cache lokal tanpa kedip dan tanpa layar kosong.
+  2. **Selama Sinkronisasi Latar Belakang**: Ditampilkan lencana mikro halus (*micro-indicator badge*) bershimmer `"🔄 Menyinkronkan data..."` di header dashboard yang menginformasikan bahwa sistem sedang mengecek mutasi/data terbaru secara senyap di background.
+  3. **Saat Data Server Tiba**: Grafik dan kartu metrik di-update secara mulus melalui transisi animasi native Chart.js (`chart.update('active')`) tanpa menghancurkan kanvas, lalu lencana mikro otomatis memudar (*fade-out*).
+
+#### 2. Target File yang Akan Dimodifikasi
+1. [`dashboard/view_dashboard.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/dashboard/view_dashboard.html) & [`transkep-web/modules/dashboard/view_dashboard.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/modules/dashboard/view_dashboard.html):
+   - Hapus tombol manual `triggerSoftRefresh`.
+   - Pasang lencana mikro sinkronisasi SWR non-destruktif (`v-if="isSyncing"`) di samping nama pengguna header.
+2. [`transkep-web/index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/index.html):
+   - Hapus placeholder tombol refresh dari App Shell Skeleton agar presisi 100% dengan tampilan asli.
+   - Naikkan cache PWA ke `transkep-v3.1.2`.
+3. [`dashboard/js_dashboard.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/dashboard/js_dashboard.html) & [`transkep-web/modules/dashboard/dashboard.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/modules/dashboard/dashboard.js):
+   - Hapus method `triggerSoftRefresh` yang sudah usang.
+   - Tambahkan state `isSyncing: true` yang otomatis berganti ke `false` saat sinkronisasi server selesai.
+4. [`dashboard/js_dashboard_grafik.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/dashboard/js_dashboard_grafik.html) & [`transkep-web/modules/dashboard/dashboard_grafik.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/modules/dashboard/dashboard_grafik.js):
+   - Pastikan transisi update chart menggunakan animasi mulus tanpa destroy canvas saat rehidrasi data baru.
+5. [`transkep-web/core/core.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/core/core.js):
+   - Menembakkan sinyal penyelesaian sinkronisasi (`transkep:sync-complete`) pada akhir proses background sync.
+6. [`transkep-web/sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/sw.js):
+   - Naikkan `CACHE_NAME` ke `transkep-v3.1.2`.
+
+#### 3. Rencana Eksekusi Bertahap (Execution Plan)
+- [x] **Langkah 1**: Hapus tombol soft refresh manual dari template dashboard dan skeleton header di `transkep-web/index.html`.
+- [x] **Langkah 2**: Pasang lencana mikro non-destruktif SWR *"Menyinkronkan..."* di samping salam pengguna header dashboard.
+- [x] **Langkah 3**: Sambungkan sinyal selesai sinkronisasi di `core.js` dengan state `isSyncing` di `dashboard.js` dan transisi `chart.update()` di `dashboard_grafik.js`.
+- [x] **Langkah 4**: Bersihkan method usang `triggerSoftRefresh` di controller dashboard.
+- [x] **Langkah 5**: Naikkan versi cache PWA Service Worker ke `transkep-v3.1.2` di `sw.js` dan `index.html`.
+- [ ] **Langkah 6**: Deploy ke Google Apps Script via Clasp dan commit/push ke GitHub (`origin/main` & `prod/main`).
+- [ ] **Langkah 7**: Uji coba refresh browser (F5) untuk memverifikasi keutuhan grafik dan transisi halusnya.
+

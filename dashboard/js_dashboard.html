@@ -18,15 +18,20 @@
         currentUser: initialUser,
         usersList: (window.state && window.state.usersList) || [],
         searchKeyword: '',
-        filterWarning: { name: '', jenis: '', bulan: '', tahun: '' },
-        isBgSyncDone: false,
+        isBgSyncDone: (window.state && window.state.isBgSyncDone) || false,
+        isSyncing: !((window.state && window.state.isBgSyncDone) || false),
         cutiLogs: [], stList: [], ipLogs: [], ikLogs: [], wfhLogs: [],
         
         // ZETTBOT FIX: State untuk Modal Status Peringatan
         showModalStatus: false,
-        modalTmt: { nip: '', type: '', nama: '', dbStatus: '' },
-        isSoftRefreshing: false
+        modalTmt: { nip: '', type: '', nama: '', dbStatus: '' }
       }
+    },
+    created() {
+      window.addEventListener('transkep:sync-complete', () => {
+        this.isSyncing = false;
+        this.isBgSyncDone = true;
+      });
     },
     computed: {
       isAdmin() {
@@ -503,27 +508,20 @@
             .updateTmtStatus(adminNip, targetNip, typeStr, newStatus, token);
       },
 
-      triggerSoftRefresh() {
-          if (this.isSoftRefreshing) return;
-          this.isSoftRefreshing = true;
-          if (window.showNotify) {
-              window.showNotify("Menyinkronkan", "Menyegarkan data dashboard di latar belakang...", "info");
+      syncFromGlobal(globalState) {
+          if (!globalState) return;
+          if (globalState.user) this.currentUser = globalState.user;
+          if (globalState.usersList) this.usersList = globalState.usersList;
+          this.isBgSyncDone = !!globalState.isBgSyncDone;
+          if (globalState.isBgSyncDone) {
+              this.isSyncing = false;
           }
-          if (typeof window.syncAllServerData === 'function') {
-              window.syncAllServerData(true);
-          }
-          if (typeof window.syncBackgroundData === 'function') {
-              window.syncBackgroundData();
-          }
-          setTimeout(() => {
-              this.isSoftRefreshing = false;
-              if (typeof window.renderAllCharts === 'function') {
-                  window.renderAllCharts();
-              }
-              if (window.showNotify) {
-                  window.showNotify("Data Terkini", "Sinkronisasi latar belakang selesai.", "success");
-              }
-          }, 1200);
+          if (globalState.cutiLogs) this.cutiLogs = globalState.cutiLogs;
+          if (globalState.stList) this.stList = globalState.stList;
+          if (globalState.ipLogs) this.ipLogs = globalState.ipLogs;
+          if (globalState.ikLogs) this.ikLogs = globalState.ikLogs;
+          if (globalState.wfhLogs) this.wfhLogs = globalState.wfhLogs;
+          this.checkAutoForward();
       }
     }
   });

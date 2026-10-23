@@ -256,13 +256,17 @@
           var ctxG = document.getElementById('genderChartAdmin');
           var elTotal = document.getElementById('chartTotalUserAdmin');
           if (ctxG) {
-              if (chartInstanceGender) chartInstanceGender.destroy();
-              chartInstanceGender = new Chart(ctxG.getContext('2d'), {
-                  type: 'doughnut',
-                  data: {
-                      labels: ['Laki-laki (' + male + ')', 'Perempuan (' + female + ')'],
-                      datasets: [{
-                          data: [male, female],
+              if (chartInstanceGender) {
+                  chartInstanceGender.data.labels = ['Laki-laki (' + male + ')', 'Perempuan (' + female + ')'];
+                  chartInstanceGender.data.datasets[0].data = [male, female];
+                  chartInstanceGender.update();
+              } else {
+                  chartInstanceGender = new Chart(ctxG.getContext('2d'), {
+                      type: 'doughnut',
+                      data: {
+                          labels: ['Laki-laki (' + male + ')', 'Perempuan (' + female + ')'],
+                          datasets: [{
+                              data: [male, female],
                           backgroundColor: ['#3b82f6', '#f43f5e'],
                           borderWidth: 0,
                           hoverOffset: 6
@@ -290,6 +294,7 @@
                       onClick: onChartClickTrigger
                   }
               });
+              }
               if (elTotal) elTotal.innerText = total;
           }
 
@@ -350,14 +355,21 @@
 
           var ctxP = document.getElementById('golonganChart');
           if (ctxP) {
-              if (chartInstanceGolongan) chartInstanceGolongan.destroy();
               var maxP = Math.max.apply(null, pData.concat([5]));
-              chartInstanceGolongan = new Chart(ctxP.getContext('2d'), {
-                  type: 'bar',
-                  data: {
-                      labels: pLabels,
-                      datasets: [{ label: 'Pegawai', data: pData, backgroundColor: '#10b981', borderRadius: 4 }]
-                  },
+              if (chartInstanceGolongan) {
+                  chartInstanceGolongan.data.labels = pLabels;
+                  chartInstanceGolongan.data.datasets[0].data = pData;
+                  if (chartInstanceGolongan.options.scales && chartInstanceGolongan.options.scales.x) {
+                      chartInstanceGolongan.options.scales.x.max = maxP + 2;
+                  }
+                  chartInstanceGolongan.update();
+              } else {
+                  chartInstanceGolongan = new Chart(ctxP.getContext('2d'), {
+                      type: 'bar',
+                      data: {
+                          labels: pLabels,
+                          datasets: [{ label: 'Pegawai', data: pData, backgroundColor: '#10b981', borderRadius: 4 }]
+                      },
                   options: {
                       indexAxis: 'y',
                       responsive: true,
@@ -382,6 +394,7 @@
                   },
                   plugins: [barDataLabelPlugin]
               });
+              }
           }
           var elTotPangkat = document.getElementById('totalPangkatText');
           if(elTotPangkat) elTotPangkat.innerHTML = '<span class="inline-block w-2 h-2 rounded bg-emerald-500 mr-1.5"></span> Total Data: <span class="font-bold text-slate-200">' + total + ' Pegawai</span>';
@@ -393,14 +406,21 @@
           var jData = jLabels.map(function(l) { return jCounts[l]; });
           var ctxJ = document.getElementById('jabatanChart');
           if (ctxJ) {
-              if (chartInstanceJabatan) chartInstanceJabatan.destroy();
               var maxJ = Math.max.apply(null, jData.concat([5]));
-              chartInstanceJabatan = new Chart(ctxJ.getContext('2d'), {
-                  type: 'bar',
-                  data: {
-                      labels: jLabels,
-                      datasets: [{ label: 'Pegawai', data: jData, backgroundColor: '#f59e0b', borderRadius: 4 }]
-                  },
+              if (chartInstanceJabatan) {
+                  chartInstanceJabatan.data.labels = jLabels;
+                  chartInstanceJabatan.data.datasets[0].data = jData;
+                  if (chartInstanceJabatan.options.scales && chartInstanceJabatan.options.scales.x) {
+                      chartInstanceJabatan.options.scales.x.max = maxJ + 2;
+                  }
+                  chartInstanceJabatan.update();
+              } else {
+                  chartInstanceJabatan = new Chart(ctxJ.getContext('2d'), {
+                      type: 'bar',
+                      data: {
+                          labels: jLabels,
+                          datasets: [{ label: 'Pegawai', data: jData, backgroundColor: '#f59e0b', borderRadius: 4 }]
+                      },
                   options: {
                       indexAxis: 'y',
                       responsive: true,
@@ -432,6 +452,7 @@
                   },
                   plugins: [barDataLabelPlugin]
               });
+              }
           }
           var elTotJabatan = document.getElementById('totalJabatanText');
           if(elTotJabatan) elTotJabatan.innerHTML = '<span class="inline-block w-2 h-2 rounded bg-amber-500 mr-1.5"></span> Total Data: <span class="font-bold text-slate-200">' + total + ' Pegawai</span>';
@@ -440,14 +461,21 @@
           var uLabels = Object.keys(uCounts), uData = uLabels.map(function(l) { return uCounts[l]; });
           var ctxUsia = document.getElementById('usiaChart');
           if (ctxUsia) {
-              if (chartInstanceUsia) chartInstanceUsia.destroy();
               var maxU = Math.max.apply(null, uData.concat([5]));
-              chartInstanceUsia = new Chart(ctxUsia.getContext('2d'), {
-                  type: 'bar',
-                  data: {
-                      labels: uLabels,
-                      datasets: [{ label: 'Pegawai', data: uData, backgroundColor: '#f43f5e', borderRadius: 4 }]
-                  },
+              if (chartInstanceUsia) {
+                  chartInstanceUsia.data.labels = uLabels;
+                  chartInstanceUsia.data.datasets[0].data = uData;
+                  if (chartInstanceUsia.options.scales && chartInstanceUsia.options.scales.x) {
+                      chartInstanceUsia.options.scales.x.max = maxU + 2;
+                  }
+                  chartInstanceUsia.update();
+              } else {
+                  chartInstanceUsia = new Chart(ctxUsia.getContext('2d'), {
+                      type: 'bar',
+                      data: {
+                          labels: uLabels,
+                          datasets: [{ label: 'Pegawai', data: uData, backgroundColor: '#f43f5e', borderRadius: 4 }]
+                      },
                   options: {
                       indexAxis: 'y',
                       responsive: true,
@@ -472,6 +500,7 @@
                   },
                   plugins: [barDataLabelPlugin]
               });
+              }
           }
           var elTotUsia = document.getElementById('totalUsiaText');
           if(elTotUsia) elTotUsia.innerHTML = '<span class="inline-block w-2 h-2 rounded bg-rose-500 mr-1.5"></span> Total Data: <span class="font-bold text-slate-200">' + total + ' Pegawai</span>';

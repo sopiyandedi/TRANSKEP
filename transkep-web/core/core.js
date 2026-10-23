@@ -372,6 +372,13 @@ function syncBackgroundData() {
         window.vueState.isBgSyncDone = true;
       }
       state.isBgSyncDone = true;
+      if (window.vmDashboard) {
+        window.vmDashboard.isSyncing = false;
+        window.vmDashboard.isBgSyncDone = true;
+      }
+      try {
+        window.dispatchEvent(new CustomEvent('transkep:sync-complete'));
+      } catch(e) {}
 
       updateSidebarBadges();
       if (typeof updateBadgePermohonan === 'function') updateBadgePermohonan();

@@ -294,6 +294,7 @@ ZONA BAWAH: MASTER CONTEXT & STATUS MIGRASI TERKINI (LIVING CONTEXT)
     - **Chart Cache Hydration & Silent Background Re-render (\dashboard_grafik.js\):**
       - Menerapkan cache snapshot statistik demografi (\	ranskep_chart_cache\) ke \localStorage\. Saat halaman dimuat ulang / refresh, fungsi enderAllCharts()\ langsung merender grafik seketika dari cache (0ms) tanpa menunggu fetch data pegawai server selesai.
       - Saat data live server tiba di latar belakang, Chart.js memperbarui dataset secara hening dengan animasi transisi yang mulus (*smooth transition update*) tanpa kedip atau reset kanvas.
-    - **Soft Refresh Interaktif Tanpa Reload Halaman:**
-      - Menambahkan tombol Soft Refresh dengan ikon putar (\a-arrows-rotate\) di bilah alat header dashboard, memungkinkan pengguna menyegarkan data kepegawaian dan kehadiran kapan saja secara mandiri tanpa perlu menekan tombol F5 browser.
-    - PWA Service Worker \sw.js\ dan \CURRENT_APP_BUILD\ di \	ranskep-web/index.html\ diperbarui ke versi **transkep-v3.1.1**.
+    - **Pilot Project SWR Non-Destructive Background Sync & Eliminasi Tombol Refresh Manual (Tahap 53):**
+      - Mengeliminasi tombol manual Soft Refresh di header dashboard, menggantikannya dengan proses background sync otomatis dan lencana mikro bershimmer (*SWR micro-indicator*) `"🔄 Menyinkronkan..."` di samping salam nama pengguna.
+      - Menerapkan pembaruan grafik non-destruktif (`chart.update('active')`) pada `dashboard_grafik.js` dan `js_dashboard_grafik.html` yang mempertahankan kanvas chart saat rehidrasi data baru sehingga terbebas dari kedipan putih.
+      - PWA Service Worker `sw.js` dan `CURRENT_APP_BUILD` di `transkep-web/index.html` diperbarui ke versi **transkep-v3.1.2**.

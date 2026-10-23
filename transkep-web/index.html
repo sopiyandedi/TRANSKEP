@@ -105,7 +105,7 @@
   <!-- ZETTBOT: Auto-Bust PWA Cache & Stale Service Worker Guard -->
   <script>
     (async function() {
-      const CURRENT_APP_BUILD = 'transkep-v3.1.1';
+      const CURRENT_APP_BUILD = 'transkep-v3.1.2';
       if (localStorage.getItem('transkep_active_build') !== CURRENT_APP_BUILD) {
         localStorage.setItem('transkep_active_build', CURRENT_APP_BUILD);
         try {
@@ -179,15 +179,15 @@
                   <h2 class="text-2xl font-bold text-white tracking-wide flex items-center gap-2">
                     <i class="fa-solid fa-house-chimney text-indigo-500 mr-2"></i>Dashboard
                   </h2>
-                  <p class="text-slate-400 text-sm mt-1">
+                  <p class="text-slate-400 text-sm mt-1 flex flex-wrap items-center gap-2">
                     Selamat datang, <span id="skeleton-user-name" class="text-slate-200 font-bold">Memuat data...</span>
+                    <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 font-medium tracking-wide animate-pulse">
+                      <i class="fa-solid fa-arrows-rotate fa-spin text-[9px] text-indigo-300"></i> Menyinkronkan...
+                    </span>
                   </p>
                 </div>
                 
                 <div class="w-full md:max-w-2xl relative flex items-center gap-3 shrink-0">
-                  <div class="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shrink-0">
-                    <i class="fa-solid fa-arrows-rotate text-sm animate-spin text-indigo-300"></i>
-                  </div>
                   <div class="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
                     <i class="fa-solid fa-floppy-disk"></i>
                   </div>

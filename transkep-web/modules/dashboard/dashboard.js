@@ -92,12 +92,18 @@ window.dashboardApp = Vue.createApp({
       usersList: (window.state && window.state.usersList) || [],
       searchKeyword: '',
       filterWarning: { name: '', jenis: '', bulan: '', tahun: '' },
-      isBgSyncDone: false,
+      isBgSyncDone: (window.state && window.state.isBgSyncDone) || false,
+      isSyncing: !((window.state && window.state.isBgSyncDone) || false),
       cutiLogs: [], stList: [], ipLogs: [], ikLogs: [], wfhLogs: [],
       showModalStatus: false,
-      modalTmt: { nip: '', type: '', nama: '', dbStatus: '' },
-      isSoftRefreshing: false
+      modalTmt: { nip: '', type: '', nama: '', dbStatus: '' }
     };
+  },
+  created() {
+    window.addEventListener('transkep:sync-complete', () => {
+      this.isSyncing = false;
+      this.isBgSyncDone = true;
+    });
   },
   computed: {
     isAdmin() {
@@ -471,6 +477,9 @@ window.dashboardApp = Vue.createApp({
       this.currentUser = globalState.user;
       this.usersList = globalState.usersList || [];
       this.isBgSyncDone = globalState.isBgSyncDone;
+      if (globalState.isBgSyncDone) {
+        this.isSyncing = false;
+      }
 
       this.cutiLogs = globalState.cutiLogs || [];
       this.stList = globalState.stList || [];
@@ -569,29 +578,6 @@ window.dashboardApp = Vue.createApp({
           this.closeModalStatus();
           showNotify("Error Sistem", err.toString(), "error");
         });
-    },
-
-    triggerSoftRefresh() {
-      if (this.isSoftRefreshing) return;
-      this.isSoftRefreshing = true;
-      if (typeof showNotify === 'function') {
-        showNotify("Menyinkronkan", "Menyegarkan data dashboard di latar belakang...", "info");
-      }
-      if (typeof window.syncAllServerData === 'function') {
-        window.syncAllServerData(true);
-      }
-      if (typeof window.syncBackgroundData === 'function') {
-        window.syncBackgroundData();
-      }
-      setTimeout(() => {
-        this.isSoftRefreshing = false;
-        if (typeof window.renderAllCharts === 'function') {
-          window.renderAllCharts();
-        }
-        if (typeof showNotify === 'function') {
-          showNotify("Data Terkini", "Sinkronisasi latar belakang selesai.", "success");
-        }
-      }, 1200);
     }
   }
 });
