@@ -298,3 +298,10 @@ ZONA BAWAH: MASTER CONTEXT & STATUS MIGRASI TERKINI (LIVING CONTEXT)
       - Mengeliminasi tombol manual Soft Refresh di header dashboard, menggantikannya dengan proses background sync otomatis dan lencana mikro bershimmer (*SWR micro-indicator*) `"🔄 Menyinkronkan..."` di samping salam nama pengguna.
       - Menerapkan pembaruan grafik non-destruktif (`chart.update('active')`) pada `dashboard_grafik.js` dan `js_dashboard_grafik.html` yang mempertahankan kanvas chart saat rehidrasi data baru sehingga terbebas dari kedipan putih.
       - PWA Service Worker `sw.js` dan `CURRENT_APP_BUILD` di `transkep-web/index.html` diperbarui ke versi **transkep-v3.1.2**.
+28. **Rencana SWR Non-Destructive Loading State & Dedicated App Shell Skeleton pada Menu Permohonan Cuti (Tahap 54 - Terkunci 🔒):**
+    - **Eliminasi Layar Kosong 0ms pada Menu Permohonan:** Menyematkan kerangka antarmuka skeleton mandiri (`#permohonan-skeleton`) di `transkep-web/index.html` dan `index.html` yang aktif seketika pada saat refresh browser jika rute terakhir adalah `#permohonan`.
+    - **Local Cache Hydration Riwayat Pengajuan:** Menyimpan dan me-rehidrasi snapshot `cutiLogs`, `ikLogs`, `ipLogs`, `wfhLogs` via `localStorage` (`transkep_cuti_cache`) ke `state.cutiLogs` pada 0ms sehingga tabel riwayat tampil utuh seketika tanpa jeda kosong.
+    - **Eliminasi Pembongkaran Tabel Menjadi Spinner Kosong:** Menghapus takeover `v-else-if="s && !s.isBgSyncDone"` dari `view_permohonan.html` dan menggantikannya dengan lencana mikro SWR berdenyut halus `"🔄 Menyinkronkan..."` di toolbar atas tabel.
+    - **Pembaruan Data Halus & Seamless Dismissal:** Menyambungkan listener `transkep:sync-complete` pada `vmRiwayatPermohonan` untuk memperbarui baris data di background saat fetch server selesai dan memudarkan lencana loading secara otomatis.
+    - Versi target PWA Service Worker: **transkep-v3.1.3**.
+

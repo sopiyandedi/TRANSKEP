@@ -2321,7 +2321,7 @@ Hasil audit mendalam ZettBOT menemukan 4 akar masalah:
 
 ---
 
-### Tahap 53: Pilot Project SWR Non-Destructive Background Sync Dashboard & Eliminasi Tombol Soft Refresh Manual (MENUNGGU PERSETUJUAN ⏳)
+### Tahap 53: Pilot Project SWR Non-Destructive Background Sync Dashboard & Eliminasi Tombol Soft Refresh Manual (SELESAI & DIVERIFIKASI ✅)
 
 #### 1. Masalah & Kebutuhan Pengguna
 - **Eliminasi Tombol Refresh Manual**: Tombol manual soft refresh di header dashboard tidak lagi diperlukan karena sistem kini menjalankan sinkronisasi latar belakang secara otomatis. Tombol ini justru memadati toolbar header dan menuntut interaksi manual pengguna.
@@ -2364,4 +2364,48 @@ Hasil audit mendalam ZettBOT menemukan 4 akar masalah:
   3. Lencana mikro SWR berdenyut halus `"🔄 Menyinkronkan..."` otomatis tampil di samping salam pengguna selama background fetch data berjalan, lalu otomatis menghilang begitu data server selesai diterima.
   4. Grafik Chart.js diperbarui secara non-destruktif (`chart.update('active')`) tanpa me-reset kanvas, sehingga perubahan angka/data bergerak dengan animasi transisi yang mulus.
   5. Versi PWA Service Worker telah dinaikkan ke `transkep-v3.1.2`, dideploy via Clasp, dan disinkronkan ke GitHub repository (`origin/main` dan `prod/main`).
+
+---
+
+### Tahap 54: Pilot Project SWR Non-Destructive Background Sync & Dedicated App Shell Skeleton Menu Permohonan Cuti (TERKUNCI & SIAP DIEKSEKUSI 🔒⏳)
+
+#### 1. Masalah & Kebutuhan Pengguna
+- **Layar Hitam/Kosong pada 0ms – 50ms (Refresh pada Menu Permohonan):**
+  Saat pengguna me-refresh browser (F5) saat berada di rute `#permohonan`, skeleton dashboard otomatis disembunyikan (`display: none`), tetapi kontainer `#slot-permohonan` belum memiliki kerangka skeleton mandiri. Hal ini menyebabkan layar hitam/kosong selama puluhan milidetik sebelum modul JavaScript permohonan selesai dimuat.
+- **Pembongkaran Tabel Menjadi Spinner Kosong (Layout Shift & Kedip Kasar):**
+  Pada file [`permohonan/view_permohonan.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/view_permohonan.html) baris 59:
+  ```html
+  <tbody v-else-if="s && !s.isBgSyncDone">
+     <tr><td colspan="7">... Menyinkronkan riwayat pengajuan dari server...</td></tr>
+  </tbody>
+  ```
+  Kondisi ini menghancurkan seluruh baris tabel riwayat yang sebelumnya sudah ada dan menggantinya dengan 1 baris spinner loading. Ketika server selesai merespons, tabel baru muncul kembali secara mendadak sehingga menimbulkan kedipan kasar.
+- **Penerapan Stale-While-Revalidate (SWR) pada Data Tabular:**
+  1. **Detik ke-0 (0ms)**: Riwayat pengajuan cuti langsung terhidrasi dari memori cache lokal `transkep_cuti_cache` ke `state.cutiLogs` sehingga tabel langsung tampil utuh seketika tanpa jeda kosong.
+  2. **Selama Sinkronisasi Latar Belakang**: Seluruh baris tabel tetap ditampilkan utuh, sementara sebuah lencana mikro SWR bershimmer `"🔄 Menyinkronkan..."` aktif di atas toolbar riwayat tabel.
+  3. **Saat Data Server Tiba**: Baris tabel diperbarui secara halus di latar belakang, dan lencana mikro otomatis *fade out*.
+
+#### 2. Target File yang Akan Dimodifikasi
+1. [`transkep-web/index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/index.html) & [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html):
+   - Tambahkan kontainer `<div id="permohonan-skeleton">` (Header permohonan, tombol tab, dan 4 baris placeholder tabel shimmer) yang aktif seketika saat `lastMenu === 'permohonan'`.
+2. [`permohonan/view_permohonan.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/view_permohonan.html) & [`transkep-web/modules/permohonan/view_permohonan.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/modules/permohonan/view_permohonan.html):
+   - Hapus takeover `v-else-if="s && !s.isBgSyncDone"` dari `<tbody>` agar tabel riwayat tidak dibongkar menjadi spinner kosong saat refresh.
+   - Pasang lencana mikro SWR non-destruktif (`v-if="isSyncing"`) di toolbar atas tabel riwayat.
+3. [`transkep-web/modules/permohonan/cuti.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/modules/permohonan/cuti.js) & [`permohonan/js_permohonan_view.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/js_permohonan_view.html):
+   - Hubungkan state `isSyncing: true` di `vmRiwayatPermohonan` dengan event listener `transkep:sync-complete`.
+   - Implementasikan cache hydration `transkep_cuti_cache` pada saat instansiasi.
+4. [`transkep-web/core/core.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/core/core.js) & [`javascript.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/javascript.html):
+   - Simpan snapshot `cutiLogs`, `ikLogs`, `ipLogs`, `wfhLogs` ke `localStorage.setItem('transkep_cuti_cache', ...)` saat data server berhasil disinkronkan.
+5. [`transkep-web/sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/sw.js) & [`transkep-web/index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/index.html):
+   - Naikkan versi cache PWA ke `transkep-v3.1.3`.
+
+#### 3. Rencana Eksekusi Bertahap (Execution Plan)
+- [ ] **Langkah 1**: Rancang dan pasang App Shell Skeleton Permohonan `<div id="permohonan-skeleton">` di `transkep-web/index.html` dan `index.html`.
+- [ ] **Langkah 2**: Hapus kondisi pembongkar tabel `v-else-if="s && !s.isBgSyncDone"` di `view_permohonan.html` (baik versi GAS maupun PWA).
+- [ ] **Langkah 3**: Pasang lencana mikro SWR *"🔄 Menyinkronkan..."* di atas toolbar tabel riwayat permohonan.
+- [ ] **Langkah 4**: Terapkan mekanisme cache snapshot riwayat (`transkep_cuti_cache`) dan listener `transkep:sync-complete` di `cuti.js` & `core.js`.
+- [ ] **Langkah 5**: Naikkan versi cache PWA Service Worker ke `transkep-v3.1.3`.
+- [ ] **Langkah 6**: Deploy ke Google Apps Script via Clasp dan commit/push ke GitHub (`origin/main` & `prod/main`).
+- [ ] **Langkah 7**: Uji coba refresh browser (F5) pada halaman Permohonan untuk memastikan tabel tetap tampil utuh tanpa jeda layar kosong.
+
 
