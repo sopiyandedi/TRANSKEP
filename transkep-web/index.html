@@ -1,19 +1,22 @@
 <!DOCTYPE html>
 <html lang="id">
+
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>TRANSKEP - Transparansi Kepegawaian PA Indramayu</title>
-  
+  <meta name="viewport"
+    content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>TRANSKEP</title>
+
   <!-- PWA & Mobile Web App Meta Tags -->
-  <meta name="description" content="TRANSKEP - Sistem Informasi Manajemen & Transparansi Kepegawaian Pengadilan Agama Indramayu">
+  <meta name="description"
+    content="TRANSKEP - Sistem Informasi Manajemen & Transparansi Kepegawaian Pengadilan Agama Indramayu">
   <meta name="theme-color" content="#4f46e5">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="application-name" content="TRANSKEP">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="TRANSKEP">
-  
+
   <!-- Favicon & PWA Icons -->
   <link rel="icon" type="image/png" href="img/logo.png">
   <link rel="apple-touch-icon" href="img/logo.png">
@@ -21,16 +24,16 @@
 
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
-  
+
   <!-- Vue.js 3 Global CDN -->
   <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
-  
+
   <!-- Chart.js CDN -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  
+
   <!-- SheetJS (Excel Importer/Exporter) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-  
+
   <!-- Firebase SDK v10 (Cloud Firestore Compat Library) -->
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
@@ -38,13 +41,14 @@
   <!-- PDF-Lib & Node-Forge (Digital Signature PAdES Engine) -->
   <script src="vendor/pdf-lib.min.js"></script>
   <script src="vendor/forge.min.js"></script>
-  
+
   <!-- Google Fonts: Plus Jakarta Sans -->
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
-  
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&display=swap"
+    rel="stylesheet">
+
   <!-- FontAwesome 6 -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-  
+
   <!-- Modular Stylesheets (100% Identik dengan TRANSKEP Asli) -->
   <link rel="stylesheet" href="css/stylesheet.css">
   <link rel="stylesheet" href="css/mobile.css">
@@ -54,7 +58,7 @@
 
   <!-- ZETTBOT: Instant Anti-FOUC Session Guard (0ms Auth State Resolution) -->
   <script>
-    (function() {
+    (function () {
       try {
         var nip = localStorage.getItem('transkep_active_nip');
         var token = localStorage.getItem('transkep_session_token');
@@ -63,7 +67,7 @@
         } else {
           document.documentElement.classList.add('app-unauthenticated');
         }
-      } catch(e) {}
+      } catch (e) { }
     })();
   </script>
 
@@ -72,39 +76,46 @@
     [v-cloak] {
       display: none !important;
     }
+
     /* Anti-FOUC Auth Guard: 0ms Eliminasi Kedip Layar Login Saat Refresh */
     html.app-authenticated #login-section,
     html.app-authenticated #slot-login {
       display: none !important;
     }
+
     html.app-authenticated #app-container {
       display: flex !important;
     }
+
     html.app-unauthenticated #login-section,
     html.app-unauthenticated #slot-login {
       display: flex !important;
     }
+
     html.app-unauthenticated #app-container {
       display: none !important;
     }
+
     /* ZETTBOT: Instant App Shell Skeleton Control (0ms Anti-Blank Layar Saat Refresh) */
     #dashboard-skeleton {
       display: none;
     }
+
     html.app-authenticated #dashboard-skeleton {
       display: block;
     }
-    html.app-authenticated #section-dashboard:not([v-cloak]) ~ #dashboard-skeleton {
+
+    html.app-authenticated #section-dashboard:not([v-cloak])~#dashboard-skeleton {
       display: none !important;
     }
   </style>
 </head>
 
 <body class="bg-slate-950 text-slate-200 min-h-screen overflow-hidden flex selection:bg-indigo-500/30">
-  
+
   <!-- ZETTBOT: Auto-Bust PWA Cache & Stale Service Worker Guard -->
   <script>
-    (async function() {
+    (async function () {
       const CURRENT_APP_BUILD = 'transkep-v3.1.6';
       if (localStorage.getItem('transkep_active_build') !== CURRENT_APP_BUILD) {
         localStorage.setItem('transkep_active_build', CURRENT_APP_BUILD);
@@ -119,7 +130,7 @@
               await r.unregister();
             }
           }
-        } catch(e) {}
+        } catch (e) { }
         window.location.reload(true);
       }
     })();
@@ -129,51 +140,65 @@
   <script>
     document.body.classList.add('preload-theme');
     if (localStorage.getItem('transkep_theme') === 'light') {
-        document.body.classList.add('light-mode');
+      document.body.classList.add('light-mode');
     }
-    setTimeout(function() {
-        document.body.classList.remove('preload-theme');
+    setTimeout(function () {
+      document.body.classList.remove('preload-theme');
     }, 300);
   </script>
 
   <!-- Glowing Background Orbs -->
-  <div class="fixed top-[-10%] left-[-10%] w-96 h-96 bg-indigo-600/20 rounded-full blur-[120px] pointer-events-none -z-10"></div>
-  <div class="fixed bottom-[-10%] right-[-10%] w-96 h-96 bg-emerald-600/10 rounded-full blur-[120px] pointer-events-none -z-10"></div>
+  <div
+    class="fixed top-[-10%] left-[-10%] w-96 h-96 bg-indigo-600/20 rounded-full blur-[120px] pointer-events-none -z-10">
+  </div>
+  <div
+    class="fixed bottom-[-10%] right-[-10%] w-96 h-96 bg-emerald-600/10 rounded-full blur-[120px] pointer-events-none -z-10">
+  </div>
 
   <!-- KANVAS BACKGROUND ANIMASI PARTIKEL JARINGAN (INSTANT RENDER 0ms) -->
-  <canvas id="loginParticleCanvas" style="z-index: -10 !important;" class="fixed inset-0 w-full h-full pointer-events-none opacity-40"></canvas>
+  <canvas id="loginParticleCanvas" style="z-index: -10 !important;"
+    class="fixed inset-0 w-full h-full pointer-events-none opacity-40"></canvas>
   <script src="core/particles.js"></script>
 
   <!-- ========================================================= -->
   <!-- 1. SLOT LOGIN SECTION & RESET PASSWORD                   -->
   <!-- ========================================================= -->
-  
+
   <!-- ========================================================= -->
   <!-- UNIVERSAL FULLSCREEN PROCESSING OVERLAY (ALA SIKEP)      -->
   <!-- ========================================================= -->
-  <div id="global-loader" class="fixed inset-0 z-[999999] bg-slate-950/85 backdrop-blur-xl flex flex-col items-center justify-center transition-all duration-400 ease-out hidden opacity-0 pointer-events-none select-none">
-     <div class="flex flex-col items-center justify-center text-center px-4 max-w-md">
-        <!-- Logo 3D Animasi Melayang & Pulse Glow -->
-        <div class="relative mb-6">
-           <div class="absolute -inset-4 bg-gradient-to-r from-indigo-500/30 to-emerald-500/20 rounded-full blur-2xl pointer-events-none"></div>
-           <img src="img/logo.png" onerror="this.onerror=null; this.src='https://lh3.googleusercontent.com/d/1xbfVM1yO_o0sn5XV6fIsqFK2GIC6k95J=w400'" alt="TRANSKEP" class="w-24 md:w-28 h-auto object-contain relative z-10 sikep-logo-animated">
+  <div id="global-loader"
+    class="fixed inset-0 z-[999999] bg-slate-950/85 backdrop-blur-xl flex flex-col items-center justify-center transition-all duration-400 ease-out hidden opacity-0 pointer-events-none select-none">
+    <div class="flex flex-col items-center justify-center text-center px-4 max-w-md">
+      <!-- Logo 3D Animasi Melayang & Pulse Glow -->
+      <div class="relative mb-6">
+        <div
+          class="absolute -inset-4 bg-gradient-to-r from-indigo-500/30 to-emerald-500/20 rounded-full blur-2xl pointer-events-none">
         </div>
+        <img src="img/logo.png"
+          onerror="this.onerror=null; this.src='https://lh3.googleusercontent.com/d/1xbfVM1yO_o0sn5XV6fIsqFK2GIC6k95J=w400'"
+          alt="TRANSKEP" class="w-24 md:w-28 h-auto object-contain relative z-10 sikep-logo-animated">
+      </div>
 
-        <!-- Teks Resmi Ala SIKEP -->
-        <h3 id="loader-title" class="text-white font-extrabold text-lg md:text-xl tracking-[0.25em] uppercase drop-shadow-[0_2px_12px_rgba(255,255,255,0.4)] animate-pulse">
-           SEDANG MEMPROSES...
-        </h3>
+      <!-- Teks Resmi Ala SIKEP -->
+      <h3 id="loader-title"
+        class="text-white font-extrabold text-lg md:text-xl tracking-[0.25em] uppercase drop-shadow-[0_2px_12px_rgba(255,255,255,0.4)] animate-pulse">
+        SEDANG MEMPROSES...
+      </h3>
 
-        <!-- Subteks Dinamis -->
-        <p id="loader-subtitle" class="text-slate-400 text-xs md:text-sm font-medium tracking-wider mt-2.5 max-w-xs leading-relaxed">
-           Menyelaraskan data sistem kepegawaian...
-        </p>
+      <!-- Subteks Dinamis -->
+      <p id="loader-subtitle"
+        class="text-slate-400 text-xs md:text-sm font-medium tracking-wider mt-2.5 max-w-xs leading-relaxed">
+        Menyelaraskan data sistem kepegawaian...
+      </p>
 
-        <!-- Garis Progress Indeterminate Modern -->
-        <div class="w-48 h-1 bg-slate-800/80 rounded-full mt-6 overflow-hidden relative shadow-inner">
-           <div class="w-full h-full bg-gradient-to-r from-transparent via-cyan-400 to-indigo-500 rounded-full animate-shimmer-bar"></div>
+      <!-- Garis Progress Indeterminate Modern -->
+      <div class="w-48 h-1 bg-slate-800/80 rounded-full mt-6 overflow-hidden relative shadow-inner">
+        <div
+          class="w-full h-full bg-gradient-to-r from-transparent via-cyan-400 to-indigo-500 rounded-full animate-shimmer-bar">
         </div>
-     </div>
+      </div>
+    </div>
   </div>
 
   <div id="slot-login"></div>
@@ -182,193 +207,219 @@
   <!-- 2. MAIN APP SHELL                                         -->
   <!-- ========================================================= -->
   <div id="app-container" class="w-full h-screen flex hidden">
-     
-     <!-- SLOT SIDEBAR & OVERLAY -->
-     <div id="slot-sidebar"></div>
 
-     <!-- Main Content Area -->
-     <main id="main-content" class="flex-1 h-full relative overflow-hidden bg-slate-950 flex flex-col">
+    <!-- SLOT SIDEBAR & OVERLAY -->
+    <div id="slot-sidebar"></div>
 
-        <!-- View Container -->
-        <div id="view-container" class="flex-1 overflow-y-auto p-4 md:p-8 relative w-full transition-all duration-300 custom-scrollbar">
-           <div id="slot-dashboard"></div>
+    <!-- Main Content Area -->
+    <main id="main-content" class="flex-1 h-full relative overflow-hidden bg-slate-950 flex flex-col">
 
-           <!-- ==================================================== -->
-           <!-- ZETTBOT: APP SHELL SKELETON (0ms RENDER ON REFRESH)  -->
-           <!-- ==================================================== -->
-           <div id="dashboard-skeleton" class="space-y-6">
-              <!-- Skeleton Header -->
-              <div class="glass border border-slate-900 rounded-3xl p-6 relative flex flex-col md:flex-row justify-between items-start md:items-center gap-6 shadow-lg">
-                <div class="shrink-0">
-                  <h2 class="text-2xl font-bold text-white tracking-wide flex items-center gap-2">
-                    <i class="fa-solid fa-house-chimney text-indigo-500 mr-2"></i>Dashboard
-                  </h2>
-                  <p class="text-slate-400 text-sm mt-1 flex flex-wrap items-center gap-2">
-                    Selamat datang, <span id="skeleton-user-name" class="text-slate-200 font-bold">Memuat data...</span>
-                  </p>
+      <!-- View Container -->
+      <div id="view-container"
+        class="flex-1 overflow-y-auto p-4 md:p-8 relative w-full transition-all duration-300 custom-scrollbar">
+        <div id="slot-dashboard"></div>
+
+        <!-- ==================================================== -->
+        <!-- ZETTBOT: APP SHELL SKELETON (0ms RENDER ON REFRESH)  -->
+        <!-- ==================================================== -->
+        <div id="dashboard-skeleton" class="space-y-6">
+          <!-- Skeleton Header -->
+          <div
+            class="glass border border-slate-900 rounded-3xl p-6 relative flex flex-col md:flex-row justify-between items-start md:items-center gap-6 shadow-lg">
+            <div class="shrink-0">
+              <h2 class="text-2xl font-bold text-white tracking-wide flex items-center gap-2">
+                <i class="fa-solid fa-house-chimney text-indigo-500 mr-2"></i>Dashboard
+              </h2>
+              <p class="text-slate-400 text-sm mt-1 flex flex-wrap items-center gap-2">
+                Selamat datang, <span id="skeleton-user-name" class="text-slate-200 font-bold">Memuat data...</span>
+              </p>
+            </div>
+
+            <div class="w-full md:max-w-2xl relative flex items-center gap-3 shrink-0">
+              <div
+                class="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
+                <i class="fa-solid fa-floppy-disk"></i>
+              </div>
+              <div
+                class="w-10 h-10 rounded-xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-center text-rose-400 shrink-0">
+                <i class="fa-solid fa-user-group"></i>
+              </div>
+              <div class="relative flex-1">
+                <div
+                  class="w-full h-11 bg-slate-950/50 border border-slate-700/50 rounded-xl flex items-center px-4 gap-3 text-slate-500 text-sm">
+                  <i class="fa-solid fa-magnifying-glass"></i>
+                  <span>Cari Nama, NIP, Jabatan, Pangkat...</span>
                 </div>
-                
-                <div class="w-full md:max-w-2xl relative flex items-center gap-3 shrink-0">
-                  <div class="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
-                    <i class="fa-solid fa-floppy-disk"></i>
-                  </div>
-                  <div class="w-10 h-10 rounded-xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-center text-rose-400 shrink-0">
-                    <i class="fa-solid fa-user-group"></i>
-                  </div>
-                  <div class="relative flex-1">
-                    <div class="w-full h-11 bg-slate-950/50 border border-slate-700/50 rounded-xl flex items-center px-4 gap-3 text-slate-500 text-sm">
-                      <i class="fa-solid fa-magnifying-glass"></i>
-                      <span>Cari Nama, NIP, Jabatan, Pangkat...</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Skeleton Grid: Absensi & Peringatan -->
+          <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+            <!-- Skeleton Kartu Ketidakhadiran -->
+            <div class="glass border border-slate-800 rounded-3xl p-6 relative flex flex-col h-[450px] lg:col-span-5">
+              <div class="flex justify-between items-center mb-4 border-b border-slate-800 pb-2 shrink-0">
+                <h3 class="text-sm font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+                  <i class="fa-solid fa-calendar-check text-emerald-400"></i> Ketidakhadiran
+                  <span class="relative flex h-2.5 w-2.5">
+                    <span
+                      class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                  </span>
+                </h3>
+                <span
+                  class="text-[10px] bg-emerald-500/10 text-emerald-400 px-2 py-1 rounded font-bold border border-emerald-500/20">Hari
+                  Ini</span>
+              </div>
+
+              <div class="flex-1 flex flex-col items-center justify-center text-center p-6 animate-pulse">
+                <div
+                  class="w-16 h-16 bg-slate-800/50 rounded-full flex items-center justify-center mb-4 border border-slate-700/50">
+                  <i class="fa-solid fa-satellite-dish text-2xl text-indigo-400 opacity-80"></i>
+                </div>
+                <h4 class="text-indigo-400 font-bold text-sm tracking-wide">Memindai Radar Kehadiran...</h4>
+                <p class="text-slate-500 text-[10px] mt-2 leading-relaxed max-w-[200px]">Menyinkronkan data kehadiran
+                  personel di latar belakang.</p>
+              </div>
+            </div>
+
+            <!-- Skeleton Kartu Peringatan Dini -->
+            <div class="glass border border-slate-800 rounded-3xl p-6 relative flex flex-col h-[450px] lg:col-span-7">
+              <div class="flex justify-between items-center mb-4 border-b border-slate-800 pb-2 shrink-0">
+                <h3 class="text-sm font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+                  <i class="fa-solid fa-bell text-rose-400"></i> Peringatan Dini TMT
+                </h3>
+                <span
+                  class="text-[10px] bg-rose-500/10 text-rose-400 px-2 py-1 rounded font-bold border border-rose-500/20">Sinkronisasi</span>
+              </div>
+
+              <div class="flex-1 space-y-3 pt-2 overflow-hidden">
+                <div
+                  class="p-3.5 rounded-2xl border border-slate-800/60 bg-slate-900/40 animate-pulse flex items-center justify-between">
+                  <div class="flex items-center gap-3">
+                    <div class="w-9 h-9 rounded-xl bg-slate-800 border border-slate-700"></div>
+                    <div class="space-y-1.5">
+                      <div class="h-3 w-32 bg-slate-800 rounded"></div>
+                      <div class="h-2.5 w-48 bg-slate-800/60 rounded"></div>
                     </div>
                   </div>
+                  <div class="h-6 w-20 bg-slate-800 rounded-full"></div>
+                </div>
+                <div
+                  class="p-3.5 rounded-2xl border border-slate-800/60 bg-slate-900/40 animate-pulse flex items-center justify-between">
+                  <div class="flex items-center gap-3">
+                    <div class="w-9 h-9 rounded-xl bg-slate-800 border border-slate-700"></div>
+                    <div class="space-y-1.5">
+                      <div class="h-3 w-36 bg-slate-800 rounded"></div>
+                      <div class="h-2.5 w-40 bg-slate-800/60 rounded"></div>
+                    </div>
+                  </div>
+                  <div class="h-6 w-20 bg-slate-800 rounded-full"></div>
+                </div>
+                <div
+                  class="p-3.5 rounded-2xl border border-slate-800/60 bg-slate-900/40 animate-pulse flex items-center justify-between">
+                  <div class="flex items-center gap-3">
+                    <div class="w-9 h-9 rounded-xl bg-slate-800 border border-slate-700"></div>
+                    <div class="space-y-1.5">
+                      <div class="h-3 w-28 bg-slate-800 rounded"></div>
+                      <div class="h-2.5 w-44 bg-slate-800/60 rounded"></div>
+                    </div>
+                  </div>
+                  <div class="h-6 w-20 bg-slate-800 rounded-full"></div>
                 </div>
               </div>
+            </div>
 
-              <!-- Skeleton Grid: Absensi & Peringatan -->
-              <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                 
-                 <!-- Skeleton Kartu Ketidakhadiran -->
-                 <div class="glass border border-slate-800 rounded-3xl p-6 relative flex flex-col h-[450px] lg:col-span-5">
-                   <div class="flex justify-between items-center mb-4 border-b border-slate-800 pb-2 shrink-0">
-                      <h3 class="text-sm font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
-                        <i class="fa-solid fa-calendar-check text-emerald-400"></i> Ketidakhadiran
-                        <span class="relative flex h-2.5 w-2.5">
-                          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                          <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
-                        </span>
-                      </h3>
-                      <span class="text-[10px] bg-emerald-500/10 text-emerald-400 px-2 py-1 rounded font-bold border border-emerald-500/20">Hari Ini</span>
-                   </div>
-                   
-                   <div class="flex-1 flex flex-col items-center justify-center text-center p-6 animate-pulse">
-                      <div class="w-16 h-16 bg-slate-800/50 rounded-full flex items-center justify-center mb-4 border border-slate-700/50">
-                          <i class="fa-solid fa-satellite-dish text-2xl text-indigo-400 opacity-80"></i>
-                      </div>
-                      <h4 class="text-indigo-400 font-bold text-sm tracking-wide">Memindai Radar Kehadiran...</h4>
-                      <p class="text-slate-500 text-[10px] mt-2 leading-relaxed max-w-[200px]">Menyinkronkan data kehadiran personel di latar belakang.</p>
-                   </div>
-                 </div>
+          </div>
 
-                 <!-- Skeleton Kartu Peringatan Dini -->
-                 <div class="glass border border-slate-800 rounded-3xl p-6 relative flex flex-col h-[450px] lg:col-span-7">
-                   <div class="flex justify-between items-center mb-4 border-b border-slate-800 pb-2 shrink-0">
-                      <h3 class="text-sm font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
-                        <i class="fa-solid fa-bell text-rose-400"></i> Peringatan Dini TMT
-                      </h3>
-                      <span class="text-[10px] bg-rose-500/10 text-rose-400 px-2 py-1 rounded font-bold border border-rose-500/20">Sinkronisasi</span>
-                   </div>
-                   
-                   <div class="flex-1 space-y-3 pt-2 overflow-hidden">
-                      <div class="p-3.5 rounded-2xl border border-slate-800/60 bg-slate-900/40 animate-pulse flex items-center justify-between">
-                         <div class="flex items-center gap-3">
-                            <div class="w-9 h-9 rounded-xl bg-slate-800 border border-slate-700"></div>
-                            <div class="space-y-1.5">
-                               <div class="h-3 w-32 bg-slate-800 rounded"></div>
-                               <div class="h-2.5 w-48 bg-slate-800/60 rounded"></div>
-                            </div>
-                         </div>
-                         <div class="h-6 w-20 bg-slate-800 rounded-full"></div>
-                      </div>
-                      <div class="p-3.5 rounded-2xl border border-slate-800/60 bg-slate-900/40 animate-pulse flex items-center justify-between">
-                         <div class="flex items-center gap-3">
-                            <div class="w-9 h-9 rounded-xl bg-slate-800 border border-slate-700"></div>
-                            <div class="space-y-1.5">
-                               <div class="h-3 w-36 bg-slate-800 rounded"></div>
-                               <div class="h-2.5 w-40 bg-slate-800/60 rounded"></div>
-                            </div>
-                         </div>
-                         <div class="h-6 w-20 bg-slate-800 rounded-full"></div>
-                      </div>
-                      <div class="p-3.5 rounded-2xl border border-slate-800/60 bg-slate-900/40 animate-pulse flex items-center justify-between">
-                         <div class="flex items-center gap-3">
-                            <div class="w-9 h-9 rounded-xl bg-slate-800 border border-slate-700"></div>
-                            <div class="space-y-1.5">
-                               <div class="h-3 w-28 bg-slate-800 rounded"></div>
-                               <div class="h-2.5 w-44 bg-slate-800/60 rounded"></div>
-                            </div>
-                         </div>
-                         <div class="h-6 w-20 bg-slate-800 rounded-full"></div>
-                      </div>
-                   </div>
-                 </div>
-
+          <!-- Skeleton Area Grafik Analitik -->
+          <div class="space-y-4 pt-4">
+            <div
+              class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 glass border border-slate-800/80 rounded-2xl px-5 py-3.5 shadow-lg">
+              <div class="flex items-center gap-3">
+                <div
+                  class="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 shrink-0">
+                  <i class="fa-solid fa-chart-pie text-lg"></i>
+                </div>
+                <div>
+                  <h3 class="text-sm font-bold text-slate-200 tracking-wide flex items-center gap-2">
+                    Demografi & Statistik Pegawai
+                    <span
+                      class="text-[9px] bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded-full font-bold border border-indigo-500/30">Memuat
+                      Grafik...</span>
+                  </h3>
+                  <p class="text-[11px] text-slate-400 mt-0.5">Komposisi gender, hierarki pangkat, jabatan dinas, dan
+                    distribusi usia.</p>
+                </div>
               </div>
+            </div>
 
-              <!-- Skeleton Area Grafik Analitik -->
-              <div class="space-y-4 pt-4">
-                 <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 glass border border-slate-800/80 rounded-2xl px-5 py-3.5 shadow-lg">
-                   <div class="flex items-center gap-3">
-                     <div class="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 shrink-0">
-                       <i class="fa-solid fa-chart-pie text-lg"></i>
-                     </div>
-                     <div>
-                       <h3 class="text-sm font-bold text-slate-200 tracking-wide flex items-center gap-2">
-                         Demografi & Statistik Pegawai
-                         <span class="text-[9px] bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded-full font-bold border border-indigo-500/30">Memuat Grafik...</span>
-                       </h3>
-                       <p class="text-[11px] text-slate-400 mt-0.5">Komposisi gender, hierarki pangkat, jabatan dinas, dan distribusi usia.</p>
-                     </div>
-                   </div>
-                 </div>
-
-                 <div class="flex overflow-x-auto gap-6 pb-6 pt-2 custom-scrollbar">
-                    <div class="shrink-0 w-[85vw] sm:w-[420px] md:w-[480px] lg:w-[500px] glass border border-slate-800/80 rounded-3xl p-6 flex flex-col h-[460px] animate-pulse justify-between">
-                       <div class="flex items-center gap-2">
-                          <div class="w-7 h-7 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 text-xs"><i class="fa-solid fa-venus-mars"></i></div>
-                          <h4 class="text-xs font-bold text-slate-200 uppercase tracking-wider">Jenis Kelamin</h4>
-                       </div>
-                       <div class="w-40 h-40 rounded-full border-4 border-slate-800/60 mx-auto my-auto flex items-center justify-center">
-                          <i class="fa-solid fa-chart-pie text-2xl text-slate-700"></i>
-                       </div>
-                       <div class="h-3 w-28 bg-slate-800/60 rounded mx-auto"></div>
-                    </div>
-                    <div class="shrink-0 w-[85vw] sm:w-[420px] md:w-[480px] lg:w-[500px] glass border border-slate-800/80 rounded-3xl p-6 flex flex-col h-[460px] animate-pulse justify-between">
-                       <div class="flex items-center gap-2">
-                          <div class="w-7 h-7 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 text-xs"><i class="fa-solid fa-ranking-star"></i></div>
-                          <h4 class="text-xs font-bold text-slate-200 uppercase tracking-wider">Pangkat & Golongan</h4>
-                       </div>
-                       <div class="h-44 w-full bg-slate-900/40 border border-slate-800/60 rounded-xl my-auto"></div>
-                       <div class="h-3 w-32 bg-slate-800/60 rounded mx-auto"></div>
-                    </div>
-                 </div>
+            <div class="flex overflow-x-auto gap-6 pb-6 pt-2 custom-scrollbar">
+              <div
+                class="shrink-0 w-[85vw] sm:w-[420px] md:w-[480px] lg:w-[500px] glass border border-slate-800/80 rounded-3xl p-6 flex flex-col h-[460px] animate-pulse justify-between">
+                <div class="flex items-center gap-2">
+                  <div
+                    class="w-7 h-7 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 text-xs">
+                    <i class="fa-solid fa-venus-mars"></i></div>
+                  <h4 class="text-xs font-bold text-slate-200 uppercase tracking-wider">Jenis Kelamin</h4>
+                </div>
+                <div
+                  class="w-40 h-40 rounded-full border-4 border-slate-800/60 mx-auto my-auto flex items-center justify-center">
+                  <i class="fa-solid fa-chart-pie text-2xl text-slate-700"></i>
+                </div>
+                <div class="h-3 w-28 bg-slate-800/60 rounded mx-auto"></div>
               </div>
-           </div>
-
-           <!-- Script Instan 0ms Rehidrasi Nama User pada Skeleton -->
-           <script>
-             (function() {
-               try {
-                 var lastMenu = localStorage.getItem('transkep_last_menu');
-                 var skel = document.getElementById('dashboard-skeleton');
-                 if (lastMenu && lastMenu !== 'dashboard' && skel) {
-                   skel.style.display = 'none';
-                 }
-                 var rawU = localStorage.getItem('transkep_user_profile') || localStorage.getItem('transkep_user');
-                 if (rawU) {
-                   var u = JSON.parse(rawU);
-                   if (u && u.nama) {
-                     var el = document.getElementById('skeleton-user-name');
-                     if (el) el.textContent = u.nama;
-                   }
-                 }
-               } catch(e) {}
-             })();
-           </script>
-           <div id="slot-permohonan"></div>
-           <div id="slot-pkp"></div>
-           <div id="slot-jobdes"></div>
-           <div id="slot-sk"></div>
-           <div id="slot-sop"></div>
-           <div id="slot-kinerja"></div>
-           <div id="slot-eoffice"></div>
-           <div id="slot-pegawai"></div>
-           <div id="slot-modals-izin"></div>
-           <div id="slot-pdf-viewer"></div>
-           <div id="slot-referensi"></div>
-           <div id="slot-templates-cetak"></div>
-           <div id="slot-mobile-nav"></div>
+              <div
+                class="shrink-0 w-[85vw] sm:w-[420px] md:w-[480px] lg:w-[500px] glass border border-slate-800/80 rounded-3xl p-6 flex flex-col h-[460px] animate-pulse justify-between">
+                <div class="flex items-center gap-2">
+                  <div
+                    class="w-7 h-7 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 text-xs">
+                    <i class="fa-solid fa-ranking-star"></i></div>
+                  <h4 class="text-xs font-bold text-slate-200 uppercase tracking-wider">Pangkat & Golongan</h4>
+                </div>
+                <div class="h-44 w-full bg-slate-900/40 border border-slate-800/60 rounded-xl my-auto"></div>
+                <div class="h-3 w-32 bg-slate-800/60 rounded mx-auto"></div>
+              </div>
+            </div>
+          </div>
         </div>
-     </main>
+
+        <!-- Script Instan 0ms Rehidrasi Nama User pada Skeleton -->
+        <script>
+          (function () {
+            try {
+              var lastMenu = localStorage.getItem('transkep_last_menu');
+              var skel = document.getElementById('dashboard-skeleton');
+              if (lastMenu && lastMenu !== 'dashboard' && skel) {
+                skel.style.display = 'none';
+              }
+              var rawU = localStorage.getItem('transkep_user_profile') || localStorage.getItem('transkep_user');
+              if (rawU) {
+                var u = JSON.parse(rawU);
+                if (u && u.nama) {
+                  var el = document.getElementById('skeleton-user-name');
+                  if (el) el.textContent = u.nama;
+                }
+              }
+            } catch (e) { }
+          })();
+        </script>
+        <div id="slot-permohonan"></div>
+        <div id="slot-pkp"></div>
+        <div id="slot-jobdes"></div>
+        <div id="slot-sk"></div>
+        <div id="slot-sop"></div>
+        <div id="slot-kinerja"></div>
+        <div id="slot-eoffice"></div>
+        <div id="slot-pegawai"></div>
+        <div id="slot-modals-izin"></div>
+        <div id="slot-pdf-viewer"></div>
+        <div id="slot-referensi"></div>
+        <div id="slot-templates-cetak"></div>
+        <div id="slot-mobile-nav"></div>
+      </div>
+    </main>
   </div>
 
   <!-- ========================================================= -->
@@ -550,4 +601,5 @@
   </script>
 
 </body>
+
 </html>
