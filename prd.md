@@ -305,3 +305,17 @@ ZONA BAWAH: MASTER CONTEXT & STATUS MIGRASI TERKINI (LIVING CONTEXT)
     - **Pembaruan Data Halus & Seamless Dismissal:** Menyambungkan listener `transkep:sync-complete` pada `vmRiwayatPermohonan` untuk memperbarui baris data di background saat fetch server selesai dan memudarkan lencana loading secara otomatis.
     - Versi target PWA Service Worker: **transkep-v3.1.3**.
 
+29. **Penerapan Fullscreen Processing Overlay Ala SIKEP, Eliminasi Kartu Kosong Pasca-Loading, dan Pembersihan Ikon Refresh Header (Tahap 55 - Selesai & Aktif ✅):**
+    - **Universal Fullscreen Processing Overlay (Standar SIKEP Mahkamah Agung):**
+      - Menyematkan overlay layar penuh (`fixed inset-0 z-[999999]`) dengan efek kaca buram kristal tebal 85% (`bg-slate-950/85 backdrop-blur-xl`).
+      - Logo TRANSKEP di bagian tengah dengan animasi 3D Floating & Breathing Pulse Neon (`filter: drop-shadow(0 0 25px rgba(99,102,241,0.5))`), tipografi tegas resmi bergaya SIKEP `SEDANG MEMPROSES...`, subteks dinamis *"Menyelaraskan data sistem kepegawaian..."*, dan garis progress indeterminate shimmer cyan-indigo.
+    - **Eliminasi Tampilan Setengah Matang Pasca-Loading:**
+      - Menyelaraskan siklus penutupan loader dengan event `transkep:sync-complete` dan `state.isBgSyncDone === true`. Loader menahan layar hingga seluruh data absensi (`cutiLogs`, `stList`, dll.), peringatan dini TMT, dan grafik demografi selesai diproses.
+      - Begitu proses sinkronisasi tuntas, overlay memudar secara mulus (*smooth fade-out* 0.4 detik), menyajikan antarmuka dashboard yang 100% lengkap dan siap dibaca tanpa jeda radar memindai atau tabel kosong.
+    - **Pembersihan Total Ikon Refresh Header:**
+      - Menghapus badge mikro berputar `isSyncing` (`[ 🔄 Menyinkronkan... ]`) dari header `view_dashboard.html` (PWA & GAS) serta dari template skeleton `transkep-web/index.html`. Area header dashboard kini tampil bersih, tenang, dan mewah.
+    - **Sistem Pengaman Watchdog (6 Detik):**
+      - Dilengkapi timer otomatis 6 detik di `syncAllServerData()` guna menjamin overlay otomatis tertutup jika koneksi server mengalami latensi ekstrem atau offline.
+    - Versi PWA Service Worker `sw.js` dan `CURRENT_APP_BUILD` dinaikkan ke **transkep-v3.1.4**.
+
+
