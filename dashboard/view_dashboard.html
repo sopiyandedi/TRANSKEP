@@ -13,9 +13,6 @@
       <h2 class="text-2xl font-bold text-white tracking-wide"><i class="fa-solid fa-house-chimney text-indigo-500 mr-2"></i>Dashboard</h2>
       <p class="text-slate-400 text-sm mt-1 flex flex-wrap items-center gap-2">
         Selamat datang, <span class="text-slate-200 font-bold">{{ currentUser ? currentUser.nama : 'Memuat data...' }}</span>
-        <span v-if="isSyncing" class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 font-medium tracking-wide animate-pulse">
-          <i class="fa-solid fa-arrows-rotate fa-spin text-[9px] text-indigo-300"></i> Menyinkronkan...
-        </span>
       </p>
     </div>
     

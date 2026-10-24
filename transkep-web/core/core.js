@@ -86,6 +86,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (typeof switchMenu === 'function') {
         switchMenu(lastMenu);
       }
+      showLoading('Menyelaraskan data sistem kepegawaian...');
       syncAllServerData(true);
     } else {
       toggleAppVisibility(false);
@@ -113,8 +114,8 @@ function toggleAppVisibility(isLoggedIn) {
   const mobTop = document.getElementById('mobile-top-bar');
   const mobBottom = document.getElementById('mobile-bottom-nav');
 
-  if (loader) {
-    loader.classList.add('hidden');
+  if (loader && !isLoggedIn) {
+    loader.classList.add('hidden', 'opacity-0', 'pointer-events-none');
     loader.style.display = 'none';
   }
 
@@ -238,6 +239,8 @@ function handleLogout() {
 }
 
 function syncAllServerData(silent) {
+  // Safe Fallback Watchdog Timer (6 detik) ala SIKEP
+  setTimeout(() => { if (typeof hideLoading === 'function') hideLoading(); }, 6000);
   const isSilent = (silent === true);
   if (!isSilent) showLoading("Menyinkronkan profil & data inti...");
   const loginNip = localStorage.getItem('transkep_active_nip');
@@ -379,6 +382,7 @@ function syncBackgroundData() {
       try {
         window.dispatchEvent(new CustomEvent('transkep:sync-complete'));
       } catch(e) {}
+      hideLoading(); // Selesai background sync
 
       updateSidebarBadges();
       if (typeof updateBadgePermohonan === 'function') updateBadgePermohonan();
@@ -404,6 +408,7 @@ function syncBackgroundData() {
     if (window.vueState) window.vueState.isBgSyncDone = true;
     const cm = (window.vueState && window.vueState.currentMenu) || state.currentMenu || 'dashboard';
     if (cm === 'dashboard' && typeof renderDashboardView === 'function') renderDashboardView();
+    hideLoading();
   };
 
   if (typeof TranskepAPI !== 'undefined' && typeof TranskepAPI.call === 'function') {
@@ -614,18 +619,26 @@ function formatNamaBersih(namaLengkap) {
 function showLoading(msg) {
   const loader = document.getElementById('global-loader');
   if (loader) {
-    const span = loader.querySelector('span');
-    if (span) span.innerText = msg;
-    loader.classList.remove('hidden');
+    const subtitle = document.getElementById('loader-subtitle') || loader.querySelector('p') || loader.querySelector('span');
+    if (subtitle && msg) subtitle.innerText = msg;
+    loader.classList.remove('hidden', 'pointer-events-none');
     loader.style.display = 'flex';
+    requestAnimationFrame(() => {
+      loader.classList.remove('opacity-0');
+      loader.classList.add('opacity-100');
+    });
   }
 }
 
 function hideLoading() {
   const loader = document.getElementById('global-loader');
   if (loader) {
-    loader.classList.add('hidden');
-    loader.style.display = 'none';
+    loader.classList.remove('opacity-100');
+    loader.classList.add('opacity-0', 'pointer-events-none');
+    setTimeout(() => {
+      loader.classList.add('hidden');
+      loader.style.display = 'none';
+    }, 400);
   }
 }
 

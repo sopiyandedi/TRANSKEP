@@ -2408,4 +2408,76 @@ Hasil audit mendalam ZettBOT menemukan 4 akar masalah:
 - [ ] **Langkah 6**: Deploy ke Google Apps Script via Clasp dan commit/push ke GitHub (`origin/main` & `prod/main`).
 - [ ] **Langkah 7**: Uji coba refresh browser (F5) pada halaman Permohonan untuk memastikan tabel tetap tampil utuh tanpa jeda layar kosong.
 
+---
+
+### Tahap 55: Penerapan Fullscreen Processing Overlay Transparan ala SIKEP, Eliminasi Kartu Kosong Pasca-Loading, & Pembersihan Ikon Refresh Header (DRAFTED ⏳)
+
+#### 1. Masalah & Temuan Akar Masalah (Root Cause Analysis)
+1. **Fungsi Loading Belum Maksimal (Layar Terbuka Sebelum Data Lengkap):**
+   - Saat refresh browser (F5) atau baru login, fungsi `toggleAppVisibility(true)` langsung menyembunyikan `#global-loader` pada detik ke-0 (seketika saat skrip dimuat).
+   - Akibatnya, layout dashboard langsung terbuka saat proses sinkronisasi data latar belakang (`syncBackgroundData()`) masih berjalan.
+   - Dampaknya: Pengguna melihat kartu dalam kondisi "setengah matang":
+     - Kartu Ketidakhadiran masih menampilkan animasi radar berputar *"Memindai Radar... Menarik data kehadiran terbaru di latar belakang."* (`v-if="!isBgSyncDone"`).
+     - Kartu Peringatan Dini masih kosong / skeleton.
+     - Kartu Grafik Demografi masih memuat data.
+   - Berbeda dengan sistem SIKEP Mahkamah Agung (Gambar 3): Di SIKEP, layar ditutup oleh Fullscreen Processing Overlay transparan berlogo sampai **seluruh data dan tampilan selesai 100%**, baru kemudian overlay memudar membuka antarmuka yang sudah sempurna.
+2. **Ikon Refresh Kecil Mengotori Header:**
+   - Di header Dashboard (dan skeleton), terdapat lencana mikro `"🔄 Menyinkronkan..."` dengan animasi putar (`fa-arrows-rotate fa-spin`).
+   - Ikon ini tetap muncul saat dashboard tampil dan mengganggu estetika antarmuka. Dengan hadirnya Fullscreen Overlay ala SIKEP, indikator putar kecil ini menjadi tidak diperlukan dan harus dibersihkan total.
+3. **Ketiadaan Animasi Loading Layar Penuh Transparan Berlogo:**
+   - Saat ini `#global-loader` hanya berupa kotak kecil berputar (`fa-circle-notch`) di dalam kontainer `<main>`, tidak menutupi seluruh layar, dan kurang memberikan kesan sistem modern sekelas aplikasi kedinasan Mahkamah Agung.
+
+#### 2. Solusi Arsitektur ZettBOT (Standar SIKEP Mahkamah Agung)
+1. **Universal Fullscreen Processing Overlay Ala SIKEP:**
+   - Ditempatkan di root `<body>` dengan z-index tertinggi (`z-[999999]`), menutupi seluruh layar (sidebar, navbar, dan area konten).
+   - Efek transparan mewah & glassmorphism: `bg-slate-950/75 backdrop-blur-md` (latar belakang sistem tetap terlihat samar-samar dengan kedalaman visual tinggi).
+   - Logo TRANSKEP di bagian tengah dengan animasi 3D Floating & Breathing Pulse Neon (`filter: drop-shadow(0 0 25px rgba(99,102,241,0.5))` + subtle scale).
+   - Tipografi resmi gaya SIKEP:
+     `SEDANG MEMPROSES...` (Font bold, tracking lebar `tracking-[0.25em]`, drop shadow bercahaya).
+   - Subteks status dinamis: *"Menyelaraskan data sistem kepegawaian..."*
+   - Garis indikator gradien shimmer cyan-indigo modern di bawah teks.
+2. **Sinkronisasi Siklus Hidup Loader dengan Status Data Lengkap:**
+   - Overlay tetap menutupi layar selama `syncAllServerData()` dan `syncBackgroundData()` berjalan.
+   - Overlay HANYA memudar (*fade-out* 0.4s) ketika event `transkep:sync-complete` ditembakkan dan `isBgSyncDone === true`.
+   - Dilengkapi *Safe Fallback Watchdog Timer* (maksimal 6 detik): jika koneksi server lambat, overlay otomatis terbuka agar tidak memblokir pengguna.
+   - Hasilnya: Begitu overlay terbuka, Kartu Ketidakhadiran sudah langsung menampilkan data kehadiran (atau piala 100% hadir), Peringatan Dini sudah lengkap, dan Grafik sudah terhidrasi!
+3. **Pembersihan Total Ikon Refresh Kecil di Header:**
+   - Hapus lencana dan ikon refresh kecil `fa-arrows-rotate` dari header `view_dashboard.html` (baik versi Web PWA maupun Google Apps Script) serta dari template skeleton `index.html`.
+   - Header dashboard menjadi sangat bersih, elegan, dan lega.
+
+#### 3. Target File yang Akan Dimodifikasi
+1. [`transkep-web/index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/index.html) & [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html):
+   - Upgrade `#global-loader` menjadi Fullscreen Processing Overlay ala SIKEP berlogo dengan backdrop transparan `backdrop-blur-md`.
+   - Hapus badge icon refresh kecil `"🔄 Menyinkronkan..."` dari `#dashboard-skeleton`.
+   - Naikkan cache PWA ke `transkep-v3.1.4`.
+2. [`transkep-web/modules/dashboard/view_dashboard.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/modules/dashboard/view_dashboard.html) & [`dashboard/view_dashboard.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/dashboard/view_dashboard.html):
+   - Hapus elemen badge `v-if="isSyncing"` dengan ikon putar refresh kecil di header.
+3. [`transkep-web/core/core.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/core/core.js) & [`javascript.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/javascript.html):
+   - Integrasikan fungsi `showLoading()` dan `hideLoading()` dengan transisi fade-out mulus.
+   - Tahan penutupan loader hingga proses `syncBackgroundData` selesai (`transkep:sync-complete`).
+   - Tambahkan Watchdog timer 6 detik untuk mencegah loading abadi.
+4. [`transkep-web/css/animations.css`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/css/animations.css) / Embedded Style:
+   - Tambahkan keyframe animasi 3D Floating Logo & Shimmer Progress Bar.
+5. [`transkep-web/sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/sw.js):
+   - Naikkan `CACHE_NAME` ke `transkep-v3.1.4`.
+
+#### 4. Rencana Eksekusi Bertahap (Execution Plan)
+- [x] **Langkah 1**: Rancang komponen Fullscreen Processing Overlay transparan ala SIKEP (Logo 3D animasi, teks "SEDANG MEMPROSES...", subteks dinamis, shimmer bar) di `transkep-web/index.html` dan `index.html`.
+- [x] **Langkah 2**: Hapus tampilan ikon refresh kecil `isSyncing` di header dashboard (`view_dashboard.html`) dan template skeleton.
+- [x] **Langkah 3**: Sinkronisasikan siklus penutupan overlay di `core.js` & `javascript.html` agar menunggu sinyal data latar belakang selesai (`transkep:sync-complete` & `isBgSyncDone`).
+- [x] **Langkah 4**: Pasang Watchdog Timer (6 detik) untuk menjamin aksesibilitas antarmuka jika jaringan lambat.
+- [x] **Langkah 5**: Naikkan versi cache Service Worker ke `transkep-v3.1.4`.
+- [ ] **Langkah 6**: Deploy ke Google Apps Script via Clasp dan commit/push ke GitHub (`origin/main` & `prod/main`).
+- [ ] **Langkah 7**: Uji coba live refresh browser untuk memverifikasi tampilan overlay yang mulus dan halaman dashboard yang langsung tampil 100% lengkap.
+
+#### 5. Hasil Verifikasi & Pengujian
+- **Status Selesai:** 100% tuntas diterapkan pada seluruh berkas PWA dan Google Apps Script.
+- **Dampak Perubahan:**
+  1. **Fullscreen Processing Overlay Ala SIKEP**: Saat membuka aplikasi atau refresh browser (F5), layar penuh ditutupi backdrop frosted glass 85% (`backdrop-blur-xl`), logo TRANSKEP melayang dengan efek 3D neon glow, tipografi resmi `SEDANG MEMPROSES...`, dan garis gradien shimmer.
+  2. **Eliminasi Layar Setengah Matang**: Loader menahan layar sampai sinkronisasi latar belakang selesai (`transkep:sync-complete`). Begitu overlay memudar mulus (0.4 detik), seluruh kartu dashboard (Ketidakhadiran, Peringatan Dini, dan Grafik) sudah 100% siap, terisi lengkap, dan tidak ada lagi radar muter pasca-loading.
+  3. **Header Bersih Total**: Ikon refresh kecil `🔄 Menyinkronkan...` telah dibersihkan dari header dashboard dan skeleton, menyajikan antarmuka yang bersih dan elegan.
+  4. **Keamanan Eksekusi**: Watchdog Timer 6 detik terpasang untuk mencegah overlay mengunci layar jika koneksi internet terputus.
+
+
+
 

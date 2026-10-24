@@ -5,14 +5,14 @@
    <meta charset="UTF-8">
    <meta name="viewport" content="width=device-width, initial-scale=1.0">
    <title>TRANSKEP</title>
-   <!-- ZETTBOT: Pelindung Anti-FOUC & Anti-Bocor Modal Vue -->
+   <!-- : Pelindung Anti-FOUC & Anti-Bocor Modal Vue -->
    <style>
       [v-cloak] {
          display: none !important;
       }
    </style>
 
-   <!-- ZETTBOT: Smart Gateway Router (GitHub Pages & Subdomain Kantor -> transkep-web) -->
+   <!--: Smart Gateway Router (GitHub Pages & Subdomain Kantor -> transkep-web) -->
    <script>
       (function () {
          var host = window.location.hostname || '';
@@ -47,16 +47,16 @@
    <!-- ZETTBOT FIX: Script eksekusi instan (Anti-Kedip/FOUC) dipasang sebelum elemen body di-render -->
    <script>
       // 0. Evaluasi Sesi Instan (0ms Anti-FOUC Auth Guard)
-      (function() {
-        try {
-          var nip = localStorage.getItem('transkep_active_nip');
-          var token = localStorage.getItem('transkep_session_token');
-          if (nip && token) {
-            document.documentElement.classList.add('app-authenticated');
-          } else {
-            document.documentElement.classList.add('app-unauthenticated');
-          }
-        } catch(e) {}
+      (function () {
+         try {
+            var nip = localStorage.getItem('transkep_active_nip');
+            var token = localStorage.getItem('transkep_session_token');
+            if (nip && token) {
+               document.documentElement.classList.add('app-authenticated');
+            } else {
+               document.documentElement.classList.add('app-unauthenticated');
+            }
+         } catch (e) { }
       })();
 
       // 1. Tahan semua efek animasi CSS
@@ -79,6 +79,33 @@
    <div
       class="fixed bottom-[-10%] right-[-10%] w-96 h-96 bg-emerald-600/10 rounded-full blur-[120px] pointer-events-none -z-10">
    </div>
+
+   
+  <!-- UNIVERSAL FULLSCREEN PROCESSING OVERLAY (ALA SIKEP) -->
+  <div id="global-loader" class="fixed inset-0 z-[999999] bg-slate-950/85 backdrop-blur-xl flex flex-col items-center justify-center transition-all duration-400 ease-out hidden opacity-0 pointer-events-none select-none">
+     <div class="flex flex-col items-center justify-center text-center px-4 max-w-md">
+        <!-- Logo 3D Animasi Melayang & Pulse Glow -->
+        <div class="relative mb-6">
+           <div class="absolute -inset-4 bg-gradient-to-r from-indigo-500/30 to-emerald-500/20 rounded-full blur-2xl pointer-events-none"></div>
+           <img src="https://drive.google.com/thumbnail?id=1xbfVM1yO_o0sn5XV6fIsqFK2GIC6k95J&sz=w400" onerror="this.onerror=null; this.src='https://lh3.googleusercontent.com/d/1xbfVM1yO_o0sn5XV6fIsqFK2GIC6k95J=w400'" alt="TRANSKEP" class="w-24 md:w-28 h-auto object-contain relative z-10 sikep-logo-animated">
+        </div>
+
+        <!-- Teks Resmi Ala SIKEP -->
+        <h3 id="loader-title" class="text-white font-extrabold text-lg md:text-xl tracking-[0.25em] uppercase drop-shadow-[0_2px_12px_rgba(255,255,255,0.4)] animate-pulse">
+           SEDANG MEMPROSES...
+        </h3>
+
+        <!-- Subteks Dinamis -->
+        <p id="loader-subtitle" class="text-slate-400 text-xs md:text-sm font-medium tracking-wider mt-2.5 max-w-xs leading-relaxed">
+           Menyelaraskan data sistem kepegawaian...
+        </p>
+
+        <!-- Garis Progress Indeterminate Modern -->
+        <div class="w-48 h-1 bg-slate-800/80 rounded-full mt-6 overflow-hidden relative shadow-inner">
+           <div class="w-full h-full bg-gradient-to-r from-transparent via-cyan-400 to-indigo-500 rounded-full animate-shimmer-bar"></div>
+        </div>
+     </div>
+  </div>
 
    <div id="login-section" class="w-full h-screen flex flex-col items-center justify-center p-4">
       <div class="w-full max-w-md relative">
@@ -191,11 +218,7 @@
       <?!= include('front_view/view_sidebar'); ?>
 
       <main id="main-content" class="flex-1 h-full relative overflow-hidden bg-slate-950 flex flex-col">
-         <div id="global-loader"
-            class="absolute inset-0 z-[90] bg-slate-950/80 backdrop-blur-sm flex flex-col items-center justify-center hidden">
-            <i class="fa-solid fa-circle-notch fa-spin text-indigo-500 text-4xl mb-4"></i>
-            <span class="text-slate-300 font-medium tracking-wide">Memuat...</span>
-         </div>
+         
 
          <div id="view-container"
             class="flex-1 overflow-y-auto p-4 md:p-8 relative w-full transition-all duration-300 custom-scrollbar">
@@ -340,7 +363,8 @@
                <div class="flex items-center gap-4 mb-2">
                   <div
                      class="w-12 h-12 bg-indigo-500/10 text-indigo-400 rounded-xl flex items-center justify-center text-xl border border-indigo-500/20">
-                     <i class="fa-solid fa-user-tie"></i></div>
+                     <i class="fa-solid fa-user-tie"></i>
+                  </div>
                   <div>
                      <p class="text-xs text-slate-400 font-bold uppercase tracking-wider">Sisa Kuota Cuti Untuk</p>
                      <p class="text-sm font-bold text-slate-200 mt-0.5">{{ currentUser.nama }}</p>

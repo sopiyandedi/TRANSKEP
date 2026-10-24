@@ -707,4 +707,35 @@
       border-top-right-radius: 1.5rem !important;
   }
 
+  /* SIKEP 3D FLOATING LOGO & BREATHING NEON */
+  @keyframes sikepFloat {
+      0%, 100% {
+          transform: translateY(0px) scale(1);
+          filter: drop-shadow(0 0 20px rgba(99, 102, 241, 0.45)) drop-shadow(0 0 45px rgba(16, 185, 129, 0.25));
+      }
+      50% {
+          transform: translateY(-8px) scale(1.03);
+          filter: drop-shadow(0 0 35px rgba(99, 102, 241, 0.75)) drop-shadow(0 0 65px rgba(16, 185, 129, 0.4));
+      }
+  }
+  .sikep-logo-animated {
+      animation: sikepFloat 3s ease-in-out infinite;
+  }
+
+  /* INDETERMINATE SHIMMER BAR */
+  @keyframes indeterminateProgress {
+      0% {
+          transform: translateX(-100%);
+      }
+      50% {
+          transform: translateX(30%);
+      }
+      100% {
+          transform: translateX(100%);
+      }
+  }
+  .animate-shimmer-bar {
+      animation: indeterminateProgress 1.6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  }
+
 </style>

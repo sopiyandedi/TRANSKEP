@@ -105,7 +105,7 @@
   <!-- ZETTBOT: Auto-Bust PWA Cache & Stale Service Worker Guard -->
   <script>
     (async function() {
-      const CURRENT_APP_BUILD = 'transkep-v3.1.2';
+      const CURRENT_APP_BUILD = 'transkep-v3.1.4';
       if (localStorage.getItem('transkep_active_build') !== CURRENT_APP_BUILD) {
         localStorage.setItem('transkep_active_build', CURRENT_APP_BUILD);
         try {
@@ -147,6 +147,35 @@
   <!-- ========================================================= -->
   <!-- 1. SLOT LOGIN SECTION & RESET PASSWORD                   -->
   <!-- ========================================================= -->
+  
+  <!-- ========================================================= -->
+  <!-- UNIVERSAL FULLSCREEN PROCESSING OVERLAY (ALA SIKEP)      -->
+  <!-- ========================================================= -->
+  <div id="global-loader" class="fixed inset-0 z-[999999] bg-slate-950/85 backdrop-blur-xl flex flex-col items-center justify-center transition-all duration-400 ease-out hidden opacity-0 pointer-events-none select-none">
+     <div class="flex flex-col items-center justify-center text-center px-4 max-w-md">
+        <!-- Logo 3D Animasi Melayang & Pulse Glow -->
+        <div class="relative mb-6">
+           <div class="absolute -inset-4 bg-gradient-to-r from-indigo-500/30 to-emerald-500/20 rounded-full blur-2xl pointer-events-none"></div>
+           <img src="img/logo.png" onerror="this.onerror=null; this.src='https://lh3.googleusercontent.com/d/1xbfVM1yO_o0sn5XV6fIsqFK2GIC6k95J=w400'" alt="TRANSKEP" class="w-24 md:w-28 h-auto object-contain relative z-10 sikep-logo-animated">
+        </div>
+
+        <!-- Teks Resmi Ala SIKEP -->
+        <h3 id="loader-title" class="text-white font-extrabold text-lg md:text-xl tracking-[0.25em] uppercase drop-shadow-[0_2px_12px_rgba(255,255,255,0.4)] animate-pulse">
+           SEDANG MEMPROSES...
+        </h3>
+
+        <!-- Subteks Dinamis -->
+        <p id="loader-subtitle" class="text-slate-400 text-xs md:text-sm font-medium tracking-wider mt-2.5 max-w-xs leading-relaxed">
+           Menyelaraskan data sistem kepegawaian...
+        </p>
+
+        <!-- Garis Progress Indeterminate Modern -->
+        <div class="w-48 h-1 bg-slate-800/80 rounded-full mt-6 overflow-hidden relative shadow-inner">
+           <div class="w-full h-full bg-gradient-to-r from-transparent via-cyan-400 to-indigo-500 rounded-full animate-shimmer-bar"></div>
+        </div>
+     </div>
+  </div>
+
   <div id="slot-login"></div>
 
   <!-- ========================================================= -->
@@ -159,11 +188,6 @@
 
      <!-- Main Content Area -->
      <main id="main-content" class="flex-1 h-full relative overflow-hidden bg-slate-950 flex flex-col">
-        <!-- Global Loader -->
-        <div id="global-loader" class="absolute inset-0 z-[90] bg-slate-950/80 backdrop-blur-sm flex flex-col items-center justify-center hidden">
-           <i class="fa-solid fa-circle-notch fa-spin text-indigo-500 text-4xl mb-4"></i>
-           <span class="text-slate-300 font-medium tracking-wide">Memuat...</span>
-        </div>
 
         <!-- View Container -->
         <div id="view-container" class="flex-1 overflow-y-auto p-4 md:p-8 relative w-full transition-all duration-300 custom-scrollbar">
@@ -181,9 +205,6 @@
                   </h2>
                   <p class="text-slate-400 text-sm mt-1 flex flex-wrap items-center gap-2">
                     Selamat datang, <span id="skeleton-user-name" class="text-slate-200 font-bold">Memuat data...</span>
-                    <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 font-medium tracking-wide animate-pulse">
-                      <i class="fa-solid fa-arrows-rotate fa-spin text-[9px] text-indigo-300"></i> Menyinkronkan...
-                    </span>
                   </p>
                 </div>
                 
@@ -465,7 +486,7 @@
       ];
 
       try {
-        const APP_BUILD_VER = '3.1.1';
+        const APP_BUILD_VER = '3.1.4';
         console.log('🔄 [ZettBOT Loader] Memuat komponen tampilan views/ secara paralel...');
         await Promise.all(VIEW_SLOTS.map(async item => {
           const res = await fetch(item.file + '?v=' + APP_BUILD_VER);
