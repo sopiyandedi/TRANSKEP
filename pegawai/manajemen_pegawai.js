@@ -70,7 +70,7 @@ function updateUser(payload, adminNip, clientToken) {
     sheet.getRange(rowIndex, 1, 1, 19).setValues(rowData);
     sheet.getRange(rowIndex, 1).setNumberFormat('@');
     
-    // ZETTBOT FIX: Update kolom ke-26 secara spesifik
+    // FIX: Update kolom ke-26 secara spesifik
     sheet.getRange(rowIndex, 26).setValue(payload.jenis_jabatan || "Fungsional Umum");
     
     SpreadsheetApp.flush();

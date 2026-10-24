@@ -346,7 +346,7 @@ function generatePdfPK(idPkp, userNip, clientToken) {
 }
 
 /**
- * ZETTBOT: GENERATOR PDF PCK BULANAN (REVISI MULTI-TABEL + SUBTOTAL)
+ * TRANSKEP: GENERATOR PDF PCK BULANAN (REVISI MULTI-TABEL + SUBTOTAL)
  */
 function generatePdfPCK(idPck, userNip, clientToken) {
   let tempFile = null;
@@ -446,13 +446,13 @@ function generatePdfPCK(idPck, userNip, clientToken) {
 
         let detTemplateRow = detailTable.getRow(2); // Baris 3: Isian Data
 
-        // ZETTBOT: Tangkap Baris Subtotal
+        // TRANSKEP: Tangkap Baris Subtotal
         let detSubtotalRow = null;
         if (detailTable.getNumRows() >= 4) {
             detSubtotalRow = detailTable.getRow(3);
         }
 
-        // ZETTBOT FIX: Logika Tabel Rekap Baru
+        // FIX: Logika Tabel Rekap Baru
         // Copy baris cetakan data (Baris 2) ke memori
         let rekTemplateRow = rekapTable.getRow(1).copy(); 
         

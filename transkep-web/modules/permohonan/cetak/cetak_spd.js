@@ -9,7 +9,7 @@ function printSuratPerjalananDinas(idST, nipPesertaTarget) {
       const stDataObj = state.stList.find(st => String(st.id) === String(idST));
       if (!stDataObj) { showNotify("Gagal", "Data ST tidak ditemukan", "error"); return; }
 
-      // ZETTBOT FIX NUKLIR: Target ID yang super aman dari bentrokan file backup
+      // FIX NUKLIR: Target ID yang super aman dari bentrokan file backup
       const template = document.getElementById('spd-nuklir-2026');
       if (!template) { showNotify("Gagal", "Template SPD belum dimuat atau ID salah", "error"); return; }
 
@@ -45,7 +45,7 @@ function printSuratPerjalananDinas(idST, nipPesertaTarget) {
       const diffTime = Math.abs(new Date(tglKembali) - new Date(tglBerangkat));
       const lamaHari = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
 
-      // ZETTBOT FIX: Konversi angka hari ke huruf (1 -> satu, 2 -> dua)
+      // FIX: Konversi angka hari ke huruf (1 -> satu, 2 -> dua)
       const hurufAngka = ["", "satu", "dua", "tiga", "empat", "lima", "enam", "tujuh", "delapan", "sembilan", "sepuluh", "sebelas"];
       const getTerbilang = (n) => {
           if (n < 12) return hurufAngka[n];
@@ -54,7 +54,7 @@ function printSuratPerjalananDinas(idST, nipPesertaTarget) {
           return n;
       };
 
-      // ZETTBOT FIX: Mengambil data pimpinan penandatangan untuk Lembar Visum (Halaman 2)
+      // FIX: Mengambil data pimpinan penandatangan untuk Lembar Visum (Halaman 2)
       const ttdST = state.usersList.find(u => String(u.nip) === String(stDataObj.pejabat_ttd)) || {};
 
       targetList.forEach((pesertaTarget) => {
@@ -81,13 +81,13 @@ function printSuratPerjalananDinas(idST, nipPesertaTarget) {
               "{{mata_anggaran}}": dataEkstra.mata_anggaran || "-",
               "{{keterangan_lain}}": "<div style='min-height: 55px;'>-</div>",
               
-              // ZETTBOT FIX: Menyuntikkan nama ttd (Full dengan Gelar) ke Halaman 2
+              // FIX: Menyuntikkan nama ttd (Full dengan Gelar) ke Halaman 2
               "{{jabatan_ttd_st}}": ttdST.jabatan || "-",
               "{{nama_ttd_st}}": ttdST.nama || "-",
               "{{nip_ttd_st}}": ttdST.nip || "-"
           };
 
-          // ZETTBOT FIX: INI BARIS AJAIB YANG KEMAREN TERHAPUS!
+          // FIX: INI BARIS AJAIB YANG KEMAREN TERHAPUS!
           for (let key in replacements) {
               const regex = new RegExp(key, 'g');
               htmlString = htmlString.replace(regex, replacements[key]);

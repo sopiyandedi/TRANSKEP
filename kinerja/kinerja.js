@@ -61,7 +61,7 @@ function approveKinerja(id, userNip, clientToken) {
 
     const kData = sheetKinerja.getDataRange().getValues();
     
-    // ZETTBOT OPTIMIZATION 1: Menggunakan findIndex untuk mencari baris Kinerja dengan sangat cepat
+    // TRANSKEP OPTIMIZATION 1: Menggunakan findIndex untuk mencari baris Kinerja dengan sangat cepat
     const foundKnjIdx = kData.findIndex((row, idx) => idx > 0 && String(row[0]) === String(id));
     
     if(foundKnjIdx === -1) throw new Error("Data SKP tidak ditemukan.");
@@ -71,7 +71,7 @@ function approveKinerja(id, userNip, clientToken) {
     
     if(String(record[8]) !== 'Menunggu TTE') throw new Error("Dokumen ini sudah disahkan sebelumnya.");
     
-    // ZETTBOT OPTIMIZATION 1: Menggunakan find untuk menarik data Pegawai & Pejabat
+    // TRANSKEP OPTIMIZATION 1: Menggunakan find untuk menarik data Pegawai & Pejabat
     const uData = sheetUser.getDataRange().getValues();
     
     const rowPegawai = uData.find((row, idx) => idx > 0 && String(row[0]) === String(record[1]));
@@ -134,7 +134,7 @@ function approveKinerja(id, userNip, clientToken) {
     fileTte.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
 
     // =========================================================================
-    // ZETTBOT OPTIMIZATION 2: BATCH UPDATE
+    // TRANSKEP OPTIMIZATION 2: BATCH UPDATE
     // Menyimpan 3 data sekaligus ke dalam baris yang sama di kolom 9, 10, 11
     // (Status, Tgl_TTE, File_Pengesahan) dalam 1x eksekusi
     // =========================================================================

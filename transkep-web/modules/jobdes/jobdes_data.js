@@ -2,7 +2,7 @@
 // FILE: jobdes_data.js (TRANSKEP Modular)
 // DESKRIPSI: Data Service Layer khusus Modul Uraian Tugas (Job Description)
 // FITUR: RPC Save Jobdes, Save Usulan, Get Usulan, Tandai Selesai, Create PDF
-// ENGINE: ZettBOT Core v1.0.0 (by Zettbos)
+// ENGINE: TRANSKEP Core v1.0.0 
 // ==========================================
 
 const JobdesDataService = {

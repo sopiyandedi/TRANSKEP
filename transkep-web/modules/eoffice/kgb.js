@@ -6,7 +6,7 @@
 // ==========================================
   // FILE: eoffice/js_kgb.html
   // DESKRIPSI: Logika Form & Live Generator KGB (Vue/Vanilla Helper)
-  // ENGINE: ZettBOT Core v1.0.0 (by Zettbos)
+  // ENGINE: TRANSKEP Core v1.0.0 
   // ==========================================
 
   // ALGORITMA KONVERSI ANGKA KE TERBILANG BAHASA INDONESIA

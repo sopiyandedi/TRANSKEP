@@ -1,6 +1,6 @@
 <!-- ================================================== -->
 <!-- FILE: dashboard/js_dashboard.html -->
-<!-- ZETTBOT FIX: TAHAP 2 MIGRASI VUE.JS (LOGIKA UI) -->
+<!-- FIX: TAHAP 2 MIGRASI VUE.JS (LOGIKA UI) -->
 <!-- ================================================== -->
 <script>
   const { createApp } = Vue;
@@ -32,7 +32,7 @@
         ikLogs: (cachedDash && cachedDash.ikLogs) || (window.state && window.state.ikLogs) || [],
         wfhLogs: (cachedDash && cachedDash.wfhLogs) || (window.state && window.state.wfhLogs) || [],
         
-        // ZETTBOT FIX: State untuk Modal Status Peringatan
+        // FIX: State untuk Modal Status Peringatan
         showModalStatus: false,
         modalTmt: { nip: '', type: '', nama: '', dbStatus: '' }
       }
@@ -459,7 +459,7 @@
 
       externalSearch(kw) { this.searchKeyword = kw; },
       
-      // ZETTBOT FIX: Modal Interaktif Native Vue
+      // FIX: Modal Interaktif Native Vue
       openModalStatus(item) {
           if (!this.isAdmin) return;
           this.modalTmt.nip = item.user.nip;

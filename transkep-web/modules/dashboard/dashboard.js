@@ -1,7 +1,7 @@
 // =========================================================================
 // FILE: dashboard.js (TRANSKEP Dashboard Logic & Vue Controller)
 // DESKRIPSI: Logika Komputasi Absensi Hari Ini, Notifikasi TMT Peringatan, & Pencarian
-// ENGINE: ZettBOT Core v1.0.0 (by Zettbos)
+// ENGINE: TRANSKEP Core v1.0.0 
 // =========================================================================
 
 function formatYMD(dateObj) {

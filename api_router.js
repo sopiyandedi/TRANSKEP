@@ -3,7 +3,7 @@
 // DESKRIPSI: Headless API Router & Gateway Adapter untuk TRANSKEP v3.0
 // TUJUAN: Menjembatani Frontend Modern (GitHub Pages / domain instansi)
 //         ke Backend Google Apps Script tanpa mengganggu Web App lama (Google Sites)
-// ENGINE: ZettBOT Core v1.0.0 (by Zettbos)
+// ENGINE: TRANSKEP Core v1.0.0 
 // ==========================================
 
 /**

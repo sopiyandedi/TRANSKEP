@@ -1,6 +1,6 @@
 // ==========================================
 // FILE: magic_approval.js (Controller Magic Link Approval Cuti)
-// Standard: ZettBOT Modern Vue 3 Architecture (by Zettbos)
+// Standard: TRANSKEP Modern Vue 3 Architecture 
 // Deskripsi: Mengelola alur verifikasi dan eksekusi persetujuan cuti
 //            berjenjang instan dari notifikasi WhatsApp tanpa perlu login
 // ==========================================

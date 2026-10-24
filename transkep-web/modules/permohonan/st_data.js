@@ -2,7 +2,7 @@
 // FILE: st_data.js (TRANSKEP Modular)
 // DESKRIPSI: Data Service Layer khusus Modul Surat Tugas (ST, SPD & Plh)
 // FITUR: Get Default Settings, Add/Update ST, Save ST Settings
-// ENGINE: ZettBOT Core v1.0.0 (by Zettbos)
+// ENGINE: TRANSKEP Core v1.0.0 
 // ==========================================
 
 const StDataService = {

@@ -1,8 +1,8 @@
 <script>
-  console.log("🚀 ZETTBOT: Menginisialisasi sistem javascript...");
+  console.log("🚀 TRANSKEP: Menginisialisasi sistem javascript...");
 
   // =========================================================================
-  // ZETTBOT FIX: Menghapus deklarasi "const { createApp } = Vue;" agar tidak
+  // FIX: Menghapus deklarasi "const { createApp } = Vue;" agar tidak
   // memicu SyntaxError bentrokan dengan modul file JS lainnya.
   // =========================================================================
 
@@ -20,14 +20,14 @@
   };
   let state = (typeof Vue !== 'undefined' && Vue.reactive) ? Vue.reactive(rawInitialState) : rawInitialState;
   
-  // ZETTBOT FIX: Pastikan window.state dan window.vueState mengarah ke proxy reaktif yang sama
+  // FIX: Pastikan window.state dan window.vueState mengarah ke proxy reaktif yang sama
   window.state = state; 
   window.vueState = state;
   
   const isGoogleEnv = (typeof google !== 'undefined' && google.script);
 
   document.addEventListener("DOMContentLoaded", () => {
-    console.log("🚀 ZETTBOT: Halaman berhasil dimuat (DOMContentLoaded).");
+    console.log("🚀 TRANSKEP: Halaman berhasil dimuat (DOMContentLoaded).");
 
     document.body.style.display = ''; 
     document.body.classList.remove('hidden');
@@ -53,7 +53,7 @@
         toggleAppVisibility(false);
       }
     } catch (e) {
-      console.error("❌ ZETTBOT Error Inisialisasi:", e);
+      console.error("❌ TRANSKEP Error Inisialisasi:", e);
       toggleAppVisibility(false);
     }
   });
@@ -175,7 +175,7 @@
     const activeNip = localStorage.getItem('transkep_active_nip');
     const sessionToken = localStorage.getItem('transkep_session_token'); 
 
-    // ZETTBOT HARDENING: Hapus sesi di server-side CacheService seketika (CWE-613)
+    // TRANSKEP HARDENING: Hapus sesi di server-side CacheService seketika (CWE-613)
     if (isGoogleEnv && activeNip && sessionToken) {
       try {
         google.script.run.logoutSession(activeNip, sessionToken);
@@ -250,7 +250,7 @@
             window.vueState.pendingPkpCount = response.data.pendingPkpCount || 0;
             window.vueState.isBgSyncDone = false; 
 
-            // ZETTBOT TAHAP 37: Pertahankan data in-memory jika sudah ada (Anti-Wiping / Non-Destructive Cache)
+            // TAHAP 37: Pertahankan data in-memory jika sudah ada (Anti-Wiping / Non-Destructive Cache)
             window.vueState.cutiLogs = window.vueState.cutiLogs || [];
             window.vueState.jobdesList = window.vueState.jobdesList || [];
             window.vueState.skList = window.vueState.skList || [];
@@ -737,7 +737,7 @@
     }
   }
 
-  // ZETTBOT FIX: Bind dialog & notifikasi eksplisit ke window global
+  // FIX: Bind dialog & notifikasi eksplisit ke window global
   window.showNotify = showNotify;
   window.showCustomConfirm = showCustomConfirm;
 
@@ -777,7 +777,7 @@
   }
 
   document.addEventListener("DOMContentLoaded", () => {
-      // ZETTBOT FIX: Menggunakan Vue.createApp secara eksplisit agar aman
+      // FIX: Menggunakan Vue.createApp secara eksplisit agar aman
       window.vmGlobalModals = Vue.createApp({
           data() {
               return {

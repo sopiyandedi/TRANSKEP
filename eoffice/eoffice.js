@@ -1,12 +1,12 @@
 // ==========================================
 // FILE: eoffice/eoffice.js
 // DESKRIPSI: Backend Controller E-Office (KGB & Paket Rapat)
-// ENGINE: ZettBOT Core v1.0.0 (by Zettbos)
+// ENGINE: TRANSKEP Core v1.0.0 
 // ==========================================
 
 /**
  * Inisialisasi Database Sheet E-Office (Safe Migration & Idempoten)
- * ZettBOT: Menjamin tidak pernah menghapus data sheet yang sudah ada
+ * TRANSKEP: Menjamin tidak pernah menghapus data sheet yang sudah ada
  */
 function initEofficeDatabase_() {
   try {

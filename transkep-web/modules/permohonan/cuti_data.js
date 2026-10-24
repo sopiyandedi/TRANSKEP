@@ -2,7 +2,7 @@
 // FILE: cuti_data.js (TRANSKEP Modular)
 // DESKRIPSI: Data Service Layer khusus Modul Permohonan Cuti & Riwayat
 // FITUR: RPC Smart Routing, Add/Update Cuti, Delete Logs, Request Cancel, FileReader Base64
-// ENGINE: ZettBOT Core v1.0.0 (by Zettbos)
+// ENGINE: TRANSKEP Core v1.0.0 
 // ==========================================
 
 const CutiDataService = {

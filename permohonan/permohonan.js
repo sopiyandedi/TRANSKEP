@@ -135,7 +135,7 @@ function addCutiLog(payload, aktorNip, clientToken) {
   } catch (err) { return { status: 'error', message: err.toString() }; }
 }
 
-// ZETTBOT UPDATE: Algoritma Saldo Khusus untuk Mode Edit Tahap 3
+// TRANSKEP UPDATE: Algoritma Saldo Khusus untuk Mode Edit Tahap 3
 function updateCutiLog(payload, aktorNip, clientToken) {
   try {
     // Validasi token sekarang mencocokkan aktorNip (Admin), bukan payload.nip (Target)

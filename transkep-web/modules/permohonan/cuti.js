@@ -4,7 +4,7 @@
 
 // ==========================================
 // FILE: permohonan.js (TRANSKEP Modular)
-// ENGINE: ZettBOT Core v1.0.0
+// ENGINE: TRANSKEP Core v1.0.0
 // ==========================================
 
 // --- Source: permohonan/js_permohonan_view.html ---
@@ -172,7 +172,7 @@
           data() {
               return {
                   s: window.vueState || state, // Mengikat variabel global state/vueState ke dalam lokal Vue
-                  activeDropdownId: null, // ZETTBOT TAHAP 43: ID Dropdown aksi yang sedang terbuka
+                  activeDropdownId: null, // TAHAP 43: ID Dropdown aksi yang sedang terbuka
                   isRefreshing: false
               };
           },
@@ -268,7 +268,7 @@
                           hasDropdown = false;
                           if (log.jenis !== 'Dinas Luar') {
                               if (sNorm === 'disetujui') {
-                                  hasDropdown = true; // ZETTBOT TAHAP 43: 1 Tombol Ikon Compact mengeluarkan 2 opsi (Cetak & Unduh TTE)
+                                  hasDropdown = true; // TAHAP 43: 1 Tombol Ikon Compact mengeluarkan 2 opsi (Cetak & Unduh TTE)
                               } else {
                                   actions.push({ actionType: 'cetakCuti', icon: 'fa-print', text: '', css: 'p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 rounded-lg transition shadow-md shadow-slate-900/30 text-xs', tooltip: 'Cetak Formulir' });
                               }
@@ -387,7 +387,7 @@
               }
           },
           methods: {
-              // ZETTBOT TAHAP 46: Trigger Refresh Sinkronisasi Riwayat Cuti
+              // TAHAP 46: Trigger Refresh Sinkronisasi Riwayat Cuti
               async refreshData() {
                   if (this.isRefreshing) return;
                   this.isRefreshing = true;
@@ -405,7 +405,7 @@
                   }
               },
 
-              // ZETTBOT TAHAP 43: Kontroler Dropdown Aksi Cuti Disetujui
+              // TAHAP 43: Kontroler Dropdown Aksi Cuti Disetujui
               toggleActionDropdown(id) {
                   this.activeDropdownId = (this.activeDropdownId === id) ? null : id;
               },
@@ -413,7 +413,7 @@
                   this.activeDropdownId = null;
               },
 
-              // ZETTBOT TAHAP 3: Membersihkan Pemanggil Eksternal (Safe Short-Circuit Standarisasi Vue)
+              // TAHAP 3: Membersihkan Pemanggil Eksternal (Safe Short-Circuit Standarisasi Vue)
               executeAction(actionType, id) {
                   this.activeDropdownId = null;
                   // --- FUNGSI EDIT / TAMPIL ---
@@ -647,7 +647,7 @@
               }
           },
           mounted() {
-              // ZETTBOT TAHAP 43: Auto-close dropdown saat pengguna klik di luar container
+              // TAHAP 43: Auto-close dropdown saat pengguna klik di luar container
               document.addEventListener('click', (e) => {
                   if (!e.target.closest('.dropdown-action-container')) {
                       this.activeDropdownId = null;
@@ -689,7 +689,7 @@
                   // Variabel untuk Modal Pembatalan Cuti
                   cancelForm: { id: '', alasan: '' },
 
-                  // ZETTBOT FIX: Variabel untuk Searchable Dropdown Bypass
+                  // FIX: Variabel untuk Searchable Dropdown Bypass
                   bypassSearchQuery: '',
                   isBypassDropdownOpen: false
               };
@@ -701,7 +701,7 @@
                   }
                   return this.s.user;
               },
-              // ZETTBOT FIX: Logika filtering untuk kolom pencarian bypass
+              // FIX: Logika filtering untuk kolom pencarian bypass
               filteredBypassUsers() {
                   if (!this.s || !this.s.usersList) return [];
                   let users = this.s.usersList;
@@ -803,7 +803,7 @@
               }
           },
           methods: {
-              // ZETTBOT FIX: Fungsi interaksi Searchable Dropdown Bypass
+              // FIX: Fungsi interaksi Searchable Dropdown Bypass
               openBypassDropdown() {
                   this.isBypassDropdownOpen = true;
                   // Jika pengguna ingin mencari orang lain, kosongkan query tapi simpan NIP lama sementara
@@ -1058,7 +1058,7 @@
                                                   if (res.data.fileUrl) this.s.cutiLogs[existIdx].bukti_url = res.data.fileUrl;
                                               }
                                           } else {
-                                               // ZETTBOT TAHAP 37: Potong kuota cuti lokal secara reaktif & instan
+                                               // TAHAP 37: Potong kuota cuti lokal secara reaktif & instan
                                                const durasiNumber = Number(res.data.durasi || durasi || 0);
                                                const targetPegawai = (String(payload.nip) === String(this.s.user.nip)) ? this.s.user : (this.s.usersList ? this.s.usersList.find(u => String(u.nip) === String(payload.nip)) : null);
                                                if (targetPegawai && payload.jenis !== 'Dinas Luar' && payload.jenis !== 'CLTN') {
@@ -1095,7 +1095,7 @@
                                                };
                                                if (this.s && this.s.cutiLogs) this.s.cutiLogs.unshift(logVirtual);
                                            }
-                                           // ZETTBOT TAHAP 37: Jalankan silent sync tanpa dialog blocking & tanpa kedip
+                                           // TAHAP 37: Jalankan silent sync tanpa dialog blocking & tanpa kedip
                                            if (typeof syncAllServerData === 'function') {
                                                syncAllServerData(true);
                                            } else if (typeof syncBackgroundData === 'function') {

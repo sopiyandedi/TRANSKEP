@@ -116,7 +116,7 @@ document.addEventListener("DOMContentLoaded", () => {
         data() {
             return {
                 globalState: window.vueState,
-                currentSkTab: 'Pegawai', // ZETTBOT FIX: Tab Rekap menjadi default saat modul dibuka
+                currentSkTab: 'Pegawai', // FIX: Tab Rekap menjadi default saat modul dibuka
                 skSearchQuery: '',
                 expandedSkRows: [],
                 expandedPegawaiRows: [],
@@ -130,7 +130,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 tempMembers: [],
                 skSearchMemberInput: '',
 
-                // ZETTBOT: State untuk Upload File PDF, Drag-Drop & Pintasan Folder Drive
+                // TRANSKEP: State untuk Upload File PDF, Drag-Drop & Pintasan Folder Drive
                 skSelectedFile: null,
                 skFileDataBase64: null,
                 isUploading: false,
@@ -186,7 +186,7 @@ document.addEventListener("DOMContentLoaded", () => {
                    mapGroup[baseId].members.push({ nip: sk.nip, peran: peran });
                 });
 
-                // ZETTBOT TAHAP 44: Integrasi & Realtime Sync dari Cloud Firestore
+                // TAHAP 44: Integrasi & Realtime Sync dari Cloud Firestore
                 (this.firestoreSks || []).forEach(fSk => {
                     const docId = String(fSk.id).trim();
                     mapGroup[docId] = {
@@ -215,7 +215,7 @@ document.addEventListener("DOMContentLoaded", () => {
                    filtered = filtered.filter(sk => sk.pj_sk === this.currentSkTab);
                 }
                 
-                // ZETTBOT FIX: Hapus limitasi role Pegawai agar mereka bisa melihat seluruh dokumen SK
+                // FIX: Hapus limitasi role Pegawai agar mereka bisa melihat seluruh dokumen SK
                 // (Transparansi penuh untuk koleksi dokumen di tab Semua SK / Filter PJ)
                 
                 if (this.skSearchQuery) {
@@ -276,7 +276,7 @@ document.addEventListener("DOMContentLoaded", () => {
             },
             filteredSkPegawaiData() {
                 let filtered = this.groupedSkPegawaiData;
-                // ZETTBOT FIX: Tab Rekap tetap aman, hanya menampilkan data milik user sendiri (jika bukan Admin)
+                // FIX: Tab Rekap tetap aman, hanya menampilkan data milik user sendiri (jika bukan Admin)
                 if (this.globalState.user && this.globalState.user.role === 'Pegawai') {
                    filtered = filtered.filter(p => String(p.nip) === String(this.globalState.user.nip));
                 }
@@ -701,15 +701,15 @@ document.addEventListener("DOMContentLoaded", () => {
             },
 
             // ==========================================
-            // ZETTBOT TAHAP 44: CLOUD FIRESTORE METHODS
+            // TAHAP 44: CLOUD FIRESTORE METHODS
             // ==========================================
             initFirebaseSkListener() {
                 if (typeof TranskepFirebase !== 'undefined' && TranskepFirebase.isReady()) {
                     this.isFirebaseConnected = true;
-                    console.log("🔥 [ZettBOT SK] Menghubungkan listener realtime Firestore SK...");
+                    console.log("🔥 [TRANSKEP SK] Menghubungkan listener realtime Firestore SK...");
                     TranskepFirebase.subscribeFirestoreSks((list) => {
                         this.firestoreSks = list || [];
-                        console.log(`🔥 [ZettBOT SK] Realtime Sync: ${this.firestoreSks.length} dokumen SK aktif di Firestore.`);
+                        console.log(`🔥 [TRANSKEP SK] Realtime Sync: ${this.firestoreSks.length} dokumen SK aktif di Firestore.`);
                     });
                 }
             },
@@ -775,5 +775,5 @@ document.addEventListener("DOMContentLoaded", () => {
     }).mount('#vue-sk-app');
 });
 
-// ZETTBOT: Menimpa renderSkView bawaan agar router Vanilla tidak menabrak
+// TRANSKEP: Menimpa renderSkView bawaan agar router Vanilla tidak menabrak
 window.renderSkView = function() {};

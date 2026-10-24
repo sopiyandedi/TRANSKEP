@@ -3,7 +3,7 @@
 // ==========================================
 
 function doGet(e) {
-  // 1. ZETTBOT ADAPTOR: Cek apakah pemanggil adalah API (GitHub Pages / Domain Luar)
+  // 1. TRANSKEP ADAPTOR: Cek apakah pemanggil adalah API (GitHub Pages / Domain Luar)
   if (e && e.parameter && (e.parameter.api === 'true' || e.parameter.format === 'json')) {
     return handleApiGet_(e);
   }
@@ -21,7 +21,7 @@ function include(filename) {
 }
 
 // ------------------------------------------
-// FUNGSI PEMBANTU KONEKSI & KEAMANAN (ZETTBOT)
+// FUNGSI PEMBANTU KONEKSI & KEAMANAN (TRANSKEP)
 // ------------------------------------------
 
 // 1. Sentralisasi Koneksi Database (DRY)
@@ -155,7 +155,7 @@ function logoutSession(nip, clientToken) {
   }
 }
 
-// 7. Gateway Otomatisasi WhatsApp (n8n + WAHA Gateway) - ZettBOT Enterprise Engine v3.0
+// 7. Gateway Otomatisasi WhatsApp (n8n + WAHA Gateway) - TRANSKEP Enterprise Engine v3.0
 function getGatewayConfig_() {
   const props = PropertiesService.getScriptProperties();
   const rawUrl = props.getProperty('N8N_WEBHOOK_URL') || props.getProperty('WAHA_BASE_URL') || 'https://supernova-endpoint-unsubtly.ngrok-free.dev/webhook/transkep-gateway';
@@ -327,7 +327,7 @@ function getBulkData(nip, clientToken) {
     if(sheetUser) {
        const uData = sheetUser.getDataRange().getDisplayValues();
 
-       // ZETTBOT HOTFIX KREDENSIAL: Cek apakah user yang login berhak melihat sandi (Admin saja)
+       // TRANSKEP HOTFIX KREDENSIAL: Cek apakah user yang login berhak melihat sandi (Admin saja)
        let isRequesterAdmin = false;
        for (let i = 1; i < uData.length; i++) {
           if (String(uData[i][0]) === String(nip) && String(uData[i][3]).toLowerCase() === 'admin') {
@@ -649,7 +649,7 @@ function requestPasswordReset(no_wa) {
 
 function getResetPasswordQueue(adminNip, clientToken) {
   try {
-    // ZETTBOT HOTFIX KREDENSIAL: Proteksi RBAC wajib Admin
+    // TRANSKEP HOTFIX KREDENSIAL: Proteksi RBAC wajib Admin
     if (!cekOtorisasiAdmin(adminNip, clientToken)) {
       throw new Error("Akses Ditolak: Anda tidak memiliki izin Admin untuk mengakses antrean ini.");
     }
@@ -708,7 +708,7 @@ function testKoneksiWAHA() {
 
 function markResetAsDone(reqId, adminNip, clientToken) {
   try {
-    // ZETTBOT HOTFIX KREDENSIAL: Proteksi RBAC wajib Admin
+    // TRANSKEP HOTFIX KREDENSIAL: Proteksi RBAC wajib Admin
     if (!cekOtorisasiAdmin(adminNip, clientToken)) {
       return { status: 'error', message: 'Akses Ditolak: Hanya Admin yang dapat memproses antrean ini.' };
     }
@@ -738,7 +738,7 @@ function markResetAsDone(reqId, adminNip, clientToken) {
 
 
 // ==========================================
-// ZETTBOT FASE 2: FUNGSI GANTI KATA SANDI (AMAN)
+// TRANSKEP FASE 2: FUNGSI GANTI KATA SANDI (AMAN)
 // ==========================================
 function changeMyPassword(nip, oldPass, newPass, clientToken) {
   try {

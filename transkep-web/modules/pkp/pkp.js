@@ -1,6 +1,6 @@
 // ==========================================
 // FILE: pkp.js (TRANSKEP Modular)
-// ENGINE: ZettBOT Core v1.0.0
+// ENGINE: TRANSKEP Core v1.0.0
 // ==========================================
 
 // --- Source: pkp/js_pkp_core.html ---
@@ -13,7 +13,7 @@
 
 function initPkpModule() {
     try {
-        console.log("🚀 ZETTBOT: Menjalankan initPkpModule()...");
+        console.log("🚀 TRANSKEP: Menjalankan initPkpModule()...");
         if (typeof mountPkpApp === 'function') mountPkpApp();
         
         var role = state.user ? state.user.role : '';
@@ -1529,8 +1529,8 @@ function savePCKFull() {
  * ========================================================
  */
 
-// ZETTBOT FIX: Track Status Mode agar Logic Save (Update Hierarki) Tahu Posisi ID yang Dikerjakan
-// ZETTBOT FIX: Track Status Mode agar Logic Save (Update Hierarki) Tahu Posisi ID yang Dikerjakan
+// FIX: Track Status Mode agar Logic Save (Update Hierarki) Tahu Posisi ID yang Dikerjakan
+// FIX: Track Status Mode agar Logic Save (Update Hierarki) Tahu Posisi ID yang Dikerjakan
 window.isVerifikasiModePK = false;
 window.verifikasiNipTargetPK = null;
 window.currentOpenedPkpId = null; 

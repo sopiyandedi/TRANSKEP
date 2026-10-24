@@ -197,7 +197,7 @@
       iframe.onload = function() {
         window.hidePdfLoader();
         
-        // --- ZETTBOT: AUTO-ACKNOWLEDGE TIMER (10 DETIK) ---
+        // --- TRANSKEP: AUTO-ACKNOWLEDGE TIMER (10 DETIK) ---
         if (window.autoAckTimer) clearTimeout(window.autoAckTimer);
         
         window.autoAckTimer = setTimeout(function() {
@@ -246,7 +246,7 @@
 
   window.closeFlipbookModal = function() {
     try {
-      // --- ZETTBOT: BERSIHKAN TIMER JIKA MODAL DITUTUP SEBELUM 10 DETIK ---
+      // --- TRANSKEP: BERSIHKAN TIMER JIKA MODAL DITUTUP SEBELUM 10 DETIK ---
       if (window.autoAckTimer) {
           clearTimeout(window.autoAckTimer);
           window.autoAckTimer = null;

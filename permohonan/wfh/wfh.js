@@ -1,5 +1,5 @@
 // =========================================================================
-// ZETTBOS BACKEND MODULE: WORK FROM HOME (Aman & Terpusat)
+// TRANSKEP BACKEND MODULE: WORK FROM HOME (Aman & Terpusat)
 // =========================================================================
 
 function submitRencanaWFH(payload, clientToken) {
@@ -191,7 +191,7 @@ function updateRencanaWfhLog(payload, clientToken) {
 
 /**
  * =======================================================================
- * ZETTBOT TAHAP 1: BACKEND GENERATOR - GOOGLE DOCS TO PDF (SERVER-SIDE)
+ * TAHAP 1: BACKEND GENERATOR - GOOGLE DOCS TO PDF (SERVER-SIDE)
  * =======================================================================
  */
 
@@ -298,7 +298,7 @@ function generatePdfLaporanWFH(id, userNip, clientToken) {
 
     if(targetTable && targetTable.getNumRows() > 1) {
         
-        // ZETTBOT FIX: Mengambil baris kosong di bawah header sebagai cetakan (Row Cloning)
+        // FIX: Mengambil baris kosong di bawah header sebagai cetakan (Row Cloning)
         const templateRow = targetTable.getRow(1);
 
         let rencanaList = []; try { rencanaList = JSON.parse(logWfh[4] || '[]'); } catch(e){}
@@ -321,7 +321,7 @@ function generatePdfLaporanWFH(id, userNip, clientToken) {
             newRow.getCell(3).setText(real);
             newRow.getCell(4).setText(stat);
 
-            // ZETTBOT FEATURE: Otomatis beri warna merah dan bold jika status Terkendala
+            // TRANSKEP FEATURE: Otomatis beri warna merah dan bold jika status Terkendala
             if (stat === 'Terkendala') {
                 try { newRow.getCell(4).getChild(0).asParagraph().editAsText().setBold(true).setForegroundColor('#ef4444'); } catch(e){}
             }
@@ -540,5 +540,5 @@ function generatePdfRencanaWFH(id, userNip, clientToken) {
 
 
 function triggerIzinDocs() {
-  DocumentApp.create("File Pancingan Izin ZettBOT");
+  DocumentApp.create("File Pancingan Izin TRANSKEP");
 }

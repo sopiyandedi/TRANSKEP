@@ -4,7 +4,7 @@
 // ==========================================
 
 // --- Source: permohonan/wfh/js_cetak_wfh_rencana.html ---
-// ZETTBOT FIX: Fungsi Otomatis Mendeteksi Hari dari Tanggal
+// FIX: Fungsi Otomatis Mendeteksi Hari dari Tanggal
     function formatDateFullIndo(dateStr) {
         if (!dateStr) return "-";
         const months = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
@@ -152,7 +152,7 @@
             doc.write(finalHTML);
             doc.close();
 
-            // ZETTBOT FIX: Suntik tabel pakai DOM murni agar Chrome tidak membuang teks keluar tabel
+            // FIX: Suntik tabel pakai DOM murni agar Chrome tidak membuang teks keluar tabel
             const targetTbody = doc.getElementById('wfh_target_tbody');
             if (targetTbody) {
                 targetTbody.innerHTML = tBodyHtml;

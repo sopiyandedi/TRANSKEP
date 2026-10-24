@@ -94,7 +94,7 @@
               </td>
               <td class="p-4 text-center">
                  <div class="flex items-center justify-center gap-1.5">
-                    <!-- ZETTBOT TAHAP 43: Dropdown Aksi Cuti Disetujui (1 Tombol Ikon Ringkas ➔ 2 Opsi) -->
+                    <!-- TAHAP 43: Dropdown Aksi Cuti Disetujui (1 Tombol Ikon Ringkas ➔ 2 Opsi) -->
                     <div v-if="log.hasDropdown" class="relative inline-block text-left dropdown-action-container">
                        <button @click.stop="toggleActionDropdown(log.id)" type="button" class="px-2.5 py-1.5 bg-slate-800/90 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 rounded-lg transition shadow-md flex items-center gap-1 text-xs" title="Opsi Cetak & Unduh Dokumen">
                           <i class="fa-solid fa-list-ul text-xs"></i>
@@ -133,7 +133,7 @@
     </div>
 </div>
 
-<!-- ZETTBOT FIX TAHAP 5: Vue Wrapper untuk Form Cuti & Pembatalan Cuti -->
+<!-- FIX TAHAP 5: Vue Wrapper untuk Form Cuti & Pembatalan Cuti -->
 <div id="vue-form-cuti-wrapper" v-cloak>
   
   <!-- MODAL PENGAJUAN CUTI BARU (DAN BYPASS) -->
@@ -151,7 +151,7 @@
 
       <form @submit.prevent="submitCuti" class="flex-1 overflow-y-auto py-4 space-y-4 text-xs pr-2 custom-scrollbar">
         
-        <!-- ZETTBOT FIX: SEARCHABLE DROPDOWN UNTUK BYPASS -->
+        <!-- FIX: SEARCHABLE DROPDOWN UNTUK BYPASS -->
         <div v-show="isBypassMode" class="bg-indigo-500/10 border border-indigo-500/30 p-4 rounded-2xl mb-4">
            <label class="block text-indigo-300 uppercase font-bold mb-1.5"><i class="fa-solid fa-user-shield mr-1"></i> Mode Bypass: Pilih Pegawai Pemohon</label>
            

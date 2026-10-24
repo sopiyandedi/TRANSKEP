@@ -2,7 +2,7 @@
 // FILE: pkp_data.js (TRANSKEP Modular)
 // DESKRIPSI: Data Service Layer khusus Modul Penilaian Kinerja Pegawai (PKP & PCK)
 // FITUR: RPC Dokumen PKP, Dokumen PCK, Detail, Submit Bulk, Aksi Persetujuan, PDF Generation
-// ENGINE: ZettBOT Core v1.0.0 (by Zettbos)
+// ENGINE: TRANSKEP Core v1.0.0 
 // ==========================================
 
 const PkpDataService = {

@@ -2,7 +2,7 @@
 // FILE: kinerja_data.js (TRANSKEP Modular)
 // DESKRIPSI: Data Service Layer khusus Modul Kinerja
 // FITUR: FileReader Base64, Payload Builder, RPC Dispatcher
-// ENGINE: ZettBOT Core v1.0.0 (by Zettbos)
+// ENGINE: TRANSKEP Core v1.0.0 
 // ==========================================
 
 const KinerjaDataService = {

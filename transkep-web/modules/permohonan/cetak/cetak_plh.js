@@ -78,7 +78,7 @@
       const diffTime = Math.abs(new Date(tglKembali) - new Date(tglBerangkat));
       const lamaHari = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
 
-      // ZETTBOT FIX: Logika 1 Hari atau Lebih untuk Penulisan Tanggal
+      // FIX: Logika 1 Hari atau Lebih untuk Penulisan Tanggal
       let tanggalTugasStr = "";
       if (lamaHari === 1 || tglBerangkat === tglKembali) {
           tanggalTugasStr = `tanggal ${formatTglPlh(tglBerangkat)}`;
@@ -86,7 +86,7 @@
           tanggalTugasStr = `tanggal ${formatTglPlh(tglBerangkat)} s.d ${formatTglPlh(tglKembali)}`;
       }
 
-      // ZETTBOT FIX: Membersihkan Gelar untuk Tanda Tangan
+      // FIX: Membersihkan Gelar untuk Tanda Tangan
       let namaTtdBersih = "-";
       if (typeof formatNamaBersih === 'function') {
           namaTtdBersih = formatNamaBersih(ttdST.nama);

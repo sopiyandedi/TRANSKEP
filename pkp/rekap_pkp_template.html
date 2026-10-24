@@ -4,7 +4,7 @@
       @page { size: A4 portrait; margin: 15mm; }
       html, body { background: white !important; color: black !important; font-family: 'Times New Roman', Times, serif; font-size: 10pt; margin:0; padding:0; }
       
-      /* ZETTBOT FIX: Hide semua elemen UI saat mencetak template ini */
+      /* FIX: Hide semua elemen UI saat mencetak template ini */
       body.print-mode-rekap > * { display: none !important; }
       body.print-mode-rekap > #template-rekap-pck-bkn { display: block !important; position: relative; width: 100%; box-sizing: border-box; }
       
@@ -20,7 +20,7 @@
       .table-data { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 9.5pt; }
       .table-data th, .table-data td { border: 1px solid black; padding: 6px 4px; vertical-align: middle; }
       
-      /* ZETTBOT TRICK: Membuat Header Tabel berulang di setiap halaman jika halamannya panjang! */
+      /* TRANSKEP TRICK: Membuat Header Tabel berulang di setiap halaman jika halamannya panjang! */
       thead { display: table-header-group; }
       
       /* Area TTD (Rata Kanan) */

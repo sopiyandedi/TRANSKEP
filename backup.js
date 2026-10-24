@@ -2,7 +2,7 @@
 // FILE: backup.gs (Sistem Auto Backup & Cleanup)
 // ==========================================
 
-// ZETTBOT PRIVAT: Akhiran underscore mencegah fungsi ini dipanggil publik dari klien via google.script.run
+// TRANSKEP PRIVAT: Akhiran underscore mencegah fungsi ini dipanggil publik dari klien via google.script.run
 function runDailyBackup_() {
   try {
     // 1. Ambil ID Database Utama

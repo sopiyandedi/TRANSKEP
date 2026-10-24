@@ -1,10 +1,10 @@
 <!-- KANVAS BACKGROUND ANIMASI -->
-<!-- ZETTBOT FIX: Kembali gunakan z-index: -10 agar mutlak di belakang menu HP -->
+<!-- FIX: Kembali gunakan z-index: -10 agar mutlak di belakang menu HP -->
 <canvas id="loginParticleCanvas" style="z-index: -10 !important;" class="fixed inset-0 w-full h-full pointer-events-none opacity-40"></canvas>
 
 <script>
   // ==========================================
-  // ZETTBOT: PARTICLE NETWORK BACKGROUND ENGINE
+  // TRANSKEP: PARTICLE NETWORK BACKGROUND ENGINE
   // ==========================================
   function initLoginParticles() {
     if (window.loginParticlesInitialized) return;
@@ -142,7 +142,7 @@
     animate();
   }
 
-  // ZETTBOT: Eksekusi Instan (0ms delay)
+  // TRANSKEP: Eksekusi Instan (0ms delay)
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", initLoginParticles);
   } else {

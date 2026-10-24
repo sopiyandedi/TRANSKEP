@@ -66,7 +66,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (!this.plhTargetNip) return null;
                 return this.pesertaList.find(p => p.nip === this.plhTargetNip);
             },
-            // ZETTBOT FIX: 5 Mesin Filter Pencarian Real-Time (Dropdown Autocomplete)
+            // FIX: 5 Mesin Filter Pencarian Real-Time (Dropdown Autocomplete)
             filteredPegawai() {
                 if (!this.s.usersList) return [];
                 const q = this.sqPegawai.toLowerCase();
@@ -105,7 +105,7 @@ document.addEventListener("DOMContentLoaded", () => {
             },
 
             // ----------------------------------------------------
-            // ZETTBOT FIX: Tombol Enter Eksekusi Hasil Teratas
+            // FIX: Tombol Enter Eksekusi Hasil Teratas
             // ----------------------------------------------------
             handleEnterPegawai() {
                 if (this.dropPegawai && this.filteredPegawai.length > 0 && this.sqPegawai !== '') {

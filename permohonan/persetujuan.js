@@ -178,7 +178,7 @@ function processBulkApproval(bulkItems, decision, notes, userNip, bypassMode, cl
 }
 
 // ==========================================
-// KONTROLER MAGIC LINK PERSETUJUAN CUTI (WAHA BOT) - ZETTBOT v2.1
+// KONTROLER MAGIC LINK PERSETUJUAN CUTI (WAHA BOT) - TRANSKEP v2.1
 // ==========================================
 
 function getCutiByToken(token) {

@@ -6,6 +6,7 @@
   <meta name="viewport"
     content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>TRANSKEP</title>
+  <script>document.title = 'TRANSKEP';</script>
 
   <!-- PWA & Mobile Web App Meta Tags -->
   <meta name="description"
@@ -56,7 +57,7 @@
   <link rel="stylesheet" href="css/custom.css">
   <link rel="stylesheet" href="css/sk_builder.css">
 
-  <!-- ZETTBOT: Instant Anti-FOUC Session Guard (0ms Auth State Resolution) -->
+  <!-- TRANSKEP: Instant Anti-FOUC Session Guard (0ms Auth State Resolution) -->
   <script>
     (function () {
       try {
@@ -71,7 +72,7 @@
     })();
   </script>
 
-  <!-- ZETTBOT: Pelindung Anti-FOUC & Anti-Bocor Modal Vue -->
+  <!-- TRANSKEP: Pelindung Anti-FOUC & Anti-Bocor Modal Vue -->
   <style>
     [v-cloak] {
       display: none !important;
@@ -96,7 +97,7 @@
       display: none !important;
     }
 
-    /* ZETTBOT: Instant App Shell Skeleton Control (0ms Anti-Blank Layar Saat Refresh) */
+    /* TRANSKEP: Instant App Shell Skeleton Control (0ms Anti-Blank Layar Saat Refresh) */
     #dashboard-skeleton {
       display: none;
     }
@@ -113,10 +114,10 @@
 
 <body class="bg-slate-950 text-slate-200 min-h-screen overflow-hidden flex selection:bg-indigo-500/30">
 
-  <!-- ZETTBOT: Auto-Bust PWA Cache & Stale Service Worker Guard -->
+  <!-- TRANSKEP: Auto-Bust PWA Cache & Stale Service Worker Guard -->
   <script>
     (async function () {
-      const CURRENT_APP_BUILD = 'transkep-v3.1.6';
+      const CURRENT_APP_BUILD = 'transkep-v3.1.7';
       if (localStorage.getItem('transkep_active_build') !== CURRENT_APP_BUILD) {
         localStorage.setItem('transkep_active_build', CURRENT_APP_BUILD);
         try {
@@ -136,7 +137,7 @@
     })();
   </script>
 
-  <!-- ZETTBOT FIX: Script Eksekusi Instan Anti-Kedip (Anti-FOUC) -->
+  <!-- FIX: Script Eksekusi Instan Anti-Kedip (Anti-FOUC) -->
   <script>
     document.body.classList.add('preload-theme');
     if (localStorage.getItem('transkep_theme') === 'light') {
@@ -220,7 +221,7 @@
         <div id="slot-dashboard"></div>
 
         <!-- ==================================================== -->
-        <!-- ZETTBOT: APP SHELL SKELETON (0ms RENDER ON REFRESH)  -->
+        <!-- TRANSKEP: APP SHELL SKELETON (0ms RENDER ON REFRESH)  -->
         <!-- ==================================================== -->
         <div id="dashboard-skeleton" class="space-y-6">
           <!-- Skeleton Header -->
@@ -429,7 +430,7 @@
   <div id="slot-magic-approval"></div>
 
   <!-- ========================================================= -->
-  <!-- 4. ZETTBOT MODULAR COMPONENT & SCRIPT LOADER             -->
+  <!-- 4. TRANSKEP MODULAR COMPONENT & SCRIPT LOADER             -->
   <!-- ========================================================= -->
   <script>
     (async function initModularTranskep() {
@@ -538,7 +539,7 @@
 
       try {
         const APP_BUILD_VER = '3.1.4';
-        console.log('🔄 [ZettBOT Loader] Memuat komponen tampilan views/ secara paralel...');
+        console.log('🔄 [TRANSKEP Loader] Memuat komponen tampilan views/ secara paralel...');
         await Promise.all(VIEW_SLOTS.map(async item => {
           const res = await fetch(item.file + '?v=' + APP_BUILD_VER);
           if (!res.ok) throw new Error(`HTTP ${res.status} saat memuat ${item.file}`);
@@ -547,7 +548,7 @@
           if (el) el.outerHTML = html;
         }));
 
-        console.log('🔄 [ZettBOT Loader] Memuat 12 template cetak views/cetak/ secara paralel...');
+        console.log('🔄 [TRANSKEP Loader] Memuat 12 template cetak views/cetak/ secara paralel...');
         const cetakSlot = document.getElementById('slot-templates-cetak');
         if (cetakSlot) {
           const cetakHtmls = await Promise.all(CETAK_TEMPLATES.map(async file => {
@@ -557,7 +558,7 @@
           }));
           cetakSlot.outerHTML = cetakHtmls.join('\n');
         }
-        console.log('✅ [ZettBOT Loader] Seluruh 16 komponen views/ & 12 template cetak sukses dimuat ke DOM.');
+        console.log('✅ [TRANSKEP Loader] Seluruh 16 komponen views/ & 12 template cetak sukses dimuat ke DOM.');
 
         const loadScript = (src) => new Promise((resolve) => {
           const s = document.createElement('script');
@@ -570,32 +571,32 @@
           document.body.appendChild(s);
         });
 
-        console.log('🔄 [ZettBOT Loader] Memuat Core JavaScript secara berurutan...');
+        console.log('🔄 [TRANSKEP Loader] Memuat Core JavaScript secara berurutan...');
         for (const src of CORE_SCRIPTS) {
           await loadScript(src);
         }
 
-        console.log('🔄 [ZettBOT Loader] Memuat Data Services secara paralel...');
+        console.log('🔄 [TRANSKEP Loader] Memuat Data Services secara paralel...');
         await Promise.all(DATA_SCRIPTS.map(loadScript));
 
-        console.log('🔄 [ZettBOT Loader] Memuat Controller & Cetak Handlers secara paralel...');
+        console.log('🔄 [TRANSKEP Loader] Memuat Controller & Cetak Handlers secara paralel...');
         await Promise.all([...CONTROLLER_SCRIPTS, ...CETAK_SCRIPTS].map(loadScript));
-        console.log('✅ [ZettBOT Loader] Seluruh script controller & print handlers aktif.');
+        console.log('✅ [TRANSKEP Loader] Seluruh script controller & print handlers aktif.');
 
         // Picu event DOMContentLoaded dan load buatan agar seluruh modul menginisialisasi Vue
-        console.log('🚀 [ZETTBOT] Menginisialisasi event DOMContentLoaded aplikasi...');
+        console.log('🚀 [TRANSKEP] Menginisialisasi event DOMContentLoaded aplikasi...');
         document.dispatchEvent(new Event('DOMContentLoaded'));
         window.dispatchEvent(new Event('load'));
 
         // PWA Service Worker Registration
         if ('serviceWorker' in navigator && (window.location.protocol === 'https:' || window.location.protocol === 'http:')) {
           navigator.serviceWorker.register('./sw.js')
-            .then(reg => console.log('📱 ZETTBOT PWA: Service Worker terdaftar (Scope:', reg.scope, ')'))
-            .catch(err => console.warn('⚠️ ZETTBOT PWA: Registrasi Service Worker gagal:', err));
+            .then(reg => console.log('📱 TRANSKEP PWA: Service Worker terdaftar (Scope:', reg.scope, ')'))
+            .catch(err => console.warn('⚠️ TRANSKEP PWA: Registrasi Service Worker gagal:', err));
         }
 
       } catch (err) {
-        console.error('❌ [ZettBOT Loader] Terjadi kesalahan inisialisasi:', err);
+        console.error('❌ [TRANSKEP Loader] Terjadi kesalahan inisialisasi:', err);
       }
     })();
   </script>

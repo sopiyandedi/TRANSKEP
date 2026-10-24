@@ -208,10 +208,10 @@
              <div v-else-if="absensiHariIni.length === 0" class="text-center p-6 mt-12 animate-fade-in text-emerald-400 font-bold">Luar Biasa! 100% Hadir.</div>
              <div v-else v-for="item in absensiHariIni" :key="item.user.nip" class="flex items-center justify-between p-3 rounded-2xl border border-slate-800/60 bg-slate-900/40 transition gap-3 mb-2 animate-fade-in">
                 <div class="flex items-center gap-3 overflow-hidden">
-                   <!-- ZETTBOT FIX: charAt safety -->
+                   <!-- FIX: charAt safety -->
                    <div class="w-10 h-10 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-center shrink-0 shadow-inner"><span class="text-sm font-black text-slate-300 uppercase">{{ item.user.nama ? item.user.nama.charAt(0) : '-' }}</span></div>
                    <div class="flex flex-col min-w-0">
-                      <!-- ZETTBOT FIX: Mengubah formatNamaBersih menjadi formatNama (terdaftar di Vue methods) -->
+                      <!-- FIX: Mengubah formatNamaBersih menjadi formatNama (terdaftar di Vue methods) -->
                       <h4 class="text-xs font-bold text-slate-200 truncate">{{ formatNama(item.user.nama) }}</h4>
                       <p class="text-[9px] text-slate-500 mt-0.5 truncate">{{ item.user.jabatan }}</p>
                    </div>
@@ -261,7 +261,7 @@
   </div>
   
   <!-- ==================================================== -->
-  <!-- AREA GRAFIK ANALITIK & DEMOGRAFI (ZETTBOT ENGINE) -->
+  <!-- AREA GRAFIK ANALITIK & DEMOGRAFI (TRANSKEP ENGINE) -->
   <!-- ==================================================== -->
   <div class="space-y-4 pt-4">
 
@@ -347,7 +347,7 @@
     </div>
   </div>
 
-  <!-- ZETTBOT FIX: MODAL UPDATE STATUS TMT (MIGRATED TO VUE) -->
+  <!-- FIX: MODAL UPDATE STATUS TMT (MIGRATED TO VUE) -->
   <div v-if="showModalStatus" class="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm transition-opacity animate-fade-in">
      <div class="glass border border-slate-800 bg-slate-900/95 rounded-3xl w-full max-w-sm flex flex-col shadow-2xl mx-4 overflow-hidden">
         <div class="p-5 border-b border-slate-800/60 bg-slate-900/80 flex items-center justify-between">

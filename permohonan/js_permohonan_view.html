@@ -163,7 +163,7 @@
           data() {
               return {
                   s: window.vueState || state, // Mengikat variabel global state/vueState ke dalam lokal Vue
-                  activeDropdownId: null, // ZETTBOT TAHAP 43: ID Dropdown aksi yang sedang terbuka
+                  activeDropdownId: null, // TAHAP 43: ID Dropdown aksi yang sedang terbuka
                   isRefreshing: false
               };
           },
@@ -256,7 +256,7 @@
                           hasDropdown = false;
                           if (log.jenis !== 'Dinas Luar') {
                               if (sNorm === 'disetujui') {
-                                  hasDropdown = true; // ZETTBOT TAHAP 43: 1 Tombol Ikon Compact mengeluarkan 2 opsi (Cetak & Unduh TTE)
+                                  hasDropdown = true; // TAHAP 43: 1 Tombol Ikon Compact mengeluarkan 2 opsi (Cetak & Unduh TTE)
                               } else {
                                   actions.push({ actionType: 'cetakCuti', icon: 'fa-print', text: '', css: 'p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 rounded-lg transition shadow-md shadow-slate-900/30 text-xs', tooltip: 'Cetak Formulir' });
                               }
@@ -375,7 +375,7 @@
               }
           },
           methods: {
-              // ZETTBOT TAHAP 46: Trigger Refresh Sinkronisasi Riwayat Cuti
+              // TAHAP 46: Trigger Refresh Sinkronisasi Riwayat Cuti
               async refreshData() {
                   if (this.isRefreshing) return;
                   this.isRefreshing = true;
@@ -393,7 +393,7 @@
                   }
               },
 
-              // ZETTBOT TAHAP 43: Kontroler Dropdown Aksi Cuti Disetujui
+              // TAHAP 43: Kontroler Dropdown Aksi Cuti Disetujui
               toggleActionDropdown(id) {
                   this.activeDropdownId = (this.activeDropdownId === id) ? null : id;
               },
@@ -401,7 +401,7 @@
                   this.activeDropdownId = null;
               },
 
-              // ZETTBOT TAHAP 3: Membersihkan Pemanggil Eksternal (Safe Short-Circuit Standarisasi Vue)
+              // TAHAP 3: Membersihkan Pemanggil Eksternal (Safe Short-Circuit Standarisasi Vue)
               executeAction(actionType, id) {
                   this.activeDropdownId = null;
                   // --- FUNGSI EDIT / TAMPIL ---
@@ -598,7 +598,7 @@
               }
           },
           mounted() {
-              // ZETTBOT TAHAP 43: Auto-close dropdown saat pengguna klik di luar container
+              // TAHAP 43: Auto-close dropdown saat pengguna klik di luar container
               document.addEventListener('click', (e) => {
                   if (!e.target.closest('.dropdown-action-container')) {
                       this.activeDropdownId = null;

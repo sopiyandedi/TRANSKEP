@@ -1,6 +1,6 @@
 # LOG REVISI & AUDIT KEAMANAN SISTEM TRANSKEP (REVISI.MD)
 ================================================================================
-ENGINE : ZettBOT Core v1.0.0 (by Zettbos)
+ENGINE : TRANSKEP Core v1.0.0 
 PROJEK : TRANSKEP v2.1 (Google Apps Script + Google Sheets + Vue 3 / Tailwind)
 ROLE   : Web Security Expert & Principal System Architect
 STATUS : AUDITED - MENUNGGU PERSETUJUAN EKSEKUSI MITIGASI
@@ -239,7 +239,7 @@ HASIL PERBAIKAN:
 
 ## BAGIAN 6: BLUEPRINT MIGRASI PARALEL (PARALLEL RUN) - HEADLESS API & REPO GITHUB BARU
 ================================================================================
-ENGINE : ZettBOT Core v1.0.0 (by Zettbos)
+ENGINE : TRANSKEP Core v1.0.0 
 PROJEK : TRANSKEP v2.1 -> v3.0 (Google Apps Script Headless API + GitHub Pages Frontend)
 TARGET : Zero-Downtime, Dual-Mode Compatibility, Multi-Repository Architecture
 DOMAIN : transkep.pa-indramayu.go.id
@@ -389,7 +389,7 @@ flowchart TD
 
 ## BAGIAN 5: RENCANA IMPLEMENTASI TAHAP 6 — PEMUNCULAN & PENYEMPURNAAN GRAFIK DASHBOARD (CHART.JS)
 ================================================================================
-ENGINE : ZettBOT Core v1.0.0 (by Zettbos)
+ENGINE : TRANSKEP Core v1.0.0 
 STATUS : MENUNGGU PERSETUJUAN PENGGUNA (PENDING APPROVAL: 'OKE TERAPKAN')
 ================================================================================
 
@@ -621,7 +621,7 @@ Mengunggah pembaruan arsitektur backend, controller headless API (`api_router.js
 3. **Pembaruan Deployment Produksi (`clasp deploy`):**
    - Memperbarui deployment ID produksi aktif:
      `AKfycbzFrbQTqmVzMio7mderK-S9ntFVjXiWYFgnXfy9fW_SUKOcIxfPywP2He1flhaK_AZ0ZA`
-   - Nomor Versi Baru: **@274** (Deskripsi: *"TRANSKEP v3.5 - ZettBOT Full Sync"*).
+   - Nomor Versi Baru: **@274** (Deskripsi: *"TRANSKEP v3.5 - TRANSKEP Full Sync"*).
 4. **Verifikasi Smoke Test Versi 274:**
    - Uji POST `action: 'ping'` &rarr; Mengembalikan respon JSON resmi:
      `{"status":"success","message":"TRANSKEP Headless API Gateway v3.0 Aktif (POST)!","timestamp":"2026-10-14T14:55:07.551Z"}`.
@@ -697,7 +697,7 @@ Menjawab kebutuhan kemudahan pemeliharaan (*maintainability*) dari pengguna terk
      16. `views/view_mobile_nav.html` (60 baris) — Header HP sticky & navigasi jempol bawah (*bottom nav*).
      17. `views/view_global_modals.html` (114 baris) — Modal Sisa Cuti & modal ganti kata sandi.
 2. **Rampingnya `index.html` Secara Permanen (200 baris):**
-   - File utama [`transkep-web/index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/index.html) kini langsung berukuran hanya **200 baris** (berisi `<head>`, kerangka app shell `#app-container`, penampung slot, dan ZettBOT Dynamic Component Loader).
+   - File utama [`transkep-web/index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/index.html) kini langsung berukuran hanya **200 baris** (berisi `<head>`, kerangka app shell `#app-container`, penampung slot, dan TRANSKEP Dynamic Component Loader).
    - Menghilangkan ketergantungan pada file raksasa 7.000 baris atau build tool.
 3. **Penyusunan Native Component Loader (Zero-Build Step):**
    - Menggunakan pemanggilan asinkron cerdas yang memuat seluruh 17 komponen dari folder `views/` secara paralel, menyuntikkannya ke slot DOM masing-masing, lalu menginisialisasi controller Vue dan siklus `DOMContentLoaded`.
@@ -1441,7 +1441,7 @@ Mengintegrasikan gateway otomatisasi pesan WhatsApp self-hosted menggunakan **WA
 ### Tahap 33: Resolusi Otomasi Reset Sandi WAHA & Penyelarasan GAS Deployment @276
 **Tanggal**: 17 Oktober 2026  
 **Status**: [SELESAI]  
-**Lead Architect**: ZettBOT (by Zettbos)
+**Lead Architect**: TRANSKEP 
 
 #### 1. Akar Masalah (Root Causes)
 1. **GAS Deployment Stale (@274):** Web App Google Apps Script sebelumnya masih mengarah pada versi `@274` yang belum memuat fungsi `sendWhatsAppMessage_` dan update WAHA.
@@ -1463,7 +1463,7 @@ Mengintegrasikan gateway otomatisasi pesan WhatsApp self-hosted menggunakan **WA
 ### Tahap 34: Auto Force Pop-up Modal Ganti Kata Sandi Saat Login Sandi Sementara (TR-XXXXXX)
 **Tanggal**: 17 Oktober 2026  
 **Status**: [SELESAI & DIVERIFIKASI]  
-**Lead Architect**: ZettBOT (by Zettbos)
+**Lead Architect**: TRANSKEP 
 
 #### 1. Kebutuhan & Problem Statement
 - Setelah fitur Reset Sandi Otomatis WhatsApp (WAHA) berhasil mengirimkan kata sandi acak sementara (`TR-XXXXXX`), pengguna yang berhasil login menggunakan sandi sementara tersebut harus langsung disodori modal Ganti Kata Sandi (Change Password) otomatis.
@@ -1499,7 +1499,7 @@ Mengintegrasikan gateway otomatisasi pesan WhatsApp self-hosted menggunakan **WA
 ### Tahap 35: Eliminasi Notifikasi E-Office & Penguncian Otorisasi Admin di Client-Side
 **Tanggal**: 18 Oktober 2026  
 **Status**: [SELESAI & DIVERIFIKASI]  
-**Lead Architect**: ZettBOT (by Zettbos)
+**Lead Architect**: TRANSKEP 
 
 #### 1. Masalah & Feedback Pengguna
 - Pengguna dengan peran non-Admin (seperti Penata Layanan Operasional, Pegawai biasa, dll.) mendapati toast pop-up peringatan berwarna oranye yang mengganggu di pojok kanan atas Dashboard saat login atau me-refresh aplikasi:
@@ -1535,7 +1535,7 @@ Mengintegrasikan gateway otomatisasi pesan WhatsApp self-hosted menggunakan **WA
 ### Tahap 36: Standardisasi Opsi Golongan PPPK ke Angka Romawi (XVII s.d I)
 **Tanggal**: 18 Oktober 2026  
 **Status**: [SELESAI & DIVERIFIKASI]  
-**Lead Architect**: ZettBOT (by Zettbos)
+**Lead Architect**: TRANSKEP 
 
 #### 1. Masalah & Feedback Pengguna
 - Pada modal Tambah / Edit Pegawai di modul Manajemen Pegawai ([view_pegawai.html](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/modules/pegawai/view_pegawai.html)), dropdown *Pangkat / Ruang Golongan* untuk kategori PPPK menampilkan angka biasa (Arab):
@@ -1564,7 +1564,7 @@ Mengintegrasikan gateway otomatisasi pesan WhatsApp self-hosted menggunakan **WA
 ### Tahap 37: Perbaikan Fitur Hapus / Tarik Pengajuan pada Modul Permohonan Cuti
 **Tanggal**: 18 Oktober 2026  
 **Status**: [SELESAI & DIVERIFIKASI]  
-**Lead Architect**: ZettBOT (by Zettbos)
+**Lead Architect**: TRANSKEP 
 
 #### 1. Masalah & Feedback Pengguna
 - Pengguna melaporkan bahwa tombol hapus (*delete* / tarik pengajuan) pada modul **Permohonan Cuti** saat ini belum berfungsi saat diklik.
@@ -1635,7 +1635,7 @@ Berdasarkan audit menyeluruh terhadap arsitektur frontend dan backend (`transkep
 ### Tahap 38: Implementasi Generator Barcode Mandiri Berlogo Pengadilan Agama (Penggantian API Pihak Ketiga)
 **Tanggal**: 18 Oktober 2026  
 **Status**: [SELESAI & DIVERIFIKASI]  
-**Lead Architect**: ZettBOT (by Zettbos)
+**Lead Architect**: TRANSKEP 
 
 #### 1. Masalah & Kebutuhan Pengguna
 - Formulir cetak cuti saat ini masih bergantung pada layanan API pihak ketiga luar: `https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=...` dan `quickchart.io`.
@@ -1689,7 +1689,7 @@ Berdasarkan audit menyeluruh terhadap arsitektur frontend dan backend (`transkep
 ### Tahap 39: Penataan Letak Vertikal Barcode TTE Cuti & Optimasi Margin 1 Lembar A4
 **Tanggal**: 18 Oktober 2026  
 **Status**: [SELESAI & DIVERIFIKASI]  
-**Lead Architect**: ZettBOT (by Zettbos)
+**Lead Architect**: TRANSKEP 
 
 #### 1. Masalah & Kebutuhan Pengguna
 - Pada formulir cetak cuti sebelumnya, tanda tangan elektronik (TTE) disusun secara horizontal menyamping (`[Barcode]` di kiri dan `[Keterangan + Nama + NIP]` di kanan).
@@ -1735,7 +1735,7 @@ Berdasarkan audit menyeluruh terhadap arsitektur frontend dan backend (`transkep
 ### Tahap 40: Pembersihan Redundansi Keterangan TTE & Desain Area Tanda Tangan Super Lega
 **Tanggal**: 18 Oktober 2026  
 **Status**: [SELESAI & DIVERIFIKASI]  
-**Lead Architect**: ZettBOT (by Zettbos)
+**Lead Architect**: TRANSKEP 
 
 #### 1. Masalah & Arahan Pengguna
 - Teks *"Ditandatangani secara elektronik"* yang sebelumnya disematkan di bawah barcode pada 3 tempat (Pemohon, Atasan Langsung, dan Pejabat Berwenang) terasa repetitif dan mempersempit ruang tanda tangan.
@@ -1775,7 +1775,7 @@ Berdasarkan audit menyeluruh terhadap arsitektur frontend dan backend (`transkep
 ### Tahap 41: Restorasi Aspek Rasio Alami Logo Oval Pengadilan Agama & Peningkatan Ukuran Barcode TTE
 **Tanggal**: 18 Oktober 2026  
 **Status**: [SELESAI & DIVERIFIKASI]  
-**Lead Architect**: ZettBOT (by Zettbos)
+**Lead Architect**: TRANSKEP 
 
 #### 1. Masalah & Pengamatan Pengguna
 - Logo Pengadilan Agama Indramayu di tengah barcode sebelumnya terpotong paksa menggunakan `ctx.arc()` (circular clip) dan dipaksa berdimensi kotak (1:1).
@@ -1821,7 +1821,7 @@ Berdasarkan audit menyeluruh terhadap arsitektur frontend dan backend (`transkep
 ### Tahap 42: Pembangunan Mesin PDF Biner & Uji Coba Injeksi TTE Digital X.509 (PAdES / PKCS#7 Prototype)
 **Tanggal**: 18 Oktober 2026  
 **Status**: [SELESAI & DIVERIFIKASI]  
-**Lead Architect**: ZettBOT (by Zettbos)
+**Lead Architect**: TRANSKEP 
 
 #### 1. Latar Belakang & Kebutuhan
 - **Latar Belakang**:
@@ -1980,7 +1980,7 @@ Berdasarkan investigasi menyeluruh pada alur pengajuan cuti (`submitCuti`), dite
 ### REVISI TAHAP 38.1: Resolusi Exception WinAnsi Encoding Checkmark (✓ 0x2713) & Vector Engine
 **Tanggal**: 19 Oktober 2026  
 **Status**: [SELESAI]  
-**Lead Architect**: ZettBOT (by Zettbos)
+**Lead Architect**: TRANSKEP 
 
 #### 1. Masalah
 Saat tombol `[ TTE ]` (Unduh PDF) diklik, muncul error toast merah:
@@ -2003,7 +2003,7 @@ Akar penyebab: Font bawaan PDF (Times-Roman / Helvetica / Courier) pada pustaka 
 ### REVISI TAHAP 43: Tombol Aksi Dropdown Adaptif Cuti Disetujui (1 Tombol Ikon Ringkas ➔ 2 Opsi: Cetak Permohonan & Unduh Persetujuan TTE)
 **Tanggal**: 20 Oktober 2026  
 **Status**: [SELESAI & DIVERIFIKASI ✅]  
-**Lead Architect**: ZettBOT (by Zettbos)
+**Lead Architect**: TRANSKEP 
 
 #### 1. Masalah & Feedback Pengguna
 - Pada Revisi Tahap 38 sebelumnya, diterapkan mekanisme *Smart Morphing* di mana saat cuti berstatus `Disetujui`, tombol langsung berubah menjadi `[ Unduh PDF ]` (TTE).
@@ -2057,7 +2057,7 @@ Akar penyebab: Font bawaan PDF (Times-Roman / Helvetica / Courier) pada pustaka 
 - **Konteks**: Menu Surat Keputusan (SK) selama ini menggunakan basis data Google Sheets (`sk_data` & `sk_ack`), di mana personil multi-pegawai dipecah baris per baris. Struktur ini kaku dan sulit untuk mendukung **fitur revisi otomatis SK** secara dinamis langsung di Web App.
 - **Tujuan**: Mengintegrasikan **Google Cloud Firestore (`transkep-314c0`)** ke dalam TRANSKEP dan menyediakan mekanisme **Pilot Migrasi 1 Dokumen SK** dari Google Sheets ke Firestore dengan struktur dokumen NoSQL lengkap (`members: [...]`, `revisi_history: [...]`), tanpa mengganggu data operasional yang sedang berjalan (Zero Risk Hybrid Bridge).
 
-#### 2. Arsitektur & Solusi Teknis ZettBOT
+#### 2. Arsitektur & Solusi Teknis TRANSKEP
 1. **Pemasangan SDK Firebase v10 Compat**:
    - Memuat `firebase-app-compat.js` dan `firebase-firestore-compat.js` via CDN resmi Google di [`transkep-web/index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/index.html) dan [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) (GAS).
 2. **Konektor Inti Firebase (`TranskepFirebase`)**:
@@ -2235,7 +2235,7 @@ TAHAP 45 (UNIVERSAL SMART SK BUILDER & DYNAMIC ATTACHMENT ENGINE) TELAH 100% SUK
 #### 1. Masalah & Temuan Akar Masalah (Root Cause Analysis)
 Berdasarkan keluhan pengguna (*"data cuti belum keluar bro"*) dan tangkapan layar sistem pada akun Dedi Sopiyan, S.H. (NIP: `199312242025211033`), tabel **Riwayat Pengajuan Cuti Anda** langsung merender fallback *"Belum ada riwayat pengajuan apapun."*. 
 
-Hasil audit mendalam ZettBOT menemukan 4 akar masalah:
+Hasil audit mendalam TRANSKEP menemukan 4 akar masalah:
 1. **Mismatch Versi Cache-Buster PWA (`transkep-web/index.html: L68`):**
    - Pada commit `e0f6dbb`, berkas `sw.js` dinaikkan ke `transkep-v3.0.4` dan `APP_BUILD_VER` dinaikkan ke `'3.0.4'`.
    - Namun pada baris 68 `transkep-web/index.html`, nilai `CURRENT_APP_BUILD` tertinggal pada `'transkep-v3.0.3'`.
@@ -2290,7 +2290,7 @@ Hasil audit mendalam ZettBOT menemukan 4 akar masalah:
 2. **Grafik Demografi Menghilang / Berkedip saat Refresh:**
    - Karena kanvas Chart.js di-reload bersama DOM baru, objek grafik hancur dan menunggu data `usersList` dihitung ulang dari awal sebelum kanvas digambar.
 
-#### 2. Solusi Arsitektur ZettBOT
+#### 2. Solusi Arsitektur TRANSKEP
 1. **Instant App Shell Skeleton pada `transkep-web/index.html`:**
    - Memasukkan kerangka kartu kaca (*glass skeleton cards*) yang bentuk, grid (12 kolom), dan posisinya persis seperti kartu Profil Pengguna, Kartu Ketidakhadiran, Kartu Peringatan Dini, dan Toolbar/Box Grafik dengan efek shimmer halus (*glass pulse skeleton*).
    - Menghilangkan jeda hitam kosong menjadi **0ms** sejak detik pertama browser me-reload halaman.
@@ -2427,7 +2427,7 @@ Hasil audit mendalam ZettBOT menemukan 4 akar masalah:
 3. **Ketiadaan Animasi Loading Layar Penuh Transparan Berlogo:**
    - Saat ini `#global-loader` hanya berupa kotak kecil berputar (`fa-circle-notch`) di dalam kontainer `<main>`, tidak menutupi seluruh layar, dan kurang memberikan kesan sistem modern sekelas aplikasi kedinasan Mahkamah Agung.
 
-#### 2. Solusi Arsitektur ZettBOT (Standar SIKEP Mahkamah Agung)
+#### 2. Solusi Arsitektur TRANSKEP (Standar SIKEP Mahkamah Agung)
 1. **Universal Fullscreen Processing Overlay Ala SIKEP:**
    - Ditempatkan di root `<body>` dengan z-index tertinggi (`z-[999999]`), menutupi seluruh layar (sidebar, navbar, dan area konten).
    - Efek transparan mewah & glassmorphism: `bg-slate-950/75 backdrop-blur-md` (latar belakang sistem tetap terlihat samar-samar dengan kedalaman visual tinggi).
@@ -2491,7 +2491,7 @@ Pasca penerapan Tahap 55, pengujian refresh (F5) menemukan 2 anomali teknis:
    - **Penyebab 2 (Data Desync di Vue)**: Pada `javascript.html`, respons latar belakang `res.data.cutiLogs` hanya dimasukkan ke `window.vueState`, tidak ke `state`. Ketika `renderDashboardView()` dipanggil, fungsi memprioritaskan `state` yang kosong, sehingga array absensi pada `window.vmDashboard` ter-reset menjadi kosong.
    - **Penyebab 3 (Ketiadaan Offline-First Cache Absensi)**: Berbeda dengan profil yang di-cache di `localStorage`, array data absensi (`cutiLogs`, `stList`, dll.) belum memiliki mekanisme caching lokal untuk rehidrasi 0ms.
 
-#### 2. Solusi Komprehensif ZettBOT
+#### 2. Solusi Komprehensif TRANSKEP
 1. **0ms Instant Loading Overlay (Anti-Jeda Refresh)**:
    - Memasang aturan CSS prioritas tinggi pada `<head>` (`index.html`, `transkep-web/index.html`, `stylesheet.html`, `stylesheet.css`):
      ```css
@@ -2537,7 +2537,7 @@ Pada pengujian Tahap 56 di aplikasi web/PWA, layar memuat animasi loading terus-
 - **Akar Masalah Sekunder (Watchdog Premature Clear)**: Baris `clearTimeout(gSyncWatchdog)` dipanggil seketika data diterima server, sehingga timer failsafe mati sebelum antarmuka sempat memanggil penutupan loader. Akibatnya, loader tertahan di layar secara permanen.
 - **Akar Masalah Ketiga (Error Handling Tanpa Dismiss)**: Jika parameter sesi atau autentikasi mengembalikan status non-sukses saat `isSilent === true`, `hideLoading()` tidak dieksekusi di blok penanganan kegagalan.
 
-#### 2. Solusi Komprehensif ZettBOT
+#### 2. Solusi Komprehensif TRANSKEP
 1. **Unconditional `hideLoading()` Execution**:
    - Menempatkan pemanggilan `hideLoading()` secara mutlak di akhir `handleSuccess` dan `handleFailure` di [`core.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/core/core.js) dan [`javascript.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/javascript.html).
    - Menambahkan penutupan loader pada setiap percabangan dini (misal ketiadaan token atau sesi kedaluwarsa).

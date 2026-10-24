@@ -2,7 +2,7 @@
 // FILE: transkep-web/core/firebase.js
 // DESKRIPSI: Inisialisasi & Konektor Resmi Firebase Cloud Firestore
 // PROJEK: TRANSKEP (transkep-314c0)
-// ENGINE: ZettBOT Core v1.0.0 (by Zettbos)
+// ENGINE: TRANSKEP Core v1.0.0 
 // ========================================================
 
 const FIREBASE_CONFIG = {
@@ -23,12 +23,12 @@ try {
       firebase.initializeApp(FIREBASE_CONFIG);
     }
     transkepDb = firebase.firestore();
-    console.log("🔥 [ZettBOT Firebase] Cloud Firestore transkep-314c0 berhasil diinisialisasi.");
+    console.log("🔥 [TRANSKEP Firebase] Cloud Firestore transkep-314c0 berhasil diinisialisasi.");
   } else {
-    console.warn("⚠️ [ZettBOT Firebase] Library Firebase CDN belum terdeteksi di window.");
+    console.warn("⚠️ [TRANSKEP Firebase] Library Firebase CDN belum terdeteksi di window.");
   }
 } catch (err) {
-  console.error("❌ [ZettBOT Firebase] Gagal inisialisasi Firebase:", err);
+  console.error("❌ [TRANSKEP Firebase] Gagal inisialisasi Firebase:", err);
 }
 
 const TranskepFirebase = {
@@ -41,7 +41,7 @@ const TranskepFirebase = {
         }
         transkepDb = firebase.firestore();
       } catch (e) {
-        console.error("❌ [ZettBOT Firebase] Lazy init failed:", e);
+        console.error("❌ [TRANSKEP Firebase] Lazy init failed:", e);
       }
     }
     return transkepDb;
@@ -133,7 +133,7 @@ const TranskepFirebase = {
         if (typeof callback === 'function') callback(list);
       },
       (error) => {
-        console.error("❌ [ZettBOT Firebase] Error listener Firestore SK:", error);
+        console.error("❌ [TRANSKEP Firebase] Error listener Firestore SK:", error);
       }
     );
   }

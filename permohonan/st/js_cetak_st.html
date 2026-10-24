@@ -7,7 +7,7 @@
         return formatDateIndoCetak(start) + " s.d. " + formatDateIndoCetak(end);
     }
 
-    // ZETTBOT FIX TAHAP 2: Perombakan fungsi format teks menggunakan Table Borderless
+    // FIX TAHAP 2: Perombakan fungsi format teks menggunakan Table Borderless
     // agar tulisan baris kedua rata menggantung persis seperti Microsoft Word.
     function formatTeksRapi(text) {
         if (!text) return "-";
@@ -52,7 +52,7 @@
         }
 
         // =========================================================================
-        // ZETTBOT FIX: SAKLAR DUMMY UNTUK CANVAS / TESTING
+        // FIX: SAKLAR DUMMY UNTUK CANVAS / TESTING
         // Ubah TEST_MODE menjadi true untuk mensimulasikan hasil print tanpa data asli.
         // =========================================================================
         var TEST_MODE = false; // <-- GANTI KE TRUE JIKA INGIN TES
@@ -72,12 +72,12 @@
         
         var totalPeserta = listPeserta.length;
         
-        // ZETTBOT FIX: Penentuan Class Layout Dinamis untuk Spacing CSS A4
+        // FIX: Penentuan Class Layout Dinamis untuk Spacing CSS A4
         var layoutClass = "st-layout-normal";
         if (totalPeserta === 1) layoutClass = "st-layout-single";
         else if (totalPeserta === 2) layoutClass = "st-layout-double";
 
-        // ZETTBOT FIX: Logika Chunking (Pemecahan array per 3 orang) & Page Break Dinamis
+        // FIX: Logika Chunking (Pemecahan array per 3 orang) & Page Break Dinamis
         // Merakit HTML murni dengan String Concatenation klasik anti-error
         var trHTML = "";
         var chunks = [];

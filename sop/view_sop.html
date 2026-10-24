@@ -1,5 +1,5 @@
 <!-- ================================================== -->
-<!-- FILE: sop/view_sop.html (VUE.JS VERSION FULL ZETTBOT FIX) -->
+<!-- FILE: sop/view_sop.html (VUE.JS VERSION FULL FIX) -->
 <!-- ================================================== -->
 <div id="section-sop" class="menu-section hidden">
   <div id="vue-sop-app" class="space-y-6 w-full h-full" v-cloak>
@@ -244,7 +244,7 @@
                        </select>
                     </div>
   
-                    <!-- ZETTBOT FIX: File Upload Drive Auto-Folder + Drag & Drop (Tinggi sejajar h-[46px]) -->
+                    <!-- FIX: File Upload Drive Auto-Folder + Drag & Drop (Tinggi sejajar h-[46px]) -->
                     <div>
                        <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Dokumen SOP (PDF) <span v-if="modalSopMode === 'add'" class="text-[9px] text-slate-500 italic font-normal normal-case tracking-normal ml-1">*folder otomatis di google drive</span></label>
                        <div class="relative" @dragover.prevent="isDraggingSop = true" @dragleave.prevent="isDraggingSop = false" @drop.prevent="handleSopFileDrop">

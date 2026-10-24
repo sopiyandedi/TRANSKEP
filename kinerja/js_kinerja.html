@@ -11,7 +11,7 @@
           isModalOpen: false,
           isUploading: false,
           
-          // ZETTBOT FIX: State untuk dropdown kustom Pejabat Penilai
+          // FIX: State untuk dropdown kustom Pejabat Penilai
           searchPejabatQuery: '',
           showDropdownPejabat: false,
           highlightedIndexPejabat: 0,
@@ -38,7 +38,7 @@
               return role.includes('atasan') || role.includes('pejabat') || role.includes('admin') || role.includes('ketua');
            });
         },
-        // ZETTBOT FIX: Computed untuk filter dropdown pencarian Pejabat
+        // FIX: Computed untuk filter dropdown pencarian Pejabat
         filteredPejabatSearch() {
            if (!this.searchPejabatQuery) return this.listPejabat;
            const q = this.searchPejabatQuery.toLowerCase();
@@ -115,7 +115,7 @@
            this.isModalOpen = false;
         },
         
-        // ZETTBOT FIX: Metode kontrol keyboard dan mouse untuk Pejabat Penilai
+        // FIX: Metode kontrol keyboard dan mouse untuk Pejabat Penilai
         highlightNextPejabat() {
            if (this.highlightedIndexPejabat < this.filteredPejabatSearch.length - 1) this.highlightedIndexPejabat++;
         },
@@ -246,7 +246,7 @@
       if(window.vmKinerja) window.vmKinerja.initView();
   };
 
-  // ZETTBOT FIX: Tutup dropdown Pejabat jika user mengklik area luar kotak
+  // FIX: Tutup dropdown Pejabat jika user mengklik area luar kotak
   document.addEventListener('click', function(e) {
       if(window.vmKinerja) {
           const containerPejabat = document.getElementById('knjPejabatContainer');

@@ -96,7 +96,7 @@
       let sisaAk25 = sisaAw25 - Number(hist.y25 || 0);
       let sisaAk26 = sisaAw26 - Number(hist.y26 || 0);
 
-      // ZETTBOT: Generator Barcode Mandiri Berlogo Pengadilan Agama (TTE In-House)
+      // TRANSKEP: Generator Barcode Mandiri Berlogo Pengadilan Agama (TTE In-House)
       const baseUrl = window.location.origin + window.location.pathname;
       const verifyUrlPegawai = baseUrl + '?action=verifyCuti&id=' + encodeURIComponent(log.id) + '&type=pemohon&nip=' + encodeURIComponent(pns.nip);
       const verifyUrlAtasan = baseUrl + '?action=verifyCuti&id=' + encodeURIComponent(log.id) + '&type=atasan&nip=' + encodeURIComponent(atasan.nip);
@@ -130,7 +130,7 @@
       let atasanJabatanStr = formatJabatanSingkat(atasan.jabatan);
       let pejabatJabatanStr = formatJabatanSingkat(pejabat.jabatan);
 
-      // ZETTBOT: Logika penampakan Barcode hanya jika status Disetujui
+      // TRANSKEP: Logika penampakan Barcode hanya jika status Disetujui
       // Jika belum disetujui, cetak kotak kosong vertikal agar layout tidak bergeser
       let viewQrAtasan = (log.status_atasan === 'Disetujui') 
           ? "<img src='" + qrAtasan + "' width='64' height='64' alt='QR Atasan' style='display: block; margin: 2px 0 4px 0;' />" 

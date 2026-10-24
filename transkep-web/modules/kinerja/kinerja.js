@@ -1,6 +1,6 @@
 // ==========================================
 // FILE: kinerja.js (TRANSKEP Modular)
-// ENGINE: ZettBOT Core v1.0.0
+// ENGINE: TRANSKEP Core v1.0.0
 // ==========================================
 
 // --- Source: kinerja/js_kinerja.html ---
@@ -16,7 +16,7 @@ document.addEventListener("DOMContentLoaded", () => {
           isModalOpen: false,
           isUploading: false,
           
-          // ZETTBOT FIX: State untuk dropdown kustom Pejabat Penilai
+          // FIX: State untuk dropdown kustom Pejabat Penilai
           searchPejabatQuery: '',
           showDropdownPejabat: false,
           highlightedIndexPejabat: 0,
@@ -43,7 +43,7 @@ document.addEventListener("DOMContentLoaded", () => {
               return role.includes('atasan') || role.includes('pejabat') || role.includes('admin') || role.includes('ketua');
            });
         },
-        // ZETTBOT FIX: Computed untuk filter dropdown pencarian Pejabat
+        // FIX: Computed untuk filter dropdown pencarian Pejabat
         filteredPejabatSearch() {
            if (!this.searchPejabatQuery) return this.listPejabat;
            const q = this.searchPejabatQuery.toLowerCase();
@@ -120,7 +120,7 @@ document.addEventListener("DOMContentLoaded", () => {
            this.isModalOpen = false;
         },
         
-        // ZETTBOT FIX: Metode kontrol keyboard dan mouse untuk Pejabat Penilai
+        // FIX: Metode kontrol keyboard dan mouse untuk Pejabat Penilai
         highlightNextPejabat() {
            if (this.highlightedIndexPejabat < this.filteredPejabatSearch.length - 1) this.highlightedIndexPejabat++;
         },
@@ -217,7 +217,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }
   };
 
-  // ZETTBOT FIX: Tutup dropdown Pejabat jika user mengklik area luar kotak
+  // FIX: Tutup dropdown Pejabat jika user mengklik area luar kotak
   document.addEventListener('click', function(e) {
       if(window.vmKinerja) {
           const containerPejabat = document.getElementById('knjPejabatContainer');

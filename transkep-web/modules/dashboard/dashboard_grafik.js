@@ -5,7 +5,7 @@
 // --- Source: dashboard/js_dashboard_grafik.html ---
 // ==========================================
   // File: js_dashboard_grafik.html
-  // ZETTBOT: Modul Khusus Analitik, Chart.js & Export Data (STABLE)
+  // TRANSKEP: Modul Khusus Analitik, Chart.js & Export Data (STABLE)
   // ==========================================
 
   var chartInstanceGender = null;
@@ -47,7 +47,7 @@
       return 0;
   }
 
-  // --- ZETTBOT: GLOBAL SCRUBBER & SORTING ENGINE (JABATAN) ---
+  // --- TRANSKEP: GLOBAL SCRUBBER & SORTING ENGINE (JABATAN) ---
   setInterval(function() {
       if (typeof state !== 'undefined' && state.usersList && state.usersList.length > 0) {
           var isChanged = false;

@@ -1,6 +1,6 @@
 # SPESIFIKASI KEBUTUHAN PRODUK (PRD) & MASTER CONTEXT: TRANSKEP v2.1
 ================================================================================
-DOKUMEN SPESIFIKASI RESMI SISTEM (ZETTBOT REVERSE-PRD)
+DOKUMEN SPESIFIKASI RESMI SISTEM (TRANSKEP SPECIFICATION)
 Projek: TRANSKEP (Transparansi Kepegawaian)
 Lingkungan: Google Apps Script Web App + Google Sheets Database
 Frontend Engine: TailwindCSS + Vue.js 3 (Global CDN) + FontAwesome 6

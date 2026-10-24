@@ -29,7 +29,7 @@
                   },
                   searchQuery: '',
                   isDropdownOpen: false,
-                  activeRekapDropdownId: null // ZETTBOT TAHAP 43: ID Dropdown aksi rekap yang sedang terbuka
+                  activeRekapDropdownId: null // TAHAP 43: ID Dropdown aksi rekap yang sedang terbuka
               };
           },
           computed: {
@@ -262,7 +262,7 @@
               },
               
               // =====================================
-              // ZETTBOT TAHAP 3: BRIDGING STANDARISASI VUE (SAFE SHORT-CIRCUIT)
+              // TAHAP 3: BRIDGING STANDARISASI VUE (SAFE SHORT-CIRCUIT)
               // =====================================
               execBypassCuti() { window.openFormCutiModal && window.openFormCutiModal(true); },
               execBuatST() { window.openModalST && window.openModalST(); },
@@ -451,7 +451,7 @@
               }
           },
           mounted() {
-              // ZETTBOT TAHAP 43: Auto-close dropdown rekap saat klik di luar
+              // TAHAP 43: Auto-close dropdown rekap saat klik di luar
               document.addEventListener('click', (e) => {
                   if (!e.target.closest('.dropdown-rekap-container')) {
                       this.activeRekapDropdownId = null;

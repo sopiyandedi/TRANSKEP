@@ -2,7 +2,7 @@
 // FILE: eoffice/rapat.js
 // DESKRIPSI: Backend Service Pembuatan Paket Dokumen Rapat (3-in-1)
 // HASIL: 1. Undangan Rapat, 2. Daftar Hadir, 3. Notulen Kedinasan
-// ENGINE: ZettBOT Core v1.0.0 (by Zettbos)
+// ENGINE: TRANSKEP Core v1.0.0 
 // ==========================================
 
 /**

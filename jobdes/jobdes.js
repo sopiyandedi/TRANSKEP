@@ -4,8 +4,8 @@
 // ==========================================
 
 function otorisasiSistem_() {
-  const folderTemp = DriveApp.createFolder("TEST_ZETTBOT_HAPUS_SAJA");
-  const fileTemp = folderTemp.createFile("test.txt", "ZettBOT Test");
+  const folderTemp = DriveApp.createFolder("TEST_TRANSKEP_TEMP");
+  const fileTemp = folderTemp.createFile("test.txt", "TRANSKEP Test");
   fileTemp.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
   
   fileTemp.setTrashed(true);
@@ -62,7 +62,7 @@ function saveJobdes(payload, userNip, clientToken) {
     
     const data = sheet.getDataRange().getDisplayValues();
     
-    // ZETTBOT OPTIMIZATION: Menggunakan metode native V8 findIndex 
+    // TRANSKEP OPTIMIZATION: Menggunakan metode native V8 findIndex 
     // melewati index 0 (header) agar pencarian baris jauh lebih cepat
     const foundIndex = data.findIndex((row, index) => index > 0 && String(row[0]) === String(payload.nip));
     const rowIndex = foundIndex !== -1 ? foundIndex + 1 : -1;

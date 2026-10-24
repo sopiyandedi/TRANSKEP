@@ -1,11 +1,11 @@
 // ==========================================
 // FILE: pegawai.js (TRANSKEP Modular)
-// ENGINE: ZettBOT Core v1.0.0
+// ENGINE: TRANSKEP Core v1.0.0
 // ==========================================
 
 // --- Source: pegawai/js_manajemen_pegawai.html ---
 // ==========================================
-  // ZETTBOT: VUE JS COMPONENT - MODUL PEGAWAI
+  // TRANSKEP: VUE JS COMPONENT - MODUL PEGAWAI
   // ==========================================
 
   document.addEventListener("DOMContentLoaded", () => {

@@ -2,7 +2,7 @@
   // ==========================================
   // FILE: js_cetak_jobdes.html
   // Deskripsi: Engine Cetak PDF via Hidden iFrame & Margin Hack
-  // ZETTBOT OPTIMIZATION: Terintegrasi penuh dengan State Vue 3
+  // TRANSKEP OPTIMIZATION: Terintegrasi penuh dengan State Vue 3
   // ==========================================
 
   window.cetakJobdes = function() {
@@ -11,7 +11,7 @@
     
     // 2. Validasi dari state Vue langsung
     if (!vm || !vm.selectedNip || !vm.selectedUser) {
-        window.zettbosAlert("Silakan pilih pegawai terlebih dahulu pada pencarian untuk dicetak.", "error");
+        (typeof showNotify === "function" ? showNotify("error" === "error" ? "Peringatan" : "Sukses", "Silakan pilih pegawai terlebih dahulu pada pencarian untuk dicetak.", "error") : alert("Silakan pilih pegawai terlebih dahulu pada pencarian untuk dicetak."));
         return;
     }
 
@@ -25,7 +25,7 @@
 
     var template = document.getElementById('templateCetakJobdes');
     if (!template) {
-        window.zettbosAlert("Error: File Template cetak tidak ditemukan.", "error");
+        (typeof showNotify === "function" ? showNotify("error" === "error" ? "Peringatan" : "Sukses", "Error: File Template cetak tidak ditemukan.", "error") : alert("Error: File Template cetak tidak ditemukan."));
         if(btnPrint) { btnPrint.innerHTML = oriText; btnPrint.disabled = false; }
         return;
     }

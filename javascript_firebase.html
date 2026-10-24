@@ -2,7 +2,7 @@
 // ========================================================
 // FILE: javascript_firebase.html
 // DESKRIPSI: Inisialisasi Firebase Cloud Firestore untuk Google Apps Script
-// ENGINE: ZettBOT Core v1.0.0 (by Zettbos)
+// ENGINE: TRANSKEP Core v1.0.0 
 // ========================================================
 (function() {
   const FIREBASE_CONFIG = {
@@ -22,10 +22,10 @@
         firebase.initializeApp(FIREBASE_CONFIG);
       }
       transkepDb = firebase.firestore();
-      console.log("🔥 [ZettBOT Firebase GAS] Cloud Firestore transkep-314c0 aktif.");
+      console.log("🔥 [TRANSKEP Firebase GAS] Cloud Firestore transkep-314c0 aktif.");
     }
   } catch (err) {
-    console.error("❌ [ZettBOT Firebase GAS] Inisialisasi gagal:", err);
+    console.error("❌ [TRANSKEP Firebase GAS] Inisialisasi gagal:", err);
   }
 
   window.TranskepFirebase = {
@@ -96,7 +96,7 @@
           snapshot.forEach(doc => list.push(doc.data()));
           if (typeof callback === 'function') callback(list);
         },
-        (error) => console.error("❌ [ZettBOT Firebase] Error listener Firestore SK:", error)
+        (error) => console.error("❌ [TRANSKEP Firebase] Error listener Firestore SK:", error)
       );
     }
   };

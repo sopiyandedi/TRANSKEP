@@ -5,7 +5,7 @@
 
 function initDashboardDB() {
   try {
-    const ss = getDB(); // ZETTBOT: Menggunakan konektor terpusat
+    const ss = getDB(); // TRANSKEP: Menggunakan konektor terpusat
     const sheet = ss.getSheetByName('user_data');
     if (!sheet) throw new Error("Sheet user_data tidak ditemukan.");
     
@@ -89,7 +89,7 @@ function forwardTmtDateByFrontend(actorNip, targetNip, type, newDateStr, clientT
         return { status: 'error', message: 'Akses Ditolak: Sesi kedaluwarsa atau manipulasi terdeteksi.' };
     }
 
-    const ss = getDB(); // ZETTBOT: Menggunakan konektor terpusat
+    const ss = getDB(); // TRANSKEP: Menggunakan konektor terpusat
     const sheet = ss.getSheetByName('user_data');
     const data = sheet.getDataRange().getValues();
     const headers = data[0];

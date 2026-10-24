@@ -2,7 +2,7 @@
 // FILE: eoffice_data.js (TRANSKEP Modular)
 // DESKRIPSI: Data Service Layer khusus Modul E-Office (KGB & Paket Rapat)
 // FITUR: RPC Get E-Office Data, Save/Generate KGB Doc, Create Paket Rapat Docs
-// ENGINE: ZettBOT Core v1.0.0 (by Zettbos)
+// ENGINE: TRANSKEP Core v1.0.0 
 // ==========================================
 
 const EofficeDataService = {

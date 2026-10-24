@@ -186,10 +186,10 @@
                         <!-- Buttons: CUTI -->
                         <template v-else-if="log.z_type === 'Cuti'">
                             <div class="flex gap-1 justify-center items-center">
-                                <!-- ZETTBOT TAHAP 43: Jika belum disetujui, tombol ikon cetak biasa -->
+                                <!-- TAHAP 43: Jika belum disetujui, tombol ikon cetak biasa -->
                                 <button v-if="String(log.status || '').trim().toLowerCase() !== 'disetujui'" @click="execCetakCuti(log.id)" class="px-2.5 py-1.5 bg-slate-800 hover:bg-indigo-600 text-slate-400 hover:text-white rounded-md transition border border-slate-700 text-xs" title="Cetak Formulir Cuti"><i class="fa-solid fa-print"></i></button>
                                 
-                                <!-- ZETTBOT TAHAP 43: Jika sudah disetujui, tombol ikon dropdown mengeluarkan 2 opsi (Cetak & Download) -->
+                                <!-- TAHAP 43: Jika sudah disetujui, tombol ikon dropdown mengeluarkan 2 opsi (Cetak & Download) -->
                                 <div v-else class="relative inline-block text-left dropdown-rekap-container">
                                     <button @click.stop="toggleRekapDropdown(log.id)" type="button" class="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-md transition border border-slate-700 text-xs font-bold flex items-center gap-1 shadow-sm" title="Opsi Cetak & Unduh Dokumen">
                                         <i class="fa-solid fa-list-ul text-xs"></i>

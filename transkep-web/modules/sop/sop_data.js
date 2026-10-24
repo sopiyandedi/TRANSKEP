@@ -2,7 +2,7 @@
 // FILE: sop_data.js (TRANSKEP Modular)
 // DESKRIPSI: Data Service Layer khusus Modul Standar Operasional Prosedur (SOP)
 // FITUR: PDF Validator & Reader, RPC Save/Delete/Acknowledge/Drive URL
-// ENGINE: ZettBOT Core v1.0.0 (by Zettbos)
+// ENGINE: TRANSKEP Core v1.0.0 
 // ==========================================
 
 const SopDataService = {

@@ -1,6 +1,6 @@
 // ==========================================
 // FILE: rekapitulasi_data.js (Data Service Layer - Rekapitulasi Riwayat Permohonan Global)
-// Standard: ZettBOT 3-Tier Architecture (by Zettbos)
+// Standard: TRANSKEP 3-Tier Architecture 
 // Deskripsi: Mengelola seluruh komunikasi asynchronous RPC penghapusan dan pembatalan
 //            riwayat permohonan ke backend Google Apps Script.
 // ==========================================

@@ -58,7 +58,7 @@
           <div class="bg-slate-900/50 border border-slate-800 p-4 rounded-xl space-y-4">
             <h4 class="text-xs font-bold text-blue-400 uppercase tracking-wider border-b border-slate-800 pb-2">2. Daftar Pegawai & Pengaturan Fasilitas</h4>
             
-            <!-- Auto-Search Pegawai (ZETTBOT FIX: Tambah Event @input dan Visual Highlight) -->
+            <!-- Auto-Search Pegawai (FIX: Tambah Event @input dan Visual Highlight) -->
             <div class="relative w-full">
               <div class="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none">
                   <i class="fa-solid fa-magnifying-glass text-slate-500"></i>
@@ -117,7 +117,7 @@
             <div class="absolute -right-10 -top-10 w-32 h-32 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none"></div>
             <h4 class="text-xs font-bold text-emerald-400 uppercase tracking-wider border-b border-emerald-500/30 pb-2">3. Data Pembiayaan SPD & ST</h4>
             
-            <!-- Auto-Search PPK (ZETTBOT FIX: Tambah Event @input dan Visual Highlight) -->
+            <!-- Auto-Search PPK (FIX: Tambah Event @input dan Visual Highlight) -->
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4 relative z-10 mb-4">
               <div class="relative">
                   <label class="block text-slate-400 uppercase font-bold mb-1 text-[11px]">Pejabat Pembuat Komitmen (PPK)</label>
@@ -194,7 +194,7 @@
                   <input type="text" v-model="form.jam" required placeholder="08.00 WIB s.d. Selesai" class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500">
                 </div>
                 
-                <!-- Auto-Search Penandatangan TTD (ZETTBOT FIX: Tambah Event @input dan Visual Highlight) -->
+                <!-- Auto-Search Penandatangan TTD (FIX: Tambah Event @input dan Visual Highlight) -->
                 <div class="relative">
                   <label class="block text-slate-400 uppercase font-bold mb-1 text-[11px] text-amber-400">Pimpinan Penandatangan <span class="text-rose-400">*</span></label>
                   <input type="text" v-model="sqTtd" @focus="dropTtd = true" @input="dropTtd = true" @blur="closeDrop('dropTtd')" @keydown.enter.prevent="handleEnterTtd" autocomplete="off" placeholder="Ketik nama Pimpinan lalu Enter..." class="w-full px-3.5 py-2.5 bg-slate-950 border border-amber-500/50 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-500 pr-10">
@@ -230,7 +230,7 @@
           </div>
           <p class="text-xs text-slate-400 mb-4">Pengganti harian untuk: <b v-if="plhTargetObj">{{ plhTargetObj.nama }}</b></p>
           
-          <!-- Auto-Search Plh (ZETTBOT FIX: Tambah Event @input dan Visual Highlight) -->
+          <!-- Auto-Search Plh (FIX: Tambah Event @input dan Visual Highlight) -->
           <div class="relative mb-5">
             <input type="text" v-model="sqPlh" @focus="dropPlh = true" @input="dropPlh = true" @blur="closeDrop('dropPlh')" @keydown.enter.prevent="handleEnterPlh" autocomplete="off" placeholder="Ketik nama Pejabat lalu Enter..." class="w-full px-3.5 py-3 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm pr-10">
             <button type="button" v-show="sqPlh !== ''" @mousedown.prevent="sqPlh = ''; plhNipTerpilih = ''" class="absolute right-3 top-[50%] -translate-y-[50%] text-slate-500 hover:text-rose-400 w-6 h-6 flex items-center justify-center"><i class="fa-solid fa-xmark"></i></button>
@@ -260,7 +260,7 @@
 
           <form @submit.prevent="saveSetting" class="space-y-4">
               
-              <!-- Auto-Search Default PPK (ZETTBOT FIX: Tambah Event @input dan Visual Highlight) -->
+              <!-- Auto-Search Default PPK (FIX: Tambah Event @input dan Visual Highlight) -->
               <div class="relative">
                   <label class="block text-slate-400 uppercase font-bold mb-1 text-[11px]">Default PPK</label>
                   <input type="text" v-model="sqSetPPK" @focus="dropSetPPK = true" @input="dropSetPPK = true" @blur="closeDrop('dropSetPPK')" @keydown.enter.prevent="handleEnterSetPPK" autocomplete="off" placeholder="Ketik nama PPK lalu Enter..." class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 pr-10">

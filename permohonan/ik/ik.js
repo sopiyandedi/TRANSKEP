@@ -1,5 +1,5 @@
 // =========================================================================
-// ZETTBOS BACKEND MODULE: IZIN KELUAR (Aman & Terpusat)
+// TRANSKEP BACKEND MODULE: IZIN KELUAR (Aman & Terpusat)
 // =========================================================================
 
 function submitIzinKeluar(payload, clientToken) {

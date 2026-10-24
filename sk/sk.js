@@ -31,7 +31,7 @@ function autoInitSkSheets(ss) {
   return isCreated;
 }
 
-// ZETTBOT: Fungsi Pintasan Mengambil URL Root Folder "TRANSKEP SK"
+// TRANSKEP: Fungsi Pintasan Mengambil URL Root Folder "TRANSKEP SK"
 function getSkDriveFolderUrl(userNip, clientToken) {
   try {
     if (!cekOtorisasi(userNip, clientToken)) return { status: 'error', message: 'Akses Ditolak: Sesi tidak valid.' };
@@ -54,7 +54,7 @@ function saveSk(payload, userNip, clientToken) {
     if (!cekOtorisasi(userNip, clientToken)) return { status: 'error', message: 'Akses Ditolak: Sesi tidak valid.' };
 
     // ========================================================
-    // ZETTBOT FIX: PROSES AUTO-UPLOAD KE FOLDER "TRANSKEP SK"
+    // FIX: PROSES AUTO-UPLOAD KE FOLDER "TRANSKEP SK"
     // ========================================================
     if (payload.fileBase64) {
        try {

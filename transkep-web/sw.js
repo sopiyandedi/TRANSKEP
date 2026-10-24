@@ -1,10 +1,10 @@
 // =========================================================================
 // FILE: sw.js (TRANSKEP Progressive Web App Service Worker)
 // DESKRIPSI: Offline Asset Caching, Fast Load & Network Pass-Through
-// ENGINE: ZettBOT PWA Engine v1.0.0 (by Zettbos)
+// ENGINE: TRANSKEP PWA Engine v1.0.0 
 // =========================================================================
 
-const CACHE_NAME = 'transkep-v3.1.6';
+const CACHE_NAME = 'transkep-v3.1.7';
 
 // Daftar aset inti yang di-cache saat Service Worker dipasang (Install)
 const PRECACHE_ASSETS = [

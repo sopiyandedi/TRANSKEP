@@ -2,7 +2,7 @@
 // FILE: pegawai_data.js (TRANSKEP Modular)
 // DESKRIPSI: Data Service Layer khusus Modul Manajemen Pegawai
 // FITUR: RPC Add/Update Pegawai, Delete Pegawai, Import Bulk, Reset Password Queue
-// ENGINE: ZettBOT Core v1.0.0 (by Zettbos)
+// ENGINE: TRANSKEP Core v1.0.0 
 // ==========================================
 
 const PegawaiDataService = {

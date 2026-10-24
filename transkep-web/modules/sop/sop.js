@@ -4,7 +4,7 @@
 
 // --- Source: sop/js_sop.html ---
 // ==========================================
-// FILE: sop/js_sop.html (VUE.JS VERSION FULL ZETTBOT FIX)
+// FILE: sop/js_sop.html (VUE.JS VERSION FULL FIX)
 // ==========================================
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -12,7 +12,7 @@ document.addEventListener("DOMContentLoaded", () => {
         data() {
             return {
                 globalState: window.vueState,
-                currentSopFilter: 'Rekap per Pegawai', // ZETTBOT FIX: Tab Rekap menjadi default saat modul dibuka
+                currentSopFilter: 'Rekap per Pegawai', // FIX: Tab Rekap menjadi default saat modul dibuka
                 sopSearchQuery: '',
                 expandedSopRows: [],
                 expandedSopRekapRows: [],
@@ -27,7 +27,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 sopPelaksanaTerpilih: [],
                 sopPegawaiSearchInput: '',
 
-                // ZETTBOT: State untuk Upload File PDF SOP, Drag-Drop & Pintasan Folder Drive
+                // TRANSKEP: State untuk Upload File PDF SOP, Drag-Drop & Pintasan Folder Drive
                 sopSelectedFile: null,
                 sopFileDataBase64: null,
                 isUploadingSop: false,
@@ -65,7 +65,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     filtered = filtered.filter(s => s.kategori_pj === this.currentSopFilter);
                 }
 
-                // ZETTBOT FIX: Transparansi penuh. Tidak ada filter berdasarkan role pegawai di tab "Semua SOP".
+                // FIX: Transparansi penuh. Tidak ada filter berdasarkan role pegawai di tab "Semua SOP".
                 
                 if (this.sopSearchQuery) {
                     const q = this.sopSearchQuery.toLowerCase();
@@ -212,7 +212,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
             },
 
-            // ZETTBOT FIX: Pintasan Buka Folder Google Drive TRANSKEP SOP (Anti-Popup Blocker)
+            // FIX: Pintasan Buka Folder Google Drive TRANSKEP SOP (Anti-Popup Blocker)
             async openSopDriveFolder() {
                 if (this.sopDriveFolderUrl) {
                     window.open(this.sopDriveFolderUrl, '_blank');
@@ -248,7 +248,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
             },
 
-            // ZETTBOT: Format ukuran file (KB / MB)
+            // TRANSKEP: Format ukuran file (KB / MB)
             formatFileSize(bytes) {
                 if (!bytes) return '0 B';
                 if (bytes < 1024) return bytes + ' B';
@@ -256,7 +256,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 else return (bytes / 1048576).toFixed(2) + ' MB';
             },
 
-            // ZETTBOT FIX: Reset input file sebelum buka modal SOP
+            // FIX: Reset input file sebelum buka modal SOP
             openModalSop(mode, id = null) {
                 this.modalSopMode = mode;
                 this.sopPelaksanaTerpilih = [];
@@ -290,7 +290,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 this.showModalSop = true;
             },
 
-            // ZETTBOT: Fungsi terpusat validasi dan konversi File PDF SOP ke Base64
+            // TRANSKEP: Fungsi terpusat validasi dan konversi File PDF SOP ke Base64
             async processSopFile(file, inputEl = null) {
                 if (!file) return;
                 try {
@@ -551,5 +551,5 @@ document.addEventListener("DOMContentLoaded", () => {
     }).mount('#vue-sop-app');
 });
 
-// ZETTBOT: Menimpa renderSopView bawaan router
+// TRANSKEP: Menimpa renderSopView bawaan router
 window.renderSopView = function() {};

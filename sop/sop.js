@@ -29,7 +29,7 @@ function autoInitSopSheets(ss) {
   if (isCreated) SpreadsheetApp.flush();
 }
 
-// ZETTBOT: Fungsi Pintasan Mengambil URL Root Folder "TRANSKEP SOP"
+// TRANSKEP: Fungsi Pintasan Mengambil URL Root Folder "TRANSKEP SOP"
 function getSopDriveFolderUrl(userNip, clientToken) {
   try {
     if (!cekOtorisasi(userNip, clientToken)) return { status: 'error', message: 'Akses Ditolak: Sesi tidak valid.' };
@@ -52,7 +52,7 @@ function saveSopData(payload, userNip, clientToken) {
     if (!cekOtorisasi(userNip, clientToken)) return { status: 'error', message: 'Akses Ditolak: Sesi tidak valid.' };
 
     // ========================================================
-    // ZETTBOT FIX: PROSES AUTO-UPLOAD SOP KE FOLDER "TRANSKEP SOP"
+    // FIX: PROSES AUTO-UPLOAD SOP KE FOLDER "TRANSKEP SOP"
     // ========================================================
     if (payload.fileBase64) {
        try {

@@ -3,7 +3,7 @@
 // Deskripsi: Script inisialisasi database & Migrasi Data
 // ==========================================
 
-// ZETTBOT PRIVAT: Akhiran underscore mencegah fungsi ini dipanggil publik dari klien via google.script.run
+// TRANSKEP PRIVAT: Akhiran underscore mencegah fungsi ini dipanggil publik dari klien via google.script.run
 function setupDatabase_() {
   try {
     let ss = null;

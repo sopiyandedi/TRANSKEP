@@ -110,7 +110,7 @@
               </td>
               <td class="p-4 text-center">
                  <div class="flex items-center justify-center gap-1.5">
-                    <!-- ZETTBOT TAHAP 43: Dropdown Aksi Cuti Disetujui (1 Tombol Ikon Ringkas ➔ 2 Opsi) -->
+                    <!-- TAHAP 43: Dropdown Aksi Cuti Disetujui (1 Tombol Ikon Ringkas ➔ 2 Opsi) -->
                     <div v-if="log.hasDropdown" class="relative inline-block text-left dropdown-action-container">
                        <button @click.stop="toggleActionDropdown(log.id)" type="button" class="px-2.5 py-1.5 bg-slate-800/90 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 rounded-lg transition shadow-md flex items-center gap-1 text-xs" title="Opsi Cetak & Unduh Dokumen">
                           <i class="fa-solid fa-list-ul text-xs"></i>
@@ -149,7 +149,7 @@
     </div>
 </div>
 
-<!-- ZETTBOT FIX TAHAP 5: Vue Wrapper untuk Form Cuti & Pembatalan Cuti -->
+<!-- FIX TAHAP 5: Vue Wrapper untuk Form Cuti & Pembatalan Cuti -->
 <div id="vue-form-cuti-wrapper" v-cloak>
   
   <!-- MODAL PENGAJUAN CUTI BARU (DAN BYPASS) -->
@@ -167,7 +167,7 @@
 
       <form @submit.prevent="submitCuti" class="flex-1 overflow-y-auto py-4 space-y-4 text-xs pr-2 custom-scrollbar">
         
-        <!-- ZETTBOT FIX: SEARCHABLE DROPDOWN UNTUK BYPASS -->
+        <!-- FIX: SEARCHABLE DROPDOWN UNTUK BYPASS -->
         <div v-show="isBypassMode" class="bg-indigo-500/10 border border-indigo-500/30 p-4 rounded-2xl mb-4">
            <label class="block text-indigo-300 uppercase font-bold mb-1.5"><i class="fa-solid fa-user-shield mr-1"></i> Mode Bypass: Pilih Pegawai Pemohon</label>
            
@@ -318,7 +318,7 @@
       <p class="text-slate-500 text-xs mt-1">Daftar berkas pengajuan dan usulan pembatalan yang membutuhkan verifikasi Anda.</p>
     </div>
     
-    <!-- ZETTBOT FIX: Menampilkan kembali Tombol Bypass dengan badge jumlah notifikasi dinamis -->
+    <!-- FIX: Menampilkan kembali Tombol Bypass dengan badge jumlah notifikasi dinamis -->
     <div v-if="isAdmin" class="flex flex-col sm:flex-row items-start sm:items-center gap-2 bg-slate-900/50 p-1.5 rounded-xl border border-slate-800">
        <span class="text-[10px] font-bold text-slate-500 uppercase px-2"><i class="fa-solid fa-key text-indigo-400 mr-1"></i> Mode Bypass:</span>
        <div class="flex gap-2 w-full sm:w-auto">
@@ -677,10 +677,10 @@
                         <!-- Buttons: CUTI -->
                         <template v-else-if="log.z_type === 'Cuti'">
                             <div class="flex gap-1 justify-center items-center">
-                                <!-- ZETTBOT TAHAP 43: Jika belum disetujui, tombol ikon cetak biasa -->
+                                <!-- TAHAP 43: Jika belum disetujui, tombol ikon cetak biasa -->
                                 <button v-if="String(log.status || '').trim().toLowerCase() !== 'disetujui'" @click="execCetakCuti(log.id)" class="px-2.5 py-1.5 bg-slate-800 hover:bg-indigo-600 text-slate-400 hover:text-white rounded-md transition border border-slate-700 text-xs" title="Cetak Formulir Cuti"><i class="fa-solid fa-print"></i></button>
                                 
-                                <!-- ZETTBOT TAHAP 43: Jika sudah disetujui, tombol ikon dropdown mengeluarkan 2 opsi -->
+                                <!-- TAHAP 43: Jika sudah disetujui, tombol ikon dropdown mengeluarkan 2 opsi -->
                                 <div v-else class="relative inline-block text-left dropdown-rekap-container">
                                     <button @click.stop="toggleRekapDropdown(log.id)" type="button" class="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-md transition border border-slate-700 text-xs font-bold flex items-center gap-1 shadow-sm" title="Opsi Cetak & Unduh Dokumen">
                                         <i class="fa-solid fa-list-ul text-xs"></i>
@@ -790,7 +790,7 @@
           <div class="bg-slate-900/50 border border-slate-800 p-4 rounded-xl space-y-4">
             <h4 class="text-xs font-bold text-blue-400 uppercase tracking-wider border-b border-slate-800 pb-2">2. Daftar Pegawai & Pengaturan Fasilitas</h4>
             
-            <!-- Auto-Search Pegawai (ZETTBOT FIX: Tambah Event @input dan Visual Highlight) -->
+            <!-- Auto-Search Pegawai (FIX: Tambah Event @input dan Visual Highlight) -->
             <div class="relative w-full">
               <div class="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none">
                   <i class="fa-solid fa-magnifying-glass text-slate-500"></i>
@@ -849,7 +849,7 @@
             <div class="absolute -right-10 -top-10 w-32 h-32 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none"></div>
             <h4 class="text-xs font-bold text-emerald-400 uppercase tracking-wider border-b border-emerald-500/30 pb-2">3. Data Pembiayaan SPD & ST</h4>
             
-            <!-- Auto-Search PPK (ZETTBOT FIX: Tambah Event @input dan Visual Highlight) -->
+            <!-- Auto-Search PPK (FIX: Tambah Event @input dan Visual Highlight) -->
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4 relative z-10 mb-4">
               <div class="relative">
                   <label class="block text-slate-400 uppercase font-bold mb-1 text-[11px]">Pejabat Pembuat Komitmen (PPK)</label>
@@ -926,7 +926,7 @@
                   <input type="text" v-model="form.jam" required placeholder="08.00 WIB s.d. Selesai" class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500">
                 </div>
                 
-                <!-- Auto-Search Penandatangan TTD (ZETTBOT FIX: Tambah Event @input dan Visual Highlight) -->
+                <!-- Auto-Search Penandatangan TTD (FIX: Tambah Event @input dan Visual Highlight) -->
                 <div class="relative">
                   <label class="block text-slate-400 uppercase font-bold mb-1 text-[11px] text-amber-400">Pimpinan Penandatangan <span class="text-rose-400">*</span></label>
                   <input type="text" v-model="sqTtd" @focus="dropTtd = true" @input="dropTtd = true" @blur="closeDrop('dropTtd')" @keydown.enter.prevent="handleEnterTtd" autocomplete="off" placeholder="Ketik nama Pimpinan lalu Enter..." class="w-full px-3.5 py-2.5 bg-slate-950 border border-amber-500/50 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-500 pr-10">
@@ -962,7 +962,7 @@
           </div>
           <p class="text-xs text-slate-400 mb-4">Pengganti harian untuk: <b v-if="plhTargetObj">{{ plhTargetObj.nama }}</b></p>
           
-          <!-- Auto-Search Plh (ZETTBOT FIX: Tambah Event @input dan Visual Highlight) -->
+          <!-- Auto-Search Plh (FIX: Tambah Event @input dan Visual Highlight) -->
           <div class="relative mb-5">
             <input type="text" v-model="sqPlh" @focus="dropPlh = true" @input="dropPlh = true" @blur="closeDrop('dropPlh')" @keydown.enter.prevent="handleEnterPlh" autocomplete="off" placeholder="Ketik nama Pejabat lalu Enter..." class="w-full px-3.5 py-3 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm pr-10">
             <button type="button" v-show="sqPlh !== ''" @mousedown.prevent="sqPlh = ''; plhNipTerpilih = ''" class="absolute right-3 top-[50%] -translate-y-[50%] text-slate-500 hover:text-rose-400 w-6 h-6 flex items-center justify-center"><i class="fa-solid fa-xmark"></i></button>
@@ -992,7 +992,7 @@
 
           <form @submit.prevent="saveSetting" class="space-y-4">
               
-              <!-- Auto-Search Default PPK (ZETTBOT FIX: Tambah Event @input dan Visual Highlight) -->
+              <!-- Auto-Search Default PPK (FIX: Tambah Event @input dan Visual Highlight) -->
               <div class="relative">
                   <label class="block text-slate-400 uppercase font-bold mb-1 text-[11px]">Default PPK</label>
                   <input type="text" v-model="sqSetPPK" @focus="dropSetPPK = true" @input="dropSetPPK = true" @blur="closeDrop('dropSetPPK')" @keydown.enter.prevent="handleEnterSetPPK" autocomplete="off" placeholder="Ketik nama PPK lalu Enter..." class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 pr-10">

@@ -6,7 +6,7 @@
       html, body { display: block !important; width: 100% !important; height: 100% !important; overflow: visible !important; background: white !important; color: black !important; margin: 0 !important; padding: 0 !important; }
       body.print-mode > * { display: none !important; }
       
-      /* ZETTBOT: Padding Buatan Kertas */
+      /* TRANSKEP: Padding Buatan Kertas */
       body.print-mode > #template-pck-container { display: block !important; position: relative; width: 100%; box-sizing: border-box; padding: 12mm 15mm !important; font-family: 'Arial', sans-serif; font-size: 8.5pt; }
 
       .table-data { width: 100%; border-collapse: collapse; margin-bottom: 25px; border: 1px solid black; }
@@ -15,7 +15,7 @@
       
       .text-center { text-align: center; } .text-right { text-align: right; } .font-bold { font-weight: bold; }
 
-      /* ZETTBOT: Pemisah Halaman (Page Break) */
+      /* TRANSKEP: Pemisah Halaman (Page Break) */
       .page-break { page-break-before: always; }
       
       .sig-space { height: 70px; }
@@ -29,12 +29,12 @@
     FORMULIR PENILAIAN CAPAIAN KINERJA BULANAN<br>PEGAWAI NEGERI SIPIL*
   </div>
   
-  <!-- ZETTBOT FIX: Teks Bulan Rata Tengah -->
+  <!-- FIX: Teks Bulan Rata Tengah -->
   <div class="text-center" style="font-size: 10pt; margin-bottom: 20px;">
     Bulan : <span id="pck-print-bulan-header-center" class="uppercase"></span>
   </div>
 
-  <!-- ZETTBOT FIX: Tabel Identitas Berkotak -->
+  <!-- FIX: Tabel Identitas Berkotak -->
   <table class="table-data" style="width: 60%; font-size: 9pt; margin-bottom: 25px;">
     <tr><td width="5%" class="text-center">1</td><td width="35%">Nama</td><td id="pck-print-pegawai-nama"></td></tr>
     <tr><td class="text-center">2</td><td>NIP</td><td id="pck-print-pegawai-nip"></td></tr>
@@ -68,7 +68,7 @@
     <tbody id="pck-print-tbody-2"></tbody>
   </table>
 
-  <!-- ZETTBOT FIX: Tabel Transparan Pembungkus Tanda Tangan (Blok Kanan, Teks Rata Kiri) -->
+  <!-- FIX: Tabel Transparan Pembungkus Tanda Tangan (Blok Kanan, Teks Rata Kiri) -->
   <table style="width: 100%; border: none; margin-top: 30px; page-break-inside: avoid;">
     <tr>
       <!-- Kolom Pendorong (Kosong) -->

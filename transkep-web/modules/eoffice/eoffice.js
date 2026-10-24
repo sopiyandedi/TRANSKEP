@@ -1,13 +1,13 @@
 // ==========================================
 // FILE: eoffice.js (TRANSKEP Modular)
-// ENGINE: ZettBOT Core v1.0.0
+// ENGINE: TRANSKEP Core v1.0.0
 // ==========================================
 
 // --- Source: eoffice/js_eoffice.html ---
 // ==========================================
   // FILE: eoffice/js_eoffice.html
   // DESKRIPSI: Logika Frontend E-Office (Vue.js 3 Reactive Engine)
-  // ENGINE: ZettBOT Core v1.0.0 (by Zettbos)
+  // ENGINE: TRANSKEP Core v1.0.0 
   // ==========================================
 
   window.renderEofficeView = function() {

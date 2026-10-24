@@ -1,10 +1,10 @@
 // =========================================================================
 // FILE: core.js (TRANSKEP Web Core Controller)
 // DESKRIPSI: State Management, Autentikasi Login, Routing Menu, Notifikasi & Modals
-// ENGINE: ZettBOT Core v1.0.0 (by Zettbos)
+// ENGINE: TRANSKEP Core v1.0.0 
 // =========================================================================
 
-console.log("🚀 ZETTBOT: Menginisialisasi sistem TRANSKEP core.js...");
+console.log("🚀 TRANSKEP: Menginisialisasi sistem TRANSKEP core.js...");
 
 let savedProfile = null;
 try {
@@ -59,7 +59,7 @@ window.vueState = state;
 const isGoogleEnv = (typeof google !== 'undefined' && google.script);
 
 document.addEventListener("DOMContentLoaded", () => {
-  console.log("🚀 ZETTBOT: Halaman berhasil dimuat (DOMContentLoaded).");
+  console.log("🚀 TRANSKEP: Halaman berhasil dimuat (DOMContentLoaded).");
 
   document.body.style.display = '';
   document.body.classList.remove('hidden');
@@ -77,7 +77,7 @@ document.addEventListener("DOMContentLoaded", () => {
         } catch(e) {}
       }
 
-      // ZETTBOT: Rehidrasi instan 0ms cache data absensi & peringatan
+      // TRANSKEP: Rehidrasi instan 0ms cache data absensi & peringatan
       try {
         const rawUsers = localStorage.getItem('transkep_users_cache');
         if (rawUsers) {
@@ -119,7 +119,7 @@ document.addEventListener("DOMContentLoaded", () => {
       toggleAppVisibility(false);
     }
   } catch (e) {
-    console.error("❌ ZETTBOT Error Inisialisasi:", e);
+    console.error("❌ TRANSKEP Error Inisialisasi:", e);
     toggleAppVisibility(false);
   }
 });
@@ -461,7 +461,7 @@ function syncBackgroundData() {
       if (cm === 'eoffice' && typeof renderEofficeView === 'function') renderEofficeView();
       if (cm === 'manajemen' && window.vmPegawai && typeof window.vmPegawai.fetchResetQueue === 'function') window.vmPegawai.fetchResetQueue();
     }
-    // ZETTBOT: Pastikan hideLoading() SELALU dipanggil saat background sync selesai!
+    // TRANSKEP: Pastikan hideLoading() SELALU dipanggil saat background sync selesai!
     hideLoading();
   };
 
@@ -770,7 +770,7 @@ function showNotify(title, message, type = 'success') {
   }, 3500);
 }
 
-// ZETTBOT: Modal Konfirmasi Universal (Anti-AI Human-Crafted Look & Feel)
+// TRANSKEP: Modal Konfirmasi Universal (Anti-AI Human-Crafted Look & Feel)
 function showCustomConfirm(title, message, onConfirm) {
   if (typeof document === 'undefined' || !document.body) {
     if (confirm(title + "\n\n" + message)) {

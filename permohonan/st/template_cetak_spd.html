@@ -1,11 +1,11 @@
 <!-- ==========================================
      FILE: template_cetak_spd.html (Template Kertas SPD 2 Halaman)
      ========================================== -->
-<!-- ZETTBOT FIX NUKLIR: Ganti ID jadi super unik agar tidak narik file backup -->
+<!-- FIX NUKLIR: Ganti ID jadi super unik agar tidak narik file backup -->
 <div id="spd-nuklir-2026" style="display: none;" class="hidden no-print">
   <style>
     /* ==========================================
-       ZETTBOT FIX: SETTING KERTAS & MARGIN
+       FIX: SETTING KERTAS & MARGIN
        ========================================== */
     @media print {
       @page { 
@@ -30,7 +30,7 @@
         width: 100%; 
         max-width: 210mm;
         margin: 0 auto; 
-        /* ZETTBOT FIX TAHAP 1: Padding disesuaikan agar layout melebar proporsional */
+        /* FIX TAHAP 1: Padding disesuaikan agar layout melebar proporsional */
         padding: 10mm 10mm 10mm 11mm; /* Atas, Kanan, Bawah, Kiri */
         box-sizing: border-box; 
         font-family: 'Bookman Old Style', 'Times New Roman', serif; 
@@ -81,7 +81,7 @@
         padding: 8px; 
         vertical-align: top; 
         width: 50%; 
-        /* ZETTBOT FIX: Tinggi dinaikkan dari 160px jadi 200px agar lega */
+        /* FIX: Tinggi dinaikkan dari 160px jadi 200px agar lega */
         height: 200px; 
         position: relative; 
     }
@@ -90,7 +90,7 @@
         padding: 8px; 
         vertical-align: top; 
         width: 50%; 
-        /* ZETTBOT FIX: Tinggi dinaikkan dari 220px jadi 260px */
+        /* FIX: Tinggi dinaikkan dari 220px jadi 260px */
         height: 260px; 
         position: relative; 
     }
@@ -109,7 +109,7 @@
     <table class="spd-header-table">
       <tr>
         <!-- ⬇️ TAG 9: LEBAR KOLOM HEADER (Kiri & Kanan) ⬇️ -->
-        <!-- ZETTBOT FIX: Diberi padding-left agar terdorong pas ke garis kuning -->
+        <!-- FIX: Diberi padding-left agar terdorong pas ke garis kuning -->
         <td style="width: 46%; padding-right: 14;">
             MAHKAMAH AGUNG<br>
             PENGADILAN AGAMA INDRAMAYU
@@ -208,7 +208,7 @@
       </tr>
       
       <!-- ========================================================= 
-           ZETTBOT FIX NUKLIR: ROW 8 PENGIKUT 
+           FIX NUKLIR: ROW 8 PENGIKUT 
            DIPISAH JADI DUA TD AGAR GARIS TENGAH 100% LURUS
            ========================================================= -->
       <tr>
@@ -263,10 +263,10 @@
       </tr>
     </table>
 
-    <!-- ZETTBOT FIX: MENGGESER TANDA TANGAN HALAMAN 1 KE POSISI YANG PAS (Sesuai Garis Kuning) -->
+    <!-- FIX: MENGGESER TANDA TANGAN HALAMAN 1 KE POSISI YANG PAS (Sesuai Garis Kuning) -->
     <table style="width: 100%; border: none; margin-top: 25px;">
       <tr>
-        <!-- ZETTBOT FIX: Menggunakan rasio 54% : 46% agar persis lurus dengan kop tabel bagian atas -->
+        <!-- FIX: Menggunakan rasio 54% : 46% agar persis lurus dengan kop tabel bagian atas -->
         <td style="width: 54%;"></td>
         <td style="width: 46%;">
           <table style="width: 100%; border: none; font-size: 11pt; padding:0; margin:0; border-spacing:0;">
@@ -307,7 +307,7 @@
                         <tr><td></td><td>Pada Tanggal</td><td>:</td><td>{{tgl_berangkat}}</td></tr>
                     </table>
                     
-                    <!-- ZETTBOT FIX: Mode Air Mengalir (Tanpa Absolute) & Geser 155px -->
+                    <!-- FIX: Mode Air Mengalir (Tanpa Absolute) & Geser 155px -->
                     <div style="margin-top: 10px; margin-left: 25px; margin-bottom: 2px;">
                         <div>{{jabatan_ttd_st}},</div>
                         
@@ -376,7 +376,7 @@
                         <tr><td></td><td>Pada Tanggal</td><td>:</td><td>{{tgl_kembali}}</td></tr>
                     </table>
                     
-                    <!-- ZETTBOT FIX: Mode Air Mengalir KIRI (Tanpa Absolute) -->
+                    <!-- FIX: Mode Air Mengalir KIRI (Tanpa Absolute) -->
                     <!-- ⬇️ TAG 19: PENDORONG TTD KIRI AGAR SEJAJAR DENGAN KANAN ⬇️ -->
                     <div style="margin-top: 68px; margin-left: 33px; margin-bottom: 2px;">
                     <div>Pejabat Pembuat Komitmen</div>
@@ -393,7 +393,7 @@
                     <div style="text-align: justify; margin-left: 25px; margin-right: 2px;">
                         Telah diperiksa dengan keterangan bahwa perjalanan tersebut diatas benar dilakukan atas perintahnya dan semata-mata untuk kepentingan jabatan dalam waktu yang sesingkat-singkatnya.
                     </div>
-                <!-- ZETTBOT FIX: Mode Air Mengalir KANAN (Tanpa Absolute) & Geser 155px -->
+                <!-- FIX: Mode Air Mengalir KANAN (Tanpa Absolute) & Geser 155px -->
                 <div style="margin-top: 30px; margin-left: 33px; margin-bottom: 2px;">
                     <div>Pejabat Pembuat Komitmen</div>
                     

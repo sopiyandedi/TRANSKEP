@@ -9,7 +9,7 @@
 }
 
 /* =========================================================
-   ZETTBOT: Instant Anti-FOUC Session Guard (Zero-Flicker)
+   TRANSKEP: Instant Anti-FOUC Session Guard (Zero-Flicker)
    ========================================================= */
 html.app-authenticated #login-section,
 html.app-authenticated #slot-login {
@@ -18,7 +18,7 @@ html.app-authenticated #slot-login {
 html.app-authenticated #app-container {
   display: flex !important;
 }
-/* ZETTBOT: Instant Fullscreen Processing Overlay (0ms Anti-Kedip / Zero Jeda on Refresh) */
+/* TRANSKEP: Instant Fullscreen Processing Overlay (0ms Anti-Kedip / Zero Jeda on Refresh) */
 html.app-authenticated #global-loader:not(.loader-hidden) {
   display: flex !important;
   opacity: 1 !important;
@@ -71,7 +71,7 @@ body {
   background: rgba(100, 116, 139, 0.4);
 }
 
-/* ZETTBOT FIX: Memperbaiki Ikon Kalender Gelap (Native Date Picker) */
+/* FIX: Memperbaiki Ikon Kalender Gelap (Native Date Picker) */
 input[type="date"]::-webkit-calendar-picker-indicator {
   filter: invert(1) opacity(0.7);
   cursor: pointer;
@@ -83,7 +83,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 /* =========================================================================
-   ZETTBOT TAHAP 1 & 3: AGGRESSIVE PRINT MEDIA QUERY
+   TAHAP 1 & 3: AGGRESSIVE PRINT MEDIA QUERY
    Mematikan semua canvas, background glow, dan memaksa kertas putih bersih
    ========================================================================= */
 @media print {
@@ -111,7 +111,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     display: none !important;
   }
 
-  /* ZETTBOT FIX: Paksa area cetak tampil penuh, TETAPI hormati JavaScript */
+  /* FIX: Paksa area cetak tampil penuh, TETAPI hormati JavaScript */
   /* Form hanya akan dicetak jika tidak sedang di-hidden oleh JS */
   .print-only:not(.hidden) {
     display: block !important;
@@ -148,7 +148,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 /* =========================================================================
-   ZETTBOT: LIGHT MODE GIMMICK ZONE
+   TRANSKEP: LIGHT MODE GIMMICK ZONE
    PERHATIAN: Semua modifikasi warna, border, shadow untuk Light Mode 
    WAJIB diletakkan di area ini agar tidak merusak tema Dark bawaan.
    ========================================================================= */
@@ -156,7 +156,7 @@ body {
   transition: background-color 0.6s ease, color 0.6s ease;
 }
 
-/* ZETTBOT FIX: Penahan animasi saat pertama kali dimuat (Anti-Blink) */
+/* FIX: Penahan animasi saat pertama kali dimuat (Anti-Blink) */
 body.preload-theme, body.preload-theme * {
   transition: none !important;
 }
@@ -175,7 +175,7 @@ body.light-mode {
   box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01) !important;
 }
 
-/* ZETTBOT FIX: 1. Clear Glass (Kaca Bening) KHUSUS Area Dashboard & Aplikasi */
+/* FIX: 1. Clear Glass (Kaca Bening) KHUSUS Area Dashboard & Aplikasi */
 /* Diisolasi dengan ketat agar halaman Login tidak ikut berubah */
 .light-mode #app-container .glass {
     background: linear-gradient(135deg, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.05) 100%) !important;
@@ -187,7 +187,7 @@ body.light-mode {
     box-shadow: 0 15px 35px rgba(0, 0, 0, 0.05) !important;
 }
 
-/* ZETTBOT FIX: 2. Menghidupkan Warna Biasan (Orb Pastel) di Latar Belakang */
+/* FIX: 2. Menghidupkan Warna Biasan (Orb Pastel) di Latar Belakang */
 .light-mode .fixed.-z-10.bg-indigo-600\/20 {
     background-color: rgba(99, 102, 241, 0.4) !important; /* Indigo pastel menyala */
     transform: scale(1.3);
@@ -224,7 +224,7 @@ body.light-mode {
    color: #334155 !important;
 }
 
-/* ZETTBOT FIX: Memperbaiki Teks Pudar di Light Mode */
+/* FIX: Memperbaiki Teks Pudar di Light Mode */
 .light-mode [class*="text-slate-100/"],
 .light-mode [class*="text-slate-200/"],
 .light-mode [class*="text-slate-300/"] {
@@ -240,7 +240,7 @@ body.light-mode {
     opacity: 0.8 !important; 
 }
 
-/* ZETTBOT FIX: Memperbaiki Ikon Kalender Gelap (Native Date Picker) di Light Mode */
+/* FIX: Memperbaiki Ikon Kalender Gelap (Native Date Picker) di Light Mode */
 .light-mode input[type="date"]::-webkit-calendar-picker-indicator {
     filter: invert(0) opacity(0.6) !important;
 }
@@ -303,7 +303,7 @@ body.light-mode {
 }
 
 /* =========================================================
-   ZETTBOT FIX: PAKSA SEARCH RESULT SOLID DI LIGHT MODE
+   FIX: PAKSA SEARCH RESULT SOLID DI LIGHT MODE
    ========================================================= */
 .light-mode #searchResultPanel,
 .light-mode #searchResultPanel.glass,
@@ -397,7 +397,7 @@ body.light-mode {
 }
 
 /* ===========================================================================
-   4. ZETTBOT FIX: SOLID POPUP & MODAL DI LIGHT MODE (ANTI-TEMBUS PANDANG)
+   4. FIX: SOLID POPUP & MODAL DI LIGHT MODE (ANTI-TEMBUS PANDANG)
    Mencegah elemen background bocor ke dalam modal popup agar nyaman dibaca
    =========================================================================== */
 /* Wadah Utama Kartu Modal (Modal Dialog Box) */
@@ -619,7 +619,7 @@ body.light-mode {
 }
 
 /* ===========================================================================
-   6. ZETTBOT FIX: MENGEMBALIKAN TEKS PUTIH & SHADOW PADA TOMBOL AKSI UTAMA 
+   6. FIX: MENGEMBALIKAN TEKS PUTIH & SHADOW PADA TOMBOL AKSI UTAMA 
    Ditingkatkan Specificity-nya agar kebal dari global override Light Mode
    =========================================================================== */
 .light-mode button.bg-indigo-500, .light-mode button.bg-indigo-600,
@@ -700,7 +700,7 @@ body.light-mode {
 }
 
 /* ==========================================================
-   9. ZETTBOT FIX: FULLSCREEN MODAL PK & PCK DI ATAS SIDEBAR & TOP BAR
+   9. FIX: FULLSCREEN MODAL PK & PCK DI ATAS SIDEBAR & TOP BAR
    (Memastikan z-index mutlak di atas seluruh navigasi sistem)
    ========================================================== */
 #modalFullScreenPK,
@@ -708,7 +708,7 @@ body.light-mode {
     z-index: 2000000 !important;
 }
 
-/* ZETTBOT FIX: Memotong sudut bocor pada modal Sisa Cuti (Tingkat Lanjut WebKit) */
+/* FIX: Memotong sudut bocor pada modal Sisa Cuti (Tingkat Lanjut WebKit) */
 #modalSisaCuti .glass {
     overflow: hidden !important;
     border-radius: 1.5rem !important; /* Setara Tailwind rounded-3xl */

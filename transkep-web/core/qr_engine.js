@@ -3,7 +3,7 @@
 // DESKRIPSI: Standalone In-House QR Code & Visual Signature Canvas Engine
 // FITUR: ISO/IEC 18004 Compliant, Error Correction Level H (30% Recovery),
 //        White Buffer Mask & Emblem Overlay, Zero External Dependency.
-// AUTHOR: ZettBOT by Zettbos (Clean Architecture)
+// AUTHOR: TRANSKEP  (Clean Architecture)
 // =========================================================================
 
 (function(global) {
@@ -830,6 +830,6 @@
   global.generateQRCodeWithLogo = generateQRCodeWithLogo;
   global.generateQRCodeDataURL = generateQRCodeDataURL;
 
-  console.log('🛡️ [ZETTBOT] In-House QR Code & Visual Signature Engine aktif (Level H + Circular Badge).');
+  console.log('🛡️ [TRANSKEP] In-House QR Code & Visual Signature Engine aktif (Level H + Circular Badge).');
 
 })(typeof window !== 'undefined' ? window : this);

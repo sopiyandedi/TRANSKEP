@@ -30,7 +30,7 @@
                   // Variabel untuk Modal Pembatalan Cuti
                   cancelForm: { id: '', alasan: '' },
 
-                  // ZETTBOT FIX: Variabel untuk Searchable Dropdown Bypass
+                  // FIX: Variabel untuk Searchable Dropdown Bypass
                   bypassSearchQuery: '',
                   isBypassDropdownOpen: false
               };
@@ -42,7 +42,7 @@
                   }
                   return this.s.user;
               },
-              // ZETTBOT FIX: Logika filtering untuk kolom pencarian bypass
+              // FIX: Logika filtering untuk kolom pencarian bypass
               filteredBypassUsers() {
                   if (!this.s || !this.s.usersList) return [];
                   let users = this.s.usersList;
@@ -144,7 +144,7 @@
               }
           },
           methods: {
-              // ZETTBOT FIX: Fungsi interaksi Searchable Dropdown Bypass
+              // FIX: Fungsi interaksi Searchable Dropdown Bypass
               openBypassDropdown() {
                   this.isBypassDropdownOpen = true;
                   // Jika pengguna ingin mencari orang lain, kosongkan query tapi simpan NIP lama sementara
@@ -367,7 +367,7 @@
                                                 if (res.data.fileUrl) this.s.cutiLogs[existIdx].bukti_url = res.data.fileUrl;
                                             }
                                         } else {
-                                            // ZETTBOT TAHAP 37: Potong kuota cuti lokal secara reaktif & instan
+                                            // TAHAP 37: Potong kuota cuti lokal secara reaktif & instan
                                             const durasiNumber = Number(res.data.durasi || durasi || 0);
                                             const targetPegawai = (String(payload.nip) === String(this.s.user.nip)) ? this.s.user : (this.s.usersList ? this.s.usersList.find(u => String(u.nip) === String(payload.nip)) : null);
                                             if (targetPegawai && payload.jenis !== 'Dinas Luar' && payload.jenis !== 'CLTN') {
@@ -404,7 +404,7 @@
                                             };
                                             if (this.s && this.s.cutiLogs) this.s.cutiLogs.unshift(logVirtual);
                                         }
-                                        // ZETTBOT TAHAP 37: Jalankan silent sync tanpa dialog blocking & tanpa kedip
+                                        // TAHAP 37: Jalankan silent sync tanpa dialog blocking & tanpa kedip
                                         if (typeof syncAllServerData === 'function') {
                                             syncAllServerData(true);
                                         } else if (typeof syncBackgroundData === 'function') {

@@ -1,7 +1,7 @@
 // ==========================================
 // FILE: particles.js
 // DESKRIPSI: Particle Network Background Engine
-// ENGINE: ZettBOT Core v1.0.0 (by Zettbos)
+// ENGINE: TRANSKEP Core v1.0.0 
 // ==========================================
 
 function initLoginParticles() {
@@ -140,7 +140,7 @@ function initLoginParticles() {
   animate();
 }
 
-// ZETTBOT: Eksekusi Instan (0ms delay) tanpa menunggu event async
+// TRANSKEP: Eksekusi Instan (0ms delay) tanpa menunggu event async
 if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", initLoginParticles);
 } else {

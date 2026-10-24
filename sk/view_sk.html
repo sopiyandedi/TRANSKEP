@@ -1,6 +1,6 @@
 <!-- VIEW COMPONENT: sk/view_sk.html -->
 <!-- ================================================== -->
-<!-- FILE: sk/view_sk.html (VUE.JS VERSION FULL ZETTBOT FIX) -->
+<!-- FILE: sk/view_sk.html (VUE.JS VERSION FULL FIX) -->
 <!-- ================================================== -->
 <div id="section-sk" class="menu-section hidden">
   <div id="vue-sk-app" class="space-y-6 w-full h-full" v-cloak>
@@ -15,7 +15,7 @@
             <button @click="currentSkTab = 'PJ. Kepaniteraan'" :class="currentSkTab === 'PJ. Kepaniteraan' ? 'px-4 py-2 rounded-lg text-xs font-bold transition-all bg-indigo-600 text-white shadow-md' : 'px-4 py-2 rounded-lg text-xs font-bold transition-all text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'">PJ. Kepaniteraan</button>
             <button @click="currentSkTab = 'PJ. Kesekretariatan'" :class="currentSkTab === 'PJ. Kesekretariatan' ? 'px-4 py-2 rounded-lg text-xs font-bold transition-all bg-indigo-600 text-white shadow-md' : 'px-4 py-2 rounded-lg text-xs font-bold transition-all text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'">PJ. Kesekretariatan</button>
             <div class="w-px h-6 bg-slate-800 mx-1 self-center"></div>
-            <!-- ZETTBOT FIX: Tab Rekap per Pegawai dipindah ke paling kanan -->
+            <!-- FIX: Tab Rekap per Pegawai dipindah ke paling kanan -->
             <button @click="currentSkTab = 'Pegawai'" :class="currentSkTab === 'Pegawai' ? 'px-4 py-2 rounded-lg text-xs font-bold transition-all bg-indigo-600 text-white shadow-md flex items-center gap-2' : 'px-4 py-2 rounded-lg text-xs font-bold transition-all text-indigo-300 hover:text-indigo-200 hover:bg-indigo-500/20 border border-transparent hover:border-indigo-500/30 flex items-center gap-2'">
               <i class="fa-solid fa-users-rectangle"></i> Rekap per Pegawai
             </button>
@@ -276,7 +276,7 @@
 
               </div>
 
-              <!-- ZETTBOT: JEMBATAN KE SMART SK BUILDER -->
+              <!-- TRANSKEP: JEMBATAN KE SMART SK BUILDER -->
               <div v-if="modalSkMode === 'add'" class="p-3 bg-gradient-to-r from-indigo-950/70 via-purple-950/40 to-slate-900 border border-indigo-500/30 rounded-2xl flex items-center justify-between gap-3 shadow-md">
                 <div class="flex items-center gap-2.5">
                   <div class="w-8 h-8 rounded-xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 flex items-center justify-center shrink-0">
@@ -420,7 +420,7 @@
         </div>
       </transition>
   
-      <!-- ZETTBOT: MODULAR BUILDER & REVISI MODALS -->
+      <!-- TRANSKEP: MODULAR BUILDER & REVISI MODALS -->
       <?!= include('sk/view_sk_builder'); ?>
       <?!= include('sk/view_sk_revisi'); ?>
 

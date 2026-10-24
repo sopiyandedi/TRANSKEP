@@ -2,7 +2,7 @@
 // FILE: sk_data.js (TRANSKEP Modular)
 // DESKRIPSI: Data Service Layer khusus Modul Surat Keputusan (SK)
 // FITUR: PDF Validator & Reader, RPC Save/Delete/Acknowledge/Drive URL
-// ENGINE: ZettBOT Core v1.0.0 (by Zettbos)
+// ENGINE: TRANSKEP Core v1.0.0 
 // ==========================================
 
 const SkDataService = {

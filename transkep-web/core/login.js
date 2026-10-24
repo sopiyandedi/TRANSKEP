@@ -1,7 +1,7 @@
 // ==========================================
 // FILE: login.js
 // DESKRIPSI: Logika Modal Lupa Password (Frontend)
-// ENGINE: ZettBOT Core v1.0.0 (by Zettbos)
+// ENGINE: TRANSKEP Core v1.0.0 
 // ==========================================
 
 let cooldownResetPass = false; // Flag anti-spam click
@@ -87,7 +87,7 @@ function submitLupaPassword(e) {
     if (typeof showNotify === 'function') showNotify("Kesalahan Jaringan", errMsg, "error");
   };
 
-  // ZETTBOT DUAL-ENGINE: Prioritaskan TranskepAPI (Headless PWA), fallback ke google.script.run (Iframe GAS)
+  // TRANSKEP DUAL-ENGINE: Prioritaskan TranskepAPI (Headless PWA), fallback ke google.script.run (Iframe GAS)
   if (typeof TranskepAPI !== 'undefined' && typeof TranskepAPI.call === 'function') {
     TranskepAPI.call('requestPasswordReset', no_wa)
       .then(handleSuccess)

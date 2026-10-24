@@ -1,6 +1,6 @@
 // ==========================================
 // FILE: referensi.js (TRANSKEP Modular)
-// ENGINE: ZettBOT Core v1.0.0
+// ENGINE: TRANSKEP Core v1.0.0
 // ==========================================
 
 // --- Source: dashboard/referensi/js_referensi.html ---

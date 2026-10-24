@@ -2,7 +2,7 @@
 // FILE: izin_data.js (TRANSKEP Modular)
 // DESKRIPSI: Data Service Layer khusus Modul Permohonan Izin (IP, IK, & WFH)
 // FITUR: Submit/Update IP, Submit/Update IK, Submit/Update Rencana WFH, Get WFH By ID, Submit Laporan WFH, FileReader Base64
-// ENGINE: ZettBOT Core v1.0.0 (by Zettbos)
+// ENGINE: TRANSKEP Core v1.0.0 
 // ==========================================
 
 const IzinDataService = {

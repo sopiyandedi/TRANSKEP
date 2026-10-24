@@ -361,7 +361,7 @@ function getDetailLengkapPCK(nipPegawai, bulanStr, tahunStr, userNip, clientToke
   }
 }
 
-// ZETTBOT FIX: Update Logika Step Persetujuan Dokumen
+// FIX: Update Logika Step Persetujuan Dokumen
 function aksiDokumenPKP(idPKP, aksi, userNip, clientToken) {
   try {
     if (!cekOtorisasi(userNip, clientToken)) {

@@ -2,7 +2,7 @@
 // FILE: eoffice/kgb.js
 // DESKRIPSI: Backend Service Penyusunan SK KGB & Google Docs Generator
 // FORMAT: Pengadilan Agama Indramayu Kelas 1.A. ke KPPN Cirebon
-// ENGINE: ZettBOT Core v1.0.0 (by Zettbos)
+// ENGINE: TRANSKEP Core v1.0.0 
 // ==========================================
 
 /**

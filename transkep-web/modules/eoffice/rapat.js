@@ -6,7 +6,7 @@
 // ==========================================
   // FILE: eoffice/js_rapat.html
   // DESKRIPSI: Logika Frontend Form Paket Rapat & Multi-Select Peserta
-  // ENGINE: ZettBOT Core v1.0.0 (by Zettbos)
+  // ENGINE: TRANSKEP Core v1.0.0 
   // ==========================================
 
   var selectedRapatPesertaNips = [];

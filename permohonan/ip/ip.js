@@ -1,5 +1,5 @@
 // =========================================================================
-// ZETTBOS BACKEND MODULE: IZIN PRIBADI (FIXED COLUMN ORDER)
+// TRANSKEP BACKEND MODULE: IZIN PRIBADI (FIXED COLUMN ORDER)
 // =========================================================================
 
 function submitIzinPribadi(payload, clientToken) {

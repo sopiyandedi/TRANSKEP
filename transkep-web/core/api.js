@@ -2,7 +2,7 @@
 // FILE: api.js (TRANSKEP Web Client SDK)
 // DESKRIPSI: SDK Komunikasi Frontend ke Google Apps Script Headless API
 // FITUR: Anti-CORS Preflight, Auto Auth Token, Client-Side In-Memory Cache
-// ENGINE: ZettBOT Core v1.0.0 (by Zettbos)
+// ENGINE: TRANSKEP Core v1.0.0 
 // ==========================================
 
 const TranskepAPI = (function () {
@@ -21,7 +21,7 @@ const TranskepAPI = (function () {
     timeout: 30000 // 30 detik
   };
 
-  // In-Memory Cache untuk perpindahan menu instan (ZettBOT In-Memory Caching Rule)
+  // In-Memory Cache untuk perpindahan menu instan (TRANSKEP In-Memory Caching Rule)
   const memoryCache = new Map();
 
   /**
@@ -225,7 +225,7 @@ if (typeof window !== 'undefined') {
   window.TranskepAPI = TranskepAPI;
 
   // ==========================================================
-  // ZETTBOT: GOOGLE.SCRIPT.RUN COMPATIBILITY SHIM (PROXY)
+  // TRANSKEP: GOOGLE.SCRIPT.RUN COMPATIBILITY SHIM (PROXY)
   // Menjembatani seluruh pemanggilan RPC di kode asli TRANSKEP
   // agar otomatis dialihkan ke Headless API tanpa ubah kode!
   // ==========================================================
@@ -247,7 +247,7 @@ if (typeof window !== 'undefined') {
           setTimeout(async () => {
             try {
               let result = await window.TranskepAPI.call(propKey, ...args);
-              // ZETTBOT: Jika server membungkus hasil RPC non-status (misal array) ke dalam { status: 'success', data: [...] },
+              // TRANSKEP: Jika server membungkus hasil RPC non-status (misal array) ke dalam { status: 'success', data: [...] },
               // unwrap kembali agar identik 100% dengan kembalian google.script.run asli
               if (result && typeof result === 'object' && result.status === 'success' && ('data' in result)) {
                 if (Array.isArray(result.data)) {

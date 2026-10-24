@@ -1,6 +1,6 @@
 // ==========================================
 // FILE: jobdes.js (TRANSKEP Modular)
-// ENGINE: ZettBOT Core v1.0.0
+// ENGINE: TRANSKEP Core v1.0.0
 // ==========================================
 
 // --- Source: jobdes/js_jobdes.html ---
@@ -175,7 +175,7 @@ function escapeHtml(str) {
            this.searchQuery = '';
            this.showDropdown = false;
         },
-        // ZETTBOT FIX: Tambahan metode untuk hapus pencarian atasan secara instan
+        // FIX: Tambahan metode untuk hapus pencarian atasan secara instan
         clearAtasanSearch() {
            this.searchAtasanQuery = '';
            this.formEdit.atasan = ''; 
@@ -194,7 +194,7 @@ function escapeHtml(str) {
         saveDasarSk() {
            window.jobdesConfigSk = { ...this.configSk };
            this.modals.dasarSk = false;
-           if(window.zettbosAlert) window.zettbosAlert("Kop Dasar SK diperbarui.", "success");
+           (typeof showNotify === "function" ? showNotify("success" === "error" ? "Peringatan" : "Sukses", "Kop Dasar SK diperbarui.", "success") : alert("Kop Dasar SK diperbarui."));
         },
         openModalEdit() {
            if(!this.selectedNip) return;
@@ -217,7 +217,7 @@ function escapeHtml(str) {
         },
         async submitEditJobdes() {
            if(!this.formEdit.atasan) {
-               if(window.zettbosAlert) window.zettbosAlert("Pilih Verifikator Atasan dari dropdown yang tersedia.", "error");
+               (typeof showNotify === "function" ? showNotify("error" === "error" ? "Peringatan" : "Sukses", "Pilih Verifikator Atasan dari dropdown yang tersedia.", "error") : alert("Pilih Verifikator Atasan dari dropdown yang tersedia."));
                return;
            }
            
@@ -239,7 +239,7 @@ function escapeHtml(str) {
                this.isLoadingForm = false;
                this.modals.editJobdes = false;
                if (res && res.status === 'success') {
-                   if(window.zettbosAlert) window.zettbosAlert(res.message, "success");
+                   (typeof showNotify === "function" ? showNotify("success" === "error" ? "Peringatan" : "Sukses", res.message, "success") : alert(res.message));
                    
                    let existingIdx = this.globalState.jobdesList.findIndex(j => j.nip === payload.nip);
                    if (existingIdx > -1) {
@@ -248,17 +248,17 @@ function escapeHtml(str) {
                        this.globalState.jobdesList.push(payload);
                    }
                } else {
-                   if(window.zettbosAlert) window.zettbosAlert("Gagal: " + (res ? res.message : "Gagal menyimpan data"), "error");
+                   (typeof showNotify === "function" ? showNotify("error" === "error" ? "Peringatan" : "Sukses", "Gagal: " + (res ? res.message : "Gagal menyimpan data"), "error") : alert("Gagal: " + (res ? res.message : "Gagal menyimpan data")));
                }
            } catch (err) {
                this.isLoadingForm = false;
                this.modals.editJobdes = false;
-               if(window.zettbosAlert) window.zettbosAlert("Error Jaringan", "error");
+               (typeof showNotify === "function" ? showNotify("error" === "error" ? "Peringatan" : "Sukses", "Error Jaringan", "error") : alert("Error Jaringan"));
            }
         },
         openModalUsulan() {
            if(!this.selectedNip) {
-              if(window.zettbosAlert) window.zettbosAlert("Pilih pegawai dulu.", "error"); 
+              (typeof showNotify === "function" ? showNotify("error" === "error" ? "Peringatan" : "Sukses", "Pilih pegawai dulu.", "error") : alert("Pilih pegawai dulu.")); 
               return; 
            }
            this.formUsulan = { namaPegawai: this.selectedUser.nama, isi: '' };
@@ -278,14 +278,14 @@ function escapeHtml(str) {
                this.isLoadingForm = false;
                this.modals.usulan = false;
                if(res && res.status === 'success') {
-                   if(window.zettbosAlert) window.zettbosAlert(res.message, "success");
+                   (typeof showNotify === "function" ? showNotify("success" === "error" ? "Peringatan" : "Sukses", res.message, "success") : alert(res.message));
                } else {
-                   if(window.zettbosAlert) window.zettbosAlert("Gagal kirim usulan.", "error");
+                   (typeof showNotify === "function" ? showNotify("error" === "error" ? "Peringatan" : "Sukses", "Gagal kirim usulan.", "error") : alert("Gagal kirim usulan."));
                }
            } catch (err) {
                this.isLoadingForm = false;
                this.modals.usulan = false;
-               if(window.zettbosAlert) window.zettbosAlert("Error koneksi.", "error");
+               (typeof showNotify === "function" ? showNotify("error" === "error" ? "Peringatan" : "Sukses", "Error koneksi.", "error") : alert("Error koneksi."));
            }
         },
         async fetchNotifikasiAdmin() {
@@ -303,7 +303,7 @@ function escapeHtml(str) {
            try {
                const res = await window.JobdesDataService.tandaiUsulanSelesai(id, this.globalState.user.nip, token);
                if(res && res.status === 'success') {
-                   if(window.zettbosAlert) window.zettbosAlert("Usulan ditandai selesai.", "success");
+                   (typeof showNotify === "function" ? showNotify("success" === "error" ? "Peringatan" : "Sukses", "Usulan ditandai selesai.", "success") : alert("Usulan ditandai selesai."));
                    this.fetchNotifikasiAdmin();
                }
            } catch (err) {
@@ -312,7 +312,7 @@ function escapeHtml(str) {
         },
         async sendJobdesWa() {
            if(!this.selectedNip || !this.selectedUser) {
-               if(window.zettbosAlert) window.zettbosAlert("Silakan pilih pegawai terlebih dahulu.", "error"); 
+               (typeof showNotify === "function" ? showNotify("error" === "error" ? "Peringatan" : "Sukses", "Silakan pilih pegawai terlebih dahulu.", "error") : alert("Silakan pilih pegawai terlebih dahulu.")); 
                return; 
            }
            
@@ -353,11 +353,11 @@ function escapeHtml(str) {
                    if (noWaClean) waLink = "https://api.whatsapp.com/send?phone=" + noWaClean + "&text=" + encodeURIComponent(pesanWa);
                    window.open(waLink, "_blank");
                } else {
-                   if(window.zettbosAlert) window.zettbosAlert("Gagal: " + (res ? res.message : "Gagal membuat dokumen PDF"), "error");
+                   (typeof showNotify === "function" ? showNotify("error" === "error" ? "Peringatan" : "Sukses", "Gagal: " + (res ? res.message : "Gagal membuat dokumen PDF"), "error") : alert("Gagal: " + (res ? res.message : "Gagal membuat dokumen PDF")));
                }
            } catch (err) {
                this.isLoadingWa = false;
-               if(window.zettbosAlert) window.zettbosAlert("Error Koneksi Jaringan", "error");
+               (typeof showNotify === "function" ? showNotify("error" === "error" ? "Peringatan" : "Sukses", "Error Koneksi Jaringan", "error") : alert("Error Koneksi Jaringan"));
            }
         }
       }

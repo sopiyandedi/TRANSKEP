@@ -2,7 +2,7 @@
 // FILE: persetujuan_data.js (TRANSKEP Modular)
 // DESKRIPSI: Data Service Layer khusus Modul Kotak Persetujuan & Verifikasi Atasan
 // FITUR: Update Status Cuti/IK/IP/WFH, Process Bulk Approval
-// ENGINE: ZettBOT Core v1.0.0 (by Zettbos)
+// ENGINE: TRANSKEP Core v1.0.0 
 // ==========================================
 
 const PersetujuanDataService = {
