@@ -8,7 +8,9 @@ document.addEventListener("DOMContentLoaded", () => {
         data() {
             return {
                 globalState: window.vueState,
-                currentSopFilter: 'Rekap per Pegawai', // FIX: Tab Rekap menjadi default saat modul dibuka
+                currentSopFilter: 'Rekap per Pegawai',
+                firestoreSops: [],
+                isFirebaseConnected: false, // FIX: Tab Rekap menjadi default saat modul dibuka
                 sopSearchQuery: '',
                 expandedSopRows: [],
                 expandedSopRekapRows: [],
@@ -41,6 +43,21 @@ document.addEventListener("DOMContentLoaded", () => {
             };
         },
         computed: {
+            unifiedSopList() {
+                const sheetList = (this.globalState && this.globalState.sopList) ? this.globalState.sopList : [];
+                const fsList = this.firestoreSops || [];
+                const map = new Map();
+                sheetList.forEach(item => {
+                    if (item.id) map.set(String(item.id), item);
+                });
+                fsList.forEach(item => {
+                    if (item.id) {
+                        const existing = map.get(String(item.id)) || {};
+                        map.set(String(item.id), { ...existing, ...item, is_firebase: true });
+                    }
+                });
+                return Array.from(map.values());
+            },
             isAdminOrOperator() {
                 if(!this.globalState.user) return false;
                 const role = this.globalState.user.role.toLowerCase();
@@ -55,7 +72,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 return typeof GROUP_TAGS !== 'undefined' ? GROUP_TAGS : {};
             },
             filteredSopList() {
-                let filtered = this.globalState.sopList || [];
+                let filtered = this.unifiedSopList;
 
                 if (this.currentSopFilter !== 'Semua SOP' && this.currentSopFilter !== 'Rekap per Pegawai') {
                     filtered = filtered.filter(s => s.kategori_pj === this.currentSopFilter);
@@ -80,10 +97,11 @@ document.addEventListener("DOMContentLoaded", () => {
                 return filtered;
             },
             sopRekapData() {
-                if (!this.globalState.usersList || !this.globalState.sopList) return [];
+                if (!this.globalState.usersList) return [];
+                const allSops = this.unifiedSopList;
 
                 let userMapping = this.globalState.usersList.map(u => {
-                    let terlibatSops = this.globalState.sopList.filter(sop => {
+                    let terlibatSops = allSops.filter(sop => {
                         try {
                             const arr = JSON.parse(sop.pelaksana_json || '[]');
                             if (typeof cekKeterlibatanPegawai !== 'undefined') {
@@ -436,13 +454,30 @@ document.addEventListener("DOMContentLoaded", () => {
             },
 
             isSopAcknowledged(sopId, nip) {
-                if(!this.globalState.sopAckList) return false;
-                return this.globalState.sopAckList.some(a => String(a.sop_id) === String(sopId) && String(a.nip) === String(nip));
+                if (this.globalState.sopAckList && this.globalState.sopAckList.some(a => String(a.sop_id) === String(sopId) && String(a.nip) === String(nip))) {
+                    return true;
+                }
+                const fSop = (this.firestoreSops || []).find(s => String(s.id) === String(sopId));
+                if (fSop && Array.isArray(fSop.acknowledgments)) {
+                    return fSop.acknowledgments.some(a => String(a.nip) === String(nip));
+                }
+                const gSop = (this.globalState.sopList || []).find(s => String(s.id) === String(sopId));
+                if (gSop && Array.isArray(gSop.acknowledgments)) {
+                    return gSop.acknowledgments.some(a => String(a.nip) === String(nip));
+                }
+                return false;
             },
             getSopAckDate(sopId, nip) {
-                if(!this.globalState.sopAckList) return '';
-                const ackData = this.globalState.sopAckList.find(a => String(a.sop_id) === String(sopId) && String(a.nip) === String(nip));
-                return ackData && ackData.tanggal_baca ? ackData.tanggal_baca.split(' ')[0] : '-';
+                if (this.globalState.sopAckList) {
+                    const ackData = this.globalState.sopAckList.find(a => String(a.sop_id) === String(sopId) && String(a.nip) === String(nip));
+                    if (ackData && ackData.tanggal_baca) return ackData.tanggal_baca.split(' ')[0];
+                }
+                const fSop = (this.firestoreSops || []).find(s => String(s.id) === String(sopId));
+                if (fSop && Array.isArray(fSop.acknowledgments)) {
+                    const ack = fSop.acknowledgments.find(a => String(a.nip) === String(nip));
+                    if (ack && ack.tanggal_baca) return ack.tanggal_baca.split(' ')[0];
+                }
+                return '-';
             },
             doAcknowledgeSop(sopId, nip, isAuto = false) {
                 const token = localStorage.getItem('transkep_session_token');
@@ -564,7 +599,127 @@ document.addEventListener("DOMContentLoaded", () => {
                 const waLink = "https://api.whatsapp.com/send?phone=" + phone + "&text=" + encodeURIComponent(msg);
                 window.open(waLink, '_blank');
                 this.showModalWaRekapSop = false;
+            },
+
+            // ==========================================
+            // CLOUD FIRESTORE REALTIME SYNC & MIGRATION
+            // ==========================================
+            initFirebaseSopListener() {
+                if (typeof TranskepFirebase !== 'undefined' && TranskepFirebase.isReady()) {
+                    this.isFirebaseConnected = true;
+                    console.log("🔥 [TRANSKEP SOP] Menghubungkan listener realtime Firestore SOP...");
+                    TranskepFirebase.subscribeFirestoreSops((list) => {
+                        this.firestoreSops = list || [];
+                        console.log(`🔥 [TRANSKEP SOP] Realtime Sync: ${this.firestoreSops.length} dokumen SOP di Firestore.`);
+
+                        // Sinkronkan ke globalState.sopList
+                        if (this.globalState && Array.isArray(this.globalState.sopList)) {
+                            this.firestoreSops.forEach(fSop => {
+                                const idx = this.globalState.sopList.findIndex(s => String(s.id) === String(fSop.id));
+                                if (idx > -1) {
+                                    this.globalState.sopList[idx] = { ...this.globalState.sopList[idx], ...fSop, is_firebase: true };
+                                } else {
+                                    this.globalState.sopList.push({ ...fSop, is_firebase: true });
+                                }
+
+                                if (Array.isArray(fSop.acknowledgments) && Array.isArray(this.globalState.sopAckList)) {
+                                    fSop.acknowledgments.forEach(ack => {
+                                        const ackIdx = this.globalState.sopAckList.findIndex(a => String(a.sop_id) === String(fSop.id) && String(a.nip) === String(ack.nip));
+                                        if (ackIdx > -1) {
+                                            this.globalState.sopAckList[ackIdx] = { ...this.globalState.sopAckList[ackIdx], ...ack };
+                                        } else {
+                                            this.globalState.sopAckList.push({ id: `ACK-${fSop.id}-${ack.nip}`, sop_id: fSop.id, nip: ack.nip, tanggal_baca: ack.tanggal_baca });
+                                        }
+                                    });
+                                }
+                            });
+                        }
+                    });
+
+                    // Listener koleksi sop_acknowledgments
+                    TranskepFirebase.subscribeFirestoreSopAcks((ackList) => {
+                        if (this.globalState && Array.isArray(this.globalState.sopAckList)) {
+                            (ackList || []).forEach(fAck => {
+                                const ackIdx = this.globalState.sopAckList.findIndex(a => String(a.sop_id) === String(fAck.sop_id) && String(a.nip) === String(fAck.nip));
+                                if (ackIdx > -1) {
+                                    this.globalState.sopAckList[ackIdx] = { ...this.globalState.sopAckList[ackIdx], ...fAck };
+                                } else {
+                                    this.globalState.sopAckList.push(fAck);
+                                }
+                            });
+                            if (typeof updateSidebarBadges === 'function') updateSidebarBadges();
+                        }
+                    });
+                }
+            },
+
+            async migrateAllSopsToFirestore() {
+                if (!this.isAdminOrOperator) return;
+                const list = this.globalState.sopList || [];
+                if (!list || list.length === 0) {
+                    if (window.showNotify) window.showNotify("Data Kosong", "Belum ada data SOP di Spreadsheet untuk dimigrasikan.", "warning");
+                    return;
+                }
+
+                const acks = this.globalState.sopAckList || [];
+                const confirmFn = window.showCustomConfirm || ((title, msg, cb) => { if(confirm(title + "\n" + msg)) cb(); });
+                confirmFn(
+                    "Migrasi SOP ke Cloud Firestore",
+                    `Apakah Anda ingin memigrasikan seluruh ${list.length} dokumen SOP beserta riwayat tanda baca pegawai ke Cloud Firestore (transkep-314c0)?`,
+                    async () => {
+                        if (window.showLoading) window.showLoading(`Memigrasikan data SOP ke Firestore...`);
+                        try {
+                            if (typeof TranskepFirebase === 'undefined' || !TranskepFirebase.isReady()) {
+                                throw new Error("Koneksi Firebase Firestore belum siap. Pastikan konfigurasi aktif.");
+                            }
+                            let count = 0;
+                            for (const item of list) {
+                                if (!item.id) continue;
+                                const relatedAcks = acks.filter(a => String(a.sop_id) === String(item.id)).map(a => ({
+                                    nip: a.nip,
+                                    tanggal_baca: a.tanggal_baca
+                                }));
+
+                                let pelaksanaArr = [];
+                                try { pelaksanaArr = JSON.parse(item.pelaksana_json || '[]'); } catch(e) { pelaksanaArr = []; }
+
+                                await TranskepFirebase.saveSopToFirestore({
+                                    id: item.id,
+                                    judul_sop: item.judul_sop || '-',
+                                    nomor_sop: item.nomor_sop || '-',
+                                    kategori_pj: item.kategori_pj || 'PJ. Kesekretariatan',
+                                    tanggal_pembuatan: item.tanggal_pembuatan || '',
+                                    tanggal_revisi: item.tanggal_revisi || '-',
+                                    tanggal_efektif: item.tanggal_efektif || '',
+                                    link_drive: item.link_drive || '-',
+                                    pelaksana: pelaksanaArr,
+                                    pelaksana_json: item.pelaksana_json || '[]',
+                                    acknowledgments: relatedAcks
+                                });
+
+                                for (const ack of relatedAcks) {
+                                    await TranskepFirebase.acknowledgeSopInFirestore(item.id, ack.nip, ack.tanggal_baca);
+                                }
+
+                                count++;
+                                if (window.showLoading && count % 5 === 0) {
+                                    window.showLoading(`Memigrasikan ${count} / ${list.length} SOP ke Firestore...`);
+                                }
+                            }
+                            if (window.hideLoading) window.hideLoading();
+                            if (window.showNotify) {
+                                window.showNotify("Sukses Migrasi! 🔥", `${count} dokumen SOP resmi tersimpan di Cloud Firestore (koleksi sop_documents).`, "success");
+                            }
+                        } catch (err) {
+                            if (window.hideLoading) window.hideLoading();
+                            if (window.showNotify) window.showNotify("Gagal Migrasi", err.message || err.toString(), "error");
+                        }
+                    }
+                );
             }
+        },
+        mounted() {
+            this.initFirebaseSopListener();
         }
     }).mount('#vue-sop-app');
 });

@@ -130,7 +130,7 @@ function saveSopData(payload, userNip, clientToken) {
           tglPembuatan, tglRevisi, tglEfektif, payload.link_drive, pelaksanaStr
         ]]);
         SpreadsheetApp.flush();
-        return { status: 'success', message: 'Dokumen SOP berhasil diperbarui.' };
+        return { status: 'success', id: payload.id, link_drive: payload.link_drive, message: 'Dokumen SOP berhasil diperbarui.' };
       } else {
         throw new Error("SOP tidak ditemukan di database.");
       }
@@ -141,7 +141,7 @@ function saveSopData(payload, userNip, clientToken) {
         tglPembuatan, tglRevisi, tglEfektif, payload.link_drive, pelaksanaStr, now
       ]);
       SpreadsheetApp.flush();
-      return { status: 'success', message: 'Dokumen SOP baru berhasil ditambahkan.' };
+      return { status: 'success', id: newId, link_drive: payload.link_drive, message: 'Dokumen SOP baru berhasil ditambahkan.' };
     }
   } catch(e) {
     return { status: 'error', message: e.toString() };
