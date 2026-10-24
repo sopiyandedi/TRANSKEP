@@ -202,11 +202,14 @@
     showNotify("Sesi Berakhir", "Anda telah berhasil keluar dari sistem.", "success");
   }
 
+  let gSyncWatchdog = null;
+
   function syncAllServerData(silent) {
-    // Safe Fallback Watchdog Timer (6 detik) ala SIKEP
-    setTimeout(() => { if (typeof hideLoading === 'function') hideLoading(); }, 6000);
+    if (gSyncWatchdog) clearTimeout(gSyncWatchdog);
+    // Safe Fallback Watchdog Timer (15 detik) ala SIKEP: hanya menutup jika server macet total
+    gSyncWatchdog = setTimeout(() => { if (typeof hideLoading === 'function') hideLoading(); }, 15000);
     const isSilent = (silent === true);
-    if (!isSilent) showLoading("Menyinkronkan profil & data inti...");
+    if (!isSilent) showLoading("Menyelaraskan data sistem kepegawaian...");
     const loginNip = localStorage.getItem('transkep_active_nip');
     const sessionToken = localStorage.getItem('transkep_session_token'); 
 
@@ -218,9 +221,10 @@
     if (isGoogleEnv) {
       google.script.run
         .withSuccessHandler(function(response) {
-          if (!isSilent) hideLoading();
+          // JANGAN panggil hideLoading() di sini agar overlay menahan layar sampai syncBackgroundData selesai
           if (response && response.status === 'success') {
             window.vueState.user = response.data.user;
+            state.user = response.data.user;
             if (response.data.user) {
               if (response.data.user.role) {
                 localStorage.setItem('transkep_user_role', response.data.user.role);
@@ -233,6 +237,10 @@
               }
             }
             window.vueState.usersList = response.data.usersList;
+            state.usersList = response.data.usersList;
+            try {
+              localStorage.setItem('transkep_users_cache', JSON.stringify(state.usersList));
+            } catch(e) {}
             window.vueState.pendingPkpCount = response.data.pendingPkpCount || 0;
             window.vueState.isBgSyncDone = false; 
 
@@ -309,30 +317,59 @@
 
      google.script.run
         .withSuccessHandler(function(res) {
-            if (res && res.status === 'success') {
-                window.vueState.cutiLogs = res.data.cutiLogs || [];
-                window.vueState.stList = res.data.stList || [];
-                window.vueState.ikLogs = res.data.ikLogs || [];
-                window.vueState.ipLogs = res.data.ipLogs || [];
-                window.vueState.wfhLogs = res.data.wfhLogs || [];
-                window.vueState.jobdesList = res.data.jobdesList || [];
-                window.vueState.skList = res.data.skList || [];
-                window.vueState.skAckList = res.data.skAckList || [];
-                window.vueState.kinerjaList = res.data.kinerjaList || [];
-                window.vueState.sopList = res.data.sopList || [];
-                window.vueState.sopAckList = res.data.sopAckList || [];
-                window.vueState.masterKinerjaList = res.data.masterKinerjaList || [];
-                
-                window.vueState.isBgSyncDone = true;
+            if (gSyncWatchdog) { clearTimeout(gSyncWatchdog); gSyncWatchdog = null; }
+            if (res && res.status === 'success' && res.data) {
+                const d = res.data;
+                state.cutiLogs = d.cutiLogs || [];
+                state.stList = d.stList || [];
+                state.ikLogs = d.ikLogs || [];
+                state.ipLogs = d.ipLogs || [];
+                state.wfhLogs = d.wfhLogs || [];
+                state.jobdesList = d.jobdesList || [];
+                state.skList = d.skList || [];
+                state.skAckList = d.skAckList || [];
+                state.kinerjaList = d.kinerjaList || [];
+                state.sopList = d.sopList || [];
+                state.sopAckList = d.sopAckList || [];
+                state.masterKinerjaList = d.masterKinerjaList || [];
                 state.isBgSyncDone = true;
-                if (window.vmDashboard) {
-                    window.vmDashboard.isSyncing = false;
-                    window.vmDashboard.isBgSyncDone = true;
+                
+                if (window.vueState) {
+                    window.vueState.cutiLogs = state.cutiLogs;
+                    window.vueState.stList = state.stList;
+                    window.vueState.ikLogs = state.ikLogs;
+                    window.vueState.ipLogs = state.ipLogs;
+                    window.vueState.wfhLogs = state.wfhLogs;
+                    window.vueState.jobdesList = state.jobdesList;
+                    window.vueState.skList = state.skList;
+                    window.vueState.skAckList = state.skAckList;
+                    window.vueState.kinerjaList = state.kinerjaList;
+                    window.vueState.sopList = state.sopList;
+                    window.vueState.sopAckList = state.sopAckList;
+                    window.vueState.masterKinerjaList = state.masterKinerjaList;
+                    window.vueState.isBgSyncDone = true;
                 }
+
+                // Simpan snapshot offline-first ke local storage
                 try {
-                    window.dispatchEvent(new CustomEvent('transkep:sync-complete'));
+                    localStorage.setItem('transkep_dashboard_cache', JSON.stringify({
+                        cutiLogs: state.cutiLogs,
+                        stList: state.stList,
+                        ikLogs: state.ikLogs,
+                        ipLogs: state.ipLogs,
+                        wfhLogs: state.wfhLogs,
+                        timestamp: Date.now()
+                    }));
                 } catch(e) {}
-                hideLoading(); // Selesai background sync
+
+                // Sinkronisasi data ke instance vmDashboard sebelum loader ditutup
+                if (window.vmDashboard && typeof window.vmDashboard.syncFromGlobal === 'function') {
+                    window.vmDashboard.syncFromGlobal(state);
+                }
+
+                try {
+                    window.dispatchEvent(new CustomEvent('transkep:sync-complete', { detail: state }));
+                } catch(e) {}
 
                 updateSidebarBadges();
                 if (typeof updateBadgePermohonan === 'function') updateBadgePermohonan();
@@ -346,12 +383,21 @@
                 if (cm === 'sop' && typeof renderSopView === 'function') renderSopView();
                 if (cm === 'jobdes' && typeof renderJobdesView === 'function') renderJobdesView();
                 if (cm === 'kinerja' && typeof renderKinerjaView === 'function') renderKinerjaView();
+
+                hideLoading(); // Selesai background sync & render
            }
         })
         .withFailureHandler(function(err) {
-            console.warn("Background Sync Gagal: " + err.message);
+            if (gSyncWatchdog) { clearTimeout(gSyncWatchdog); gSyncWatchdog = null; }
+            console.warn("Background Sync Gagal: " + (err ? err.message : ""));
             state.isBgSyncDone = true;
             if (window.vueState) window.vueState.isBgSyncDone = true;
+            if (window.vmDashboard && typeof window.vmDashboard.syncFromGlobal === 'function') {
+                window.vmDashboard.syncFromGlobal(state);
+            }
+            try {
+                window.dispatchEvent(new CustomEvent('transkep:sync-complete', { detail: state }));
+            } catch(e) {}
             const cm = (window.vueState && window.vueState.currentMenu) || state.currentMenu || 'dashboard';
             if (cm === 'dashboard' && typeof renderDashboardView === 'function') renderDashboardView();
             hideLoading();
@@ -545,6 +591,7 @@
   function showLoading(msg) {
     const loader = document.getElementById('global-loader');
     if (loader) {
+      loader.classList.remove('loader-hidden');
       const subtitle = document.getElementById('loader-subtitle') || loader.querySelector('p') || loader.querySelector('span');
       if (subtitle && msg) subtitle.innerText = msg;
       loader.classList.remove('hidden', 'pointer-events-none');
@@ -558,7 +605,9 @@
 
   function hideLoading() {
     const loader = document.getElementById('global-loader');
+    document.documentElement.classList.add('app-loaded');
     if (loader) {
+      loader.classList.add('loader-hidden');
       loader.classList.remove('opacity-100');
       loader.classList.add('opacity-0', 'pointer-events-none');
       setTimeout(() => {

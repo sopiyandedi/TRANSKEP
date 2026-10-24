@@ -6,9 +6,36 @@
    <meta name="viewport" content="width=device-width, initial-scale=1.0">
    <title>TRANSKEP</title>
    <!-- : Pelindung Anti-FOUC & Anti-Bocor Modal Vue -->
+   <script>
+      // 0ms Instant Anti-FOUC Auth Guard di Head
+      (function () {
+         try {
+            var nip = localStorage.getItem('transkep_active_nip');
+            var token = localStorage.getItem('transkep_session_token');
+            if (nip && token) {
+               document.documentElement.classList.add('app-authenticated');
+            } else {
+               document.documentElement.classList.add('app-unauthenticated');
+            }
+         } catch (e) { }
+      })();
+   </script>
    <style>
       [v-cloak] {
          display: none !important;
+      }
+      /* ZETTBOT: Instant Fullscreen Processing Overlay (0ms Anti-Kedip / Zero Jeda on Refresh) */
+      html.app-authenticated #global-loader:not(.loader-hidden) {
+         display: flex !important;
+         opacity: 1 !important;
+         pointer-events: auto !important;
+      }
+      #global-loader.loader-hidden {
+         opacity: 0 !important;
+         pointer-events: none !important;
+      }
+      html.app-authenticated:not(.app-loaded) #dashboard-skeleton {
+         opacity: 0 !important;
       }
    </style>
 

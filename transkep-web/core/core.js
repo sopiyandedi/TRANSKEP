@@ -76,6 +76,33 @@ document.addEventListener("DOMContentLoaded", () => {
           }
         } catch(e) {}
       }
+
+      // ZETTBOT: Rehidrasi instan 0ms cache data absensi & peringatan
+      try {
+        const rawUsers = localStorage.getItem('transkep_users_cache');
+        if (rawUsers) {
+          state.usersList = JSON.parse(rawUsers);
+          if (window.vueState) window.vueState.usersList = state.usersList;
+        }
+        const rawDash = localStorage.getItem('transkep_dashboard_cache');
+        if (rawDash) {
+          const cached = JSON.parse(rawDash);
+          state.cutiLogs = cached.cutiLogs || [];
+          state.stList = cached.stList || [];
+          state.ipLogs = cached.ipLogs || [];
+          state.ikLogs = cached.ikLogs || [];
+          state.wfhLogs = cached.wfhLogs || [];
+          state.isBgSyncDone = true;
+          if (window.vueState) {
+            window.vueState.cutiLogs = state.cutiLogs;
+            window.vueState.stList = state.stList;
+            window.vueState.ipLogs = state.ipLogs;
+            window.vueState.ikLogs = state.ikLogs;
+            window.vueState.wfhLogs = state.wfhLogs;
+            window.vueState.isBgSyncDone = true;
+          }
+        }
+      } catch(e) {}
       toggleAppVisibility(true);
 
       if (state.user && typeof renderGlobalHeader === 'function') {
@@ -115,8 +142,9 @@ function toggleAppVisibility(isLoggedIn) {
   const mobBottom = document.getElementById('mobile-bottom-nav');
 
   if (loader && !isLoggedIn) {
-    loader.classList.add('hidden', 'opacity-0', 'pointer-events-none');
+    loader.classList.add('loader-hidden', 'hidden', 'opacity-0', 'pointer-events-none');
     loader.style.display = 'none';
+    rootEl.classList.remove('app-loaded');
   }
 
   if (!loginSec) {
@@ -238,11 +266,14 @@ function handleLogout() {
   showNotify("Sesi Berakhir", "Anda telah berhasil keluar dari sistem.", "success");
 }
 
+let gSyncWatchdog = null;
+
 function syncAllServerData(silent) {
-  // Safe Fallback Watchdog Timer (6 detik) ala SIKEP
-  setTimeout(() => { if (typeof hideLoading === 'function') hideLoading(); }, 6000);
+  if (gSyncWatchdog) clearTimeout(gSyncWatchdog);
+  // Safe Fallback Watchdog Timer (15 detik) ala SIKEP: hanya menutup jika server macet total
+  gSyncWatchdog = setTimeout(() => { if (typeof hideLoading === 'function') hideLoading(); }, 15000);
   const isSilent = (silent === true);
-  if (!isSilent) showLoading("Menyinkronkan profil & data inti...");
+  if (!isSilent) showLoading("Menyelaraskan data sistem kepegawaian...");
   const loginNip = localStorage.getItem('transkep_active_nip');
   const sessionToken = localStorage.getItem('transkep_session_token');
 
@@ -252,7 +283,7 @@ function syncAllServerData(silent) {
   }
 
   const handleSuccess = function (response) {
-    if (!isSilent) hideLoading();
+    // JANGAN panggil hideLoading() di sini agar overlay menahan layar sampai syncBackgroundData selesai
     if (response && response.status === 'success') {
       state.user = response.data.user;
       if (state.user) {
@@ -267,6 +298,9 @@ function syncAllServerData(silent) {
         }
       }
       state.usersList = response.data.usersList;
+      try {
+        localStorage.setItem('transkep_users_cache', JSON.stringify(state.usersList));
+      } catch(e) {}
       state.pendingPkpCount = response.data.pendingPkpCount || 0;
       state.isBgSyncDone = false;
 
@@ -344,6 +378,7 @@ function syncBackgroundData() {
   if (!loginNip || !sessionToken) return;
 
   const handleSuccess = function (res) {
+    if (gSyncWatchdog) { clearTimeout(gSyncWatchdog); gSyncWatchdog = null; }
     if (res && res.status === 'success' && res.data) {
       const d = res.data;
       state.cutiLogs = d.cutiLogs || [];
@@ -358,6 +393,7 @@ function syncBackgroundData() {
       state.sopList = d.sopList || [];
       state.sopAckList = d.sopAckList || [];
       state.masterKinerjaList = d.masterKinerjaList || [];
+      state.isBgSyncDone = true;
 
       if (window.vueState) {
         window.vueState.cutiLogs = state.cutiLogs;
@@ -374,15 +410,27 @@ function syncBackgroundData() {
         window.vueState.masterKinerjaList = state.masterKinerjaList;
         window.vueState.isBgSyncDone = true;
       }
-      state.isBgSyncDone = true;
-      if (window.vmDashboard) {
-        window.vmDashboard.isSyncing = false;
-        window.vmDashboard.isBgSyncDone = true;
-      }
+
+      // Simpan snapshot offline-first ke local storage
       try {
-        window.dispatchEvent(new CustomEvent('transkep:sync-complete'));
+        localStorage.setItem('transkep_dashboard_cache', JSON.stringify({
+          cutiLogs: state.cutiLogs,
+          stList: state.stList,
+          ikLogs: state.ikLogs,
+          ipLogs: state.ipLogs,
+          wfhLogs: state.wfhLogs,
+          timestamp: Date.now()
+        }));
       } catch(e) {}
-      hideLoading(); // Selesai background sync
+
+      // Sinkronisasi data ke instance vmDashboard sebelum loader ditutup
+      if (window.vmDashboard && typeof window.vmDashboard.syncFromGlobal === 'function') {
+        window.vmDashboard.syncFromGlobal(state);
+      }
+
+      try {
+        window.dispatchEvent(new CustomEvent('transkep:sync-complete', { detail: state }));
+      } catch(e) {}
 
       updateSidebarBadges();
       if (typeof updateBadgePermohonan === 'function') updateBadgePermohonan();
@@ -403,9 +451,16 @@ function syncBackgroundData() {
   };
 
   const handleFailure = function (err) {
+    if (gSyncWatchdog) { clearTimeout(gSyncWatchdog); gSyncWatchdog = null; }
     console.warn("Background Sync Gagal: " + (err ? err.message : ""));
     state.isBgSyncDone = true;
     if (window.vueState) window.vueState.isBgSyncDone = true;
+    if (window.vmDashboard && typeof window.vmDashboard.syncFromGlobal === 'function') {
+      window.vmDashboard.syncFromGlobal(state);
+    }
+    try {
+      window.dispatchEvent(new CustomEvent('transkep:sync-complete', { detail: state }));
+    } catch(e) {}
     const cm = (window.vueState && window.vueState.currentMenu) || state.currentMenu || 'dashboard';
     if (cm === 'dashboard' && typeof renderDashboardView === 'function') renderDashboardView();
     hideLoading();
@@ -619,6 +674,7 @@ function formatNamaBersih(namaLengkap) {
 function showLoading(msg) {
   const loader = document.getElementById('global-loader');
   if (loader) {
+    loader.classList.remove('loader-hidden');
     const subtitle = document.getElementById('loader-subtitle') || loader.querySelector('p') || loader.querySelector('span');
     if (subtitle && msg) subtitle.innerText = msg;
     loader.classList.remove('hidden', 'pointer-events-none');
@@ -632,7 +688,9 @@ function showLoading(msg) {
 
 function hideLoading() {
   const loader = document.getElementById('global-loader');
+  document.documentElement.classList.add('app-loaded');
   if (loader) {
+    loader.classList.add('loader-hidden');
     loader.classList.remove('opacity-100');
     loader.classList.add('opacity-0', 'pointer-events-none');
     setTimeout(() => {

@@ -87,20 +87,34 @@ window.dashboardApp = Vue.createApp({
         if (rawU) initialUser = JSON.parse(rawU);
       } catch (e) {}
     }
+    let cachedDash = null;
+    try {
+      const raw = localStorage.getItem('transkep_dashboard_cache');
+      if (raw) cachedDash = JSON.parse(raw);
+    } catch(e) {}
+
     return {
       currentUser: initialUser,
       usersList: (window.state && window.state.usersList) || [],
       searchKeyword: '',
       filterWarning: { name: '', jenis: '', bulan: '', tahun: '' },
-      isBgSyncDone: (window.state && window.state.isBgSyncDone) || false,
-      isSyncing: !((window.state && window.state.isBgSyncDone) || false),
-      cutiLogs: [], stList: [], ipLogs: [], ikLogs: [], wfhLogs: [],
+      isBgSyncDone: (window.state && window.state.isBgSyncDone) || (cachedDash ? true : false),
+      isSyncing: !((window.state && window.state.isBgSyncDone) || (cachedDash ? true : false)),
+      cutiLogs: (cachedDash && cachedDash.cutiLogs) || (window.state && window.state.cutiLogs) || [],
+      stList: (cachedDash && cachedDash.stList) || (window.state && window.state.stList) || [],
+      ipLogs: (cachedDash && cachedDash.ipLogs) || (window.state && window.state.ipLogs) || [],
+      ikLogs: (cachedDash && cachedDash.ikLogs) || (window.state && window.state.ikLogs) || [],
+      wfhLogs: (cachedDash && cachedDash.wfhLogs) || (window.state && window.state.wfhLogs) || [],
       showModalStatus: false,
       modalTmt: { nip: '', type: '', nama: '', dbStatus: '' }
     };
   },
   created() {
-    window.addEventListener('transkep:sync-complete', () => {
+    window.addEventListener('transkep:sync-complete', (e) => {
+      const gState = (e && e.detail) || window.vueState || (typeof state !== 'undefined' ? state : null);
+      if (gState && typeof this.syncFromGlobal === 'function') {
+        this.syncFromGlobal(gState);
+      }
       this.isSyncing = false;
       this.isBgSyncDone = true;
     });
