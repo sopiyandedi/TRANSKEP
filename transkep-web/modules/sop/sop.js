@@ -618,20 +618,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         }
                     });
 
-                    // Listener koleksi sop_acknowledgments
-                    TranskepFirebase.subscribeFirestoreSopAcks((ackList) => {
-                        if (this.globalState && Array.isArray(this.globalState.sopAckList)) {
-                            (ackList || []).forEach(fAck => {
-                                const ackIdx = this.globalState.sopAckList.findIndex(a => String(a.sop_id) === String(fAck.sop_id) && String(a.nip) === String(fAck.nip));
-                                if (ackIdx > -1) {
-                                    this.globalState.sopAckList[ackIdx] = { ...this.globalState.sopAckList[ackIdx], ...fAck };
-                                } else {
-                                    this.globalState.sopAckList.push(fAck);
-                                }
-                            });
-                            if (typeof updateSidebarBadges === 'function') updateSidebarBadges();
-                        }
-                    });
+
                 }
             },
 
@@ -678,10 +665,6 @@ document.addEventListener("DOMContentLoaded", () => {
                                     pelaksana_json: item.pelaksana_json || '[]',
                                     acknowledgments: relatedAcks
                                 });
-
-                                for (const ack of relatedAcks) {
-                                    await TranskepFirebase.acknowledgeSopInFirestore(item.id, ack.nip, ack.tanggal_baca);
-                                }
 
                                 count++;
                                 if (window.showLoading && count % 5 === 0) {

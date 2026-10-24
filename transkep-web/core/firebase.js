@@ -269,7 +269,6 @@ const TranskepFirebase = {
   // OPERASI DOKUMEN STANDAR OPERASIONAL PROSEDUR (SOP)
   // ==========================================
   SOP_COLLECTION: 'sop_documents',
-  SOP_ACK_COLLECTION: 'sop_acknowledgments',
 
   /**
    * Menyimpan / Memperbarui Dokumen SOP ke Firestore
@@ -321,18 +320,7 @@ const TranskepFirebase = {
     if (!db) throw new Error("Cloud Firestore belum siap terhubung.");
     const cleanId = String(docId).trim();
     await db.collection(this.SOP_COLLECTION).doc(cleanId).delete();
-
-    // Hapus juga riwayat acknowledgment terkait jika ada
-    try {
-      const acksSnapshot = await db.collection(this.SOP_ACK_COLLECTION).where('sop_id', '==', cleanId).get();
-      const batch = db.batch();
-      acksSnapshot.forEach(doc => batch.delete(doc.ref));
-      await batch.commit();
-    } catch(e) {
-      console.warn("⚠️ [TRANSKEP Firebase] Gagal bersihkan acknowledgment SOP:", e);
-    }
-
-    return { status: 'success', message: 'Dokumen SOP dan riwayat acknowledgment berhasil dihapus dari Cloud Firestore.' };
+    return { status: 'success', message: 'Dokumen SOP berhasil dihapus dari Cloud Firestore.' };
   },
 
   /**
@@ -371,6 +359,7 @@ const TranskepFirebase = {
 
   /**
    * Menyimpan Konfirmasi Baca (Acknowledgment) SOP ke Firestore
+   * Disimpan langsung di dalam array acknowledgments pada dokumen SOP (1 koleksi terpadu)
    */
   async acknowledgeSopInFirestore(sopId, nip, tanggalBaca) {
     const db = this.getDb();
@@ -385,48 +374,13 @@ const TranskepFirebase = {
     }
 
     const ackItem = { nip: cleanNip, tanggal_baca: tgl };
-    const ackDocId = `${cleanSopId}_${cleanNip}`;
 
-    // 1. Simpan di koleksi sop_acknowledgments
-    await db.collection(this.SOP_ACK_COLLECTION).doc(ackDocId).set({
-      id: ackDocId,
-      sop_id: cleanSopId,
-      nip: cleanNip,
-      tanggal_baca: tgl,
-      created_at: firebase.firestore.FieldValue.serverTimestamp()
-    }, { merge: true });
-
-    // 2. Simpan juga ke array acknowledgments di dalam dokumen SOP
-    try {
-      await db.collection(this.SOP_COLLECTION).doc(cleanSopId).update({
-        acknowledgments: firebase.firestore.FieldValue.arrayUnion(ackItem),
-        updated_at: firebase.firestore.FieldValue.serverTimestamp()
-      });
-    } catch(e) {
-      console.warn("⚠️ [TRANSKEP Firebase] Update arrayUnion di SOP document dilewati:", e.message);
-    }
+    await db.collection(this.SOP_COLLECTION).doc(cleanSopId).update({
+      acknowledgments: firebase.firestore.FieldValue.arrayUnion(ackItem),
+      updated_at: firebase.firestore.FieldValue.serverTimestamp()
+    });
 
     return { status: 'success', sop_id: cleanSopId, nip: cleanNip, tanggal_baca: tgl, message: 'Acknowledgment SOP berhasil dicatat di Cloud Firestore.' };
-  },
-
-  /**
-   * Memasang Realtime Listener untuk Acknowledgment SOP
-   */
-  subscribeFirestoreSopAcks(callback) {
-    const db = this.getDb();
-    if (!db) return null;
-    return db.collection(this.SOP_ACK_COLLECTION).onSnapshot(
-      (snapshot) => {
-        const list = [];
-        snapshot.forEach(doc => {
-          list.push(doc.data());
-        });
-        if (typeof callback === 'function') callback(list);
-      },
-      (error) => {
-        console.error("❌ [TRANSKEP Firebase] Error listener Firestore SOP Acks:", error);
-      }
-    );
   }
 };
 
