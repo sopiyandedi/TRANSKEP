@@ -206,14 +206,20 @@
 
   function syncAllServerData(silent) {
     if (gSyncWatchdog) clearTimeout(gSyncWatchdog);
-    // Safe Fallback Watchdog Timer (15 detik) ala SIKEP: hanya menutup jika server macet total
-    gSyncWatchdog = setTimeout(() => { if (typeof hideLoading === 'function') hideLoading(); }, 15000);
+    // Safe Fallback Watchdog Timer (8 detik): menjamin layar tidak pernah terjebak loading
+    gSyncWatchdog = setTimeout(() => {
+      console.warn("⚠️ Watchdog: Menutup paksa loader setelah 8 detik.");
+      if (typeof hideLoading === 'function') hideLoading();
+    }, 8000);
+
     const isSilent = (silent === true);
     if (!isSilent) showLoading("Menyelaraskan data sistem kepegawaian...");
     const loginNip = localStorage.getItem('transkep_active_nip');
     const sessionToken = localStorage.getItem('transkep_session_token'); 
 
     if (!loginNip || !sessionToken) {
+      if (gSyncWatchdog) { clearTimeout(gSyncWatchdog); gSyncWatchdog = null; }
+      if (typeof hideLoading === 'function') hideLoading();
       handleLogout();
       return;
     }
@@ -289,6 +295,8 @@
             }
 
           } else {
+            if (gSyncWatchdog) { clearTimeout(gSyncWatchdog); gSyncWatchdog = null; }
+            hideLoading();
             if (!isSilent) {
               showNotify("Gagal Sinkronisasi", response ? response.message : "Data bermasalah", "error");
               handleLogout();
@@ -300,8 +308,9 @@
           }
         })
         .withFailureHandler(function(error) {
+          if (gSyncWatchdog) { clearTimeout(gSyncWatchdog); gSyncWatchdog = null; }
+          hideLoading();
           if (!isSilent) {
-            hideLoading();
             showNotify("Terputus dari Server", error.message, "error");
             handleLogout();
           }
@@ -313,7 +322,11 @@
   function syncBackgroundData() {
      const loginNip = localStorage.getItem('transkep_active_nip');
      const sessionToken = localStorage.getItem('transkep_session_token');
-     if (!loginNip || !sessionToken) return;
+     if (!loginNip || !sessionToken) {
+       if (gSyncWatchdog) { clearTimeout(gSyncWatchdog); gSyncWatchdog = null; }
+       hideLoading();
+       return;
+     }
 
      google.script.run
         .withSuccessHandler(function(res) {
@@ -384,8 +397,8 @@
                 if (cm === 'jobdes' && typeof renderJobdesView === 'function') renderJobdesView();
                 if (cm === 'kinerja' && typeof renderKinerjaView === 'function') renderKinerjaView();
 
-                hideLoading(); // Selesai background sync & render
            }
+           hideLoading(); // Selesai background sync & render: jaminan selalu dipanggil!
         })
         .withFailureHandler(function(err) {
             if (gSyncWatchdog) { clearTimeout(gSyncWatchdog); gSyncWatchdog = null; }
@@ -612,8 +625,8 @@
       loader.classList.add('opacity-0', 'pointer-events-none');
       setTimeout(() => {
         loader.classList.add('hidden');
-        loader.style.display = 'none';
-      }, 400);
+        loader.style.setProperty('display', 'none', 'important');
+      }, 350);
     }
   }
 

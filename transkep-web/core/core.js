@@ -270,14 +270,20 @@ let gSyncWatchdog = null;
 
 function syncAllServerData(silent) {
   if (gSyncWatchdog) clearTimeout(gSyncWatchdog);
-  // Safe Fallback Watchdog Timer (15 detik) ala SIKEP: hanya menutup jika server macet total
-  gSyncWatchdog = setTimeout(() => { if (typeof hideLoading === 'function') hideLoading(); }, 15000);
+  // Safe Fallback Watchdog Timer (8 detik): menjamin layar tidak pernah terjebak loading
+  gSyncWatchdog = setTimeout(() => {
+    console.warn("⚠️ Watchdog: Menutup paksa loader setelah 8 detik.");
+    if (typeof hideLoading === 'function') hideLoading();
+  }, 8000);
+
   const isSilent = (silent === true);
   if (!isSilent) showLoading("Menyelaraskan data sistem kepegawaian...");
   const loginNip = localStorage.getItem('transkep_active_nip');
   const sessionToken = localStorage.getItem('transkep_session_token');
 
   if (!loginNip || !sessionToken) {
+    if (gSyncWatchdog) { clearTimeout(gSyncWatchdog); gSyncWatchdog = null; }
+    if (typeof hideLoading === 'function') hideLoading();
     handleLogout();
     return;
   }
@@ -341,6 +347,8 @@ function syncAllServerData(silent) {
       }
 
     } else {
+      if (gSyncWatchdog) { clearTimeout(gSyncWatchdog); gSyncWatchdog = null; }
+      hideLoading();
       if (!isSilent) {
         showNotify("Gagal Sinkronisasi", response ? response.message : "Data bermasalah", "error");
         handleLogout();
@@ -353,8 +361,9 @@ function syncAllServerData(silent) {
   };
 
   const handleFailure = function (error) {
+    if (gSyncWatchdog) { clearTimeout(gSyncWatchdog); gSyncWatchdog = null; }
+    hideLoading();
     if (!isSilent) {
-      hideLoading();
       showNotify("Terputus dari Server", (error && error.message) ? error.message : "Gagal sinkronisasi", "error");
       handleLogout();
     }
@@ -375,7 +384,11 @@ function syncAllServerData(silent) {
 function syncBackgroundData() {
   const loginNip = localStorage.getItem('transkep_active_nip');
   const sessionToken = localStorage.getItem('transkep_session_token');
-  if (!loginNip || !sessionToken) return;
+  if (!loginNip || !sessionToken) {
+    if (gSyncWatchdog) { clearTimeout(gSyncWatchdog); gSyncWatchdog = null; }
+    hideLoading();
+    return;
+  }
 
   const handleSuccess = function (res) {
     if (gSyncWatchdog) { clearTimeout(gSyncWatchdog); gSyncWatchdog = null; }
@@ -448,6 +461,8 @@ function syncBackgroundData() {
       if (cm === 'eoffice' && typeof renderEofficeView === 'function') renderEofficeView();
       if (cm === 'manajemen' && window.vmPegawai && typeof window.vmPegawai.fetchResetQueue === 'function') window.vmPegawai.fetchResetQueue();
     }
+    // ZETTBOT: Pastikan hideLoading() SELALU dipanggil saat background sync selesai!
+    hideLoading();
   };
 
   const handleFailure = function (err) {
@@ -695,8 +710,8 @@ function hideLoading() {
     loader.classList.add('opacity-0', 'pointer-events-none');
     setTimeout(() => {
       loader.classList.add('hidden');
-      loader.style.display = 'none';
-    }, 400);
+      loader.style.setProperty('display', 'none', 'important');
+    }, 350);
   }
 }
 

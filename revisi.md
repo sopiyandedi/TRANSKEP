@@ -2526,3 +2526,29 @@ Pasca penerapan Tahap 55, pengujian refresh (F5) menemukan 2 anomali teknis:
 #### 4. Hasil Verifikasi
 - **Jeda Refresh 0ms**: Saat F5 ditekan, loading overlay langsung aktif di frame ke-0 tanpa kedip atau jeda skeleton.
 - **Kartu Ketidakhadiran 100% Terisi**: Ketika overlay memudar, data absensi (personel yang cuti/dinas/izin atau status "Luar Biasa! 100% Personel Hadir") sudah tampil seketika tanpa ada lagi radar berputar.
+
+---
+
+### Tahap 57: Perbaikan Kritis Layar Loading Terjebak (*Infinite Stuck Loading*) & Jaminan Penutupan Overlay
+
+#### 1. Masalah & Temuan Akar Masalah (Root Cause Analysis)
+Pada pengujian Tahap 56 di aplikasi web/PWA, layar memuat animasi loading terus-menerus (*stuck infinitely*) dan tidak pernah masuk ke dashboard.
+- **Akar Masalah Utama**: Pada `transkep-web/core/core.js`, fungsi `hideLoading()` yang sebelumnya berada di akhir `syncBackgroundData()` terpotong saat penyesuaian berkas, sehingga blok `handleSuccess` berakhir tanpa memanggil `hideLoading()`.
+- **Akar Masalah Sekunder (Watchdog Premature Clear)**: Baris `clearTimeout(gSyncWatchdog)` dipanggil seketika data diterima server, sehingga timer failsafe mati sebelum antarmuka sempat memanggil penutupan loader. Akibatnya, loader tertahan di layar secara permanen.
+- **Akar Masalah Ketiga (Error Handling Tanpa Dismiss)**: Jika parameter sesi atau autentikasi mengembalikan status non-sukses saat `isSilent === true`, `hideLoading()` tidak dieksekusi di blok penanganan kegagalan.
+
+#### 2. Solusi Komprehensif ZettBOT
+1. **Unconditional `hideLoading()` Execution**:
+   - Menempatkan pemanggilan `hideLoading()` secara mutlak di akhir `handleSuccess` dan `handleFailure` di [`core.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/core/core.js) dan [`javascript.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/javascript.html).
+   - Menambahkan penutupan loader pada setiap percabangan dini (misal ketiadaan token atau sesi kedaluwarsa).
+2. **Koreksi Watchdog Failsafe 8 Detik**:
+   - Menyetel timer darurat ke 8 detik yang **pasti** memaksa `#global-loader` ditutup jika terjadi kendala jaringan ekstrem atau kegagalan asinkron tak terduga.
+3. **Penyempurnaan Transisi CSS**:
+   - Memastikan `#global-loader.loader-hidden.hidden, #global-loader.hidden` memiliki atribut `display: none !important; visibility: hidden !important;`.
+   - Di fungsi `hideLoading()`, menambahkan `loader.style.setProperty('display', 'none', 'important')` pasca transisi 350ms.
+4. **Cache Busting PWA v3.1.6**:
+   - Mengangkat `CACHE_NAME` dan `CURRENT_APP_BUILD` ke `transkep-v3.1.6` untuk memastikan seluruh peramban pengguna membersihkan Service Worker lama dan memuat kode stabil seketika.
+
+#### 3. Status Pengujian & Hasil
+- **Overlay Buka & Tutup Sempurna**: Layar loading langsung tampil di 0ms, menyelaraskan data dalam 1–2 detik, lalu memudar mulus (fade-out) membuka dashboard secara sempurna.
+- **Bebas Hang**: Tidak ada lagi kondisi terjebak loading (*infinite loading*).

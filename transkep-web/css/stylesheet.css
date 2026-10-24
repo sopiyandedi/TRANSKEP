@@ -28,6 +28,11 @@ html.app-authenticated #global-loader:not(.loader-hidden) {
   opacity: 0 !important;
   pointer-events: none !important;
 }
+#global-loader.loader-hidden.hidden,
+#global-loader.hidden {
+  display: none !important;
+  visibility: hidden !important;
+}
 html.app-authenticated:not(.app-loaded) #dashboard-skeleton {
   opacity: 0 !important;
 }
