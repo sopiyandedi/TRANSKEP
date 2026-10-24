@@ -1,5 +1,11 @@
- <script>
-  function escapeHtml(str) {
+<script>
+// ==========================================
+// FILE: jobdes.js (TRANSKEP Modular)
+// ENGINE: TRANSKEP Core v1.0.0
+// ==========================================
+
+// --- Source: jobdes/js_jobdes.html ---
+function escapeHtml(str) {
       if (!str) return '';
       return String(str)
           .replace(/&/g, '&amp;')
@@ -68,7 +74,9 @@
           notifUsulan: [],
           isFullscreen: false,
           isLoadingWa: false,
-          isLoadingForm: false
+          isLoadingForm: false,
+          firestoreJobdes: [],
+          isFirebaseConnected: false
         };
       },
       computed: {
@@ -111,7 +119,10 @@
           return (this.globalState.usersList || []).find(u => u.nip === this.selectedNip) || null;
         },
         selectedJobdes() {
-          const jd = (this.globalState.jobdesList || []).find(j => j.nip === this.selectedNip);
+          const fJd = (this.firestoreJobdes || []).find(j => String(j.nip) === String(this.selectedNip));
+          if (fJd) return fJd;
+
+          const jd = (this.globalState.jobdesList || []).find(j => String(j.nip) === String(this.selectedNip));
           return jd || { 
             ikhtisar_jabatan: 'Deskripsi ikhtisar tugas belum diatur.', 
             tugas_pokok: '- Belum diisi.', 
@@ -210,7 +221,7 @@
            
            this.modals.editJobdes = true;
         },
-        submitEditJobdes() {
+        async submitEditJobdes() {
            if(!this.formEdit.atasan) {
                (typeof showNotify === "function" ? showNotify("error" === "error" ? "Peringatan" : "Sukses", "Pilih Verifikator Atasan dari dropdown yang tersedia.", "error") : alert("Pilih Verifikator Atasan dari dropdown yang tersedia."));
                return;
@@ -229,30 +240,27 @@
            };
 
            const token = localStorage.getItem('transkep_session_token');
-           
-           google.script.run
-             .withSuccessHandler((res) => {
-                 this.isLoadingForm = false;
-                 this.modals.editJobdes = false;
-                 if (res.status === 'success') {
-                     (typeof showNotify === "function" ? showNotify("success" === "error" ? "Peringatan" : "Sukses", res.message, "success") : alert(res.message));
-                     
-                     let existingIdx = this.globalState.jobdesList.findIndex(j => j.nip === payload.nip);
-                     if (existingIdx > -1) {
-                         this.globalState.jobdesList[existingIdx] = payload;
-                     } else {
-                         this.globalState.jobdesList.push(payload);
-                     }
-                 } else {
-                     (typeof showNotify === "function" ? showNotify("error" === "error" ? "Peringatan" : "Sukses", "Gagal: " + res.message, "error") : alert("Gagal: " + res.message));
-                 }
-             })
-             .withFailureHandler((err) => {
-                 this.isLoadingForm = false;
-                 this.modals.editJobdes = false;
-                 (typeof showNotify === "function" ? showNotify("error" === "error" ? "Peringatan" : "Sukses", "Error Jaringan", "error") : alert("Error Jaringan"));
-             })
-             .saveJobdes(payload, this.globalState.user.nip, token);
+           try {
+               const res = await window.JobdesDataService.saveJobdes(payload, this.globalState.user.nip, token);
+               this.isLoadingForm = false;
+               this.modals.editJobdes = false;
+               if (res && res.status === 'success') {
+                   (typeof showNotify === "function" ? showNotify("success" === "error" ? "Peringatan" : "Sukses", res.message, "success") : alert(res.message));
+                   
+                   let existingIdx = this.globalState.jobdesList.findIndex(j => j.nip === payload.nip);
+                   if (existingIdx > -1) {
+                       this.globalState.jobdesList[existingIdx] = payload;
+                   } else {
+                       this.globalState.jobdesList.push(payload);
+                   }
+               } else {
+                   (typeof showNotify === "function" ? showNotify("error" === "error" ? "Peringatan" : "Sukses", "Gagal: " + (res ? res.message : "Gagal menyimpan data"), "error") : alert("Gagal: " + (res ? res.message : "Gagal menyimpan data")));
+               }
+           } catch (err) {
+               this.isLoadingForm = false;
+               this.modals.editJobdes = false;
+               (typeof showNotify === "function" ? showNotify("error" === "error" ? "Peringatan" : "Sukses", "Error Jaringan", "error") : alert("Error Jaringan"));
+           }
         },
         openModalUsulan() {
            if(!this.selectedNip) {
@@ -262,7 +270,7 @@
            this.formUsulan = { namaPegawai: this.selectedUser.nama, isi: '' };
            this.modals.usulan = true;
         },
-        submitUsulan() {
+        async submitUsulan() {
            this.isLoadingForm = true;
            const payload = {
               nip_pegawai: this.selectedNip,
@@ -271,42 +279,44 @@
               isi_usulan: this.formUsulan.isi
            };
            const token = localStorage.getItem('transkep_session_token');
-           google.script.run
-             .withSuccessHandler((res) => {
-                 this.isLoadingForm = false;
-                 this.modals.usulan = false;
-                 if(res.status === 'success') {
-                     (typeof showNotify === "function" ? showNotify("success" === "error" ? "Peringatan" : "Sukses", res.message, "success") : alert(res.message));
-                 } else {
-                     (typeof showNotify === "function" ? showNotify("error" === "error" ? "Peringatan" : "Sukses", "Gagal kirim usulan.", "error") : alert("Gagal kirim usulan."));
-                 }
-             })
-             .withFailureHandler((err) => {
-                 this.isLoadingForm = false;
-                 this.modals.usulan = false;
-                 (typeof showNotify === "function" ? showNotify("error" === "error" ? "Peringatan" : "Sukses", "Error koneksi.", "error") : alert("Error koneksi."));
-             })
-             .saveUsulanReposisi(payload, this.globalState.user.nip, token);
+           try {
+               const res = await window.JobdesDataService.saveUsulan(payload, this.globalState.user.nip, token);
+               this.isLoadingForm = false;
+               this.modals.usulan = false;
+               if(res && res.status === 'success') {
+                   (typeof showNotify === "function" ? showNotify("success" === "error" ? "Peringatan" : "Sukses", res.message, "success") : alert(res.message));
+               } else {
+                   (typeof showNotify === "function" ? showNotify("error" === "error" ? "Peringatan" : "Sukses", "Gagal kirim usulan.", "error") : alert("Gagal kirim usulan."));
+               }
+           } catch (err) {
+               this.isLoadingForm = false;
+               this.modals.usulan = false;
+               (typeof showNotify === "function" ? showNotify("error" === "error" ? "Peringatan" : "Sukses", "Error koneksi.", "error") : alert("Error koneksi."));
+           }
         },
-        fetchNotifikasiAdmin() {
+        async fetchNotifikasiAdmin() {
            const token = localStorage.getItem('transkep_session_token');
-           google.script.run
-             .withSuccessHandler((usulanArr) => { this.notifUsulan = usulanArr || []; })
-             .getUsulanMenunggu(this.globalState.user.nip, token);
+           try {
+               const usulanArr = await window.JobdesDataService.getUsulanMenunggu(this.globalState.user.nip, token);
+               this.notifUsulan = usulanArr || [];
+           } catch (err) {
+               console.error("Gagal memuat notifikasi usulan:", err);
+           }
         },
-        prosesSelesaiUsulan(id) {
+        async prosesSelesaiUsulan(id) {
            const token = localStorage.getItem('transkep_session_token');
            this.notifUsulan = this.notifUsulan.filter(u => u.id !== id);
-           google.script.run
-             .withSuccessHandler((res) => {
-                 if(res.status === 'success') {
-                     (typeof showNotify === "function" ? showNotify("success" === "error" ? "Peringatan" : "Sukses", "Usulan ditandai selesai.", "success") : alert("Usulan ditandai selesai."));
-                     this.fetchNotifikasiAdmin();
-                 }
-             })
-             .tandaiUsulanSelesai(id, this.globalState.user.nip, token);
+           try {
+               const res = await window.JobdesDataService.tandaiUsulanSelesai(id, this.globalState.user.nip, token);
+               if(res && res.status === 'success') {
+                   (typeof showNotify === "function" ? showNotify("success" === "error" ? "Peringatan" : "Sukses", "Usulan ditandai selesai.", "success") : alert("Usulan ditandai selesai."));
+                   this.fetchNotifikasiAdmin();
+               }
+           } catch (err) {
+               console.error("Gagal memproses selesai usulan:", err);
+           }
         },
-        sendJobdesWa() {
+        async sendJobdesWa() {
            if(!this.selectedNip || !this.selectedUser) {
                (typeof showNotify === "function" ? showNotify("error" === "error" ? "Peringatan" : "Sukses", "Silakan pilih pegawai terlebih dahulu.", "error") : alert("Silakan pilih pegawai terlebih dahulu.")); 
                return; 
@@ -340,30 +350,124 @@
            const fileName = "Uraian_Tugas_" + this.selectedUser.nama.replace(/[^a-zA-Z0-9]/g, "_");
            const token = localStorage.getItem('transkep_session_token');
 
-           google.script.run
-             .withSuccessHandler((res) => {
-                 this.isLoadingWa = false;
-                 if(res.status === 'success') {
-                     let pesanWa = `Yth. Bapak/Ibu *${this.selectedUser.nama}*,\n\nBerikut kami sampaikan dokumen *Uraian Tugas / Job Description* resmi Anda.\n\nUnduh dokumen PDF: ${res.url}\n\nTerima Kasih.\n_Sistem Kepegawaian TRANSKEP_`;
-                     let waLink = "https://api.whatsapp.com/send?text=" + encodeURIComponent(pesanWa);
-                     if (noWaClean) waLink = "https://api.whatsapp.com/send?phone=" + noWaClean + "&text=" + encodeURIComponent(pesanWa);
-                     window.open(waLink, "_blank");
-                 } else {
-                     (typeof showNotify === "function" ? showNotify("error" === "error" ? "Peringatan" : "Sukses", "Gagal: " + res.message, "error") : alert("Gagal: " + res.message));
-                 }
-             })
-             .withFailureHandler((err) => {
-                 this.isLoadingWa = false;
-                 (typeof showNotify === "function" ? showNotify("error" === "error" ? "Peringatan" : "Sukses", "Error Koneksi Jaringan", "error") : alert("Error Koneksi Jaringan"));
-             })
-             .createPdfJobdes(printHTML, fileName, this.globalState.user.nip, token);
+           try {
+               const res = await window.JobdesDataService.createPdfJobdes(printHTML, fileName, this.globalState.user.nip, token);
+               this.isLoadingWa = false;
+               if(res && res.status === 'success') {
+                   let pesanWa = `Yth. Bapak/Ibu *${this.selectedUser.nama}*,\n\nBerikut kami sampaikan dokumen *Uraian Tugas / Job Description* resmi Anda.\n\nUnduh dokumen PDF: ${res.url}\n\nTerima Kasih.\n_Sistem Kepegawaian TRANSKEP_`;
+                   let waLink = "https://api.whatsapp.com/send?text=" + encodeURIComponent(pesanWa);
+                   if (noWaClean) waLink = "https://api.whatsapp.com/send?phone=" + noWaClean + "&text=" + encodeURIComponent(pesanWa);
+                   window.open(waLink, "_blank");
+               } else {
+                   (typeof showNotify === "function" ? showNotify("error" === "error" ? "Peringatan" : "Sukses", "Gagal: " + (res ? res.message : "Gagal membuat dokumen PDF"), "error") : alert("Gagal: " + (res ? res.message : "Gagal membuat dokumen PDF")));
+               }
+           } catch (err) {
+               this.isLoadingWa = false;
+               (typeof showNotify === "function" ? showNotify("error" === "error" ? "Peringatan" : "Sukses", "Error Koneksi Jaringan", "error") : alert("Error Koneksi Jaringan"));
+           }
+        },
+
+        // ==========================================
+        // CLOUD FIRESTORE REALTIME SYNC & MIGRATION
+        // ==========================================
+        initFirebaseJobdesListener() {
+          if (typeof TranskepFirebase !== 'undefined' && TranskepFirebase.isReady()) {
+            this.isFirebaseConnected = true;
+            console.log("🔥 [TRANSKEP Jobdes] Menghubungkan listener realtime Firestore Jobdes...");
+            TranskepFirebase.subscribeFirestoreJobdes((list) => {
+              this.firestoreJobdes = list || [];
+              console.log(`🔥 [TRANSKEP Jobdes] Realtime Sync: ${this.firestoreJobdes.length} dokumen Jobdes di Firestore.`);
+              
+              // Sinkronkan ke globalState.jobdesList
+              if (window.vueState && Array.isArray(window.vueState.jobdesList)) {
+                this.firestoreJobdes.forEach(fJd => {
+                  const idx = window.vueState.jobdesList.findIndex(j => String(j.nip) === String(fJd.nip));
+                  if (idx > -1) {
+                    window.vueState.jobdesList[idx] = { ...window.vueState.jobdesList[idx], ...fJd, is_firebase: true };
+                  } else {
+                    window.vueState.jobdesList.push({ ...fJd, is_firebase: true });
+                  }
+                });
+              }
+            });
+
+            // Listener usulan reposisi realtime
+            TranskepFirebase.subscribeFirestoreUsulanJobdes((usulanList) => {
+              const pending = (usulanList || []).filter(u => u.status === 'Menunggu');
+              if (pending.length > 0) {
+                this.notifUsulan = pending;
+              }
+            });
+          }
+        },
+
+        async migrateAllJobdesToFirestore() {
+          if (!this.hasAdminAccess) return;
+          const list = this.globalState.jobdesList || [];
+          if (!list || list.length === 0) {
+            if (window.showNotify) window.showNotify("Data Kosong", "Belum ada data Jobdes di Spreadsheet untuk dimigrasikan.", "warning");
+            return;
+          }
+
+          const confirmFn = window.showCustomConfirm || ((title, msg, cb) => { if(confirm(title + "\n" + msg)) cb(); });
+          confirmFn(
+            "Migrasi Jobdes ke Cloud Firestore",
+            `Apakah Anda ingin memigrasikan seluruh ${list.length} data Uraian Tugas Pegawai ke Cloud Firestore (transkep-314c0)?`,
+            async () => {
+              if (window.showLoading) window.showLoading(`Memigrasikan data ke Firestore...`);
+              try {
+                if (typeof TranskepFirebase === 'undefined' || !TranskepFirebase.isReady()) {
+                  throw new Error("Koneksi Firebase Firestore belum siap. Pastikan konfigurasi aktif.");
+                }
+                let count = 0;
+                for (const item of list) {
+                  if (!item.nip) continue;
+                  await TranskepFirebase.saveJobdesToFirestore({
+                    nip: item.nip,
+                    atasan_nip: item.atasan_nip || '',
+                    dasar_lampiran: item.dasar_lampiran || '-',
+                    ikhtisar_jabatan: item.ikhtisar_jabatan || '',
+                    tugas_pokok: item.tugas_pokok || '',
+                    tugas_tambahan: item.tugas_tambahan || '',
+                    tanggung_jawab: item.tanggung_jawab || '',
+                    hasil_kerja: item.hasil_kerja || '',
+                    updated_by: (this.globalState.user ? this.globalState.user.nama : "Admin")
+                  });
+                  count++;
+                  if (window.showLoading && count % 5 === 0) {
+                    window.showLoading(`Memigrasikan ${count} / ${list.length} data ke Firestore...`);
+                  }
+                }
+                if (window.hideLoading) window.hideLoading();
+                if (window.showNotify) {
+                  window.showNotify("Sukses Migrasi! 🔥", `${count} dokumen Uraian Tugas resmi tersimpan di Cloud Firestore (koleksi jobdes_documents).`, "success");
+                }
+              } catch (err) {
+                if (window.hideLoading) window.hideLoading();
+                if (window.showNotify) window.showNotify("Gagal Migrasi", err.message || err.toString(), "error");
+              }
+            }
+          );
+        }
+      },
+      mounted() {
+        this.initFirebaseJobdesListener();
+        if (this.hasAdminAccess) {
+          const token = localStorage.getItem('transkep_session_token');
+          if (this.globalState.user && this.globalState.user.nip) {
+            window.JobdesDataService.getUsulanMenunggu(this.globalState.user.nip, token)
+              .then(res => { if(res && res.length) this.notifUsulan = res; })
+              .catch(() => {});
+          }
         }
       }
     }).mount('#vue-jobdes-app');
   });
 
   window.renderJobdesView = function() {
-      if(window.vmJobdes) window.vmJobdes.initView();
+      if(window.vmJobdes && typeof window.vmJobdes.initView === 'function') {
+          window.vmJobdes.initView();
+      }
   };
 
   document.addEventListener('click', function(e) {
@@ -382,4 +486,7 @@
           }
       }
   });
+
+// Logika Cetak Jobdes dipisahkan ke js/cetak/cetak_jobdes.js
+
 </script>

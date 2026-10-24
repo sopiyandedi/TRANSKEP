@@ -73,7 +73,9 @@ function escapeHtml(str) {
           notifUsulan: [],
           isFullscreen: false,
           isLoadingWa: false,
-          isLoadingForm: false
+          isLoadingForm: false,
+          firestoreJobdes: [],
+          isFirebaseConnected: false
         };
       },
       computed: {
@@ -116,7 +118,10 @@ function escapeHtml(str) {
           return (this.globalState.usersList || []).find(u => u.nip === this.selectedNip) || null;
         },
         selectedJobdes() {
-          const jd = (this.globalState.jobdesList || []).find(j => j.nip === this.selectedNip);
+          const fJd = (this.firestoreJobdes || []).find(j => String(j.nip) === String(this.selectedNip));
+          if (fJd) return fJd;
+
+          const jd = (this.globalState.jobdesList || []).find(j => String(j.nip) === String(this.selectedNip));
           return jd || { 
             ikhtisar_jabatan: 'Deskripsi ikhtisar tugas belum diatur.', 
             tugas_pokok: '- Belum diisi.', 
@@ -359,6 +364,100 @@ function escapeHtml(str) {
                this.isLoadingWa = false;
                (typeof showNotify === "function" ? showNotify("error" === "error" ? "Peringatan" : "Sukses", "Error Koneksi Jaringan", "error") : alert("Error Koneksi Jaringan"));
            }
+        },
+
+        // ==========================================
+        // CLOUD FIRESTORE REALTIME SYNC & MIGRATION
+        // ==========================================
+        initFirebaseJobdesListener() {
+          if (typeof TranskepFirebase !== 'undefined' && TranskepFirebase.isReady()) {
+            this.isFirebaseConnected = true;
+            console.log("🔥 [TRANSKEP Jobdes] Menghubungkan listener realtime Firestore Jobdes...");
+            TranskepFirebase.subscribeFirestoreJobdes((list) => {
+              this.firestoreJobdes = list || [];
+              console.log(`🔥 [TRANSKEP Jobdes] Realtime Sync: ${this.firestoreJobdes.length} dokumen Jobdes di Firestore.`);
+              
+              // Sinkronkan ke globalState.jobdesList
+              if (window.vueState && Array.isArray(window.vueState.jobdesList)) {
+                this.firestoreJobdes.forEach(fJd => {
+                  const idx = window.vueState.jobdesList.findIndex(j => String(j.nip) === String(fJd.nip));
+                  if (idx > -1) {
+                    window.vueState.jobdesList[idx] = { ...window.vueState.jobdesList[idx], ...fJd, is_firebase: true };
+                  } else {
+                    window.vueState.jobdesList.push({ ...fJd, is_firebase: true });
+                  }
+                });
+              }
+            });
+
+            // Listener usulan reposisi realtime
+            TranskepFirebase.subscribeFirestoreUsulanJobdes((usulanList) => {
+              const pending = (usulanList || []).filter(u => u.status === 'Menunggu');
+              if (pending.length > 0) {
+                this.notifUsulan = pending;
+              }
+            });
+          }
+        },
+
+        async migrateAllJobdesToFirestore() {
+          if (!this.hasAdminAccess) return;
+          const list = this.globalState.jobdesList || [];
+          if (!list || list.length === 0) {
+            if (window.showNotify) window.showNotify("Data Kosong", "Belum ada data Jobdes di Spreadsheet untuk dimigrasikan.", "warning");
+            return;
+          }
+
+          const confirmFn = window.showCustomConfirm || ((title, msg, cb) => { if(confirm(title + "\n" + msg)) cb(); });
+          confirmFn(
+            "Migrasi Jobdes ke Cloud Firestore",
+            `Apakah Anda ingin memigrasikan seluruh ${list.length} data Uraian Tugas Pegawai ke Cloud Firestore (transkep-314c0)?`,
+            async () => {
+              if (window.showLoading) window.showLoading(`Memigrasikan data ke Firestore...`);
+              try {
+                if (typeof TranskepFirebase === 'undefined' || !TranskepFirebase.isReady()) {
+                  throw new Error("Koneksi Firebase Firestore belum siap. Pastikan konfigurasi aktif.");
+                }
+                let count = 0;
+                for (const item of list) {
+                  if (!item.nip) continue;
+                  await TranskepFirebase.saveJobdesToFirestore({
+                    nip: item.nip,
+                    atasan_nip: item.atasan_nip || '',
+                    dasar_lampiran: item.dasar_lampiran || '-',
+                    ikhtisar_jabatan: item.ikhtisar_jabatan || '',
+                    tugas_pokok: item.tugas_pokok || '',
+                    tugas_tambahan: item.tugas_tambahan || '',
+                    tanggung_jawab: item.tanggung_jawab || '',
+                    hasil_kerja: item.hasil_kerja || '',
+                    updated_by: (this.globalState.user ? this.globalState.user.nama : "Admin")
+                  });
+                  count++;
+                  if (window.showLoading && count % 5 === 0) {
+                    window.showLoading(`Memigrasikan ${count} / ${list.length} data ke Firestore...`);
+                  }
+                }
+                if (window.hideLoading) window.hideLoading();
+                if (window.showNotify) {
+                  window.showNotify("Sukses Migrasi! 🔥", `${count} dokumen Uraian Tugas resmi tersimpan di Cloud Firestore (koleksi jobdes_documents).`, "success");
+                }
+              } catch (err) {
+                if (window.hideLoading) window.hideLoading();
+                if (window.showNotify) window.showNotify("Gagal Migrasi", err.message || err.toString(), "error");
+              }
+            }
+          );
+        }
+      },
+      mounted() {
+        this.initFirebaseJobdesListener();
+        if (this.hasAdminAccess) {
+          const token = localStorage.getItem('transkep_session_token');
+          if (this.globalState.user && this.globalState.user.nip) {
+            window.JobdesDataService.getUsulanMenunggu(this.globalState.user.nip, token)
+              .then(res => { if(res && res.length) this.notifUsulan = res; })
+              .catch(() => {});
+          }
         }
       }
     }).mount('#vue-jobdes-app');

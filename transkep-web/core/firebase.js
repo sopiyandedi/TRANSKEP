@@ -136,6 +136,133 @@ const TranskepFirebase = {
         console.error("❌ [TRANSKEP Firebase] Error listener Firestore SK:", error);
       }
     );
+  },
+
+  // ==========================================
+  // OPERASI DOKUMEN URAIAN TUGAS (JOBDES)
+  // ==========================================
+  JOBDES_COLLECTION: 'jobdes_documents',
+  JOBDES_USULAN_COLLECTION: 'jobdes_usulan',
+
+  /**
+   * Menyimpan / Memperbarui Dokumen Jobdes ke Firestore
+   */
+  async saveJobdesToFirestore(jobdesData) {
+    const db = this.getDb();
+    if (!db) throw new Error("Cloud Firestore belum siap terhubung.");
+    
+    const docId = String(jobdesData.nip || '').trim();
+    if (!docId) throw new Error("NIP pegawai diperlukan untuk menyimpan dokumen Jobdes.");
+
+    const payload = {
+      nip: docId,
+      atasan_nip: String(jobdesData.atasan_nip || '').trim(),
+      dasar_lampiran: jobdesData.dasar_lampiran || '-',
+      ikhtisar_jabatan: jobdesData.ikhtisar_jabatan || '',
+      tugas_pokok: jobdesData.tugas_pokok || '',
+      tugas_tambahan: jobdesData.tugas_tambahan || '',
+      tanggung_jawab: jobdesData.tanggung_jawab || '',
+      hasil_kerja: jobdesData.hasil_kerja || '',
+      is_firebase: true,
+      updated_at: firebase.firestore.FieldValue.serverTimestamp()
+    };
+
+    if (jobdesData.updated_by) {
+      payload.updated_by = jobdesData.updated_by;
+    }
+
+    await db.collection(this.JOBDES_COLLECTION).doc(docId).set(payload, { merge: true });
+    return { status: 'success', nip: docId, data: payload, message: 'Uraian tugas berhasil disimpan di Cloud Firestore.' };
+  },
+
+  /**
+   * Mengambil Seluruh Dokumen Jobdes dari Firestore
+   */
+  async getFirestoreJobdes() {
+    const db = this.getDb();
+    if (!db) return [];
+    const snapshot = await db.collection(this.JOBDES_COLLECTION).get();
+    const list = [];
+    snapshot.forEach(doc => {
+      list.push(doc.data());
+    });
+    return list;
+  },
+
+  /**
+   * Memasang Realtime Listener untuk Dokumen Jobdes
+   */
+  subscribeFirestoreJobdes(callback) {
+    const db = this.getDb();
+    if (!db) return null;
+    return db.collection(this.JOBDES_COLLECTION).onSnapshot(
+      (snapshot) => {
+        const list = [];
+        snapshot.forEach(doc => {
+          list.push(doc.data());
+        });
+        if (typeof callback === 'function') callback(list);
+      },
+      (error) => {
+        console.error("❌ [TRANSKEP Firebase] Error listener Firestore Jobdes:", error);
+      }
+    );
+  },
+
+  /**
+   * Menyimpan Usulan Reposisi ke Firestore
+   */
+  async saveUsulanJobdesToFirestore(usulanData) {
+    const db = this.getDb();
+    if (!db) throw new Error("Cloud Firestore belum siap terhubung.");
+    
+    const usulanId = String(usulanData.id || ('USUL-' + Date.now())).trim();
+    const payload = {
+      id: usulanId,
+      nip_pegawai: String(usulanData.nip_pegawai || '').trim(),
+      nama_pegawai: usulanData.nama_pegawai || '-',
+      nama_pengusul: usulanData.nama_pengusul || '-',
+      isi_usulan: usulanData.isi_usulan || '-',
+      status: usulanData.status || 'Menunggu',
+      is_firebase: true,
+      created_at: firebase.firestore.FieldValue.serverTimestamp()
+    };
+
+    await db.collection(this.JOBDES_USULAN_COLLECTION).doc(usulanId).set(payload, { merge: true });
+    return { status: 'success', id: usulanId, data: payload, message: 'Usulan reposisi berhasil dikirim ke Cloud Firestore.' };
+  },
+
+  /**
+   * Memasang Realtime Listener untuk Usulan Jobdes
+   */
+  subscribeFirestoreUsulanJobdes(callback) {
+    const db = this.getDb();
+    if (!db) return null;
+    return db.collection(this.JOBDES_USULAN_COLLECTION).onSnapshot(
+      (snapshot) => {
+        const list = [];
+        snapshot.forEach(doc => {
+          list.push(doc.data());
+        });
+        if (typeof callback === 'function') callback(list);
+      },
+      (error) => {
+        console.error("❌ [TRANSKEP Firebase] Error listener Firestore Usulan Jobdes:", error);
+      }
+    );
+  },
+
+  /**
+   * Menandai Usulan Selesai di Firestore
+   */
+  async tandaiUsulanSelesaiInFirestore(usulanId) {
+    const db = this.getDb();
+    if (!db) throw new Error("Cloud Firestore belum siap terhubung.");
+    await db.collection(this.JOBDES_USULAN_COLLECTION).doc(String(usulanId).trim()).update({
+      status: 'Selesai',
+      completed_at: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    return { status: 'success', message: 'Usulan ditandai selesai di Cloud Firestore.' };
   }
 };
 

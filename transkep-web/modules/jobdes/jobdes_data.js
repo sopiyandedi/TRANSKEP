@@ -8,12 +8,28 @@
 const JobdesDataService = {
   /**
    * Menyimpan pembaruan uraian tugas pegawai
-   * @param {Object} payload - Data ikhtisar, tugas pokok, tambahan, dll
-   * @param {string} userNip - NIP pengedit
-   * @param {string} token - Token sesi aktif
-   * @returns {Promise<Object>} Respon server { status, message }
+   * Prioritas: Simpan instan ke Cloud Firestore (koleksi jobdes_documents)
+   * Sinkronisasi background ke Google Spreadsheet
    */
-  saveJobdes(payload, userNip, token) {
+  async saveJobdes(payload, userNip, token) {
+    if (typeof TranskepFirebase !== 'undefined' && TranskepFirebase.isReady()) {
+      try {
+        const firestoreRes = await TranskepFirebase.saveJobdesToFirestore({
+          ...payload,
+          updated_by: userNip || (typeof state !== 'undefined' && state.user ? state.user.nama : 'Admin')
+        });
+
+        // Mirror ke Google Spreadsheet jika tersedia (tanpa memblokir UI)
+        if (typeof google !== 'undefined' && google.script && google.script.run) {
+          const authToken = token || (typeof localStorage !== 'undefined' ? localStorage.getItem('transkep_session_token') : '') || '';
+          google.script.run.saveJobdes(payload, userNip, authToken);
+        }
+        return firestoreRes;
+      } catch (err) {
+        console.warn("⚠️ [JobdesDataService] Gagal simpan ke Firestore, fallback ke Apps Script:", err);
+      }
+    }
+
     const authToken = token || (typeof localStorage !== 'undefined' ? localStorage.getItem('transkep_session_token') : '') || '';
     return new Promise((resolve, reject) => {
       if (typeof google === 'undefined' || !google.script || !google.script.run) {
@@ -28,12 +44,21 @@ const JobdesDataService = {
 
   /**
    * Menyimpan usulan reposisi / revisi uraian tugas dari pegawai
-   * @param {Object} payload - Data usulan
-   * @param {string} userNip - NIP pengusul
-   * @param {string} token - Token sesi aktif
-   * @returns {Promise<Object>} Respon server { status, message }
    */
-  saveUsulan(payload, userNip, token) {
+  async saveUsulan(payload, userNip, token) {
+    if (typeof TranskepFirebase !== 'undefined' && TranskepFirebase.isReady()) {
+      try {
+        const firestoreRes = await TranskepFirebase.saveUsulanJobdesToFirestore(payload);
+        if (typeof google !== 'undefined' && google.script && google.script.run) {
+          const authToken = token || (typeof localStorage !== 'undefined' ? localStorage.getItem('transkep_session_token') : '') || '';
+          google.script.run.saveUsulanReposisi(payload, userNip, authToken);
+        }
+        return firestoreRes;
+      } catch (err) {
+        console.warn("⚠️ [JobdesDataService] Gagal simpan usulan ke Firestore, fallback ke Apps Script:", err);
+      }
+    }
+
     const authToken = token || (typeof localStorage !== 'undefined' ? localStorage.getItem('transkep_session_token') : '') || '';
     return new Promise((resolve, reject) => {
       if (typeof google === 'undefined' || !google.script || !google.script.run) {
@@ -48,15 +73,12 @@ const JobdesDataService = {
 
   /**
    * Mengambil daftar usulan reposisi yang menunggu verifikasi admin
-   * @param {string} userNip - NIP admin
-   * @param {string} token - Token sesi aktif
-   * @returns {Promise<Array>} Daftar usulan
    */
   getUsulanMenunggu(userNip, token) {
     const authToken = token || (typeof localStorage !== 'undefined' ? localStorage.getItem('transkep_session_token') : '') || '';
     return new Promise((resolve, reject) => {
       if (typeof google === 'undefined' || !google.script || !google.script.run) {
-        return reject(new Error("Koneksi google.script.run tidak tersedia."));
+        return resolve([]);
       }
       google.script.run
         .withSuccessHandler((res) => resolve(res || []))
@@ -67,16 +89,20 @@ const JobdesDataService = {
 
   /**
    * Menandai usulan reposisi telah diproses / selesai
-   * @param {string|number} id - ID usulan
-   * @param {string} userNip - NIP admin
-   * @param {string} token - Token sesi aktif
-   * @returns {Promise<Object>} Respon server
    */
-  tandaiUsulanSelesai(id, userNip, token) {
+  async tandaiUsulanSelesai(id, userNip, token) {
+    if (typeof TranskepFirebase !== 'undefined' && TranskepFirebase.isReady()) {
+      try {
+        await TranskepFirebase.tandaiUsulanSelesaiInFirestore(id);
+      } catch (e) {
+        console.warn("⚠️ [JobdesDataService] Firestore usulan update error:", e);
+      }
+    }
+
     const authToken = token || (typeof localStorage !== 'undefined' ? localStorage.getItem('transkep_session_token') : '') || '';
     return new Promise((resolve, reject) => {
       if (typeof google === 'undefined' || !google.script || !google.script.run) {
-        return reject(new Error("Koneksi google.script.run tidak tersedia."));
+        return resolve({ status: 'success', message: 'Usulan ditandai selesai.' });
       }
       google.script.run
         .withSuccessHandler((res) => resolve(res))

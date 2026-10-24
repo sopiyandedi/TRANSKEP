@@ -1,3 +1,4 @@
+<!-- VIEW COMPONENT: jobdes/view_jobdes.html -->
 <div id="section-jobdes" class="menu-section space-y-6 hidden">
   <div id="vue-jobdes-app" v-cloak>
     
@@ -40,6 +41,10 @@
           <i class="fa-solid fa-file-contract"></i> Atur Dasar SK
         </button>
 
+        <button v-if="hasAdminAccess" @click="migrateAllJobdesToFirestore" class="flex w-full sm:w-auto px-4 py-2.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 font-bold rounded-xl border border-amber-500/30 transition items-center justify-center gap-2 text-xs shadow-lg whitespace-nowrap relative z-[90]" title="Migrasikan Seluruh Data Uraian Tugas ke Cloud Firestore (transkep-314c0)">
+          <i class="fa-solid fa-cloud-arrow-up text-amber-400"></i> Migrasi ke Firestore
+        </button>
+
         <button v-if="hasAdminAccess" @click="modals.notifAdmin = true" class="flex relative w-full sm:w-auto px-3 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl border border-slate-700 transition shadow-lg items-center justify-center z-[90]" title="Lihat Usulan Reposisi">
           <i class="fa-solid fa-bell animate-bounce text-amber-400 text-sm"></i>
           <span v-show="notifUsulan.length > 0" class="absolute -top-1.5 -right-1.5 bg-rose-500 text-white text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full shadow-md">{{ notifUsulan.length }}</span>
@@ -78,8 +83,13 @@
       </div>
 
       <div v-else id="jobdesDocContent" class="space-y-6 relative h-full flex flex-col animate-fade-in">
-        <div class="text-center border-b border-slate-800 pb-5 pt-2">
-          <h3 class="text-2xl font-bold uppercase tracking-widest text-slate-100 jd-title-text">Daftar Rincian Tugas Jabatan</h3>
+        <div class="text-center border-b border-slate-800 pb-5 pt-2 flex flex-col items-center">
+          <div class="flex items-center gap-2">
+            <h3 class="text-2xl font-bold uppercase tracking-widest text-slate-100 jd-title-text">Daftar Rincian Tugas Jabatan</h3>
+            <span v-if="selectedJobdes?.is_firebase" class="text-[10px] bg-emerald-500/20 text-emerald-300 px-2.5 py-0.5 rounded-full font-bold border border-emerald-500/30 flex items-center gap-1.5 shadow-sm" title="Tersinkronisasi Realtime dengan Cloud Firestore">
+              <i class="fa-solid fa-fire text-amber-400"></i> Firestore
+            </span>
+          </div>
           <p id="jdPrevNamaJabatan" class="text-indigo-400 text-base font-bold mt-2 uppercase tracking-wide">{{ selectedUser?.jabatan || '-' }}</p>
         </div>
 
