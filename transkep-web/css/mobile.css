@@ -10,7 +10,8 @@
     }
 
     /* 2. Top Bar dan Bottom Nav */
-    #mobile-top-bar {
+    html.app-authenticated #mobile-top-bar {
+        display: flex !important;
         position: fixed !important;
         top: 0 !important;
         left: 0 !important;
@@ -19,7 +20,12 @@
         z-index: 900 !important; /* Nilai di bawah overlay sidebar */
     }
 
-    #mobile-bottom-nav {
+    html.app-unauthenticated #mobile-top-bar {
+        display: none !important;
+    }
+
+    html.app-authenticated #mobile-bottom-nav {
+        display: flex !important;
         position: fixed !important;
         bottom: 0 !important;
         left: 0 !important;
@@ -28,6 +34,10 @@
         height: 68px !important;
         z-index: 99999 !important;
         transform: translateZ(0) !important;
+    }
+
+    html.app-unauthenticated #mobile-bottom-nav {
+        display: none !important;
     }
 
     /* 3. ANGKAT SIDEBAR & OVERLAY KE LAPISAN PALING ATAS */
@@ -116,5 +126,12 @@
 
 .overflow-x-auto {
     -webkit-overflow-scrolling: touch;
+}
+
+@media (min-width: 1024px) {
+    #mobile-top-bar,
+    #mobile-bottom-nav {
+        display: none !important;
+    }
 }
 

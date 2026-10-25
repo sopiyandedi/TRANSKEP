@@ -2663,4 +2663,84 @@ Pada pengujian Tahap 56 di aplikasi web/PWA, layar memuat animasi loading terus-
 - **Ramping & Ringkas**: 160 baris skeleton lama dipangkas menjadi ~50 baris Universal Adaptive Skeleton di `index.html`.
 - **PWA Cache v3.3.8**: Versi cache Service Worker dan APP_BUILD_VER telah dinaikkan ke `transkep-v3.3.8`.
 
+---
+
+### Tahap 60: Rekonstruksi & Aktivasi Top Bar Mobile (Sticky Header HP: Nama Pegawai, Tombol Reset Password & Logout) (DRAFTED ⏳)
+
+#### 1. Masalah & Temuan Akar Masalah (Root Cause Analysis)
+1. **Header Mobile Hilang Total:**
+   - Pada layar smartphone/mobile (lebar `< 1024px`), desktop header (`#global-profile-header`) secara sengaja disembunyikan oleh CSS `mobile.css` (`display: none !important;`) agar tidak memakan ruang layar.
+   - Sebagai gantinya, sistem TRANSKEP telah memiliki berkas komponen Top App Bar khusus HP (`#mobile-top-bar` di `transkep-web/core/view_mobile_nav.html` dan `front_view/view_mobile_nav.html`), yang didesain memuat:
+     - Avatar inisial dengan badge gradien.
+     - Nama pegawai & jabatan/peran.
+     - 3 tombol aksi cepat: Mode Terang/Gelap, Ganti/Reset Kata Sandi (`openChangePasswordModal()`), dan Keluar Sistem/Logout (`handleLogout()`).
+   - Namun, bar atas ini **sama sekali tidak tampil** di layar HP karena:
+     1. **`v-cloak` Terkunci Selamanya:** Tag `<div id="mobile-top-bar" ... v-cloak>` dipasangi atribut `v-cloak`. Di PWA `transkep-web`, tidak ada instance Vue yang di-mount ke `#mobile-top-bar` sehingga aturan CSS global `[v-cloak] { display: none !important; }` menyembunyikannya secara permanen.
+     2. **Ketiadaan Aturan CSS Aktif Mobile:** Di `mobile.css`, `#mobile-top-bar` tidak memiliki aturan eksplisit `display: flex !important;` ketika pengguna terotentikasi (`html.app-authenticated`). Karena tag HTML memiliki kelas bawaan `hidden`, Tailwind CSS merender `display: none`.
+     3. **Penempatan Kontainer `#slot-mobile-nav`:** Di `transkep-web/index.html`, `<div id="slot-mobile-nav"></div>` diletakkan di dalam `#view-container` (kontainer dengan scroll internal dan padding), bukan di tingkat container viewport (`#app-container`), sehingga posisinya rentan terpotong dan terpengaruh scrolling.
+     4. **Ketiadaan Rehidrasi Profil Mobile:** Di `core.js`, fungsi `renderGlobalHeader()` hanya me-render `#global-profile-header` desktop dan tidak pernah memanggil `updateMobileProfileUI()`, sehingga nama user tidak terisi ke Top Bar mobile.
+
+#### 2. Solusi Rekayasa Sistem (Standar ZettBOT Human-Crafted Aesthetic)
+1. **Relokasi Slot Mobile Nav (`transkep-web/index.html`):**
+   - Pindahkan `<div id="slot-mobile-nav"></div>` keluar dari `#view-container`, ditempatkan langsung di bawah `#app-container` (sejajar dengan `<main>`).
+   - Menjamin Top Bar menempel presisi di `top: 0` dan Bottom Nav menempel presisi di `bottom: 0` secara stabil tanpa terganggu scroll isi konten.
+2. **Penguatan CSS Responsif Mobile (`transkep-web/css/mobile.css` & `front_view/css_mobile.html`):**
+   - Pada layar mobile (`@media (max-width: 1023px)`):
+     - `html.app-authenticated #mobile-top-bar`: Diberikan aturan `display: flex !important; position: fixed !important; top: 0; left: 0; right: 0; height: 4rem; z-index: 900;` dengan efek kaca (*glassmorphism*) elegan.
+     - `html.app-authenticated #mobile-bottom-nav`: Diberikan aturan `display: flex !important; position: fixed !important; bottom: 0; z-index: 99999;`.
+     - `html.app-unauthenticated #mobile-top-bar, html.app-unauthenticated #mobile-bottom-nav`: `display: none !important;` (tetap tersembunyi saat di layar login).
+   - Pada layar desktop (`@media (min-width: 1024px)`):
+     - `#mobile-top-bar, #mobile-bottom-nav`: `display: none !important;` (hanya tampil di perangkat mobile/tablet).
+3. **Penyempurnaan Template & Tombol Top Bar (`transkep-web/core/view_mobile_nav.html`):**
+   - Sisi Kiri (Identitas Pengguna):
+     - Avatar inisial pegawai (`#mobile-avatar`) dengan border dan gradien elegan.
+     - Nama pegawai tebal rapi (`#mobile-user-name`) dan Jabatan singkat (`#mobile-user-role`).
+     - Klik pada area profil langsung mengarahkan ke dashboard (`switchMenu('dashboard')`).
+   - Sisi Kanan (Tombol Aksi Cepat Identik dengan Header Desktop):
+     - **Tombol Reset / Ganti Kata Sandi (`openChangePasswordModal()`):** Menggunakan ikon persis `fa-solid fa-key` dengan aksen ungu (`bg-purple-500/10 hover:bg-purple-500 border border-purple-500/20 text-purple-400 hover:text-white rounded-xl shadow-md shadow-purple-500/10`).
+     - **Tombol Keluar Sistem / Logout (`handleLogout()`):** Menggunakan ikon persis `fa-solid fa-power-off` dengan aksen rose/merah lembut (`bg-rose-500/10 hover:bg-rose-500 border border-rose-500/20 text-rose-400 hover:text-white rounded-xl shadow-md shadow-rose-500/10`).
+     - **Tombol Alih Tema Dinamis (Bulan / Matahari):**
+       - Saat kondisi **Mode Gelap (Dark)**: Menampilkan ikon **Matahari (`fa-solid fa-sun text-amber-400`)** agar intuitif diklik untuk beralih ke mode terang.
+       - Saat kondisi **Mode Terang (Light)**: Menampilkan ikon **Bulan (`fa-solid fa-moon text-indigo-400`)** agar intuitif diklik untuk beralih ke mode gelap.
+       - Diperbarui secara otomatis saat tombol ditekan atau tema dimuat dari `localStorage`.
+4. **Kontroler JavaScript & Rehidrasi Otomatis (`transkep-web/core/core.js` & `javascript.html`):**
+   - Bangun fungsi `window.updateMobileProfileUI()`:
+     - Mengambil nama & inisial pegawai secara instan dari `state.user` (atau fallback `localStorage`).
+     - Melakukan injeksi teks instan ke DOM (0ms Zero-Flicker) DAN mengintegrasikan instance Vue untuk reaktivitas mulus.
+     - Melepaskan atribut `v-cloak` dan kelas `hidden` dari `#mobile-top-bar`.
+   - Modifikasi fungsi `toggleThemeMode()` dan inisialisasi tema:
+     - Menambahkan fungsi helper `updateThemeIcon()` yang secara dinamis mengubah ikon `#mobile-theme-icon` menjadi `fa-sun` saat gelap dan `fa-moon` saat terang.
+   - Hubungkan `updateMobileProfileUI()` ke dalam alur `renderGlobalHeader()` dan `toggleAppVisibility(true)` agar selalu tersinkronisasi saat login maupun refresh.
+5. **Bump Cache PWA ke v3.3.9 (`sw.js` & `index.html`):**
+   - Naikkan cache Service Worker ke `transkep-v3.3.9` agar smartphone pengguna langsung mengambil tampilan baru tanpa tersangkut cache lama.
+
+#### 3. Target Berkas yang Dimodifikasi
+- [`transkep-web/index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/index.html)
+- [`transkep-web/css/mobile.css`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/css/mobile.css)
+- [`transkep-web/core/view_mobile_nav.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/core/view_mobile_nav.html)
+- [`transkep-web/core/core.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/core/core.js)
+- [`transkep-web/sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/sw.js)
+- [`javascript.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/javascript.html) & [`front_view/css_mobile.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/front_view/css_mobile.html) (Keselarasan versi Google Apps Script)
+
+#### 4. Rencana Eksekusi Bertahap (Execution Plan)
+- [x] **Langkah 1**: Relokasi `<div id="slot-mobile-nav"></div>` ke tingkat root `#app-container` di `transkep-web/index.html`.
+- [x] **Langkah 2**: Perbaiki CSS `#mobile-top-bar` di `transkep-web/css/mobile.css` (tambahkan `display: flex !important;` untuk `html.app-authenticated`).
+- [x] **Langkah 3**: Optimalkan template `#mobile-top-bar` di `transkep-web/core/view_mobile_nav.html` dengan tombol profil, reset password, dan logout.
+- [x] **Langkah 4**: Implementasikan fungsi `updateMobileProfileUI()` di `transkep-web/core/core.js` dan kaitkan dengan `renderGlobalHeader()`.
+- [x] **Langkah 5**: Sinkronisasikan berkas GAS (`javascript.html` & `front_view/css_mobile.html`).
+- [x] **Langkah 6**: Bump versi cache Service Worker ke `transkep-v3.3.9`.
+- [x] **Langkah 7**: Validasi sintaks JS (`node -c`) dan commit & push ke GitHub (`origin/main` & `prod/main`).
+
+#### 5. Hasil Verifikasi & Status Akhir: [SELESAI] ✅
+- **Sticky Top Bar HP Aktif**: `#mobile-top-bar` menempel kokoh di `top: 0` pada perangkat mobile dengan tinggi 4rem (64px) dan glassmorphism Slate-900/90.
+- **Identitas User Terpampang**: Avatar inisial pegawai, nama lengkap/singkat, dan jabatan/role otomatis terisi sejak detik ke-0 (0ms) dari `state.user` / `localStorage`.
+- **Ikon Identik 100%**:
+  - Tombol Ganti / Reset Sandi: `<i class="fa-solid fa-key text-sm"></i>` dengan styling kotak ungu elegan (`bg-purple-500/10 text-purple-400 border-purple-500/20`), identik dengan tombol desktop header.
+  - Tombol Keluar Sistem / Logout: `<i class="fa-solid fa-power-off text-sm"></i>` dengan styling kotak rose/merah lembut (`bg-rose-500/10 text-rose-400 border-rose-500/20`), identik dengan tombol desktop header.
+- **Logika Tema Dinamis (Bulan / Matahari)**:
+  - Saat mode Gelap: Ikon Matahari emas (`fa-solid fa-sun text-amber-400`) aktif dan siap diklik untuk beralih ke terang.
+  - Saat mode Terang: Ikon Bulan indigo (`fa-solid fa-moon text-indigo-400`) aktif dan siap diklik untuk beralih ke gelap.
+- **PWA Cache v3.3.9**: Cache PWA dinaikkan ke `transkep-v3.3.9` agar smartphone pengguna langsung memperbarui tampilan tanpa tertahan cache lama.
+
+
 

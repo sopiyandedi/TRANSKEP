@@ -3,28 +3,37 @@
      Hanya muncul di layar Mobile/Tablet (di bawah breakpoint 'lg')
      ========================================================= -->
 
-<!-- 1. TOP APP BAR (Sticky Header HP - VUE MIGRATED) -->
-<div id="mobile-top-bar" class="hidden lg:hidden fixed top-0 left-0 right-0 h-16 z-[80] glass border-b border-slate-800/60 bg-slate-900/90 backdrop-blur-xl flex items-center justify-between px-4 shadow-sm transition-all duration-300" v-cloak>
+<!-- 1. TOP APP BAR (Sticky Header HP) -->
+<div id="mobile-top-bar" class="lg:hidden fixed top-0 left-0 right-0 h-16 z-[900] glass border-b border-slate-800/60 bg-slate-900/90 backdrop-blur-xl flex items-center justify-between px-3.5 shadow-sm transition-all duration-300" v-cloak>
     
-    <!-- Profil Singkat & Info (Diurus oleh Vue) -->
-    <div class="flex items-center gap-3 overflow-hidden cursor-pointer" onclick="switchMenu('dashboard')">
-        <div id="mobile-avatar" class="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-black shadow-md border border-indigo-400/30 bg-gradient-to-br from-indigo-500 to-purple-600 shrink-0">
+    <!-- Profil Singkat & Info Pegawai -->
+    <div class="flex items-center gap-2.5 overflow-hidden cursor-pointer shrink" onclick="switchMenu('dashboard')">
+        <div id="mobile-avatar" class="w-9 h-9 rounded-xl flex items-center justify-center text-white text-xs font-black shadow-md border border-indigo-400/30 bg-gradient-to-br from-indigo-500 to-purple-600 shrink-0">
             {{ userInitials }}
         </div>
         <div class="flex flex-col min-w-0">
-            <h2 id="mobile-user-name" class="text-sm font-bold text-slate-200 truncate leading-tight">{{ cleanName }}</h2>
-            <div class="flex items-center gap-1.5">
-                <p id="mobile-user-role" class="text-[9px] text-indigo-400 font-medium truncate uppercase tracking-wider">{{ currentUser ? currentUser.jabatan : 'Tunggu sebentar...' }}</p>
-                <span id="mobile-sync-badge" class="inline-flex items-center gap-1 text-[9px] text-emerald-400"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Live</span>
+            <h2 id="mobile-user-name" class="text-xs font-bold text-slate-200 truncate leading-tight">{{ cleanName }}</h2>
+            <div class="flex items-center gap-1.5 mt-0.5">
+                <p id="mobile-user-role" class="text-[9px] text-indigo-400 font-medium truncate uppercase tracking-wider">{{ currentUser ? (currentUser.jabatan || 'Pegawai') : 'Memuat...' }}</p>
+                <span id="mobile-sync-badge" class="inline-flex items-center"></span>
             </div>
         </div>
     </div>
 
-    <!-- Tombol Aksi Kanan (PASTIKAN HANYA ADA 3 TOMBOL INI) -->
-    <div class="flex items-center gap-1.5 shrink-0">
-        <button onclick="toggleThemeMode()" class="w-9 h-9 rounded-xl text-slate-400 hover:text-amber-400 hover:bg-slate-800/80 flex items-center justify-center transition-colors" title="Mode Terang/Gelap"><i class="fa-solid fa-moon"></i></button>
-        <button onclick="openChangePasswordModal()" class="w-9 h-9 rounded-xl text-slate-400 hover:text-purple-400 hover:bg-purple-500/10 flex items-center justify-center transition-colors border border-transparent hover:border-purple-500/30" title="Ganti Kata Sandi"><i class="fa-solid fa-key"></i></button>
-        <button onclick="handleLogout()" class="w-9 h-9 rounded-xl text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 flex items-center justify-center transition-colors border border-transparent hover:border-rose-500/30" title="Keluar Sistem"><i class="fa-solid fa-power-off"></i></button>
+    <!-- Tombol Aksi Kanan (Tema Dinamis, Reset Password & Logout) -->
+    <div class="flex items-center gap-2 shrink-0">
+        <!-- Tombol Alih Tema: Ikon Matahari saat Gelap, Ikon Bulan saat Terang -->
+        <button id="btn-theme-mobile" onclick="toggleThemeMode()" class="w-9 h-9 shrink-0 flex items-center justify-center bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 text-amber-400 hover:text-amber-300 rounded-xl transition-all duration-300 shadow-sm shadow-amber-500/5 active:scale-95" title="Beralih Mode Terang / Gelap">
+            <i id="mobile-theme-icon" class="fa-solid fa-sun text-sm"></i>
+        </button>
+        <!-- Tombol Reset Kata Sandi (Identik dengan Header Desktop) -->
+        <button onclick="openChangePasswordModal()" class="w-9 h-9 shrink-0 flex items-center justify-center bg-purple-500/10 hover:bg-purple-500 border border-purple-500/20 hover:border-purple-500 text-purple-400 hover:text-white rounded-xl transition-all duration-300 shadow-md shadow-purple-500/10 active:scale-95" title="Ganti Kata Sandi">
+            <i class="fa-solid fa-key text-sm"></i>
+        </button>
+        <!-- Tombol Keluar Sistem / Logout (Identik dengan Header Desktop) -->
+        <button onclick="handleLogout()" class="w-9 h-9 shrink-0 flex items-center justify-center bg-rose-500/10 hover:bg-rose-500 border border-rose-500/20 hover:border-rose-500 text-rose-400 hover:text-white rounded-xl transition-all duration-300 shadow-md shadow-rose-500/10 active:scale-95" title="Keluar Sistem">
+            <i class="fa-solid fa-power-off text-sm"></i>
+        </button>
     </div>
 </div>
 

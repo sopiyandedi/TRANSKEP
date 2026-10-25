@@ -242,8 +242,16 @@ function toggleAppVisibility(isLoggedIn, animate) {
       appCont.classList.remove('hidden');
       appCont.style.display = '';
       appCont.classList.add('app-fade-in');
-      if (mobTop) { mobTop.classList.remove('hidden'); mobTop.classList.add('app-fade-in'); }
-      if (mobBottom) { mobBottom.classList.remove('hidden'); mobBottom.classList.add('app-fade-in'); }
+      if (mobTop) { 
+        mobTop.classList.remove('hidden'); 
+        mobTop.removeAttribute('v-cloak');
+        mobTop.classList.add('app-fade-in'); 
+      }
+      if (mobBottom) { 
+        mobBottom.classList.remove('hidden'); 
+        mobBottom.classList.add('app-fade-in'); 
+      }
+      if (typeof updateMobileProfileUI === 'function') updateMobileProfileUI();
 
       setTimeout(() => {
         loginSec.classList.add('hidden');
@@ -256,8 +264,12 @@ function toggleAppVisibility(isLoggedIn, animate) {
     } else {
       if (loginSec) { loginSec.classList.add('hidden'); loginSec.style.display = 'none'; }
       if (appCont) { appCont.classList.remove('hidden'); appCont.style.display = ''; }
-      if (mobTop) { mobTop.classList.remove('hidden'); }
+      if (mobTop) { 
+        mobTop.classList.remove('hidden'); 
+        mobTop.removeAttribute('v-cloak');
+      }
       if (mobBottom) { mobBottom.classList.remove('hidden'); }
+      if (typeof updateMobileProfileUI === 'function') updateMobileProfileUI();
     }
   } else {
     rootEl.classList.remove('app-authenticated');
@@ -1204,6 +1216,29 @@ function initNavigationAccess() {
   } catch (e) { }
 }
 
+function updateThemeIcon() {
+  const isLight = document.body.classList.contains('light-mode');
+  const themeIcons = document.querySelectorAll('#mobile-theme-icon, .theme-toggle-icon');
+  themeIcons.forEach(icon => {
+    if (isLight) {
+      icon.className = 'fa-solid fa-moon text-sm text-indigo-400';
+    } else {
+      icon.className = 'fa-solid fa-sun text-sm text-amber-400';
+    }
+  });
+
+  const btnTheme = document.getElementById('btn-theme-mobile');
+  if (btnTheme) {
+    if (isLight) {
+      btnTheme.className = 'w-9 h-9 shrink-0 flex items-center justify-center bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/20 text-indigo-400 hover:text-indigo-300 rounded-xl transition-all duration-300 shadow-sm shadow-indigo-500/5 active:scale-95';
+      btnTheme.title = 'Beralih ke Mode Gelap';
+    } else {
+      btnTheme.className = 'w-9 h-9 shrink-0 flex items-center justify-center bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 text-amber-400 hover:text-amber-300 rounded-xl transition-all duration-300 shadow-sm shadow-amber-500/5 active:scale-95';
+      btnTheme.title = 'Beralih ke Mode Terang';
+    }
+  }
+}
+
 function toggleThemeMode() {
   const body = document.body;
   body.classList.toggle('light-mode');
@@ -1215,6 +1250,7 @@ function toggleThemeMode() {
     localStorage.setItem('transkep_theme', 'dark');
     showNotify("Mode Gelap Aktif", "Tampilan Dark Glass yang elegan telah diterapkan!", "success");
   }
+  updateThemeIcon();
 }
 
 // Inisialisasi Vue untuk Modal Global (Sisa Cuti & Ubah Password)
@@ -1417,4 +1453,79 @@ function renderGlobalHeader() {
     }
     headerDiv.removeAttribute('v-cloak');
   }
+
+  // Sinkronisasi Bar Atas Mobile (Sticky Header HP)
+  if (typeof updateMobileProfileUI === 'function') {
+    updateMobileProfileUI();
+  }
 }
+
+// -------------------------------------------------------------
+// KONTROLER MOBILE TOP APP BAR & REHIDRASI PROFIL HP
+// -------------------------------------------------------------
+window.updateMobileProfileUI = function () {
+  let user = state.user;
+  if (!user) {
+    try {
+      const rawUser = localStorage.getItem('transkep_user_profile') || localStorage.getItem('transkep_user');
+      if (rawUser) user = JSON.parse(rawUser);
+    } catch (e) { }
+  }
+  if (!user) return;
+
+  const topBar = document.getElementById('mobile-top-bar');
+  if (!topBar) return;
+
+  // 1. Direct DOM injection (0ms Zero-Flicker)
+  let cleanName = (user.nama || 'Pegawai').split(',')[0].replace(/\b(Drs|Dr|H|Hj)\b\.?\s*/gi, '').trim();
+  let words = cleanName.split(' ');
+  let initials = (words[0] ? words[0].charAt(0).toUpperCase() : '') + (words[1] ? words[1].charAt(0).toUpperCase() : '');
+  if (!initials) initials = 'ID';
+
+  const avatarEl = document.getElementById('mobile-avatar');
+  const nameEl = document.getElementById('mobile-user-name');
+  const roleEl = document.getElementById('mobile-user-role');
+
+  if (avatarEl) avatarEl.textContent = initials;
+  if (nameEl) nameEl.textContent = cleanName;
+  if (roleEl) roleEl.textContent = user.jabatan || 'Pegawai';
+
+  topBar.removeAttribute('v-cloak');
+  topBar.classList.remove('hidden');
+
+  // 2. Vue instance binding (Reaktivitas Mulus)
+  if (!window.vmMobileNav && typeof Vue !== 'undefined') {
+    try {
+      const { createApp } = Vue;
+      window.vmMobileNav = createApp({
+        data() {
+          return { currentUser: user };
+        },
+        computed: {
+          cleanName() {
+            if (!this.currentUser || !this.currentUser.nama) return "Pegawai";
+            return this.currentUser.nama.split(',')[0].replace(/\b(Drs|Dr|H|Hj)\b\.?\s*/gi, '').trim();
+          },
+          userInitials() {
+            if (!this.currentUser || !this.currentUser.nama) return "ID";
+            let cName = this.cleanName;
+            let w = cName.split(' ');
+            let ini = (w[0] ? w[0].charAt(0).toUpperCase() : '') + (w[1] ? w[1].charAt(0).toUpperCase() : '');
+            return ini || "ID";
+          }
+        }
+      }).mount('#mobile-top-bar');
+      topBar.removeAttribute('v-cloak');
+    } catch (err) {
+      console.warn('[MobileNav] Vue mount notice:', err);
+    }
+  } else if (window.vmMobileNav) {
+    window.vmMobileNav.currentUser = user;
+    topBar.removeAttribute('v-cloak');
+  }
+
+  // 3. Update status ikon tema matahari/bulan
+  if (typeof updateThemeIcon === 'function') {
+    updateThemeIcon();
+  }
+};

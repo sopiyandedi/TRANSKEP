@@ -334,6 +334,19 @@ ZONA BAWAH: MASTER CONTEXT & STATUS MIGRASI TERKINI (LIVING CONTEXT)
       - Menghilang secara mulus saat view target selesai dimuat dan di-mount ke DOM.
     - Versi PWA Service Worker `sw.js` dan `CURRENT_APP_BUILD` dinaikkan ke **transkep-v3.3.8**.
 
+32. **Rekonstruksi & Aktivasi Top Bar Mobile (Tahap 60 - Selesai & Aktif ✅):**
+    - **Sticky Header HP 4rem (64px) Glassmorphism:**
+      - Mengaktifkan komponen `#mobile-top-bar` khusus layar ponsel (`< 1024px`) dengan relokasi slot nav langsung ke `#app-container` dan penegasan CSS `html.app-authenticated #mobile-top-bar { display: flex !important; }`.
+      - Menampilkan avatar inisial pegawai bergradien, nama pegawai tebal, dan jabatan yang terisi otomatis dalam 0ms via `updateMobileProfileUI()`.
+    - **Ikon Tombol Aksi Identik 100%:**
+      - **Reset / Ganti Kata Sandi:** Menggunakan ikon `fa-solid fa-key` dengan aksen ungu (`bg-purple-500/10 text-purple-400 border border-purple-500/20`), identik dengan tombol desktop header.
+      - **Keluar Sistem / Logout:** Menggunakan ikon `fa-solid fa-power-off` dengan aksen rose/merah lembut (`bg-rose-500/10 text-rose-400 border border-rose-500/20`), identik dengan tombol desktop header.
+    - **Tombol Tema Dinamis (Bulan / Matahari):**
+      - Saat layar dalam mode Gelap (Dark Mode): Menampilkan ikon Matahari emas `fa-solid fa-sun text-amber-400` (klik untuk ganti ke terang).
+      - Saat layar dalam mode Terang (Light Mode): Menampilkan ikon Bulan indigo `fa-solid fa-moon text-indigo-400` (klik untuk ganti ke gelap).
+      - Sinkron otomatis dengan `localStorage` (`transkep_theme`).
+    - Versi PWA Service Worker `sw.js` dan `APP_BUILD_VER` dinaikkan ke **transkep-v3.3.9**.
+
 
 
 

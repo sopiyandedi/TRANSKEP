@@ -1107,6 +1107,29 @@ let gSyncWatchdog = null;
     } catch (e) {}
   }
   
+  function updateThemeIcon() {
+      const isLight = document.body.classList.contains('light-mode');
+      const themeIcons = document.querySelectorAll('#mobile-theme-icon, .theme-toggle-icon');
+      themeIcons.forEach(icon => {
+          if (isLight) {
+              icon.className = 'fa-solid fa-moon text-sm text-indigo-400';
+          } else {
+              icon.className = 'fa-solid fa-sun text-sm text-amber-400';
+          }
+      });
+
+      const btnTheme = document.getElementById('btn-theme-mobile');
+      if (btnTheme) {
+          if (isLight) {
+              btnTheme.className = 'w-9 h-9 shrink-0 flex items-center justify-center bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/20 text-indigo-400 hover:text-indigo-300 rounded-xl transition-all duration-300 shadow-sm shadow-indigo-500/5 active:scale-95';
+              btnTheme.title = 'Beralih ke Mode Gelap';
+          } else {
+              btnTheme.className = 'w-9 h-9 shrink-0 flex items-center justify-center bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 text-amber-400 hover:text-amber-300 rounded-xl transition-all duration-300 shadow-sm shadow-amber-500/5 active:scale-95';
+              btnTheme.title = 'Beralih ke Mode Terang';
+          }
+      }
+  }
+
   function toggleThemeMode() {
       const body = document.body;
       body.classList.toggle('light-mode');
@@ -1118,6 +1141,7 @@ let gSyncWatchdog = null;
           localStorage.setItem('transkep_theme', 'dark');
           showNotify("Mode Gelap Aktif", "Tampilan Dark Glass yang elegan telah diterapkan!", "success");
       }
+      updateThemeIcon();
   }
 
   document.addEventListener("DOMContentLoaded", () => {

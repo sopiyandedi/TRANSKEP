@@ -58,11 +58,15 @@ function updateMobileProfileUI() {
                     }
                 }
             }).mount('#mobile-top-bar');
+            topBar.removeAttribute('v-cloak');
         }
     } else {
         // Jika sudah aktif, lempar datanya dan biarkan Vue otomatis mengubah layar!
         window.vmMobileNav.currentUser = state.user;
+        const topBar = document.getElementById('mobile-top-bar');
+        if (topBar) topBar.removeAttribute('v-cloak');
     }
+    if (typeof updateThemeIcon === 'function') updateThemeIcon();
 }
 
 // 3. Pantau event render sistem agar UI Mobile ikut diperbarui secara otomatis
