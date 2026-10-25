@@ -609,9 +609,9 @@ function ensureDashboardMounted() {
     dashElem.removeAttribute('v-cloak');
     dashElem.classList.remove('v-cloak');
   }
-  const skel = document.getElementById('dashboard-skeleton');
+  const skel = document.getElementById('app-skeleton') || document.getElementById('dashboard-skeleton');
   if (skel && window.vmDashboard) {
-    skel.style.display = 'none';
+    skel.style.setProperty('display', 'none', 'important');
   }
   return window.vmDashboard;
 }

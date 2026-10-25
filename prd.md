@@ -318,15 +318,22 @@ ZONA BAWAH: MASTER CONTEXT & STATUS MIGRASI TERKINI (LIVING CONTEXT)
       - Dilengkapi timer otomatis 6 detik di `syncAllServerData()` guna menjamin overlay otomatis tertutup jika koneksi server mengalami latensi ekstrem atau offline.
     - Versi PWA Service Worker `sw.js` dan `CURRENT_APP_BUILD` dinaikkan ke **transkep-v3.1.4**.
 
-30. **Inisialisasi 4 Pilar Modul PKP & PCK di Cloud Firestore (Tahap 58.A - Selesai & Aktif ✅):**
+30. **Inisialisasi 4 Pilar Modul PKP & PCK di Cloud Firestore (Tahap 58 - Selesai & Aktif ✅):**
     - **Fondasi Konektor Resmi (`TranskepFirebase`)**:
       - Memasang definisi koleksi resmi `master_kinerja`, `pkp_documents`, `pck_documents`, dan `pck_rekapitulasi` pada `transkep-web/core/firebase.js` dan `javascript_firebase.html`.
-      - Menyediakan method CRUD & Realtime Listener lengkap:
-        1. *Pilar 0 (Master Jabatan)*: `saveMasterKinerjaToFirestore`, `getFirestoreMasterKinerja`, `deleteMasterKinerjaFromFirestore` dengan dukungan `aliases` anti-mismatch.
-        2. *Pilar 1 (Kontrak PK Tahunan)*: `savePkpToFirestore`, `getFirestorePkps`, `subscribeFirestorePkps`, `deletePkpFromFirestore`.
-        3. *Pilar 2 (Capaian PCK Bulanan)*: `savePckToFirestore`, `getFirestorePcks`, `subscribeFirestorePcks`, `deletePckFromFirestore`.
-        4. *Pilar 3 (Rekapitulasi Terkunci)*: `saveRekapitulasiToFirestore`, `getFirestoreRekapitulasi`, `subscribeFirestoreRekapitulasi`.
-    - Menjamin arsitektur *Zero-Risk Hybrid Bridge* di mana fungsi baru bersifat *non-breaking* dan sheet lama tetap berjalan normal.
+      - Menyediakan method CRUD & Realtime Listener lengkap (Pilar 0 s.d. Pilar 3 dengan snapshot lock resmi).
+    - Menjamin arsitektur *Zero-Risk Hybrid Bridge* di mana fungsi baru bersifat *non-breaking* dan sheet lama tetap berjalan normal sebagai cold backup.
+
+31. **Eliminasi Badge Sync Header & Universal Adaptive Skeleton (Tahap 59 - Selesai & Aktif ✅):**
+    - **Silent Background Sync**:
+      - Mematikan badge kuning `[ 🔄 Menyinkronkan... ]` pada `updateSyncStatus('syncing')` di `core.js` dan `javascript.html`.
+      - Kartu identitas user di header tetap bersih, tenang, dan mewah tanpa gangguan indikator sinkronisasi.
+    - **Universal Adaptive App Shell Skeleton (`#app-skeleton`)**:
+      - Memangkas 160 baris hardcoded skeleton lama menjadi ~50 baris Universal Adaptive Skeleton di `transkep-web/index.html`.
+      - Skrip 0ms adaptif otomatis membaca `transkep_last_menu` saat refresh (F5), menginjeksikan judul & ikon resmi (Permohonan, PKP, Jobdes, SK, SOP, E-Office, Pegawai), serta menampilkan kerangka baris shimmer tabel tanpa delay layar kosong (0ms).
+      - Menghilang secara mulus saat view target selesai dimuat dan di-mount ke DOM.
+    - Versi PWA Service Worker `sw.js` dan `CURRENT_APP_BUILD` dinaikkan ke **transkep-v3.3.8**.
+
 
 
 

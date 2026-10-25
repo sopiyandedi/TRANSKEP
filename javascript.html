@@ -504,18 +504,20 @@ window.smartPatchTable = function(tbodyOrId, newItems, rowRendererFn, idKey = 'i
     let htmlMobile = '';
 
     if (status === 'syncing') {
-      htmlDesktop = '<span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-medium bg-amber-500/10 text-amber-300 border border-amber-500/30 shadow-sm shadow-amber-500/10 transition-all duration-300"><i class="fa-solid fa-rotate fa-spin text-[10px]"></i> Menyinkronkan...</span>';
-      htmlMobile = '<span class="inline-flex items-center gap-1 text-[9px] text-amber-300"><i class="fa-solid fa-rotate fa-spin text-[8px]"></i> Sync...</span>';
+      // SILENT BACKGROUND SYNC: Berjalan murni di latar belakang tanpa badge kuning
+      htmlDesktop = '';
+      htmlMobile = '';
     } else if (status === 'live') {
-      htmlDesktop = '<span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-sm shadow-emerald-500/5 transition-all duration-300"><span class="w-2 h-2 rounded-full bg-emerald-400"></span> ⚡ Live</span>';
-      htmlMobile = '<span class="inline-flex items-center gap-1 text-[9px] text-emerald-400"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Live</span>';
+      // Sinkronisasi selesai senyap & tenang
+      htmlDesktop = '';
+      htmlMobile = '';
     } else if (status === 'offline') {
       htmlDesktop = '<span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-medium bg-rose-500/10 text-rose-300 border border-rose-500/20 shadow-sm shadow-rose-500/5 transition-all duration-300"><i class="fa-solid fa-triangle-exclamation text-[10px]"></i> Offline (Cache)</span>';
       htmlMobile = '<span class="inline-flex items-center gap-1 text-[9px] text-rose-300"><i class="fa-solid fa-wifi text-[8px]"></i> Offline</span>';
     }
 
-    if (badgeDesktop && htmlDesktop) badgeDesktop.innerHTML = htmlDesktop;
-    if (badgeMobile && htmlMobile) badgeMobile.innerHTML = htmlMobile;
+    if (badgeDesktop) badgeDesktop.innerHTML = htmlDesktop;
+    if (badgeMobile) badgeMobile.innerHTML = htmlMobile;
   };
 
 let gSyncWatchdog = null;
@@ -792,9 +794,9 @@ let gSyncWatchdog = null;
            activeSection.classList.add('block');
         }
 
-        var skel = document.getElementById('dashboard-skeleton');
-        if (skel && menuId !== 'dashboard') {
-           skel.style.display = 'none';
+        var skel = document.getElementById('app-skeleton') || document.getElementById('dashboard-skeleton');
+        if (skel && activeSection) {
+           skel.style.setProperty('display', 'none', 'important');
         }
 
         const navButtons = document.querySelectorAll('button[id^="nav-"]');

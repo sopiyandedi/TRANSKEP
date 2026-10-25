@@ -2610,3 +2610,57 @@ Pada pengujian Tahap 56 di aplikasi web/PWA, layar memuat animasi loading terus-
 - **Integritas Rekapitulasi Terjamin**: Snapshot bulanan terkunci resmi (Opsi B) melindungi data capaian dari pergeseran pasca pengesahan Ketua Pengadilan.
 - **Keamanan Zero-Risk**: Seluruh aksi tulis tetap mencadangkan data ke Google Sheets di background sebagai arsip beku (cold backup).
 
+---
+
+### Tahap 59: Eliminasi Badge Sync Kuning Header & Universal Adaptive Skeleton untuk Semua Menu (DRAFTED ⏳)
+
+#### 1. Masalah & Temuan Akar Masalah (Root Cause Analysis)
+1. **Lencana Sinkronisasi Kuning Mengotori Header:**
+   - Pada kartu identitas user (di samping tombol Ganti Password dan Logout), fungsi `updateSyncStatus('syncing')` di `core.js` dan `javascript.html` secara dinamis merender badge kuning berputar `[ 🔄 Menyinkronkan... ]`.
+   - Pengguna menghendaki proses sinkronisasi berjalan murni di latar belakang (*silent background sync*) tanpa perlu indikator visual yang mencolok di header.
+2. **Layar Kosong (Blank) Saat Refresh di Luar Menu Dashboard:**
+   - Saat pengguna me-refresh halaman (F5) ketika sedang berada di menu selain Dashboard (misal: Permohonan Cuti, PKP, Jobdes, SK, SOP, E-Office, Kelola Pegawai), layar menjadi kosong (blank hitam) selama 1–3 detik.
+   - **Penyebab**:
+     - `index.html` hanya memuat `#dashboard-skeleton` yang di-hardcode khusus untuk Dashboard.
+     - Skrip pada baris 390-392 mengecek: jika `lastMenu !== 'dashboard'`, `#dashboard-skeleton` langsung disembunyikan (`display: none`).
+     - Sementara itu, kontainer menu lain (`#slot-permohonan`, `#slot-pkp`, dll.) masih berstatus elemen kosong dan harus menunggu antrean `fetch()` puluhan file modular HTML dan script JS selesai sebelum Vue di-mount.
+     - Akibatnya, ada jeda layar hampa tanpa kerangka apa pun bagi menu-menu non-dashboard.
+
+#### 2. Solusi Rekayasa Sistem (Standar ZettBOT)
+1. **Silent Background Sync (Pembersihan Badge Kuning):**
+   - Menonaktifkan injeksi HTML badge kuning pada `updateSyncStatus('syncing')` di `core.js` dan `javascript.html`.
+   - Proses sinkronisasi data server dan Firestore tetap berjalan 100% di latar belakang secara senyap.
+2. **Universal Adaptive Skeleton (1 Komponen Terpadu untuk Semua Menu):**
+   - Menghindari pendekatan membuat 10 file skeleton terpisah yang justru memicu latensi network fetch tambahan.
+   - Mengintegrasikan **1 Universal Adaptive App Shell Skeleton (`#app-skeleton`)** langsung di `index.html` (dan `transkep-web/index.html`):
+     - Di detik ke-0 (0ms), skrip inline mini mengevaluasi `localStorage.getItem('transkep_last_menu') || 'dashboard'`:
+       - **Mode A (Dashboard)**: Merender skeleton kartu absensi & peringatan dini seperti biasa.
+       - **Mode B (Universal Menu Non-Dashboard)**: Menginjeksikan ikon & judul resmi menu terkait (Permohonan, PKP, Jobdes, SK, SOP, E-Office, Manajemen Pegawai) serta merender kerangka header kaca + toolbar pencarian/filter + tabel shimmer (*pulsing rows*).
+     - Menghilang secara otomatis dan mulus segera setelah modul Vue target selesai di-mount (`activeSection` aktif).
+     - Tampilan di semua menu seketika menjadi 0ms responsif, mulus, dan seragam.
+
+#### 3. Target Berkas yang Akan Dimodifikasi
+1. [`transkep-web/core/core.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/core/core.js) & [`javascript.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/javascript.html):
+   - Modifikasi `updateSyncStatus`: Kosongkan badge saat status `'syncing'` agar berjalan senyap di background.
+2. [`transkep-web/index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/index.html) & [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html):
+   - Upgrade `#dashboard-skeleton` menjadi `#app-skeleton` (Universal Adaptive Skeleton).
+   - Tambahkan skrip adaptif 0ms untuk membaca `transkep_last_menu` dan merender kerangka spesifik menu yang sedang aktif.
+   - Bersihkan penanganan `skel.style.display` lama di `switchMenu()` agar terhubung ke `#app-skeleton`.
+3. [`transkep-web/sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/sw.js):
+   - Naikkan cache PWA ke `transkep-v3.3.8`.
+
+#### 4. Rencana Eksekusi Bertahap (Execution Plan)
+- [x] **Langkah 1**: Matikan badge kuning `Menyinkronkan...` pada `updateSyncStatus('syncing')` di `core.js` dan `javascript.html`.
+- [x] **Langkah 2**: Rancang Universal Adaptive Skeleton Layout (Mode Dashboard & Mode Menu Tabel/Modul) di `transkep-web/index.html`.
+- [x] **Langkah 3**: Buat skrip rehidrasi 0ms yang menyesuaikan judul, ikon, dan layout skeleton sesuai `transkep_last_menu`.
+- [x] **Langkah 4**: Sinkronisasikan penutupan skeleton pada event `switchMenu()` saat modul selesai di-mount.
+- [x] **Langkah 5**: Bump versi cache PWA ke `transkep-v3.3.8`.
+- [x] **Langkah 6**: Validasi sintaks, uji coba refresh pada menu non-dashboard (Permohonan, PKP, dll.), dan serahkan hasil ke pengguna.
+
+#### 5. Hasil Verifikasi & Status Akhir: [SELESAI] ✅
+- **Header Bersih Total**: Badge kuning `[ 🔄 Menyinkronkan... ]` telah dinonaktifkan dari header. Proses sinkronisasi berjalan senyap di background.
+- **Universal Adaptive Skeleton**: Saat F5 pada menu apa pun (Permohonan, PKP, Jobdes, SK, SOP, E-Office, Pegawai), kerangka judul, ikon, dan baris shimmer tabel langsung aktif di 0ms tanpa ada jeda layar blank.
+- **Ramping & Ringkas**: 160 baris skeleton lama dipangkas menjadi ~50 baris Universal Adaptive Skeleton di `index.html`.
+- **PWA Cache v3.3.8**: Versi cache Service Worker dan APP_BUILD_VER telah dinaikkan ke `transkep-v3.3.8`.
+
+
