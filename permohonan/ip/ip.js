@@ -27,7 +27,7 @@ function submitIzinPribadi(payload, clientToken) {
         payload.alasan, payload.atasan_nip, 'Menunggu', '', payload.pejabat_nip
     ]);
     
-    SpreadsheetApp.flush();
+    if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush();
     return { status: 'success', message: 'Izin Pribadi berhasil diajukan dan sedang menunggu persetujuan.', data: { id: newId } };
   } catch (err) { return { status: 'error', message: err.toString() }; }
 }
@@ -76,7 +76,7 @@ function updateIpStatus(id, decision, notes, userNip, bypassMode, clientToken) {
     sheet.getRange(rowIndex, 8).setValue(decision); 
     sheet.getRange(rowIndex, 9).setValue(finalNotes); 
     
-    SpreadsheetApp.flush();
+    if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush();
     return { status: 'success', message: 'Usulan Izin Pribadi berhasil diproses.' };
   } catch(e) { return { status: 'error', message: e.toString() }; }
 }
@@ -100,7 +100,7 @@ function deleteIzinPribadiLog(id, forceDelete, userNip, clientToken) {
     if (rowIndex === -1) throw new Error("Data tidak ditemukan di sistem.");
     
     sheet.deleteRow(rowIndex);
-    SpreadsheetApp.flush();
+    if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush();
     return { status: 'success', message: 'Pengajuan Izin Pribadi berhasil ditarik dan dihapus.' };
   } catch (err) { return { status: 'error', message: err.toString() }; }
 }
@@ -131,7 +131,7 @@ function updateIzinPribadiLog(payload, clientToken) {
     sheet.getRange(rowIndex, 9).setValue(''); 
     sheet.getRange(rowIndex, 10).setValue(payload.pejabat_nip); // Kolom J 
     
-    SpreadsheetApp.flush();
+    if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush();
     return { status: 'success', message: 'Izin Pribadi berhasil diperbarui.' };
   } catch (err) { return { status: 'error', message: err.toString() }; }
 }

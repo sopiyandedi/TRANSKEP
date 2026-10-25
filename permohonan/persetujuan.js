@@ -74,7 +74,7 @@ function updateCutiStatus(id, decision, notes, userNip, bypassMode, clientToken)
        if (isBypassPejabat) finalNotes += " *(via Bypass oleh " + namaPenyetuju + ")*";
        sheetCuti.getRange(rowIndex, 13).setValue(finalNotes);
        
-       SpreadsheetApp.flush();
+       if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush();
        return { status: 'success', message: `Usulan Pembatalan telah di-${decision.toLowerCase()}.` };
     }
 
@@ -141,7 +141,7 @@ function updateCutiStatus(id, decision, notes, userNip, bypassMode, clientToken)
            }
         }
     }
-    SpreadsheetApp.flush(); 
+    if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush(); 
     return { status: 'success', message: `Berkas berhasil ${decision.toLowerCase()}.` };
   } catch (err) { return { status: 'error', message: err.toString() }; }
 }
@@ -345,7 +345,7 @@ function processMagicLinkApproval(token, decision, notes) {
       if (catatanBersih) sheetCuti.getRange(rowIndex, 9).setValue(catatanBersih); // catatan atasan (col 9)
       
       if (decision === 'Disetujui') {
-        SpreadsheetApp.flush();
+        if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush();
         
         // Teruskan Magic Link ke Pejabat Berwenang via WAHA
         if (pejabat.no_wa && pejabat.no_wa.length > 8) {
@@ -384,7 +384,7 @@ function processMagicLinkApproval(token, decision, notes) {
         
         // Kembalikan saldo cuti
         refundCutiSaldo_(sheetUser, pemohonNip, jenisCuti, targetRow[16]);
-        SpreadsheetApp.flush();
+        if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush();
         
         // Kirim notifikasi penolakan ke pemohon
         if (pemohon.no_wa && pemohon.no_wa.length > 8) {
@@ -416,7 +416,7 @@ function processMagicLinkApproval(token, decision, notes) {
       
       if (decision === 'Disetujui') {
         sheetCuti.getRange(rowIndex, 8).setValue('Disetujui'); // Final status
-        SpreadsheetApp.flush();
+        if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush();
         
         // Kirim konfirmasi persetujuan resmi ke pemohon
         if (pemohon.no_wa && pemohon.no_wa.length > 8) {
@@ -446,7 +446,7 @@ function processMagicLinkApproval(token, decision, notes) {
         // Pejabat menolak
         sheetCuti.getRange(rowIndex, 8).setValue('Ditolak');
         refundCutiSaldo_(sheetUser, pemohonNip, jenisCuti, targetRow[16]);
-        SpreadsheetApp.flush();
+        if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush();
         
         if (pemohon.no_wa && pemohon.no_wa.length > 8) {
           const msgReject = "*TRANSKEP - STATUS USULAN CUTI* ⚠️\n\n" +
@@ -563,7 +563,7 @@ function resendCutiWhatsApp(cutiId, adminNip, clientToken) {
     if (!magicToken) {
       magicToken = Utilities.getUuid();
       sheetCuti.getRange(rowIndex, 19).setValue(magicToken);
-      SpreadsheetApp.flush();
+      if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush();
     }
     
     const statusAtasan = targetRow[13];

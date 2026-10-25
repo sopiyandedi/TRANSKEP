@@ -117,22 +117,17 @@
   <!-- TRANSKEP: Auto-Bust PWA Cache & Stale Service Worker Guard -->
   <script>
     (async function () {
-      const CURRENT_APP_BUILD = 'transkep-v3.2.0';
+      const CURRENT_APP_BUILD = 'transkep-v3.3.7';
       if (localStorage.getItem('transkep_active_build') !== CURRENT_APP_BUILD) {
         localStorage.setItem('transkep_active_build', CURRENT_APP_BUILD);
         try {
           if ('caches' in window) {
             const keys = await caches.keys();
-            await Promise.all(keys.map(k => caches.delete(k)));
-          }
-          if ('serviceWorker' in navigator) {
-            const regs = await navigator.serviceWorker.getRegistrations();
-            for (const r of regs) {
-              await r.unregister();
-            }
+            await Promise.all(keys.map(k => {
+              if (k !== CURRENT_APP_BUILD) return caches.delete(k);
+            }));
           }
         } catch (e) { }
-        window.location.reload(true);
       }
     })();
   </script>
@@ -538,7 +533,7 @@
       ];
 
       try {
-        const APP_BUILD_VER = '3.1.4';
+        const APP_BUILD_VER = '3.3.7';
         console.log('🔄 [TRANSKEP Loader] Memuat komponen tampilan views/ secara paralel...');
         await Promise.all(VIEW_SLOTS.map(async item => {
           const res = await fetch(item.file + '?v=' + APP_BUILD_VER);

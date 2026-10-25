@@ -32,7 +32,7 @@ function cetakIzinKeluar(id) {
         } else {
             setTimeout(() => {
                 hideLoading(); window.isGlobalPrinting = false;
-                alert("[CANVAS MODE] Simulasi cetak IK untuk ID: " + id);
+                showNotify("Pratinjau Cetak", "[CANVAS MODE] Simulasi cetak dokumen aktif.", "info");
             }, 1000);
         }
     }

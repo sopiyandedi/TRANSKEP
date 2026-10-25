@@ -413,7 +413,13 @@
                                     }
                                   } else { if(window.showNotify) window.showNotify("Gagal", res.message, "error"); }
                                 })
-                                .withFailureHandler((err) => { if(window.hideLoading) window.hideLoading(); if(window.showNotify) window.showNotify("Error Koneksi", err.toString(), "error"); });
+                                .withFailureHandler((err) => {
+                                   if(window.hideLoading) window.hideLoading();
+                                   if (typeof backupCutiLogs !== 'undefined') this.s.cutiLogs = backupCutiLogs;
+                                   if (typeof backupUser !== 'undefined') this.s.user = backupUser;
+                                   if (typeof backupUsersList !== 'undefined' && backupUsersList) this.s.usersList = backupUsersList;
+                                   if(window.showNotify) window.showNotify("Pengajuan Gagal", "Gagal mengirim ke server: " + err.toString() + " (Data dan saldo dikembalikan)", "error");
+                                 });
                               
                               if (payload.id) runner.updateCutiLog(payload, this.s.user.nip, token);
                               else runner.addCutiLog(payload, this.s.user.nip, token);

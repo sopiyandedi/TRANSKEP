@@ -74,22 +74,22 @@ const app = createApp({
     function saveConfig() {
       TranskepAPI.setApiUrl(configApiUrl.value);
       showConfigModal.value = false;
-      alert('URL API berhasil disimpan!');
+      if (typeof showNotify === 'function') showNotify('Pengaturan API', 'URL API berhasil disimpan!', 'success');
     }
 
     async function testPing() {
       const targetUrl = configApiUrl.value ? configApiUrl.value.trim() : '';
       if (!targetUrl || targetUrl.includes('AKfycbx...')) {
-        alert('Silakan masukkan URL Web App Apps Script Anda terlebih dahulu.');
+        if (typeof showNotify === 'function') showNotify('Input Kosong', 'Silakan masukkan URL Web App Apps Script Anda terlebih dahulu.', 'warning');
         return;
       }
       TranskepAPI.setApiUrl(targetUrl);
       pingLoading.value = true;
       try {
         const res = await TranskepAPI.ping(targetUrl);
-        alert('Sukses Terhubung: ' + res.message);
+        if (typeof showNotify === 'function') showNotify('Koneksi Sukses', res.message, 'success');
       } catch (err) {
-        alert('Gagal Terhubung: ' + err.message + '\n\nTips Penting:\n1. Pastikan di Apps Script opsi "Siapa yang memiliki akses" (Who has access) diatur ke "Siapa saja" (Anyone).\n2. Pastikan URL berakhiran /exec.');
+        if (typeof showNotify === 'function') showNotify('Gagal Terhubung', err.message, 'error');
       } finally {
         pingLoading.value = false;
       }

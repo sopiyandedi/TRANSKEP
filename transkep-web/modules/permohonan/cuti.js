@@ -1026,8 +1026,57 @@
                               payload.atasan_nip = routeRes.data.atasan_nip; payload.pejabat_nip = routeRes.data.pejabat_nip;
                               let routingMsg = routeRes.data.pesan;
                               
-                              if(window.showLoading) window.showLoading(payload.id ? "Memperbarui data cuti..." : "Mengirimkan usulan cuti...");
-                              
+                              // OPTIMISTIC UI TAHAP 4 (0ms Update & Auto-Rollback)
+                              this.closeModal();
+                              const backupCutiLogs = JSON.parse(JSON.stringify(this.s.cutiLogs || []));
+                              const backupUser = JSON.parse(JSON.stringify(this.s.user || {}));
+                              const backupUsersList = this.s.usersList ? JSON.parse(JSON.stringify(this.s.usersList)) : null;
+
+                              const durasiNumber = Number(durasi || 1);
+                              const tempOptId = payload.id || ('CUTI-OPT-' + Date.now());
+
+                              if (payload.id) {
+                                  const existIdx = this.s.cutiLogs.findIndex(l => String(l.id) === String(payload.id));
+                                  if (existIdx > -1) {
+                                      this.s.cutiLogs[existIdx].jenis = payload.jenis; this.s.cutiLogs[existIdx].tgl_mulai = payload.tgl_mulai;
+                                      this.s.cutiLogs[existIdx].tgl_selesai = payload.tgl_selesai; this.s.cutiLogs[existIdx].alasan = payload.alasan;
+                                      this.s.cutiLogs[existIdx].alamat = payload.alamat; this.s.cutiLogs[existIdx].atasan_nip = payload.atasan_nip;
+                                      this.s.cutiLogs[existIdx].pejabat_nip = payload.pejabat_nip; this.s.cutiLogs[existIdx].plh_nip = payload.plh_nip;
+                                  }
+                              } else {
+                                  const targetPegawai = (String(payload.nip) === String(this.s.user.nip)) ? this.s.user : (this.s.usersList ? this.s.usersList.find(u => String(u.nip) === String(payload.nip)) : null);
+                                  if (targetPegawai && payload.jenis !== 'Dinas Luar' && payload.jenis !== 'CLTN') {
+                                      if (payload.jenis === 'Tahunan') {
+                                          if (targetPegawai.s_tahunan_2024 >= durasiNumber) targetPegawai.s_tahunan_2024 -= durasiNumber;
+                                          else if (targetPegawai.s_tahunan_2025 >= durasiNumber) targetPegawai.s_tahunan_2025 -= durasiNumber;
+                                          else if (targetPegawai.s_tahunan_2026 >= durasiNumber) targetPegawai.s_tahunan_2026 -= durasiNumber;
+                                      } else {
+                                          const mapCol = { 'Sakit': 's_sakit', 'Alasan Penting': 's_penting', 'Penting': 's_penting', 'Besar': 's_besar', 'Melahirkan': 's_melahirkan' };
+                                          const fld = mapCol[payload.jenis];
+                                          if (fld && targetPegawai[fld] !== undefined) targetPegawai[fld] = Math.max(0, Number(targetPegawai[fld] || 0) - durasiNumber);
+                                      }
+                                      if (this.s.usersList && targetPegawai.nip) {
+                                          const uIdx = this.s.usersList.findIndex(u => String(u.nip) === String(targetPegawai.nip));
+                                          if (uIdx !== -1) this.s.usersList[uIdx] = Object.assign({}, targetPegawai);
+                                      }
+                                  }
+
+                                  const optimisticLog = {
+                                      id: tempOptId, tgl_pengajuan: new Date().toLocaleDateString('id-ID'), nip: payload.nip,
+                                      jenis: payload.jenis, tgl_mulai: payload.tgl_mulai, tgl_selesai: payload.tgl_selesai,
+                                      alasan: payload.alasan, status: (payload.jenis === 'Dinas Luar' ? 'Disetujui' : 'Menunggu'),
+                                      status_atasan: (payload.jenis === 'Dinas Luar' ? 'Disetujui' : 'Menunggu'),
+                                      status_pejabat: (payload.jenis === 'Dinas Luar' ? 'Disetujui' : 'Menunggu'),
+                                      atasan_nip: payload.atasan_nip, pejabat_nip: payload.pejabat_nip, sisa_cuti: durasiNumber,
+                                      alamat: payload.alamat, plh_nip: payload.plh_nip, isOptimistic: true
+                                  };
+                                  if (this.s && this.s.cutiLogs) this.s.cutiLogs.unshift(optimisticLog);
+                              }
+
+                              if(window.showNotify) {
+                                  window.showNotify("Pengajuan Dikirim 🚀", payload.id ? "Perubahan usulan dicatat (0ms)." : "Usulan cuti berhasil dicatat (0ms) & sedang disinkronkan ke server.", "success");
+                              }
+
                               const savePromise = (typeof CutiDataService !== 'undefined')
                                   ? (payload.id ? CutiDataService.updateCutiLog(payload, currentNip, token) : CutiDataService.addCutiLog(payload, currentNip, token))
                                   : new Promise((resolve, reject) => {
@@ -1041,8 +1090,6 @@
                                   });
 
                               return savePromise.then((res) => {
-                                  if(window.hideLoading) window.hideLoading();
-                                  this.closeModal();
                                   if (res && res.status === 'success') {
                                       if(routingMsg) window.showNotify("Berhasil Disimpan", res.message + "<br><br><span class='text-[10px] text-amber-400'>Info Pengalihan:</span><br><span class='text-[10px] leading-relaxed'>" + routingMsg + "</span>", "success");
                                       else window.showNotify("Berhasil Disimpan", res.message, "success");

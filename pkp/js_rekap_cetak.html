@@ -6,25 +6,46 @@
  * ========================================================
  */
 
-function cetakRekapPCKBulanan() {
+function cetakRekapPCKBulanan(snapshotData) {
     try {
-        var thn = document.getElementById("filterTahunPCK").value;
-        var blnSelect = document.getElementById("filterBulanPCK");
-        var bln = blnSelect.value;
+        var thnEl = document.getElementById("filterTahunPCK");
+        var blnEl = document.getElementById("filterBulanPCK");
 
-        if (bln === "0") {
+        var thn = (snapshotData && snapshotData.tahun) || (thnEl && thnEl.value) || (window.vueState ? window.vueState.selectedYear : (new Date().getFullYear()));
+        var bln = (snapshotData && snapshotData.bulan) || (blnEl && blnEl.value) || (window.vueState ? window.vueState.selectedMonth : "0");
+
+        if (bln === "0" || !bln) {
             showNotify("Bulan Belum Dipilih", "Silakan pilih bulan spesifik (misal: Januari) di dropdown untuk mencetak rekapitulasi.", "warning");
             return;
         }
 
-        showLoading("Mempersiapkan Dokumen Cetak...");
+        showLoading("Mempersiapkan Dokumen Cetak Rekapitulasi...");
 
-        // 1. Filter hanya data yang bulan dan tahunnya cocok, DAN statusnya sudah sah/final
-        var dataToPrint = (state.pckDokumen || []).filter(function(item) {
-            return String(item.tahun).trim() === String(thn).trim() &&
-                   String(item.bulan).trim().toLowerCase() === String(bln).trim().toLowerCase() &&
-                   (item.status === "Disetujui" || item.status === "Final");
-        });
+        var dataToPrint = [];
+        var isFromSnapshot = false;
+
+        // 1. Prioritaskan data dari snapshot Firestore yang telah disahkan / dikunci (Opsi B)
+        if (snapshotData && Array.isArray(snapshotData.daftar_nilai) && snapshotData.daftar_nilai.length > 0) {
+            dataToPrint = snapshotData.daftar_nilai;
+            isFromSnapshot = true;
+        } else {
+            var activeSnapshot = null;
+            if (window.vueState && typeof window.vueState.currentRekapSnapshot !== 'undefined' && window.vueState.currentRekapSnapshot) {
+                activeSnapshot = window.vueState.currentRekapSnapshot;
+            }
+            if (activeSnapshot && Array.isArray(activeSnapshot.daftar_nilai) && activeSnapshot.daftar_nilai.length > 0) {
+                dataToPrint = activeSnapshot.daftar_nilai;
+                isFromSnapshot = true;
+                snapshotData = activeSnapshot;
+            } else {
+                var pckList = (typeof state !== 'undefined' && state.pckDokumen) ? state.pckDokumen : ((window.vueState && window.vueState.pckDokumen) ? window.vueState.pckDokumen : []);
+                dataToPrint = pckList.filter(function(item) {
+                    return String(item.tahun).trim() === String(thn).trim() &&
+                           String(item.bulan).trim().toLowerCase() === String(bln).trim().toLowerCase() &&
+                           (item.status === "Disetujui" || item.status === "Final");
+                });
+            }
+        }
 
         if (dataToPrint.length === 0) {
             hideLoading();
@@ -35,58 +56,98 @@ function cetakRekapPCKBulanan() {
         // 2. Suntik Data ke Tabel Template
         var tbody = document.getElementById("rekap-pck-tbody");
         var html = "";
+        var users = (typeof state !== 'undefined' && state.usersList) ? state.usersList : ((window.vueState && window.vueState.usersList) ? window.vueState.usersList : []);
         
         for (var i = 0; i < dataToPrint.length; i++) {
             var row = dataToPrint[i];
-            
-            // Cari data user lengkap dari state.usersList berdasarkan NIP
-            var userDetail = state.usersList.find(function(u) { return String(u.nip).replace(/'/g, "").trim() === String(row.nip).replace(/'/g, "").trim(); });
-            
-            var namaPegawai = userDetail ? userDetail.nama : "Tidak Ditemukan";
-            var nipPegawai = userDetail ? userDetail.nip : row.nip;
-            var jabatanPegawai = userDetail ? userDetail.jabatan : "-";
-            
-            var nilai = parseFloat(row.nilai_akhir || 0);
+            var namaPegawai = row.nama || row.nama_pegawai;
+            var nipPegawai = row.nip || row.nip_pegawai;
+            var jabatanPegawai = row.jabatan || row.jabatan_pegawai;
+            var nilai = parseFloat(row.nilai || row.nilai_akhir || 0);
+
+            if (!namaPegawai || !jabatanPegawai) {
+                var cleanNip = String(nipPegawai || '').replace(/'/g, "").trim();
+                var userDetail = users.find(function(u) { return String(u.nip).replace(/'/g, "").trim() === cleanNip; });
+                if (userDetail) {
+                    namaPegawai = namaPegawai || userDetail.nama;
+                    jabatanPegawai = jabatanPegawai || userDetail.jabatan;
+                } else {
+                    namaPegawai = namaPegawai || "Pegawai (" + nipPegawai + ")";
+                    jabatanPegawai = jabatanPegawai || "-";
+                }
+            }
 
             // Logika Predikat (Standard BKN)
-            var predikat = "Kurang";
-            if (nilai >= 91) predikat = "Sangat Baik";
-            else if (nilai >= 76) predikat = "Baik";
-            else if (nilai >= 61) predikat = "Cukup";
-            else if (nilai >= 51) predikat = "Kurang";
-            else if (nilai <= 50) predikat = "Buruk";
+            var predikat = row.predikat;
+            if (!predikat) {
+                if (nilai >= 91) predikat = "Sangat Baik";
+                else if (nilai >= 76) predikat = "Baik";
+                else if (nilai >= 61) predikat = "Cukup";
+                else if (nilai >= 51) predikat = "Kurang";
+                else predikat = "Buruk";
+            }
 
             html += "<tr>" +
                 "<td class='text-center'>" + (i+1) + "</td>" +
                 "<td><div class='font-bold' style='margin-bottom: 2px;'>" + namaPegawai + "</div><div>NIP. " + nipPegawai + "</div></td>" +
-                "<td class='text-center'>-</td>" + // Kolom AK (Angka Kredit) dikosongkan secara default
+                "<td class='text-center'>-</td>" +
                 "<td>" + jabatanPegawai + "</td>" +
                 "<td class='text-center'>" +
                     "<div class='font-bold'>" + predikat + "</div>" +
                     "<div style='font-size: 8.5pt;'>(" + nilai.toFixed(2) + ")</div>" +
                 "</td>" +
-                "<td></td>" + // Kolom Keterangan selalu kosong agar bisa ditulis tangan
+                "<td>" + (isFromSnapshot ? "<span style='font-size:7.5pt; color:#666;'>Terkunci</span>" : "") + "</td>" +
             "</tr>";
         }
         
         tbody.innerHTML = html;
 
         // 3. Suntik Header & Footer Template
-        document.getElementById("rekap-pck-print-bulan").innerText = bln.toUpperCase() + " TAHUN " + thn;
+        document.getElementById("rekap-pck-print-bulan").innerText = String(bln).toUpperCase() + " TAHUN " + thn;
 
         var tglFull = new Date();
         var blnArray = ["Januari","Februari","Maret","April","Mei","Juni","Juli","Agustus","September","Oktober","November","Desember"];
-        document.getElementById("rekap-pck-print-tanggal").innerText = "Indramayu, ..... " + blnArray[tglFull.getMonth()] + " " + tglFull.getFullYear();
+        var tanggalText = "Indramayu, ..... " + blnArray[tglFull.getMonth()] + " " + tglFull.getFullYear();
 
-        // Default Pimpinan Unit Kerja (Ketua Pengadilan Agama)
-        // Jika pimpinan berganti, admin cukup mengganti string di bawah ini
-        document.getElementById("rekap-pck-print-pejabat-nama").innerText = "Drs. Sudirman, M.Si.";
-        document.getElementById("rekap-pck-print-pejabat-nip").innerText = "NIP. 19850505002";
+        if (snapshotData && snapshotData.tgl_pengesahan) {
+            var parts = String(snapshotData.tgl_pengesahan).split('-');
+            if (parts.length === 3) {
+                var mIdx = parseInt(parts[1], 10) - 1;
+                tanggalText = "Indramayu, " + parseInt(parts[2], 10) + " " + (blnArray[mIdx] || parts[1]) + " " + parts[0];
+            }
+        }
+        document.getElementById("rekap-pck-print-tanggal").innerText = tanggalText;
 
-        // 4. Eksekusi Print
+        // 4. Pejabat Penilai Dinamis (Mencari Pimpinan Satker secara cerdas dari usersList / snapshot)
+        var pejabatNama = "Ketua Pengadilan Agama Indramayu";
+        var pejabatNip = "-";
+
+        if (snapshotData && snapshotData.pejabat_nama && snapshotData.pejabat_nama !== '-') {
+            pejabatNama = snapshotData.pejabat_nama;
+            pejabatNip = snapshotData.pejabat_nip ? ("NIP. " + String(snapshotData.pejabat_nip).replace(/NIP\.?\s*/i, '').trim()) : "-";
+        } else {
+            var ketua = users.find(function(u) {
+                var jab = String(u.jabatan || '').toLowerCase();
+                return jab.includes("ketua") && !jab.includes("wakil");
+            });
+            if (!ketua) {
+                ketua = users.find(function(u) {
+                    var jab = String(u.jabatan || '').toLowerCase();
+                    return jab.includes("wakil ketua") || u.role === 'Pejabat Berwenang';
+                });
+            }
+            if (ketua) {
+                pejabatNama = ketua.nama;
+                pejabatNip = ketua.nip ? ("NIP. " + String(ketua.nip).replace(/'/g, '').trim()) : "-";
+            }
+        }
+
+        document.getElementById("rekap-pck-print-pejabat-nama").innerText = pejabatNama;
+        document.getElementById("rekap-pck-print-pejabat-nip").innerText = pejabatNip;
+
+        // 5. Eksekusi Print
         var container = document.getElementById("template-rekap-pck-bkn");
-        document.body.appendChild(container); // Pindahkan ke luar agar tidak kena overflow hidden
-        
+        document.body.appendChild(container);
         document.body.classList.add("print-mode-rekap");
         
         hideLoading();

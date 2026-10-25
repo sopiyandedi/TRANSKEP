@@ -431,21 +431,23 @@ document.addEventListener("DOMContentLoaded", () => {
                         "Hapus Dokumen SOP?",
                         "Tindakan ini tidak bisa dibatalkan. Riwayat persetujuan/baca dari pegawai untuk SOP ini juga akan dihapus.",
                         () => {
-                            if(window.showLoading) window.showLoading("Menghapus Data SOP...");
+                            // OPTIMISTIC DELETE SOP TAHAP 4 (0ms)
+                            const backupSop = [...(this.globalState.sopList || [])];
+                            const backupAck = [...(this.globalState.sopAckList || [])];
+                            this.globalState.sopList = this.globalState.sopList.filter(s => s.id !== id);
+                            this.globalState.sopAckList = this.globalState.sopAckList.filter(a => a.sop_id !== id);
+                            if(window.showNotify) window.showNotify("SOP Dihapus ⚡", "Dokumen SOP telah dihapus dari daftar (0ms).", "info");
+
                             google.script.run
                                 .withSuccessHandler(res => {
-                                    if(window.hideLoading) window.hideLoading();
-                                    if(res.status === 'success') {
-                                        this.globalState.sopList = this.globalState.sopList.filter(s => s.id !== id);
-                                        this.globalState.sopAckList = this.globalState.sopAckList.filter(a => a.sop_id !== id);
-                                        if(window.showNotify) window.showNotify("Berhasil", res.message, "success");
-                                    } else {
-                                        if(window.showNotify) window.showNotify("Gagal", res.message, "error");
+                                    if (!res || res.status !== 'success') {
+                                        this.globalState.sopList = backupSop; this.globalState.sopAckList = backupAck;
+                                        if(window.showNotify) window.showNotify("Gagal Hapus SOP", (res ? res.message : "Gagal menghapus.") + " (Data dikembalikan)", "error");
                                     }
                                 })
                                 .withFailureHandler(err => {
-                                    if(window.hideLoading) window.hideLoading();
-                                    if(window.showNotify) window.showNotify("Error", err.message, "error");
+                                    this.globalState.sopList = backupSop; this.globalState.sopAckList = backupAck;
+                                    if(window.showNotify) window.showNotify("Error", err.message + " (Data dikembalikan)", "error");
                                 })
                                 .deleteSopData(id, this.globalState.user.nip, token);
                         }

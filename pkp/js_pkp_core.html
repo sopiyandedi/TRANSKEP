@@ -323,7 +323,7 @@ function cetakDokumen(jenis, id) {
         } else {
             setTimeout(() => { 
                 hideLoading(); window.isGlobalPrinting = false; 
-                alert("[CANVAS MODE] PDF PK akan terbuka di sini."); 
+                if (typeof showNotify === "function") showNotify("Pratinjau Cetak", "Dokumen siap dicetak dalam Canvas Mode.", "info"); 
             }, 1500);
         }
     } else if (jenis === 'PCK') {
@@ -353,7 +353,7 @@ function cetakDokumen(jenis, id) {
         } else {
             setTimeout(() => { 
                 hideLoading(); window.isGlobalPrinting = false; 
-                alert("[CANVAS MODE] PDF PCK akan terbuka di sini."); 
+                if (typeof showNotify === "function") showNotify("Pratinjau Cetak", "Dokumen siap dicetak dalam Canvas Mode.", "info"); 
             }, 1500);
         }
     }

@@ -25,18 +25,39 @@
       [v-cloak] {
          display: none !important;
       }
-      /* TRANSKEP: Instant Fullscreen Processing Overlay (0ms Anti-Kedip / Zero Jeda on Refresh) */
-      html.app-authenticated #global-loader:not(.loader-hidden) {
+      /* TRANSKEP: Non-blocking loader & Smooth Transitions (skill.md) */
+      #global-loader {
+         display: none;
+         opacity: 0;
+         pointer-events: none;
+         transition: opacity 0.3s ease;
+      }
+      #global-loader.active {
          display: flex !important;
          opacity: 1 !important;
          pointer-events: auto !important;
       }
-      #global-loader.loader-hidden {
+      .auth-fade-out {
          opacity: 0 !important;
+         transform: scale(0.97) !important;
+         transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
          pointer-events: none !important;
       }
-      html.app-authenticated:not(.app-loaded) #dashboard-skeleton {
+      .app-fade-in {
+         opacity: 1 !important;
+         transform: translateY(0) !important;
+         transition: opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1), transform 0.35s cubic-bezier(0.4, 0, 0.2, 1) !important;
+      }
+      .app-fade-prep {
          opacity: 0 !important;
+         transform: translateY(8px) !important;
+      }
+      .sync-badge-pulse {
+         animation: pulseSlow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+      }
+      @keyframes pulseSlow {
+         0%, 100% { opacity: 1; transform: scale(1); }
+         50% { opacity: 0.5; transform: scale(0.92); }
       }
    </style>
 
@@ -194,7 +215,7 @@
 
                </div>
                <div class="pt-4">
-                  <button type="submit"
+                  <button type="submit" id="btnLoginSubmit"
                      class="w-full py-4 rounded-xl text-xs font-bold text-indigo-300 bg-indigo-500/10 border border-indigo-500/20 hover:bg-indigo-500/20 hover:border-indigo-500/40 hover:text-indigo-100 backdrop-blur-sm transition-all duration-300 shadow-[0_4px_15px_rgba(99,102,241,0.15)] uppercase flex items-center justify-center gap-3 tracking-widest group">
                      Masuk Aplikasi <i
                         class="fa-solid fa-arrow-right-to-bracket transition-transform duration-300 group-hover:translate-x-1"></i>
@@ -339,6 +360,7 @@
    <?!= include('permohonan/st/js_cetak_plh'); ?>
    <?!= include('permohonan/js_persetujuan'); ?>
    <?!= include('permohonan/js_rekapitulasi'); ?>
+   <?!= include('javascript_firebase'); ?>
    <?!= include('pkp/js_pkp_core'); ?>
    <?!= include('pkp/js_pkp_render'); ?>
    <?!= include('pkp/js_pkp_modal'); ?>
@@ -347,7 +369,6 @@
    <?!= include('pkp/js_rekap_cetak'); ?>
    <?!= include('jobdes/js_jobdes'); ?>
    <?!= include('jobdes/js_cetak_jobdes'); ?>
-   <?!= include('javascript_firebase'); ?>
    <?!= include('sk/js_sortir'); ?>
    <?!= include('sk/js_sk_builder'); ?>
    <?!= include('sk/js_sk'); ?>

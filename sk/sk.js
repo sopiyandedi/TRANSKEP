@@ -26,7 +26,7 @@ function autoInitSkSheets(ss) {
      isCreated = true;
   }
   
-  if (isCreated) SpreadsheetApp.flush();
+  if (isCreated) if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush();
   
   return isCreated;
 }
@@ -142,7 +142,7 @@ function saveSk(payload, userNip, clientToken) {
         sheet.getRange(sheet.getLastRow() + 1, 1, rowsToInsert.length, rowsToInsert[0].length).setValues(rowsToInsert);
     }
 
-    SpreadsheetApp.flush();
+    if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush();
     return { status: 'success', message: 'Dokumen SK berhasil disimpan dengan sempurna!' };
   } catch (e) {
     return { status: 'error', message: e.toString() };
@@ -178,7 +178,7 @@ function deleteSk(id, userNip, clientToken) {
        }
     }
 
-    SpreadsheetApp.flush();
+    if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush();
     return { status: 'success', message: 'Surat Keputusan berhasil dihapus secara keseluruhan.' };
   } catch(e) {
     return { status: 'error', message: e.toString() };
@@ -207,7 +207,7 @@ function acknowledgeSk(skId, nip, clientToken) {
     const now = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'dd/MM/yyyy HH:mm:ss');
 
     sheet.appendRow([newId, skId, nip, now]);
-    SpreadsheetApp.flush();
+    if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush();
     return { status: 'success', message: 'Dokumen SK telah ditandai sebagai dibaca.' };
   } catch(e) {
     return { status: 'error', message: e.toString() };

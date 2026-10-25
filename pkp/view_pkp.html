@@ -16,18 +16,24 @@
                     <p class="text-slate-400 text-sm mt-1">Kelola dokumen target dan realisasi kinerja pegawai</p>
                 </div>
                 
-                <!-- Tab Lapis 1 (Navigasi Utama) -->
-                <div v-if="canAccessLapis1" class="flex flex-wrap gap-2 bg-slate-950 p-1.5 rounded-2xl border border-slate-800 w-full md:w-auto">
-                    <button @click="activeLapis1 = 'riwayat'" :class="activeLapis1 === 'riwayat' ? 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/20' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'" class="px-5 py-2.5 rounded-xl text-sm font-bold border border-transparent transition flex items-center gap-2">
-                        <i class="fa-solid fa-clock-rotate-left"></i> Riwayat Saya
+                <!-- Tombol Sinkron ke Firestore & Tab Lapis 1 -->
+                <div class="flex items-center gap-2">
+                    <button v-if="currentUser && (currentUser.role === 'Admin' || currentUser.role === 'Operator')" @click="syncPkpToFirestore" title="Sinkronisasi Dokumen PK & PCK ke Cloud Firestore" class="px-3.5 py-2.5 rounded-2xl text-xs font-bold bg-slate-950 hover:bg-slate-800 text-slate-300 border border-slate-800 transition flex items-center gap-2 shadow-sm">
+                        <i class="fa-solid fa-cloud-arrow-up text-amber-400"></i> Sinkron ke Firestore
                     </button>
-                    <button v-if="canVerify" @click="activeLapis1 = 'verifikasi'" :class="activeLapis1 === 'verifikasi' ? 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/20' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'" class="relative px-5 py-2.5 rounded-xl text-sm font-bold border border-transparent transition flex items-center gap-2">
-                        <i class="fa-solid fa-list-check"></i> Kotak Verifikasi
-                        <span v-if="verifikasiBadgeCount > 0" class="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-rose-500 text-[10px] text-white font-bold shadow-lg shadow-rose-500/50 border-2 border-slate-900">{{ verifikasiBadgeCount }}</span>
-                    </button>
-                    <button v-if="canRekap" @click="activeLapis1 = 'rekap'" :class="activeLapis1 === 'rekap' ? 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/20' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'" class="px-5 py-2.5 rounded-xl text-sm font-bold border border-transparent transition flex items-center gap-2">
-                        <i class="fa-solid fa-globe"></i> Rekapitulasi
-                    </button>
+                    <!-- Tab Lapis 1 (Navigasi Utama) -->
+                    <div v-if="canAccessLapis1" class="flex flex-wrap gap-2 bg-slate-950 p-1.5 rounded-2xl border border-slate-800 w-full md:w-auto">
+                        <button @click="activeLapis1 = 'riwayat'" :class="activeLapis1 === 'riwayat' ? 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/20' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'" class="px-5 py-2.5 rounded-xl text-sm font-bold border border-transparent transition flex items-center gap-2">
+                            <i class="fa-solid fa-clock-rotate-left"></i> Riwayat Saya
+                        </button>
+                        <button v-if="canVerify" @click="activeLapis1 = 'verifikasi'" :class="activeLapis1 === 'verifikasi' ? 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/20' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'" class="relative px-5 py-2.5 rounded-xl text-sm font-bold border border-transparent transition flex items-center gap-2">
+                            <i class="fa-solid fa-list-check"></i> Kotak Verifikasi
+                            <span v-if="verifikasiBadgeCount > 0" class="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-rose-500 text-[10px] text-white font-bold shadow-lg shadow-rose-500/50 border-2 border-slate-900">{{ verifikasiBadgeCount }}</span>
+                        </button>
+                        <button v-if="canRekap" @click="activeLapis1 = 'rekap'" :class="activeLapis1 === 'rekap' ? 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/20' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'" class="px-5 py-2.5 rounded-xl text-sm font-bold border border-transparent transition flex items-center gap-2">
+                            <i class="fa-solid fa-globe"></i> Rekapitulasi
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -48,12 +54,12 @@
                 
                 <div class="flex items-center gap-3 w-full sm:w-auto flex-wrap sm:flex-nowrap justify-end">
                     <!-- Filter Tahun -->
-                    <select v-model="selectedYear" class="w-full sm:w-auto bg-slate-950 border border-slate-800 text-indigo-400 text-xs font-bold py-2.5 px-4 rounded-xl outline-none focus:border-indigo-500 transition-all cursor-pointer shadow-md">
+                    <select id="filterTahunPCK" v-model="selectedYear" class="w-full sm:w-auto bg-slate-950 border border-slate-800 text-indigo-400 text-xs font-bold py-2.5 px-4 rounded-xl outline-none focus:border-indigo-500 transition-all cursor-pointer shadow-md">
                         <option v-for="y in availableYears" :key="y" :value="y">Tahun {{ y }}</option>
                     </select>
 
                     <!-- Filter Bulan (PCK di Rekapitulasi) -->
-                    <select v-if="activeMainTab === 'PCK'" v-model="selectedMonth" class="w-full sm:w-auto bg-slate-950 border border-slate-800 text-indigo-400 text-xs font-bold py-2.5 px-4 rounded-xl outline-none focus:border-indigo-500 transition-all cursor-pointer shadow-md">
+                    <select id="filterBulanPCK" v-if="activeMainTab === 'PCK'" v-model="selectedMonth" class="w-full sm:w-auto bg-slate-950 border border-slate-800 text-indigo-400 text-xs font-bold py-2.5 px-4 rounded-xl outline-none focus:border-indigo-500 transition-all cursor-pointer shadow-md">
                         <option value="0">-- Pilih Bulan --</option>
                         <option v-for="b in daftarBulan" :key="b" :value="b">{{ b }}</option>
                     </select>
@@ -61,6 +67,16 @@
                     <!-- Tombol Cetak Rekap PCK -->
                     <button v-if="activeLapis1 === 'rekap' && activeMainTab === 'PCK'" @click="cetakRekap" class="shrink-0 bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 px-4 rounded-xl shadow-lg shadow-indigo-600/20 transition-all flex justify-center items-center gap-2 text-sm whitespace-nowrap">
                         <i class="fa-solid fa-print"></i> Cetak Rekap PCK
+                    </button>
+
+                    <!-- Tombol Kunci & Sahkan Rekap (Opsi B) -->
+                    <button v-if="activeLapis1 === 'rekap' && activeMainTab === 'PCK' && canLockRekap"
+                            @click="kunciDanSahkanRekap"
+                            :disabled="isLockingRekap"
+                            :class="currentRekapLocked ? 'bg-emerald-600/20 text-emerald-400 border border-emerald-500/40 hover:bg-emerald-600/30' : 'bg-amber-600 hover:bg-amber-500 text-white shadow-lg shadow-amber-600/20'"
+                            class="shrink-0 font-bold py-2.5 px-4 rounded-xl transition-all flex justify-center items-center gap-2 text-sm whitespace-nowrap">
+                        <i :class="currentRekapLocked ? 'fa-solid fa-lock text-emerald-400' : 'fa-solid fa-file-signature'"></i>
+                        {{ currentRekapLocked ? 'Rekap Terkunci (Disahkan)' : 'Kunci & Sahkan Rekap' }}
                     </button>
                     
                     <!-- Tombol Action PK / PCK di Riwayat Saya -->
@@ -271,37 +287,85 @@
                 </div>
 
                 <!-- Tabel Rekap PCK -->
-                <div v-show="activeMainTab === 'PCK'" class="flex-1 overflow-x-auto p-0">
-                    <table class="w-full text-left text-sm text-slate-300 whitespace-nowrap min-w-[800px] border-collapse">
-                        <thead class="text-xs uppercase bg-slate-950/80 text-slate-400 sticky top-0 z-10 border-b border-slate-800/80">
-                            <tr>
-                                <th class="p-4 font-bold tracking-wider">Nama Pegawai</th>
-                                <th class="p-4 font-bold tracking-wider">Bulan Laporan</th>
-                                <th class="p-4 text-center font-bold tracking-wider">Total Rencana</th>
-                                <th class="p-4 text-center font-bold tracking-wider">Nilai Capaian</th>
-                                <th class="p-4 text-center font-bold tracking-wider">Status</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr v-if="rekapListPCK.length === 0">
-                                <td colspan="5" class="p-8 text-center text-slate-500">Tidak ada laporan PCK pada {{ selectedMonth !== '0' ? 'bulan ' + selectedMonth : '' }} tahun {{ selectedYear }}.</td>
-                            </tr>
-                            <tr v-for="row in rekapListPCK" :key="row.id_pck" class="hover:bg-slate-800/30 transition-colors border-b border-slate-800/50">
-                                <td class="p-4">
-                                    <span class="font-bold text-slate-200">{{ getPegawaiInfo(row.nip).nama }}</span><br>
-                                    <span class="text-[10px] text-slate-500">{{ getPegawaiInfo(row.nip).jabatan }}</span>
-                                </td>
-                                <td class="p-4 font-bold text-white"><i class="fa-regular fa-clock text-amber-500 mr-2"></i> {{ row.bulan }} {{ row.tahun }}</td>
-                                <td class="p-4 text-center font-mono text-slate-300">{{ row.rencana }} Kegiatan</td>
-                                <td class="p-4 text-center">
-                                    <span v-if="row.status === 'Draft'" class="text-[10px] uppercase tracking-wider text-slate-500">Draft</span>
-                                    <span v-else-if="row.nilai_akhir" class="font-black text-emerald-400 text-sm">{{ formatNilai(row.nilai_akhir) }}</span>
-                                    <span v-else>-</span>
-                                </td>
-                                <td class="p-4 text-center"><span :class="getStatusBadgeClass(row.status)" class="px-2.5 py-1 text-[10px] uppercase tracking-wider font-bold rounded-lg">{{ row.status }}</span></td>
-                            </tr>
-                        </tbody>
-                    </table>
+                <!-- Tabel Rekap PCK -->
+                <div v-show="activeMainTab === 'PCK'" class="flex-1 flex flex-col overflow-hidden">
+                    <!-- Banner Status Rekapitulasi (Snapshot Terkunci vs Berjalan) -->
+                    <div v-if="selectedMonth !== '0'" class="p-3 mx-4 mt-3 mb-1 rounded-xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-md"
+                         :class="currentRekapLocked ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300' : 'bg-slate-900/60 border-slate-800 text-slate-300'">
+                        <div class="flex items-center gap-3">
+                            <div class="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 shadow-inner"
+                                 :class="currentRekapLocked ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'">
+                                <i :class="currentRekapLocked ? 'fa-solid fa-lock text-emerald-400' : 'fa-solid fa-arrows-rotate text-amber-400'"></i>
+                            </div>
+                            <div>
+                                <div class="text-xs font-bold flex items-center gap-2">
+                                    <span>{{ currentRekapLocked ? 'Dokumen Rekapitulasi Terkunci / Disahkan' : 'Data Rekapitulasi Berjalan (Kalkulasi Live)' }}</span>
+                                    <span v-if="currentRekapLocked" class="px-2 py-0.5 rounded text-[10px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-mono font-bold flex items-center gap-1">
+                                        <i class="fa-solid fa-bolt text-emerald-400 text-[9px]"></i> Cloud Firestore
+                                    </span>
+                                </div>
+                                <div class="text-[11px] text-slate-400 mt-0.5">
+                                    <span v-if="currentRekapLocked">
+                                        Pejabat Penilai: <strong>{{ currentRekapSnapshot.pejabat_nama }}</strong> &bull; Tgl: {{ currentRekapSnapshot.tgl_pengesahan }} &bull; Total Pegawai: <strong>{{ currentRekapSnapshot.total_pegawai }}</strong> &bull; Nilai Rata-rata: <strong>{{ currentRekapSnapshot.rata_rata_satker }}</strong>
+                                    </span>
+                                    <span v-else>
+                                        Menampilkan kalkulasi live bulan {{ selectedMonth }} {{ selectedYear }}. Tekan tombol "Kunci & Sahkan Rekap" di kanan atas jika evaluasi satker sudah final.
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                        <div v-if="currentRekapLocked && canLockRekap" class="shrink-0 flex items-center gap-2">
+                            <button type="button" @click="bukaKunciRekap" title="Buka Kunci untuk Merevisi Laporan" class="text-xs px-3 py-1.5 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30 transition flex items-center gap-1.5 font-bold">
+                                <i class="fa-solid fa-lock-open text-xs"></i> Buka Kunci
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="flex-1 overflow-x-auto p-0">
+                        <table class="w-full text-left text-sm text-slate-300 whitespace-nowrap min-w-[800px] border-collapse">
+                            <thead class="text-xs uppercase bg-slate-950/80 text-slate-400 sticky top-0 z-10 border-b border-slate-800/80">
+                                <tr>
+                                    <th class="p-4 font-bold tracking-wider">Nama Pegawai</th>
+                                    <th class="p-4 font-bold tracking-wider">Bulan Laporan</th>
+                                    <th class="p-4 text-center font-bold tracking-wider">Total Rencana</th>
+                                    <th class="p-4 text-center font-bold tracking-wider">Nilai Capaian</th>
+                                    <th class="p-4 text-center font-bold tracking-wider">Predikat</th>
+                                    <th class="p-4 text-center font-bold tracking-wider">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-if="rekapListPCK.length === 0">
+                                    <td colspan="6" class="p-8 text-center text-slate-500">Tidak ada laporan PCK pada {{ selectedMonth !== '0' ? 'bulan ' + selectedMonth : '' }} tahun {{ selectedYear }}.</td>
+                                </tr>
+                                <tr v-for="row in rekapListPCK" :key="row.id_pck || row.nip" class="hover:bg-slate-800/30 transition-colors border-b border-slate-800/50">
+                                    <td class="p-4">
+                                        <span class="font-bold text-slate-200">{{ row.nama || getPegawaiInfo(row.nip).nama }}</span><br>
+                                        <span class="text-[10px] text-slate-500">{{ row.jabatan || getPegawaiInfo(row.nip).jabatan }}</span>
+                                    </td>
+                                    <td class="p-4 font-bold text-white"><i class="fa-regular fa-clock text-amber-500 mr-2"></i> {{ row.bulan }} {{ row.tahun }}</td>
+                                    <td class="p-4 text-center font-mono text-slate-300">{{ row.rencana || row.total_rencana }} Kegiatan</td>
+                                    <td class="p-4 text-center">
+                                        <span v-if="row.status === 'Draft'" class="text-[10px] uppercase tracking-wider text-slate-500">Draft</span>
+                                        <span v-else-if="row.nilai_akhir || row.nilai" class="font-black text-emerald-400 text-sm">{{ formatNilai(row.nilai_akhir || row.nilai) }}</span>
+                                        <span v-else>-</span>
+                                    </td>
+                                    <td class="p-4 text-center">
+                                        <span v-if="row.predikat" class="px-2.5 py-1 text-[10px] font-bold rounded-lg bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">
+                                            {{ row.predikat }}
+                                        </span>
+                                        <span v-else class="text-slate-500">-</span>
+                                    </td>
+                                    <td class="p-4 text-center">
+                                        <span :class="getStatusBadgeClass(row.status)" class="px-2.5 py-1 text-[10px] uppercase tracking-wider font-bold rounded-lg inline-flex items-center gap-1">
+                                            {{ row.status }}
+                                            <i v-if="row.is_snapshot" class="fa-solid fa-lock text-emerald-400 text-[10px]" title="Snapshot Terkunci"></i>
+                                            <i v-else-if="row.is_firebase" class="fa-solid fa-bolt text-emerald-400 text-[10px]" title="Cloud Firestore (0ms)"></i>
+                                        </span>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
 

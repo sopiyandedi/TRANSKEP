@@ -2552,3 +2552,61 @@ Pada pengujian Tahap 56 di aplikasi web/PWA, layar memuat animasi loading terus-
 #### 3. Status Pengujian & Hasil
 - **Overlay Buka & Tutup Sempurna**: Layar loading langsung tampil di 0ms, menyelaraskan data dalam 1–2 detik, lalu memudar mulus (fade-out) membuka dashboard secara sempurna.
 - **Bebas Hang**: Tidak ada lagi kondisi terjebak loading (*infinite loading*).
+
+---
+
+### Tahap 58: Migrasi Basis Data Modul PKP & PCK ke Cloud Firestore (Zero-Risk Hybrid Bridge & 4 Pilar Terpadu) - [SELESAI] ✅
+
+#### 1. Masalah & Latar Belakang
+- **Konteks**: Modul Penilaian Kinerja Pegawai (PKP) dan Penilaian Capaian Kinerja (PCK) selama ini menggunakan basis data Google Sheets dengan 4 sheet terpisah (`pkp_dokumen`, `pkp_rencana`, `pck_dokumen`, `pck_realisasi`) serta 1 sheet kamus template (`master_kinerja`).
+- **Kelemahan Sistem Berjalan**:
+  1. *Latensi Simpan Tinggi (3–5 Detik)*: Setiap kali menyimpan kontrak PK atau realisasi PCK, Google Apps Script harus melakukan looping baris dan delete-insert ulang data detail.
+  2. *Rekapitulasi Belum Memiliki Penyimpanan Resmi*: Dokumen Rekapitulasi bulanan masih dihasilkan secara instan (*on-the-fly*) tanpa penguncian status resmi (*Lock Period*), sehingga rentan bergeser jika nilai pegawai diubah pasca pengesahan Ketua Pengadilan.
+  3. *Pencocokan Template Jabatan Kaku*: Fitur *Tarik Template Jabatan* sangat bergantung pada pencocokan teks nama jabatan persis tanpa penanganan sinonim/aliases.
+- **Tujuan**:
+  Memindahkan penyimpanan data PKP dan PCK ke **Google Cloud Firestore (`transkep-314c0`)** secara bertahap, aman, dan tanpa risiko kehilangan data (*Zero-Risk Hybrid Bridge*), dengan Google Sheets dipertahankan sebagai *cold backup*.
+
+#### 2. Arsitektur 4 Pilar Basis Data PKP di Cloud Firestore
+1. **Pilar 0: Koleksi `master_kinerja` (Kamus & Template Target per Jabatan)**:
+   - ID Dokumen: `TEMPL_{slug_jabatan}` (misal: `TEMPL_jurusita`, `TEMPL_kasubbag_ptip`).
+   - Format: `{ nama_jabatan, kategori, aliases: [...], sasaran_list: [ { sasaran, indikator_list: [ { indikator, satuan, mutu_default, kuantitas_default, waktu_default, pagu_default } ] } ] }`.
+2. **Pilar 1: Koleksi `pkp_documents` (Kontrak Perjanjian Kinerja Tahunan - 1x per Awal Tahun)**:
+   - ID Dokumen: `PKP_{tahun}_{nip}` (misal: `PKP_2026_199312242025211033`).
+   - Format: `{ id_pkp, nip_pegawai, nip_penilai, nip_atasan, tahun, status, nilai_akhir, items: [ { id_item, jenis, sasaran, indikator, kuantitas, satuan, mutu, waktu, pagu } ] }`.
+3. **Pilar 2: Koleksi `pck_documents` (Laporan Realisasi Kinerja Bulanan - 12x per Tahun)**:
+   - ID Dokumen: `PCK_{tahun}_{bulan_pad}_{nip}` (misal: `PCK_2026_01_199312242025211033`).
+   - Format: `{ id_pck, nip_pegawai, bulan, tahun, status, nilai_akhir, total_rencana, realisasi: [ { id_item_pk, real_kuantitas, real_mutu, capaian } ] }`.
+4. **Pilar 3: Koleksi `pck_rekapitulasi` (Lembar Rekap Bulanan Terkunci - Opsi B)**:
+   - ID Dokumen: `REKAP_{tahun}_{bulan_pad}` (misal: `REKAP_2026_01`).
+   - Format: `{ id_rekap, bulan, tahun, status: "Terkunci / Disahkan", tgl_pengesahan, pejabat_penilai: { nama, nip }, daftar_nilai: [ { no, nama, nip, jabatan, nilai, predikat } ] }`.
+
+#### 3. Rencana Eksekusi Bertahap (Step-by-Step Execution Plan - "Pelan Saja")
+- [x] **Sub-Tahap 58.A (Selesai ✅)**: Fondasi Konektor & Skema Firestore di `firebase.js` & `javascript_firebase.html`:
+  - Menyiapkan modul konektor `TranskepFirebase` untuk koleksi PKP, PCK, Rekapitulasi, dan Master Kinerja pada `transkep-web/core/firebase.js` dan `javascript_firebase.html`.
+  - Fungsi CRUD dasar: `savePkpToFirestore`, `getFirestorePkps`, `savePckToFirestore`, `getFirestorePcks`, `saveMasterKinerjaToFirestore`, `getFirestoreMasterKinerja`, `saveRekapitulasiToFirestore`.
+- [x] **Sub-Tahap 58.B (Selesai ✅)**: Migrasi Pilar 0: Kamus Kinerja / Template Jabatan:
+  - Ekstraksi dan injeksi template jabatan ke koleksi `master_kinerja` dengan penambahan array `aliases` (Jurusita, Panitera Pengganti, Pranata Komputer, Kasubbag PTIP, Kasubbag Kepegawaian, Kasubbag Umum).
+  - Pembaruan method `applyTemplateKinerja()` di `transkep-web/modules/pkp/pkp.js` dan `pkp/js_pkp_render.html` agar membaca dari Firestore/Cache lokal (0ms) dengan smart alias matching.
+- [x] **Sub-Tahap 58.C (Selesai ✅)**: Migrasi Pilar 1: Perjanjian Kinerja Tahunan `pkp_documents`:
+  - Integrasi simpan form PK ke Firestore (`savePkpToFirestore`), pengambilan detail instan 0ms (`getDetailPKP`), dan aksi status dokumen (`aksiDokumenPKP`).
+  - Penyatuan data hybrid (Sheets + Firestore), realtime snapshot listener (`subscribePkpRealtime`), dan tombol migrasi 1-klik untuk Admin (`migrateSheetsPkpToFirestore`).
+- [x] **Sub-Tahap 58.D (Selesai ✅)**: Migrasi Pilar 2: Capaian Kinerja Bulanan `pck_documents`:
+  - Integrasi simpan form PCK ke Firestore (`savePckToFirestore`), pengambilan detail instan 0ms (`getDetailLengkapPCK`), dan aksi status dokumen (`aksiDokumenPCK`).
+  - Penyatuan data hybrid (Sheets + Firestore), realtime snapshot listener (`subscribePckRealtime`), dan tombol migrasi 1-klik untuk Admin (`migrateSheetsPckToFirestore`).
+  - Pemasangan Realtime Listener untuk persetujuan atasan (*instant approval*).
+- [x] **Sub-Tahap 58.E (Selesai ✅)**: Pilar 3: Snapshot & Fitur Kunci Rekapitulasi `pck_rekapitulasi` (Opsi B):
+  - Penyediaan tombol `[ 🔒 Kunci & Sahkan Rekapitulasi ]` bagi Admin / Pimpinan Satker.
+  - Penyimpanan snapshot immutable di Firestore `pck_rekapitulasi` (`REKAP_YYYY_Bulan`) berisi rekapitulasi nilai seluruh pegawai, tgl pengesahan, pejabat penilai, dan rata-rata satker.
+  - Banner visual penanda status terkunci vs berjalan di tab Rekapitulasi.
+  - Fitur `[ 🔓 Buka Kunci ]` bagi Admin jika revisi diperlukan.
+  - Penyelarasan template cetak BKN (`cetak_rekap_pkp.js` & `cetak_rekap_pkp.html`) dengan identitas pimpinan dinamis dari `usersList` atau snapshot.
+- [x] **Sub-Tahap 58.F (Selesai ✅)**: Pembersihan, Verifikasi Mandiri & Cold Backup Policy:
+  - Memastikan sheet lama tetap aman sebagai cadangan arsip beku (*cold backup*) tanpa perubahan skema destruktif.
+  - Verifikasi mandiri sintaks (`node -c`) pada seluruh berkas JavaScript modul PKP, Core Firebase, dan Cetak (Status: 100% OK, 0 Syntax Error).
+  - Bump versi cache Service Worker PWA ke `transkep-v3.3.0` dan `APP_BUILD_VER` ke `3.3.0` di `index.html`.
+
+#### 4. Hasil & Status Akhir: [SELESAI] ✅
+- **Performa 0ms**: Pengambilan dokumen PK, PCK, dan Rekapitulasi berlangsung instan melalui Cloud Firestore tanpa round-trip Apps Script lambat.
+- **Integritas Rekapitulasi Terjamin**: Snapshot bulanan terkunci resmi (Opsi B) melindungi data capaian dari pergeseran pasca pengesahan Ketua Pengadilan.
+- **Keamanan Zero-Risk**: Seluruh aksi tulis tetap mencadangkan data ke Google Sheets di background sebagai arsip beku (cold backup).
+

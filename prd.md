@@ -68,7 +68,7 @@ ZONA BAWAH: MASTER CONTEXT & STATUS MIGRASI TERKINI (LIVING CONTEXT)
 | **Kelola Pegawai** | `pegawai/view_manajemen_pegawai.html`, `js_manajemen_pegawai.html` | ✅ **VUE.JS** | Mounted `#vue-manajemen-pegawai` (`window.vmPegawai`). Table CRUD & Excel parser. |
 | **Top App Bar Mobile** | `front_view/view_mobile_nav.html`, `js_mobile.html` | ✅ **VUE.JS** | Mounted `#mobile-top-bar` (`window.vmMobileNav`). Avatar & status user. |
 | **Global Modals (Sisa Cuti & Sandi)**| `index.html`, `javascript.html` | ✅ **VUE.JS** | Mounted `#vue-global-modals` (`window.vmGlobalModals`). |
-| **Penilaian Kinerja (PKP)** | `pkp/view_pkp.html`, `js_pkp_core.html`, `js_pkp_render.html`, `js_pkp_modal.html` | ✅ **VUE.JS** | Mounted `#vue-pkp-app` (`window.vmPkpApp`). Layar utama, Riwayat, Verifikasi, Rekap, Modal Target PK, dan Modal Realisasi PCK + live calculator capaian. |
+| **Penilaian Kinerja (PKP)** | `pkp/view_pkp.html`, `js_pkp_core.html`, `js_pkp_render.html`, `js_pkp_modal.html`, `modules/pkp/` | ✅ **VUE.JS + FIRESTORE** | Mounted `#vue-pkp-app` (`window.vmPkpApp`). 4 Pilar Firestore (`master_kinerja`, `pkp_documents`, `pck_documents`, `pck_rekapitulasi` Opsi B snapshot lock) + live calculator capaian + background Sheets cold backup. |
 | **E-Office (KGB & Paket Rapat)** | `eoffice/view_eoffice.html`, `js_eoffice.html`, `view_kgb.html`, `js_kgb.html`, `view_rapat.html`, `js_rapat.html` | ✅ **VUE.JS** | Mounted `#vue-eoffice-app` (`window.vmEoffice`). Rekapitulasi Global pekerjaan, auto-draf KGB dari Dashboard, Generator SK KGB (PP 05/2024), dan Paket Dokumen Rapat 3-in-1 (Undangan, Absensi, Notulen). |
 | **Modal Referensi Kode Surat**| `dashboard/referensi/view_kode.html`, `js_kode.html` | ❌ **VANILLA JS (BELUM)** | Pencarian kode surat & render DOM menggunakan `innerHTML`. |
 | **Modal Referensi Absensi** | `dashboard/referensi/view_referensi.html`, `js_referensi.html` | ❌ **VANILLA JS (BELUM)** | Modal popup statis + toggle kelas via vanilla JS. |
@@ -317,5 +317,16 @@ ZONA BAWAH: MASTER CONTEXT & STATUS MIGRASI TERKINI (LIVING CONTEXT)
     - **Sistem Pengaman Watchdog (6 Detik):**
       - Dilengkapi timer otomatis 6 detik di `syncAllServerData()` guna menjamin overlay otomatis tertutup jika koneksi server mengalami latensi ekstrem atau offline.
     - Versi PWA Service Worker `sw.js` dan `CURRENT_APP_BUILD` dinaikkan ke **transkep-v3.1.4**.
+
+30. **Inisialisasi 4 Pilar Modul PKP & PCK di Cloud Firestore (Tahap 58.A - Selesai & Aktif ✅):**
+    - **Fondasi Konektor Resmi (`TranskepFirebase`)**:
+      - Memasang definisi koleksi resmi `master_kinerja`, `pkp_documents`, `pck_documents`, dan `pck_rekapitulasi` pada `transkep-web/core/firebase.js` dan `javascript_firebase.html`.
+      - Menyediakan method CRUD & Realtime Listener lengkap:
+        1. *Pilar 0 (Master Jabatan)*: `saveMasterKinerjaToFirestore`, `getFirestoreMasterKinerja`, `deleteMasterKinerjaFromFirestore` dengan dukungan `aliases` anti-mismatch.
+        2. *Pilar 1 (Kontrak PK Tahunan)*: `savePkpToFirestore`, `getFirestorePkps`, `subscribeFirestorePkps`, `deletePkpFromFirestore`.
+        3. *Pilar 2 (Capaian PCK Bulanan)*: `savePckToFirestore`, `getFirestorePcks`, `subscribeFirestorePcks`, `deletePckFromFirestore`.
+        4. *Pilar 3 (Rekapitulasi Terkunci)*: `saveRekapitulasiToFirestore`, `getFirestoreRekapitulasi`, `subscribeFirestoreRekapitulasi`.
+    - Menjamin arsitektur *Zero-Risk Hybrid Bridge* di mana fungsi baru bersifat *non-breaking* dan sheet lama tetap berjalan normal.
+
 
 

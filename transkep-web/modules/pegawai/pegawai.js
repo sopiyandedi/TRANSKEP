@@ -159,43 +159,51 @@
         async submitPegawai() {
           this.formPegawai.pangkat = this.normalizePangkat(this.formPegawai.pangkat);
           const token = localStorage.getItem('transkep_session_token');
-          if(window.showLoading) window.showLoading("Mencatat perubahan profil ke database...");
           const adminNip = (this.currentUser && this.currentUser.nip) || localStorage.getItem('transkep_active_nip');
+
+          // OPTIMISTIC UI TAHAP 4 (0ms Update & Auto-Rollback)
+          this.closePegawaiModal();
+          const backupUsers = JSON.parse(JSON.stringify(this.usersList));
+
+          if (this.modalPegMode === 'add') {
+            this.usersList.push({ ...this.formPegawai });
+            if(window.showNotify) window.showNotify("Pegawai Ditambahkan ⚡", "Data akun pegawai baru telah dicatat (0ms).", "success");
+          } else {
+            const idx = this.usersList.findIndex(u => String(u.nip) === String(this.formPegawai.nip));
+            if (idx !== -1) this.usersList[idx] = { ...this.usersList[idx], ...this.formPegawai };
+            if(window.showNotify) window.showNotify("Profil Diperbarui ⚡", "Perubahan data pegawai disimpan (0ms).", "success");
+          }
 
           try {
             const res = await window.PegawaiDataService.savePegawai(this.formPegawai, this.modalPegMode, adminNip, token);
-            if(window.hideLoading) window.hideLoading(); 
-            this.closePegawaiModal();
-            if (res && res.status === 'success') { 
-              if(window.showNotify) window.showNotify("Profil Disimpan", res.message, "success"); 
-              if(window.syncAllServerData) window.syncAllServerData(); 
-            } else { 
-              if(window.showNotify) window.showNotify("Gagal Menyimpan", res ? res.message : "Gagal menyimpan data", "error"); 
+            if (!res || res.status !== 'success') {
+              this.usersList = backupUsers;
+              if(window.showNotify) window.showNotify("Gagal Menyimpan", (res ? res.message : "Gagal menyimpan data.") + " (Data dikembalikan)", "error");
             }
           } catch (err) {
-            if(window.hideLoading) window.hideLoading(); 
-            this.closePegawaiModal(); 
-            if(window.showNotify) window.showNotify("Error Sistem", err.toString(), "error"); 
+            this.usersList = backupUsers;
+            if(window.showNotify) window.showNotify("Error Sistem", err.toString() + " (Data dikembalikan)", "error");
           }
         },
         deletePegawaiRecord(user) {
           const token = localStorage.getItem('transkep_session_token');
           if(window.showCustomConfirm) {
              window.showCustomConfirm("Hapus Data Pegawai", `Hapus permanen akun PNS atas nama ${user.nama} (NIP: ${user.nip})? Tindakan ini tidak dapat dibatalkan.`, async () => {
-                if(window.showLoading) window.showLoading("Mengeksekusi penghapusan pegawai...");
+                // OPTIMISTIC DELETE TAHAP 4 (0ms)
+                const backupUsers = [...this.usersList];
+                this.usersList = this.usersList.filter(u => String(u.nip) !== String(user.nip));
+                if(window.showNotify) window.showNotify("Pegawai Dihapus ⚡", "Akun atas nama " + user.nama + " telah dihapus (0ms).", "info");
+
                 const adminNip = (this.currentUser && this.currentUser.nip) || localStorage.getItem('transkep_active_nip');
                 try {
                   const res = await window.PegawaiDataService.deletePegawai(user.nip, adminNip, token);
-                  if(window.hideLoading) window.hideLoading();
-                  if (res && res.status === 'success') { 
-                      if(window.showNotify) window.showNotify("Berhasil Dihapus", res.message, "success"); 
-                      if(window.syncAllServerData) window.syncAllServerData(); 
-                  } else { 
-                      if(window.showNotify) window.showNotify("Gagal Hapus", res ? res.message : "Gagal menghapus pegawai", "error"); 
+                  if (!res || res.status !== 'success') {
+                    this.usersList = backupUsers;
+                    if(window.showNotify) window.showNotify("Gagal Hapus", (res ? res.message : "Gagal menghapus pegawai.") + " (Data dikembalikan)", "error");
                   }
                 } catch (err) {
-                  if(window.hideLoading) window.hideLoading();
-                  if(window.showNotify) window.showNotify("Error", err.toString(), "error");
+                  this.usersList = backupUsers;
+                  if(window.showNotify) window.showNotify("Error Jaringan", err.toString() + " (Data dikembalikan)", "error");
                 }
              });
           }
@@ -325,7 +333,7 @@
             };
             
             if (window.showCustomConfirm) window.showCustomConfirm("Proses Antrean?", "Lanjutkan?", runProcess);
-            else if(confirm("Kirim kredensial?")) runProcess();
+            else if(window.showCustomConfirm) window.showCustomConfirm("Kirim Kredensial", "Kirim kredensial via WhatsApp?", () => runProcess()); else runProcess();
         }
       },
       mounted() {

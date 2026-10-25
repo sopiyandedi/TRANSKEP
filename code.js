@@ -286,11 +286,112 @@ function verifyLogin(nip, pass) {
   } catch (e) { return { status: 'error', message: e.toString() }; }
 }
 
-function getBulkData(nip, clientToken) {
+// ==========================================
+// TAHAP 2: SERVER-SIDE CACHING & VERSIONING
+// ==========================================
+
+function getServerDataVersion_() {
+  let v = null;
+  try {
+    v = PropertiesService.getScriptProperties().getProperty('TRANSKEP_DATA_VERSION');
+  } catch(e) {}
+  if (!v) {
+    v = String(new Date().getTime());
+    try {
+      PropertiesService.getScriptProperties().setProperty('TRANSKEP_DATA_VERSION', v);
+    } catch(e) {}
+  }
+  return v;
+}
+
+function bumpDataVersion() {
+  try {
+    bumpDataVersion();
+  } catch(e) {}
+  const newVersion = String(new Date().getTime());
+  try {
+    PropertiesService.getScriptProperties().setProperty('TRANSKEP_DATA_VERSION', newVersion);
+  } catch(e) {}
+  invalidateServerCache_();
+  return newVersion;
+}
+const bumpDataVersion_ = bumpDataVersion;
+
+function invalidateServerCache_() {
+  try {
+    const cache = CacheService.getScriptCache();
+    cache.remove('TRANSKEP_BG_DATA_COUNT');
+  } catch(e) {}
+}
+
+function setCacheChunked_(baseKey, dataObj, expirationInSeconds) {
+  try {
+    const jsonStr = JSON.stringify(dataObj);
+    const chunkSize = 80000; // ~80KB per chunk aman dari limit 100KB Apps Script
+    const totalChunks = Math.ceil(jsonStr.length / chunkSize);
+    const cache = CacheService.getScriptCache();
+    const exp = expirationInSeconds || 21600; // default 6 jam
+
+    cache.put(baseKey + '_COUNT', String(totalChunks), exp);
+
+    for (let i = 0; i < totalChunks; i++) {
+      const chunk = jsonStr.substring(i * chunkSize, (i + 1) * chunkSize);
+      cache.put(baseKey + '_' + i, chunk, exp);
+    }
+    return true;
+  } catch(err) {
+    console.warn("⚠️ Gagal setCacheChunked_:", err);
+    return false;
+  }
+}
+
+function getCacheChunked_(baseKey) {
+  try {
+    const cache = CacheService.getScriptCache();
+    const countStr = cache.get(baseKey + '_COUNT');
+    if (!countStr) return null;
+    const totalChunks = parseInt(countStr, 10);
+    if (isNaN(totalChunks) || totalChunks <= 0) return null;
+
+    let fullStr = '';
+    for (let i = 0; i < totalChunks; i++) {
+      const chunk = cache.get(baseKey + '_' + i);
+      if (chunk === null) return null;
+      fullStr += chunk;
+    }
+    return JSON.parse(fullStr);
+  } catch(err) {
+    console.warn("⚠️ Gagal getCacheChunked_:", err);
+    return null;
+  }
+}
+
+function normalizeDateDB(dateStr) {
+  if (!dateStr) return "";
+  if (dateStr.includes('-') && dateStr.split('-')[0].length === 4) return dateStr;
+  let parts = dateStr.includes('/') ? dateStr.split('/') : dateStr.split('-');
+  if (parts.length === 3) {
+      let d = parts[0].padStart(2, '0');
+      let m = parts[1].padStart(2, '0');
+      let y = parts[2];
+      if (y.length === 2) y = "20" + y; 
+      return `${y}-${m}-${d}`;
+  }
+  return dateStr;
+}
+
+function getBulkData(nip, clientToken, clientVersion) {
   try {
     // === VALIDASI KEAMANAN TERPUSAT ===
     if (!cekOtorisasi(nip, clientToken)) {
         return { status: 'error', message: 'Akses Ditolak: Sesi kedaluwarsa atau manipulasi terdeteksi. Silakan login ulang.' };
+    }
+
+    const serverVersion = getServerDataVersion_();
+
+    // DELTA SYNC SHORT-CIRCUIT (TAHAP 2):
+    if (clientVersion && String(clientVersion) === String(serverVersion)) {
+      return { status: 'NOT_MODIFIED', version: serverVersion };
     }
     
     // Memanggil koneksi database terpusat
@@ -308,26 +409,11 @@ function getBulkData(nip, clientToken) {
       must_change_password: !!cachedTempPass,
       temp_pass: cachedTempPass || ''
     };
-    
-    function normalizeDateDB(dateStr) {
-       if (!dateStr) return "";
-       if (dateStr.includes('-') && dateStr.split('-')[0].length === 4) return dateStr;
-       let parts = dateStr.includes('/') ? dateStr.split('/') : dateStr.split('-');
-       if (parts.length === 3) {
-           let d = parts[0].padStart(2, '0');
-           let m = parts[1].padStart(2, '0');
-           let y = parts[2];
-           if (y.length === 2) y = "20" + y; 
-           return `${y}-${m}-${d}`;
-       }
-       return dateStr;
-    }
 
     const sheetUser = ss.getSheetByName('user_data');
     if(sheetUser) {
        const uData = sheetUser.getDataRange().getDisplayValues();
 
-       // TRANSKEP HOTFIX KREDENSIAL: Cek apakah user yang login berhak melihat sandi (Admin saja)
        let isRequesterAdmin = false;
        for (let i = 1; i < uData.length; i++) {
           if (String(uData[i][0]) === String(nip) && String(uData[i][3]).toLowerCase() === 'admin') {
@@ -338,7 +424,6 @@ function getBulkData(nip, clientToken) {
 
        for(let i=1; i<uData.length; i++) {
           const isCurrentUser = (String(uData[i][0]) === String(nip));
-          // Password HANYA disertakan jika peminta adalah Admin, atau untuk akun user itu sendiri
           const userPassword = (isRequesterAdmin || isCurrentUser) ? uData[i][5] : '';
 
           const u = {
@@ -353,7 +438,7 @@ function getBulkData(nip, clientToken) {
             status_knp: uData[i][21] || '', tgl_selesai_knp: uData[i][22] || '',
             status_pensiun: uData[i][23] || '', tgl_selesai_pensiun: uData[i][24] || '',
             jenis_jabatan: uData[i][25] || 'Fungsional Umum'
-        };
+          };
           data.usersList.push(u);
           if (isCurrentUser) data.user = u;
        }
@@ -397,17 +482,30 @@ function getBulkData(nip, clientToken) {
     }
     data.pendingPkpCount = pendingCount;
 
-    return { status: 'success', data: data };
+    return { status: 'UPDATED', version: serverVersion, data: data };
   } catch (e) { return { status: 'error', message: e.toString() }; }
 }
 
-function getBackgroundData(nip, clientToken) {
+function getBackgroundData(nip, clientToken, clientVersion) {
   try {
     // === VALIDASI KEAMANAN TERPUSAT ===
     if (!cekOtorisasi(nip, clientToken)) {
         return { status: 'error', message: 'Sesi kedaluwarsa atau tidak valid.' };
     }
     
+    const serverVersion = getServerDataVersion_();
+
+    // DELTA SYNC SHORT-CIRCUIT (TAHAP 2):
+    if (clientVersion && String(clientVersion) === String(serverVersion)) {
+      return { status: 'NOT_MODIFIED', version: serverVersion };
+    }
+
+    // Cek Server-Side Cache (CacheService Chunked)
+    const cachedBg = getCacheChunked_('TRANSKEP_BG_DATA_' + serverVersion);
+    if (cachedBg) {
+      return { status: 'UPDATED', version: serverVersion, data: cachedBg };
+    }
+
     // Memanggil koneksi database terpusat
     const ss = getDB();
 
@@ -519,7 +617,10 @@ function getBackgroundData(nip, clientToken) {
        }
     }
 
-    return { status: 'success', data: data };
+    // Simpan ke CacheService secara chunked
+    setCacheChunked_('TRANSKEP_BG_DATA_' + serverVersion, data, 21600);
+
+    return { status: 'UPDATED', version: serverVersion, data: data };
   } catch (e) { return { status: 'error', message: e.toString() }; }
 }
 
@@ -619,7 +720,7 @@ function requestPasswordReset(no_wa) {
         }
       } catch(e) {}
       
-      SpreadsheetApp.flush();
+      bumpDataVersion();
       return { 
         status: 'success', 
         message: 'Kata sandi sementara telah berhasil dikirim otomatis ke nomor WhatsApp Anda (' + userFound.no_wa + ').' 
@@ -635,7 +736,7 @@ function requestPasswordReset(no_wa) {
       const uniqueId = 'REQ-' + new Date().getTime();
       const timestamp = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'dd/MM/yyyy HH:mm:ss');
       logSheet.appendRow([uniqueId, timestamp, userFound.nip, userFound.nama, userFound.no_wa, tempPass]);
-      SpreadsheetApp.flush();
+      bumpDataVersion();
 
       return { 
         status: 'success', 
@@ -727,7 +828,7 @@ function markResetAsDone(reqId, adminNip, clientToken) {
     
     if (rowIndex !== -1) {
       sheet.deleteRow(rowIndex);
-      SpreadsheetApp.flush();
+      bumpDataVersion();
       return { status: 'success' };
     }
     throw new Error("Antrean dengan ID tersebut tidak ditemukan atau sudah diproses orang lain.");
@@ -848,7 +949,7 @@ function handleWebhookST_(payload) {
     dataEkstraJson 
   ]));
   
-  SpreadsheetApp.flush();
+  bumpDataVersion();
 
   return jsonResponse_({
     status: "success",

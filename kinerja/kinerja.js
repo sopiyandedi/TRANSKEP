@@ -40,7 +40,7 @@ function addKinerjaLog(payload, clientToken) {
 
     sheet.getRange(sheet.getLastRow(), 2, 1, 2).setNumberFormat('@'); // Cegah NIP jadi angka
     
-    SpreadsheetApp.flush();
+    if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush();
     return { status: 'success', message: 'Dokumen SKP berhasil diunggah.' };
   } catch (err) {
     return { status: 'error', message: err.toString() };
@@ -146,7 +146,7 @@ function approveKinerja(id, userNip, clientToken) {
         fileTte.getUrl()
     ]]);
     
-    SpreadsheetApp.flush();
+    if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush();
     return { status: 'success', message: 'Tanda tangan elektronik berhasil dibubuhkan.' };
     
   } catch(e) {

@@ -33,7 +33,7 @@ function addUser(payload, adminNip, clientToken) {
     const lastRow = sheet.getLastRow();
     sheet.getRange(lastRow, 1).setNumberFormat('@'); // Set NIP jadi plain text
     
-    SpreadsheetApp.flush();
+    if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush();
     return { status: 'success', message: 'Data pegawai baru berhasil ditambahkan.' };
   } catch (err) {
     return { status: 'error', message: err.toString() };
@@ -73,7 +73,7 @@ function updateUser(payload, adminNip, clientToken) {
     // FIX: Update kolom ke-26 secara spesifik
     sheet.getRange(rowIndex, 26).setValue(payload.jenis_jabatan || "Fungsional Umum");
     
-    SpreadsheetApp.flush();
+    if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush();
     return { status: 'success', message: 'Data profil pegawai berhasil diperbarui.' };
   } catch (err) {
     return { status: 'error', message: err.toString() };
@@ -101,7 +101,7 @@ function deleteUser(nip, adminNip, clientToken) {
     if (rowIndex === -1) throw new Error("Data pegawai tidak ditemukan.");
     
     sheet.deleteRow(rowIndex);
-    SpreadsheetApp.flush();
+    if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush();
     return { status: 'success', message: 'Data pegawai berhasil dihapus permanen.' };
   } catch (err) {
     return { status: 'error', message: err.toString() };
@@ -148,7 +148,7 @@ function importBulkUsers(jsonArray, adminNip, clientToken) {
        }
     });
     
-    SpreadsheetApp.flush();
+    if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush();
     return { status: 'success', message: 'Import/Sinkronisasi excel ke database berhasil diproses.' };
   } catch(e) {
     return { status: 'error', message: e.toString() };

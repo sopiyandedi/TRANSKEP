@@ -297,24 +297,41 @@ document.addEventListener("DOMContentLoaded", () => {
                     data_ekstra_json: JSON.stringify(ekstraData) 
                 };
 
+                // OPTIMISTIC ST TAHAP 4 (0ms Update & Auto-Rollback)
+                this.closeModalST();
+                const backupSt = [...(this.s.stList || [])];
+                const tempStId = this.currentEditId || ('ST-OPT-' + Date.now());
+
+                if (this.currentEditId) {
+                    const idx = this.s.stList.findIndex(x => String(x.id) === String(this.currentEditId));
+                    if (idx !== -1) {
+                        this.s.stList[idx] = Object.assign({}, this.s.stList[idx], payload);
+                    }
+                } else {
+                    const optimisticSt = {
+                        id: tempStId, nomor_st: payload.nomor_st, tujuan: payload.tujuan,
+                        tempat: payload.tempat, tgl_mulai: payload.tgl_mulai, tgl_selesai: payload.tgl_selesai,
+                        peserta: payload.peserta_json, waktu: new Date().toLocaleDateString('id-ID')
+                    };
+                    if (this.s.stList) this.s.stList.unshift(optimisticSt);
+                }
+
+                if(window.showNotify) {
+                    window.showNotify("Surat Tugas Diterbitkan ⚡", this.currentEditId ? "Perubahan Surat Tugas disimpan (0ms)." : "Surat Tugas & rombongan dinas diterbitkan (0ms).", "success");
+                }
+
                 const token = localStorage.getItem('transkep_session_token'); 
-                if(window.showLoading) window.showLoading(this.currentEditId ? "Memperbarui Surat Tugas..." : "Menerbitkan Dokumen Terpadu...");
-                
                 if (typeof google !== 'undefined') {
                     const runner = google.script.run
                       .withSuccessHandler((res) => {
-                          if(window.hideLoading) window.hideLoading();
-                          if (res.status === 'success') { 
-                              this.closeModalST(); 
-                              if(window.showNotify) window.showNotify("Berhasil", this.currentEditId ? res.message : "ST, SPD, dan Plh diterbitkan.", "success"); 
-                              if (typeof window.syncAllServerData === 'function') window.syncAllServerData(); 
-                          } else { 
-                              if(window.showNotify) window.showNotify("Gagal", res.message, "error"); 
+                          if (!res || res.status !== 'success') {
+                              this.s.stList = backupSt;
+                              if(window.showNotify) window.showNotify("Gagal Menerbitkan ST", (res ? res.message : "Terjadi kesalahan.") + " (Data dikembalikan)", "error");
                           }
                       })
                       .withFailureHandler((err) => { 
-                          if(window.hideLoading) window.hideLoading(); 
-                          if(window.showNotify) window.showNotify("Error Koneksi", err.toString(), "error"); 
+                          this.s.stList = backupSt;
+                          if(window.showNotify) window.showNotify("Error Koneksi", err.toString() + " (Data dikembalikan)", "error"); 
                       });
                       
                     if (this.currentEditId) runner.updateSuratTugas(payload, this.s.user.nip, token);

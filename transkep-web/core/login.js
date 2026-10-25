@@ -40,7 +40,7 @@ function submitLupaPassword(e) {
     if (typeof showNotify === 'function') {
       showNotify("Tunggu Sebentar", "Sistem sedang memproses antrean sebelumnya. Silakan tunggu sekitar 60 detik sebelum mengirim permintaan baru.", "warning");
     } else {
-      alert("Tunggu 60 detik sebelum mengirim permintaan baru.");
+      if (typeof showNotify === "function") showNotify("Mohon Tunggu", "Tunggu 60 detik sebelum mengirim permintaan baru.", "warning");
     }
     return;
   }

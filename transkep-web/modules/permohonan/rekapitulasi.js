@@ -320,44 +320,46 @@
               deleteRekapRecord(id) {
                   const token = localStorage.getItem('transkep_session_token');
                   if(window.showCustomConfirm) window.showCustomConfirm("Batalkan Cuti", "Apakah Anda yakin ingin membatalkan cuti ini? Statusnya akan berubah menjadi DIBATALKAN dan saldo cuti akan dikembalikan utuh ke pegawai terkait.", async () => {
-                      if(window.showLoading) window.showLoading("Membatalkan data...");
+                      // OPTIMISTIC CANCEL TAHAP 4 (0ms)
+                      const backupCuti = JSON.parse(JSON.stringify(this.s.cutiLogs || []));
+                      const logIndex = this.s.cutiLogs.findIndex(l => String(l.id) === String(id));
+                      if (logIndex !== -1) {
+                          this.s.cutiLogs[logIndex].status = 'DIBATALKAN';
+                          this.s.cutiLogs[logIndex].status_atasan = 'DIBATALKAN';
+                          this.s.cutiLogs[logIndex].status_pejabat = 'DIBATALKAN';
+                      }
+                      if(window.showNotify) window.showNotify("Cuti Dibatalkan ⚡", "Status cuti dibatalkan secara instan (0ms).", "success");
+
                       try {
                           const res = await RekapitulasiDataService.deleteCuti(id, this.s.user.nip, token);
-                          if(window.hideLoading) window.hideLoading();
-                          if (res && res.status === 'success') {
-                              if(window.showNotify) window.showNotify("Berhasil Dibatalkan", res.message, "success");
-                              const logIndex = this.s.cutiLogs.findIndex(l => String(l.id) === String(id));
-                              if (logIndex !== -1) {
-                                  this.s.cutiLogs[logIndex].status = 'DIBATALKAN';
-                                  this.s.cutiLogs[logIndex].status_atasan = 'DIBATALKAN';
-                                  this.s.cutiLogs[logIndex].status_pejabat = 'DIBATALKAN';
-                              }
-                          } else { 
-                              if(window.showNotify) window.showNotify("Gagal Membatalkan", res ? res.message : "Terjadi kesalahan.", "error"); 
+                          if (!res || res.status !== 'success') {
+                              this.s.cutiLogs = backupCuti;
+                              if(window.showNotify) window.showNotify("Gagal Membatalkan", (res ? res.message : "Terjadi kesalahan.") + " (Status dikembalikan)", "error");
                           }
                       } catch (err) {
-                          if(window.hideLoading) window.hideLoading();
-                          if(window.showNotify) window.showNotify("Error", err.message || err.toString(), "error");
+                          this.s.cutiLogs = backupCuti;
+                          if(window.showNotify) window.showNotify("Error Jaringan", (err.message || err.toString()) + " (Status dikembalikan)", "error");
                       }
                   });
               },
               deleteSTRecord(id) {
                   const token = localStorage.getItem('transkep_session_token');
                   if(window.showCustomConfirm) window.showCustomConfirm("Hapus Surat Tugas", "Apakah Anda yakin ingin menghapus dokumen Surat Tugas ini? Semua nama pegawai yang tergabung dalam rombongan dinas ini akan ikut terhapus riwayatnya.", async () => {
-                      if(window.showLoading) window.showLoading("Menghapus Surat Tugas...");
+                      // OPTIMISTIC DELETE TAHAP 4 (0ms)
+                      const backupSt = [...(this.s.stList || [])];
+                      const logIndex = this.s.stList.findIndex(l => String(l.id) === String(id));
+                      if (logIndex !== -1) this.s.stList.splice(logIndex, 1);
+                      if(window.showNotify) window.showNotify("Surat Tugas Dihapus ⚡", "Dokumen telah dihapus dari daftar (0ms).", "success");
+
                       try {
                           const res = await RekapitulasiDataService.deleteST(id, this.s.user.nip, token);
-                          if(window.hideLoading) window.hideLoading();
-                          if (res && res.status === 'success') {
-                              if(window.showNotify) window.showNotify("Surat Tugas Dihapus", res.message, "success");
-                              const logIndex = this.s.stList.findIndex(l => String(l.id) === String(id));
-                              if (logIndex !== -1) this.s.stList.splice(logIndex, 1);
-                          } else { 
-                              if(window.showNotify) window.showNotify("Gagal Menghapus", res ? res.message : "Terjadi kesalahan.", "error"); 
+                          if (!res || res.status !== 'success') {
+                              this.s.stList = backupSt;
+                              if(window.showNotify) window.showNotify("Gagal Hapus ST", (res ? res.message : "Gagal menghapus.") + " (Data dikembalikan)", "error");
                           }
                       } catch (err) {
-                          if(window.hideLoading) window.hideLoading();
-                          if(window.showNotify) window.showNotify("Error Jaringan", err.message || err.toString(), "error");
+                          this.s.stList = backupSt;
+                          if(window.showNotify) window.showNotify("Error Jaringan", err.message || err.toString() + " (Data dikembalikan)", "error");
                       }
                   });
               },

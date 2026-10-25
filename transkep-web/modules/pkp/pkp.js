@@ -373,7 +373,7 @@ function cetakDokumen(jenis, id) {
                 if (res && res.status === 'success') {
                     showNotify("Berhasil", "Dokumen PK berhasil dibuat!", "success");
                     if (res.url && res.url !== '#') window.open(res.url, '_blank');
-                    else alert("[CANVAS MODE] PDF PK akan terbuka di sini.");
+                    else showNotify("Info Dokumen", "[CANVAS MODE] PDF PK siap diunduh.", "info");
                 } else {
                     showNotify("Gagal Cetak", res ? res.message : "Gagal generate PDF", "error");
                 }
@@ -407,7 +407,7 @@ function cetakDokumen(jenis, id) {
                 if (res && res.status === 'success') {
                     showNotify("Berhasil", "Laporan PCK berhasil dibuat!", "success");
                     if (res.url && res.url !== '#') window.open(res.url, '_blank');
-                    else alert("[CANVAS MODE] PDF PCK akan terbuka di sini.");
+                    else showNotify("Info Dokumen", "[CANVAS MODE] PDF PCK siap diunduh.", "info");
                 } else {
                     showNotify("Gagal Cetak", res ? res.message : "Gagal generate PDF", "error");
                 }
@@ -478,6 +478,9 @@ function mountPkpApp() {
                 isReadOnlyPCK: false,
                 isVerifikasiPCK: false,
                 modalPCKError: '',
+                isMigratingFirestore: false,
+                rekapSnapshots: [],
+                isLockingRekap: false,
                 formPCK: {
                     tahun: new Date().getFullYear(),
                     bulan: '0',
@@ -495,6 +498,10 @@ function mountPkpApp() {
             usersList() {
                 return (this.globalState && this.globalState.usersList) ? this.globalState.usersList : ((typeof state !== 'undefined' && state.usersList) ? state.usersList : []);
             },
+            isAdmin() {
+                const role = this.currentUser ? (this.currentUser.role || '') : '';
+                return role === 'Admin' || (typeof state !== 'undefined' && state.isAdmin);
+            },
             canVerify() {
                 const role = this.currentUser ? (this.currentUser.role || '') : '';
                 return ['Admin', 'Operator', 'Atasan Langsung', 'Pejabat Berwenang'].includes(role);
@@ -502,6 +509,21 @@ function mountPkpApp() {
             canRekap() {
                 const role = this.currentUser ? (this.currentUser.role || '') : '';
                 return ['Admin', 'Operator'].includes(role);
+            },
+            canLockRekap() {
+                const role = this.currentUser ? (this.currentUser.role || '') : '';
+                return ['Admin', 'Atasan Langsung', 'Pejabat Berwenang'].includes(role) || this.isAdmin;
+            },
+            currentRekapSnapshot() {
+                const yr = String(this.selectedYear).trim();
+                const bln = String(this.selectedMonth).trim().toLowerCase();
+                if (!bln || bln === '0') return null;
+                return (this.rekapSnapshots || []).find(r => {
+                    return String(r.tahun).trim() === yr && String(r.bulan).trim().toLowerCase() === bln;
+                }) || null;
+            },
+            currentRekapLocked() {
+                return !!this.currentRekapSnapshot;
             },
             canAccessLapis1() {
                 return this.canVerify || this.canRekap;
@@ -563,6 +585,27 @@ function mountPkpApp() {
             rekapListPCK() {
                 const yr = String(this.selectedYear).trim();
                 const selectedM = this.selectedMonth && this.selectedMonth !== '0' ? String(this.selectedMonth).trim().toLowerCase() : null;
+
+                // Jika ada snapshot terkunci untuk bulan & tahun ini, sajikan daftar_nilai dari snapshot (Opsi B)
+                if (this.currentRekapSnapshot && Array.isArray(this.currentRekapSnapshot.daftar_nilai) && this.currentRekapSnapshot.daftar_nilai.length > 0) {
+                    return this.currentRekapSnapshot.daftar_nilai.map(row => ({
+                        id_pck: 'SNAP_' + row.nip,
+                        nip: row.nip,
+                        nama: row.nama,
+                        jabatan: row.jabatan,
+                        bulan: this.currentRekapSnapshot.bulan,
+                        tahun: this.currentRekapSnapshot.tahun,
+                        rencana: row.total_rencana || '-',
+                        total_rencana: row.total_rencana || '-',
+                        nilai_akhir: row.nilai,
+                        nilai: row.nilai,
+                        status: 'Terkunci / Disahkan',
+                        predikat: row.predikat,
+                        is_snapshot: true,
+                        is_firebase: true
+                    }));
+                }
+
                 return this.safePckList.filter(item => {
                     const isTahunSama = String(item.tahun || '').trim() === yr;
                     const isBulanSama = selectedM ? (String(item.bulan || '').trim().toLowerCase() === selectedM) : true;
@@ -762,7 +805,173 @@ function mountPkpApp() {
                 if (typeof validasiCepatDokumen === 'function') validasiCepatDokumen(tipe, id);
             },
             cetakRekap() {
-                if (typeof cetakRekapPCKBulanan === 'function') cetakRekapPCKBulanan();
+                if (typeof cetakRekapPCKBulanan === 'function') {
+                    cetakRekapPCKBulanan(this.currentRekapSnapshot);
+                }
+            },
+            async kunciDanSahkanRekap() {
+                if (!this.selectedMonth || this.selectedMonth === '0') {
+                    showNotify("Pilih Bulan", "Silakan tentukan bulan laporan terlebih dahulu untuk mengesahkan rekapitulasi.", "warning");
+                    return;
+                }
+
+                const yr = String(this.selectedYear).trim();
+                const bln = String(this.selectedMonth).trim();
+
+                const approvedList = this.safePckList.filter(item => {
+                    return String(item.tahun).trim() === yr &&
+                           String(item.bulan).trim().toLowerCase() === bln.toLowerCase() &&
+                           (item.status === 'Disetujui' || item.status === 'Final');
+                });
+
+                if (approvedList.length === 0) {
+                    showNotify("Belum Ada Data Disetujui", `Tidak ada dokumen PCK berstatus Disetujui / Final pada bulan ${bln} ${yr}. Pastikan atasan telah menyetujui capaian bawahan.`, "warning");
+                    return;
+                }
+
+                let confirmResult = false;
+                if (typeof Swal !== 'undefined') {
+                    const swalRes = await Swal.fire({
+                        title: 'Kunci & Sahkan Rekapitulasi?',
+                        html: `<div class="text-sm text-left">
+                            <p class="mb-2">Anda akan mengesahkan dan mengunci rekapitulasi capaian kinerja untuk:</p>
+                            <ul class="list-disc pl-5 mb-2 font-semibold">
+                                <li>Periode: <strong>${bln} ${yr}</strong></li>
+                                <li>Total Pegawai: <strong>${approvedList.length} orang</strong></li>
+                            </ul>
+                            <p class="text-xs text-amber-400">Dokumen snapshot immutable (tidak berubah) akan disimpan di Cloud Firestore.</p>
+                        </div>`,
+                        icon: 'question',
+                        showCancelButton: true,
+                        confirmButtonColor: '#059669',
+                        cancelButtonColor: '#475569',
+                        confirmButtonText: '<i class="fa-solid fa-lock mr-1"></i> Sahkan & Kunci',
+                        cancelButtonText: 'Batal'
+                    });
+                    confirmResult = swalRes.isConfirmed;
+                } else {
+                    confirmResult = true;
+                }
+
+                if (!confirmResult) return;
+
+                try {
+                    this.isLockingRekap = true;
+                    showLoading("Mengunci & Menyimpan Snapshot Rekapitulasi...");
+
+                    const users = this.usersList || [];
+                    let ketua = users.find(u => {
+                        const j = String(u.jabatan || '').toLowerCase();
+                        return j.includes('ketua') && !j.includes('wakil');
+                    });
+                    if (!ketua) {
+                        ketua = users.find(u => {
+                            const j = String(u.jabatan || '').toLowerCase();
+                            return j.includes('wakil ketua') || u.role === 'Pejabat Berwenang';
+                        }) || this.currentUser;
+                    }
+
+                    let sumNilai = 0;
+                    const daftarNilai = approvedList.map(item => {
+                        const cleanNip = String(item.nip || '').replace(/'/g, '').trim();
+                        const u = users.find(x => String(x.nip).replace(/'/g, '').trim() === cleanNip) || {};
+                        const val = parseFloat(item.nilai_akhir || item.nilai || 0);
+                        sumNilai += val;
+
+                        let pred = 'Kurang';
+                        if (val >= 91) pred = 'Sangat Baik';
+                        else if (val >= 76) pred = 'Baik';
+                        else if (val >= 61) pred = 'Cukup';
+                        else if (val >= 51) pred = 'Kurang';
+                        else pred = 'Buruk';
+
+                        return {
+                            nip: cleanNip,
+                            nama: u.nama || item.nama || ('Pegawai ' + cleanNip),
+                            jabatan: u.jabatan || item.jabatan || '-',
+                            nilai: val.toFixed(2),
+                            predikat: pred,
+                            total_rencana: parseInt(item.rencana || item.total_rencana || 0) || 0
+                        };
+                    });
+
+                    const avgScore = approvedList.length > 0 ? (sumNilai / approvedList.length).toFixed(2) : 0;
+
+                    const payload = {
+                        id_rekap: 'REKAP_' + yr + '_' + bln,
+                        bulan: bln,
+                        tahun: yr,
+                        unit_kerja: 'Pengadilan Agama Indramayu',
+                        status: 'Terkunci / Disahkan',
+                        pejabat_nama: ketua ? ketua.nama : 'Ketua Pengadilan Agama Indramayu',
+                        pejabat_nip: ketua ? (ketua.nip ? String(ketua.nip).replace(/'/g, '').trim() : '-') : '-',
+                        tgl_pengesahan: new Date().toISOString().split('T')[0],
+                        total_pegawai: approvedList.length,
+                        rata_rata_satker: parseFloat(avgScore),
+                        daftar_nilai: daftarNilai
+                    };
+
+                    if (typeof PkpDataService !== 'undefined' && typeof PkpDataService.saveFirestoreRekapitulasi === 'function') {
+                        await PkpDataService.saveFirestoreRekapitulasi(payload);
+                    } else if (typeof TranskepFirebase !== 'undefined' && TranskepFirebase.isReady()) {
+                        await TranskepFirebase.saveRekapitulasiToFirestore(payload);
+                    }
+
+                    const idx = this.rekapSnapshots.findIndex(r => r.id_rekap === payload.id_rekap);
+                    if (idx >= 0) {
+                        this.rekapSnapshots.splice(idx, 1, payload);
+                    } else {
+                        this.rekapSnapshots.push(payload);
+                    }
+
+                    hideLoading();
+                    showNotify("Rekapitulasi Disahkan", `Rekapitulasi bulan ${bln} ${yr} berhasil dikunci dan diamankan di Cloud Firestore.`, "success");
+                } catch (err) {
+                    hideLoading();
+                    console.error("Gagal kunci rekap:", err);
+                    showNotify("Gagal Mengunci Rekap", err.message || String(err), "error");
+                } finally {
+                    this.isLockingRekap = false;
+                }
+            },
+            async bukaKunciRekap() {
+                if (!this.currentRekapSnapshot) return;
+                const snapshot = this.currentRekapSnapshot;
+
+                let confirmResult = false;
+                if (typeof Swal !== 'undefined') {
+                    const swalRes = await Swal.fire({
+                        title: 'Buka Kunci Rekapitulasi?',
+                        text: `Status rekapitulasi bulan ${snapshot.bulan} ${snapshot.tahun} akan dibuka kembali sehingga penilaian dapat direvisi.`,
+                        icon: 'warning',
+                        showCancelButton: true,
+                        confirmButtonColor: '#e11d48',
+                        cancelButtonColor: '#475569',
+                        confirmButtonText: '<i class="fa-solid fa-lock-open mr-1"></i> Ya, Buka Kunci',
+                        cancelButtonText: 'Batal'
+                    });
+                    confirmResult = swalRes.isConfirmed;
+                } else {
+                    confirmResult = true;
+                }
+
+                if (!confirmResult) return;
+
+                try {
+                    showLoading("Membuka Kunci Rekapitulasi...");
+                    if (typeof PkpDataService !== 'undefined' && typeof PkpDataService.deleteFirestoreRekapitulasi === 'function') {
+                        await PkpDataService.deleteFirestoreRekapitulasi(snapshot.id_rekap);
+                    } else if (typeof TranskepFirebase !== 'undefined' && TranskepFirebase.isReady()) {
+                        await TranskepFirebase.deleteRekapitulasiFromFirestore(snapshot.id_rekap);
+                    }
+
+                    this.rekapSnapshots = this.rekapSnapshots.filter(r => r.id_rekap !== snapshot.id_rekap);
+                    hideLoading();
+                    showNotify("Kunci Dibuka", `Rekapitulasi bulan ${snapshot.bulan} ${snapshot.tahun} kini kembali berstatus kalkulasi berjalan.`, "success");
+                } catch (err) {
+                    hideLoading();
+                    showNotify("Gagal Buka Kunci", err.message || String(err), "error");
+                }
             },
             handleActionBtn() {
                 if (this.activeMainTab === 'PK') {
@@ -921,54 +1130,92 @@ function mountPkpApp() {
                     ind.waktu = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
                 }
             },
-            applyTemplateKinerja() {
+            async applyTemplateKinerja() {
                 const u = this.currentUser;
                 if (!u || !u.jabatan) {
                     showNotify("Gagal", "Jabatan Anda tidak ditemukan di sistem.", "error");
                     return;
                 }
-                const jabatanUser = String(u.jabatan).trim().toLowerCase();
-                const mList = (typeof state !== 'undefined' && state.masterKinerjaList) ? state.masterKinerjaList : [];
-                const templates = mList.filter(m => String(m.jabatan).trim().toLowerCase() === jabatanUser);
+                const jabatanUser = String(u.jabatan).trim();
 
-                if (templates.length === 0) {
+                // 1. Coba ambil template terstruktur dari Firestore / Cache (PkpDataService)
+                let matchedTemplate = null;
+                let templatesList = [];
+                if (typeof PkpDataService !== 'undefined' && typeof PkpDataService.getMasterKinerjaTemplates === 'function') {
+                    try {
+                        templatesList = await PkpDataService.getMasterKinerjaTemplates();
+                        matchedTemplate = PkpDataService.findTemplateForJabatan(jabatanUser, templatesList);
+                    } catch (err) {
+                        console.warn("[PKP] Gagal mengambil template kinerja Firestore:", err);
+                    }
+                }
+
+                // 2. Fallback jika belum ketemu di Firestore: Cek legacy flat list (state.masterKinerjaList dari Sheets)
+                let legacyTemplates = [];
+                if (!matchedTemplate) {
+                    const mList = (typeof state !== 'undefined' && state.masterKinerjaList) ? state.masterKinerjaList : [];
+                    legacyTemplates = mList.filter(m => {
+                        const mJab = String(m.jabatan || '').trim().toLowerCase();
+                        const uJab = jabatanUser.toLowerCase();
+                        return mJab === uJab || mJab.includes(uJab) || uJab.includes(mJab);
+                    });
+                }
+
+                if (!matchedTemplate && legacyTemplates.length === 0) {
                     showNotify("Template Kosong", "Belum ada template 'Kamus Kinerja' untuk jabatan " + u.jabatan + ". Silakan input manual atau hubungi Admin.", "warning");
                     return;
                 }
 
                 showCustomConfirm("Tarik Template Kinerja?", "Tindakan ini akan <b>MENGHAPUS SEMUA</b> form isian di bawah yang sedang Anda ketik dan menggantinya dengan template otomatis. Lanjutkan?", () => {
-                    const groupMap = {};
-                    templates.forEach(item => {
-                        const sName = item.sasaran || '';
-                        if (!groupMap[sName]) groupMap[sName] = [];
-                        groupMap[sName].push(item);
-                    });
+                    let newSasaranList = [];
 
-                    const newSasaranList = [];
-                    for (const sName in groupMap) {
-                        const items = groupMap[sName];
-                        const indList = items.map(kg => {
-                            let wArr = [1,2,3,4,5,6,7,8,9,10,11,12];
-                            if (kg.waktu) {
-                                wArr = String(kg.waktu).split(',').map(x => parseInt(x.trim())).filter(x => !isNaN(x));
+                    if (matchedTemplate && Array.isArray(matchedTemplate.sasaran_list) && matchedTemplate.sasaran_list.length > 0) {
+                        // Gunakan template terstruktur Firestore
+                        newSasaranList = JSON.parse(JSON.stringify(matchedTemplate.sasaran_list));
+                        newSasaranList.forEach(s => {
+                            if (Array.isArray(s.indikatorList)) {
+                                s.indikatorList.forEach(ind => {
+                                    if (!Array.isArray(ind.waktu) || ind.waktu.length === 0) {
+                                        ind.waktu = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+                                    }
+                                });
                             }
-                            return {
-                                indikator: kg.indikator || '',
-                                mutu: kg.mutu || 100,
-                                kuantitas: kg.kuantitas || 1,
-                                satuan: kg.satuan || 'Dokumen',
-                                waktu: wArr.length ? wArr : [1,2,3,4,5,6,7,8,9,10,11,12],
-                                pagu: kg.pagu || 0
-                            };
                         });
-                        newSasaranList.push({
-                            sasaran: sName,
-                            indikatorList: indList
+                    } else if (legacyTemplates.length > 0) {
+                        // Gunakan template flat dari Google Sheets
+                        const groupMap = {};
+                        legacyTemplates.forEach(item => {
+                            const sName = item.sasaran || '';
+                            if (!groupMap[sName]) groupMap[sName] = [];
+                            groupMap[sName].push(item);
                         });
+
+                        for (const sName in groupMap) {
+                            const items = groupMap[sName];
+                            const indList = items.map(kg => {
+                                let wArr = [1,2,3,4,5,6,7,8,9,10,11,12];
+                                if (kg.waktu) {
+                                    wArr = String(kg.waktu).split(',').map(x => parseInt(x.trim())).filter(x => !isNaN(x));
+                                }
+                                return {
+                                    indikator: kg.indikator || '',
+                                    mutu: kg.mutu || 100,
+                                    kuantitas: kg.kuantitas || 1,
+                                    satuan: kg.satuan || 'Dokumen',
+                                    waktu: wArr.length ? wArr : [1,2,3,4,5,6,7,8,9,10,11,12],
+                                    pagu: kg.pagu || 0
+                                };
+                            });
+                            newSasaranList.push({
+                                sasaran: sName,
+                                indikatorList: indList
+                            });
+                        }
                     }
 
                     this.formPK.sasaranList = newSasaranList;
-                    showNotify("Template Berhasil Ditarik", "Seluruh data Sasaran dan Indikator otomatis diisikan berdasarkan jabatan " + u.jabatan, "success");
+                    const namaTpl = matchedTemplate ? matchedTemplate.nama_jabatan : u.jabatan;
+                    showNotify("Template Berhasil Ditarik", "Seluruh data Sasaran dan Indikator otomatis diisikan berdasarkan template jabatan " + namaTpl, "success");
                 });
             },
             savePKFull() {
@@ -1046,10 +1293,15 @@ function mountPkpApp() {
                     }
 
                     this.modalPKSubmitting = true;
+                    const docId = this.modalPKCurrentId || ('PKP_' + inputTahun + '_' + nipPegawai);
                     const payload = {
+                        id_pkp: docId,
                         nipPegawai: nipPegawai,
+                        nip: nipPegawai,
                         nipPenilai: inputNipPenilai,
+                        penilai: inputNipPenilai,
                         nipAtasanPejabat: inputNipAtasanPejabat,
+                        atasan_pejabat: inputNipAtasanPejabat,
                         tahun: inputTahun,
                         items: arrayData,
                         status: finalStatus
@@ -1066,7 +1318,7 @@ function mountPkpApp() {
                                     .withFailureHandler(reject)
                                     .submitBulkPKP(payload, currentNip, token);
                             } else {
-                                setTimeout(() => resolve({ success: true, id_pkp: 'PKP-DEMO-' + Date.now(), message: 'Data PK tersimpan di local memory.' }), 500);
+                                setTimeout(() => resolve({ success: true, id_pkp: docId, message: 'Data PK tersimpan di local memory.' }), 500);
                             }
                         });
 
@@ -1074,15 +1326,31 @@ function mountPkpApp() {
                         .then(res => {
                             this.modalPKSubmitting = false;
                             if (res && res.success) {
+                                const targetId = res.id_pkp || docId;
                                 if (typeof state !== 'undefined' && state.pkpDokumen) {
-                                    const existingIdx = state.pkpDokumen.findIndex(p => String(p.id_pkp) === String(res.id_pkp));
-                                    if (existingIdx > -1) state.pkpDokumen[existingIdx].status = finalStatus;
-                                    else state.pkpDokumen.unshift({ id_pkp: res.id_pkp, nip: nipPegawai, penilai: inputNipPenilai, tahun: inputTahun, status: finalStatus, nilai: "0" });
+                                    const existingIdx = state.pkpDokumen.findIndex(p => String(p.id_pkp) === String(targetId));
+                                    if (existingIdx > -1) {
+                                        state.pkpDokumen[existingIdx].status = finalStatus;
+                                        state.pkpDokumen[existingIdx].penilai = inputNipPenilai;
+                                        state.pkpDokumen[existingIdx].atasan_pejabat = inputNipAtasanPejabat;
+                                        state.pkpDokumen[existingIdx].is_firebase = true;
+                                    } else {
+                                        state.pkpDokumen.unshift({
+                                            id_pkp: targetId,
+                                            nip: nipPegawai,
+                                            penilai: inputNipPenilai,
+                                            atasan_pejabat: inputNipAtasanPejabat,
+                                            tahun: inputTahun,
+                                            status: finalStatus,
+                                            nilai: "0",
+                                            is_firebase: true
+                                        });
+                                    }
                                     if (window.vueState) window.vueState.pkpDokumen = state.pkpDokumen;
                                 }
                                 this.syncData(state.pkpDokumen, state.pckDokumen);
                                 this.closeModalPK();
-                                showNotify("Tersimpan", res.message, "success");
+                                showNotify("Tersimpan", res.message || "Dokumen PK berhasil diamankan.", "success");
                             } else {
                                 showNotify("Gagal", res ? res.message : "Error server", "error");
                             }
@@ -1291,11 +1559,16 @@ function mountPkpApp() {
                     const nilaiAkhir = (finalCapaianVal !== '-' && !isNaN(parseFloat(finalCapaianVal))) ? finalCapaianVal : "0";
                     const nipTarget = this.modalPCKNipTarget || (this.currentUser ? this.currentUser.nip : '');
                     const finalStatus = this.isVerifikasiPCK ? "Disetujui" : "Draft";
+                    const docId = 'PCK_' + thn + '_' + blnText + '_' + nipTarget;
 
                     const payload = {
+                        id_pck: docId,
                         nipPegawai: nipTarget,
+                        nip: nipTarget,
                         bulan: blnText,
                         tahun: thn,
+                        rencana: items.length,
+                        total_rencana: items.length,
                         nilai_akhir: nilaiAkhir,
                         items: items,
                         status: finalStatus
@@ -1314,7 +1587,7 @@ function mountPkpApp() {
                                     .withFailureHandler(reject)
                                     .submitBulkPCK(payload, currentNip, token);
                             } else {
-                                setTimeout(() => resolve({ success: true, id_pck: 'PCK-DEMO-' + Date.now() }), 500);
+                                setTimeout(() => resolve({ success: true, id_pck: docId }), 500);
                             }
                         });
 
@@ -1322,29 +1595,32 @@ function mountPkpApp() {
                         .then(res => {
                             this.modalPCKSubmitting = false;
                             if (res && res.success) {
+                                const targetId = res.id_pck || docId;
                                 if (typeof state !== 'undefined' && state.pckDokumen) {
-                                    const existingIdx = state.pckDokumen.findIndex(p => String(p.id_pck) === String(res.id_pck));
+                                    const existingIdx = state.pckDokumen.findIndex(p => String(p.id_pck) === String(targetId));
                                     if (existingIdx > -1) {
                                         state.pckDokumen[existingIdx].rencana = items.length;
                                         state.pckDokumen[existingIdx].nilai_akhir = nilaiAkhir;
                                         state.pckDokumen[existingIdx].status = finalStatus;
+                                        state.pckDokumen[existingIdx].is_firebase = true;
                                     } else {
                                         state.pckDokumen.unshift({
-                                            id_pck: res.id_pck,
+                                            id_pck: targetId,
                                             nip: nipTarget,
                                             bulan: blnText,
                                             tahun: thn,
                                             rencana: items.length,
                                             progress: "100%",
                                             status: finalStatus,
-                                            nilai_akhir: nilaiAkhir
+                                            nilai_akhir: nilaiAkhir,
+                                            is_firebase: true
                                         });
                                     }
                                     if (window.vueState) window.vueState.pckDokumen = state.pckDokumen;
                                 }
                                 this.syncData(state.pkpDokumen, state.pckDokumen);
                                 this.closeModalPCK();
-                                showNotify("Tersimpan", "Dokumen telah diamankan.", "success");
+                                showNotify("Tersimpan", res.message || "Laporan PCK berhasil diamankan di Cloud Firestore.", "success");
                             } else {
                                 showNotify("Gagal", res ? res.message : "Error server", "error");
                             }
@@ -1357,12 +1633,66 @@ function mountPkpApp() {
                     console.error(e);
                     this.modalPCKSubmitting = false;
                 }
+            },
+            async syncPkpToFirestore() {
+                if (this.isMigratingFirestore) return;
+                this.isMigratingFirestore = true;
+                try {
+                    let totalCount = 0;
+                    if (typeof PkpDataService !== 'undefined') {
+                        if (typeof PkpDataService.migrateSheetsPkpToFirestore === 'function') {
+                            const resPk = await PkpDataService.migrateSheetsPkpToFirestore();
+                            totalCount += (resPk.count || 0);
+                        }
+                        if (typeof PkpDataService.migrateSheetsPckToFirestore === 'function') {
+                            const resPck = await PkpDataService.migrateSheetsPckToFirestore();
+                            totalCount += (resPck.count || 0);
+                        }
+                        showNotify("Sinkronisasi Selesai", `${totalCount} dokumen PK & PCK berhasil dicadangkan ke Cloud Firestore.`, "success");
+                    }
+                } catch (err) {
+                    showNotify("Gagal Sinkronisasi", err.message || String(err), "error");
+                } finally {
+                    this.isMigratingFirestore = false;
+                }
             }
         },
         mounted() {
             // Sinkronisasi data awal jika sudah tersedia di global state
             if (typeof state !== 'undefined') {
                 this.syncData(state.pkpDokumen, state.pckDokumen);
+            }
+            // 1. Ambil dokumen PK & PCK dari Cloud Firestore & pasang Realtime Listener
+            if (typeof PkpDataService !== 'undefined') {
+                if (typeof PkpDataService.loadFirestorePkpDocuments === 'function') {
+                    PkpDataService.loadFirestorePkpDocuments().catch(e => console.warn(e));
+                }
+                if (typeof PkpDataService.loadFirestorePckDocuments === 'function') {
+                    PkpDataService.loadFirestorePckDocuments().catch(e => console.warn(e));
+                }
+                if (typeof PkpDataService.subscribePkpRealtime === 'function') {
+                    PkpDataService.subscribePkpRealtime();
+                }
+                if (typeof PkpDataService.subscribePckRealtime === 'function') {
+                    PkpDataService.subscribePckRealtime();
+                }
+                // 2. Prefetch master template kinerja di latar belakang
+                if (typeof PkpDataService.getMasterKinerjaTemplates === 'function') {
+                    PkpDataService.getMasterKinerjaTemplates().catch(err => {
+                        console.warn("[PKP] Background prefetch template gagal:", err);
+                    });
+                }
+                // 3. Ambil snapshot rekapitulasi dari Cloud Firestore & pasang Realtime Listener (Opsi B)
+                if (typeof PkpDataService.loadFirestoreRekapitulasi === 'function') {
+                    PkpDataService.loadFirestoreRekapitulasi(this.selectedYear).then(res => {
+                        if (Array.isArray(res)) this.rekapSnapshots = res;
+                    }).catch(e => console.warn(e));
+                }
+                if (typeof PkpDataService.subscribeRekapRealtime === 'function') {
+                    PkpDataService.subscribeRekapRealtime(list => {
+                        if (Array.isArray(list)) this.rekapSnapshots = list;
+                    });
+                }
             }
         }
     }).mount('#vue-pkp-app');

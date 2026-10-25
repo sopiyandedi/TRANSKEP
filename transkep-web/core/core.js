@@ -1,3 +1,87 @@
+// =========================================================
+// DUAL-ENVIRONMENT BRIDGE (ANTIGRAVITY & HEADLESS PWA BRIDGE - TAHAP 5)
+// =========================================================
+if (typeof window.google === 'undefined' || !window.google.script) {
+  window.google = window.google || {};
+  window.google.script = {
+    run: new Proxy({}, {
+      get: function(target, propKey) {
+        if (propKey === 'withSuccessHandler') {
+          return function(successCallback) {
+            return new Proxy({}, {
+              get: function(t, methodKey) {
+                if (methodKey === 'withFailureHandler') {
+                  return function(failureCallback) {
+                    return new Proxy({}, {
+                      get: function(tt, actionKey) {
+                        return function(...args) {
+                          if (typeof window.TranskepAPI !== 'undefined' && typeof window.TranskepAPI.call === 'function') {
+                            window.TranskepAPI.call(actionKey, ...args)
+                              .then(res => { if (typeof successCallback === 'function') successCallback(res); })
+                              .catch(err => { if (typeof failureCallback === 'function') failureCallback(err); });
+                          } else {
+                            console.log('[PreviewBridge] google.script.run.' + actionKey + ' fallback invoked:', args);
+                            setTimeout(() => {
+                              if (typeof successCallback === 'function') {
+                                successCallback({ status: 'success', message: '[Simulasi Preview] Aksi ' + actionKey + ' berhasil.', data: {} });
+                              }
+                            }, 50);
+                          }
+                        };
+                      }
+                    });
+                  };
+                }
+                return function(...args) {
+                  if (typeof window.TranskepAPI !== 'undefined' && typeof window.TranskepAPI.call === 'function') {
+                    window.TranskepAPI.call(methodKey, ...args)
+                      .then(res => { if (typeof successCallback === 'function') successCallback(res); })
+                      .catch(err => console.warn('[PreviewBridge] Error:', err));
+                  } else {
+                    console.log('[PreviewBridge] google.script.run.' + methodKey + ' fallback invoked:', args);
+                    setTimeout(() => {
+                      if (typeof successCallback === 'function') {
+                        successCallback({ status: 'success', message: '[Simulasi Preview] Aksi ' + methodKey + ' berhasil.', data: {} });
+                      }
+                    }, 50);
+                  }
+                };
+              }
+            });
+          };
+        }
+        if (propKey === 'withFailureHandler') {
+          return function(failureCallback) {
+            return new Proxy({}, {
+              get: function(t, methodKey) {
+                return function(...args) {
+                  if (typeof window.TranskepAPI !== 'undefined' && typeof window.TranskepAPI.call === 'function') {
+                    window.TranskepAPI.call(methodKey, ...args)
+                      .catch(err => { if (typeof failureCallback === 'function') failureCallback(err); });
+                  } else {
+                    console.log('[PreviewBridge] google.script.run.' + methodKey + ' invoked without success handler:', args);
+                  }
+                };
+              }
+            });
+          };
+        }
+        return function(...args) {
+          if (typeof window.TranskepAPI !== 'undefined' && typeof window.TranskepAPI.call === 'function') {
+            return window.TranskepAPI.call(propKey, ...args);
+          }
+          console.log('[PreviewBridge] Direct google.script.run.' + propKey + ' invoked:', args);
+        };
+      }
+    }),
+    host: {
+      close: function() { console.log('[PreviewBridge] google.script.host.close() called.'); },
+      setHeight: function(h) {},
+      setWidth: function(w) {}
+    }
+  };
+}
+
 // =========================================================================
 // FILE: core.js (TRANSKEP Web Core Controller)
 // DESKRIPSI: State Management, Autentikasi Login, Routing Menu, Notifikasi & Modals
@@ -101,6 +185,7 @@ document.addEventListener("DOMContentLoaded", () => {
             window.vueState.wfhLogs = state.wfhLogs;
             window.vueState.isBgSyncDone = true;
           }
+      if (typeof updateSyncStatus === 'function') updateSyncStatus('live');
         }
       } catch(e) {}
       toggleAppVisibility(true);
@@ -113,7 +198,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (typeof switchMenu === 'function') {
         switchMenu(lastMenu);
       }
-      showLoading('Menyelaraskan data sistem kepegawaian...');
+      // Zero-Flicker Refresh: Langsung render dari cache lokal, background revalidation tanpa blocking spinner
       syncAllServerData(true);
     } else {
       toggleAppVisibility(false);
@@ -124,16 +209,8 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 });
 
-function toggleAppVisibility(isLoggedIn) {
+function toggleAppVisibility(isLoggedIn, animate) {
   const rootEl = document.documentElement;
-  if (isLoggedIn) {
-    rootEl.classList.add('app-authenticated');
-    rootEl.classList.remove('app-unauthenticated');
-  } else {
-    rootEl.classList.remove('app-authenticated');
-    rootEl.classList.add('app-unauthenticated');
-  }
-
   let loginSec = document.getElementById('login-section');
   let appCont = document.getElementById('app-container');
   const loader = document.getElementById('global-loader');
@@ -141,15 +218,15 @@ function toggleAppVisibility(isLoggedIn) {
   const mobTop = document.getElementById('mobile-top-bar');
   const mobBottom = document.getElementById('mobile-bottom-nav');
 
-  if (loader && !isLoggedIn) {
+  if (loader) {
     loader.classList.add('loader-hidden', 'hidden', 'opacity-0', 'pointer-events-none');
-    loader.style.display = 'none';
-    rootEl.classList.remove('app-loaded');
+    loader.style.setProperty('display', 'none', 'important');
+    rootEl.classList.add('app-loaded');
   }
 
   if (!loginSec) {
     const passInput = document.querySelector('input[type="password"]');
-    if (passInput) loginSec = passInput.closest('div.min-h-screen') || passInput.closest('form').parentElement.parentElement;
+    if (passInput) loginSec = passInput.closest('div.min-h-screen') || (passInput.closest('form') && passInput.closest('form').parentElement && passInput.closest('form').parentElement.parentElement);
   }
   if (!appCont) {
     appCont = document.getElementById('main-content') || document.querySelector('main');
@@ -157,15 +234,54 @@ function toggleAppVisibility(isLoggedIn) {
   }
 
   if (isLoggedIn) {
-    if (loginSec) { loginSec.classList.add('hidden'); loginSec.style.display = 'none'; }
-    if (appCont) { appCont.classList.remove('hidden'); appCont.style.display = ''; }
-    if (mobTop) { mobTop.classList.remove('hidden'); }
-    if (mobBottom) { mobBottom.classList.remove('hidden'); }
+    rootEl.classList.add('app-authenticated');
+    rootEl.classList.remove('app-unauthenticated');
+
+    if (animate && loginSec && appCont) {
+      loginSec.classList.add('auth-fade-out');
+      appCont.classList.remove('hidden');
+      appCont.style.display = '';
+      appCont.classList.add('app-fade-in');
+      if (mobTop) { mobTop.classList.remove('hidden'); mobTop.classList.add('app-fade-in'); }
+      if (mobBottom) { mobBottom.classList.remove('hidden'); mobBottom.classList.add('app-fade-in'); }
+
+      setTimeout(() => {
+        loginSec.classList.add('hidden');
+        loginSec.style.display = 'none';
+        loginSec.classList.remove('auth-fade-out');
+        appCont.classList.remove('app-fade-in');
+        if (mobTop) mobTop.classList.remove('app-fade-in');
+        if (mobBottom) mobBottom.classList.remove('app-fade-in');
+      }, 350);
+    } else {
+      if (loginSec) { loginSec.classList.add('hidden'); loginSec.style.display = 'none'; }
+      if (appCont) { appCont.classList.remove('hidden'); appCont.style.display = ''; }
+      if (mobTop) { mobTop.classList.remove('hidden'); }
+      if (mobBottom) { mobBottom.classList.remove('hidden'); }
+    }
   } else {
-    if (loginSec) { loginSec.classList.remove('hidden'); loginSec.style.display = ''; }
-    if (appCont) { appCont.classList.add('hidden'); appCont.style.display = 'none'; }
-    if (mobTop) { mobTop.classList.add('hidden'); }
-    if (mobBottom) { mobBottom.classList.add('hidden'); }
+    rootEl.classList.remove('app-authenticated');
+    rootEl.classList.add('app-unauthenticated');
+
+    if (animate && loginSec && appCont) {
+      appCont.classList.add('auth-fade-out');
+      setTimeout(() => {
+        if (appCont) { appCont.classList.add('hidden'); appCont.style.display = 'none'; appCont.classList.remove('auth-fade-out'); }
+        if (mobTop) { mobTop.classList.add('hidden'); }
+        if (mobBottom) { mobBottom.classList.add('hidden'); }
+        if (loginSec) {
+          loginSec.classList.remove('hidden');
+          loginSec.style.display = '';
+          loginSec.classList.add('app-fade-in');
+          setTimeout(() => loginSec.classList.remove('app-fade-in'), 350);
+        }
+      }, 250);
+    } else {
+      if (loginSec) { loginSec.classList.remove('hidden'); loginSec.style.display = ''; }
+      if (appCont) { appCont.classList.add('hidden'); appCont.style.display = 'none'; }
+      if (mobTop) { mobTop.classList.add('hidden'); }
+      if (mobBottom) { mobBottom.classList.add('hidden'); }
+    }
   }
 }
 
@@ -188,52 +304,84 @@ function handleLogin(event) {
     return;
   }
 
-  showLoading("Memverifikasi Kredensial...");
+  const btnSubmit = document.getElementById('btnLoginSubmit') || (document.getElementById('loginForm') && document.getElementById('loginForm').querySelector('button[type="submit"]'));
+  const originalBtnHtml = btnSubmit ? btnSubmit.innerHTML : '';
 
-  google.script.run
-    .withSuccessHandler(function (response) {
-      if (response && response.status === 'success') {
-        localStorage.setItem('transkep_active_nip', response.data.nip);
-        localStorage.setItem('transkep_session_token', response.token);
-        localStorage.setItem('transkep_user_nama', response.data.nama || '');
-        localStorage.setItem('transkep_user_role', response.data.role || '');
-        try {
-          localStorage.setItem('transkep_user_profile', JSON.stringify(response.data));
-          localStorage.setItem('transkep_user', JSON.stringify(response.data));
-        } catch (e) {
-          console.warn("Gagal menyimpan transkep_user_profile ke localStorage:", e);
-        }
+  if (btnSubmit) {
+    btnSubmit.disabled = true;
+    btnSubmit.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin mr-2"></i><span>Memverifikasi...</span>';
+  }
 
-        // Set user di state seketika agar tidak null saat sync berlangsung
-        window.vueState.user = response.data;
-        if (typeof state !== 'undefined') state.user = response.data;
-        if (typeof renderGlobalHeader === 'function') {
-          renderGlobalHeader();
-        }
+  const resetBtn = () => {
+    if (btnSubmit) {
+      btnSubmit.disabled = false;
+      btnSubmit.innerHTML = originalBtnHtml;
+    }
+  };
 
-        const isTemporary = !!(response.must_change_password || (typeof pass === 'string' && /^TR-\d{6}$/.test(pass.trim())));
-        if (isTemporary) {
-          localStorage.setItem('transkep_force_change_password', pass.trim());
-          setTimeout(() => {
-            if (typeof window.openChangePasswordModal === 'function') {
-              window.openChangePasswordModal(pass.trim(), true);
-            }
-          }, 300);
-        }
-
-        toggleAppVisibility(true);
-        syncAllServerData();
-        showNotify("Login Berhasil", `Selamat datang kembali, ${response.data.nama}`, "success");
-      } else {
-        hideLoading();
-        showNotify("Akses Ditolak", response ? response.message : "Tidak ada respon server", "error");
+  const handleSuccess = function (response) {
+    if (response && (response.status === 'success' || response.status === 'UPDATED')) {
+      if (response.version) {
+        localStorage.setItem('TRANSKEP_DATA_VERSION', response.version);
       }
-    })
-    .withFailureHandler(function (error) {
-      hideLoading();
-      showNotify("Error Server", error.message || "Gagal menghubungi server", "error");
-    })
-    .verifyLogin(nip, pass);
+      if (btnSubmit) {
+        btnSubmit.innerHTML = '<i class="fa-solid fa-circle-check mr-2 text-emerald-400"></i><span>Berhasil!</span>';
+      }
+      localStorage.setItem('transkep_active_nip', response.data.nip);
+      localStorage.setItem('transkep_session_token', response.token);
+      localStorage.setItem('transkep_user_nama', response.data.nama || '');
+      localStorage.setItem('transkep_user_role', response.data.role || '');
+      try {
+        localStorage.setItem('transkep_user_profile', JSON.stringify(response.data));
+        localStorage.setItem('transkep_user', JSON.stringify(response.data));
+      } catch (e) {
+        console.warn("Gagal menyimpan transkep_user_profile ke localStorage:", e);
+      }
+
+      window.vueState.user = response.data;
+      if (typeof state !== 'undefined') state.user = response.data;
+      if (typeof renderGlobalHeader === 'function') {
+        renderGlobalHeader();
+      }
+
+      const isTemporary = !!(response.must_change_password || (typeof pass === 'string' && /^TR-\d{6}$/.test(pass.trim())));
+      if (isTemporary) {
+        localStorage.setItem('transkep_force_change_password', pass.trim());
+        setTimeout(() => {
+          if (typeof window.openChangePasswordModal === 'function') {
+            window.openChangePasswordModal(pass.trim(), true);
+          }
+        }, 300);
+      }
+
+      // Transisi sinematik halus
+      toggleAppVisibility(true, true);
+      syncAllServerData(true);
+      showNotify("Login Berhasil", `Selamat datang kembali, ${response.data.nama}`, "success");
+    } else {
+      resetBtn();
+      showNotify("Akses Ditolak", response ? response.message : "Tidak ada respon server", "error");
+    }
+  };
+
+  const handleFailure = function (error) {
+    resetBtn();
+    showNotify("Error Server", (error && error.message) ? error.message : "Gagal menghubungi server", "error");
+  };
+
+  if (typeof TranskepAPI !== 'undefined' && typeof TranskepAPI.call === 'function') {
+    TranskepAPI.call('verifyLogin', nip, pass)
+      .then(handleSuccess)
+      .catch(handleFailure);
+  } else if (typeof google !== 'undefined' && google.script && google.script.run) {
+    google.script.run
+      .withSuccessHandler(handleSuccess)
+      .withFailureHandler(handleFailure)
+      .verifyLogin(nip, pass);
+  } else {
+    resetBtn();
+    showNotify("Error", "Koneksi server tidak terdeteksi", "error");
+  }
 }
 
 function handleLogout() {
@@ -266,6 +414,187 @@ function handleLogout() {
   showNotify("Sesi Berakhir", "Anda telah berhasil keluar dari sistem.", "success");
 }
 
+// =========================================================
+// NON-BLOCKING SYNC STATUS BADGE (TAHAP 1)
+// =========================================================
+// =========================================================
+// SMART DOM DIFFING & TABLE PATCHING HELPER (TAHAP 3)
+// =========================================================
+// =========================================================
+// OPTIMISTIC UI MUTATION RUNNER (TAHAP 4)
+// =========================================================
+window.runOptimisticMutation = function(options) {
+  const {
+    applyLocal,
+    rollbackLocal,
+    remoteCall,
+    successToast,
+    onSuccess,
+    onError
+  } = options || {};
+
+  try {
+    if (typeof applyLocal === 'function') applyLocal();
+  } catch (err) {
+    console.error("❌ [OptimisticUI] Error executing applyLocal:", err);
+  }
+
+  try {
+    const s = window.vueState || window.state;
+    if (s) {
+      localStorage.setItem('transkep_dashboard_cache', JSON.stringify({
+        cutiLogs: s.cutiLogs,
+        stList: s.stList,
+        ipLogs: s.ipLogs,
+        ikLogs: s.ikLogs,
+        wfhLogs: s.wfhLogs
+      }));
+      if (s.usersList) localStorage.setItem('transkep_users_cache', JSON.stringify(s.usersList));
+      if (s.user) localStorage.setItem('transkep_user_profile', JSON.stringify(s.user));
+    }
+  } catch(e) {}
+
+  if (successToast && typeof window.showNotify === 'function') {
+    if (typeof successToast === 'string') {
+      window.showNotify("Tersimpan (0ms)", successToast, "success");
+    } else {
+      window.showNotify(successToast.title || "Tersimpan (0ms)", successToast.msg || "Perubahan diterapkan.", "success");
+    }
+  }
+
+  const p = (typeof remoteCall === 'function') ? remoteCall() : remoteCall;
+  if (p && typeof p.then === 'function') {
+    return p
+      .then((res) => {
+        if (res && res.status === 'error') {
+          throw new Error(res.message || 'Server mengembalikan error');
+        }
+        if (typeof onSuccess === 'function') onSuccess(res);
+        try {
+          const s = window.vueState || window.state;
+          if (s) {
+            localStorage.setItem('transkep_dashboard_cache', JSON.stringify({
+              cutiLogs: s.cutiLogs,
+              stList: s.stList,
+              ipLogs: s.ipLogs,
+              ikLogs: s.ikLogs,
+              wfhLogs: s.wfhLogs
+            }));
+          }
+        } catch(e) {}
+        return res;
+      })
+      .catch((err) => {
+        console.warn("⚠️ [OptimisticUI] Server call failed, performing rollback:", err);
+        try {
+          if (typeof rollbackLocal === 'function') rollbackLocal();
+        } catch(rbErr) {
+          console.error("❌ [OptimisticUI] Rollback failed:", rbErr);
+        }
+        try {
+          const s = window.vueState || window.state;
+          if (s) {
+            localStorage.setItem('transkep_dashboard_cache', JSON.stringify({
+              cutiLogs: s.cutiLogs,
+              stList: s.stList,
+              ipLogs: s.ipLogs,
+              ikLogs: s.ikLogs,
+              wfhLogs: s.wfhLogs
+            }));
+          }
+        } catch(e) {}
+        if (typeof onError === 'function') onError(err);
+        if (typeof window.showNotify === 'function') {
+          window.showNotify("Sinkronisasi Gagal", (err.message || err.toString()) + " (Perubahan dikembalikan)", "error");
+        }
+      });
+  }
+};
+
+window.smartPatchTable = function(tbodyOrId, newItems, rowRendererFn, idKey = 'id') {
+  const tbody = typeof tbodyOrId === 'string' ? document.getElementById(tbodyOrId) : tbodyOrId;
+  if (!tbody) return;
+
+  window.requestAnimationFrame(() => {
+    const existingRows = Array.from(tbody.querySelectorAll('tr[data-id]'));
+    const existingMap = new Map();
+    existingRows.forEach(tr => existingMap.set(String(tr.dataset.id), tr));
+
+    const container = tbody.closest('.overflow-y-auto') || tbody.closest('.overflow-auto');
+    const prevScrollTop = container ? container.scrollTop : null;
+
+    if (existingRows.length === 0) {
+      let fullHtml = '';
+      newItems.forEach(item => { fullHtml += rowRendererFn(item); });
+      tbody.innerHTML = fullHtml;
+      return;
+    }
+
+    const processedIds = new Set();
+    newItems.forEach((item, index) => {
+      const idVal = String(item[idKey] || item.nip || item.id_tugas || index);
+      processedIds.add(idVal);
+
+      if (existingMap.has(idVal)) {
+        const existingRow = existingMap.get(idVal);
+        const tempDiv = document.createElement('tbody');
+        tempDiv.innerHTML = rowRendererFn(item);
+        const newRow = tempDiv.firstElementChild;
+        if (newRow && existingRow.innerHTML !== newRow.innerHTML) {
+          existingRow.innerHTML = newRow.innerHTML;
+          existingRow.classList.add('row-highlight-new');
+          setTimeout(() => existingRow.classList.remove('row-highlight-new'), 2000);
+        }
+      } else {
+        const tempDiv = document.createElement('tbody');
+        tempDiv.innerHTML = rowRendererFn(item);
+        const newRow = tempDiv.firstElementChild;
+        if (newRow) {
+          newRow.classList.add('row-highlight-new');
+          if (index === 0 && tbody.firstElementChild) {
+            tbody.insertBefore(newRow, tbody.firstElementChild);
+          } else {
+            tbody.appendChild(newRow);
+          }
+          setTimeout(() => newRow.classList.remove('row-highlight-new'), 2000);
+        }
+      }
+    });
+
+    existingRows.forEach(tr => {
+      if (!processedIds.has(String(tr.dataset.id))) {
+        tr.remove();
+      }
+    });
+
+    if (prevScrollTop !== null && container) {
+      container.scrollTop = prevScrollTop;
+    }
+  });
+};
+
+window.updateSyncStatus = function(status) {
+  const badgeDesktop = document.getElementById('sync-status-badge');
+  const badgeMobile = document.getElementById('mobile-sync-badge');
+
+  let htmlDesktop = '';
+  let htmlMobile = '';
+
+  if (status === 'syncing') {
+    htmlDesktop = '<span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-medium bg-amber-500/10 text-amber-300 border border-amber-500/30 shadow-sm shadow-amber-500/10 transition-all duration-300"><i class="fa-solid fa-rotate fa-spin text-[10px]"></i> Menyinkronkan...</span>';
+    htmlMobile = '<span class="inline-flex items-center gap-1 text-[9px] text-amber-300"><i class="fa-solid fa-rotate fa-spin text-[8px]"></i> Sync...</span>';
+  } else if (status === 'live') {
+    htmlDesktop = '<span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-sm shadow-emerald-500/5 transition-all duration-300"><span class="w-2 h-2 rounded-full bg-emerald-400"></span> ⚡ Live</span>';
+    htmlMobile = '<span class="inline-flex items-center gap-1 text-[9px] text-emerald-400"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Live</span>';
+  } else if (status === 'offline') {
+    htmlDesktop = '<span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-medium bg-rose-500/10 text-rose-300 border border-rose-500/20 shadow-sm shadow-rose-500/5 transition-all duration-300"><i class="fa-solid fa-triangle-exclamation text-[10px]"></i> Offline (Cache)</span>';
+    htmlMobile = '<span class="inline-flex items-center gap-1 text-[9px] text-rose-300"><i class="fa-solid fa-wifi text-[8px]"></i> Offline</span>';
+  }
+
+  if (badgeDesktop && htmlDesktop) badgeDesktop.innerHTML = htmlDesktop;
+  if (badgeMobile && htmlMobile) badgeMobile.innerHTML = htmlMobile;
+};
+
 let gSyncWatchdog = null;
 
 function syncAllServerData(silent) {
@@ -278,8 +607,10 @@ function syncAllServerData(silent) {
 
   const isSilent = (silent === true);
   if (!isSilent) showLoading("Menyelaraskan data sistem kepegawaian...");
+  if (typeof updateSyncStatus === 'function') updateSyncStatus('syncing');
   const loginNip = localStorage.getItem('transkep_active_nip');
   const sessionToken = localStorage.getItem('transkep_session_token');
+  const clientVersion = localStorage.getItem('TRANSKEP_DATA_VERSION') || '';
 
   if (!loginNip || !sessionToken) {
     if (gSyncWatchdog) { clearTimeout(gSyncWatchdog); gSyncWatchdog = null; }
@@ -289,6 +620,12 @@ function syncAllServerData(silent) {
   }
 
   const handleSuccess = function (response) {
+    if (response && response.status === 'NOT_MODIFIED') {
+      console.log(`⚡ [Delta Sync] Bulk data sama dengan server (v${response.version}). Short-circuit 0ms.`);
+      syncBackgroundData();
+      return;
+    }
+
     // JANGAN panggil hideLoading() di sini agar overlay menahan layar sampai syncBackgroundData selesai
     if (response && response.status === 'success') {
       state.user = response.data.user;
@@ -363,6 +700,7 @@ function syncAllServerData(silent) {
   const handleFailure = function (error) {
     if (gSyncWatchdog) { clearTimeout(gSyncWatchdog); gSyncWatchdog = null; }
     hideLoading();
+    if (typeof updateSyncStatus === 'function') updateSyncStatus('offline');
     if (!isSilent) {
       showNotify("Terputus dari Server", (error && error.message) ? error.message : "Gagal sinkronisasi", "error");
       handleLogout();
@@ -370,20 +708,21 @@ function syncAllServerData(silent) {
   };
 
   if (typeof TranskepAPI !== 'undefined' && typeof TranskepAPI.call === 'function') {
-    TranskepAPI.call('getBulkData', loginNip, sessionToken)
+    TranskepAPI.call('getBulkData', loginNip, sessionToken, clientVersion)
       .then(handleSuccess)
       .catch(handleFailure);
   } else if (typeof google !== 'undefined' && google.script && google.script.run) {
     google.script.run
       .withSuccessHandler(handleSuccess)
       .withFailureHandler(handleFailure)
-      .getBulkData(loginNip, sessionToken);
+      .getBulkData(loginNip, sessionToken, clientVersion);
   }
 }
 
 function syncBackgroundData() {
   const loginNip = localStorage.getItem('transkep_active_nip');
   const sessionToken = localStorage.getItem('transkep_session_token');
+  const clientVersion = localStorage.getItem('TRANSKEP_DATA_VERSION') || '';
   if (!loginNip || !sessionToken) {
     if (gSyncWatchdog) { clearTimeout(gSyncWatchdog); gSyncWatchdog = null; }
     hideLoading();
@@ -392,7 +731,20 @@ function syncBackgroundData() {
 
   const handleSuccess = function (res) {
     if (gSyncWatchdog) { clearTimeout(gSyncWatchdog); gSyncWatchdog = null; }
-    if (res && res.status === 'success' && res.data) {
+
+    // SHORT-CIRCUIT DELTA SYNC:
+    if (res && res.status === 'NOT_MODIFIED') {
+      console.log(`⚡ [Delta Sync] Background data sama dengan server (v${res.version}). Zero DOM redraw.`);
+      state.isBgSyncDone = true;
+      if (window.vueState) window.vueState.isBgSyncDone = true;
+      if (typeof updateSyncStatus === 'function') updateSyncStatus('live');
+      hideLoading();
+      return;
+    }
+    if (res && (res.status === 'success' || res.status === 'UPDATED') && res.data) {
+      if (res.version) {
+        localStorage.setItem('TRANSKEP_DATA_VERSION', res.version);
+      }
       const d = res.data;
       state.cutiLogs = d.cutiLogs || [];
       state.stList = d.stList || [];
@@ -448,18 +800,21 @@ function syncBackgroundData() {
       updateSidebarBadges();
       if (typeof updateBadgePermohonan === 'function') updateBadgePermohonan();
 
-      const cm = (window.vueState && window.vueState.currentMenu) || state.currentMenu || 'dashboard';
-      if (cm === 'dashboard' && typeof renderDashboardView === 'function') renderDashboardView();
-      if (cm === 'permohonan' && typeof renderPermohonanView === 'function') renderPermohonanView();
-      if (cm === 'persetujuan' && typeof renderPersetujuanView === 'function') renderPersetujuanView();
-      if (cm === 'rekapitulasi' && typeof renderRekapitulasiView === 'function') renderRekapitulasiView();
-      if (cm === 'sk' && typeof renderSkView === 'function') renderSkView();
-      if (cm === 'sop' && typeof renderSopView === 'function') renderSopView();
-      if (cm === 'jobdes' && typeof renderJobdesView === 'function') renderJobdesView();
-      if (cm === 'kinerja' && typeof renderKinerjaView === 'function') renderKinerjaView();
-      if (cm === 'pkp' && typeof initPkpModule === 'function') initPkpModule();
-      if (cm === 'eoffice' && typeof renderEofficeView === 'function') renderEofficeView();
-      if (cm === 'manajemen' && window.vmPegawai && typeof window.vmPegawai.fetchResetQueue === 'function') window.vmPegawai.fetchResetQueue();
+      // SMART RAF BATCH RENDERING (TAHAP 3)
+      window.requestAnimationFrame(() => {
+        const cm = (window.vueState && window.vueState.currentMenu) || state.currentMenu || 'dashboard';
+        if (cm === 'dashboard' && typeof renderDashboardView === 'function') renderDashboardView();
+        if (cm === 'permohonan' && typeof renderPermohonanView === 'function') renderPermohonanView();
+        if (cm === 'persetujuan' && typeof renderPersetujuanView === 'function') renderPersetujuanView();
+        if (cm === 'rekapitulasi' && typeof renderRekapitulasiView === 'function') renderRekapitulasiView();
+        if (cm === 'sk' && typeof renderSkView === 'function') renderSkView();
+        if (cm === 'sop' && typeof renderSopView === 'function') renderSopView();
+        if (cm === 'jobdes' && typeof renderJobdesView === 'function') renderJobdesView();
+        if (cm === 'kinerja' && typeof renderKinerjaView === 'function') renderKinerjaView();
+        if (cm === 'pkp' && typeof initPkpModule === 'function') initPkpModule();
+        if (cm === 'eoffice' && typeof renderEofficeView === 'function') renderEofficeView();
+        if (cm === 'manajemen' && window.vmPegawai && typeof window.vmPegawai.fetchResetQueue === 'function') window.vmPegawai.fetchResetQueue();
+      });
     }
     // TRANSKEP: Pastikan hideLoading() SELALU dipanggil saat background sync selesai!
     hideLoading();
@@ -482,14 +837,14 @@ function syncBackgroundData() {
   };
 
   if (typeof TranskepAPI !== 'undefined' && typeof TranskepAPI.call === 'function') {
-    TranskepAPI.call('getBackgroundData', loginNip, sessionToken)
+    TranskepAPI.call('getBackgroundData', loginNip, sessionToken, clientVersion)
       .then(handleSuccess)
       .catch(handleFailure);
   } else if (typeof google !== 'undefined' && google.script && google.script.run) {
     google.script.run
       .withSuccessHandler(handleSuccess)
       .withFailureHandler(handleFailure)
-      .getBackgroundData(loginNip, sessionToken);
+      .getBackgroundData(loginNip, sessionToken, clientVersion);
   }
 }
 
@@ -689,15 +1044,10 @@ function formatNamaBersih(namaLengkap) {
 function showLoading(msg) {
   const loader = document.getElementById('global-loader');
   if (loader) {
-    loader.classList.remove('loader-hidden');
+    loader.classList.remove('loader-hidden', 'hidden', 'pointer-events-none');
     const subtitle = document.getElementById('loader-subtitle') || loader.querySelector('p') || loader.querySelector('span');
     if (subtitle && msg) subtitle.innerText = msg;
-    loader.classList.remove('hidden', 'pointer-events-none');
-    loader.style.display = 'flex';
-    requestAnimationFrame(() => {
-      loader.classList.remove('opacity-0');
-      loader.classList.add('opacity-100');
-    });
+    loader.classList.add('active');
   }
 }
 
@@ -705,13 +1055,11 @@ function hideLoading() {
   const loader = document.getElementById('global-loader');
   document.documentElement.classList.add('app-loaded');
   if (loader) {
-    loader.classList.add('loader-hidden');
-    loader.classList.remove('opacity-100');
-    loader.classList.add('opacity-0', 'pointer-events-none');
+    loader.classList.remove('active');
+    loader.classList.add('loader-hidden', 'pointer-events-none');
     setTimeout(() => {
       loader.classList.add('hidden');
-      loader.style.setProperty('display', 'none', 'important');
-    }, 350);
+    }, 300);
   }
 }
 
@@ -885,7 +1233,16 @@ document.addEventListener("DOMContentLoaded", () => {
       methods: {
         cancelPasswordModal() {
           if (this.isMandatory) {
-            if (confirm("Perhatian: Akun Anda masih menggunakan sandi sementara WhatsApp yang rentan. Yakin ingin menunda pembuatan sandi baru?")) {
+            if (window.showCustomConfirm) {
+              window.showCustomConfirm(
+                "Tunda Buat Sandi Baru?",
+                "Perhatian: Akun Anda masih menggunakan sandi sementara WhatsApp yang rentan. Yakin ingin menunda pembuatan sandi baru?",
+                () => {
+                  this.showModalPassword = false;
+                  localStorage.removeItem('transkep_force_change_password');
+                }
+              );
+            } else {
               this.showModalPassword = false;
               localStorage.removeItem('transkep_force_change_password');
             }
@@ -1012,8 +1369,13 @@ function renderGlobalHeader() {
                </div>
             </div>
          </div>
-         <div class="flex items-center gap-5 w-full md:w-auto justify-end border-t md:border-t-0 border-slate-800/60 pt-4 md:pt-0 relative z-10">
-            <div class="flex items-center gap-2">
+         <div class="flex items-center gap-4 w-full md:w-auto justify-end border-t md:border-t-0 border-slate-800/60 pt-4 md:pt-0 relative z-10">
+             <div id="sync-status-badge" class="inline-flex items-center">
+                <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-sm shadow-emerald-500/5">
+                   <span class="w-2 h-2 rounded-full bg-emerald-400"></span> ⚡ Live
+                </span>
+             </div>
+             <div class="flex items-center gap-2">
                <button @click="openMobileSidebar" title="Buka Menu" class="lg:hidden w-12 h-12 shrink-0 flex items-center justify-center bg-indigo-500/10 hover:bg-indigo-500 border border-indigo-500/20 hover:border-indigo-500 text-indigo-400 hover:text-white rounded-xl transition-all duration-300 shadow-lg shadow-indigo-500/10">
                   <i class="fa-solid fa-bars-staggered text-lg"></i>
                </button>

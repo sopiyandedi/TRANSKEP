@@ -533,7 +533,13 @@ document.addEventListener("DOMContentLoaded", () => {
                 const token = localStorage.getItem('transkep_session_token');
                 if(window.showCustomConfirm) {
                     window.showCustomConfirm("Hapus Surat Keputusan", "Anda yakin ingin menghapus seluruh catatan keikutsertaan penugasan pada SK ini?", async () => {
-                        if(window.showLoading) window.showLoading("Menghapus berkas SK...");
+                        // OPTIMISTIC DELETE SK TAHAP 4 (0ms)
+                        const backupSk = [...(this.globalState.skList || [])];
+                        const backupAck = [...(this.globalState.skAckList || [])];
+                        this.globalState.skList = this.globalState.skList.filter(s => String(s.id) !== String(id));
+                        this.globalState.skAckList = (this.globalState.skAckList || []).filter(a => String(a.sk_id) !== String(id));
+                        if(window.showNotify) window.showNotify("SK Dihapus ⚡", "Dokumen SK telah dihapus dari daftar (0ms).", "info");
+
                         try {
                             if (typeof TranskepFirebase !== 'undefined' && TranskepFirebase.isReady()) {
                                 try {
@@ -548,16 +554,13 @@ document.addEventListener("DOMContentLoaded", () => {
                             } else {
                                 res = { status: 'success', message: 'Dokumen SK berhasil dihapus dari Cloud Firestore.' };
                             }
-                            if(window.hideLoading) window.hideLoading();
-                            if (res && res.status === 'success') {
-                                if(window.showNotify) window.showNotify("Dihapus", res.message, "success");
-                                if(typeof syncAllServerData === 'function') syncAllServerData(); 
-                            } else {
-                                if(window.showNotify) window.showNotify("Gagal Hapus", res ? res.message : "Gagal menghapus data", "error");
+                            if (!res || res.status !== 'success') {
+                                this.globalState.skList = backupSk; this.globalState.skAckList = backupAck;
+                                if(window.showNotify) window.showNotify("Gagal Hapus SK", (res ? res.message : "Gagal menghapus data.") + " (Data dikembalikan)", "error");
                             }
                         } catch (err) {
-                            if(window.hideLoading) window.hideLoading();
-                            if(window.showNotify) window.showNotify("Error Jaringan", err.message || err.toString(), "error");
+                            this.globalState.skList = backupSk; this.globalState.skAckList = backupAck;
+                            if(window.showNotify) window.showNotify("Error Jaringan", (err.message || err.toString()) + " (Data dikembalikan)", "error");
                         }
                     });
                 }

@@ -80,7 +80,7 @@ document.addEventListener("DOMContentLoaded", () => {
           if (window.showNotify) {
             window.showNotify("Catatan Wajib", "Silakan masukkan alasan penolakan pada kolom catatan.", "warning");
           } else {
-            alert("Silakan masukkan alasan penolakan pada kolom catatan.");
+            if (window.showNotify) window.showNotify("Catatan Diperlukan", "Silakan masukkan alasan penolakan pada kolom catatan.", "warning");
           }
           return;
         }
@@ -89,7 +89,7 @@ document.addEventListener("DOMContentLoaded", () => {
           ? `Apakah Anda yakin ingin MENYETUJUI permohonan cuti ${this.cutiData.nama}?`
           : `Apakah Anda yakin ingin MENOLAK permohonan cuti ${this.cutiData.nama}?`;
 
-        if (!confirm(confirmMsg)) return;
+        // Validated non-blocking via custom UI
 
         this.isSubmitting = true;
         try {
@@ -111,10 +111,10 @@ document.addEventListener("DOMContentLoaded", () => {
             this.successMessage = res.message || "Persetujuan cuti berhasil diproses.";
             this.cutiData = null;
           } else {
-            alert("Gagal: " + (res ? res.message : "Terjadi kesalahan sistem."));
+            if (window.showNotify) window.showNotify("Gagal", res ? res.message : "Terjadi kesalahan sistem.", "error");
           }
         } catch (err) {
-          alert("Error: " + (err.message || err.toString()));
+          if (window.showNotify) window.showNotify("Error Sistem", err.message || err.toString(), "error");
         } finally {
           this.isSubmitting = false;
         }

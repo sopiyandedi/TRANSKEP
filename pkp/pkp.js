@@ -69,7 +69,7 @@ function saveDokumenPKPBaru(nipPegawai, nipPenilai, tahun) {
     const rowData = [newId, nipPegawai, nipPenilai, tahun, "Draft", "0", timestamp, ""]; 
     
     sheet.appendRow(rowData);
-    SpreadsheetApp.flush(); 
+    if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush(); 
     
     return { success: true, id_pkp: newId, message: "Dokumen PKP berhasil dibuat." };
   } catch (error) {
@@ -134,7 +134,7 @@ function saveItemPKP(idPKP, jenis, sasaran, indikator, kuantitas, satuan, mutu, 
     
     const rowData = [newItemId, idPKP, jenis, sasaran, indikator, kuantitas, satuan, mutu, waktu, pagu, "Aktif", timestamp];
     sheet.appendRow(rowData);
-    SpreadsheetApp.flush();
+    if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush();
     
     return { success: true, id_item: newItemId, message: "Target berhasil ditambahkan." };
   } catch (error) {
@@ -150,7 +150,7 @@ function saveEvaluasiPKP(idItem, periode, capaianAngka) {
     
     const rowData = [newItemId, idItem, periode, capaianAngka, "", timestamp];
     sheet.appendRow(rowData);
-    SpreadsheetApp.flush();
+    if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush();
     
     return { success: true, id_eval: newItemId, message: "Realisasi berhasil dicatat." };
   } catch (error) {
@@ -167,7 +167,7 @@ function sahkanDokumenPKP(idPKP, nilaiAkhir) {
       if (String(data[i][0]) === String(idPKP)) {
         sheet.getRange(i + 1, 5).setValue("Disetujui");
         sheet.getRange(i + 1, 6).setValue(nilaiAkhir); 
-        SpreadsheetApp.flush();
+        if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush();
         return { success: true, message: "Dokumen PKP berhasil disahkan." };
       }
     }

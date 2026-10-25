@@ -381,6 +381,311 @@ const TranskepFirebase = {
     });
 
     return { status: 'success', sop_id: cleanSopId, nip: cleanNip, tanggal_baca: tgl, message: 'Acknowledgment SOP berhasil dicatat di Cloud Firestore.' };
+  },
+
+  // ==========================================
+  // OPERASI MODUL PENILAIAN KINERJA (PKP & PCK)
+  // ==========================================
+  MASTER_KINERJA_COLLECTION: 'master_kinerja',
+  PKP_COLLECTION: 'pkp_documents',
+  PCK_COLLECTION: 'pck_documents',
+  REKAP_COLLECTION: 'pck_rekapitulasi',
+
+  // --- PILAR 0: KAMUS KINERJA / TEMPLATE JABATAN ---
+  /**
+   * Menyimpan / Memperbarui Template Jabatan di Cloud Firestore
+   */
+  async saveMasterKinerjaToFirestore(templateData) {
+    const db = this.getDb();
+    if (!db) throw new Error("Cloud Firestore belum siap terhubung.");
+
+    const rawJabatan = String(templateData.nama_jabatan || templateData.jabatan || '').trim();
+    if (!rawJabatan) throw new Error("Nama jabatan wajib disertakan.");
+    
+    const slug = rawJabatan.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+    const docId = String(templateData.id || ('TEMPL_' + slug)).trim();
+
+    let aliases = [rawJabatan];
+    if (Array.isArray(templateData.aliases)) {
+      aliases = Array.from(new Set([rawJabatan, ...templateData.aliases]));
+    }
+
+    const payload = {
+      id: docId,
+      nama_jabatan: rawJabatan,
+      kategori: templateData.kategori || 'Kepaniteraan',
+      aliases: aliases,
+      sasaran_list: Array.isArray(templateData.sasaran_list) ? templateData.sasaran_list : [],
+      is_firebase: true,
+      updated_at: firebase.firestore.FieldValue.serverTimestamp(),
+      updated_by: templateData.updated_by || ((typeof state !== 'undefined' && state.user) ? state.user.nama : 'Admin')
+    };
+
+    await db.collection(this.MASTER_KINERJA_COLLECTION).doc(docId).set(payload, { merge: true });
+    return { status: 'success', id: docId, data: payload, message: 'Template jabatan berhasil disimpan di Cloud Firestore.' };
+  },
+
+  /**
+   * Mengambil Seluruh Template Kamus Jabatan dari Firestore
+   */
+  async getFirestoreMasterKinerja() {
+    const db = this.getDb();
+    if (!db) return [];
+    const snapshot = await db.collection(this.MASTER_KINERJA_COLLECTION).get();
+    const list = [];
+    snapshot.forEach(doc => list.push(doc.data()));
+    return list;
+  },
+
+  /**
+   * Menghapus Template Jabatan dari Firestore
+   */
+  async deleteMasterKinerjaFromFirestore(docId) {
+    const db = this.getDb();
+    if (!db) throw new Error("Cloud Firestore belum siap terhubung.");
+    await db.collection(this.MASTER_KINERJA_COLLECTION).doc(String(docId).trim()).delete();
+    return { status: 'success', message: 'Template jabatan berhasil dihapus dari Cloud Firestore.' };
+  },
+
+  // --- PILAR 1: PERJANJIAN KINERJA (PK) TAHUNAN ---
+  /**
+   * Menyimpan / Memperbarui Dokumen Kontrak PK Tahunan
+   */
+  async savePkpToFirestore(pkpData) {
+    const db = this.getDb();
+    if (!db) throw new Error("Cloud Firestore belum siap terhubung.");
+
+    const nipPegawai = String(pkpData.nip_pegawai || pkpData.nip || '').trim();
+    const tahun = String(pkpData.tahun || new Date().getFullYear()).trim();
+    if (!nipPegawai) throw new Error("NIP pegawai diperlukan untuk menyimpan dokumen PK.");
+
+    const docId = String(pkpData.id_pkp || ('PKP_' + tahun + '_' + nipPegawai)).trim();
+
+    const payload = {
+      id_pkp: docId,
+      nip_pegawai: nipPegawai,
+      nip_penilai: String(pkpData.nip_penilai || pkpData.penilai || '').trim(),
+      nip_atasan_pejabat: String(pkpData.nip_atasan_pejabat || pkpData.atasan_pejabat || '').trim(),
+      tahun: tahun,
+      status: pkpData.status || 'Draft',
+      nilai_akhir: String(pkpData.nilai_akhir || pkpData.nilai || '0'),
+      items: Array.isArray(pkpData.items) ? pkpData.items : [],
+      is_firebase: true,
+      updated_at: firebase.firestore.FieldValue.serverTimestamp()
+    };
+
+    if (!pkpData.created_at) {
+      payload.created_at = firebase.firestore.FieldValue.serverTimestamp();
+    }
+
+    await db.collection(this.PKP_COLLECTION).doc(docId).set(payload, { merge: true });
+    return { status: 'success', id: docId, id_pkp: docId, data: payload, message: 'Dokumen PK berhasil disimpan di Cloud Firestore.' };
+  },
+
+  /**
+   * Mengambil Dokumen PK dari Firestore
+   */
+  async getFirestorePkps(filterNip, filterTahun) {
+    const db = this.getDb();
+    if (!db) return [];
+    let query = db.collection(this.PKP_COLLECTION);
+    if (filterTahun) query = query.where('tahun', '==', String(filterTahun).trim());
+    if (filterNip) query = query.where('nip_pegawai', '==', String(filterNip).trim());
+
+    const snapshot = await query.get();
+    const list = [];
+    snapshot.forEach(doc => list.push(doc.data()));
+    return list;
+  },
+
+  /**
+   * Memasang Realtime Listener untuk Dokumen PK Tahunan
+   */
+  subscribeFirestorePkps(callback) {
+    const db = this.getDb();
+    if (!db) return null;
+    return db.collection(this.PKP_COLLECTION).onSnapshot(
+      (snapshot) => {
+        const list = [];
+        snapshot.forEach(doc => list.push(doc.data()));
+        if (typeof callback === 'function') callback(list);
+      },
+      (error) => console.error("❌ [TRANSKEP Firebase] Error listener Firestore PKP:", error)
+    );
+  },
+
+  /**
+   * Menghapus Dokumen PK dari Firestore
+   */
+  async deletePkpFromFirestore(idPkp) {
+    const db = this.getDb();
+    if (!db) throw new Error("Cloud Firestore belum siap terhubung.");
+    await db.collection(this.PKP_COLLECTION).doc(String(idPkp).trim()).delete();
+    return { status: 'success', message: 'Dokumen PK berhasil dihapus dari Cloud Firestore.' };
+  },
+
+  // --- PILAR 2: PENILAIAN CAPAIAN KINERJA (PCK) BULANAN ---
+  /**
+   * Menyimpan / Memperbarui Dokumen Capaian Kinerja Bulanan
+   */
+  async savePckToFirestore(pckData) {
+    const db = this.getDb();
+    if (!db) throw new Error("Cloud Firestore belum siap terhubung.");
+
+    const nipPegawai = String(pckData.nip_pegawai || pckData.nip || pckData.nipPegawai || '').trim();
+    const bulan = String(pckData.bulan || '').trim();
+    const tahun = String(pckData.tahun || new Date().getFullYear()).trim();
+    if (!nipPegawai || !bulan) throw new Error("NIP pegawai dan bulan diperlukan untuk menyimpan dokumen PCK.");
+
+    const docId = String(pckData.id_pck || ('PCK_' + tahun + '_' + bulan + '_' + nipPegawai)).trim();
+    const itemsList = Array.isArray(pckData.realisasi || pckData.items) ? (pckData.realisasi || pckData.items) : [];
+
+    const payload = {
+      id_pck: docId,
+      nip_pegawai: nipPegawai,
+      nip: nipPegawai,
+      bulan: bulan,
+      tahun: tahun,
+      total_rencana: parseInt(pckData.total_rencana || pckData.rencana || itemsList.length) || 0,
+      rencana: parseInt(pckData.rencana || pckData.total_rencana || itemsList.length) || 0,
+      progress: pckData.progress || '100%',
+      status: pckData.status || 'Draft',
+      nilai_akhir: String(pckData.nilai_akhir || '0'),
+      realisasi: itemsList,
+      is_firebase: true,
+      updated_at: firebase.firestore.FieldValue.serverTimestamp()
+    };
+
+    if (!pckData.created_at) {
+      payload.created_at = firebase.firestore.FieldValue.serverTimestamp();
+    }
+
+    await db.collection(this.PCK_COLLECTION).doc(docId).set(payload, { merge: true });
+    return { status: 'success', id: docId, id_pck: docId, data: payload, message: 'Dokumen PCK berhasil disimpan di Cloud Firestore.' };
+  },
+
+  /**
+   * Mengambil Dokumen PCK dari Firestore
+   */
+  async getFirestorePcks(filterNip, filterTahun, filterBulan) {
+    const db = this.getDb();
+    if (!db) return [];
+    let query = db.collection(this.PCK_COLLECTION);
+    if (filterTahun) query = query.where('tahun', '==', String(filterTahun).trim());
+    if (filterBulan) query = query.where('bulan', '==', String(filterBulan).trim());
+    if (filterNip) query = query.where('nip_pegawai', '==', String(filterNip).trim());
+
+    const snapshot = await query.get();
+    const list = [];
+    snapshot.forEach(doc => list.push(doc.data()));
+    return list;
+  },
+
+  /**
+   * Memasang Realtime Listener untuk Dokumen PCK Bulanan
+   */
+  subscribeFirestorePcks(callback) {
+    const db = this.getDb();
+    if (!db) return null;
+    return db.collection(this.PCK_COLLECTION).onSnapshot(
+      (snapshot) => {
+        const list = [];
+        snapshot.forEach(doc => list.push(doc.data()));
+        if (typeof callback === 'function') callback(list);
+      },
+      (error) => console.error("❌ [TRANSKEP Firebase] Error listener Firestore PCK:", error)
+    );
+  },
+
+  /**
+   * Menghapus Dokumen PCK dari Firestore
+   */
+  async deletePckFromFirestore(idPck) {
+    const db = this.getDb();
+    if (!db) throw new Error("Cloud Firestore belum siap terhubung.");
+    await db.collection(this.PCK_COLLECTION).doc(String(idPck).trim()).delete();
+    return { status: 'success', message: 'Dokumen PCK berhasil dihapus dari Cloud Firestore.' };
+  },
+
+  // --- PILAR 3: SNAPSHOT & PENGESAHAN REKAPITULASI BULANAN ---
+  /**
+   * Menyimpan / Mengunci Dokumen Rekapitulasi Bulanan Satker (Opsi B)
+   */
+  async saveRekapitulasiToFirestore(rekapData) {
+    const db = this.getDb();
+    if (!db) throw new Error("Cloud Firestore belum siap terhubung.");
+
+    const bulan = String(rekapData.bulan || '').trim();
+    const tahun = String(rekapData.tahun || new Date().getFullYear()).trim();
+    if (!bulan || !tahun) throw new Error("Bulan dan tahun diperlukan untuk menyimpan rekapitulasi.");
+
+    const docId = String(rekapData.id_rekap || ('REKAP_' + tahun + '_' + bulan)).trim();
+
+    const payload = {
+      id_rekap: docId,
+      bulan: bulan,
+      tahun: tahun,
+      unit_kerja: rekapData.unit_kerja || 'Pengadilan Agama Indramayu',
+      status: rekapData.status || 'Terkunci / Disahkan',
+      pejabat_nama: rekapData.pejabat_nama || '-',
+      pejabat_nip: rekapData.pejabat_nip || '-',
+      tgl_pengesahan: rekapData.tgl_pengesahan || new Date().toISOString().split('T')[0],
+      total_pegawai: parseInt(rekapData.total_pegawai || 0) || 0,
+      rata_rata_satker: parseFloat(rekapData.rata_rata_satker || 0) || 0,
+      daftar_nilai: Array.isArray(rekapData.daftar_nilai) ? rekapData.daftar_nilai : [],
+      is_firebase: true,
+      updated_at: firebase.firestore.FieldValue.serverTimestamp()
+    };
+
+    await db.collection(this.REKAP_COLLECTION).doc(docId).set(payload, { merge: true });
+    return { status: 'success', id: docId, data: payload, message: 'Dokumen rekapitulasi berhasil disahkan dan disimpan di Cloud Firestore.' };
+  },
+
+  /**
+   * Mengambil Dokumen Rekapitulasi Tertentu atau Seluruh Rekap dari Firestore
+   */
+  async getFirestoreRekapitulasi(tahun, bulan) {
+    const db = this.getDb();
+    if (!db) return null;
+
+    if (tahun && bulan) {
+      const docId = 'REKAP_' + String(tahun).trim() + '_' + String(bulan).trim();
+      const doc = await db.collection(this.REKAP_COLLECTION).doc(docId).get();
+      return doc.exists ? doc.data() : null;
+    }
+
+    let query = db.collection(this.REKAP_COLLECTION);
+    if (tahun) query = query.where('tahun', '==', String(tahun).trim());
+    const snapshot = await query.get();
+    const list = [];
+    snapshot.forEach(doc => list.push(doc.data()));
+    return list;
+  },
+
+  /**
+   * Memasang Realtime Listener untuk Dokumen Rekapitulasi
+   */
+  subscribeFirestoreRekapitulasi(callback) {
+    const db = this.getDb();
+    if (!db) return null;
+    return db.collection(this.REKAP_COLLECTION).onSnapshot(
+      (snapshot) => {
+        const list = [];
+        snapshot.forEach(doc => list.push(doc.data()));
+        if (typeof callback === 'function') callback(list);
+      },
+      (error) => console.error("❌ [TRANSKEP Firebase] Error listener Firestore Rekapitulasi:", error)
+    );
+  },
+
+  /**
+   * Menghapus / Membatalkan Pengesahan Rekapitulasi dari Firestore (Admin Only)
+   */
+  async deleteRekapitulasiFromFirestore(idRekap) {
+    const db = this.getDb();
+    if (!db) throw new Error("Cloud Firestore belum siap terhubung.");
+    await db.collection(this.REKAP_COLLECTION).doc(String(idRekap).trim()).delete();
+    return { status: 'success', message: 'Dokumen rekapitulasi berhasil dihapus / dibuka kuncinya dari Cloud Firestore.' };
   }
 };
 

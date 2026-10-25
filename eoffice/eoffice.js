@@ -81,7 +81,7 @@ function initEofficeDatabase_() {
       });
     }
 
-    SpreadsheetApp.flush();
+    if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush();
     return { status: 'success', message: 'Sheet E-Office berhasil diinisialisasi secara aman.' };
   } catch (err) {
     Logger.log("ERROR initEofficeDatabase_: " + err.toString());

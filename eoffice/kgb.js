@@ -155,7 +155,7 @@ function saveOrGenerateKgbDoc(payload, actionType, adminNip, clientToken) {
       }
     }
 
-    SpreadsheetApp.flush();
+    if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush();
     return {
       status: 'success',
       message: (actionType === 'generate') ? 'SK KGB berhasil diterbitkan!' : 'Draf KGB berhasil disimpan.',

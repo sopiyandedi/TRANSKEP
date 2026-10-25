@@ -364,7 +364,7 @@ function createPaketRapatDocs(payload, adminNip, clientToken) {
       sheet.appendRow(safeRapatRow);
     }
 
-    SpreadsheetApp.flush();
+    if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush();
 
     return {
       status: 'success',

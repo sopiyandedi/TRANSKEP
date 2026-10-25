@@ -62,7 +62,7 @@
             setTimeout(() => { 
                 hideLoading(); 
                 window.isGlobalPrinting = false; 
-                alert("[CANVAS MODE] Berhasil memanggil backend. PDF URL akan terbuka di sini."); 
+                if (typeof showNotify === "function") showNotify("Pratinjau Cetak", "Dokumen siap dicetak dalam Canvas Mode.", "info"); 
             }, 1500);
         }
     }

@@ -79,7 +79,7 @@ function saveJobdes(payload, userNip, clientToken) {
         sheet.getRange(rowIndex, 1, 1, 8).setValues([rowData]);
     }
     
-    SpreadsheetApp.flush(); 
+    if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush(); 
     return { status: 'success', message: 'Uraian tugas berhasil disimpan.' };
   } catch(e) {
     return { status: 'error', message: e.toString() };
@@ -153,7 +153,7 @@ function saveUsulanReposisi(payload, userNip, clientToken) {
        'Menunggu'
     ]);
     
-    SpreadsheetApp.flush();
+    if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush();
     return { status: 'success', message: 'Usulan reposisi berhasil dikirim ke Admin.' };
   } catch(e) {
     return { status: 'error', message: e.toString() };
@@ -203,7 +203,7 @@ function tandaiUsulanSelesai(timestampId, userNip, clientToken) {
           break;
        }
     }
-    SpreadsheetApp.flush();
+    if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush();
     return { status: 'success' };
   } catch(e) {
     return { status: 'error' };

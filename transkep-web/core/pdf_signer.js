@@ -291,7 +291,7 @@ endobj\n`;
 <<
 /Size ${newSize}
 /Root ${rootRef}
-${infoRef ? `/Info ${infoRef}\n` : ''}/Prev ${prevXref}
+${infoRef ? ('/Info ' + infoRef + '\n') : ''}/Prev ${prevXref}
 >>
 startxref
 ${absXrefOffset}

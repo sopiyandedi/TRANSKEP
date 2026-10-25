@@ -19,7 +19,7 @@ function setupSheetST() {
       sheetST.getRange(1, 1, 1, headers.length).setFontWeight('bold').setBackground('#1e40af').setFontColor('#ffffff').setHorizontalAlignment('center');
       sheetST.setFrozenRows(1);
     }
-    SpreadsheetApp.flush();
+    if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush();
     return "Database st_log siap.";
   } catch (e) { return "Error: " + e.toString(); }
 }
@@ -45,7 +45,7 @@ function addSuratTugas(payload, userNip, clientToken) {
       'DISETUJUI', payload.data_ekstra_json || '' 
     ]));
     
-    SpreadsheetApp.flush();
+    if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush();
     return { status: 'success', message: 'Surat Tugas berhasil diterbitkan.', id: idST };
   } catch (err) { return { status: 'error', message: err.toString() }; }
 }
@@ -75,7 +75,7 @@ function updateSuratTugas(payload, userNip, clientToken) {
     ];
     
     sheetST.getRange(rowIndex, 1, 1, updatedRow.length).setValues([updatedRow]);
-    SpreadsheetApp.flush();
+    if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush();
     return { status: 'success', message: 'Data Surat Tugas berhasil diperbarui secara permanen.' };
   } catch (err) { return { status: 'error', message: err.toString() }; }
 }
@@ -115,7 +115,7 @@ function deleteSuratTugasLog(id, userNip, clientToken) {
     if (rowIndex === -1) throw new Error("Data Surat Tugas tidak ditemukan.");
 
     sheetST.deleteRow(rowIndex);
-    SpreadsheetApp.flush();
+    if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush();
     return { status: 'success', message: 'Surat Tugas berhasil dihapus permanen.' };
   } catch (err) { return { status: 'error', message: err.toString() }; }
 } 

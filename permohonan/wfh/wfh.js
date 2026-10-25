@@ -24,7 +24,7 @@ function submitRencanaWFH(payload, clientToken) {
         "", payload.atasan_nip, 'Menunggu', 'Belum Lapor', ''
     ]);
     
-    SpreadsheetApp.flush();
+    if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush();
     return { status: 'success', message: 'Rencana WFH berhasil diajukan.', data: { id: newId } };
   } catch (err) { return { status: 'error', message: err.toString() }; }
 }
@@ -100,7 +100,7 @@ function submitLaporanWFH(payload, clientToken) {
     sheet.getRange(rowIndex, 9).setValue('Menunggu'); 
     sheet.getRange(rowIndex, 11).setValue(finalJsonUrls); 
     
-    SpreadsheetApp.flush();
+    if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush();
     return { status: 'success', message: 'Laporan dan Eviden WFH berhasil dikirim.', data: { fileUrl: finalJsonUrls } };
   } catch (err) { return { status: 'error', message: err.toString() }; }
 }
@@ -130,7 +130,7 @@ function updateWfhStatus(id, stage, decision, notes, userNip, bypassMode, client
     
     sheet.getRange(rowIndex, 10).setValue(combinedNotes.trim()); 
     
-    SpreadsheetApp.flush();
+    if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush();
     return { status: 'success', message: `Usulan ${stage} WFH berhasil diproses.` };
   } catch(e) { return { status: 'error', message: e.toString() }; }
 }
@@ -155,7 +155,7 @@ function deleteWfhLog(id, forceDelete, userNip, clientToken) {
     if (rowIndex === -1) throw new Error("Data tidak ditemukan di sistem.");
     
     sheet.deleteRow(rowIndex);
-    SpreadsheetApp.flush();
+    if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush();
     return { status: 'success', message: 'Pengajuan WFH berhasil ditarik dan dihapus.' };
   } catch (err) { return { status: 'error', message: err.toString() }; }
 }
@@ -184,7 +184,7 @@ function updateRencanaWfhLog(payload, clientToken) {
     sheet.getRange(rowIndex, 8).setValue('Menunggu'); 
     sheet.getRange(rowIndex, 10).setValue(''); 
     
-    SpreadsheetApp.flush();
+    if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush();
     return { status: 'success', message: 'Rencana WFH berhasil diperbarui.' };
   } catch (err) { return { status: 'error', message: err.toString() }; }
 }

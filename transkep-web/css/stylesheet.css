@@ -18,23 +18,22 @@ html.app-authenticated #slot-login {
 html.app-authenticated #app-container {
   display: flex !important;
 }
-/* TRANSKEP: Instant Fullscreen Processing Overlay (0ms Anti-Kedip / Zero Jeda on Refresh) */
-html.app-authenticated #global-loader:not(.loader-hidden) {
+/* TRANSKEP: Non-blocking loader & Zero-Flicker Refresh (skill.md) */
+#global-loader {
+  display: none;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+#global-loader.active {
   display: flex !important;
   opacity: 1 !important;
   pointer-events: auto !important;
 }
-#global-loader.loader-hidden {
-  opacity: 0 !important;
-  pointer-events: none !important;
-}
-#global-loader.loader-hidden.hidden,
+#global-loader.loader-hidden,
 #global-loader.hidden {
   display: none !important;
   visibility: hidden !important;
-}
-html.app-authenticated:not(.app-loaded) #dashboard-skeleton {
-  opacity: 0 !important;
 }
 html.app-unauthenticated #login-section,
 html.app-unauthenticated #slot-login {

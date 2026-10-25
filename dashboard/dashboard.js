@@ -20,7 +20,7 @@ function initDashboardDB() {
            .setBackground('#064e3b')
            .setFontColor('#ffffff')
            .setHorizontalAlignment('center');
-      SpreadsheetApp.flush();
+      if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush();
       Logger.log("SUCCESS: Kolom Pensiun berhasil ditambahkan!");
       return "SUCCESS: Kolom Pensiun berhasil ditambahkan!";
     }
@@ -76,7 +76,7 @@ function updateTmtStatus(actorNip, targetNip, type, newStatus, clientToken) {
     sheet.getRange(rowIndex, colStatus).setValue(valStatus);
     sheet.getRange(rowIndex, colTgl).setValue(valTgl);
 
-    SpreadsheetApp.flush();
+    if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush();
     return { status: 'success', message: 'Status berhasil diperbarui' };
   } catch (e) {
     return { status: 'error', message: e.toString() };
@@ -121,7 +121,7 @@ function forwardTmtDateByFrontend(actorNip, targetNip, type, newDateStr, clientT
         sheet.getRange(rowIndex, colTgl).setValue('');
     }
 
-    SpreadsheetApp.flush();
+    if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush();
     return { status: 'success' };
   } catch(e) {
     return { status: 'error', message: e.toString() };

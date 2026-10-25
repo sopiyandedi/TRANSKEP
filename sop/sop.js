@@ -26,7 +26,7 @@ function autoInitSopSheets(ss) {
      isCreated = true;
   }
   
-  if (isCreated) SpreadsheetApp.flush();
+  if (isCreated) if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush();
 }
 
 // TRANSKEP: Fungsi Pintasan Mengambil URL Root Folder "TRANSKEP SOP"
@@ -129,7 +129,7 @@ function saveSopData(payload, userNip, clientToken) {
           payload.judul_sop, payload.kategori_pj, payload.nomor_sop,
           tglPembuatan, tglRevisi, tglEfektif, payload.link_drive, pelaksanaStr
         ]]);
-        SpreadsheetApp.flush();
+        if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush();
         return { status: 'success', id: payload.id, link_drive: payload.link_drive, message: 'Dokumen SOP berhasil diperbarui.' };
       } else {
         throw new Error("SOP tidak ditemukan di database.");
@@ -140,7 +140,7 @@ function saveSopData(payload, userNip, clientToken) {
         newId, payload.judul_sop, payload.kategori_pj, payload.nomor_sop,
         tglPembuatan, tglRevisi, tglEfektif, payload.link_drive, pelaksanaStr, now
       ]);
-      SpreadsheetApp.flush();
+      if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush();
       return { status: 'success', id: newId, link_drive: payload.link_drive, message: 'Dokumen SOP baru berhasil ditambahkan.' };
     }
   } catch(e) {
@@ -171,7 +171,7 @@ function deleteSopData(id, userNip, clientToken) {
            }
         }
         
-        SpreadsheetApp.flush();
+        if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush();
         return { status: 'success', message: 'Dokumen SOP berhasil dihapus.' };
       }
     }
@@ -202,7 +202,7 @@ function acknowledgeSop(sopId, nip, clientToken) {
     const now = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'dd/MM/yyyy HH:mm:ss');
 
     sheet.appendRow([newId, sopId, nip, now]);
-    SpreadsheetApp.flush();
+    if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush();
     return { status: 'success', message: 'Dokumen SOP telah ditandai sebagai dibaca.' };
   } catch(e) {
     return { status: 'error', message: e.toString() };

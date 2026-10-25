@@ -76,3 +76,49 @@
     animation: indeterminateProgress 1.6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
 }
 
+/* 6. CINEMATIC APP & AUTH TRANSITIONS */
+.auth-fade-out {
+    opacity: 0 !important;
+    transform: scale(0.97) !important;
+    transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    pointer-events: none !important;
+}
+
+.app-fade-in {
+    opacity: 1 !important;
+    transform: translateY(0) !important;
+    transition: opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1), transform 0.35s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.app-fade-prep {
+    opacity: 0 !important;
+    transform: translateY(8px) !important;
+}
+
+/* Status Non-Blocking Sync Badge */
+.sync-badge-pulse {
+    animation: pulseSlow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+@keyframes pulseSlow {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.92); }
+}
+
+
+
+/* =========================================================
+   TAHAP 3: SMART DOM DIFFING & HIGH-PERFORMANCE TABLE RENDERING
+   ========================================================= */
+@keyframes rowHighlightPulse {
+  0% { background-color: rgba(99, 102, 241, 0.35); }
+  100% { background-color: transparent; }
+}
+
+.row-highlight-new {
+  animation: rowHighlightPulse 1.8s ease-out forwards;
+}
+
+tbody tr {
+  content-visibility: auto;
+  contain-intrinsic-size: 0 48px;
+}

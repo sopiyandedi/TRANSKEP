@@ -38,7 +38,8 @@ function handleApiGet_(e) {
       if (!nip || !token) {
         return jsonResponse_({ status: 'error', message: 'Parameter nip dan token wajib disertakan.' });
       }
-      const data = getBulkData(nip, token);
+      const clientVersion = params.clientVersion || params.version || '';
+      const data = getBulkData(nip, token, clientVersion);
       return jsonResponse_(data);
     }
 
@@ -120,7 +121,10 @@ function handleApiPost_(payload, e) {
 
       // Core Data Fetch
       case 'getBulkData':
-        return jsonResponse_(getBulkData(payload.nip, payload.token));
+        return jsonResponse_(getBulkData(payload.nip, payload.token, payload.clientVersion || payload.version || ''));
+
+      case 'getBackgroundData':
+        return jsonResponse_(getBackgroundData(payload.nip, payload.token, payload.clientVersion || payload.version || ''));
 
       // Dashboard & Status TMT
       case 'updateTmtStatus':

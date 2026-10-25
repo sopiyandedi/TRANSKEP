@@ -242,11 +242,21 @@
                   }
                   if (notes === '') notes = 'ACC';
 
-                  if(window.showLoading) window.showLoading("Menyimpan keputusan...");
+                  // OPTIMISTIC APPROVAL TAHAP 4 (0ms Update & Auto-Rollback)
+                  this.showSingleModal = false;
                   const token = localStorage.getItem('transkep_session_token');
                   const logId = this.singleTarget.id;
                   const zType = this.singleTarget.z_type;
                   const stage = this.singleTarget.wfh_stage;
+
+                  const backupLogs = JSON.parse(JSON.stringify(this.s.cutiLogs || []));
+                  const backupIk = JSON.parse(JSON.stringify(this.s.ikLogs || []));
+                  const backupIp = JSON.parse(JSON.stringify(this.s.ipLogs || []));
+                  const backupWfh = JSON.parse(JSON.stringify(this.s.wfhLogs || []));
+
+                  // Langsung terapkan perubahan status di memori 0ms
+                  this.routeStateUpdate(logId, zType, decision, notes, stage);
+                  if(window.showNotify) window.showNotify("Keputusan Diterapkan ⚡", "Keputusan " + decision + " berhasil diterapkan pada berkas.", "success");
 
                   let actionPromise = null;
                   if (zType === 'Cuti') actionPromise = PersetujuanDataService.updateCutiStatus(logId, decision, notes, this.s.user.nip, this.bypassMode, token);
@@ -257,16 +267,19 @@
 
                   actionPromise
                     .then((res) => {
-                        if(window.hideLoading) window.hideLoading();
-                        this.showSingleModal = false;
                         if (res && res.status === 'success') {
-                            if(window.showNotify) window.showNotify("Berhasil", res.message, "success");
-                            this.routeStateUpdate(logId, zType, decision, notes, stage);
-                        } else { if(window.showNotify) window.showNotify("Error Sistem", res ? res.message : "Gagal memproses keputusan.", "error"); }
+                            // Sukses tersinkronisasi diam-diam
+                        } else {
+                            // Rollback jika server menolak
+                            this.s.cutiLogs = backupLogs; this.s.ikLogs = backupIk; this.s.ipLogs = backupIp; this.s.wfhLogs = backupWfh;
+                            if(typeof updateBadgePermohonan === 'function') setTimeout(updateBadgePermohonan, 50);
+                            if(window.showNotify) window.showNotify("Gagal Simpan", (res ? res.message : "Gagal memproses keputusan.") + " (Status dikembalikan)", "error");
+                        }
                     })
                     .catch((err) => {
-                        if(window.hideLoading) window.hideLoading();
-                        if(window.showNotify) window.showNotify("Gagal Jaringan", err.toString(), "error");
+                        this.s.cutiLogs = backupLogs; this.s.ikLogs = backupIk; this.s.ipLogs = backupIp; this.s.wfhLogs = backupWfh;
+                        if(typeof updateBadgePermohonan === 'function') setTimeout(updateBadgePermohonan, 50);
+                        if(window.showNotify) window.showNotify("Gagal Jaringan", err.toString() + " (Status dikembalikan)", "error");
                     });
               },
               
@@ -277,25 +290,35 @@
                   }
                   if (this.selectedItems.length === 0) return;
 
-                  if(window.showLoading) window.showLoading(`Memproses ${this.selectedItems.length} berkas secara massal...`);
+                  // OPTIMISTIC BULK APPROVAL TAHAP 4 (0ms Update & Auto-Rollback)
+                  this.showBulkModal = false;
                   const token = localStorage.getItem('transkep_session_token');
+                  const countItems = this.selectedItems.length;
 
-                  PersetujuanDataService.processBulkApproval(this.selectedItems, this.bulkDecision, notes, this.s.user.nip, this.bypassMode, token)
+                  const backupLogs = JSON.parse(JSON.stringify(this.s.cutiLogs || []));
+                  const backupIk = JSON.parse(JSON.stringify(this.s.ikLogs || []));
+                  const backupIp = JSON.parse(JSON.stringify(this.s.ipLogs || []));
+                  const backupWfh = JSON.parse(JSON.stringify(this.s.wfhLogs || []));
+                  const processedItems = [...this.selectedItems];
+
+                  processedItems.forEach(item => {
+                      this.routeStateUpdate(item.id, item.type, this.bulkDecision, notes, item.stage);
+                  });
+                  this.selectedItems = [];
+                  if(window.showNotify) window.showNotify("Keputusan Massal Diterapkan ⚡", countItems + " berkas berhasil diperbarui (0ms).", "success");
+
+                  PersetujuanDataService.processBulkApproval(processedItems, this.bulkDecision, notes, this.s.user.nip, this.bypassMode, token)
                       .then((res) => {
-                          if(window.hideLoading) window.hideLoading();
-                          this.showBulkModal = false;
-                          if (res && res.status === 'success') {
-                              if(window.showNotify) window.showNotify("Bulk Approve Sukses", res.message, "success");
-                              this.selectedItems.forEach(item => {
-                                  this.routeStateUpdate(item.id, item.type, this.bulkDecision, notes, item.stage);
-                              });
-                              this.selectedItems = []; 
-                          } else { if(window.showNotify) window.showNotify("Error Sistem", res ? res.message : "Gagal memproses persetujuan massal.", "error"); }
+                          if (!res || res.status !== 'success') {
+                              this.s.cutiLogs = backupLogs; this.s.ikLogs = backupIk; this.s.ipLogs = backupIp; this.s.wfhLogs = backupWfh;
+                              if(typeof updateBadgePermohonan === 'function') setTimeout(updateBadgePermohonan, 50);
+                              if(window.showNotify) window.showNotify("Gagal Massal", (res ? res.message : "Gagal memproses.") + " (Data dikembalikan)", "error");
+                          }
                       })
                       .catch((err) => {
-                          if(window.hideLoading) window.hideLoading();
-                          this.showBulkModal = false;
-                          if(window.showNotify) window.showNotify("Gagal Jaringan", err.toString(), "error");
+                          this.s.cutiLogs = backupLogs; this.s.ikLogs = backupIk; this.s.ipLogs = backupIp; this.s.wfhLogs = backupWfh;
+                          if(typeof updateBadgePermohonan === 'function') setTimeout(updateBadgePermohonan, 50);
+                          if(window.showNotify) window.showNotify("Gagal Jaringan", err.toString() + " (Data dikembalikan)", "error");
                       });
               },
 

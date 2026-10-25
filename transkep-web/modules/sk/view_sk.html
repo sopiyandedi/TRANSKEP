@@ -71,7 +71,7 @@
             </thead>
             <tbody>
               <template v-for="(sk, index) in filteredSkData" :key="sk.id">
-                <tr class="border-b border-slate-900 hover:bg-slate-900/10 transition group">
+                <tr :data-id="sk.id" class="border-b border-slate-900 hover:bg-slate-900/10 transition group">
                   <td class="p-4 text-center font-mono text-slate-500">{{ index + 1 }}</td>
                   <td class="p-4 max-w-[220px]">
                     <div class="flex items-center gap-1.5 flex-wrap">

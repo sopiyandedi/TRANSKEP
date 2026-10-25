@@ -597,23 +597,20 @@ window.dashboardApp = Vue.createApp({
 });
 
 function ensureDashboardMounted() {
-  if (!window.vmDashboard && window.dashboardApp) {
-    const dashElem = document.getElementById('section-dashboard');
-    if (dashElem) {
-      try {
-        window.vmDashboard = window.dashboardApp.mount('#section-dashboard');
-      } catch (e) {
-        console.warn("Mounting dashboardApp error:", e);
-      }
+  const dashElem = document.getElementById('section-dashboard');
+  if (!window.vmDashboard && window.dashboardApp && dashElem) {
+    try {
+      window.vmDashboard = window.dashboardApp.mount('#section-dashboard');
+    } catch (e) {
+      console.warn("Mounting dashboardApp error:", e);
     }
   }
-  const dashElem = document.getElementById('section-dashboard');
   if (dashElem) {
     dashElem.removeAttribute('v-cloak');
     dashElem.classList.remove('v-cloak');
   }
   const skel = document.getElementById('dashboard-skeleton');
-  if (skel) {
+  if (skel && window.vmDashboard) {
     skel.style.display = 'none';
   }
   return window.vmDashboard;
@@ -641,13 +638,7 @@ function renderDashboardView() {
     }
   }
 
-  if (!curState || !curState.user) return;
-
-  if (window.vmDashboard && typeof window.vmDashboard.syncFromGlobal === 'function') {
-    window.vmDashboard.syncFromGlobal(curState);
-  }
-
-  const activeMenu = (window.vueState && window.vueState.currentMenu) || localStorage.getItem('transkep_last_menu');
+  const activeMenu = (window.vueState && window.vueState.currentMenu) || localStorage.getItem('transkep_last_menu') || 'dashboard';
   if (activeMenu === 'dashboard') {
     const dashElem = document.getElementById('section-dashboard');
     if (dashElem) {
@@ -655,6 +646,10 @@ function renderDashboardView() {
       dashElem.classList.add('block');
       dashElem.removeAttribute('v-cloak');
     }
+  }
+
+  if (curState && curState.user && window.vmDashboard && typeof window.vmDashboard.syncFromGlobal === 'function') {
+    window.vmDashboard.syncFromGlobal(curState);
   }
 
   if (typeof renderAllCharts === 'function') {

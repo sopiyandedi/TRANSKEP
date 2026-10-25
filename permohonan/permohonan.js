@@ -86,7 +86,7 @@ function addCutiLog(payload, aktorNip, clientToken) {
       statusAwal, '', payload.atasan_nip || '-', payload.pejabat_nip || '-', durasi, payload.plh_nip || '', statusAwal, statusAwal, payload.alamat || '-', JSON.stringify(historyJson), fileUrl, magicToken
     ]));
     
-    SpreadsheetApp.flush(); 
+    if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush(); 
 
     // Notifikasi WhatsApp Magic Link ke Atasan Langsung (Non-blocking)
     if (payload.jenis !== 'Dinas Luar' && payload.atasan_nip && payload.atasan_nip !== '-') {
@@ -195,7 +195,7 @@ function updateCutiLog(payload, aktorNip, clientToken) {
                 sheetUser.getRange(rowIndexUser, colLama).setValue(cVal + hLain);
             }
         }
-        SpreadsheetApp.flush(); // Commit Refund sebelum potong ulang!
+        if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush(); // Commit Refund sebelum potong ulang!
 
         // --- 2. POTONG SALDO DENGAN DURASI & JENIS BARU ---
         const freshUser = sheetUser.getRange(rowIndexUser, 1, 1, 15).getValues()[0];
@@ -255,7 +255,7 @@ function updateCutiLog(payload, aktorNip, clientToken) {
     sheetCuti.getRange(rowIndexCuti, 17).setValue(JSON.stringify(historyJson));
     sheetCuti.getRange(rowIndexCuti, 18).setValue(fileUrlUpdate);
 
-    SpreadsheetApp.flush(); 
+    if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush(); 
     return { status: 'success', message: 'Perubahan cuti berhasil disimpan.', data: { id: payload.id, durasi: durasiBaru, history: JSON.stringify(historyJson), fileUrl: fileUrlUpdate } };
   } catch (err) { return { status: 'error', message: err.toString() }; }
 }
@@ -360,7 +360,7 @@ function deleteCutiLog(id, forceDelete, userNip, clientToken) {
         finalMessage = 'Transaksi permohonan berhasil ditarik dan dihapus sepenuhnya dari sistem.';
     }
     
-    SpreadsheetApp.flush();
+    if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush();
     return { status: 'success', message: finalMessage };
   } catch (err) { return { status: 'error', message: err.toString() }; }
 }
@@ -386,7 +386,7 @@ function requestCancelCuti(id, alasanBatal, userNip, clientToken) {
     sheetCuti.getRange(rowIndex, 7).setValue(alasanBaru); 
     sheetCuti.getRange(rowIndex, 8).setValue('Menunggu Pembatalan');
     
-    SpreadsheetApp.flush();
+    if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush();
     return { status: 'success' };
   } catch (err) { return { status: 'error', message: err.toString() }; }
 }

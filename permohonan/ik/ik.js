@@ -25,7 +25,7 @@ function submitIzinKeluar(payload, clientToken) {
         payload.jam, payload.alasan, payload.atasan_nip, 'Menunggu', ''
     ]);
     
-    SpreadsheetApp.flush();
+    if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush();
     return { status: 'success', message: 'Izin Keluar berhasil diajukan dan sedang menunggu persetujuan.', data: { id: newId } };
   } catch (err) { return { status: 'error', message: err.toString() }; }
 }
@@ -73,7 +73,7 @@ function updateIkStatus(id, decision, notes, userNip, bypassMode, clientToken) {
     sheet.getRange(rowIndex, 9).setValue(decision); 
     sheet.getRange(rowIndex, 10).setValue(finalNotes); 
     
-    SpreadsheetApp.flush();
+    if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush();
     return { status: 'success', message: 'Usulan Izin Keluar berhasil diproses.' };
   } catch(e) { return { status: 'error', message: e.toString() }; }
 }
@@ -97,7 +97,7 @@ function deleteIzinKeluarLog(id, forceDelete, userNip, clientToken) {
     if (rowIndex === -1) throw new Error("Data tidak ditemukan di sistem.");
     
     sheet.deleteRow(rowIndex);
-    SpreadsheetApp.flush();
+    if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush();
     return { status: 'success', message: 'Pengajuan Izin Keluar berhasil ditarik dan dihapus.' };
   } catch (err) { return { status: 'error', message: err.toString() }; }
 }
@@ -128,7 +128,7 @@ function updateIzinKeluarLog(payload, clientToken) {
     sheet.getRange(rowIndex, 9).setValue('Menunggu');
     sheet.getRange(rowIndex, 10).setValue('');
     
-    SpreadsheetApp.flush();
+    if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush();
     return { status: 'success', message: 'Izin Keluar berhasil diperbarui.' };
   } catch (err) { return { status: 'error', message: err.toString() }; }
 }
