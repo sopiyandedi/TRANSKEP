@@ -8,6 +8,12 @@
   <title>TRANSKEP</title>
   <script>document.title = 'TRANSKEP';</script>
 
+  <!-- Security Hardening: Content Security Policy & Anti-MIME Sniffing (Enterprise Grade) -->
+  <meta http-equiv="Content-Security-Policy"
+    content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://unpkg.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://www.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com; font-src 'self' data: https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' data: blob: https:; connect-src 'self' https://script.google.com https://script.googleusercontent.com https://firestore.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://*.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com; frame-src 'self' blob: data:; object-src 'none'; base-uri 'self';">
+  <meta http-equiv="X-Content-Type-Options" content="nosniff">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+
   <!-- PWA & Mobile Web App Meta Tags -->
   <meta name="description"
     content="TRANSKEP - Sistem Informasi Manajemen & Transparansi Kepegawaian Pengadilan Agama Indramayu">

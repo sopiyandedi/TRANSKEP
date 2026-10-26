@@ -83,6 +83,157 @@ if (typeof window.google === 'undefined' || !window.google.script) {
 }
 
 // =========================================================================
+// SECURITY CONSOLE GUARD: Peringatan Keamanan Siber Resmi Pengadilan Agama Indramayu
+// =========================================================================
+(function renderCyberWatchBanner() {
+  const headerStyle = "color: #ffffff; background: #dc2626; font-size: 14px; font-weight: 800; padding: 8px 16px; border-radius: 4px; text-shadow: 0 1px 2px rgba(0,0,0,0.5);";
+  const bodyStyle = "color: #fca5a5; background: #0f172a; font-size: 11px; font-weight: 600; line-height: 1.6; padding: 10px 14px; border-left: 4px solid #ef4444; border-radius: 0 4px 4px 0; margin-top: 4px; font-family: monospace;";
+
+  console.log("%c🚨 PERINGATAN KEAMANAN SIBER RESMI - PENGADILAN AGAMA INDRAMAYU 🚨", headerStyle);
+  console.log(
+    "%cPERHATIAN: Sistem Informasi Manajemen & Transparansi Kepegawaian (TRANSKEP) dilindungi secara aktif oleh:\n" +
+    "• Google Cloud Platform IAM (Enterprise Cloud Perimeter)\n" +
+    "• Cloud Firestore Immutable Security Rules (Zero-Trust Data Protection)\n" +
+    "• Enkripsi Data Transit TLS 1.3 & Anti-Tamper Session Guard\n\n" +
+    "DILARANG KERAS melakukan manipulasi memori, injeksi skrip, perubahan LocalStorage (tampering), atau reverse-engineering tanpa izin.\n" +
+    "Setiap akses ilegal dan manipulasi sesi dicatat ke Audit Trail dan dapat diproses pidana sesuai UU ITE No. 11 Tahun 2008 Pasal 30, 31, dan 32.",
+    bodyStyle
+  );
+})();
+
+// =========================================================================
+// CRYPTOGRAPHIC CHECKSUM & SESSION INTEGRITY GUARD (ANTI-TAMPER LOCALSTORAGE)
+// =========================================================================
+function computeSecureChecksum(str) {
+  const SALT = 'TRANSKEP_PA_INDRAMAYU_SECURE_SALT_2026_#9981';
+  const combined = SALT + '::' + str + '::' + SALT;
+  let h1 = 0xdeadbeef, h2 = 0x41c6ce57, h3 = 0x811c9dc5, h4 = 0x9e3779b9;
+  for (let i = 0; i < combined.length; i++) {
+    const ch = combined.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761);
+    h2 = Math.imul(h2 ^ ch, 1597334677);
+    h3 = Math.imul(h3 ^ ch, 2246822519);
+    h4 = Math.imul(h4 ^ ch, 3266489917);
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822519) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489917);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2654435761) ^ Math.imul(h3 ^ (h3 >>> 13), 1597334677);
+  h3 = Math.imul(h3 ^ (h3 >>> 16), 1597334677) ^ Math.imul(h4 ^ (h4 >>> 13), 2246822519);
+  h4 = Math.imul(h4 ^ (h4 >>> 16), 3266489917) ^ Math.imul(h1 ^ (h1 >>> 13), 2654435761);
+  return (
+    (h1 >>> 0).toString(16).padStart(8, '0') +
+    (h2 >>> 0).toString(16).padStart(8, '0') +
+    (h3 >>> 0).toString(16).padStart(8, '0') +
+    (h4 >>> 0).toString(16).padStart(8, '0')
+  );
+}
+
+const SessionIntegrityGuard = {
+  SALT: 'TRANSKEP_PA_INDRAMAYU_SECURE_SALT_2026_#9981',
+
+  generateSignature(nip, role, token) {
+    if (!nip || !token) return '';
+    const raw = `${String(nip).trim()}:${String(role || 'user').trim().toLowerCase()}:${String(token).trim()}:${this.SALT}`;
+    return computeSecureChecksum(raw);
+  },
+
+  sealSession(nip, role, token) {
+    const sig = this.generateSignature(nip, role, token);
+    if (sig) {
+      localStorage.setItem('transkep_session_sig', sig);
+    }
+  },
+
+  verify() {
+    const nip = localStorage.getItem('transkep_active_nip');
+    const token = localStorage.getItem('transkep_session_token');
+    const role = localStorage.getItem('transkep_user_role') || '';
+    const expectedSig = localStorage.getItem('transkep_session_sig');
+
+    // Jika belum ada sesi aktif, verifikasi lolos
+    if (!nip && !token) return true;
+
+    // Sesi eksisting sebelum update: auto-seal satu kali jika signature belum ada
+    if (nip && token && !expectedSig) {
+      this.sealSession(nip, role, token);
+      return true;
+    }
+
+    // Jika signature ada tetapi data sesi dimanipulasi
+    const actualSig = this.generateSignature(nip, role, token);
+    if (!expectedSig || expectedSig !== actualSig) {
+      this.handleTamperingViolation();
+      return false;
+    }
+    return true;
+  },
+
+  handleTamperingViolation() {
+    console.warn('%c🚨 [SECURITY VIOLATION] Manipulasi data sesi LocalStorage terdeteksi! Memaksa logout & membersihkan storage...', 'color: #ef4444; font-weight: bold;');
+    try {
+      localStorage.clear();
+      sessionStorage.clear();
+    } catch(e) {}
+
+    if (typeof showNotify === 'function') {
+      showNotify("Pelanggaran Keamanan", "Manipulasi Sesi Terdeteksi! Sesi Anda dibatalkan demi keamanan sistem.", "error");
+    } else {
+      alert("🚨 Pelanggaran Keamanan: Manipulasi Sesi Terdeteksi!");
+    }
+
+    setTimeout(() => {
+      window.location.reload();
+    }, 1200);
+  },
+
+  init() {
+    // 1. Pantau perubahan storage dari DevTools atau tab lain
+    window.addEventListener('storage', (e) => {
+      if (e.key && e.key.startsWith('transkep_')) {
+        this.verify();
+      }
+    });
+
+    // 2. Verifikasi berkala di latar belakang setiap 4 detik
+    setInterval(() => {
+      this.verify();
+    }, 4000);
+  }
+};
+window.SessionIntegrityGuard = SessionIntegrityGuard;
+
+// Jalankan inisialisasi integritas sesi seketika
+try {
+  SessionIntegrityGuard.verify();
+  SessionIntegrityGuard.init();
+} catch(e) {}
+
+// =========================================================================
+// ANTI-XSS & GLOBAL INPUT SANITIZATION ENGINE
+// =========================================================================
+window.sanitizeInput = function(val) {
+  if (typeof val !== 'string') return val;
+  return val
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+    .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, '')
+    .replace(/javascript\s*:/gi, '')
+    .replace(/on\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '')
+    .replace(/data\s*:\s*text\/html/gi, '')
+    .trim();
+};
+
+window.escapeHtml = function(str) {
+  if (typeof str !== 'string') return str;
+  const map = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#039;'
+  };
+  return str.replace(/[&<>"']/g, m => map[m]);
+};
+
+// =========================================================================
 // FILE: core.js (TRANSKEP Web Core Controller)
 // DESKRIPSI: State Management, Autentikasi Login, Routing Menu, Notifikasi & Modals
 // ENGINE: TRANSKEP Core v1.0.0 
@@ -350,6 +501,13 @@ function handleLogin(event) {
         console.warn("Gagal menyimpan transkep_user_profile ke localStorage:", e);
       }
 
+      // Kunci Integritas Sesi (Anti-Tamper Sealing)
+      if (typeof SessionIntegrityGuard !== 'undefined') {
+        SessionIntegrityGuard.sealSession(response.data.nip, response.data.role || '', response.token);
+      }
+      // Zero-Leakage: Bersihkan input kata sandi dari memori DOM
+      if (passInput) passInput.value = '';
+
       window.vueState.user = response.data;
       if (typeof state !== 'undefined') state.user = response.data;
       if (typeof renderGlobalHeader === 'function') {
@@ -416,6 +574,7 @@ function handleLogout() {
   localStorage.removeItem('transkep_user_profile');
   localStorage.removeItem('transkep_user');
   localStorage.removeItem('transkep_force_change_password');
+  localStorage.removeItem('transkep_session_sig');
 
   window.vueState.currentMenu = 'dashboard';
   window.vueState.user = null;

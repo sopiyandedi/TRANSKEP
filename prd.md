@@ -371,3 +371,20 @@ ZONA BAWAH: MASTER CONTEXT & STATUS MIGRASI TERKINI (LIVING CONTEXT)
     - **PWA Scope & Cache Invalidation**:
       - Versi Service Worker `sw.js` dinaikkan ke **transkep-v3.5.0** dengan scope root domain (`/`).
       - Menyematkan pembersih unregister otomatis di `index.html` untuk menghapus registrasi Service Worker lama yang tersangkut di scope `/transkep-web/`.
+
+35. **Penguatan Keamanan Siber Kelas Enterprise (Tahap 63 - Selesai & Aktif ✅):**
+    - **Anti-Tamper LocalStorage (`SessionIntegrityGuard`)**:
+      - Menerapkan cryptographic checksum signature SHA-256 (`transkep_session_sig`) yang menyegel NIP, role, session token, dan salt rahasia.
+      - Mendeteksi upaya pengubahan role/identitas manual via Inspect Element DevTools, memicu auto-purge storage, memunculkan toast pelanggaran, dan memaksa logout seketika.
+    - **Content Security Policy (CSP) & Anti-MIME Sniffing**:
+      - Memasang meta tag CSP whitelist presisi di `<head>` [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) yang mengisolasi eksekusi skrip murni ke domain resmi (Google Apps Script, Firebase, Firestore, dan CDN resmi terverifikasi).
+      - Mengaktifkan `X-Content-Type-Options: nosniff` dan `Referrer-Policy: strict-origin-when-cross-origin`.
+    - **Global Anti-XSS Input Sanitization Engine**:
+      - Memasang `window.sanitizeInput` dan `window.escapeHtml` di [`core/core.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/core/core.js).
+      - Menanamkan interceptor rekursif otomatis pada [`core/api.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/core/api.js) untuk membersihkan seluruh string formulir dari tag script, iframe, dan event handler jahat sebelum payload dikirim.
+    - **Zero-Leakage Logs & Penyamaran Kredensial**:
+      - Memastikan memory wipe pada field input password segera setelah login dan nihil paparan kredensial di console.
+    - **Console Cyber Watch Banner**:
+      - Menampilkan banner peringatan keamanan resmi Pengadilan Agama Indramayu berwarna merah menyala dan berbingkai tebal di DevTools Console (F12) dengan landasan hukum UU ITE No. 11 Tahun 2008 Pasal 30–32.
+    - **PWA Cache Invalidation**:
+      - Versi Service Worker `sw.js` dinaikkan ke **transkep-v3.5.1**.

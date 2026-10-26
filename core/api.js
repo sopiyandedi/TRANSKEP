@@ -39,9 +39,41 @@ const TranskepAPI = (function () {
   }
 
   /**
+   * Helper Rekursif Sanitasi Payload (Global Anti-XSS Interceptor)
+   */
+  function sanitizePayloadRecursive(obj) {
+    if (!obj || typeof obj !== 'object') return obj;
+    for (let key in obj) {
+      if (typeof obj[key] === 'string') {
+        const lowerKey = key.toLowerCase();
+        // Kecualikan atribut otentikasi/kriptografi dari pengubahan teks
+        if (lowerKey.includes('pass') || lowerKey.includes('token') || lowerKey.includes('sig')) {
+          continue;
+        }
+        if (typeof window !== 'undefined' && typeof window.sanitizeInput === 'function') {
+          obj[key] = window.sanitizeInput(obj[key]);
+        }
+      } else if (typeof obj[key] === 'object') {
+        sanitizePayloadRecursive(obj[key]);
+      }
+    }
+    return obj;
+  }
+
+  /**
    * Inti Eksekusi HTTP Fetch ke Google Apps Script (Anti-CORS)
    */
   async function request(payload, options = {}) {
+    // 1. Verifikasi Integritas Sesi (Anti-Tampering Gate)
+    if (typeof window !== 'undefined' && window.SessionIntegrityGuard && typeof window.SessionIntegrityGuard.verify === 'function') {
+      if (!window.SessionIntegrityGuard.verify()) {
+        throw new Error('Pelanggaran Keamanan: Integritas sesi tidak valid.');
+      }
+    }
+
+    // 2. Sanitasi Rekursif Payload Outgoing (Anti-XSS Interceptor)
+    sanitizePayloadRecursive(payload);
+
     // Sisipkan kredensial sesi jika payload belum memuatnya
     const auth = getAuth();
     if (!payload.nip && auth.nip) payload.nip = auth.nip;
@@ -147,6 +179,9 @@ const TranskepAPI = (function () {
         localStorage.setItem('transkep_session_token', res.token);
         localStorage.setItem('transkep_token', res.token);
         localStorage.setItem('transkep_user', JSON.stringify(res.data));
+        if (typeof window !== 'undefined' && window.SessionIntegrityGuard) {
+          window.SessionIntegrityGuard.sealSession(res.data.nip, res.data.role || '', res.token);
+        }
         memoryCache.clear(); // Bersihkan cache lama
       }
 
@@ -174,6 +209,7 @@ const TranskepAPI = (function () {
         localStorage.removeItem('transkep_session_token');
         localStorage.removeItem('transkep_token');
         localStorage.removeItem('transkep_user');
+        localStorage.removeItem('transkep_session_sig');
         memoryCache.clear();
       }
     },
