@@ -357,3 +357,17 @@ ZONA BAWAH: MASTER CONTEXT & STATUS MIGRASI TERKINI (LIVING CONTEXT)
       - Menghapus tombol `🔄 Refresh` di samping tombol `+ Buat Agenda Rapat` pada `view_eoffice.html`.
     - **PWA Cache Invalidation**:
       - Versi Service Worker `sw.js` dan `APP_BUILD_VER` di `index.html` dinaikkan ke **transkep-v3.4.0** untuk invalidasi instan tanpa tertahan cache lama.
+
+34. **Migrasi Frontend ke Root Domain Resmi (Tahap 62 - Selesai & Aktif ✅):**
+    - **Aktivasi Root Custom Domain (`sso.pa-indramayu.go.id`)**:
+      - Seluruh berkas frontend SPA/PWA ([`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html), [`manifest.json`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/manifest.json), [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js), `core/`, `modules/`, `css/`, `img/`, `vendor/`) kini berada langsung di tingkat root repositori (`/`).
+      - Halaman login dan dashboard aplikasi diakses langsung di `https://sso.pa-indramayu.go.id/` tanpa prefix `/transkep-web/`.
+      - Folder redundan `transkep-web/` dihapus secara bersih.
+    - **Proteksi Domain & Deploy (`CNAME` & `.nojekyll`)**:
+      - Berkas [`CNAME`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/CNAME) dipasang di root berisi `sso.pa-indramayu.go.id` agar custom domain GitHub Pages terkunci permanen.
+      - Berkas [`.nojekyll`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/.nojekyll) dipasang di root untuk menonaktifkan Jekyll build engine sehingga seluruh berkas statis dan library vendor terlayani utuh.
+    - **Isolasi Backend Google Apps Script (`.claspignore`)**:
+      - Menambahkan direktif proteksi pada [`.claspignore`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/.claspignore) untuk mengabaikan seluruh aset frontend di root (`core/**`, `modules/**`, `css/**`, `img/**`, `vendor/**`, `index.html`, `sw.js`, `manifest.json`, `CNAME`, `.nojekyll`) agar `clasp push` hanya memproses backend controller GAS (`code.js`, `api_router.js`, `setup.js`, `backup.js`, `appsscript.json`).
+    - **PWA Scope & Cache Invalidation**:
+      - Versi Service Worker `sw.js` dinaikkan ke **transkep-v3.5.0** dengan scope root domain (`/`).
+      - Menyematkan pembersih unregister otomatis di `index.html` untuk menghapus registrasi Service Worker lama yang tersangkut di scope `/transkep-web/`.

@@ -1,9 +1,19 @@
 # ==========================================
-# .claspignore (TRANSKEP Safety Isolation)
+# .claspignore (TRANSKEP Backend GAS Isolation)
 # ==========================================
-# Mencegah berkas repositori frontend baru atau dokumentasi
+# Mencegah berkas frontend PWA, dokumentasi, dan aset
 # ikut terunggah ke Google Apps Script saat 'clasp push'
 
-transkep-web/**
 .git/**
 *.md
+CNAME
+.nojekyll
+core/**
+modules/**
+css/**
+img/**
+vendor/**
+sw.js
+manifest.json
+package.json
+index.html

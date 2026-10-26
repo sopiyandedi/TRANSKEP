@@ -2781,6 +2781,50 @@ Elemen-elemen tersebut merupakan penanda teknis basis data internal dan tombol p
 - **Modul E-Office**: Header hanya menampilkan tombol utama `+ Buat Agenda Rapat` dengan aksen emerald yang elegan tanpa tombol manual `Refresh`.
 - **PWA Cache v3.4.0**: Cache Service Worker dinaikkan ke `transkep-v3.4.0` dan `APP_BUILD_VER = '3.4.0'` sehingga browser klien tidak menampilkan cache HTML usang.
 
+---
 
+### Tahap 49: Migrasi Frontend ke Root Domain Resmi (sso.pa-indramayu.go.id), Eliminasi Path /transkep-web/, Pemasangan CNAME & Perlindungan Backend GAS [SELESAI & DIVERIFIKASI] ✅
 
+#### 1. Latar Belakang & Akar Masalah
+1. **Pelepasan Google Sites & Migrasi Domain:** Pengguna telah sukses menghubungkan custom domain resmi kantor `sso.pa-indramayu.go.id` menggantikan `transkep.github.io` dan telah menghapus broadcast di Google Sites.
+2. **Akar Masalah Path `/transkep-web/`:**
+   - Repositori GitHub Pages (`transkep.github.io`) menyajikan konten langsung dari root `/`.
+   - Di root repo sebelumnya, terdapat `index.html` warisan Google Apps Script yang mengeksekusi gateway redirect otomatis:
+     `if (!isGoogleHost && !window.location.pathname.includes('/transkep-web')) { window.location.replace('./transkep-web/...'); }`
+   - Sementara seluruh frontend modern (SPA/PWA) terisolasi di dalam subfolder `transkep-web/`.
+   - Akibatnya, saat pengguna mengakses `https://sso.pa-indramayu.go.id/`, browser otomatis dilempar ke `https://sso.pa-indramayu.go.id/transkep-web/`.
 
+#### 2. Sasaran Teknis & Realisasi
+1. **Aplikasi Berjalan Murni di Root (`/`):**
+   - Halaman login dan seluruh modul sistem diakses langsung di `https://sso.pa-indramayu.go.id/` tanpa embel-embel folder `/transkep-web/`.
+2. **Penyelarasan Struktur Berkas (Promote to Root):**
+   - Seluruh aset dan komponen inti frontend (`index.html`, `manifest.json`, `sw.js`, `core/`, `modules/`, `css/`, `img/`, `vendor/`) dinaikkan langsung ke Root repositori.
+   - Subfolder duplikat `transkep-web/` dihapus secara bersih (sesuai arahan user, jaring pengaman tidak diperlukan karena aplikasi belum di-launching).
+3. **Penyediaan File `CNAME` & `.nojekyll` di Root:**
+   - Berkas `CNAME` di root berisi teks murni: `sso.pa-indramayu.go.id` agar custom domain di GitHub Pages terkunci permanen dan tidak hilang saat git push.
+   - Berkas `.nojekyll` dibuat di root agar GitHub Pages tidak memproses Jekyll engine (mencegah potensi asset filtering / MIME issues).
+4. **Proteksi Backend Google Apps Script (`.claspignore`):**
+   - Memperbarui `.claspignore` agar saat pengguna menjalankan `clasp push`, seluruh aset frontend baru (`core/`, `modules/`, `css/`, `img/`, `vendor/`, `index.html`, `manifest.json`, `sw.js`, `CNAME`, `.nojekyll`) tidak terunggah ke Google Apps Script. `clasp push` hanya menyentuh berkas backend controller (`code.js`, `api_router.js`, `setup.js`, `backup.js`, `appsscript.json`).
+5. **PWA Scope & Cache Invalidation:**
+   - Service Worker `sw.js` diperbarui ke versi `transkep-v3.5.0` dengan scope root (`/`).
+   - Menyertakan mekanisme unregister Service Worker lawas yang berada di scope `/transkep-web/`.
+6. **Sinkronisasi Git Multi-Remote:**
+   - Commit perubahan dan push ke kedua remote repository:
+     - `origin` (`sopiyandedi/TRANSKEP.git`)
+     - `prod` (`transkep/transkep.github.io.git`)
+
+#### 3. Rencana Eksekusi Bertahap (Execution Plan)
+- [x] **Langkah 1**: Salin/Promosikan seluruh isi folder `transkep-web/` ke root workspace (`index.html`, `manifest.json`, `sw.js`, `core/`, `modules/`, `css/`, `img/`, `vendor/`).
+- [x] **Langkah 2**: Buat file `CNAME` di root project dengan isi: `sso.pa-indramayu.go.id`.
+- [x] **Langkah 3**: Buat file `.nojekyll` kosong di root project.
+- [x] **Langkah 4**: Hapus subfolder `transkep-web/` agar struktur repositori bersih tanpa redundansi.
+- [x] **Langkah 5**: Perbarui `.claspignore` untuk memproteksi Google Apps Script dari file-file frontend di root.
+- [x] **Langkah 6**: Naikkan versi cache Service Worker ke `transkep-v3.5.0` di `sw.js` dan tambahkan unregister scope lama di `index.html`.
+- [x] **Langkah 7**: Jalankan verifikasi keutuhan file (`git status`, validasi sintaks JS `node -c`).
+- [x] **Langkah 8**: Lakukan `git add`, `git commit`, dan `git push` ke `origin main` serta `prod main`.
+
+#### 4. Hasil Verifikasi & Status Akhir: [SELESAI] ✅
+- Halaman login kini dapat diakses langsung pada URL root `https://sso.pa-indramayu.go.id/`.
+- File `CNAME` dan `.nojekyll` terpasang kokoh di root project.
+- Seluruh aset modular (`core/`, `modules/`, `css/`, `img/`, `vendor/`) terbaca langsung dari root tanpa prefix `/transkep-web/`.
+- PWA terdaftar pada root scope dengan cache `transkep-v3.5.0`.
