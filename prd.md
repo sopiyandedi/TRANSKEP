@@ -347,6 +347,13 @@ ZONA BAWAH: MASTER CONTEXT & STATUS MIGRASI TERKINI (LIVING CONTEXT)
       - Sinkron otomatis dengan `localStorage` (`transkep_theme`).
     - Versi PWA Service Worker `sw.js` dan `APP_BUILD_VER` dinaikkan ke **transkep-v3.3.9**.
 
-
-
-
+33. **Pembersihan Antarmuka (Decluttering UI) Firestore & Tombol Refresh (Tahap 61 - Selesai & Aktif ✅):**
+    - **Modul Penilaian Kinerja (PKP)**:
+      - Menghapus badge `☁️ Firestore` pada judul halaman `Penilaian Kinerja (PKP)` di `view_pkp.html`.
+      - Menghapus tombol manual `🔄 Sinkron Firestore` / `Sinkron ke Firestore` di baris aksi header atas.
+    - **Modul Jobdes (Daftar Rincian Tugas Jabatan)**:
+      - Menghapus badge `🔥 Firestore` pada judul dokumen `DAFTAR RINCIAN TUGAS JABATAN` di `view_jobdes.html`.
+    - **Modul E-Office & Administrasi Kedinasan**:
+      - Menghapus tombol `🔄 Refresh` di samping tombol `+ Buat Agenda Rapat` pada `view_eoffice.html`.
+    - **PWA Cache Invalidation**:
+      - Versi Service Worker `sw.js` dan `APP_BUILD_VER` di `index.html` dinaikkan ke **transkep-v3.4.0** untuk invalidasi instan tanpa tertahan cache lama.

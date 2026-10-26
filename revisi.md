@@ -2742,5 +2742,45 @@ Pada pengujian Tahap 56 di aplikasi web/PWA, layar memuat animasi loading terus-
   - Saat mode Terang: Ikon Bulan indigo (`fa-solid fa-moon text-indigo-400`) aktif dan siap diklik untuk beralih ke gelap.
 - **PWA Cache v3.3.9**: Cache PWA dinaikkan ke `transkep-v3.3.9` agar smartphone pengguna langsung memperbarui tampilan tanpa tertahan cache lama.
 
+---
+
+### Tahap 48: Pembersihan Antarmuka (Decluttering UI) - Penghapusan Tombol/Badge Firestore & Tombol Refresh E-Office [SELESAI & DIVERIFIKASI] ✅
+
+#### 1. Masalah & Kebutuhan Pengguna
+Berdasarkan tangkapan layar (screenshot) dan instruksi pengguna:
+1. **Screenshot 1 (Modul PKP - Penilaian Kinerja Pegawai):**
+   - Terdapat badge `☁️ Firestore` di samping judul halaman `Penilaian Kinerja (PKP)`.
+   - Terdapat tombol `🔄 Sinkron Firestore` (dengan ikon `fa-arrows-rotate`) di area header aksi atas.
+2. **Screenshot 2 (Modul Jobdes - Daftar Rincian Tugas Jabatan):**
+   - Terdapat badge `🔥 Firestore` di sebelah judul `DAFTAR RINCIAN TUGAS JABATAN`.
+3. **Screenshot 3 (Modul E-Office & Administrasi Kedinasan):**
+   - Terdapat tombol `🔄 Refresh` (dengan ikon `fa-arrows-rotate`) di samping tombol `+ Buat Agenda Rapat`.
+
+**Akar Masalah & Tujuan:**
+Elemen-elemen tersebut merupakan penanda teknis basis data internal dan tombol pemicu manual yang kini tidak lagi diperlukan di antarmuka pengguna karena seluruh sinkronisasi data telah berjalan otomatis di latar belakang (background sync & auto-refresh). Penghapusan ini bertujuan menciptakan antarmuka yang lebih bersih (*decluttered*), minimalis, dan profesional tanpa mengurangi fungsionalitas sistem.
+
+#### 2. Rincian Modifikasi Antarmuka
+
+| No | Modul / Halaman | Komponen yang Dihapus | Lokasi Berkas | Dampak Fungsional |
+| :---: | :--- | :--- | :--- | :--- |
+| **01** | **Penilaian Kinerja (PKP)** | - Badge `<span ...><i class="fa-solid fa-cloud"></i> Firestore</span>`<br>- Tombol `<button ... @click="syncPkpToFirestore">... Sinkron Firestore</button>` | [`transkep-web/modules/pkp/view_pkp.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/modules/pkp/view_pkp.html) & [`pkp/view_pkp.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/pkp/view_pkp.html) | Header PKP menjadi bersih; metode `syncPkpToFirestore` tetap aman di controller tanpa error DOM. |
+| **02** | **Jobdes (Rincian Tugas)** | - Badge `<span v-if="selectedJobdes?.is_firebase" ...><i class="fa-solid fa-fire text-amber-400"></i> Firestore</span>` | [`transkep-web/modules/jobdes/view_jobdes.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/modules/jobdes/view_jobdes.html) & [`jobdes/view_jobdes.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/jobdes/view_jobdes.html) | Judul dokumen tampil murni dan elegan tanpa badge database. |
+| **03** | **E-Office & Administrasi Kedinasan** | - Tombol `<button @click="refreshData()" ...><i class="fa-arrows-rotate"></i> Refresh</button>` | [`transkep-web/modules/eoffice/view_eoffice.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/modules/eoffice/view_eoffice.html) & [`eoffice/view_eoffice.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/view_eoffice.html) | Header kanan E-Office hanya memfokuskan tombol utama `+ Buat Agenda Rapat`. Data tetap dimuat otomatis saat modul dibuka atau setelah modal disimpan. |
+| **04** | **PWA Cache Invalidation** | - Bump versi cache Service Worker ke `transkep-v3.4.0`<br>- Bump `APP_BUILD_VER` ke `'3.4.0'` | [`transkep-web/sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/sw.js) & [`transkep-web/index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/index.html) | Memastikan browser dan perangkat mobile langsung memuat template view terbaru tanpa terhalang cache. |
+
+#### 3. Rencana Eksekusi Bertahap (Execution Plan)
+- [x] **Langkah 1**: Edit [`transkep-web/modules/pkp/view_pkp.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/modules/pkp/view_pkp.html) & [`pkp/view_pkp.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/pkp/view_pkp.html) untuk menghapus badge `Firestore` pada judul dan tombol `Sinkron Firestore`.
+- [x] **Langkah 2**: Edit [`transkep-web/modules/jobdes/view_jobdes.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/modules/jobdes/view_jobdes.html) & [`jobdes/view_jobdes.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/jobdes/view_jobdes.html) untuk menghapus badge `Firestore` pada judul tugas jabatan.
+- [x] **Langkah 3**: Edit [`transkep-web/modules/eoffice/view_eoffice.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/modules/eoffice/view_eoffice.html) & [`eoffice/view_eoffice.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/view_eoffice.html) untuk menghapus tombol `Refresh` beserta icon putarnya.
+- [x] **Langkah 4**: Naikkan versi cache PWA ke `transkep-v3.4.0` pada [`transkep-web/sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/sw.js) dan [`transkep-web/index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/transkep-web/index.html).
+- [x] **Langkah 5**: Lakukan verifikasi sintaks HTML/JS dan laporkan detail hasil perubahan ke pengguna.
+
+#### 4. Hasil Verifikasi & Status Akhir: [SELESAI] ✅
+- **Modul PKP**: Header bersih dan proporsional. Tidak ada lagi badge `Firestore` dan tombol `Sinkron Firestore`. Tab navigasi `Riwayat Saya`, `Kotak Verifikasi`, dan `Rekapitulasi` tertata rapi.
+- **Modul Jobdes**: Judul `DAFTAR RINCIAN TUGAS JABATAN` tampil bersih tanpa badge `Firestore`.
+- **Modul E-Office**: Header hanya menampilkan tombol utama `+ Buat Agenda Rapat` dengan aksen emerald yang elegan tanpa tombol manual `Refresh`.
+- **PWA Cache v3.4.0**: Cache Service Worker dinaikkan ke `transkep-v3.4.0` dan `APP_BUILD_VER = '3.4.0'` sehingga browser klien tidak menampilkan cache HTML usang.
+
+
 
 

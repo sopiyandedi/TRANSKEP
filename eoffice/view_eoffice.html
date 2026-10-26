@@ -24,11 +24,6 @@
         
         <!-- Tombol Aksi Kanan Atas: HANYA Agenda Rapat (KGB dipicu otomatis dari Dashboard) -->
         <div class="flex flex-wrap items-center gap-2">
-          <button @click="refreshData()" class="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-slate-300 font-bold rounded-xl border border-slate-800 transition flex items-center gap-2 text-xs" title="Segarkan Data">
-            <i :class="['fa-solid fa-arrows-rotate', isLoading ? 'fa-spin text-indigo-400' : '']"></i>
-            <span>Refresh</span>
-          </button>
-          
           <button @click="triggerOpenModalRapat()" class="px-4 py-2 bg-emerald-500/10 hover:bg-emerald-500 text-emerald-400 hover:text-white font-bold rounded-xl border border-emerald-500/20 transition flex items-center justify-center gap-2 text-xs shadow-lg shadow-emerald-500/5">
             <i class="fa-solid fa-calendar-plus"></i> + Buat Agenda Rapat
           </button>

@@ -80,12 +80,7 @@
 
       <div v-else id="jobdesDocContent" class="space-y-6 relative h-full flex flex-col animate-fade-in">
         <div class="text-center border-b border-slate-800 pb-5 pt-2 flex flex-col items-center">
-          <div class="flex items-center gap-2">
-            <h3 class="text-2xl font-bold uppercase tracking-widest text-slate-100 jd-title-text">Daftar Rincian Tugas Jabatan</h3>
-            <span v-if="selectedJobdes?.is_firebase" class="text-[10px] bg-emerald-500/20 text-emerald-300 px-2.5 py-0.5 rounded-full font-bold border border-emerald-500/30 flex items-center gap-1.5 shadow-sm" title="Tersinkronisasi Realtime dengan Cloud Firestore">
-              <i class="fa-solid fa-fire text-amber-400"></i> Firestore
-            </span>
-          </div>
+          <h3 class="text-2xl font-bold uppercase tracking-widest text-slate-100 jd-title-text">Daftar Rincian Tugas Jabatan</h3>
           <p id="jdPrevNamaJabatan" class="text-indigo-400 text-base font-bold mt-2 uppercase tracking-wide">{{ selectedUser?.jabatan || '-' }}</p>
         </div>
 
