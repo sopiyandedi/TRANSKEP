@@ -644,8 +644,8 @@ const LoginRateLimiter = {
       localStorage.setItem(this.STORAGE_KEY_LOCKED_UNTIL, String(lockUntil));
       this.startCountdown();
       showNotify(
-        "🚨 KEAMANAN SIBER: Akun Terkunci",
-        "Percobaan login gagal sebanyak 2 kali berturut-turut! Form login dikunci selama 60 detik demi mencegah serangan Brute Force.",
+        "Akses Terkunci",
+        "Terlalu banyak percobaan. Silakan tunggu 60 detik.",
         "error"
       );
 
@@ -656,9 +656,9 @@ const LoginRateLimiter = {
             waktu: new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }),
             url: window.location.href,
             userAgent: navigator.userAgent,
-            jenis_pelanggaran: 'RATE_LIMIT_BRUTE_FORCE_LOCKOUT',
+            jenis_pelanggaran: 'RATE_LIMIT_LOCKOUT',
             nip: 'SECURITY_SYSTEM',
-            detail: 'Login gagal 2 kali. Sistem mengunci akses selama 60 detik.',
+            detail: 'Login gagal 2 kali. Cooldown 60 detik.',
             timestamp: firebase.firestore.FieldValue.serverTimestamp()
           }).catch(() => {});
         }
@@ -666,8 +666,8 @@ const LoginRateLimiter = {
       return true;
     } else {
       showNotify(
-        "Peringatan Keamanan",
-        `Percobaan login gagal (${attempts}/${this.MAX_ATTEMPTS}). Jika salah 1 kali lagi, akses login akan dikunci selama 60 detik!`,
+        "Login Gagal",
+        "NIP atau kata sandi salah. Sisa 1 kesempatan.",
         "warning"
       );
       return false;
@@ -697,7 +697,7 @@ const LoginRateLimiter = {
         if (btn) {
           btn.disabled = true;
           btn.classList.add('opacity-60', 'cursor-not-allowed');
-          btn.innerHTML = `<i class="fa-solid fa-shield-halved fa-bounce mr-2 text-rose-400"></i><span>Terkunci (${remaining}s)</span>`;
+          btn.innerHTML = `<i class="fa-solid fa-clock mr-2 text-rose-400"></i><span>Tunggu (${remaining}s)</span>`;
         }
         if (passInput) passInput.disabled = true;
       } else {
@@ -712,7 +712,7 @@ const LoginRateLimiter = {
           passInput.disabled = false;
           passInput.focus();
         }
-        showNotify("Keamanan Siber", "Masa penguncian login telah berakhir. Silakan coba masuk kembali.", "info");
+        showNotify("Info", "Silakan coba masuk kembali.", "info");
       }
     };
 
@@ -775,7 +775,7 @@ function handleLogin(event) {
 
   if (typeof LoginRateLimiter !== 'undefined' && LoginRateLimiter.isLocked()) {
     const sec = LoginRateLimiter.getRemainingSeconds();
-    showNotify("Akses Ditolak", `Keamanan Siber: Percobaan login gagal melebihi batas (2x). Sistem terkunci selama ${sec} detik demi keamanan.`, "error");
+    showNotify("Akses Terkunci", `Silakan tunggu ${sec} detik lagi.`, "warning");
     LoginRateLimiter.startCountdown();
     return;
   }

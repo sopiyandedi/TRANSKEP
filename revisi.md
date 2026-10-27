@@ -3078,6 +3078,33 @@ Pengguna melaporkan bahwa pratinjau (*preview*) dokumen PDF di modal SK dan SOP 
 - [x] Setelah 60 detik: tombol otomatis kembali bertuliskan `Masuk Aplikasi` dan input aktif kembali.
 - [x] Login berhasil: counter gagal langsung di-reset ke 0.
 
+---
+
+### TAHAP 57: Penyederhanaan Notifikasi & Status Rate Limiter Login (v3.5.7)
+
+#### 1. Masalah / Kebutuhan
+- Pesan peringatan keamanan pada Tahap 56 dinilai terlalu panjang dan detail (*"🚨 KEAMANAN SIBER: Akun Terkunci..."*).
+- Kebutuhan: Ubah pesan menjadi ringkas, padat, dan elegan tanpa mengurangi ketegasan proteksi 60 detik.
+
+#### 2. Perubahan Teks & UI
+1. **Peringatan Kegagalan Ke-1:**
+   - Menjadi: *"Login Gagal: NIP atau kata sandi salah. Sisa 1 kesempatan."*
+2. **Peringatan Terkunci (Kegagalan Ke-2):**
+   - Menjadi: *"Akses Terkunci: Terlalu banyak percobaan. Silakan tunggu 60 detik."*
+3. **Status Tombol:**
+   - Berubah dari teks panjang menjadi: `<i class="fa-solid fa-clock mr-2 text-rose-400"></i> Tunggu (Xs)`.
+4. **Upaya Klik Saat Terkunci:**
+   - Menjadi: *"Akses Terkunci: Silakan tunggu X detik lagi."*
+5. **Cooldown Selesai:**
+   - Menjadi: *"Info: Silakan coba masuk kembali."*
+
+#### 3. File yang Dimodifikasi
+- `core/core.js`: Penyesuaian teks notifikasi & tombol pada objek `LoginRateLimiter`.
+- `sw.js` & `index.html`: Cache versi dinaikkan ke **v3.5.7**.
+
+#### 4. Status: [SELESAI & AKTIF] ✅
+
+
 
 
 
