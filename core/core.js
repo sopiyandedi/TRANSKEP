@@ -599,14 +599,155 @@ function toggleAppVisibility(isLoggedIn, animate) {
   }
 }
 
+// =========================================================================
+// ANTI-BRUTE FORCE & LOGIN RATE LIMITER (TAHAP 56)
+// =========================================================================
+const LoginRateLimiter = {
+  MAX_ATTEMPTS: 2,
+  LOCKOUT_DURATION_MS: 60 * 1000, // 60 Detik
+  STORAGE_KEY_ATTEMPTS: 'transkep_login_fail_count',
+  STORAGE_KEY_LOCKED_UNTIL: 'transkep_login_lock_until',
+  _tickerTimer: null,
+
+  getFailedAttempts() {
+    try {
+      return parseInt(localStorage.getItem(this.STORAGE_KEY_ATTEMPTS) || '0', 10);
+    } catch (e) {
+      return 0;
+    }
+  },
+
+  getLockedUntil() {
+    try {
+      return parseInt(localStorage.getItem(this.STORAGE_KEY_LOCKED_UNTIL) || '0', 10);
+    } catch (e) {
+      return 0;
+    }
+  },
+
+  isLocked() {
+    return this.getLockedUntil() > Date.now();
+  },
+
+  getRemainingSeconds() {
+    const lockedUntil = this.getLockedUntil();
+    const remaining = Math.ceil((lockedUntil - Date.now()) / 1000);
+    return remaining > 0 ? remaining : 0;
+  },
+
+  recordFailedAttempt() {
+    let attempts = this.getFailedAttempts() + 1;
+    localStorage.setItem(this.STORAGE_KEY_ATTEMPTS, String(attempts));
+
+    if (attempts >= this.MAX_ATTEMPTS) {
+      const lockUntil = Date.now() + this.LOCKOUT_DURATION_MS;
+      localStorage.setItem(this.STORAGE_KEY_LOCKED_UNTIL, String(lockUntil));
+      this.startCountdown();
+      showNotify(
+        "🚨 KEAMANAN SIBER: Akun Terkunci",
+        "Percobaan login gagal sebanyak 2 kali berturut-turut! Form login dikunci selama 60 detik demi mencegah serangan Brute Force.",
+        "error"
+      );
+
+      // Audit Log Otomatis ke Firestore
+      try {
+        if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length > 0) {
+          firebase.firestore().collection('security_incidents').add({
+            waktu: new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }),
+            url: window.location.href,
+            userAgent: navigator.userAgent,
+            jenis_pelanggaran: 'RATE_LIMIT_BRUTE_FORCE_LOCKOUT',
+            nip: 'SECURITY_SYSTEM',
+            detail: 'Login gagal 2 kali. Sistem mengunci akses selama 60 detik.',
+            timestamp: firebase.firestore.FieldValue.serverTimestamp()
+          }).catch(() => {});
+        }
+      } catch (e) {}
+      return true;
+    } else {
+      showNotify(
+        "Peringatan Keamanan",
+        `Percobaan login gagal (${attempts}/${this.MAX_ATTEMPTS}). Jika salah 1 kali lagi, akses login akan dikunci selama 60 detik!`,
+        "warning"
+      );
+      return false;
+    }
+  },
+
+  reset() {
+    try {
+      localStorage.removeItem(this.STORAGE_KEY_ATTEMPTS);
+      localStorage.removeItem(this.STORAGE_KEY_LOCKED_UNTIL);
+    } catch (e) {}
+    if (this._tickerTimer) {
+      clearInterval(this._tickerTimer);
+      this._tickerTimer = null;
+    }
+  },
+
+  startCountdown() {
+    if (this._tickerTimer) clearInterval(this._tickerTimer);
+
+    const updateUI = () => {
+      const remaining = this.getRemainingSeconds();
+      const btn = document.getElementById('btnLoginSubmit');
+      const passInput = document.getElementById('loginPass');
+
+      if (remaining > 0) {
+        if (btn) {
+          btn.disabled = true;
+          btn.classList.add('opacity-60', 'cursor-not-allowed');
+          btn.innerHTML = `<i class="fa-solid fa-shield-halved fa-bounce mr-2 text-rose-400"></i><span>Terkunci (${remaining}s)</span>`;
+        }
+        if (passInput) passInput.disabled = true;
+      } else {
+        // Cooldown selesai, buka kembali form login
+        this.reset();
+        if (btn) {
+          btn.disabled = false;
+          btn.classList.remove('opacity-60', 'cursor-not-allowed');
+          btn.innerHTML = `Masuk Aplikasi <i class="fa-solid fa-arrow-right-to-bracket transition-transform duration-300 group-hover:translate-x-1"></i>`;
+        }
+        if (passInput) {
+          passInput.disabled = false;
+          passInput.focus();
+        }
+        showNotify("Keamanan Siber", "Masa penguncian login telah berakhir. Silakan coba masuk kembali.", "info");
+      }
+    };
+
+    updateUI();
+    this._tickerTimer = setInterval(updateUI, 1000);
+  },
+
+  init() {
+    if (this.isLocked()) {
+      this.startCountdown();
+    }
+  }
+};
+window.LoginRateLimiter = LoginRateLimiter;
+try {
+  LoginRateLimiter.init();
+} catch (e) {}
+
 function resetLoginFormUI() {
+  if (typeof LoginRateLimiter !== 'undefined' && LoginRateLimiter.isLocked()) {
+    LoginRateLimiter.startCountdown();
+    return;
+  }
+
   const btnSubmit = document.getElementById('btnLoginSubmit') || (document.getElementById('loginForm') && document.getElementById('loginForm').querySelector('button[type="submit"]'));
   if (btnSubmit) {
     btnSubmit.disabled = false;
+    btnSubmit.classList.remove('opacity-60', 'cursor-not-allowed');
     btnSubmit.innerHTML = 'Masuk Aplikasi <i class="fa-solid fa-arrow-right-to-bracket transition-transform duration-300 group-hover:translate-x-1"></i>';
   }
   const passInput = document.getElementById('loginPass');
-  if (passInput) passInput.value = '';
+  if (passInput) {
+    passInput.disabled = false;
+    passInput.value = '';
+  }
 
   const nipInput = document.getElementById('loginNip');
   const rememberCheckbox = document.getElementById('rememberMe');
@@ -631,6 +772,13 @@ window.resetLoginFormUI = resetLoginFormUI;
 
 function handleLogin(event) {
   if (event) event.preventDefault();
+
+  if (typeof LoginRateLimiter !== 'undefined' && LoginRateLimiter.isLocked()) {
+    const sec = LoginRateLimiter.getRemainingSeconds();
+    showNotify("Akses Ditolak", `Keamanan Siber: Percobaan login gagal melebihi batas (2x). Sistem terkunci selama ${sec} detik demi keamanan.`, "error");
+    LoginRateLimiter.startCountdown();
+    return;
+  }
 
   let nipInput = document.getElementById('loginNip');
   let passInput = document.getElementById('loginPass');
@@ -665,6 +813,9 @@ function handleLogin(event) {
 
   const handleSuccess = function (response) {
     if (response && (response.status === 'success' || response.status === 'UPDATED')) {
+      if (typeof LoginRateLimiter !== 'undefined') {
+        LoginRateLimiter.reset();
+      }
       if (response.version) {
         localStorage.setItem('TRANSKEP_DATA_VERSION', response.version);
       }
@@ -721,12 +872,18 @@ function handleLogin(event) {
       showNotify("Login Berhasil", `Selamat datang kembali, ${response.data.nama}`, "success");
     } else {
       resetBtn();
+      if (typeof LoginRateLimiter !== 'undefined') {
+        LoginRateLimiter.recordFailedAttempt();
+      }
       showNotify("Akses Ditolak", response ? response.message : "Tidak ada respon server", "error");
     }
   };
 
   const handleFailure = function (error) {
     resetBtn();
+    if (typeof LoginRateLimiter !== 'undefined') {
+      LoginRateLimiter.recordFailedAttempt();
+    }
     showNotify("Error Server", (error && error.message) ? error.message : "Gagal menghubungi server", "error");
   };
 

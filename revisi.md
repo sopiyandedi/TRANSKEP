@@ -3041,6 +3041,44 @@ Pengguna melaporkan bahwa pratinjau (*preview*) dokumen PDF di modal SK dan SOP 
 - [x] Login ke aplikasi, lalu klik tombol Logout: tombol login seketika kembali normal bertuliskan *"Masuk Aplikasi"*.
 - [x] Centang *"Ingatkan Saya"*, lalu login dan logout: kolom NIP otomatis terisi kembali dan kursor langsung siap di kolom password.
 
+---
+
+### TAHAP 56: Modul Keamanan Siber Rate-Limiting & Anti-Brute Force Login (v3.5.6)
+
+#### 1. Masalah / Kebutuhan
+- **Celah Serangan Brute Force:** Adanya potensi pengujian penetrasi atau tebak-tebakan kata sandi secara berulang oleh pihak penyerang / tim IT.
+- **Aturan Tegas Klien:** Jika login gagal sebanyak **2 kali berturut-turut**, sistem seketika mengunci (*lockout*) formulir login selama **60 detik**.
+
+#### 2. Arsitektur & Rekayasa Keamanan (`LoginRateLimiter`)
+1. **Mekanisme Perhitungan Percobaan (`MAX_ATTEMPTS = 2`):**
+   - Setiap kali verifikasi login gagal (respon error dari backend atau network fail), `transkep_login_fail_count` bertambah.
+   - Pada kegagalan ke-1: Menampilkan notifikasi peringatan kuning: *"Percobaan login gagal (1/2). Jika salah 1 kali lagi, akses login akan dikunci selama 60 detik!"*.
+   - Pada kegagalan ke-2: Mengunci formulir login seketika dengan durasi `LOCKOUT_DURATION_MS = 60000` (60 detik).
+2. **Anti-Bypass Refresh Browser (F5-Proof):**
+   - Timestamp batas kunci disimpan ke `localStorage.setItem('transkep_login_lock_until', timestamp)`.
+   - Jika pengguna/penyerang me-refresh peramban (F5 / reload), sistem menghitung sisa detik secara presisi (`lockedUntil - Date.now()`) dan countdown timer langsung dilanjutkan tanpa reset.
+3. **UI / UX Status Terkunci:**
+   - Tombol `#btnLoginSubmit` dinonaktifkan (`disabled = true`) dan menampilkan animasi pelindung:
+     `<i class="fa-solid fa-shield-halved fa-bounce mr-2 text-rose-400"></i> Terkunci (Xs)`.
+   - Input password dinonaktifkan (`disabled = true`).
+   - Ticker berjalan setiap detik. Begitu waktu habis, form otomatis terbuka kembali dan kursor fokus ke input password.
+4. **Audit Trail Siber Terhubung:**
+   - Saat lockout 60 detik terpicu, insiden otomatis dicatat ke koleksi Cloud Firestore `security_incidents` dengan tag `RATE_LIMIT_BRUTE_FORCE_LOCKOUT`.
+5. **Reset State:**
+   - Begitu pengguna berhasil login dengan benar, seluruh hitungan gagal dan lock timestamp langsung dihapus bersih.
+
+#### 3. File yang Dimodifikasi
+- `core/core.js`: Implementasi objek `LoginRateLimiter`, integrasi ke `handleLogin`, `handleSuccess`, `handleFailure`, dan `resetLoginFormUI`.
+- `sw.js` & `index.html`: Cache versi dinaikkan ke **v3.5.6**.
+
+#### 4. Kriteria Pengujian & Status: [SELESAI & AKTIF] ✅
+- [x] Masukkan kata sandi salah 1x: muncul peringatan sisa percobaan (1/2).
+- [x] Masukkan kata sandi salah ke-2x: form seketika terkunci, tombol berubah menjadi `Terkunci (60s)` dan hitung mundur aktif.
+- [x] Tekan F5 (refresh browser): form tetap terkunci dengan sisa detik yang berjalan akurat (kebal refresh).
+- [x] Setelah 60 detik: tombol otomatis kembali bertuliskan `Masuk Aplikasi` dan input aktif kembali.
+- [x] Login berhasil: counter gagal langsung di-reset ke 0.
+
+
 
 
 
