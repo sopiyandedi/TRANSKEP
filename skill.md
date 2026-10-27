@@ -1,60 +1,65 @@
-# ROLE & OBJECTIVE
-Kamu adalah Senior Google Apps Script & Frontend Performance Architect. Tugas kamu adalah melakukan refactoring pada mekanisme ambil data (fetch), simpan data (CRUD), dan refresh tabel di aplikasi **Transkep** (`code.gs` dan `index.html`) agar proses refresh menjadi **Super Halus (Zero-Flicker), Instan (0ms Optimistic UI), dan Non-Blocking**, tanpa merusak desain `<style>` maupun logika bisnis yang sudah ada.
+ROLE & OBJECTIVE
 
----
+Kamu adalah Senior Cloud Security & Frontend Modular Architect. Tugas kamu adalah melakukan refactoring arsitektur keamanan dan koneksi Firebase pada proyek Transkep (sso.pa-indramayu.go.id) menjadi Component-Based (Satu File Pusat) tanpa merusak desain <style>, tampilan UI, maupun logika bisnis yang sudah berjalan di seluruh modul (index.html, dashboard/, eoffice/, front_view/, jobdes/, kinerja/, pegawai/, permohonan/).
 
-# ATURAN WAJIB BACKEND (`code.gs`)
+INSTRUKSI EKSEKUSI WAJIB
 
-1. **Server-Side Caching & Versioning (`CacheService` + `PropertiesService`)**:
-   - Buat mekanisme penanda versi data menggunakan `PropertiesService.getScriptProperties().getProperty('TRANSKEP_DATA_VERSION')`.
-   - Simpan hasil pembacaan data sheet yang sudah diproses ke dalam `CacheService.getScriptCache()` (pecah menjadi *chunk* otomatis jika ukuran string JSON mendekati 90KB).
-   - Setiap fungsi yang mengubah data (Create, Update, Delete) WAJIB diakhiri dengan `SpreadsheetApp.flush()`, lalu memperbarui nilai `TRANSKEP_DATA_VERSION` dengan timestamp terbaru dan menghapus/memperbarui cache di `CacheService`.
+1. Buat Modul Pusat: /core/transkep-security-core.js (atau di root /transkep-security-core.js)
 
-2. **Delta Sync / Short-Circuit Refresh**:
-   - Pada fungsi pengambilan data utama di `code.gs`, tambahkan parameter `clientVersion`.
-   - Jika `clientVersion` dari browser SAMA DENGAN `TRANSKEP_DATA_VERSION` di server, langsung kembalikan objek `{ status: 'NOT_MODIFIED', version: serverVersion }` dalam hitungan milidetik **tanpa** membaca ulang sel Google Sheets.
-   - Jika berbeda atau cache kosong, ambil dari `CacheService` (atau baca Sheet jika cache expired) dan kembalikan `{ status: 'UPDATED', version: serverVersion, data: [...] }`.
+Buat satu file JavaScript modular terpusat yang menangani seluruh keamanan siber dan inisialisasi Firebase untuk seluruh halaman aplikasi Transkep dengan fitur wajib berikut:
 
-3. **Batch Operations & Standar Data**:
-   - DILARANG melakukan loop baca/tulis sel satu per satu. Wajib gunakan `Range.getDisplayValues()` untuk membaca data dan `setValues()` untuk menulis data.
-   - Gunakan `Utilities.formatDate(new Date(), 'Asia/Jakarta', 'dd/MM/yyyy HH:mm:ss')` untuk seluruh pencatatan waktu.
-   - Bungkus setiap fungsi utama dengan blok `try-catch` yang mengembalikan objek respons terstruktur `{ success: boolean, message: string, data: any, version: string }`.
+A. Centralized Firebase & App Check Ready Connector
 
----
+Pusatkan konfigurasi firebaseConfig (Project ID: transkep-314c0) di dalam file ini sehingga tidak terduplikasi secara berantakan di tiap modul.
 
-# ATURAN WAJIB FRONTEND (`index.html`)
+Siapkan variabel konstanta TRANSKEP_RECAPTCHA_SITE_KEY = '' di bagian paling atas file. Buat logika otomatis: jika konstanta tersebut sudah diisi string kunci, langsung aktifkan firebase.appCheck() / initializeAppCheck dengan ReCaptchaV3Provider dan isTokenAutoRefreshEnabled: true.
 
-1. **Zero-Flicker Refresh (DILARANG Mengosongkan Tabel Saat Refresh)**:
-   - Saat user menekan tombol Refresh atau saat *auto-refresh* berjalan, **DILARANG KERAS** mengosongkan isi tabel (`tbody.innerHTML = ''`) atau menutup layar dengan *full-screen loading spinner* yang memblokir interaksi user.
-   - Biarkan data lama tetap tampil di layar sambil mengambil data baru di belakang layar (*background fetch*).
-   - Gunakan indikator *non-blocking* (seperti ikon putar pada tombol Refresh, *top progress bar* tipis, atau badge status "Syncing... -> Live" dengan aksen `#00ffaa`).
+B. Cryptographic Session & LocalStorage Integrity Guard (Anti-Tamper Inspect Element)
 
-2. **Stale-While-Revalidate dengan `localStorage`**:
-   - Saat aplikasi Transkep pertama kali dibuka atau di-refresh, langsung render data terakhir dari `localStorage` (`TRANSKEP_CACHE_DATA`) dalam waktu <10ms agar tabel langsung terisi tanpa jeda putih/kosong.
-   - Secara paralel di belakang layar, panggil backend dengan mengirimkan `localStorage.getItem('TRANSKEP_DATA_VERSION')`.
-   - Jika respons backend adalah `NOT_MODIFIED`, hentikan indikator loading tanpa menyentuh ulang DOM tabel.
-   - Jika respons backend adalah `UPDATED`, simpan data & versi baru ke `localStorage`, lalu jalankan pembaruan DOM secara halus.
+Buat mekanisme Signature Hash / Checksum otomatis untuk setiap data sesi login pegawai (nip, role, nama, jabatan) yang disimpan di localStorage atau sessionStorage.
 
-3. **Smart DOM Diffing & `requestAnimationFrame`**:
-   - Gunakan teknik *Smart Patching* atau injeksi string tunggal di dalam `window.requestAnimationFrame()`:
-     - Bandingkan data baru dengan data yang sedang tampil di layar menggunakan **ID Transaksi** (`dataset.id` pada elemen `<tr>`).
-     - Jika hanya ada penambahan/perubahan beberapa baris, cukup sisipkan atau perbarui baris `<tr>` terkait dan berikan efek transisi CSS *highlight* halus tanpa me-reset posisi *scroll* user.
-     - Jika melakukan *batch render*, rakit seluruh baris menjadi satu kesatuan string di memori terlebih dahulu sebelum disuntikkan ke DOM, dan terapkan CSS `content-visibility: auto;` pada baris tabel.
+Jalankan pengecekan periodik (setInterval setiap 2 detik) dan event listener window.addEventListener('storage', ...):
 
-4. **Optimistic UI pada Transaksi CRUD**:
-   - Saat user melakukan Tambah, Edit, atau Hapus data:
-     1. Langsung perbarui array state lokal di memori browser, perbarui `localStorage`, dan perbarui baris tabel DOM **saat itu juga (0 milidetik)**.
-     2. Tutup form/modal dan tampilkan *custom toast* non-blocking.
-     3. Kirim perubahan ke `code.gs` via `google.script.run` di belakang layar.
-     4. Jika server mengembalikan error, lakukan *rollback* otomatis ke state sebelumnya dan tampilkan *toast* peringatan.
+Jika ada seseorang (seperti penguji IT) yang mengubah isi localStorage secara manual lewat tab Application -> LocalStorage di Inspect Element (misal mengubah NIP atau menaikkan role menjadi Admin), sistem WAJIB mendeteksi ketidakcocokan signature!
 
-5. **Keamanan Sintaks & Dual-Environment Bridge (Antigravity Preview Friendly)**:
-   - Wajib bungkus setiap pemanggilan `google.script.run` dengan pengecekan `if (typeof google !== 'undefined' && google.script)` agar tidak terjadi `ReferenceError` saat diuji di *Local Browser Preview* Antigravity (sediakan fallback simulasi state lokal jika dijalankan di luar iframe Google).
-   - **DILARANG KERAS** menggunakan *Nested Template Literals* (tanda backtick `` ` `` bersarang) di dalam pembuatan string HTML. Gunakan penggabungan string klasik (`+` dan `'...'`) yang aman dari *SyntaxError*.
-   - Pertahankan **100% desain `<style>` yang sudah ada** tanpa mengubah tema warna maupun tata letak komponen yang sudah berjalan.
-   - Gunakan `onsubmit="event.preventDefault();"` pada semua form, ekstrak input menjadi tipe data primitif sebelum dikirim ke server, dan **DILARANG** menggunakan `alert()` atau `confirm()` bawaan browser.
+Jika manipulasi terdeteksi:
 
----
+Catat insiden secara diam-diam ke koleksi Firestore security_incidents (berisi waktu kejadian Asia/Jakarta, halaman URL, userAgent, dan jenis pelanggaran: 'LOCALSTORAGE_TAMPERING_DETECTED', sertakan field nip: 'SECURITY_SYSTEM' agar lolos validasi Firestore Rules).
 
-# INSTRUKSI EKSEKUSI
-Periksa file `code.gs` dan `index.html` di dalam workspace saat ini, lalu langsung terapkan seluruh arsitektur **Smooth Refresh & Optimistic UI** di atas secara utuh tanpa menghapus fitur bisnis eksisting aplikasi Transkep.
+Hapus seluruh storage, tampilkan custom toast/modal peringatan merah menyala: "PELANGGARAN KEAMANAN SIBER: Manipulasi Sesi Terdeteksi! Akses Anda telah dicatat di Audit Log.", lalu paksa redirect ke halaman login utama (/).
+
+C. Console Cyber Security Warning Banner (Jebakan F12 / Inspect Element)
+
+Saat halaman dimuat atau saat Developer Tools dibuka, bersihkan log sensitif dan cetak peringatan resmi berdesain tegas menggunakan styling CSS di console.log:
+
+Judul besar warna merah menyala: ⚠️ PERINGATAN KEAMANAN SIBER - PENGADILAN AGAMA INDRAMAYU
+
+Isi pesan: Sistem SSO Transkep (sso.pa-indramayu.go.id) dilindungi oleh Enkripsi TLS 1.3, Google Cloud API Referrer Lock, Firestore Immutable Anti-Delete Rules, dan Session Integrity Check. Segala aktivitas injeksi skrip, manipulasi LocalStorage, atau pemindaian tidak sah dicatat secara real-time ke dalam Security Audit Log.
+
+Nonaktifkan pencetakan data kredensial mentah (password/token) ke dalam console.log di lingkungan produksi (sso.pa-indramayu.go.id).
+
+D. Global Anti-XSS Input Sanitizer & Domain Lock
+
+Sediakan fungsi global window.sanitizeTranskepInput(str) yang membersihkan tag <script>, <iframe>, onload=, onerror=, dan karakter injeksi berbahaya sebelum data dikirim ke Cloud Firestore.
+
+Pasang pengecekan hostname: pastikan aplikasi berjalan optimal di sso.pa-indramayu.go.id, transkep.github.io, atau localhost.
+
+2. Integrasikan ke Seluruh Modul Halaman & Pasang Security Meta Tags
+
+Hubungkan file <script src="/transkep-security-core.js"></script> ke halaman utama (index.html) dan seluruh halaman di dalam folder modul (dashboard/, eoffice/, front_view/, jobdes/, kinerja/, pegawai/, permohonan/).
+
+Tambahkan Security Meta Tags pada <head> di setiap file HTML utama:
+
+<meta http-equiv="X-Content-Type-Options" content="nosniff">
+
+<meta name="referrer" content="strict-origin-when-cross-origin">
+
+Pastikan seluruh fitur baca/tulis Firestore yang sudah ada di setiap modul tetap berjalan 100% normal dan lancar tanpa error.
+
+3. Bersihkan Path /transkep-web/ & Pastikan File CNAME Aman
+
+Pastikan file CNAME di root repository berisi sso.pa-indramayu.go.id.
+
+Pastikan tidak ada lagi hardcode redirect yang memaksa URL pindah ke /transkep-web/ sehingga domain https://sso.pa-indramayu.go.id/ berjalan bersih.
+
+Setelah seluruh perubahan selesai diverifikasi tanpa error, lakukan git add, git commit, dan git push ke GitHub.

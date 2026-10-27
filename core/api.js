@@ -206,6 +206,9 @@ const TranskepAPI = (function () {
       } catch (e) {
         console.warn('Gagal revokasi sesi di server:', e);
       } finally {
+        if (typeof window !== 'undefined' && window.SessionIntegrityGuard && typeof window.SessionIntegrityGuard.resetSession === 'function') {
+          window.SessionIntegrityGuard.resetSession();
+        }
         localStorage.removeItem('transkep_active_nip');
         localStorage.removeItem('transkep_user_nip');
         localStorage.removeItem('transkep_session_token');
