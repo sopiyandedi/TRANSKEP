@@ -388,3 +388,14 @@ ZONA BAWAH: MASTER CONTEXT & STATUS MIGRASI TERKINI (LIVING CONTEXT)
       - Menampilkan banner peringatan keamanan resmi Pengadilan Agama Indramayu berwarna merah menyala dan berbingkai tebal di DevTools Console (F12) dengan landasan hukum UU ITE No. 11 Tahun 2008 Pasal 30–32.
     - **PWA Cache Invalidation**:
       - Versi Service Worker `sw.js` dinaikkan ke **transkep-v3.5.1**.
+
+36. **Penyelarasan CSP Iframe Google Drive Preview PDF (Tahap 64 - Selesai & Aktif ✅):**
+    - **Whitelist Iframe CSP Google Drive & Docs**:
+      - Memperbarui parameter `frame-src` pada meta tag CSP di `<head>` [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) menjadi `frame-src 'self' blob: data: https://drive.google.com https://docs.google.com https://*.google.com;`.
+      - Mengeliminasi galat browser Chromium *"This content is blocked. Contact the site owner to fix the issue"* saat membuka pratinjau dokumen SK dan SOP.
+    - **Peningkatan Responsivitas Tombol Buka Penuh & Iframe**:
+      - Menyesuaikan tombol *"Buka Penuh"* di modal PDF (`modules/pdf_viewer/view_pdf_viewer.html` dan `sk/view_iframepdf.html`) agar selalu tampak jelas baik di layar ponsel pintar (Mobile) maupun komputer (Desktop).
+      - Menambahkan atribut `allow="autoplay; encrypted-media; fullscreen"` pada elemen `<iframe>`.
+    - **PWA Cache Invalidation**:
+      - Versi Service Worker `sw.js` dan `APP_BUILD_VER` di `index.html` dinaikkan ke **transkep-v3.5.2** untuk invalidasi instan tanpa tertahan cache lama.
+

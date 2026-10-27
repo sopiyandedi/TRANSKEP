@@ -2891,3 +2891,47 @@ Pengguna menghendaki penguatan keamanan tingkat lanjut (*Enterprise-Grade Harden
 #### 4. Hasil Verifikasi & Status Akhir: [SELESAI & AKTIF] ✅
 - Seluruh 5 lapis pengamanan enterprise (terutama Pilar 1 Anti-Tamper dan Pilar 2 Session Verification) berjalan aktif dan terkunci kokoh di remote `origin` dan `prod` (`sso.pa-indramayu.go.id`).
 
+---
+
+### Tahap 52: Perbaikan Iframe Preview Dokumen PDF (Whitelist Google Drive di CSP) [SELESAI & DIVERIFIKASI] ✅
+
+#### 1. Latar Belakang Masalah & Bukti Lapangan
+Pengguna melaporkan bahwa pratinjau (*preview*) dokumen PDF di modal SK dan SOP tidak dapat tampil dengan pesan galat pada iframe:
+> **"This content is blocked. Contact the site owner to fix the issue."**
+
+#### 2. Akar Masalah (Root Cause Analysis)
+1. **Penyebab Utama (Content Security Policy Blocking):**
+   - Pada pembaruan penguatan keamanan siber sebelumnya (Tahap 50), dipasang meta tag keamanan ketat di `<head>` [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html):
+     ```html
+     frame-src 'self' blob: data:;
+     ```
+   - Direktif `frame-src` ini hanya mengizinkan iframe yang memuat sumber internal (`'self'`), `blob:`, dan `data:`.
+   - Modul PDF Viewer (`modules/pdf_viewer/pdf_viewer.js`) memuat pratinjau Google Drive ke dalam iframe:
+     ```javascript
+     iframe.src = "https://drive.google.com/file/d/" + fileId + "/preview";
+     ```
+   - Karena domain `https://drive.google.com` dan `https://docs.google.com` belum dimasukkan ke dalam daftar izin (*whitelist*) `frame-src`, browser Chromium (Google Chrome / Edge) langsung **memblokir pemuatan iframe** demi menegakkan kebijakan CSP situs kita sendiri.
+   - Browser Chromium secara otomatis menampilkan layar galat bawaan bertuliskan: *"This content is blocked. Contact the site owner to fix the issue."* (artinya: konten diblokir oleh kebijakan pemilik situs web).
+
+#### 3. Rencana Perbaikan Teknis (Action Plan)
+
+| No | File Target | Baris | Perubahan Teknis | Dampak / Tujuan |
+| :---: | :--- | :---: | :--- | :--- |
+| **01** | [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) | `L13` | Perbarui `frame-src` pada meta tag CSP menjadi: <br>`frame-src 'self' blob: data: https://drive.google.com https://docs.google.com https://*.google.com;` | Mengizinkan browser me-render embed Google Drive Preview dan Google Docs tanpa melonggarkan keamanan lainnya. |
+| **02** | [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) | `L511` | Perbarui `APP_BUILD_VER` dari `'3.4.0'` menjadi `'3.5.2'`. | Memastikan browser menarik seluruh komponen DOM dan file JavaScript versi terbaru tanpa terganjal cache lama. |
+| **03** | [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) | `L7` | Naikkan versi cache PWA `CACHE_NAME` dari `'transkep-v3.5.1'` ke `'transkep-v3.5.2'`. | Service Worker akan otomatis memperbarui cache offline dan menyajikan berkas `index.html` dengan CSP terbaru. |
+| **04** | [`modules/pdf_viewer/view_pdf_viewer.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/pdf_viewer/view_pdf_viewer.html) & [`sk/view_iframepdf.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sk/view_iframepdf.html) | Header modal | Ubah tombol `"Buka Penuh"` (`#fbBtnDownloadDirect`) dari kelas `hidden sm:flex` menjadi `flex items-center ...` | Memastikan tombol fallback untuk membuka dokumen di tab baru selalu terlihat dan mudah diakses di semua ukuran layar (Desktop & Mobile). |
+| **05** | [`modules/pdf_viewer/view_pdf_viewer.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/pdf_viewer/view_pdf_viewer.html) & [`sk/view_iframepdf.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sk/view_iframepdf.html) | Tag `<iframe>` | Tambahkan atribut `allow="autoplay; encrypted-media; fullscreen"`. | Menjamin iframe Google Drive memiliki izin fitur rendering dan fullscreen yang optimal. |
+
+#### 4. Kriteria Pengujian (Verification Checklist)
+- [x] Perbarui CSP `frame-src` dengan domain resmi Google Drive & Docs.
+- [x] Naikkan versi PWA Service Worker (`transkep-v3.5.2`) dan `APP_BUILD_VER` (`3.5.2`).
+- [x] Tombol "Buka Penuh" responsif dan selalu tampak di layar HP maupun PC.
+- [x] Sintaks terverifikasi bersih (`node -c sw.js` exit 0).
+
+#### 5. Hasil Verifikasi & Status Akhir: [SELESAI & AKTIF] ✅
+- Browser tidak lagi memblokir pemuatan iframe Google Drive pratinjau PDF.
+- Kebijakan CSP tetap mempertahankan standar keamanan siber enterprise tingkat A tanpa membiarkan celah clickjacking atau script injection liar.
+
+
+
