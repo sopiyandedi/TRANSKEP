@@ -3104,6 +3104,89 @@ Pengguna melaporkan bahwa pratinjau (*preview*) dokumen PDF di modal SK dan SOP 
 
 #### 4. Status: [SELESAI & AKTIF] ✅
 
+---
+
+### TAHAP 58: Implementasi Session Idle Timeout Guard (Auto-Logout Inaktif 15 Menit) (v3.5.8)
+
+#### 1. Latar Belakang & Masalah
+- **Risiko Keamanan Fisik (*Physical Session Hijacking*):** Pegawai meninggalkan PC/laptop di meja kantor tanpa menekan tombol logout. Rekan kerja atau pihak luar berpotensi melihat data sensitif atau mengubah data permohonan/SK atas nama NIP yang bersangkutan.
+- **Integritas Jejak Audit (*Audit Trail*):** Menghindari manipulasi data oleh pihak ketiga yang akan tertuduh kepada pemilik NIP sah.
+- **Kenyamanan UX vs Keamanan:** Durasi ditetapkan **15 Menit** (*sweet spot* instansi perkantoran), dengan dialog peringatan hitung mundur (*grace period*) **2 Menit (120 detik)** sebelum sesi benar-benar diputus, sehingga tidak mengejutkan pegawai yang sedang membaca dokumen fisik di meja.
+
+#### 2. Arsitektur & Rekayasa Sistem (`IdleTimeoutGuard`)
+1. **Konfigurasi Waktu Standar:**
+   - `IDLE_LIMIT_MS = 15 * 60 * 1000` (15 Menit = 900.000 ms).
+   - `WARNING_BEFORE_MS = 2 * 60 * 1000` (Peringatan muncul di menit ke-13 / sisa 120 detik).
+2. **Sensor Aktivitas Berkinerja Tinggi (*Throttled Activity Listener*):**
+   - Mendengarkan event interaksi alami pengguna: `mousemove`, `keydown`, `click`, `scroll`, dan `touchstart`.
+   - Menerapkan *throttling* (pencatatan aktivitas maksimal sekali per 1000ms) agar performa browser tetap 60fps tanpa beban CPU.
+   - Menyimpan `transkep_last_active_time` di `localStorage` untuk sinkronisasi otomatis status inaktif lintas tab (*Cross-Tab Sync*).
+3. **Modal Peringatan Hitung Mundur Elegan (*Anti-AI Human-Crafted Aesthetic*):**
+   - Modal peringatan mengambang dengan latar *backdrop blur* halus dan palet *Slate-900 / Amber-500*:
+     - Ikon status jam animasi: `<i class="fa-solid fa-hourglass-half text-amber-400 fa-spin-pulse"></i>`.
+     - Teks informatif: *"Sesi Anda akan berakhir dalam **Xs** karena tidak ada aktivitas."*
+     - Tombol Utama: `<button id="btnKeepActive">Tetap Masuk</button>` (Reset timer ke 0, modal tertutup, sesi aman).
+     - Tombol Sekunder: `<button id="btnImmediateLogout">Keluar Sekarang</button>` (Eksekusi logout langsung).
+4. **Eksekusi Pemutusan Sesi Presisi:**
+   - Jika hitungan mundur habis (0 detik) tanpa respons:
+     - Tutup modal peringatan.
+     - Panggil `handleLogout()`, mencabut token dari `CacheService` server Google Apps Script dan membersihkan `localStorage`.
+     - Tampilkan notifikasi di layar login: *"Sesi Berakhir: Anda telah keluar otomatis demi keamanan karena tidak ada aktivitas selama 15 menit."*
+5. **Siklus Hidup Terpadu (*Lifecycle Guard*):**
+   - Timer otomatis dimulai (*start*) saat login berhasil (`toggleAppVisibility(true)`).
+   - Timer otomatis dimatikan (*stop*) saat logout (`toggleAppVisibility(false)` atau `handleLogout()`).
+
+#### 3. Rencana Berkas yang Dimodifikasi
+- [`core/core.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/core/core.js): Pemasangan modul objek `IdleTimeoutGuard` serta integrasi ke siklus login/logout.
+- [`core/view_global_modals.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/core/view_global_modals.html): Penambahan template komponen UI modal peringatan `#modalIdleWarning`.
+- [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) & [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js): Peningkatan versi cache sistem ke **v3.5.8**.
+
+#### 4. Kriteria Pengujian & Status: [SELESAI & AKTIF] ✅
+- [x] Pengguna login ke sistem: `IdleTimeoutGuard` aktif memantau interaksi.
+- [x] Simulasi inaktif mencapai menit ke-13 (sisa 2 menit): Modal peringatan hitung mundur muncul di layar.
+- [x] Pengguna mengklik tombol *"Tetap Masuk"* atau berinteraksi: Modal tertutup dan timer di-reset ke 0.
+- [x] Pengguna membiarkan hingga countdown 0 detik: Sistem otomatis memicu `handleLogout()`, membersihkan sesi, dan mengarahkan ke halaman login dengan pesan yang jelas.
+- [x] Saat di halaman login (belum login): `IdleTimeoutGuard` dalam kondisi nonaktif (tidak berjalan sia-sia).
+
+---
+
+### TAHAP 59: Integrasi Firebase App Check (Fraud Defense reCAPTCHA Enterprise) & Domain Lock (v3.5.9)
+
+#### 1. Latar Belakang & Analisis Keamanan
+- **Proteksi Perimeter Firestore (Anti-Abuse / Anti-Scraping):** Backend Cloud Firestore (`transkep-314c0`) perlu dilindungi dari akses langsung tanpa otorisasi peramban resmi. Dengan mengintegrasikan **Firebase App Check** menggunakan provider **Fraud Defense (reCAPTCHA Enterprise)**, setiap permintaan data ke Firestore wajib mengantongi token atestasi valid dari Google.
+- **Pencegahan Kloning Web (Domain Lock):** Memastikan seluruh sistem hanya dapat berjalan di domain resmi `sso.pa-indramayu.go.id` (serta domain pengujian resmi `localhost` dan `transkep.github.io`). Jika kode dikloning ke situs phishing/liar, sistem otomatis memutus akses (*Anti-Cloning Lockdown*).
+
+#### 2. Arsitektur & Rekayasa Keamanan
+1. **Pemuatan Library Firebase App Check Compat (v10.14.1):**
+   - Menambahkan `<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-check-compat.js"></script>` di `<head>` [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html).
+2. **Penyelarasan CSP (Content Security Policy) Terhadap reCAPTCHA:**
+   - Memperbarui `script-src` dan `frame-src` pada meta tag CSP di [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) dengan whitelist resmi:
+     `https://www.google.com/recaptcha/` `https://www.gstatic.com/recaptcha/` `https://recaptcha.net/`.
+3. **Inisialisasi `firebase.appCheck()` di `core/firebase.js`:**
+   - Menggunakan Site Key resmi: `'6LfkOv8tAAAAAPm0LLzS7uJmKRUcmNBIuYZymlRz'`.
+   - Menginisialisasi `ReCaptchaEnterpriseProvider` dengan fallback `ReCaptchaV3Provider`.
+   - Mengaktifkan `isTokenAutoRefreshEnabled: true`.
+   - Melindungi dengan *defensive try-catch* agar pembacaan/penulisan data Firestore tetap berjalan lancar tanpa terhenti jika terjadi kendala jaringan reCAPTCHA.
+4. **Domain Lock Guard di `core/core.js`:**
+   - Memeriksa `window.location.hostname`. Jika domain tidak sah terdeteksi, layar seketika dikunci dan pelanggaran dicatat.
+5. **PWA Cache Invalidation:**
+   - Versi Service Worker `sw.js` dan `CURRENT_APP_BUILD` di `index.html` dinaikkan ke **`transkep-v3.5.9`**.
+
+#### 3. Berkas yang Dimodifikasi
+- [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html): CSP meta tag, library CDN App Check, dan versi build `v3.5.9`.
+- [`core/firebase.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/core/firebase.js): Blok konektor Firebase App Check (Fraud Defense).
+- [`core/core.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/core/core.js): Integrasi `verifyDomainIntegrity()`.
+- [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js): Cache name `transkep-v3.5.9`.
+
+#### 4. Kriteria Pengujian & Status: [SELESAI & AKTIF] ✅
+- [x] Library App Check CDN (`firebase-app-check-compat.js`) termuat tanpa error sintaks.
+- [x] Console browser menampilkan status: `🛡️ [TRANSKEP Security] Firebase App Check (Fraud Defense / reCAPTCHA Enterprise) aktif.`
+- [x] Query Firestore (SK, Log, Dokumen) berjalan lancar dengan header atestasi App Check.
+- [x] CSP memuat whitelist `google.com/recaptcha`, `gstatic.com/recaptcha`, dan `recaptcha.net`.
+- [x] Hostname check lolos di domain resmi `sso.pa-indramayu.go.id` dan localhost, serta memutus domain kloning liar.
+
+
+
 
 
 

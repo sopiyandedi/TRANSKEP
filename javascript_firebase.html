@@ -16,11 +16,34 @@
   };
 
   let transkepDb = null;
+  let transkepAppCheck = null;
+  const TRANSKEP_RECAPTCHA_SITE_KEY = '6LfkOv8tAAAAAPm0LLzS7uJmKRUcmNBIuYZymlRz';
+
   try {
     if (typeof firebase !== 'undefined') {
       if (!firebase.apps || firebase.apps.length === 0) {
         firebase.initializeApp(FIREBASE_CONFIG);
       }
+
+      // App Check (Fraud Defense / reCAPTCHA Enterprise)
+      try {
+        if (typeof firebase.appCheck === 'function') {
+          let provider = null;
+          if (typeof firebase.appCheck.ReCaptchaEnterpriseProvider === 'function') {
+            provider = new firebase.appCheck.ReCaptchaEnterpriseProvider(TRANSKEP_RECAPTCHA_SITE_KEY);
+          } else if (typeof firebase.appCheck.ReCaptchaV3Provider === 'function') {
+            provider = new firebase.appCheck.ReCaptchaV3Provider(TRANSKEP_RECAPTCHA_SITE_KEY);
+          }
+          if (provider) {
+            transkepAppCheck = firebase.appCheck();
+            transkepAppCheck.activate(provider, true);
+            console.log("🛡️ [TRANSKEP Firebase GAS] App Check Fraud Defense aktif.");
+          }
+        }
+      } catch (acErr) {
+        console.warn("⚠️ [TRANSKEP Firebase GAS] App Check notice:", acErr.message || acErr);
+      }
+
       transkepDb = firebase.firestore();
       console.log("🔥 [TRANSKEP Firebase GAS] Cloud Firestore transkep-314c0 aktif.");
     }
@@ -30,6 +53,8 @@
 
   window.TranskepFirebase = {
     config: FIREBASE_CONFIG,
+    siteKey: TRANSKEP_RECAPTCHA_SITE_KEY,
+    getAppCheck() { return transkepAppCheck; },
     getDb() {
       if (!transkepDb && typeof firebase !== 'undefined') {
         try {

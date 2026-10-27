@@ -83,6 +83,56 @@ if (typeof window.google === 'undefined' || !window.google.script) {
 }
 
 // =========================================================================
+// DOMAIN LOCK & HOSTNAME INTEGRITY GUARD (TAHAP 59)
+// =========================================================================
+(function verifyDomainIntegrity() {
+  try {
+    const currentHost = (window.location.hostname || '').toLowerCase();
+    if (!currentHost) return; // Local file preview / embedded webview
+
+    const allowedHosts = [
+      'sso.pa-indramayu.go.id',
+      'pa-indramayu.go.id',
+      'transkep.github.io',
+      'sopiyandedi.github.io',
+      'localhost',
+      '127.0.0.1'
+    ];
+
+    const isGoogleSandbox = currentHost.endsWith('google.com') || 
+                            currentHost.endsWith('googleusercontent.com');
+
+    const isAllowed = allowedHosts.includes(currentHost) || isGoogleSandbox;
+
+    if (!isAllowed) {
+      console.error("🚨 [SECURITY VIOLATION] Upaya akses domain tidak sah (Anti-Cloning Lockdown):", currentHost);
+      const lockOverlay = () => {
+        document.body.innerHTML = `
+          <div style="position:fixed;inset:0;background:#090d16;color:#f87171;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:system-ui,-apple-system,sans-serif;padding:24px;text-align:center;z-index:9999999;">
+            <div style="font-size:52px;margin-bottom:16px;">🛑</div>
+            <h2 style="font-size:22px;font-weight:800;color:#ffffff;margin-bottom:8px;letter-spacing:0.025em;">AKSES DITOLAK: DOMAIN TIDAK SAH</h2>
+            <p style="font-size:13px;color:#94a3b8;max-width:440px;line-height:1.6;margin-bottom:24px;">
+              Sistem Informasi TRANSKEP Pengadilan Agama Indramayu dilindungi Domain Lock. Sistem mendeteksi upaya peniruan / kloning situs pada host: <code>${currentHost}</code>.
+            </p>
+            <a href="https://sso.pa-indramayu.go.id" style="background:#4f46e5;color:#ffffff;text-decoration:none;padding:12px 24px;border-radius:12px;font-size:13px;font-weight:700;box-shadow:0 10px 15px -3px rgba(79,70,229,0.3);">
+              Buka Domain Resmi sso.pa-indramayu.go.id
+            </a>
+          </div>
+        `;
+      };
+      if (document.body) {
+        lockOverlay();
+      } else {
+        document.addEventListener("DOMContentLoaded", lockOverlay);
+      }
+      throw new Error("UNAUTHORIZED_DOMAIN_ACCESS");
+    }
+  } catch (e) {
+    if (e.message === "UNAUTHORIZED_DOMAIN_ACCESS") throw e;
+  }
+})();
+
+// =========================================================================
 // SECURITY CONSOLE GUARD: Peringatan Keamanan Siber Resmi Pengadilan Agama Indramayu
 // =========================================================================
 (function renderCyberWatchBanner() {
@@ -92,9 +142,11 @@ if (typeof window.google === 'undefined' || !window.google.script) {
   console.log("%c🚨 PERINGATAN KEAMANAN SIBER RESMI - PENGADILAN AGAMA INDRAMAYU 🚨", headerStyle);
   console.log(
     "%cPERHATIAN: Sistem Informasi Manajemen & Transparansi Kepegawaian (TRANSKEP) dilindungi secara aktif oleh:\n" +
-    "• Google Cloud Platform IAM (Enterprise Cloud Perimeter)\n" +
+    "• Google Cloud Fraud Defense / reCAPTCHA Enterprise (Firebase App Check Attestation)\n" +
+    "• Google Cloud Platform IAM & Enterprise Perimeter Guard\n" +
     "• Cloud Firestore Immutable Security Rules (Zero-Trust Data Protection)\n" +
-    "• Enkripsi Data Transit TLS 1.3 & Anti-Tamper Session Guard\n\n" +
+    "• Enkripsi Data Transit TLS 1.3 & Anti-Tamper Session Guard\n" +
+    "• Domain Lock & Hostname Integrity (sso.pa-indramayu.go.id)\n\n" +
     "DILARANG KERAS melakukan manipulasi memori, injeksi skrip, perubahan LocalStorage (tampering), atau reverse-engineering tanpa izin.\n" +
     "Setiap akses ilegal dan manipulasi sesi dicatat ke Audit Trail dan dapat diproses pidana sesuai UU ITE No. 11 Tahun 2008 Pasal 30, 31, dan 32.",
     bodyStyle
@@ -367,6 +419,7 @@ window.sanitizeInput = function(val) {
     .replace(/data\s*:\s*text\/html/gi, '')
     .trim();
 };
+window.sanitizeTranskepInput = window.sanitizeInput;
 
 window.escapeHtml = function(str) {
   if (typeof str !== 'string') return str;
@@ -535,6 +588,10 @@ function toggleAppVisibility(isLoggedIn, animate) {
     rootEl.classList.add('app-authenticated');
     rootEl.classList.remove('app-unauthenticated');
 
+    if (typeof IdleTimeoutGuard !== 'undefined') {
+      IdleTimeoutGuard.start();
+    }
+
     if (animate && loginSec && appCont) {
       loginSec.classList.add('auth-fade-out');
       appCont.classList.remove('hidden');
@@ -573,6 +630,10 @@ function toggleAppVisibility(isLoggedIn, animate) {
     rootEl.classList.remove('app-authenticated');
     rootEl.classList.add('app-unauthenticated');
 
+    if (typeof IdleTimeoutGuard !== 'undefined') {
+      IdleTimeoutGuard.stop();
+    }
+
     if (typeof resetLoginFormUI === 'function') {
       resetLoginFormUI();
     }
@@ -598,6 +659,257 @@ function toggleAppVisibility(isLoggedIn, animate) {
     }
   }
 }
+
+// =========================================================================
+// SESSION IDLE TIMEOUT GUARD (TAHAP 58)
+// Auto-Logout 15 Menit saat Inaktif + Modal Peringatan 120 Detik
+// =========================================================================
+const IdleTimeoutGuard = {
+  IDLE_LIMIT_MS: 15 * 60 * 1000,    // 15 Menit (900.000 ms)
+  WARNING_BEFORE_MS: 2 * 60 * 1000, // Peringatan 2 Menit (120.000 ms) sebelum logout
+  STORAGE_KEY_LAST_ACTIVE: 'transkep_last_active_time',
+
+  _checkInterval: null,
+  _isWarningShown: false,
+  _listenersAttached: false,
+  _lastThrottledUpdate: 0,
+  _boundActivityHandler: null,
+
+  isUserLoggedIn() {
+    try {
+      const nip = localStorage.getItem('transkep_active_nip');
+      const token = localStorage.getItem('transkep_session_token');
+      return !!(nip && token);
+    } catch (e) {
+      return false;
+    }
+  },
+
+  getLastActiveTime() {
+    try {
+      const stored = localStorage.getItem(this.STORAGE_KEY_LAST_ACTIVE);
+      const val = stored ? parseInt(stored, 10) : 0;
+      return val > 0 ? val : Date.now();
+    } catch (e) {
+      return Date.now();
+    }
+  },
+
+  recordActivity() {
+    if (!this.isUserLoggedIn()) return;
+    const now = Date.now();
+    // Throttle pembaruan timestamp agar tidak membebani browser (maksimal sekali per 1 detik)
+    if (now - this._lastThrottledUpdate < 1000) return;
+    this._lastThrottledUpdate = now;
+
+    try {
+      localStorage.setItem(this.STORAGE_KEY_LAST_ACTIVE, String(now));
+    } catch (e) {}
+
+    // Jika peringatan belum muncul dan ada aktivitas biasa, pastikan modal tertutup
+    if (!this._isWarningShown) {
+      this.hideWarningModal();
+    }
+  },
+
+  resetTimer() {
+    const now = Date.now();
+    this._lastThrottledUpdate = now;
+    try {
+      localStorage.setItem(this.STORAGE_KEY_LAST_ACTIVE, String(now));
+    } catch (e) {}
+    this.hideWarningModal();
+  },
+
+  ensureModalInDOM() {
+    let modal = document.getElementById('modalIdleWarning');
+    if (!modal) {
+      const wrapper = document.createElement('div');
+      wrapper.id = 'modalIdleWarning';
+      wrapper.className = 'fixed inset-0 z-[99999] hidden items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-fade-in';
+      wrapper.style.display = 'none';
+      wrapper.innerHTML = `
+        <div class="glass border border-amber-500/30 bg-slate-900/95 rounded-2xl w-full max-w-sm flex flex-col shadow-2xl overflow-hidden text-center p-6 relative">
+          <div class="w-14 h-14 mx-auto mb-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center text-2xl shadow-lg shadow-amber-500/10">
+            <i class="fa-solid fa-hourglass-half fa-spin-pulse"></i>
+          </div>
+          <h3 class="text-base font-bold text-white mb-1 tracking-wide">Sesi Segera Berakhir</h3>
+          <p class="text-xs text-slate-400 leading-relaxed mb-4">
+            Tidak ada aktivitas terdeteksi. Demi keamanan data kepegawaian, akun Anda akan keluar otomatis dalam:
+          </p>
+          <div class="bg-slate-950/80 border border-slate-800 rounded-xl py-3 px-4 mb-5 shadow-inner flex items-center justify-center gap-2">
+            <span id="idleCountdownSeconds" class="text-2xl font-black text-amber-400 font-mono tracking-tight">120</span>
+            <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Detik</span>
+          </div>
+          <div class="flex flex-col sm:flex-row gap-2.5">
+            <button type="button" id="btnIdleKeepActive" class="flex-1 py-2.5 px-4 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold text-xs rounded-xl shadow-lg shadow-amber-500/20 transition-all flex items-center justify-center gap-2">
+              <i class="fa-solid fa-rotate-right"></i> Tetap Masuk
+            </button>
+            <button type="button" id="btnIdleImmediateLogout" class="py-2.5 px-4 bg-slate-800/80 hover:bg-rose-500/20 hover:text-rose-400 text-slate-400 font-semibold text-xs rounded-xl border border-slate-700/50 hover:border-rose-500/30 transition-all">
+              Keluar Sekarang
+            </button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(wrapper);
+      this.bindModalButtons();
+    } else {
+      this.bindModalButtons();
+    }
+  },
+
+  bindModalButtons() {
+    const btnKeep = document.getElementById('btnIdleKeepActive');
+    const btnLogout = document.getElementById('btnIdleImmediateLogout');
+
+    if (btnKeep && !btnKeep.dataset.idleBound) {
+      btnKeep.dataset.idleBound = 'true';
+      btnKeep.addEventListener('click', (e) => {
+        e.preventDefault();
+        this.resetTimer();
+        if (typeof showNotify === 'function') {
+          showNotify("Sesi Diperpanjang", "Aktivitas Anda telah dikonfirmasi.", "info");
+        }
+      });
+    }
+
+    if (btnLogout && !btnLogout.dataset.idleBound) {
+      btnLogout.dataset.idleBound = 'true';
+      btnLogout.addEventListener('click', (e) => {
+        e.preventDefault();
+        this.stop();
+        if (typeof handleLogout === 'function') {
+          handleLogout();
+        }
+      });
+    }
+  },
+
+  showWarningModal(remainingSeconds) {
+    this._isWarningShown = true;
+    this.ensureModalInDOM();
+    const modal = document.getElementById('modalIdleWarning');
+    const countdownEl = document.getElementById('idleCountdownSeconds');
+    
+    if (modal) {
+      modal.classList.remove('hidden');
+      modal.style.display = 'flex';
+    }
+    if (countdownEl) {
+      countdownEl.textContent = String(remainingSeconds);
+    }
+  },
+
+  hideWarningModal() {
+    this._isWarningShown = false;
+    const modal = document.getElementById('modalIdleWarning');
+    if (modal) {
+      modal.classList.add('hidden');
+      modal.style.display = 'none';
+    }
+  },
+
+  checkIdleStatus() {
+    if (!this.isUserLoggedIn()) {
+      this.stop();
+      return;
+    }
+
+    const now = Date.now();
+    const lastActive = this.getLastActiveTime();
+    const elapsed = now - lastActive;
+    const warningThreshold = this.IDLE_LIMIT_MS - this.WARNING_BEFORE_MS; // 13 Menit
+
+    if (elapsed >= this.IDLE_LIMIT_MS) {
+      // Waktu habis -> Paksa logout
+      this.handleTimeoutLogout();
+    } else if (elapsed >= warningThreshold) {
+      // Sisa waktu hitung mundur (2 menit terakhir)
+      const remainingSeconds = Math.max(0, Math.ceil((this.IDLE_LIMIT_MS - elapsed) / 1000));
+      this.showWarningModal(remainingSeconds);
+    } else {
+      if (this._isWarningShown) {
+        this.hideWarningModal();
+      }
+    }
+  },
+
+  handleTimeoutLogout() {
+    this.stop();
+    if (typeof handleLogout === 'function') {
+      handleLogout();
+    }
+    setTimeout(() => {
+      if (typeof showNotify === 'function') {
+        showNotify(
+          "Sesi Berakhir",
+          "Anda telah keluar otomatis demi keamanan karena tidak ada aktivitas selama 15 menit.",
+          "warning"
+        );
+      }
+    }, 400);
+  },
+
+  start() {
+    if (!this.isUserLoggedIn()) return;
+    this.stop(); // Bersihkan instance timer sebelumnya jika ada
+
+    // Set waktu awal jika belum ada
+    if (!localStorage.getItem(this.STORAGE_KEY_LAST_ACTIVE)) {
+      localStorage.setItem(this.STORAGE_KEY_LAST_ACTIVE, String(Date.now()));
+    }
+
+    this.attachEventListeners();
+    this.ensureModalInDOM();
+
+    // Loop interval 1 detik untuk memantau waktu inaktif & update detik hitung mundur
+    this._checkInterval = setInterval(() => {
+      this.checkIdleStatus();
+    }, 1000);
+  },
+
+  stop() {
+    if (this._checkInterval) {
+      clearInterval(this._checkInterval);
+      this._checkInterval = null;
+    }
+    this.hideWarningModal();
+    this.detachEventListeners();
+    try {
+      localStorage.removeItem(this.STORAGE_KEY_LAST_ACTIVE);
+    } catch (e) {}
+  },
+
+  attachEventListeners() {
+    if (this._listenersAttached) return;
+    this._boundActivityHandler = () => this.recordActivity();
+
+    const events = ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'];
+    events.forEach(evt => {
+      window.addEventListener(evt, this._boundActivityHandler, { passive: true });
+    });
+    this._listenersAttached = true;
+  },
+
+  detachEventListeners() {
+    if (!this._listenersAttached || !this._boundActivityHandler) return;
+    const events = ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'];
+    events.forEach(evt => {
+      window.removeEventListener(evt, this._boundActivityHandler);
+    });
+    this._listenersAttached = false;
+  },
+
+  init() {
+    if (this.isUserLoggedIn()) {
+      this.start();
+    }
+  }
+};
+window.IdleTimeoutGuard = IdleTimeoutGuard;
+try {
+  IdleTimeoutGuard.init();
+} catch (e) {}
 
 // =========================================================================
 // ANTI-BRUTE FORCE & LOGIN RATE LIMITER (TAHAP 56)
@@ -903,6 +1215,10 @@ function handleLogin(event) {
 }
 
 function handleLogout() {
+  if (typeof IdleTimeoutGuard !== 'undefined') {
+    IdleTimeoutGuard.stop();
+  }
+
   const activeNip = localStorage.getItem('transkep_active_nip');
   const sessionToken = localStorage.getItem('transkep_session_token');
 

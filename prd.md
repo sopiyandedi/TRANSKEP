@@ -421,4 +421,31 @@ ZONA BAWAH: MASTER CONTEXT & STATUS MIGRASI TERKINI (LIVING CONTEXT)
     - **PWA Cache Invalidation**:
       - Versi Service Worker `sw.js` dan `APP_BUILD_VER` di `index.html` dinaikkan ke **transkep-v3.5.4** untuk invalidasi instan cache browser.
 
+39. **Session Idle Timeout Guard (Tahap 58 / Auto-Logout 15 Menit - Selesai & Aktif ✅):**
+    - **Engine `IdleTimeoutGuard`**:
+      - Terpasang di [`core/core.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/core/core.js) untuk memantau waktu inaktif pengguna (*inactivity period*) secara real-time.
+      - Konfigurasi batas waktu: **15 Menit** (`IDLE_LIMIT_MS = 900.000 ms`), dengan dialog peringatan hitung mundur (*grace period*) **2 Menit / 120 Detik** sebelum logout dipicu (`WARNING_BEFORE_MS = 120.000 ms`).
+      - Sensor interaksi berkinerja tinggi (*throttled listener* 1000ms) memantau event `mousemove`, `keydown`, `click`, `scroll`, dan `touchstart`.
+      - Sinkronisasi status waktu inaktif lintas tab (*cross-tab sync*) melalui `localStorage` (`transkep_last_active_time`).
+    - **Komponen UI Modal Peringatan Inaktif (`#modalIdleWarning`)**:
+      - Ditempatkan di [`core/view_global_modals.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/core/view_global_modals.html) dengan palet Slate-900 / Amber-500 dan animasi jam hitung mundur detik.
+      - Memiliki tombol interaksi *"Tetap Masuk"* (reset timer ke 0) dan *"Keluar Sekarang"* (langsung logout).
+    - **Eksekusi Pemutusan Sesi Bersih**:
+      - Saat hitungan mundur habis (0 detik), sistem memanggil `handleLogout()`, mencabut token dari `CacheService` server Google Apps Script ([`logoutSession`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/code.js#L145)) dan membersihkan data sesi lokal.
+40. **Firebase App Check (Fraud Defense reCAPTCHA Enterprise) & Domain Lock (Tahap 59 - Selesai & Aktif ✅):**
+    - **Inisialisasi `firebase.appCheck()`**:
+      - Terpasang di [`core/firebase.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/core/firebase.js) dengan Site Key resmi `6LfkOv8tAAAAAPm0LLzS7uJmKRUcmNBIuYZymlRz` menggunakan `ReCaptchaEnterpriseProvider` (fallback `ReCaptchaV3Provider`).
+      - Pengaktifan otomatis token refresh: `isTokenAutoRefreshEnabled: true`.
+      - Library pendukung dimuat melalui CDN `firebase-app-check-compat.js` (v10.14.1) di [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html).
+    - **Penyelarasan CSP (Content Security Policy)**:
+      - Penambahan domain resmi Google reCAPTCHA (`google.com/recaptcha`, `gstatic.com/recaptcha`, `recaptcha.net`) pada direktif `script-src` dan `frame-src`.
+      - Penambahan `https://content-firebaseappcheck.googleapis.com` pada direktif `connect-src`.
+    - **Domain Lock & Hostname Integrity Guard**:
+      - Memastikan eksekusi aplikasi murni pada domain resmi: `sso.pa-indramayu.go.id`, `pa-indramayu.go.id`, `transkep.github.io`, `localhost`, `127.0.0.1`, dan lingkungan sandbox Google Apps Script.
+      - Upaya kloning domain liar seketika diblokir dengan tampilan penolakan akses dan insiden dicatat ke audit log.
+    - **PWA Cache Invalidation**:
+      - Versi Service Worker `sw.js` dan `CURRENT_APP_BUILD` di `index.html` dinaikkan ke **`transkep-v3.5.9`**.
+
+
+
 

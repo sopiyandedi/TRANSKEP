@@ -4,15 +4,21 @@ Kamu adalah Senior Cloud Security & Frontend Modular Architect. Tugas kamu adala
 
 INSTRUKSI EKSEKUSI WAJIB
 
-1. Buat Modul Pusat: /core/transkep-security-core.js (atau di root /transkep-security-core.js)
+1. Buat Modul Pusat: /transkep-security-core.js (di root repository)
 
 Buat satu file JavaScript modular terpusat yang menangani seluruh keamanan siber dan inisialisasi Firebase untuk seluruh halaman aplikasi Transkep dengan fitur wajib berikut:
 
-A. Centralized Firebase & App Check Ready Connector
+A. Centralized Firebase & App Check (Fraud Defense) Connector
 
-Pusatkan konfigurasi firebaseConfig (Project ID: transkep-314c0) di dalam file ini sehingga tidak terduplikasi secara berantakan di tiap modul.
+Pusatkan konfigurasi firebaseConfig (Project ID: transkep-314c0) di dalam file ini sehingga terkelola dari satu pintu.
 
-Siapkan variabel konstanta TRANSKEP_RECAPTCHA_SITE_KEY = '' di bagian paling atas file. Buat logika otomatis: jika konstanta tersebut sudah diisi string kunci, langsung aktifkan firebase.appCheck() / initializeAppCheck dengan ReCaptchaV3Provider dan isTokenAutoRefreshEnabled: true.
+Integrasikan Firebase App Check menggunakan Site Key resmi yang sudah teregistrasi di Firebase Fraud Defense:
+
+TRANSKEP_RECAPTCHA_SITE_KEY = '6LfkOv8tAAAAAPm0LLzS7uJmKRUcmNBIuYZymlRz'
+
+Aktifkan isTokenAutoRefreshEnabled: true.
+
+Bungkus inisialisasi App Check dengan blok try-catch yang aman (mendukung ReCaptchaEnterpriseProvider maupun ReCaptchaV3Provider sesuai SDK yang dimuat) agar aplikasi tetap berjalan 100% mulus di semua kondisi jaringan tanpa memicu error yang menghentikan halaman.
 
 B. Cryptographic Session & LocalStorage Integrity Guard (Anti-Tamper Inspect Element)
 
@@ -34,7 +40,7 @@ Saat halaman dimuat atau saat Developer Tools dibuka, bersihkan log sensitif dan
 
 Judul besar warna merah menyala: ⚠️ PERINGATAN KEAMANAN SIBER - PENGADILAN AGAMA INDRAMAYU
 
-Isi pesan: Sistem SSO Transkep (sso.pa-indramayu.go.id) dilindungi oleh Enkripsi TLS 1.3, Google Cloud API Referrer Lock, Firestore Immutable Anti-Delete Rules, dan Session Integrity Check. Segala aktivitas injeksi skrip, manipulasi LocalStorage, atau pemindaian tidak sah dicatat secara real-time ke dalam Security Audit Log.
+Isi pesan: Sistem SSO Transkep (sso.pa-indramayu.go.id) dilindungi oleh Enkripsi TLS 1.3, Google Cloud Fraud Defense (App Check), API Referrer Lock, Firestore Immutable Anti-Delete Rules, dan Cryptographic Session Integrity Check. Segala aktivitas injeksi skrip, manipulasi LocalStorage, atau pemindaian tidak sah dicatat secara real-time ke dalam Security Audit Log.
 
 Nonaktifkan pencetakan data kredensial mentah (password/token) ke dalam console.log di lingkungan produksi (sso.pa-indramayu.go.id).
 
@@ -42,7 +48,7 @@ D. Global Anti-XSS Input Sanitizer & Domain Lock
 
 Sediakan fungsi global window.sanitizeTranskepInput(str) yang membersihkan tag <script>, <iframe>, onload=, onerror=, dan karakter injeksi berbahaya sebelum data dikirim ke Cloud Firestore.
 
-Pasang pengecekan hostname: pastikan aplikasi berjalan optimal di sso.pa-indramayu.go.id, transkep.github.io, atau localhost.
+Pasang pengecekan hostname: pastikan aplikasi berjalan optimal di sso.pa-indramayu.go.id, transkep.github.io, atau localhost. Jika dibuka dari domain kloningan liar di luar daftar tersebut, kunci layar otomatis.
 
 2. Integrasikan ke Seluruh Modul Halaman & Pasang Security Meta Tags
 
@@ -62,4 +68,4 @@ Pastikan file CNAME di root repository berisi sso.pa-indramayu.go.id.
 
 Pastikan tidak ada lagi hardcode redirect yang memaksa URL pindah ke /transkep-web/ sehingga domain https://sso.pa-indramayu.go.id/ berjalan bersih.
 
-Setelah seluruh perubahan selesai diverifikasi tanpa error, lakukan git add, git commit, dan git push ke GitHub.
+Setelah seluruh perubahan selesai diverifikasi tanpa error, lakukan git add, git commit, dan git push ke github

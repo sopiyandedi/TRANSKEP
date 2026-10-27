@@ -16,12 +16,37 @@ const FIREBASE_CONFIG = {
 };
 
 let transkepDb = null;
+let transkepAppCheck = null;
+
+// Konfigurasi reCAPTCHA Enterprise / Fraud Defense App Check
+const TRANSKEP_RECAPTCHA_SITE_KEY = '6LfkOv8tAAAAAPm0LLzS7uJmKRUcmNBIuYZymlRz';
 
 try {
   if (typeof firebase !== 'undefined') {
     if (!firebase.apps || firebase.apps.length === 0) {
       firebase.initializeApp(FIREBASE_CONFIG);
     }
+
+    // Inisialisasi Firebase App Check (Fraud Defense / reCAPTCHA Enterprise)
+    try {
+      if (typeof firebase.appCheck === 'function') {
+        let provider = null;
+        if (typeof firebase.appCheck.ReCaptchaEnterpriseProvider === 'function') {
+          provider = new firebase.appCheck.ReCaptchaEnterpriseProvider(TRANSKEP_RECAPTCHA_SITE_KEY);
+        } else if (typeof firebase.appCheck.ReCaptchaV3Provider === 'function') {
+          provider = new firebase.appCheck.ReCaptchaV3Provider(TRANSKEP_RECAPTCHA_SITE_KEY);
+        }
+
+        if (provider) {
+          transkepAppCheck = firebase.appCheck();
+          transkepAppCheck.activate(provider, true); // isTokenAutoRefreshEnabled: true
+          console.log("🛡️ [TRANSKEP Security] Firebase App Check (Fraud Defense / reCAPTCHA Enterprise) aktif.");
+        }
+      }
+    } catch (acErr) {
+      console.warn("⚠️ [TRANSKEP Security] Catatan inisialisasi App Check:", acErr.message || acErr);
+    }
+
     transkepDb = firebase.firestore();
     console.log("🔥 [TRANSKEP Firebase] Cloud Firestore transkep-314c0 berhasil diinisialisasi.");
   } else {
@@ -33,6 +58,10 @@ try {
 
 const TranskepFirebase = {
   config: FIREBASE_CONFIG,
+  siteKey: TRANSKEP_RECAPTCHA_SITE_KEY,
+  getAppCheck() {
+    return transkepAppCheck;
+  },
   getDb() {
     if (!transkepDb && typeof firebase !== 'undefined') {
       try {
