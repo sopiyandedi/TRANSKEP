@@ -586,35 +586,40 @@ document.addEventListener("DOMContentLoaded", () => {
                 });
                 return ack ? ack.tanggal_baca.split(' ')[0] : '';
             },
-            doAcknowledgeSk(skId, nip) {
+            doAcknowledgeSk(skId, nip, isAuto = false) {
                 const token = localStorage.getItem('transkep_session_token');
-                if(window.showCustomConfirm) {
-                    window.showCustomConfirm("Tandai Sudah Dibaca?", "Dengan menekan YA, Anda menyatakan telah membaca dan memahami tugas/peran Anda di dalam Surat Keputusan (SK) ini.", async () => {
-                        const nowRaw = new Date();
-                        if(!this.globalState.skAckList) this.globalState.skAckList = [];
-                        
-                        this.globalState.skAckList.push({
-                            id: 'ACK-TEMP', sk_id: skId, nip: nip, 
-                            tanggal_baca: nowRaw.toLocaleDateString('en-GB') + ' ' + nowRaw.toLocaleTimeString('en-GB')
-                        });
-                        
-                        if (typeof updateSidebarBadges === 'function') updateSidebarBadges(); 
-                        
-                        try {
-                            const res = await window.SkDataService.acknowledgeSk(skId, nip, token);
-                            if(res && res.status === 'success') {
-                                if(window.showNotify) window.showNotify("Tercatat", res.message, "success");
-                            } else {
-                                this.globalState.skAckList = this.globalState.skAckList.filter(a => !(a.sk_id === skId && a.nip === nip));
-                                if (typeof updateSidebarBadges === 'function') updateSidebarBadges();
-                                if(window.showNotify) window.showNotify("Gagal", res ? res.message : "Gagal mencatat", "error");
-                            }
-                        } catch (err) { 
+                
+                const processAck = async () => {
+                    const nowRaw = new Date();
+                    if(!this.globalState.skAckList) this.globalState.skAckList = [];
+                    
+                    this.globalState.skAckList.push({
+                        id: 'ACK-TEMP', sk_id: skId, nip: nip, 
+                        tanggal_baca: nowRaw.toLocaleDateString('en-GB') + ' ' + nowRaw.toLocaleTimeString('en-GB')
+                    });
+                    
+                    if (typeof updateSidebarBadges === 'function') updateSidebarBadges(); 
+                    
+                    try {
+                        const res = await window.SkDataService.acknowledgeSk(skId, nip, token);
+                        if(res && res.status === 'success') {
+                            if(!isAuto && window.showNotify) window.showNotify("Tercatat", res.message, "success");
+                        } else {
                             this.globalState.skAckList = this.globalState.skAckList.filter(a => !(a.sk_id === skId && a.nip === nip));
                             if (typeof updateSidebarBadges === 'function') updateSidebarBadges();
-                            if(window.showNotify) window.showNotify("Error", err.message || err.toString(), "error"); 
+                            if(!isAuto && window.showNotify) window.showNotify("Gagal", res ? res.message : "Gagal mencatat", "error");
                         }
-                    });
+                    } catch (err) { 
+                        this.globalState.skAckList = this.globalState.skAckList.filter(a => !(a.sk_id === skId && a.nip === nip));
+                        if (typeof updateSidebarBadges === 'function') updateSidebarBadges();
+                        if(!isAuto && window.showNotify) window.showNotify("Error", err.message || err.toString(), "error"); 
+                    }
+                };
+
+                if (isAuto) {
+                    processAck();
+                } else if (window.showCustomConfirm) {
+                    window.showCustomConfirm("Tandai Sudah Dibaca?", "Dengan menekan YA, Anda menyatakan telah membaca dan memahami tugas/peran Anda di dalam Surat Keputusan (SK) ini.", processAck);
                 }
             },
             markWaSent(event) {

@@ -399,3 +399,15 @@ ZONA BAWAH: MASTER CONTEXT & STATUS MIGRASI TERKINI (LIVING CONTEXT)
     - **PWA Cache Invalidation**:
       - Versi Service Worker `sw.js` dan `APP_BUILD_VER` di `index.html` dinaikkan ke **transkep-v3.5.2** untuk invalidasi instan tanpa tertahan cache lama.
 
+37. **Otomatisasi Murni Status "Sudah Dibaca" SK & SOP (Tahap 65 / R53 - Selesai & Aktif ✅):**
+    - **Silent Auto-Acknowledgment Dokumen (6 Detik)**:
+      - Menambahkan parameter `isAuto = false` pada fungsi `doAcknowledgeSk` (`modules/sk/sk.js` dan `sk/js_sk.html`) dan `doAcknowledgeSop` (`modules/sop/sop.js` dan `sop/js_sop.html`).
+      - Saat dokumen PDF dibuka di modal pratinjau (`modules/pdf_viewer/pdf_viewer.js` dan `sk/js_iframepdf.html`), timer berjalan selama 6 detik lalu mencatat status *"Sudah Dibaca"* ke backend Firestore/GAS secara 100% hening (*silent*) tanpa dialog popup konfirmasi dan tanpa toast notifikasi yang menginterupsi pembacaan.
+      - Badge jumlah dokumen belum dibaca di sidebar berkurang secara otomatis dan reaktif saat pembacaan selesai.
+    - **Eliminasi Tombol Manual & Notifikasi Berlebih**:
+      - Menghapus tombol manual hijau *"Tandai Telah Dibaca"* dari tabel rincian pegawai SK (`modules/sk/view_sk.html` & `sk/view_sk.html`) dan pelaksana SOP (`modules/sop/view_sop.html` & `sop/view_sop.html`).
+      - Menggantikan tombol dengan label status informatif yang rapi: status *"Belum membaca dokumen"* berubah otomatis menjadi *"Dibaca: [Tanggal & Waktu]"* saat pegawai membuka dokumen PDF.
+      - Menjamin pegawai benar-benar membuka dan membaca file dokumen untuk memperoleh status *"Sudah Dibaca"*.
+    - **PWA Cache Invalidation**:
+      - Versi Service Worker `sw.js` dan `APP_BUILD_VER` di `index.html` dinaikkan ke **transkep-v3.5.3** untuk memastikan browser memuat seluruh controller dan tampilan terbaru secara instan.
+

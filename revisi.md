@@ -2933,5 +2933,45 @@ Pengguna melaporkan bahwa pratinjau (*preview*) dokumen PDF di modal SK dan SOP 
 - Browser tidak lagi memblokir pemuatan iframe Google Drive pratinjau PDF.
 - Kebijakan CSP tetap mempertahankan standar keamanan siber enterprise tingkat A tanpa membiarkan celah clickjacking atau script injection liar.
 
+---
+
+### Tahap 53: Otomatisasi Murni Status "Sudah Dibaca" SK & SOP (Silent Auto-Ack & Eliminasi Tombol/Notif Manual) [SELESAI & DIVERIFIKASI] ✅
+
+#### 1. Latar Belakang Masalah & Kebutuhan Pengguna
+1. **Kendala Notifikasi Muncul Saat Membaca:**
+   - Pada modul SK dan SOP, saat pratinjau PDF dibuka, terdapat timer latar belakang (10 detik) untuk menandai dokumen telah dibaca. Namun, ketika timer berjalan, sistem justru memunculkan modal popup konfirmasi (*"Tandai Sudah Dibaca?"*) atau toast notifikasi yang mengagetkan dan menginterupsi pengguna yang sedang fokus membaca isi dokumen di dalam modal.
+2. **Kebutuhan Alur Otomatis Murni (Tanpa Tombol Manual):**
+   - Pengguna menghendaki penandaan status *"Sudah Dibaca"* berlangsung murni secara otomatis:
+     - Cukup klik tombol/ikon baca dokumen PDF.
+     - Setelah membaca dokumen selama beberapa detik (misal 5–7 detik), dokumen secara otomatis ditandai *"Sudah Dibaca"* di latar belakang tanpa ada notifikasi atau dialog konfirmasi yang keluar.
+     - Tombol manual *"Tandai Telah Dibaca"* (yang memicu notifikasi) dihapus dari kolom rincian pegawai, sehingga pegawai benar-benar harus membuka dokumen untuk mendapatkan status *"Sudah Dibaca"*.
+
+#### 2. Akar Masalah (Root Cause Analysis)
+1. Pada [`modules/sk/sk.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/sk/sk.js#L589), fungsi `doAcknowledgeSk(skId, nip)` belum memiliki parameter `isAuto`. Akibatnya, saat dipanggil dari timer `pdf_viewer.js` dengan flag `true`, fungsi tetap mengeksekusi `window.showCustomConfirm("Tandai Sudah Dibaca?", ...)` dan memicu toast notifikasi sukses.
+2. Di tabel rincian SK ([`modules/sk/view_sk.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/sk/view_sk.html#L196)) dan SOP ([`modules/sop/view_sop.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/sop/view_sop.html#L198)), masih terdapat tombol manual hijau `<button>Tandai Telah Dibaca</button>` yang memungkinkan pengguna menandai dokumen tanpa pernah membukanya.
+
+#### 3. Rencana Perbaikan Teknis (Action Plan)
+
+| No | File Target | Bagian / Baris | Perubahan Teknis | Dampak / Tujuan |
+| :---: | :--- | :---: | :--- | :--- |
+| **01** | [`modules/sk/sk.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/sk/sk.js) & [`sk/js_sk.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sk/js_sk.html) | `doAcknowledgeSk` | Tambahkan parameter `isAuto = false`. Jika `isAuto === true`, langsung eksekusi pencatatan ke backend dan update state `skAckList` & sidebar badge secara **100% senyap (Silent)** tanpa `showCustomConfirm` dan tanpa `showNotify`. | Mencegah munculnya popup konfirmasi dan toast saat pengguna sedang membaca PDF di modal. |
+| **02** | [`modules/sop/sop.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/sop/sop.js) & [`sop/js_sop.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sop/js_sop.html) | `doAcknowledgeSop` | Pastikan saat `isAuto === true`, seluruh proses berlangsung 100% senyap tanpa memanggil `window.showNotify`. | Menjamin penandaan SOP di latar belakang berjalan hening tanpa notifikasi toast. |
+| **03** | [`modules/pdf_viewer/pdf_viewer.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/pdf_viewer/pdf_viewer.js) & [`sk/js_iframepdf.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sk/js_iframepdf.html) | `autoAckTimer` | Sesuaikan timer pembacaan otomatis menjadi **6 detik** (responsif & nyaman). Pastikan pemanggilan `doAcknowledgeSk` dan `doAcknowledgeSop` mengirimkan argumen `true` (silent mode). | Pengguna yang membaca dokumen selama 6 detik otomatis tercatat membaca tanpa ada gangguan popup. |
+| **04** | [`modules/sk/view_sk.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/sk/view_sk.html) & [`sk/view_sk.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sk/view_sk.html) | Kolom status pegawai | Hapus tombol manual hijau `Tandai Telah Dibaca`. Ganti dengan label status seragam: <br>- Jika belum dibaca: `<div class="text-[10px] text-rose-400 font-medium flex items-center justify-center gap-1 w-full whitespace-nowrap"><i class="fa-solid fa-circle-exclamation"></i> Belum membaca SK ini.</div>`<br>- Jika sudah dibaca: `<div class="text-[10px] text-emerald-400 font-medium flex items-center justify-center gap-1.5 w-full whitespace-nowrap"><i class="fa-solid fa-check-double"></i> Dibaca: {{ getSkAckDate(sk.id, p.nip) }}</div>` | Menghilangkan tombol manual yang memicu notif dan memastikan pegawai hanya bisa memperoleh status "Sudah Dibaca" dengan membuka file dokumen. |
+| **05** | [`modules/sop/view_sop.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/sop/view_sop.html) & [`sop/view_sop.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sop/view_sop.html) | Kolom status pelaksana | Hapus tombol manual hijau `Tandai Telah Dibaca`. Ganti dengan label status seragam yang otomatis berubah menjadi hijau *"Dibaca: [Tgl/Jam]"* saat dokumen dibuka. | Menyelaraskan modul SOP dengan standar alur otomatis murni. |
+| **06** | [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) & [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) | Versi rilis | Naikkan versi cache PWA `CACHE_NAME` ke `'transkep-v3.5.3'` dan `APP_BUILD_VER` ke `'3.5.3'`. | Memastikan browser menarik seluruh pembaruan script controller dan template view tanpa terhalang cache lama. |
+
+#### 4. Kriteria Pengujian (Verification Checklist)
+- [x] Buka menu SK, klik ikon/tombol **"Baca Buku PDF"**. Buka dokumen selama minimal 6 detik. Pastikan **TIDAK ADA popup konfirmasi atau notifikasi toast** yang muncul saat membaca.
+- [x] Tutup modal pratinjau SK. Buka rincian pegawai SK tersebut: status otomatis berubah menjadi hijau: *"Dibaca: [Tanggal/Jam]"*.
+- [x] Buka menu SOP: klik **"Baca Dokumen"**, tunggu 6 detik, status otomatis tersimpan hening tanpa notifikasi apapun.
+- [x] Tombol manual hijau *"Tandai Telah Dibaca"* di tabel SK maupun SOP telah bersih terhapus.
+- [x] Badge angka belum dibaca di sidebar menu SK & SOP otomatis berkurang / hilang saat dokumen telah otomatis terbaca.
+
+#### 5. Hasil Verifikasi & Status Akhir: [SELESAI & AKTIF] ✅
+- Alur pembacaan SK dan SOP kini murni otomatis, profesional, dan hening. Pegawai dapat membaca PDF dengan nyaman tanpa terganggu oleh dialog popup atau toast notifikasi yang mengagetkan.
+
+
+
 
 

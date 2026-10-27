@@ -191,14 +191,8 @@
                                           <div class="text-slate-500 text-[10px] mt-1 truncate">Peran Anda: <span class="text-indigo-300 font-bold">{{ sk.peran }}</span> | No: <span class="font-mono text-slate-400">{{ sk.no_sk }} ({{ formatTglSk(sk.tgl_sk) }})</span></div>
                                       </div>
                                       <div class="flex-1 flex items-center justify-center shrink-0 px-4">
-                                          <template v-if="String(globalState.user.nip) === String(p.nip)">
-                                              <div v-if="isSkAcknowledged(sk.id, p.nip)" class="text-[10px] text-emerald-400 font-medium flex items-center justify-center gap-1.5 w-full whitespace-nowrap"><i class="fa-solid fa-check-double"></i> Dibaca: {{ getSkAckDate(sk.id, p.nip) }}</div>
-                                              <button v-else @click="doAcknowledgeSk(sk.id, p.nip)" class="text-[10px] font-bold text-white bg-emerald-600 hover:bg-emerald-500 px-3 py-1.5 rounded-lg shadow-lg shadow-emerald-500/20 transition flex items-center justify-center gap-1.5 w-full whitespace-nowrap"><i class="fa-regular fa-handshake"></i> Tandai Telah Dibaca</button>
-                                          </template>
-                                          <template v-else>
-                                              <div v-if="isSkAcknowledged(sk.id, p.nip)" class="text-[10px] text-emerald-500 font-medium flex items-center justify-center gap-1 w-full whitespace-nowrap"><i class="fa-solid fa-check"></i> Sudah membaca SK ini.</div>
-                                              <div v-else class="text-[10px] text-rose-400 font-medium flex items-center justify-center gap-1 w-full whitespace-nowrap"><i class="fa-solid fa-circle-exclamation"></i> Belum membaca SK ini.</div>
-                                          </template>
+                                          <div v-if="isSkAcknowledged(sk.id, p.nip)" class="text-[10px] text-emerald-400 font-medium flex items-center justify-center gap-1.5 w-full whitespace-nowrap"><i class="fa-solid fa-check-double"></i> Dibaca: {{ getSkAckDate(sk.id, p.nip) }}</div>
+                                          <div v-else class="text-[10px] text-rose-400 font-medium flex items-center justify-center gap-1 w-full whitespace-nowrap"><i class="fa-solid fa-circle-exclamation"></i> Belum membaca SK ini.</div>
                                       </div>
                                       <div class="shrink-0 pl-2 text-right">
                                           <button @click="openFlipbookPdf(sk.link_drive, sk.judul_sk)" class="group px-3 py-1.5 bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500 hover:text-white border border-indigo-500/20 rounded-md text-[10px] font-bold transition whitespace-nowrap shadow-sm"><i class="fa-solid fa-book-open mr-1 group-hover:animate-bounce"></i> Baca Buku PDF</button>

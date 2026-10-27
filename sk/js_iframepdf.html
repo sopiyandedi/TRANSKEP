@@ -193,11 +193,11 @@
       iframe.onload = function() {
         window.hidePdfLoader();
         
-        // --- TRANSKEP: AUTO-ACKNOWLEDGE TIMER (10 DETIK) ---
+        // --- TRANSKEP: AUTO-ACKNOWLEDGE TIMER (6 DETIK - SILENT) ---
         if (window.autoAckTimer) clearTimeout(window.autoAckTimer);
         
         window.autoAckTimer = setTimeout(function() {
-            var currentUser = window.vueState ? window.vueState.user : null;
+            var currentUser = (window.vueState && window.vueState.user) ? window.vueState.user : ((typeof state !== 'undefined' && state.user) ? state.user : null);
             if (!currentUser) return;
             var currNip = currentUser.nip;
 
@@ -208,7 +208,7 @@
                         ? cekKeterlibatanPegawai(targetSk.members, currNip).terlibat 
                         : targetSk.members.some(function(m) { return String(m.nip) === String(currNip); });
                     
-                    if (isMember) window.vmSkApp.doAcknowledgeSk(targetSk.id, currNip, true); // true = eksekusi diam-diam
+                    if (isMember) window.vmSkApp.doAcknowledgeSk(targetSk.id, currNip, true); // true = eksekusi diam-diam tanpa notif
                 }
             } 
             // Jika dokumen yang dibuka adalah SOP
@@ -221,10 +221,10 @@
                         ? cekKeterlibatanPegawai(pelaksanaArr, currNip).terlibat
                         : pelaksanaArr.some(function(m) { return String(m.nip) === String(currNip); });
                     
-                    if (isSopMember) window.vmSopApp.doAcknowledgeSop(targetSop.id, currNip, true);
+                    if (isSopMember) window.vmSopApp.doAcknowledgeSop(targetSop.id, currNip, true); // true = silent tanpa notif
                 }
             }
-        }, 10000); // 10000 ms = 10 detik (Bisa disesuaikan angkanya bro)
+        }, 6000); // 6000 ms = 6 detik membaca otomatis tertandai hening
         // --------------------------------------------------
       };
 
