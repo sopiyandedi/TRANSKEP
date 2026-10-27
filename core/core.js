@@ -573,6 +573,10 @@ function toggleAppVisibility(isLoggedIn, animate) {
     rootEl.classList.remove('app-authenticated');
     rootEl.classList.add('app-unauthenticated');
 
+    if (typeof resetLoginFormUI === 'function') {
+      resetLoginFormUI();
+    }
+
     if (animate && loginSec && appCont) {
       appCont.classList.add('auth-fade-out');
       setTimeout(() => {
@@ -594,6 +598,36 @@ function toggleAppVisibility(isLoggedIn, animate) {
     }
   }
 }
+
+function resetLoginFormUI() {
+  const btnSubmit = document.getElementById('btnLoginSubmit') || (document.getElementById('loginForm') && document.getElementById('loginForm').querySelector('button[type="submit"]'));
+  if (btnSubmit) {
+    btnSubmit.disabled = false;
+    btnSubmit.innerHTML = 'Masuk Aplikasi <i class="fa-solid fa-arrow-right-to-bracket transition-transform duration-300 group-hover:translate-x-1"></i>';
+  }
+  const passInput = document.getElementById('loginPass');
+  if (passInput) passInput.value = '';
+
+  const nipInput = document.getElementById('loginNip');
+  const rememberCheckbox = document.getElementById('rememberMe');
+  const isRemembered = localStorage.getItem('transkep_remember_me') === 'true';
+  const rememberedNip = localStorage.getItem('transkep_remember_nip') || '';
+
+  if (rememberCheckbox) {
+    rememberCheckbox.checked = isRemembered;
+  }
+
+  if (nipInput) {
+    if (isRemembered && rememberedNip) {
+      nipInput.value = rememberedNip;
+      if (passInput) setTimeout(() => passInput.focus(), 150);
+    } else {
+      nipInput.value = '';
+      setTimeout(() => nipInput.focus(), 150);
+    }
+  }
+}
+window.resetLoginFormUI = resetLoginFormUI;
 
 function handleLogin(event) {
   if (event) event.preventDefault();
@@ -671,6 +705,16 @@ function handleLogin(event) {
         }, 300);
       }
 
+      // Tangani status Ingatkan Saya (Remember Me - Simpan NIP saja secara aman)
+      const rememberCheckbox = document.getElementById('rememberMe');
+      if (rememberCheckbox && rememberCheckbox.checked) {
+        localStorage.setItem('transkep_remember_me', 'true');
+        localStorage.setItem('transkep_remember_nip', response.data.nip);
+      } else {
+        localStorage.removeItem('transkep_remember_me');
+        localStorage.removeItem('transkep_remember_nip');
+      }
+
       // Transisi sinematik halus
       toggleAppVisibility(true, true);
       syncAllServerData(true);
@@ -731,6 +775,11 @@ function handleLogout() {
   window.vueState.user = null;
   window.vueState.rendered = {};
   window.vueState.isBgSyncDone = false;
+
+  // Reset status tombol login ke 'Masuk Aplikasi' & pulihkan NIP jika Ingatkan Saya aktif
+  if (typeof resetLoginFormUI === 'function') {
+    resetLoginFormUI();
+  }
 
   toggleAppVisibility(false);
   showNotify("Sesi Berakhir", "Anda telah berhasil keluar dari sistem.", "success");

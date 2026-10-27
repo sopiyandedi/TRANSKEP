@@ -3011,6 +3011,37 @@ Pengguna melaporkan bahwa pratinjau (*preview*) dokumen PDF di modal SK dan SOP 
 #### 5. Hasil Verifikasi & Status Akhir: [SELESAI & AKTIF] ✅
 - LocalStorage TRANSKEP kini terkunci rapat, kebal manipulasi, dan otomatis mengembalikan nilai asli seketika saat diutak-atik.
 
+---
+
+### TAHAP 55: Perbaikan Status Tombol Login Saat Logout & Fitur "Ingatkan Saya" (Remember Me) (v3.5.5)
+
+#### 1. Masalah / Kebutuhan
+1. **Status Tombol Login Tertahan:** Saat pengguna menekan tombol Keluar Sistem (Logout), formulir login kembali tampil namun tombol `btnLoginSubmit` masih berstatus `disabled` dengan teks *"Berhasil!"* (sisa status saat login sukses sebelumnya). Seharusnya tombol kembali bersih dan bertuliskan *"Masuk Aplikasi"*.
+2. **Fitur "Ingatkan Saya" (Remember Me):** Pengguna memerlukan fitur ceklis "Ingatkan Saya" agar tidak perlu mengetik ulang 18 digit NIP setiap kali login, dengan penempatan tata letak yang ergonomis dan aman sesuai standar keamanan instansi.
+
+#### 2. Analisis & Desain Solusi
+1. **Penyebab:** Pada fungsi `handleSuccess` di `core.js`, elemen tombol login dimanipulasi DOM-nya menjadi teks *"Berhasil!"* dengan ikon centang hijau. Saat `handleLogout()` dipanggil, sistem hanya membersihkan sesi storage dan menyembunyikan kontainer aplikasi, namun tidak merestart state DOM tombol login.
+2. **Solusi Reset State (`resetLoginFormUI()`):**
+   - Dibuat fungsi sentral `resetLoginFormUI()` yang otomatis dipanggil saat `handleLogout()`, `toggleAppVisibility(false)`, maupun inisialisasi awal.
+   - Mengembalikan teks tombol menjadi `Masuk Aplikasi` lengkap dengan ikon panah transitif, mengaktifkan kembali tombol (`disabled = false`), dan mengosongkan kolom kata sandi.
+3. **Arsitektur Fitur "Ingatkan Saya":**
+   - **Keamanan (GovTech Standard):** Hanya menyimpan NIP ke `localStorage.setItem('transkep_remember_nip', nip)` dan status ceklis `transkep_remember_me`. Kata sandi **TIDAK PERNAH DISIMPAN** demi mematuhi standar ISO 27001 dan keamanan siber instansi.
+   - **Ergonomi UI/UX:** Checkbox glassmorphism `rememberMe` ditempatkan sejajar horizontal tepat di atas tombol submit, bersanding simetris dengan tombol `Lupa password?` (`flex items-center justify-between`).
+   - **Autofocus Cerdas:** Jika ceklis aktif, NIP terisi otomatis dan kursor langsung fokus ke input kata sandi (`loginPass.focus()`), mempercepat proses login pegawai.
+
+#### 3. File yang Dimodifikasi
+1. `core/view_login.html`: Menambahkan elemen checkbox kustom `rememberMe` dengan label *"Ingatkan Saya"* sejajar dengan tombol *"Lupa password?"*.
+2. `core/core.js`:
+   - Menambahkan fungsi `resetLoginFormUI()`.
+   - Menghubungkan penyimpanan status "Ingatkan Saya" saat login berhasil.
+   - Memanggil `resetLoginFormUI()` saat logout dan perpindahan visibilitas aplikasi.
+3. `sw.js` & `index.html`: Menaikkan versi cache ke **v3.5.5**.
+
+#### 4. Kriteria Pengujian & Status: [SELESAI & AKTIF] ✅
+- [x] Login ke aplikasi, lalu klik tombol Logout: tombol login seketika kembali normal bertuliskan *"Masuk Aplikasi"*.
+- [x] Centang *"Ingatkan Saya"*, lalu login dan logout: kolom NIP otomatis terisi kembali dan kursor langsung siap di kolom password.
+
+
 
 
 
