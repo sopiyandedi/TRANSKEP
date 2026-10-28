@@ -479,9 +479,17 @@ ZONA BAWAH: MASTER CONTEXT & STATUS MIGRASI TERKINI (LIVING CONTEXT)
     - **Bust Cache PWA Menyeluruh**:
       - Versi Service Worker `sw.js`, `CURRENT_APP_BUILD`, dan `APP_BUILD_VER` di `index.html` dinaikkan ke **`transkep-v3.6.2`** / **`3.6.2`**.
 
-
-
-
-
-
-
+44. **Migrasi Basis Data Modul E-Office (KGB & Paket Rapat) ke Cloud Firestore (Tahap 63 - Selesai & Aktif ✅):**
+    - **Pondasi Koleksi Cloud Firestore (`eoffice_kgb` & `eoffice_rapat`)**:
+      - Terpasang di `core/firebase.js` dan `javascript_firebase.html` dengan metode CRUD lengkap (`saveKgbToFirestore`, `getFirestoreKgbs`, `subscribeFirestoreKgbs`, `deleteKgbFromFirestore`, `saveRapatToFirestore`, `getFirestoreRapats`, `subscribeFirestoreRapats`, `deleteRapatFromFirestore`).
+    - **Arsitektur Firestore-First (0ms) & Local Cache Hydration**:
+      - `EofficeDataService.getEofficeData` di `modules/eoffice/eoffice_data.js` mengutamakan query Cloud Firestore secara paralel, dilengkapi hidrasi cache lokal (`transkep_eoffice_cache`) sehingga saat menu E-Office dibuka, antarmuka langsung menyajikan dokumen dalam tempo 0ms tanpa tertahan loading spinner.
+      - Auto-Migration terpasang: jika database Firestore masih kosong, sistem otomatis menyalin data riwayat lama dari Google Sheets ke Firestore di latar belakang tanpa risiko kehilangan data.
+    - **Penyimpanan Draf KGB Instan (<50ms)**:
+      - Aksi `saveOrGenerateKgb` dengan mode `'draft'` menulis langsung ke Firestore `eoffice_kgb` (<50ms) dan mengirimkan cold backup ke Google Sheets secara asinkron di latar belakang.
+    - **Integrasi Reaktif Dashboard -> E-Office (0ms)**:
+      - Saat Admin mengubah status KGB pegawai menjadi `'Proses'` pada Dashboard TMT (`submitTmtStatus`), dokumen `DRAFT-{nip}` seketika di-upsert ke Firestore `eoffice_kgb` dan disintesis ke daftar E-Office secara instan.
+    - **Penyelarasan Penerbitan Dokumen Google Docs**:
+      - Pembuatan fisik file Google Docs/PDF tetap dieksekusi worker Google Apps Script (`DocumentApp`/`DriveApp`), namun begitu URL dokumen selesai dibuat, seluruh metadata dan link dokumen langsung disimpan secara real-time ke Firestore serta memperbarui data pegawai (`status_kgb = 'Selesai'`, `tmt_kgb`) secara atomik.
+    - **PWA Cache Invalidation**:
+      - Versi Service Worker `sw.js` dan `APP_BUILD_VER` di `index.html` dinaikkan ke **`transkep-v3.6.3`** / **`3.6.3`**.

@@ -500,6 +500,29 @@
                         if (typeStr === 'KGB') { 
                             userRef.status_kgb = (newStatus === 'Menunggu') ? '' : newStatus; 
                             userRef.tgl_selesai_kgb = (newStatus === 'Selesai') ? todayYMD : ''; 
+
+                            // Sinkronisasi Instan ke Cloud Firestore (eoffice_kgb)
+                            if (typeof TranskepFirebase !== 'undefined' && TranskepFirebase.isReady && TranskepFirebase.isReady()) {
+                                if (newStatus === 'Proses') {
+                                    TranskepFirebase.saveKgbToFirestore({
+                                        id_kgb: 'DRAFT-' + targetNip,
+                                        nip: targetNip,
+                                        nama_pegawai: userRef.nama || '',
+                                        pangkat: userRef.pangkat || '',
+                                        golongan: userRef.golongan || '',
+                                        jabatan: userRef.jabatan || '',
+                                        tmt_lama: userRef.tmt_kgb || '',
+                                        status: 'Sedang Diproses',
+                                        is_from_dashboard: true,
+                                        tanggal_input: todayYMD
+                                    }).catch(e => console.warn("⚠️ [Dashboard GAS] Firestore KGB sync notice:", e));
+                                } else {
+                                    TranskepFirebase.deleteKgbFromFirestore('DRAFT-' + targetNip).catch(() => {});
+                                }
+                            }
+                            if (window.vmEoffice && typeof window.vmEoffice.loadData === 'function') {
+                                window.vmEoffice.loadData(true);
+                            }
                         }
                         if (typeStr === 'Pangkat') { 
                             userRef.status_knp = (newStatus === 'Menunggu') ? '' : newStatus; 

@@ -509,7 +509,7 @@
       ];
 
       try {
-        const APP_BUILD_VER = '3.6.2';
+        const APP_BUILD_VER = '3.6.3';
         console.log('🔄 [TRANSKEP Loader] Memuat komponen tampilan views/ secara paralel...');
         await Promise.all(VIEW_SLOTS.map(async item => {
           const res = await fetch(item.file + '?v=' + APP_BUILD_VER);

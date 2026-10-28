@@ -167,7 +167,7 @@
   // ==========================================
   // SUBMIT FORM KGB: SIMPAN DRAF / GENERATE DOCS
   // ==========================================
-  function submitKgbForm(actionType) {
+  async function submitKgbForm(actionType) {
     var idKgb = document.getElementById('kgbFieldIdKgb').value;
     var nip = document.getElementById('kgbFieldNip').value;
     var nama = document.getElementById('kgbFieldNama').value;
@@ -224,6 +224,42 @@
       showLoading(actionType === 'generate' ? "Menerbitkan SK KGB & membuat Google Docs..." : "Menyimpan draf KGB...");
     }
 
+        if (window.EofficeDataService && typeof window.EofficeDataService.saveOrGenerateKgb === 'function') {
+      try {
+        var res = await window.EofficeDataService.saveOrGenerateKgb(payload, actionType, adminNip, token);
+        if (typeof hideLoading === 'function') hideLoading();
+        if (btnDoc) btnDoc.disabled = false;
+        if (btnDraft) btnDraft.disabled = false;
+
+        if (res && res.status === 'success') {
+          closeKgbModalForm();
+          if (typeof showNotify === 'function') {
+            showNotify(
+              "Sukses", 
+              actionType === 'generate' ? "SK KGB berhasil diterbitkan ke Google Docs!" : "Draf KGB berhasil disimpan.", 
+              "success"
+            );
+          }
+          if (typeof window.refreshEofficeData === 'function') {
+            window.refreshEofficeData();
+          }
+        } else {
+          if (typeof showNotify === 'function') {
+            showNotify("Gagal", (res ? res.message : "Terjadi kendala saat menyimpan berkas KGB."), "error");
+          }
+        }
+      } catch (err) {
+        if (typeof hideLoading === 'function') hideLoading();
+        if (btnDoc) btnDoc.disabled = false;
+        if (btnDraft) btnDraft.disabled = false;
+        console.error("Error save KGB: ", err);
+        if (typeof showNotify === 'function') {
+          showNotify("Error Sistem", err.toString(), "error");
+        }
+      }
+      return;
+    }
+
     google.script.run
       .withSuccessHandler(function(res) {
         if (typeof hideLoading === 'function') hideLoading();
@@ -239,7 +275,6 @@
               "success"
             );
           }
-          // Refresh list E-Office
           if (typeof window.refreshEofficeData === 'function') {
             window.refreshEofficeData();
           }

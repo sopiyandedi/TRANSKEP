@@ -715,6 +715,196 @@ const TranskepFirebase = {
     if (!db) throw new Error("Cloud Firestore belum siap terhubung.");
     await db.collection(this.REKAP_COLLECTION).doc(String(idRekap).trim()).delete();
     return { status: 'success', message: 'Dokumen rekapitulasi berhasil dihapus / dibuka kuncinya dari Cloud Firestore.' };
+  },
+
+  // ==========================================
+  // OPERASI DOKUMEN E-OFFICE (KGB & RAPAT)
+  // ==========================================
+  EOFFICE_KGB_COLLECTION: 'eoffice_kgb',
+  EOFFICE_RAPAT_COLLECTION: 'eoffice_rapat',
+
+  /**
+   * Menyimpan / Memperbarui Dokumen KGB ke Cloud Firestore
+   */
+  async saveKgbToFirestore(kgbData) {
+    const db = this.getDb();
+    if (!db) throw new Error("Cloud Firestore belum siap terhubung.");
+
+    const docId = String(kgbData.id_kgb || kgbData.id || ('KGB-' + Date.now())).trim();
+    if (!docId) throw new Error("ID Dokumen KGB diperlukan.");
+
+    const payload = {
+      id: docId,
+      id_kgb: docId,
+      nip: String(kgbData.nip || '').trim(),
+      nama_pegawai: kgbData.nama_pegawai || kgbData.nama || '',
+      tanggal_lahir: kgbData.tanggal_lahir || '',
+      pangkat: kgbData.pangkat || '',
+      golongan: kgbData.golongan || '',
+      jabatan: kgbData.jabatan || '',
+      unit_kerja: kgbData.unit_kerja || 'Pengadilan Agama Indramayu',
+      nomor_surat: kgbData.nomor_surat || '',
+      tanggal_surat: kgbData.tanggal_surat || '',
+      tujuan_kppn: kgbData.tujuan_kppn || 'Kepala KPPN Cirebon',
+      gaji_lama: kgbData.gaji_lama || '',
+      pejabat_lama: kgbData.pejabat_lama || '',
+      nomor_sk_lama: kgbData.nomor_sk_lama || '',
+      tanggal_sk_lama: kgbData.tanggal_sk_lama || '',
+      tmt_lama: kgbData.tmt_lama || '',
+      mkg_lama: kgbData.mkg_lama || '',
+      gaji_baru: kgbData.gaji_baru || '',
+      terbilang_gaji: kgbData.terbilang_gaji || '',
+      mkg_baru: kgbData.mkg_baru || '',
+      tmt_baru: kgbData.tmt_baru || '',
+      tmt_yad: kgbData.tmt_yad || '',
+      nama_ketua: kgbData.nama_ketua || '',
+      dasar_pp: kgbData.dasar_pp || '',
+      status: kgbData.status || (kgbData.file_doc_url ? 'Selesai' : 'Sedang Diproses'),
+      file_doc_url: kgbData.file_doc_url || kgbData.doc_url || '',
+      file_pdf_url: kgbData.file_pdf_url || kgbData.pdf_url || '',
+      file_id: kgbData.file_id || kgbData.doc_id || '',
+      tanggal_input: kgbData.tanggal_input || new Date().toISOString().split('T')[0],
+      is_from_dashboard: !!kgbData.is_from_dashboard,
+      is_firebase: true,
+      updated_at: (typeof firebase !== 'undefined' && firebase.firestore && firebase.firestore.FieldValue) ? firebase.firestore.FieldValue.serverTimestamp() : new Date().toISOString()
+    };
+
+    if (!kgbData.created_at) {
+      payload.created_at = (typeof firebase !== 'undefined' && firebase.firestore && firebase.firestore.FieldValue) ? firebase.firestore.FieldValue.serverTimestamp() : new Date().toISOString();
+    }
+
+    await db.collection(this.EOFFICE_KGB_COLLECTION).doc(docId).set(payload, { merge: true });
+    return { status: 'success', id: docId, data: payload };
+  },
+
+  /**
+   * Menghapus Dokumen KGB dari Cloud Firestore
+   */
+  async deleteKgbFromFirestore(docId) {
+    const db = this.getDb();
+    if (!db) throw new Error("Cloud Firestore belum siap terhubung.");
+    await db.collection(this.EOFFICE_KGB_COLLECTION).doc(String(docId).trim()).delete();
+    return { status: 'success', message: 'Data KGB berhasil dihapus dari Cloud Firestore.' };
+  },
+
+  /**
+   * Mengambil Seluruh Dokumen KGB dari Cloud Firestore
+   */
+  async getFirestoreKgbs() {
+    const db = this.getDb();
+    if (!db) return [];
+    const snapshot = await db.collection(this.EOFFICE_KGB_COLLECTION).get();
+    const list = [];
+    snapshot.forEach(doc => {
+      list.push(doc.data());
+    });
+    return list;
+  },
+
+  /**
+   * Memasang Realtime Listener untuk Dokumen KGB
+   */
+  subscribeFirestoreKgbs(callback) {
+    const db = this.getDb();
+    if (!db) return null;
+    return db.collection(this.EOFFICE_KGB_COLLECTION).onSnapshot(
+      (snapshot) => {
+        const list = [];
+        snapshot.forEach(doc => {
+          list.push(doc.data());
+        });
+        if (typeof callback === 'function') callback(list);
+      },
+      (error) => {
+        console.error("❌ [TRANSKEP Firebase] Error listener Firestore KGB:", error);
+      }
+    );
+  },
+
+  /**
+   * Menyimpan / Memperbarui Dokumen Paket Rapat ke Cloud Firestore
+   */
+  async saveRapatToFirestore(rapatData) {
+    const db = this.getDb();
+    if (!db) throw new Error("Cloud Firestore belum siap terhubung.");
+
+    const docId = String(rapatData.id_rapat || rapatData.id || ('RPT-' + Date.now())).trim();
+    if (!docId) throw new Error("ID Dokumen Rapat diperlukan.");
+
+    const payload = {
+      id: docId,
+      id_rapat: docId,
+      nomor_undangan: rapatData.nomor_undangan || '',
+      agenda: rapatData.agenda || '',
+      hari_tanggal: rapatData.hari_tanggal || '',
+      waktu_mulai: rapatData.waktu_mulai || '',
+      waktu_selesai: rapatData.waktu_selesai || '',
+      tempat: rapatData.tempat || 'Ruang Rapat',
+      pemimpin: rapatData.pemimpin || '',
+      notulis: rapatData.notulis || '',
+      peserta_json: typeof rapatData.peserta_json === 'string' ? rapatData.peserta_json : JSON.stringify(rapatData.peserta_json || []),
+      pembahasan: rapatData.pembahasan || '',
+      kesimpulan: rapatData.kesimpulan || '',
+      status: rapatData.status || 'Selesai',
+      doc_undangan_url: rapatData.doc_undangan_url || '',
+      doc_absen_url: rapatData.doc_absen_url || '',
+      doc_notulen_url: rapatData.doc_notulen_url || '',
+      folder_url: rapatData.folder_url || '',
+      tanggal_input: rapatData.tanggal_input || new Date().toISOString().split('T')[0],
+      is_firebase: true,
+      updated_at: (typeof firebase !== 'undefined' && firebase.firestore && firebase.firestore.FieldValue) ? firebase.firestore.FieldValue.serverTimestamp() : new Date().toISOString()
+    };
+
+    if (!rapatData.created_at) {
+      payload.created_at = (typeof firebase !== 'undefined' && firebase.firestore && firebase.firestore.FieldValue) ? firebase.firestore.FieldValue.serverTimestamp() : new Date().toISOString();
+    }
+
+    await db.collection(this.EOFFICE_RAPAT_COLLECTION).doc(docId).set(payload, { merge: true });
+    return { status: 'success', id: docId, data: payload };
+  },
+
+  /**
+   * Menghapus Dokumen Paket Rapat dari Cloud Firestore
+   */
+  async deleteRapatFromFirestore(docId) {
+    const db = this.getDb();
+    if (!db) throw new Error("Cloud Firestore belum siap terhubung.");
+    await db.collection(this.EOFFICE_RAPAT_COLLECTION).doc(String(docId).trim()).delete();
+    return { status: 'success', message: 'Data Rapat berhasil dihapus dari Cloud Firestore.' };
+  },
+
+  /**
+   * Mengambil Seluruh Dokumen Rapat dari Cloud Firestore
+   */
+  async getFirestoreRapats() {
+    const db = this.getDb();
+    if (!db) return [];
+    const snapshot = await db.collection(this.EOFFICE_RAPAT_COLLECTION).get();
+    const list = [];
+    snapshot.forEach(doc => {
+      list.push(doc.data());
+    });
+    return list;
+  },
+
+  /**
+   * Memasang Realtime Listener untuk Dokumen Rapat
+   */
+  subscribeFirestoreRapats(callback) {
+    const db = this.getDb();
+    if (!db) return null;
+    return db.collection(this.EOFFICE_RAPAT_COLLECTION).onSnapshot(
+      (snapshot) => {
+        const list = [];
+        snapshot.forEach(doc => {
+          list.push(doc.data());
+        });
+        if (typeof callback === 'function') callback(list);
+      },
+      (error) => {
+        console.error("❌ [TRANSKEP Firebase] Error listener Firestore Rapat:", error);
+      }
+    );
   }
 };
 

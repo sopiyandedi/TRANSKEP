@@ -160,6 +160,59 @@
       },
 
       methods: {
+                async triggerMigrasiSheets() {
+          if (!this.isAdmin) return;
+          if (typeof showLoading === 'function') {
+            showLoading("Menyalin data KGB & Rapat dari Google Sheets ke Cloud Firestore...");
+          }
+          try {
+            const res = await window.EofficeDataService.syncAllSheetsToFirestore();
+            if (typeof hideLoading === 'function') hideLoading();
+            if (res && res.status === 'success') {
+              if (typeof showNotify === 'function') {
+                showNotify("Migrasi Berhasil", res.message, "success");
+              }
+              this.loadData(true);
+            } else {
+              if (typeof showNotify === 'function') {
+                showNotify("Perhatian Migrasi", (res ? res.message : "Tidak ada data yang dimigrasikan."), "warning");
+              }
+            }
+          } catch (err) {
+            if (typeof hideLoading === 'function') hideLoading();
+            console.error("Gagal migrasi:", err);
+            if (typeof showNotify === 'function') {
+              showNotify("Gagal Migrasi", err.toString(), "error");
+            }
+          }
+        },
+        initRealtimeListeners() {
+          if (this._hasSubscribed) return;
+          if (typeof TranskepFirebase !== 'undefined' && TranskepFirebase.isReady && TranskepFirebase.isReady()) {
+            this._hasSubscribed = true;
+            TranskepFirebase.subscribeFirestoreKgbs((list) => {
+              if (Array.isArray(list)) {
+                const merged = (window.EofficeDataService && typeof window.EofficeDataService.mergeDashboardQueue === 'function')
+                  ? window.EofficeDataService.mergeDashboardQueue(list)
+                  : list;
+                this.rawKgbList = merged;
+                if (window.EofficeDataService && typeof window.EofficeDataService.setLocalCache === 'function') {
+                  window.EofficeDataService.setLocalCache({ kgb: merged, rapat: this.rawRapatList });
+                }
+              }
+            });
+            TranskepFirebase.subscribeFirestoreRapats((list) => {
+              if (Array.isArray(list)) {
+                this.rawRapatList = list;
+                if (window.EofficeDataService && typeof window.EofficeDataService.setLocalCache === 'function') {
+                  window.EofficeDataService.setLocalCache({ kgb: this.rawKgbList, rapat: list });
+                }
+              }
+            });
+            console.log("🔥 [E-Office] Realtime listener Cloud Firestore aktif.");
+          }
+        },
+
         async loadData(isSilent) {
           if (!this.currentUser && typeof state !== 'undefined' && state.user) {
             this.s.user = state.user;
@@ -176,7 +229,10 @@
 
           if (!nip || !token) return;
 
-          if (!isSilent) this.isLoading = true;
+          if (!isSilent && this.rawKgbList.length === 0 && this.rawRapatList.length === 0) {
+            this.isLoading = true;
+          }
+          this.initRealtimeListeners();
 
           try {
             const res = await window.EofficeDataService.getEofficeData(nip, token);

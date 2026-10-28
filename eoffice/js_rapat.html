@@ -185,7 +185,7 @@
   // ==========================================
   // SUBMIT FORM RAPAT KE GOOGLE APPS SCRIPT
   // ==========================================
-  function submitRapatForm() {
+  async function submitRapatForm() {
     var agenda = document.getElementById('rapatFieldAgenda').value;
     var nomorUndangan = document.getElementById('rapatFieldNomorUndangan').value;
     var hariTanggal = document.getElementById('rapatFieldHariTanggal').value;
@@ -261,6 +261,42 @@
 
     if (typeof showLoading === 'function') {
       showLoading("Menerbitkan 3 Dokumen Rapat ke Google Docs...");
+    }
+
+        if (window.EofficeDataService && typeof window.EofficeDataService.createPaketRapat === 'function') {
+      try {
+        var res = await window.EofficeDataService.createPaketRapat(payload, adminNip, token);
+        if (typeof hideLoading === 'function') hideLoading();
+        if (btnSubmit) btnSubmit.disabled = false;
+
+        if (res && res.status === 'success') {
+          closeRapatModalForm();
+          if (typeof showNotify === 'function') {
+            showNotify("Sukses", "3 Dokumen Rapat berhasil dibuat di Google Drive!", "success");
+          }
+          showRapatSuccessResultModal(
+            agenda, 
+            res.data.doc_undangan_url, 
+            res.data.doc_absen_url, 
+            res.data.doc_notulen_url
+          );
+          if (typeof window.refreshEofficeData === 'function') {
+            window.refreshEofficeData();
+          }
+        } else {
+          if (typeof showNotify === 'function') {
+            showNotify("Gagal", (res ? res.message : "Terjadi kendala saat menerbitkan dokumen rapat."), "error");
+          }
+        }
+      } catch (err) {
+        if (typeof hideLoading === 'function') hideLoading();
+        if (btnSubmit) btnSubmit.disabled = false;
+        console.error("Error submit rapat: ", err);
+        if (typeof showNotify === 'function') {
+          showNotify("Error Sistem", err.toString(), "error");
+        }
+      }
+      return;
     }
 
     google.script.run
