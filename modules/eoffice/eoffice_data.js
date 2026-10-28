@@ -42,7 +42,8 @@ const EofficeDataService = {
 
   /**
    * Mengambil data arsip E-Office (KGB dan Paket Rapat)
-   * Mengutamakan Cloud Firestore (0ms), dengan fallback ke Google Apps Script (Sheets)
+   * Mengutamakan Cloud Firestore (0ms), dan otomatis fallback + auto-seed dari Google Sheets
+   * jika koleksi Firestore masih kosong atau belum diizinkan oleh Firestore Rules.
    * @param {string} nip - NIP pengguna
    * @param {string} token - Token sesi aktif
    * @returns {Promise<Object>} Respon { status, data: { kgb, rapat }, source }
@@ -62,37 +63,35 @@ const EofficeDataService = {
         let kgbList = Array.isArray(rawKgbs) ? rawKgbs : [];
         let rapatList = Array.isArray(rawRapats) ? rawRapats : [];
 
-        // 2. Auto-Migration: Jika Firestore masih kosong & belum pernah migrasi, sedot data lama dari Google Sheets
-        const hasMigrated = (typeof localStorage !== 'undefined') && localStorage.getItem(this.MIGRATION_FLAG_KEY) === 'true';
-        if (!hasMigrated && kgbList.length === 0 && rapatList.length === 0) {
-          this.triggerBackgroundMigration(userNip, authToken);
-        }
-
-        // 3. Sintesis Reaktif: Integrasikan pegawai dengan status_kgb === 'Proses' dari state.usersList
+        // Integrasikan pegawai dengan status_kgb === 'Proses' dari state.usersList
         kgbList = this.mergeDashboardQueue(kgbList);
 
-        const resultData = { kgb: kgbList, rapat: rapatList };
-        this.setLocalCache(resultData);
+        // Jika di Firestore sudah ada data, langsung sajikan dalam 0ms!
+        if (kgbList.length > 0 || rapatList.length > 0) {
+          const resultData = { kgb: kgbList, rapat: rapatList };
+          this.setLocalCache(resultData);
+          return {
+            status: 'success',
+            data: resultData,
+            source: 'firestore'
+          };
+        }
 
-        return {
-          status: 'success',
-          data: resultData,
-          source: 'firestore'
-        };
+        // Jika Firestore masih 0 dokumen, lanjutkan ke Langkah 2 (tarik dari Google Sheets & auto-seed ke Firestore)
+        console.log("ℹ️ [E-Office] Koleksi Firestore masih kosong, mengambil data awal dari Google Sheets...");
       } catch (fsErr) {
-        console.warn("⚠️ [E-Office] Firestore query gagal, mencoba fallback ke GAS/Sheets:", fsErr);
+        console.warn("⚠️ [E-Office] Firestore query tertahan (cek Firestore Rules), fallback ke Google Sheets:", fsErr);
       }
     }
 
-    // 4. Fallback ke Google Apps Script (Google Sheets) jika Firestore tidak tersedia
+    // 2. Fallback & Auto-Seed dari Google Apps Script (Google Sheets)
     return new Promise((resolve, reject) => {
       if (typeof google === 'undefined' || !google.script || !google.script.run) {
-        // Cek apakah ada cache lokal yang bisa disajikan saat offline
         const cached = this.getLocalCache();
         if (cached && (cached.kgb || cached.rapat)) {
           return resolve({
             status: 'success',
-            data: { kgb: cached.kgb || [], rapat: cached.rapat || [] },
+            data: { kgb: this.mergeDashboardQueue(cached.kgb || []), rapat: cached.rapat || [] },
             source: 'cache_offline'
           });
         }
@@ -102,9 +101,22 @@ const EofficeDataService = {
       google.script.run
         .withSuccessHandler((res) => {
           if (res && res.status === 'success' && res.data) {
-            this.setLocalCache(res.data);
+            const mergedKgb = this.mergeDashboardQueue(res.data.kgb || []);
+            const rapatData = res.data.rapat || [];
+            const finalData = { kgb: mergedKgb, rapat: rapatData };
+            this.setLocalCache(finalData);
+
+            // Auto-Seed di latar belakang ke Cloud Firestore jika ada data dari Sheets
+            this.seedSheetsDataToFirestore(mergedKgb, rapatData).catch(() => {});
+
+            resolve({
+              status: 'success',
+              data: finalData,
+              source: 'sheets_fallback'
+            });
+          } else {
+            resolve(res);
           }
-          resolve(res);
         })
         .withFailureHandler((err) => reject(err))
         .getEofficeData(userNip, authToken);
@@ -112,11 +124,48 @@ const EofficeDataService = {
   },
 
   /**
+   * Menyalin array KGB dan Rapat yang sudah diambil dari Sheets langsung ke Firestore di background
+   */
+  async seedSheetsDataToFirestore(kgbList, rapatList) {
+    if (typeof TranskepFirebase === 'undefined' || !TranskepFirebase.isReady || !TranskepFirebase.isReady()) return;
+    let savedAny = false;
+    if (Array.isArray(kgbList)) {
+      for (const k of kgbList) {
+        if (k && (k.id_kgb || k.nip)) {
+          try {
+            await TranskepFirebase.saveKgbToFirestore(k);
+            savedAny = true;
+          } catch (e) {
+            console.warn("⚠️ [E-Office Auto-Seed] Gagal menulis KGB ke Firestore (cek Rules):", e.message || e);
+            break;
+          }
+        }
+      }
+    }
+    if (Array.isArray(rapatList)) {
+      for (const r of rapatList) {
+        if (r && (r.id_rapat || r.agenda)) {
+          try {
+            await TranskepFirebase.saveRapatToFirestore(r);
+            savedAny = true;
+          } catch (e) {
+            console.warn("⚠️ [E-Office Auto-Seed] Gagal menulis Rapat ke Firestore (cek Rules):", e.message || e);
+            break;
+          }
+        }
+      }
+    }
+    if (savedAny && typeof localStorage !== 'undefined') {
+      localStorage.setItem(this.MIGRATION_FLAG_KEY, 'true');
+    }
+  },
+
+  /**
    * Menyintesis antrean pegawai berstatus KGB 'Proses' dari state.usersList ke daftar KGB
    * Memastikan siapapun yang diubah statusnya di Dashboard langsung muncul di E-Office (0ms)
    */
   mergeDashboardQueue(kgbList) {
-    const list = [...kgbList];
+    const list = Array.isArray(kgbList) ? [...kgbList] : [];
     const uList = (window.vueState && window.vueState.usersList) ? window.vueState.usersList : (typeof state !== 'undefined' ? state.usersList : []);
 
     if (Array.isArray(uList)) {
@@ -124,7 +173,6 @@ const EofficeDataService = {
         const statusKgb = String(u.status_kgb || u.Status_KGB || '').trim().toUpperCase();
         if (statusKgb === 'PROSES') {
           const strNip = String(u.nip || '').trim();
-          // Cek apakah sudah ada item di list KGB untuk NIP ini yang masih berstatus draft/proses
           const exists = list.some(k => String(k.nip || '').trim() === strNip && String(k.status || '').toLowerCase() !== 'selesai');
           if (!exists) {
             list.push({
@@ -135,6 +183,7 @@ const EofficeDataService = {
               golongan: u.golongan || '',
               jabatan: u.jabatan || '',
               tmt_lama: u.tmt_kgb || '',
+              tmt_baru: u.tmt_kgb || '',
               status: 'Sedang Diproses',
               is_from_dashboard: true,
               tanggal_input: new Date().toISOString().split('T')[0]
@@ -148,11 +197,7 @@ const EofficeDataService = {
   },
 
   /**
-   * Migrasi Latar Belakang: Memindahkan arsip KGB dan Paket Rapat dari Google Sheets ke Cloud Firestore (One-Time)
-   */
-    /**
-   * Menyinkronkan seluruh data KGB & Rapat dari Google Sheets ke Cloud Firestore
-   * Menjamin koleksi 'eoffice_kgb' & 'eoffice_rapat' langsung muncul di Firebase Console
+   * Menyinkronkan seluruh data KGB & Rapat dari Google Sheets ke Cloud Firestore secara eksplisit
    */
   async syncAllSheetsToFirestore() {
     if (typeof TranskepFirebase === 'undefined' || !TranskepFirebase.isReady || !TranskepFirebase.isReady()) {
@@ -188,87 +233,45 @@ const EofficeDataService = {
 
     let kgbCount = 0;
     let rapatCount = 0;
+    let permissionError = null;
 
-    // 2. Simpan semua riwayat KGB dari Sheets ke Firestore
-    if (sheetData && Array.isArray(sheetData.kgb)) {
-      for (const k of sheetData.kgb) {
-        if (k && (k.id_kgb || k.nip)) {
-          try {
-            await TranskepFirebase.saveKgbToFirestore(k);
-            kgbCount++;
-          } catch (e) {
-            console.warn("⚠️ Gagal migrasi baris KGB:", k, e);
-          }
+    // 2. Gabungkan data KGB dari Sheets + antrean Dashboard
+    const allKgbs = this.mergeDashboardQueue((sheetData && Array.isArray(sheetData.kgb)) ? sheetData.kgb : []);
+    for (const k of allKgbs) {
+      if (k && (k.id_kgb || k.nip)) {
+        try {
+          await TranskepFirebase.saveKgbToFirestore(k);
+          kgbCount++;
+        } catch (e) {
+          permissionError = e;
+          console.error("❌ Gagal simpan KGB ke Firestore:", e);
+          break;
         }
       }
     }
 
-    // 3. Simpan seluruh pegawai berstatus KGB 'Proses' dari state.usersList
-    const uList = (window.vueState && window.vueState.usersList) ? window.vueState.usersList : (typeof state !== 'undefined' ? state.usersList : []);
-    if (Array.isArray(uList)) {
-      for (const u of uList) {
-        const stKgb = String(u.status_kgb || u.Status_KGB || '').trim().toUpperCase();
-        if (stKgb === 'PROSES') {
-          const draftId = 'DRAFT-' + String(u.nip).trim();
-          try {
-            await TranskepFirebase.saveKgbToFirestore({
-              id_kgb: draftId,
-              nip: String(u.nip).trim(),
-              nama_pegawai: u.nama || '',
-              pangkat: u.pangkat || '',
-              golongan: u.golongan || '',
-              jabatan: u.jabatan || '',
-              tmt_lama: u.tmt_kgb || '',
-              status: 'Sedang Diproses',
-              is_from_dashboard: true,
-              tanggal_input: new Date().toISOString().split('T')[0]
-            });
-            kgbCount++;
-          } catch (e) {}
-        }
-      }
-    }
-
-    // 4. Simpan semua riwayat Rapat dari Sheets ke Firestore
-    if (sheetData && Array.isArray(sheetData.rapat)) {
+    // 3. Simpan semua riwayat Rapat dari Sheets ke Firestore
+    if (!permissionError && sheetData && Array.isArray(sheetData.rapat)) {
       for (const r of sheetData.rapat) {
         if (r && (r.id_rapat || r.agenda)) {
           try {
             await TranskepFirebase.saveRapatToFirestore(r);
             rapatCount++;
           } catch (e) {
-            console.warn("⚠️ Gagal migrasi baris Rapat:", r, e);
+            permissionError = e;
+            console.error("❌ Gagal simpan Rapat ke Firestore:", e);
+            break;
           }
         }
       }
     }
 
-    // 5. Inisialisasi awal jika masih 0 agar kedua koleksi SEGERA MUNCUL DI FIREBASE CONSOLE!
-    if (kgbCount === 0) {
-      await TranskepFirebase.saveKgbToFirestore({
-        id_kgb: 'INIT_KGB',
-        nip: nip || '197309081998031001',
-        nama_pegawai: 'Inisialisasi Koleksi KGB',
-        pangkat: 'Pembina Utama Madya',
-        jabatan: 'Ketua / Wakil Ketua',
-        status: 'Sedang Diproses',
-        tanggal_input: new Date().toISOString().split('T')[0],
-        catatan: 'Dokumen inisiasi awal koleksi eoffice_kgb Cloud Firestore'
-      });
-      kgbCount++;
-    }
-
-    if (rapatCount === 0) {
-      await TranskepFirebase.saveRapatToFirestore({
-        id_rapat: 'INIT_RAPAT',
-        agenda: 'Inisialisasi Koleksi Paket Rapat',
-        pemimpin: 'Ketua Pengadilan Agama Indramayu',
-        tempat: 'Ruang Media Center / Aula',
-        hari_tanggal: new Date().toISOString().split('T')[0],
-        status: 'Terjadwal',
-        tanggal_input: new Date().toISOString().split('T')[0]
-      });
-      rapatCount++;
+    if (permissionError) {
+      const errMsg = String(permissionError.message || permissionError);
+      if (errMsg.toLowerCase().includes('permission') || errMsg.toLowerCase().includes('insufficient')) {
+        throw new Error("Ditolak oleh Firestore Security Rules! Tambahkan koleksi 'eoffice_kgb' dan 'eoffice_rapat' pada tab Rules di Firebase Console.");
+      }
+      throw permissionError;
     }
 
     if (typeof localStorage !== 'undefined') {
@@ -284,49 +287,6 @@ const EofficeDataService = {
 
   triggerBackgroundMigration(nip, token) {
     this.syncAllSheetsToFirestore().catch(() => {});
-    return;
-
-    if (typeof google === 'undefined' || !google.script || !google.script.run) return;
-
-    console.log("🔄 [E-Office Migration] Memulai migrasi data lama dari Google Sheets ke Cloud Firestore...");
-    google.script.run
-      .withSuccessHandler(async (res) => {
-        if (res && res.status === 'success' && res.data && typeof TranskepFirebase !== 'undefined') {
-          const sheetKgbs = Array.isArray(res.data.kgb) ? res.data.kgb : [];
-          const sheetRapats = Array.isArray(res.data.rapat) ? res.data.rapat : [];
-
-          // 1. Simpan baris KGB ke Firestore
-          for (const k of sheetKgbs) {
-            try {
-              if (k.id_kgb && !String(k.id_kgb).startsWith('DRAFT-')) {
-                await TranskepFirebase.saveKgbToFirestore(k);
-              }
-            } catch (e) {
-              console.warn("⚠️ Gagal migrasi baris KGB:", k, e);
-            }
-          }
-
-          // 2. Simpan baris Rapat ke Firestore
-          for (const r of sheetRapats) {
-            try {
-              if (r.id_rapat) {
-                await TranskepFirebase.saveRapatToFirestore(r);
-              }
-            } catch (e) {
-              console.warn("⚠️ Gagal migrasi baris Rapat:", r, e);
-            }
-          }
-
-          if (typeof localStorage !== 'undefined') {
-            localStorage.setItem(this.MIGRATION_FLAG_KEY, 'true');
-          }
-          console.log(`✅ [E-Office Migration] Berhasil migrasi ${sheetKgbs.length} KGB dan ${sheetRapats.length} Rapat ke Cloud Firestore.`);
-        }
-      })
-      .withFailureHandler((err) => {
-        console.warn("⚠️ [E-Office Migration] Gagal menarik data migrasi dari GAS:", err);
-      })
-      .getEofficeData(nip, token);
   },
 
   /**
@@ -409,7 +369,7 @@ const EofficeDataService = {
                 await TranskepFirebase.saveKgbToFirestore(completedKgb);
 
                 // Jika sebelumnya ada dokumen draf sementara (DRAFT-{nip}), bersihkan
-                if (payload.nip) {
+                if (payload.nip && docId !== ('DRAFT-' + payload.nip)) {
                   try {
                     await TranskepFirebase.deleteKgbFromFirestore('DRAFT-' + payload.nip);
                   } catch (delErr) {}

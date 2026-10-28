@@ -187,17 +187,20 @@
             this._hasSubscribed = true;
             TranskepFirebase.subscribeFirestoreKgbs((list) => {
               if (Array.isArray(list)) {
+                const baseList = list.length > 0 ? list : this.rawKgbList;
                 const merged = (window.EofficeDataService && typeof window.EofficeDataService.mergeDashboardQueue === 'function')
-                  ? window.EofficeDataService.mergeDashboardQueue(list)
-                  : list;
-                this.rawKgbList = merged;
-                if (window.EofficeDataService && typeof window.EofficeDataService.setLocalCache === 'function') {
-                  window.EofficeDataService.setLocalCache({ kgb: merged, rapat: this.rawRapatList });
+                  ? window.EofficeDataService.mergeDashboardQueue(baseList)
+                  : baseList;
+                if (list.length > 0 || merged.length > 0) {
+                  this.rawKgbList = merged;
+                  if (window.EofficeDataService && typeof window.EofficeDataService.setLocalCache === 'function') {
+                    window.EofficeDataService.setLocalCache({ kgb: merged, rapat: this.rawRapatList });
+                  }
                 }
               }
             });
             TranskepFirebase.subscribeFirestoreRapats((list) => {
-              if (Array.isArray(list)) {
+              if (Array.isArray(list) && list.length > 0) {
                 this.rawRapatList = list;
                 if (window.EofficeDataService && typeof window.EofficeDataService.setLocalCache === 'function') {
                   window.EofficeDataService.setLocalCache({ kgb: this.rawKgbList, rapat: list });
@@ -316,7 +319,32 @@
       },
 
       mounted() {
-        // Hanya muat data otomatis jika menu saat ini adalah E-Office dan pengguna adalah Admin
+        // 1. 0ms Local Cache Hydration
+        if (window.EofficeDataService && typeof window.EofficeDataService.getLocalCache === 'function') {
+          const cached = window.EofficeDataService.getLocalCache();
+          if (cached && (Array.isArray(cached.kgb) || Array.isArray(cached.rapat))) {
+            const merged = (typeof window.EofficeDataService.mergeDashboardQueue === 'function')
+              ? window.EofficeDataService.mergeDashboardQueue(cached.kgb || [])
+              : (cached.kgb || []);
+            if (merged.length > 0) this.rawKgbList = merged;
+            if (Array.isArray(cached.rapat) && cached.rapat.length > 0) this.rawRapatList = cached.rapat;
+          }
+        }
+
+        // 2. Dengarkan event sinkronisasi server selesai (transkep:sync-complete) agar antrean KGB Dashboard langsung masuk
+        window.addEventListener('transkep:sync-complete', () => {
+          if (this.isAdmin) {
+            if (window.EofficeDataService && typeof window.EofficeDataService.mergeDashboardQueue === 'function') {
+              this.rawKgbList = window.EofficeDataService.mergeDashboardQueue(this.rawKgbList);
+            }
+            const activeMenu = (window.vueState && window.vueState.currentMenu) || localStorage.getItem('transkep_last_menu');
+            if (activeMenu === 'eoffice') {
+              this.loadData(true);
+            }
+          }
+        });
+
+        // 3. Muat data jika menu saat ini adalah E-Office
         const currentMenu = (window.vueState && window.vueState.currentMenu) || localStorage.getItem('transkep_last_menu');
         if (currentMenu === 'eoffice' && this.isAdmin) {
           this.loadData();
