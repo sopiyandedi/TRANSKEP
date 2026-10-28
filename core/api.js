@@ -65,7 +65,17 @@ const TranskepAPI = (function () {
    */
   async function request(payload, options = {}) {
     // 1. Verifikasi Integritas Sesi (Anti-Tampering Gate)
-    if (typeof window !== 'undefined' && window.SessionIntegrityGuard && typeof window.SessionIntegrityGuard.verify === 'function') {
+    // Pengecualian endpoint publik: login, verifyLogin, ping, dan submitLupaPassword
+    const isPublicAction = (
+      payload.action === 'login' ||
+      payload.action === 'ping' ||
+      payload.action === 'submitLupaPassword' ||
+      payload.method === 'verifyLogin' ||
+      payload.method === 'ping' ||
+      payload.method === 'submitLupaPassword'
+    );
+
+    if (!isPublicAction && typeof window !== 'undefined' && window.SessionIntegrityGuard && typeof window.SessionIntegrityGuard.verify === 'function') {
       if (!window.SessionIntegrityGuard.verify()) {
         throw new Error('Pelanggaran Keamanan: Integritas sesi tidak valid.');
       }
@@ -174,15 +184,28 @@ const TranskepAPI = (function () {
       });
 
       if (res && res.status === 'success' && res.token) {
-        localStorage.setItem('transkep_active_nip', res.data.nip);
-        localStorage.setItem('transkep_user_nip', res.data.nip);
-        localStorage.setItem('transkep_session_token', res.token);
-        localStorage.setItem('transkep_token', res.token);
-        localStorage.setItem('transkep_user_role', res.data.role || '');
-        localStorage.setItem('transkep_user_nama', res.data.nama || '');
-        localStorage.setItem('transkep_user', JSON.stringify(res.data));
-        if (typeof window !== 'undefined' && window.SessionIntegrityGuard) {
-          window.SessionIntegrityGuard.sealSession(res.data.nip, res.data.role || '', res.token);
+        if (typeof window !== 'undefined' && window.SessionIntegrityGuard && typeof window.SessionIntegrityGuard.runInternal === 'function') {
+          window.SessionIntegrityGuard.runInternal(() => {
+            localStorage.setItem('transkep_active_nip', res.data.nip);
+            localStorage.setItem('transkep_user_nip', res.data.nip);
+            localStorage.setItem('transkep_session_token', res.token);
+            localStorage.setItem('transkep_token', res.token);
+            localStorage.setItem('transkep_user_role', res.data.role || '');
+            localStorage.setItem('transkep_user_nama', res.data.nama || '');
+            localStorage.setItem('transkep_user', JSON.stringify(res.data));
+            window.SessionIntegrityGuard.sealSession(res.data.nip, res.data.role || '', res.token);
+          });
+        } else {
+          localStorage.setItem('transkep_active_nip', res.data.nip);
+          localStorage.setItem('transkep_user_nip', res.data.nip);
+          localStorage.setItem('transkep_session_token', res.token);
+          localStorage.setItem('transkep_token', res.token);
+          localStorage.setItem('transkep_user_role', res.data.role || '');
+          localStorage.setItem('transkep_user_nama', res.data.nama || '');
+          localStorage.setItem('transkep_user', JSON.stringify(res.data));
+          if (typeof window !== 'undefined' && window.SessionIntegrityGuard) {
+            window.SessionIntegrityGuard.sealSession(res.data.nip, res.data.role || '', res.token);
+          }
         }
         memoryCache.clear(); // Bersihkan cache lama
       }
@@ -206,15 +229,33 @@ const TranskepAPI = (function () {
       } catch (e) {
         console.warn('Gagal revokasi sesi di server:', e);
       } finally {
-        if (typeof window !== 'undefined' && window.SessionIntegrityGuard && typeof window.SessionIntegrityGuard.resetSession === 'function') {
-          window.SessionIntegrityGuard.resetSession();
+        if (typeof window !== 'undefined' && window.SessionIntegrityGuard && typeof window.SessionIntegrityGuard.runInternal === 'function') {
+          window.SessionIntegrityGuard.runInternal(() => {
+            if (typeof window.SessionIntegrityGuard.resetSession === 'function') {
+              window.SessionIntegrityGuard.resetSession();
+            }
+            localStorage.removeItem('transkep_active_nip');
+            localStorage.removeItem('transkep_user_nip');
+            localStorage.removeItem('transkep_session_token');
+            localStorage.removeItem('transkep_token');
+            localStorage.removeItem('transkep_user_role');
+            localStorage.removeItem('transkep_user_nama');
+            localStorage.removeItem('transkep_user_profile');
+            localStorage.removeItem('transkep_user');
+            localStorage.removeItem('transkep_session_sig');
+            localStorage.removeItem('transkep_last_active_time');
+          });
+        } else {
+          if (typeof window !== 'undefined' && window.SessionIntegrityGuard && typeof window.SessionIntegrityGuard.resetSession === 'function') {
+            window.SessionIntegrityGuard.resetSession();
+          }
+          localStorage.removeItem('transkep_active_nip');
+          localStorage.removeItem('transkep_user_nip');
+          localStorage.removeItem('transkep_session_token');
+          localStorage.removeItem('transkep_token');
+          localStorage.removeItem('transkep_user');
+          localStorage.removeItem('transkep_session_sig');
         }
-        localStorage.removeItem('transkep_active_nip');
-        localStorage.removeItem('transkep_user_nip');
-        localStorage.removeItem('transkep_session_token');
-        localStorage.removeItem('transkep_token');
-        localStorage.removeItem('transkep_user');
-        localStorage.removeItem('transkep_session_sig');
         memoryCache.clear();
       }
     },

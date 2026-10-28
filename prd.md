@@ -445,6 +445,20 @@ ZONA BAWAH: MASTER CONTEXT & STATUS MIGRASI TERKINI (LIVING CONTEXT)
       - Upaya kloning domain liar seketika diblokir dengan tampilan penolakan akses dan insiden dicatat ke audit log.
     - **PWA Cache Invalidation**:
       - Versi Service Worker `sw.js` dan `CURRENT_APP_BUILD` di `index.html` dinaikkan ke **`transkep-v3.5.9`**.
+41. **Role Exemption & Hardening Integritas Sesi (Tahap 60 - Selesai & Aktif ✅):**
+    - **Pengecualian Mutlak Role Admin & Operator dari Auto-Logout Inaktif**:
+      - Ditambahkan metode `isExemptRole()` pada `IdleTimeoutGuard` di [`core/core.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/core/core.js).
+      - Role `Admin` dan `Operator` (case-insensitive) sepenuhnya bebas dari pemutusan sesi inaktif, menjamin kelancaran tugas pemantauan dan pengelolaan tanpa gangguan kick logout.
+    - **Perbaikan Residu Waktu Idle Timestamp Pegawai**:
+      - `IdleTimeoutGuard.start()` dirombak agar selalu menyegarkan `transkep_last_active_time` ke `Date.now()` seketika sesi dimulai, mencegah terjadinya tendangan instan akibat timestamp sesi usang dari hari sebelumnya.
+    - **Bypass Pintu Gerbang Integritas Sesi pada Endpoint Publik**:
+      - `TranskepAPI.request` di [`core/api.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/core/api.js) membebaskan aksi publik (`login`, `verifyLogin`, `ping`, `submitLupaPassword`) dari verifikasi `SessionIntegrityGuard.verify()`, sehingga pengguna belum login dapat mengakses endpoint autentikasi tanpa hambatan.
+    - **Sinkronisasi Aman & Penghindaran False-Positive Anti-Tamper**:
+      - Penambahan `SessionIntegrityGuard.runInternal(fn)` untuk membungkus mutasi LocalStorage internal (`handleLogin`, `handleLogout`, `syncAllServerData`, dan `TranskepAPI.login/logout`).
+      - Storage prototype interceptor diperkuat agar mentoleransi penyelarasan role yang sesuai dengan memori sesi aktif dan toleran terhadap variasi huruf kapital (case-insensitive).
+    - **PWA Cache Invalidation**:
+      - Versi Service Worker [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) dan `CURRENT_APP_BUILD` di [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) dinaikkan ke **`transkep-v3.6.0`**.
+
 
 
 

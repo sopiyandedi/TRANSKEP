@@ -3185,13 +3185,65 @@ Pengguna melaporkan bahwa pratinjau (*preview*) dokumen PDF di modal SK dan SOP 
 - [x] CSP memuat whitelist `google.com/recaptcha`, `gstatic.com/recaptcha`, dan `recaptcha.net`.
 - [x] Hostname check lolos di domain resmi `sso.pa-indramayu.go.id` dan localhost, serta memutus domain kloning liar.
 
+---
 
+### TAHAP 60: Pengecualian Khusus Role Admin & Operator pada Pengaman Sesi (Idle Timeout Guard) & Resolusi False-Positive Snap-Back Storage (v3.6.0)
 
+#### 1. Latar Belakang & Akar Masalah
+1. **Kasus di Lapangan:**
+   - Pengguna dengan peran `Admin` (misal NIP `19800101001`) maupun role biasa/`Pegawai` mengalami kondisi langsung ditolak / di-*kick* (force logout seketika) sesaat setelah menekan tombol Masuk Aplikasi atau saat sinkronisasi data.
+2. **Akar Masalah 1 (`IdleTimeoutGuard` Menendang Admin & Pegawai Akibat Residu Timestamp):**
+   - Modul `IdleTimeoutGuard` (Tahap 58) dirancang untuk memutus sesi secara otomatis setelah 15 menit inaktif.
+   - **Bagi Admin & Operator:** Modul belum memiliki filter pengecualian peran (`isExemptRole`), sehingga akun operasional yang bertugas seharian ikut terkena pengawasan inaktivitas.
+   - **Bagi Seluruh Pengguna (Termasuk Pegawai):** Pada `IdleTimeoutGuard.start()`, inisialisasi waktu hanya mengecek `if (!localStorage.getItem(this.STORAGE_KEY_LAST_ACTIVE))`. Jika di peramban pengguna masih tersimpan nilai `transkep_last_active_time` dari sesi sebelumnya (>15 menit lalu), loop 1 detik langsung menganggap sesi kedaluwarsa seketika (0 milidetik setelah login) dan memicu `handleTimeoutLogout()` -> `handleLogout()`.
+3. **Akar Masalah 2 (`Storage.prototype.setItem` Interceptor Triggered saat Server Sync):**
+   - Pada `syncAllServerData()` di `core/core.js` (baris 1480-1485), data profil pengguna dari server disimpan ulang ke `localStorage` (`transkep_user_role`, `transkep_user_profile`, `transkep_user`).
+   - Karena panggilan tersebut tidak dibungkus oleh flag internal `_isInternalAuthAction = true`, interceptor `Storage.prototype.setItem` mengidentifikasinya sebagai manipulasi konsol luar dan memicu `SessionIntegrityGuard.handleTamperingViolation()` yang seketika menghapus storage dan me-reload halaman ke login (berlaku untuk semua role).
+4. **Akar Masalah 3 (`TranskepAPI.request` Memvalidasi Sesi pada Endpoint Publik Login):**
+   - Di [`core/api.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/core/api.js) baris 68, fungsi `request()` menjalankan `SessionIntegrityGuard.verify()` untuk **seluruh request**, termasuk pemanggilan `verifyLogin`, `login`, dan `ping`.
+   - Sebelum login berhasil, pengguna belum memiliki signature sesi yang sah (`transkep_session_sig`). Jika ada sisa data parsial di peramban, `verify()` menganggapnya sebagai anomali dan melempar error sebelum request verifikasi sandi sempat diproses.
 
+#### 2. Rencana Arsitektur & Perbaikan Sistem
+1. **Pengecualian Mutlak Role Admin & Operator pada `IdleTimeoutGuard`:**
+   - Menambahkan metode `isExemptRole()`:
+     ```javascript
+     isExemptRole() {
+       try {
+         const role = (localStorage.getItem('transkep_user_role') || (typeof state !== 'undefined' && state.user && state.user.role) || '').toLowerCase().trim();
+         return role === 'admin' || role === 'operator';
+       } catch (e) {
+         return false;
+       }
+     }
+     ```
+   - Jika `isExemptRole()` bernilai `true`:
+     - `IdleTimeoutGuard.start()` seketika melakukan `this.stop(); return;` (tidak memasang listener, tidak menyalakan interval, tidak memunculkan modal peringatan).
+     - Akun `Admin` dan `Operator` bebas bertugas seharian penuh tanpa risiko ter-kick atau terkena auto-logout.
+2. **Koreksi Logika Timestamp Awal `IdleTimeoutGuard.start()` untuk Pegawai:**
+   - Untuk pengguna non-admin (Pegawai biasa), `start()` WAJIB SELALU memperbarui `localStorage.setItem(this.STORAGE_KEY_LAST_ACTIVE, String(Date.now()))` dan menyegarkan variabel internal `this._lastThrottledUpdate` saat login berhasil, sehingga tidak pernah lagi terjadi kick mendadak akibat residu waktu lama.
+3. **Penyelarasan Gate Sesi pada `core/api.js` (Bypass untuk Login & Ping):**
+   - Mengecualikan method publik (`verifyLogin`, `login`, `ping`, `submitLupaPassword`) dari validasi `SessionIntegrityGuard.verify()` di `core/api.js`.
+4. **Proteksi Internal Auth Action pada `handleLogin()` dan `syncAllServerData()`:**
+   - Menyelimuti penyimpanan data sesi di `handleLogin` dan `syncAllServerData` dengan flag `_isInternalAuthAction = true` serta menggunakan `_rawStorageSet` agar sinkronisasi data resmi dari server tidak memicu interceptor manipulasi.
+   - Memperbaiki `SessionIntegrityGuard.verify()` agar hanya mencatat pelanggaran jika sesi memori (`_activeMemorySession`) sudah pernah aktif sebelumnya, mencegah false-positive saat pengguna belum login.
+5. **Peningkatan Versi PWA & Cache Invalidation:**
+   - Menaikkan versi cache ke **`transkep-v3.6.0`** pada `sw.js` dan `index.html`.
 
+#### 3. Berkas yang Akan Dimodifikasi
+- [`core/core.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/core/core.js):
+  - Penambahan `isExemptRole()` pada `IdleTimeoutGuard` (bypass Admin & Operator).
+  - Reset timestamp segar pada `start()`.
+  - Pembungkusan `_isInternalAuthAction = true` pada alur login dan `syncAllServerData()`.
+  - Penyempurnaan `SessionIntegrityGuard.verify()`.
+- [`core/api.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/core/api.js):
+  - Bypass verifikasi integritas sesi untuk aksi login, verifyLogin, dan ping.
+- [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html): Peningkatan `CURRENT_APP_BUILD` ke `v3.6.0`.
+- [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js): Peningkatan `CACHE_NAME` ke `transkep-v3.6.0`.
 
-
-
-
-
-
+#### 4. Kriteria Pengujian & Status: [SELESAI & AKTIF] ✅
+- [x] Login menggunakan akun Admin (misal NIP `19800101001`): Berhasil masuk lancar tanpa ter-kick.
+- [x] Login menggunakan akun Pegawai biasa: Berhasil masuk lancar tanpa ter-kick.
+- [x] Pengguna role Admin & Operator bebas inaktif tanpa batasan waktu (tidak kena auto-logout 15 menit).
+- [x] Pengguna role Pegawai tetap terlindungi oleh timeout 15 menit dengan hitungan waktu segar sejak login.
+- [x] Konsol browser bersih dari peringatan `[SECURITY VIOLATION]` saat login dan sinkronisasi server berjalan normal.
+- [x] Modul Service Worker cache `sw.js` dan `CURRENT_APP_BUILD` di `index.html` terbarui ke `transkep-v3.6.0`.
