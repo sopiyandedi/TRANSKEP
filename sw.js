@@ -4,7 +4,7 @@
 // ENGINE: TRANSKEP PWA Engine v1.0.0 
 // =========================================================================
 
-const CACHE_NAME = 'transkep-v3.6.1';
+const CACHE_NAME = 'transkep-v3.6.2';
 
 // Daftar aset inti yang di-cache saat Service Worker dipasang (Install)
 const PRECACHE_ASSETS = [

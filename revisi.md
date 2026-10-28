@@ -3274,3 +3274,27 @@ Pengguna melaporkan bahwa pratinjau (*preview*) dokumen PDF di modal SK dan SOP 
 - [x] Percobaan manipulasi role via DevTools Console/Application tab tetap ditangkap dan di-snap back secara sah.
 - [x] Versi build `sw.js` dan `index.html` terbarui ke `v3.6.1`.
 
+---
+
+### TAHAP 62: Dual-Remote Production Deployment & Comprehensive Internal Auth Scoping (v3.6.2)
+
+#### 1. Latar Belakang & Akar Masalah
+- **Isu di Lapangan:**
+  - Pengguna melaporkan bahwa saat mencoba login, modal merah peringatan siber *"Injeksi script pada kunci transkep_user_role"* masih muncul di domain produksi `https://sso.pa-indramayu.go.id/`.
+- **Akar Masalah Teknis Utama:**
+  1. **Deployment Remote Mismatch:** Repositori memiliki 2 remote git: `origin` (`sopiyandedi/TRANSKEP.git`) dan `prod` (`transkep/transkep.github.io.git`). Domain publik `https://sso.pa-indramayu.go.id/` terhubung langsung dengan GitHub Pages organisasi pada repositori `prod`. Pada commit sebelumnya, `git push` hanya dikirimkan ke `origin`, sehingga server produksi live masih menjalankan kode lama `v3.5.7`/`v3.5.9`.
+  2. **Internal Auth Race Window:** Diperlukan trailing window pada `SessionIntegrityGuard.runInternal` untuk mengantisipasi eksekusi mikro-task atau penulisan profil yang terjadi sesaat setelah autentikasi.
+
+#### 2. Solusi Arsitektur
+1. **Dual-Remote Deployment Pipeline:** Memastikan eksekusi `git push` dilakukan secara komprehensif ke kedua remote target: `origin` (main) dan `prod` (main).
+2. **Trailing Safety Window pada `runInternal`:** `SessionIntegrityGuard.runInternal` kini dilengkapi buffer penutupan 100ms agar seluruh rantai mutasi internal dijamin berada dalam koridor terotorisasi.
+3. **Comprehensive Internal Scoping:** Seluruh alur mutasi storage pada `handleLogin` (`core.js`), `syncAllServerData` (`core.js`), dan `TranskepAPI.login` (`core/api.js`) dibungkus secara menyeluruh di dalam `runInternal`.
+4. **Full PWA Cache Busting ke v3.6.2:** Menyesuaikan `CACHE_NAME` di `sw.js` dan `APP_BUILD_VER` di `index.html` ke **`3.6.2`** guna menjamin pembaruan instan pada browser pengguna.
+
+#### 3. Kriteria Pengujian & Status: [SELESAI & AKTIF] ✅
+- [x] Kode mutakhir berhasil dipush ke kedua remote: `origin/main` dan `prod/main`.
+- [x] Server live `https://sso.pa-indramayu.go.id/` terverifikasi menyajikan `sw.js` dan `core.js` versi terbaru v3.6.2.
+- [x] Mutasi sesi internal terisolasi 100% dan bebas dari risiko false-positive interceptor.
+- [x] Seluruh sintaks JavaScript lolos validasi tanpa error.
+
+

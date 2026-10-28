@@ -212,7 +212,9 @@ const SessionIntegrityGuard = {
     try {
       if (typeof fn === 'function') return fn();
     } finally {
-      _isInternalAuthAction = false;
+      setTimeout(() => {
+        _isInternalAuthAction = false;
+      }, 100);
     }
   },
 
@@ -1194,65 +1196,73 @@ function handleLogin(event) {
 
   const handleSuccess = function (response) {
     if (response && (response.status === 'success' || response.status === 'UPDATED')) {
-      if (typeof LoginRateLimiter !== 'undefined') {
-        LoginRateLimiter.reset();
-      }
-      if (response.version) {
-        localStorage.setItem('TRANSKEP_DATA_VERSION', response.version);
-      }
-      if (btnSubmit) {
-        btnSubmit.innerHTML = '<i class="fa-solid fa-circle-check mr-2 text-emerald-400"></i><span>Berhasil!</span>';
-      }
-      // Kunci & Segel Sesi Terlebih Dahulu (Atomic Sealing via Raw Storage)
-      if (typeof SessionIntegrityGuard !== 'undefined' && typeof SessionIntegrityGuard.sealSession === 'function') {
-        SessionIntegrityGuard.sealSession(response.data.nip, response.data.role || '', response.token);
+      const applyLoginSuccess = () => {
+        if (typeof LoginRateLimiter !== 'undefined') {
+          LoginRateLimiter.reset();
+        }
+        if (response.version) {
+          localStorage.setItem('TRANSKEP_DATA_VERSION', response.version);
+        }
+        if (btnSubmit) {
+          btnSubmit.innerHTML = '<i class="fa-solid fa-circle-check mr-2 text-emerald-400"></i><span>Berhasil!</span>';
+        }
+        // Kunci & Segel Sesi Terlebih Dahulu (Atomic Sealing via Raw Storage)
+        if (typeof SessionIntegrityGuard !== 'undefined' && typeof SessionIntegrityGuard.sealSession === 'function') {
+          SessionIntegrityGuard.sealSession(response.data.nip, response.data.role || '', response.token);
+        } else {
+          localStorage.setItem('transkep_active_nip', response.data.nip);
+          localStorage.setItem('transkep_session_token', response.token);
+          localStorage.setItem('transkep_user_role', response.data.role || '');
+        }
+
+        // Simpan Data Profil Pengguna
+        localStorage.setItem('transkep_user_nama', response.data.nama || '');
+        try {
+          localStorage.setItem('transkep_user_profile', JSON.stringify(response.data));
+          localStorage.setItem('transkep_user', JSON.stringify(response.data));
+        } catch (e) {
+          console.warn("Gagal menyimpan transkep_user_profile ke localStorage:", e);
+        }
+        // Zero-Leakage: Bersihkan input kata sandi dari memori DOM
+        if (passInput) passInput.value = '';
+
+        window.vueState.user = response.data;
+        if (typeof state !== 'undefined') state.user = response.data;
+        if (typeof renderGlobalHeader === 'function') {
+          renderGlobalHeader();
+        }
+
+        const isTemporary = !!(response.must_change_password || (typeof pass === 'string' && /^TR-\d{6}$/.test(pass.trim())));
+        if (isTemporary) {
+          localStorage.setItem('transkep_force_change_password', pass.trim());
+          setTimeout(() => {
+            if (typeof window.openChangePasswordModal === 'function') {
+              window.openChangePasswordModal(pass.trim(), true);
+            }
+          }, 300);
+        }
+
+        // Tangani status Ingatkan Saya (Remember Me - Simpan NIP saja secara aman)
+        const rememberCheckbox = document.getElementById('rememberMe');
+        if (rememberCheckbox && rememberCheckbox.checked) {
+          localStorage.setItem('transkep_remember_me', 'true');
+          localStorage.setItem('transkep_remember_nip', response.data.nip);
+        } else {
+          localStorage.removeItem('transkep_remember_me');
+          localStorage.removeItem('transkep_remember_nip');
+        }
+
+        // Transisi sinematik halus
+        toggleAppVisibility(true, true);
+        syncAllServerData(true);
+        showNotify("Login Berhasil", `Selamat datang kembali, ${response.data.nama}`, "success");
+      };
+
+      if (typeof SessionIntegrityGuard !== 'undefined' && typeof SessionIntegrityGuard.runInternal === 'function') {
+        SessionIntegrityGuard.runInternal(applyLoginSuccess);
       } else {
-        localStorage.setItem('transkep_active_nip', response.data.nip);
-        localStorage.setItem('transkep_session_token', response.token);
-        localStorage.setItem('transkep_user_role', response.data.role || '');
+        applyLoginSuccess();
       }
-
-      // Simpan Data Profil Pengguna
-      localStorage.setItem('transkep_user_nama', response.data.nama || '');
-      try {
-        localStorage.setItem('transkep_user_profile', JSON.stringify(response.data));
-        localStorage.setItem('transkep_user', JSON.stringify(response.data));
-      } catch (e) {
-        console.warn("Gagal menyimpan transkep_user_profile ke localStorage:", e);
-      }
-      // Zero-Leakage: Bersihkan input kata sandi dari memori DOM
-      if (passInput) passInput.value = '';
-
-      window.vueState.user = response.data;
-      if (typeof state !== 'undefined') state.user = response.data;
-      if (typeof renderGlobalHeader === 'function') {
-        renderGlobalHeader();
-      }
-
-      const isTemporary = !!(response.must_change_password || (typeof pass === 'string' && /^TR-\d{6}$/.test(pass.trim())));
-      if (isTemporary) {
-        localStorage.setItem('transkep_force_change_password', pass.trim());
-        setTimeout(() => {
-          if (typeof window.openChangePasswordModal === 'function') {
-            window.openChangePasswordModal(pass.trim(), true);
-          }
-        }, 300);
-      }
-
-      // Tangani status Ingatkan Saya (Remember Me - Simpan NIP saja secara aman)
-      const rememberCheckbox = document.getElementById('rememberMe');
-      if (rememberCheckbox && rememberCheckbox.checked) {
-        localStorage.setItem('transkep_remember_me', 'true');
-        localStorage.setItem('transkep_remember_nip', response.data.nip);
-      } else {
-        localStorage.removeItem('transkep_remember_me');
-        localStorage.removeItem('transkep_remember_nip');
-      }
-
-      // Transisi sinematik halus
-      toggleAppVisibility(true, true);
-      syncAllServerData(true);
-      showNotify("Login Berhasil", `Selamat datang kembali, ${response.data.nama}`, "success");
     } else {
       resetBtn();
       if (typeof LoginRateLimiter !== 'undefined') {
@@ -1563,26 +1573,34 @@ function syncAllServerData(silent) {
 
     // JANGAN panggil hideLoading() di sini agar overlay menahan layar sampai syncBackgroundData selesai
     if (response && response.status === 'success') {
-      state.user = response.data.user;
-      if (state.user) {
-        if (state.user.role && typeof SessionIntegrityGuard !== 'undefined' && typeof SessionIntegrityGuard.sealSession === 'function') {
-          const nip = localStorage.getItem('transkep_active_nip') || state.user.nip;
-          const token = localStorage.getItem('transkep_session_token');
-          if (nip && token) {
-            SessionIntegrityGuard.sealSession(nip, state.user.role, token);
+      const applySyncData = () => {
+        state.user = response.data.user;
+        if (state.user) {
+          if (state.user.role && typeof SessionIntegrityGuard !== 'undefined' && typeof SessionIntegrityGuard.sealSession === 'function') {
+            const nip = localStorage.getItem('transkep_active_nip') || state.user.nip;
+            const token = localStorage.getItem('transkep_session_token');
+            if (nip && token) {
+              SessionIntegrityGuard.sealSession(nip, state.user.role, token);
+            }
+          }
+          try {
+            localStorage.setItem('transkep_user_profile', JSON.stringify(state.user));
+            localStorage.setItem('transkep_user', JSON.stringify(state.user));
+          } catch (e) {
+            console.warn("Gagal menyimpan transkep_user_profile ke localStorage:", e);
           }
         }
+        state.usersList = response.data.usersList;
         try {
-          localStorage.setItem('transkep_user_profile', JSON.stringify(state.user));
-          localStorage.setItem('transkep_user', JSON.stringify(state.user));
-        } catch (e) {
-          console.warn("Gagal menyimpan transkep_user_profile ke localStorage:", e);
-        }
+          localStorage.setItem('transkep_users_cache', JSON.stringify(state.usersList));
+        } catch(e) {}
+      };
+
+      if (typeof SessionIntegrityGuard !== 'undefined' && typeof SessionIntegrityGuard.runInternal === 'function') {
+        SessionIntegrityGuard.runInternal(applySyncData);
+      } else {
+        applySyncData();
       }
-      state.usersList = response.data.usersList;
-      try {
-        localStorage.setItem('transkep_users_cache', JSON.stringify(state.usersList));
-      } catch(e) {}
       state.pendingPkpCount = response.data.pendingPkpCount || 0;
       state.isBgSyncDone = false;
 

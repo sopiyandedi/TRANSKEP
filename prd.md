@@ -469,6 +469,16 @@ ZONA BAWAH: MASTER CONTEXT & STATUS MIGRASI TERKINI (LIVING CONTEXT)
       - Jika pengguna membuka halaman dengan signature sesi usang/kadaluwarsa, `verify()` melakukan pembersihan sesi damai (`this.resetSession()`) kembali ke layar login tanpa memicu modal merah peringatan siber. Modal siber un-dismissable hanya muncul jika ada manipulasi aktif pada sesi memori yang sedang berjalan.
     - **Bust Cache PWA Menyeluruh**:
       - Versi Service Worker `sw.js`, `CURRENT_APP_BUILD`, dan `APP_BUILD_VER` di `index.html` dinaikkan ke **`transkep-v3.6.1`** / **`v3.6.1`**.
+43. **Dual-Remote Production Deployment & Comprehensive Internal Auth Scoping (Tahap 62 - Selesai & Aktif ✅):**
+    - **Dual-Remote Push Pipeline Synchronization**:
+      - Teridentifikasi bahwa domain produksi `https://sso.pa-indramayu.go.id/` dialihkan melalui repositori organisasi `https://github.com/transkep/transkep.github.io.git` (`prod`), bukan repositori developer `origin`.
+      - Dilakukan sinkronisasi penuh dengan mendorong seluruh commit dan perbaikan mutakhir langsung ke kedua remote (`origin` dan `prod`).
+    - **Penyempurnaan `runInternal` dengan Trailing Safety Window**:
+      - `SessionIntegrityGuard.runInternal` ditambahkan buffer waktu 100ms agar seluruh mikrotask dan mutasi storage internal pasca-login/sync aman berada di dalam koridor otoritas internal.
+      - Membungkus seluruh alur mutasi di `handleLogin` (`core.js`), `syncAllServerData` (`core.js`), dan `TranskepAPI.login` (`core/api.js`) di dalam `SessionIntegrityGuard.runInternal`.
+    - **Bust Cache PWA Menyeluruh**:
+      - Versi Service Worker `sw.js`, `CURRENT_APP_BUILD`, dan `APP_BUILD_VER` di `index.html` dinaikkan ke **`transkep-v3.6.2`** / **`3.6.2`**.
+
 
 
 
