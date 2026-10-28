@@ -458,6 +458,18 @@ ZONA BAWAH: MASTER CONTEXT & STATUS MIGRASI TERKINI (LIVING CONTEXT)
       - Storage prototype interceptor diperkuat agar mentoleransi penyelarasan role yang sesuai dengan memori sesi aktif dan toleran terhadap variasi huruf kapital (case-insensitive).
     - **PWA Cache Invalidation**:
       - Versi Service Worker [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) dan `CURRENT_APP_BUILD` di [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) dinaikkan ke **`transkep-v3.6.0`**.
+42. **Eliminasi Total False-Positive Anti-Tamper & Atomic Sealing (Tahap 61 - Selesai & Aktif ✅):**
+    - **Pembersihan `PROTECTED_SESSION_KEYS`**:
+      - Mengeliminasi kunci profil (`transkep_user_nama`, `transkep_user_profile`, `transkep_user`) dari daftar proteksi ketat interceptor, menyisakan 4 kunci inti otorisasi: `transkep_active_nip`, `transkep_session_token`, `transkep_user_role`, dan `transkep_session_sig`.
+    - **Penyegelan Sesi Atomik (`sealSession`) via `_rawStorageSet`**:
+      - `sealSession` kini menuliskan ke-4 kunci sesi langsung menggunakan referensi murni `_rawStorageSet.call(localStorage, ...)` mendahului penyimpanan profil apa pun, menjamin memori sesi dan storage 100% sinkron seketika (0ms) tanpa memicu interceptor.
+    - **Normalisasi Huruf Kecil (*Canonical Lowercase*) pada Tanda Tangan Kriptografis**:
+      - Fungsi `generateSignature` kini selalu melakukan `.toLowerCase()` pada parameter `role`, meniadakan potensi ketidakcocokan akibat perbedaan kapitalisasi huruf (`Admin` vs `admin`).
+    - **Penanganan Damai Sesi Usang (*Graceful Stale Session Reset*)**:
+      - Jika pengguna membuka halaman dengan signature sesi usang/kadaluwarsa, `verify()` melakukan pembersihan sesi damai (`this.resetSession()`) kembali ke layar login tanpa memicu modal merah peringatan siber. Modal siber un-dismissable hanya muncul jika ada manipulasi aktif pada sesi memori yang sedang berjalan.
+    - **Bust Cache PWA Menyeluruh**:
+      - Versi Service Worker `sw.js`, `CURRENT_APP_BUILD`, dan `APP_BUILD_VER` di `index.html` dinaikkan ke **`transkep-v3.6.1`** / **`v3.6.1`**.
+
 
 
 

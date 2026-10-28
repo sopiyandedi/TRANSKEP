@@ -192,9 +192,6 @@ const PROTECTED_SESSION_KEYS = [
   'transkep_active_nip',
   'transkep_session_token',
   'transkep_user_role',
-  'transkep_user_nama',
-  'transkep_user_profile',
-  'transkep_user',
   'transkep_session_sig'
 ];
 
@@ -203,7 +200,10 @@ const SessionIntegrityGuard = {
 
   generateSignature(nip, role, token) {
     if (!nip || !token) return '';
-    const raw = `${String(nip).trim()}:${String(role || 'Pegawai').trim()}:${String(token).trim()}:${this.SALT}`;
+    const cleanNip = String(nip).trim();
+    const cleanRole = String(role || 'Pegawai').trim().toLowerCase();
+    const cleanToken = String(token).trim();
+    const raw = `${cleanNip}:${cleanRole}:${cleanToken}:${this.SALT}`;
     return computeSecureChecksum(raw);
   },
 
@@ -224,15 +224,20 @@ const SessionIntegrityGuard = {
       const cleanToken = String(token || '').trim();
       const sig = this.generateSignature(cleanNip, cleanRole, cleanToken);
 
+      _activeMemorySession = {
+        nip: cleanNip,
+        role: cleanRole,
+        token: cleanToken,
+        sig: sig
+      };
+
       if (sig) {
+        _rawStorageSet.call(localStorage, 'transkep_active_nip', cleanNip);
+        _rawStorageSet.call(localStorage, 'transkep_user_role', cleanRole);
+        _rawStorageSet.call(localStorage, 'transkep_session_token', cleanToken);
         _rawStorageSet.call(localStorage, 'transkep_session_sig', sig);
-        _activeMemorySession = {
-          nip: cleanNip,
-          role: cleanRole,
-          token: cleanToken,
-          sig: sig
-        };
       }
+      return sig;
     } finally {
       _isInternalAuthAction = false;
     }
@@ -241,7 +246,14 @@ const SessionIntegrityGuard = {
   resetSession() {
     _isInternalAuthAction = true;
     _activeMemorySession = null;
-    setTimeout(() => { _isInternalAuthAction = false; }, 500);
+    try {
+      _rawStorageRemove.call(localStorage, 'transkep_active_nip');
+      _rawStorageRemove.call(localStorage, 'transkep_session_token');
+      _rawStorageRemove.call(localStorage, 'transkep_user_role');
+      _rawStorageRemove.call(localStorage, 'transkep_session_sig');
+    } finally {
+      setTimeout(() => { _isInternalAuthAction = false; }, 300);
+    }
   },
 
   verify() {
@@ -258,21 +270,16 @@ const SessionIntegrityGuard = {
       return true;
     }
 
-    // Jika ada data sesi parsial tetapi salah satu kunci utama hilang:
-    // Hanya tangani sebagai pelanggaran jika sesi memori sudah aktif di runtime browser
-    if (!nip || !token || !expectedSig) {
-      if (_activeMemorySession) {
-        this.handleTamperingViolation('Kunci sesi LocalStorage tidak lengkap atau tanda tangan dihapus.');
-        return false;
-      }
-      return true;
-    }
-
     // Sesi baru dimuat dari tab/refresh: inisialisasi memori sesi jika valid
     if (!_activeMemorySession) {
+      // Jika data sesi belum lengkap, jangan picu tampering violation
+      if (!nip || !token || !expectedSig) {
+        return true;
+      }
       const calcSig = this.generateSignature(nip, role, token);
       if (expectedSig !== calcSig) {
-        this.handleTamperingViolation('Tanda tangan sesi (Signature) tidak cocok dengan identitas pengguna.');
+        console.warn('[SECURITY] Sesi lokal tidak valid atau signature usang. Membersihkan sesi...');
+        this.resetSession();
         return false;
       }
       _activeMemorySession = {
@@ -282,6 +289,12 @@ const SessionIntegrityGuard = {
         sig: expectedSig
       };
       return true;
+    }
+
+    // Jika salah satu kunci utama hilang saat memori sesi sedang aktif
+    if (!nip || !token || !expectedSig) {
+      this.handleTamperingViolation('Kunci sesi LocalStorage tidak lengkap atau tanda tangan dihapus.');
+      return false;
     }
 
     // Bandingkan secara absolut dengan snapshot memori aktif (toleran case-insensitive pada role)
@@ -296,15 +309,10 @@ const SessionIntegrityGuard = {
         curSig !== _activeMemorySession.sig) {
 
       // AUTO-REVERT INSTANT SNAP-BACK: Paksa kembalikan nilai di LocalStorage seketika (0ms)
-      _isInternalAuthAction = true;
-      try {
-        _rawStorageSet.call(localStorage, 'transkep_active_nip', _activeMemorySession.nip);
-        _rawStorageSet.call(localStorage, 'transkep_user_role', _activeMemorySession.role);
-        _rawStorageSet.call(localStorage, 'transkep_session_token', _activeMemorySession.token);
-        _rawStorageSet.call(localStorage, 'transkep_session_sig', _activeMemorySession.sig);
-      } finally {
-        _isInternalAuthAction = false;
-      }
+      _rawStorageSet.call(localStorage, 'transkep_active_nip', _activeMemorySession.nip);
+      _rawStorageSet.call(localStorage, 'transkep_user_role', _activeMemorySession.role);
+      _rawStorageSet.call(localStorage, 'transkep_session_token', _activeMemorySession.token);
+      _rawStorageSet.call(localStorage, 'transkep_session_sig', _activeMemorySession.sig);
 
       this.handleTamperingViolation('Manipulasi data sesi LocalStorage terdeteksi! (Role/NIP dimodifikasi)');
       return false;
@@ -376,10 +384,13 @@ const SessionIntegrityGuard = {
     // 2. Interceptor Storage API (Mencegah modifikasi langsung via Console F12 / script injection)
     try {
       Storage.prototype.setItem = function(key, val) {
-        if (this === localStorage && PROTECTED_SESSION_KEYS.includes(key) && !_isInternalAuthAction) {
+        if (this === localStorage && PROTECTED_SESSION_KEYS.includes(key)) {
+          if (_isInternalAuthAction) {
+            return _rawStorageSet.apply(this, arguments);
+          }
           if (_activeMemorySession) {
-            // Toleransi jika nilai sama persis dengan memori sesi aktif (sinkronisasi internal)
             const sKey = key.replace('transkep_', '');
+            // Toleransi jika nilai sama persis dengan memori sesi aktif
             if (sKey === 'user_role' && _activeMemorySession.role && String(val).trim().toLowerCase() === _activeMemorySession.role.toLowerCase()) {
               return _rawStorageSet.apply(this, arguments);
             }
@@ -389,7 +400,18 @@ const SessionIntegrityGuard = {
             if (sKey === 'session_token' && _activeMemorySession.token && String(val).trim() === _activeMemorySession.token) {
               return _rawStorageSet.apply(this, arguments);
             }
+            if (sKey === 'session_sig' && _activeMemorySession.sig && String(val).trim() === _activeMemorySession.sig) {
+              return _rawStorageSet.apply(this, arguments);
+            }
+
             console.warn(`%c🚨 [SECURITY VIOLATION] Upaya modifikasi console pada '${key}' ditolak!`, 'color: #ef4444; font-weight: bold;');
+            const fallbackVal = sKey === 'user_role' ? _activeMemorySession.role :
+                                sKey === 'active_nip' ? _activeMemorySession.nip :
+                                sKey === 'session_token' ? _activeMemorySession.token :
+                                _activeMemorySession.sig;
+            if (fallbackVal) {
+              _rawStorageSet.call(localStorage, key, fallbackVal);
+            }
             SessionIntegrityGuard.handleTamperingViolation(`Injeksi script pada kunci ${key}`);
             return;
           }
@@ -398,7 +420,10 @@ const SessionIntegrityGuard = {
       };
 
       Storage.prototype.removeItem = function(key) {
-        if (this === localStorage && PROTECTED_SESSION_KEYS.includes(key) && !_isInternalAuthAction) {
+        if (this === localStorage && PROTECTED_SESSION_KEYS.includes(key)) {
+          if (_isInternalAuthAction) {
+            return _rawStorageRemove.apply(this, arguments);
+          }
           if (_activeMemorySession) {
             console.warn(`%c🚨 [SECURITY VIOLATION] Upaya penghapusan console pada '${key}' ditolak!`, 'color: #ef4444; font-weight: bold;');
             SessionIntegrityGuard.handleTamperingViolation(`Penghapusan kunci ${key}`);
@@ -1178,35 +1203,22 @@ function handleLogin(event) {
       if (btnSubmit) {
         btnSubmit.innerHTML = '<i class="fa-solid fa-circle-check mr-2 text-emerald-400"></i><span>Berhasil!</span>';
       }
-      // Kunci & Simpan Data Sesi dalam Proteksi Internal
-      if (typeof SessionIntegrityGuard !== 'undefined' && typeof SessionIntegrityGuard.runInternal === 'function') {
-        SessionIntegrityGuard.runInternal(() => {
-          localStorage.setItem('transkep_active_nip', response.data.nip);
-          localStorage.setItem('transkep_session_token', response.token);
-          localStorage.setItem('transkep_user_nama', response.data.nama || '');
-          localStorage.setItem('transkep_user_role', response.data.role || '');
-          try {
-            localStorage.setItem('transkep_user_profile', JSON.stringify(response.data));
-            localStorage.setItem('transkep_user', JSON.stringify(response.data));
-          } catch (e) {
-            console.warn("Gagal menyimpan transkep_user_profile ke localStorage:", e);
-          }
-          SessionIntegrityGuard.sealSession(response.data.nip, response.data.role || '', response.token);
-        });
+      // Kunci & Segel Sesi Terlebih Dahulu (Atomic Sealing via Raw Storage)
+      if (typeof SessionIntegrityGuard !== 'undefined' && typeof SessionIntegrityGuard.sealSession === 'function') {
+        SessionIntegrityGuard.sealSession(response.data.nip, response.data.role || '', response.token);
       } else {
         localStorage.setItem('transkep_active_nip', response.data.nip);
         localStorage.setItem('transkep_session_token', response.token);
-        localStorage.setItem('transkep_user_nama', response.data.nama || '');
         localStorage.setItem('transkep_user_role', response.data.role || '');
-        try {
-          localStorage.setItem('transkep_user_profile', JSON.stringify(response.data));
-          localStorage.setItem('transkep_user', JSON.stringify(response.data));
-        } catch (e) {
-          console.warn("Gagal menyimpan transkep_user_profile ke localStorage:", e);
-        }
-        if (typeof SessionIntegrityGuard !== 'undefined') {
-          SessionIntegrityGuard.sealSession(response.data.nip, response.data.role || '', response.token);
-        }
+      }
+
+      // Simpan Data Profil Pengguna
+      localStorage.setItem('transkep_user_nama', response.data.nama || '');
+      try {
+        localStorage.setItem('transkep_user_profile', JSON.stringify(response.data));
+        localStorage.setItem('transkep_user', JSON.stringify(response.data));
+      } catch (e) {
+        console.warn("Gagal menyimpan transkep_user_profile ke localStorage:", e);
       }
       // Zero-Leakage: Bersihkan input kata sandi dari memori DOM
       if (passInput) passInput.value = '';
@@ -1553,33 +1565,18 @@ function syncAllServerData(silent) {
     if (response && response.status === 'success') {
       state.user = response.data.user;
       if (state.user) {
-        if (typeof SessionIntegrityGuard !== 'undefined' && typeof SessionIntegrityGuard.runInternal === 'function') {
-          SessionIntegrityGuard.runInternal(() => {
-            if (state.user.role) {
-              localStorage.setItem('transkep_user_role', state.user.role);
-              const nip = localStorage.getItem('transkep_active_nip');
-              const token = localStorage.getItem('transkep_session_token');
-              if (nip && token) {
-                SessionIntegrityGuard.sealSession(nip, state.user.role, token);
-              }
-            }
-            try {
-              localStorage.setItem('transkep_user_profile', JSON.stringify(state.user));
-              localStorage.setItem('transkep_user', JSON.stringify(state.user));
-            } catch (e) {
-              console.warn("Gagal menyimpan transkep_user_profile ke localStorage:", e);
-            }
-          });
-        } else {
-          if (state.user.role) {
-            localStorage.setItem('transkep_user_role', state.user.role);
+        if (state.user.role && typeof SessionIntegrityGuard !== 'undefined' && typeof SessionIntegrityGuard.sealSession === 'function') {
+          const nip = localStorage.getItem('transkep_active_nip') || state.user.nip;
+          const token = localStorage.getItem('transkep_session_token');
+          if (nip && token) {
+            SessionIntegrityGuard.sealSession(nip, state.user.role, token);
           }
-          try {
-            localStorage.setItem('transkep_user_profile', JSON.stringify(state.user));
-            localStorage.setItem('transkep_user', JSON.stringify(state.user));
-          } catch (e) {
-            console.warn("Gagal menyimpan transkep_user_profile ke localStorage:", e);
-          }
+        }
+        try {
+          localStorage.setItem('transkep_user_profile', JSON.stringify(state.user));
+          localStorage.setItem('transkep_user', JSON.stringify(state.user));
+        } catch (e) {
+          console.warn("Gagal menyimpan transkep_user_profile ke localStorage:", e);
         }
       }
       state.usersList = response.data.usersList;

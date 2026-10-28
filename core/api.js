@@ -184,29 +184,17 @@ const TranskepAPI = (function () {
       });
 
       if (res && res.status === 'success' && res.token) {
-        if (typeof window !== 'undefined' && window.SessionIntegrityGuard && typeof window.SessionIntegrityGuard.runInternal === 'function') {
-          window.SessionIntegrityGuard.runInternal(() => {
-            localStorage.setItem('transkep_active_nip', res.data.nip);
-            localStorage.setItem('transkep_user_nip', res.data.nip);
-            localStorage.setItem('transkep_session_token', res.token);
-            localStorage.setItem('transkep_token', res.token);
-            localStorage.setItem('transkep_user_role', res.data.role || '');
-            localStorage.setItem('transkep_user_nama', res.data.nama || '');
-            localStorage.setItem('transkep_user', JSON.stringify(res.data));
-            window.SessionIntegrityGuard.sealSession(res.data.nip, res.data.role || '', res.token);
-          });
+        if (typeof window !== 'undefined' && window.SessionIntegrityGuard && typeof window.SessionIntegrityGuard.sealSession === 'function') {
+          window.SessionIntegrityGuard.sealSession(res.data.nip, res.data.role || '', res.token);
         } else {
           localStorage.setItem('transkep_active_nip', res.data.nip);
-          localStorage.setItem('transkep_user_nip', res.data.nip);
           localStorage.setItem('transkep_session_token', res.token);
-          localStorage.setItem('transkep_token', res.token);
           localStorage.setItem('transkep_user_role', res.data.role || '');
-          localStorage.setItem('transkep_user_nama', res.data.nama || '');
-          localStorage.setItem('transkep_user', JSON.stringify(res.data));
-          if (typeof window !== 'undefined' && window.SessionIntegrityGuard) {
-            window.SessionIntegrityGuard.sealSession(res.data.nip, res.data.role || '', res.token);
-          }
         }
+        localStorage.setItem('transkep_user_nip', res.data.nip);
+        localStorage.setItem('transkep_token', res.token);
+        localStorage.setItem('transkep_user_nama', res.data.nama || '');
+        localStorage.setItem('transkep_user', JSON.stringify(res.data));
         memoryCache.clear(); // Bersihkan cache lama
       }
 

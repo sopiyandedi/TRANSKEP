@@ -3247,3 +3247,30 @@ Pengguna melaporkan bahwa pratinjau (*preview*) dokumen PDF di modal SK dan SOP 
 - [x] Pengguna role Pegawai tetap terlindungi oleh timeout 15 menit dengan hitungan waktu segar sejak login.
 - [x] Konsol browser bersih dari peringatan `[SECURITY VIOLATION]` saat login dan sinkronisasi server berjalan normal.
 - [x] Modul Service Worker cache `sw.js` dan `CURRENT_APP_BUILD` di `index.html` terbarui ke `transkep-v3.6.0`.
+
+---
+
+### TAHAP 61: Eliminasi Total False-Positive Anti-Tamper & Atomic Sealing (v3.6.1)
+
+#### 1. Latar Belakang & Akar Masalah
+- **Insiden di Lapangan:**
+  - Pengguna mendapati modal merah *"PELANGGARAN KEAMANAN SIBER: Manipulasi sesi LocalStorage terdeteksi! (Injeksi script pada kunci transkep_user_role)"* muncul saat masuk ke dashboard.
+- **Akar Masalah Teknis:**
+  1. `PROTECTED_SESSION_KEYS` mencakup kunci profil non-otorisasi (`transkep_user_profile`, `transkep_user_nama`, `transkep_user`), sehingga penyimpanan profil oleh modul lain memicu pelanggaran.
+  2. Pada `handleLogin`, penyimpanan `transkep_user_role` mendahului `sealSession`, sementara memori `_activeMemorySession` masih menyimpan role sesi lama (`Pegawai`). Interceptor mendeteksi perubahan nilai ke `Admin` sebagai upaya eskalasi hak akses konsol.
+  3. Perbedaan kapitalisasi huruf pada `role` (`Admin` vs `admin`) menyebabkan hash kriptografis `generateSignature` berbeda.
+  4. Pada saat refresh halaman, ketidakcocokan signature lama langsung memicu modal peringatan siber bukannya logout damai.
+
+#### 2. Solusi Arsitektur
+1. **Refining `PROTECTED_SESSION_KEYS`**: Hanya mengunci 4 kunci inti otorisasi: `transkep_active_nip`, `transkep_session_token`, `transkep_user_role`, `transkep_session_sig`.
+2. **Atomic Sealing via `_rawStorageSet`**: `sealSession` dijalankan paling pertama saat autentikasi dan menuliskan ke-4 kunci secara atomik menggunakan `_rawStorageSet` tanpa melewati interceptor.
+3. **Canonical Lowercase Signature**: `generateSignature` selalu menormalisasi role ke `.toLowerCase()`.
+4. **Graceful Stale Session Reset**: Jika signature pada storage tidak cocok saat awal muat, sistem mereset sesi secara damai ke login tanpa modal alarm siber.
+5. **Full Cache Busting**: Versi PWA dan `APP_BUILD_VER` dinaikkan ke **`v3.6.1`**.
+
+#### 3. Kriteria Pengujian & Status: [SELESAI & AKTIF] ✅
+- [x] Login Admin dan Pegawai berjalan mulus tanpa alarm *"PELANGGARAN KEAMANAN SIBER"*.
+- [x] Penyimpanan profil pengguna dan sinkronisasi server bebas benturan.
+- [x] Percobaan manipulasi role via DevTools Console/Application tab tetap ditangkap dan di-snap back secara sah.
+- [x] Versi build `sw.js` dan `index.html` terbarui ke `v3.6.1`.
+
