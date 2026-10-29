@@ -126,11 +126,11 @@ const EofficeDataService = {
         let kgbList = Array.isArray(rawKgbs) ? rawKgbs : [];
         let rapatList = Array.isArray(rawRapats) ? rawRapats : [];
 
-        // Integrasikan pegawai dengan status_kgb === 'Proses' dari state.usersList
+        // Integrasikan pegawai dengan status_kgb === 'Proses' / 'Selesai' dari dashboard
         kgbList = this.mergeDashboardQueue(kgbList);
 
-        const alreadyMigrated = (typeof localStorage !== 'undefined' && localStorage.getItem(this.MIGRATION_FLAG_KEY) === 'true');
-        if (kgbList.length > 0 || rapatList.length > 0 || alreadyMigrated) {
+        // HANYA kembalikan dari Firestore jika Firestore benar-benar memiliki data fisik!
+        if (rawKgbs.length > 0 || rawRapats.length > 0) {
           const resultData = { kgb: kgbList, rapat: rapatList };
           this.setLocalCache(resultData);
           return {
@@ -140,56 +140,62 @@ const EofficeDataService = {
           };
         }
 
-        console.log("ℹ️ [E-Office] Koleksi Firestore masih kosong, mengambil data awal dari Google Sheets...");
+        console.log("ℹ️ [E-Office] Firestore kosong (belum migrasi), mengambil riwayat dari Google Sheets...");
       } catch (fsErr) {
-        console.warn("⚠️ [E-Office] Firestore query tertahan (cek Firestore Rules), fallback ke Google Sheets:", fsErr);
+        console.warn("⚠️ [E-Office] Firestore query tertahan, fallback ke Google Sheets:", fsErr);
       }
     }
 
-    // 2. Fallback & Auto-Seed dari Google Apps Script / Cache Lokal
-    return new Promise((resolve) => {
-      const fallbackToQueueOrCache = () => {
-        const cached = this.getLocalCache();
-        const baseKgb = (cached && Array.isArray(cached.kgb)) ? cached.kgb : [];
-        const mergedKgb = this.mergeDashboardQueue(baseKgb);
-        const rapatData = (cached && Array.isArray(cached.rapat)) ? cached.rapat : [];
-        const finalData = { kgb: mergedKgb, rapat: rapatData };
+    // 2. Ambil dari Google Apps Script (Google Sheets) via TranskepAPI / google.script.run
+    try {
+      let sheetRes = null;
+      if (typeof window.TranskepAPI !== 'undefined' && typeof window.TranskepAPI.call === 'function') {
+        sheetRes = await window.TranskepAPI.call('getEofficeData', userNip, authToken);
+      } else if (typeof google !== 'undefined' && google.script && google.script.run) {
+        sheetRes = await new Promise((resolve) => {
+          google.script.run
+            .withSuccessHandler(res => resolve(res))
+            .withFailureHandler(() => resolve(null))
+            .getEofficeData(userNip, authToken);
+        });
+      }
+
+      if (sheetRes && sheetRes.status === 'success' && sheetRes.data) {
+        const serverKgb = Array.isArray(sheetRes.data.kgb) ? sheetRes.data.kgb : [];
+        const serverRapat = Array.isArray(sheetRes.data.rapat) ? sheetRes.data.rapat : [];
+        const mergedKgb = this.mergeDashboardQueue(serverKgb);
+        const finalData = { kgb: mergedKgb, rapat: serverRapat };
         this.setLocalCache(finalData);
+
+        // Auto-seed ke Firestore jika ada data
+        if (mergedKgb.length > 0 || serverRapat.length > 0) {
+          this.seedSheetsDataToFirestore(mergedKgb, serverRapat).catch(() => {});
+        }
+
         return {
           status: 'success',
           data: finalData,
-          source: (baseKgb.length > 0) ? 'cache_offline' : 'dashboard_synthesized'
+          source: 'sheets_live'
         };
-      };
-
-      if (typeof google === 'undefined' || !google.script || !google.script.run) {
-        return resolve(fallbackToQueueOrCache());
       }
+    } catch (sheetErr) {
+      console.warn("⚠️ [E-Office] Ambil data dari Google Sheets tertahan:", sheetErr);
+    }
 
-      google.script.run
-        .withSuccessHandler((res) => {
-          if (res && res.status === 'success' && res.data) {
-            const mergedKgb = this.mergeDashboardQueue(res.data.kgb || []);
-            const rapatData = res.data.rapat || [];
-            const finalData = { kgb: mergedKgb, rapat: rapatData };
-            this.setLocalCache(finalData);
-            this.seedSheetsDataToFirestore(mergedKgb, rapatData).catch(() => { });
-
-            resolve({
-              status: 'success',
-              data: finalData,
-              source: 'sheets_fallback'
-            });
-          } else {
-            resolve(fallbackToQueueOrCache());
-          }
-        })
-        .withFailureHandler((err) => {
-          console.warn("⚠️ [E-Office] Fallback RPC gagal, menggunakan sintesis antrean dashboard:", err);
-          resolve(fallbackToQueueOrCache());
-        })
-        .getEofficeData(userNip, authToken);
-    });
+    // 3. Fallback Akhir: Sintesiskan dari Cache Lokal / Antrean Dashboard
+    const cached = this.getLocalCache();
+    const baseKgb = (cached && Array.isArray(cached.kgb) && cached.kgb.length > 0) ? cached.kgb : [];
+    const mergedKgb = this.mergeDashboardQueue(baseKgb);
+    const rapatData = (cached && Array.isArray(cached.rapat)) ? cached.rapat : [];
+    const finalData = { kgb: mergedKgb, rapat: rapatData };
+    if (mergedKgb.length > 0 || rapatData.length > 0) {
+      this.setLocalCache(finalData);
+    }
+    return {
+      status: 'success',
+      data: finalData,
+      source: (baseKgb.length > 0) ? 'cache_offline' : 'dashboard_synthesized'
+    };
   },
 
   /**
@@ -304,6 +310,41 @@ const EofficeDataService = {
               tanggal_input: u.tgl_selesai_kgb || new Date().toISOString().split('T')[0]
             });
           }
+        }
+        // 3. KASUS CADANGAN: Jika daftar masih kosong, tampilkan pegawai yang jatuh tempo KGB (deadline <= 90 hari)
+        else if (list.length === 0 && u.tmt_kgb) {
+          try {
+            const parseFn = (typeof parseTanggalLokal === 'function') ? parseTanggalLokal : (d => new Date(d));
+            const d = parseFn(u.tmt_kgb);
+            if (d && !isNaN(d.getTime())) {
+              const targetKgb = new Date(d);
+              targetKgb.setFullYear(targetKgb.getFullYear() + 2);
+              const today = new Date();
+              today.setHours(0, 0, 0, 0);
+              const diffDays = Math.ceil((targetKgb.getTime() - today.getTime()) / (1000 * 3600 * 24));
+              if (diffDays <= 90) {
+                const hasItem = list.some(k => String(k.nip || '').replace(/['"\s]/g, '') === strNip);
+                if (!hasItem) {
+                  const dNew = new Date(d);
+                  dNew.setFullYear(dNew.getFullYear() + 2);
+                  const tmtBaru = `${dNew.getFullYear()}-${String(dNew.getMonth() + 1).padStart(2, '0')}-${String(dNew.getDate()).padStart(2, '0')}`;
+                  list.push({
+                    id_kgb: 'DRAFT-' + strNip,
+                    nip: strNip,
+                    nama_pegawai: u.nama || '',
+                    pangkat: u.pangkat || '',
+                    golongan: u.golongan || '',
+                    jabatan: u.jabatan || '',
+                    tmt_lama: u.tmt_kgb || '',
+                    tmt_baru: tmtBaru,
+                    status: 'Sedang Diproses',
+                    is_from_dashboard: true,
+                    tanggal_input: new Date().toISOString().split('T')[0]
+                  });
+                }
+              }
+            }
+          } catch(e) {}
         }
       });
     }

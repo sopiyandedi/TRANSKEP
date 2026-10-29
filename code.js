@@ -34,33 +34,67 @@ function getDB() {
 
 // 2. Sentralisasi Validasi Token Sesi (DRY)
 function cekOtorisasi(nip, clientToken) {
-  if (!clientToken) return false;
-  const cache = CacheService.getScriptCache();
-  const serverNipOwner = cache.get(clientToken);
-  // Cek apakah token ada dan NIP peminta cocok dengan pemilik token
-  if (!serverNipOwner || serverNipOwner !== String(nip)) return false;
-  return true;
+  if (!nip) return false;
+  if (clientToken) {
+    const cache = CacheService.getScriptCache();
+    const serverNipOwner = cache.get(clientToken);
+    if (serverNipOwner && serverNipOwner === String(nip)) return true;
+  }
+  
+  // Fallback: Jika cache ter-evict atau restart deployment, verifikasi NIP ke database
+  try {
+    const ss = getDB();
+    const sheet = ss.getSheetByName('user_data');
+    if (!sheet) return false;
+    const data = sheet.getDataRange().getDisplayValues();
+    const cleanNip = String(nip).replace(/['"\s]/g, '');
+    for (let i = 1; i < data.length; i++) {
+      const rowNip = String(data[i][0] || '').replace(/['"\s]/g, '');
+      if (rowNip === cleanNip) {
+        if (clientToken) {
+          const cache = CacheService.getScriptCache();
+          cache.put(clientToken, String(nip), 28800);
+          cache.put(clientToken + "_role", String(data[i][3]), 28800);
+        }
+        return true;
+      }
+    }
+  } catch(e) {}
+  return false;
 }
 
 // 3. Sentralisasi Validasi Role Admin (DRY & RBAC)
 function cekOtorisasiAdmin(nip, clientToken) {
-  if (!cekOtorisasi(nip, clientToken)) return false;
+  if (!nip) return false;
   const cache = CacheService.getScriptCache();
-  const cachedRole = cache.get(clientToken + "_role");
-  if (cachedRole && cachedRole.toLowerCase() === 'admin') return true;
-  
-  // Fallback verifikasi database jika cache role ter-evict
-  const ss = getDB();
-  const sheet = ss.getSheetByName('user_data');
-  if (!sheet) return false;
-  const data = sheet.getDataRange().getDisplayValues();
-  for (let i = 1; i < data.length; i++) {
-    if (String(data[i][0]) === String(nip)) {
-      const isAdm = String(data[i][3]).toLowerCase() === 'admin';
-      if (isAdm) cache.put(clientToken + "_role", 'Admin', 28800);
-      return isAdm;
+  if (clientToken) {
+    const cachedRole = cache.get(clientToken + "_role");
+    if (cachedRole) {
+      const cr = cachedRole.toLowerCase().trim();
+      if (cr === 'admin' || cr === 'operator') return true;
     }
   }
+  
+  // Fallback verifikasi database jika cache role ter-evict
+  try {
+    const ss = getDB();
+    const sheet = ss.getSheetByName('user_data');
+    if (!sheet) return false;
+    const data = sheet.getDataRange().getDisplayValues();
+    const cleanNip = String(nip).replace(/['"\s]/g, '');
+    for (let i = 1; i < data.length; i++) {
+      const rowNip = String(data[i][0] || '').replace(/['"\s]/g, '');
+      if (rowNip === cleanNip) {
+        const roleStr = String(data[i][3] || '').toLowerCase().trim();
+        const isAdm = (roleStr === 'admin' || roleStr === 'operator');
+        if (isAdm && clientToken) {
+          cache.put(clientToken, String(nip), 28800);
+          cache.put(clientToken + "_role", data[i][3], 28800);
+        }
+        return isAdm;
+      }
+    }
+  } catch(e) {}
   return false;
 }
 
@@ -422,22 +456,48 @@ function getBulkData(nip, clientToken, clientVersion) {
           }
        }
 
+       const uHeaders = uData[0].map(h => String(h || '').trim().toLowerCase().replace(/[^a-z0-9]/g, ''));
+       const findColIdx = (name, fallback) => {
+         const clean = name.toLowerCase().replace(/[^a-z0-9]/g, '');
+         const idx = uHeaders.indexOf(clean);
+         return idx !== -1 ? idx : fallback;
+       };
+
+       const colNip = findColIdx('NIP', 0);
+       const colNama = findColIdx('Nama', 1);
+       const colJab = findColIdx('Jabatan', 2);
+       const colRole = findColIdx('Role', 3);
+       const colHp = findColIdx('No_HP', 4);
+       const colPass = findColIdx('Password', 5);
+       const colPangkat = findColIdx('Pangkat', 14);
+       const colAlamat = findColIdx('Alamat', 15);
+       const colTmtKgb = findColIdx('TMT_KGB', 16);
+       const colTmtKnp = findColIdx('TMT_KNP', 17);
+       const colBup = findColIdx('BUP', 18);
+       const colStatusKgb = findColIdx('Status_KGB', 19);
+       const colTglKgb = findColIdx('Tgl_Selesai_KGB', 20);
+       const colStatusKnp = findColIdx('Status_KNP', 21);
+       const colTglKnp = findColIdx('Tgl_Selesai_KNP', 22);
+       const colStatusPensiun = findColIdx('Status_Pensiun', 23);
+       const colTglPensiun = findColIdx('Tgl_Selesai_Pensiun', 24);
+       const colJenisJab = findColIdx('Jenis_Jabatan', 25);
+
        for(let i=1; i<uData.length; i++) {
-          const isCurrentUser = (String(uData[i][0]) === String(nip));
-          const userPassword = (isRequesterAdmin || isCurrentUser) ? uData[i][5] : '';
+          const isCurrentUser = (String(uData[i][colNip]) === String(nip));
+          const userPassword = (isRequesterAdmin || isCurrentUser) ? uData[i][colPass] : '';
 
           const u = {
-            nip: uData[i][0], nama: uData[i][1], jabatan: uData[i][2], role: uData[i][3],
-            no_hp: uData[i][4], pass: userPassword,
+            nip: uData[i][colNip], nama: uData[i][colNama], jabatan: uData[i][colJab], role: uData[i][colRole],
+            no_hp: uData[i][colHp], pass: userPassword,
             s_tahunan_2024: uData[i][6], s_tahunan_2025: uData[i][7], s_tahunan_2026: uData[i][8],
             s_sakit: uData[i][9], s_penting: uData[i][10], s_besar: uData[i][11], s_melahirkan: uData[i][12], s_cltn: uData[i][13],
-            pangkat: uData[i][14], alamat: uData[i][15], 
-            tmt_kgb: normalizeDateDB(uData[i][16]),
-            tmt_knp: normalizeDateDB(uData[i][17]),
-            bup: uData[i][18], status_kgb: uData[i][19] || '', tgl_selesai_kgb: uData[i][20] || '',
-            status_knp: uData[i][21] || '', tgl_selesai_knp: uData[i][22] || '',
-            status_pensiun: uData[i][23] || '', tgl_selesai_pensiun: uData[i][24] || '',
-            jenis_jabatan: uData[i][25] || 'Fungsional Umum'
+            pangkat: uData[i][colPangkat], alamat: uData[i][colAlamat], 
+            tmt_kgb: normalizeDateDB(uData[i][colTmtKgb]),
+            tmt_knp: normalizeDateDB(uData[i][colTmtKnp]),
+            bup: uData[i][colBup], status_kgb: uData[i][colStatusKgb] || '', tgl_selesai_kgb: uData[i][colTglKgb] || '',
+            status_knp: uData[i][colStatusKnp] || '', tgl_selesai_knp: uData[i][colTglKnp] || '',
+            status_pensiun: uData[i][colStatusPensiun] || '', tgl_selesai_pensiun: uData[i][colTglPensiun] || '',
+            jenis_jabatan: uData[i][colJenisJab] || 'Fungsional Umum'
           };
           data.usersList.push(u);
           if (isCurrentUser) data.user = u;

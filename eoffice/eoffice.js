@@ -147,14 +147,21 @@ function getEofficeData(nip, clientToken) {
     if (userSheet && userSheet.getLastRow() > 1) {
       const uData = userSheet.getDataRange().getValues();
       const headers = uData[0];
-      const nipCol = headers.indexOf('NIP');
-      const namaCol = headers.indexOf('Nama');
-      const pangkatCol = headers.indexOf('Pangkat');
-      const jabCol = headers.indexOf('Jabatan');
-      const tmtKgbCol = headers.indexOf('TMT_KGB');
-      const statusKgbCol = headers.indexOf('Status_KGB');
+      const uHeaders = headers.map(h => String(h || '').trim().toLowerCase().replace(/[^a-z0-9]/g, ''));
+      const findCol = (name, fallback) => {
+        const cleanName = name.toLowerCase().replace(/[^a-z0-9]/g, '');
+        const idx = uHeaders.indexOf(cleanName);
+        return idx !== -1 ? idx : fallback;
+      };
 
-      if (statusKgbCol !== -1 && nipCol !== -1) {
+      const nipCol = findCol('NIP', 0);
+      const namaCol = findCol('Nama', 1);
+      const pangkatCol = findCol('Pangkat', 14);
+      const jabCol = findCol('Jabatan', 2);
+      const tmtKgbCol = findCol('TMT_KGB', 16);
+      const statusKgbCol = findCol('Status_KGB', 19);
+
+      if (nipCol !== -1) {
         for (let i = 1; i < uData.length; i++) {
           const rowNip = String(uData[i][nipCol]);
           const statusKgb = String(uData[i][statusKgbCol] || '').trim();

@@ -231,17 +231,22 @@ document.addEventListener("DOMContentLoaded", () => {
           this._hasSubscribed = true;
           TranskepFirebase.subscribeFirestoreKgbs((list) => {
             if (Array.isArray(list)) {
-              if (list.length > 0) this._allowEmptyFirestoreSnapshot = true;
-              const isMigrated = (typeof localStorage !== 'undefined' && localStorage.getItem('transkep_eoffice_migrated_v1') === 'true');
-              const shouldAcceptEmpty = this._allowEmptyFirestoreSnapshot || isMigrated || this.rawKgbList.length === 0;
-              const baseList = (list.length > 0 || shouldAcceptEmpty) ? list : this.rawKgbList;
-              const merged = (window.EofficeDataService && typeof window.EofficeDataService.mergeDashboardQueue === 'function')
-                ? window.EofficeDataService.mergeDashboardQueue(baseList)
-                : baseList;
+              // KUNCI: Jangan biarkan snapshot kosong menimpa data yang sudah ada di memori/sheets!
+              if (list.length === 0 && this.rawKgbList.length > 0) {
+                console.log("ℹ️ [E-Office] Snapshot Firestore kosong. Mempertahankan riwayat aktif.");
+                return;
+              }
 
-              this.rawKgbList = merged;
-              if (window.EofficeDataService && typeof window.EofficeDataService.setLocalCache === 'function') {
-                window.EofficeDataService.setLocalCache({ kgb: merged, rapat: this.rawRapatList });
+              if (list.length > 0) {
+                this._allowEmptyFirestoreSnapshot = true;
+                const merged = (window.EofficeDataService && typeof window.EofficeDataService.mergeDashboardQueue === 'function')
+                  ? window.EofficeDataService.mergeDashboardQueue(list)
+                  : list;
+
+                this.rawKgbList = merged;
+                if (window.EofficeDataService && typeof window.EofficeDataService.setLocalCache === 'function') {
+                  window.EofficeDataService.setLocalCache({ kgb: merged, rapat: this.rawRapatList });
+                }
               }
             }
           });
@@ -282,8 +287,15 @@ document.addEventListener("DOMContentLoaded", () => {
           const res = await window.EofficeDataService.getEofficeData(nip, token);
           this.isLoading = false;
           if (res && res.status === 'success' && res.data) {
-            this.rawKgbList = res.data.kgb || [];
-            this.rawRapatList = res.data.rapat || [];
+            const incomingKgb = Array.isArray(res.data.kgb) ? res.data.kgb : [];
+            const incomingRapat = Array.isArray(res.data.rapat) ? res.data.rapat : [];
+            // Jangan timpa jika respon server kosong padahal memori lokal sudah memiliki data
+            if (incomingKgb.length > 0 || this.rawKgbList.length === 0) {
+              this.rawKgbList = incomingKgb;
+            }
+            if (incomingRapat.length > 0 || this.rawRapatList.length === 0) {
+              this.rawRapatList = incomingRapat;
+            }
           } else if (res && res.message) {
             if (res.message.includes('Akses Ditolak') || !this.isAdmin) {
               console.warn("[E-Office] Akses dibatasi untuk Administrator:", res.message);
