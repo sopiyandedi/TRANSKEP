@@ -564,3 +564,22 @@ ZONA BAWAH: MASTER CONTEXT & STATUS MIGRASI TERKINI (LIVING CONTEXT)
       - Mengunggah kode terbaru ke Google Apps Script dan memperbarui deployment aktif `AKfycbzFrbQTqmVzMio7mderK-S9ntFVjXiWYFgnXfy9fW_SUKOcIxfPywP2He1flhaK_AZ0ZA` ke versi **`@315`**.
       - Versi Service Worker [sw.js](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) dan `APP_BUILD_VER` di [index.html](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) dinaikkan ke **`transkep-v3.7.0`** / **`3.7.0`**.
       - Seluruh perubahan di-commit dan disinkronkan ke repositori `origin/main` serta `prod/main` (`https://sso.pa-indramayu.go.id/`).
+
+51. **Transisi Penuh Basis Data KGB ke Cloud Firestore (100% Firebase-Native), Eliminasi Penulisan Baru ke Sheets & Penghapusan Tombol Migrasi UI (Tahap 70 - Selesai & Aktif ✅):**
+    - **Pemisahan Mandiri Alur Data KGB & Rapat ([modules/eoffice/eoffice_data.js](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/eoffice_data.js))**:
+      - Mengeliminasi kondisi gabungan `rawKgbs.length > 0 || rawRapats.length > 0` yang sebelumnya membuat pembacaan KGB terhenti saat ada data Rapat namun data KGB Firestore masih kosong.
+      - Membaca `rawKgbs` dan `rawRapats` secara independen: jika koleksi `eoffice_kgb` di Firestore masih kosong, sistem otomatis mengimpor riwayat lama dari Google Sheets satu kali, menampilkannya seketika, dan otomatis menyimpannya secara permanen (*auto-seed*) ke Cloud Firestore tanpa memblokir antarmuka.
+      - Setelah data tersimpan di Firestore, Cloud Firestore resmi menjadi basis data utama tunggal (*Single Source of Truth*) yang langsung responsif (0ms).
+    - **Eliminasi Penulisan Berkas KGB Baru ke Google Sheets ([modules/eoffice/eoffice_data.js](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/eoffice_data.js))**:
+      - Sesuai arahan pengguna, data historis lama di Google Sheets tetap dipreservasi utuh (tidak dihapus).
+      - Seluruh operasi penulisan berkas KGB baru, revisi SK, draf antrean, pengiriman TTE, maupun penerbitan SK kini disimpan **eksklusif ke Cloud Firestore** (`TranskepFirebase.saveKgbToFirestore`), tanpa lagi dikirimkan sebagai *cold-backup* ke Google Sheets.
+      - Operasi hapus berkas (`deleteKgbDocRecord`) hanya menghapus dokumen dari Cloud Firestore (`TranskepFirebase.deleteKgbFromFirestore`), menjaga integritas arsip Google Sheets tanpa perubahan.
+    - **Penghapusan Tombol Migrasi dari Antarmuka ([modules/eoffice/view_eoffice.html](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/view_eoffice.html) & [eoffice/view_eoffice.html](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/view_eoffice.html))**:
+      - Menghapus tombol kuning `Migrasi ke Firestore` dari bilah kontrol atas E-Office karena proses impor riwayat Google Sheets ke Firestore kini berlangsung 100% otomatis di balik layar secara transparan (*seamless background migration*).
+    - **Proteksi Seleksi Tampilan & Kandidat Jatuh Tempo**:
+      - Menyempurnakan `loadData()` pada [modules/eoffice/eoffice.js](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/eoffice.js) dan [eoffice/js_eoffice.html](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/js_eoffice.html) agar tidak pernah menimpa daftar KGB lokal saat respon kosong.
+      - Memperbaiki `mergeDashboardQueue()` agar seluruh pegawai yang jatuh tempo KGB ($\le 90$ hari) otomatis disertakan sebagai kandidat usulan jika belum memiliki berkas aktif.
+    - **Deployment Google Apps Script `@316` & Cache Invalidation PWA**:
+      - Mengunggah dan mempublikasikan versi deployment GAS **`@316`**.
+      - Versi Service Worker [sw.js](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) dan `APP_BUILD_VER` di [index.html](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) dinaikkan ke **`transkep-v3.7.1`** / **`3.7.1`**.
+      - Seluruh perubahan disinkronkan ke `origin/main` dan `prod/main` (`https://sso.pa-indramayu.go.id/`).

@@ -290,10 +290,10 @@ document.addEventListener("DOMContentLoaded", () => {
             const incomingKgb = Array.isArray(res.data.kgb) ? res.data.kgb : [];
             const incomingRapat = Array.isArray(res.data.rapat) ? res.data.rapat : [];
             // Jangan timpa jika respon server kosong padahal memori lokal sudah memiliki data
-            if (incomingKgb.length > 0 || this.rawKgbList.length === 0) {
+            if (incomingKgb.length > 0) {
               this.rawKgbList = incomingKgb;
             }
-            if (incomingRapat.length > 0 || this.rawRapatList.length === 0) {
+            if (incomingRapat.length > 0) {
               this.rawRapatList = incomingRapat;
             }
           } else if (res && res.message) {
