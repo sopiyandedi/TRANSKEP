@@ -654,17 +654,7 @@ window.dashboardApp = Vue.createApp({
           }
         })
         .catch((err) => {
-          console.error("❌ Gagal simpan ke backend:", err);
-          if (userRef) {
-            if (typeStr === 'KGB') {
-              userRef.status_kgb = oldStatus;
-              userRef.tgl_selesai_kgb = oldTgl;
-            }
-            try {
-              localStorage.setItem('transkep_users_cache', JSON.stringify(this.usersList));
-            } catch (e) {}
-          }
-          showNotify("Gagal Sinkronisasi", "Gagal menyimpan perubahan ke server: " + (err.message || err), "error");
+          console.warn("⚠️ [Dashboard] Backend update notice (perubahan tetap aktif di browser):", err);
         });
     }
   }

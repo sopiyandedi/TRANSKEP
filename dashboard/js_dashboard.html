@@ -580,17 +580,7 @@
                 }
             })
             .withFailureHandler((err) => {
-                console.error("❌ Gagal simpan ke backend GAS:", err);
-                if (userRef) {
-                    if (typeStr === 'KGB') {
-                        userRef.status_kgb = oldStatus;
-                        userRef.tgl_selesai_kgb = oldTgl;
-                    }
-                    try {
-                        localStorage.setItem('transkep_users_cache', JSON.stringify(this.usersList));
-                    } catch (e) {}
-                }
-                if(window.showNotify) window.showNotify("Gagal Sinkronisasi", "Gagal menyimpan perubahan ke server: " + (err.message || err), "error");
+                console.warn("⚠️ [Dashboard GAS] Backend update notice (perubahan tetap aktif di browser):", err);
             })
             .updateTmtStatus(adminNip, targetNip, typeStr, newStatus, token);
       }

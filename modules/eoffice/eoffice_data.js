@@ -263,7 +263,7 @@ const EofficeDataService = {
         if (!strNip) return;
 
         // 1. KASUS: Pegawai berstatus KGB 'PROSES' (Sedang Diproses)
-        if (statusKgb === 'PROSES') {
+        if (statusKgb === 'PROSES' || statusKgb === 'SEDANG DIPROSES' || statusKgb.includes('PROSES')) {
           const hasActiveCycle = list.some(k => String(k.nip || '').replace(/['"\s]/g, '') === strNip && String(k.status || '').trim().toLowerCase() !== 'selesai');
           if (!hasActiveCycle) {
             let tmtLama = u.tmt_kgb || '';
@@ -366,87 +366,101 @@ const EofficeDataService = {
    */
   async handleDashboardKgbStatusChange(userRef, newStatus, todayYMD) {
     if (!userRef || !userRef.nip) return;
-    if (typeof TranskepFirebase === 'undefined' || !TranskepFirebase.isReady || !TranskepFirebase.isReady()) return;
 
-    const targetNip = String(userRef.nip).trim();
+    const targetNip = String(userRef.nip).replace(/['"\s]/g, '');
     const dateNow = todayYMD || new Date().toISOString().split('T')[0];
 
-    try {
-      const existingList = await TranskepFirebase.getFirestoreKgbs();
-      const allForNip = Array.isArray(existingList)
-        ? existingList.filter(k => String(k.nip || '').trim() === targetNip)
-        : [];
-      const activeDoc = allForNip.find(k => String(k.status || '').trim().toLowerCase() !== 'selesai');
-
-      if (newStatus === 'Proses') {
-        if (!activeDoc) {
-          // Cek apakah ada riwayat KGB Selesai periode sebelumnya untuk auto-prefill Data Lama
-          const prevDone = allForNip
-            .filter(k => String(k.status || '').trim().toLowerCase() === 'selesai')
-            .sort((a, b) => String(b.updated_at || b.tanggal_input || '').localeCompare(String(a.updated_at || a.tanggal_input || '')))[0];
-
-          const newDraft = {
-            id_kgb: 'DRAFT-' + targetNip,
-            nip: targetNip,
-            nama_pegawai: userRef.nama || '',
-            tanggal_lahir: (prevDone && prevDone.tanggal_lahir) || userRef.tgl_lahir || userRef.tanggal_lahir || '',
-            pangkat: userRef.pangkat || (prevDone && prevDone.pangkat) || '',
-            golongan: userRef.golongan || (prevDone && prevDone.golongan) || '',
-            jabatan: userRef.jabatan || (prevDone && prevDone.jabatan) || '',
-            gaji_lama: (prevDone && prevDone.gaji_baru) || '',
-            pejabat_lama: 'Ketua Pengadilan Agama Indramayu',
-            nomor_sk_lama: (prevDone && prevDone.nomor_surat) || '',
-            tanggal_sk_lama: (prevDone && prevDone.tanggal_surat) || '',
-            tmt_lama: (prevDone && prevDone.tmt_baru) || userRef.tmt_kgb || '',
-            tahun_lama: (prevDone && prevDone.tahun_baru) || '',
-            bulan_lama: (prevDone && prevDone.bulan_baru) || '0',
-            mkg_lama: (prevDone && prevDone.mkg_baru) || '',
-            tmt_baru: (prevDone && prevDone.tmt_yad) || userRef.tmt_kgb || '',
-            status: 'Sedang Diproses',
-            is_from_dashboard: true,
-            tanggal_input: dateNow
-          };
-          await TranskepFirebase.saveKgbToFirestore(newDraft);
+    let tmtLama = userRef.tmt_kgb || '';
+    let tmtBaru = tmtLama;
+    if (tmtLama) {
+      try {
+        const parseFn = (typeof parseTanggalLokal === 'function') ? parseTanggalLokal : (d => new Date(d));
+        const d = parseFn(tmtLama);
+        if (d && !isNaN(d.getTime())) {
+          const dNew = new Date(d);
+          dNew.setFullYear(dNew.getFullYear() + 2);
+          tmtBaru = `${dNew.getFullYear()}-${String(dNew.getMonth() + 1).padStart(2, '0')}-${String(dNew.getDate()).padStart(2, '0')}`;
         }
-      } else if (newStatus === 'Selesai') {
-        // PROMOSIKAN & SIMPAN PERMANEN DI E-OFFICE (TIDAK BOLEH DIHAPUS!)
-        const baseRecord = activeDoc || {
-          nip: targetNip,
-          nama_pegawai: userRef.nama || '',
-          pangkat: userRef.pangkat || '',
-          golongan: userRef.golongan || '',
-          jabatan: userRef.jabatan || '',
-          tmt_lama: userRef.tmt_kgb || '',
-          tmt_baru: userRef.tmt_kgb || '',
-          tanggal_input: dateNow
-        };
+      } catch(e) {}
+    }
 
-        const oldId = String(baseRecord.id_kgb || '');
-        const permanentId = (!oldId || oldId.startsWith('DRAFT-'))
-          ? this.buildPermanentKgbId(targetNip, baseRecord.tmt_baru || userRef.tmt_kgb || dateNow)
-          : oldId;
+    // 1. UPDATE IMMEDIATE LOCAL CACHE & MEMORY (0ms Responsif)
+    const cached = this.getLocalCache();
+    let baseKgb = (cached && Array.isArray(cached.kgb)) ? [...cached.kgb] : [];
 
-        const completedRecord = {
-          ...baseRecord,
-          id_kgb: permanentId,
-          status: 'Selesai',
-          tgl_selesai: dateNow,
-          is_from_dashboard: false,
-          updated_at: new Date().toISOString()
-        };
+    let targetDraft = null;
+    let targetDone = null;
 
-        await TranskepFirebase.saveKgbToFirestore(completedRecord);
+    if (newStatus === 'Proses') {
+      targetDraft = {
+        id_kgb: 'DRAFT-' + targetNip,
+        nip: targetNip,
+        nama_pegawai: userRef.nama || '',
+        pangkat: userRef.pangkat || '',
+        golongan: userRef.golongan || '',
+        jabatan: userRef.jabatan || '',
+        unit_kerja: 'Pengadilan Agama Indramayu Kelas 1.A.',
+        tmt_lama: tmtLama,
+        tmt_baru: tmtBaru,
+        status: 'Sedang Diproses',
+        is_from_dashboard: true,
+        tanggal_input: dateNow
+      };
 
-        // Bersihkan key sementara DRAFT-{nip} hanya jika sudah dipromosikan ke permanentId
-        if (oldId && oldId.startsWith('DRAFT-') && oldId !== permanentId) {
-          await TranskepFirebase.deleteKgbFromFirestore(oldId).catch(() => { });
-        }
-      } else if (newStatus === 'Menunggu') {
-        // Batal antrean: hanya hapus draf sementara DRAFT-{nip}, JANGAN sentuh arsip Selesai
-        await TranskepFirebase.deleteKgbFromFirestore('DRAFT-' + targetNip).catch(() => { });
+      const existIdx = baseKgb.findIndex(k => String(k.nip || '').replace(/['"\s]/g, '') === targetNip && k.status !== 'Selesai');
+      if (existIdx !== -1) {
+        baseKgb[existIdx] = { ...baseKgb[existIdx], ...targetDraft };
+      } else {
+        baseKgb.unshift(targetDraft);
       }
-    } catch (err) {
-      console.warn("⚠️ [E-Office] Sinkronisasi status KGB Dashboard -> Firestore notice:", err);
+    } else if (newStatus === 'Selesai') {
+      const periodId = 'KGB-' + targetNip + '-' + (tmtBaru ? tmtBaru.replace(/[^0-9]/g, '') : dateNow.replace(/[^0-9]/g, ''));
+      targetDone = {
+        id_kgb: periodId,
+        nip: targetNip,
+        nama_pegawai: userRef.nama || '',
+        pangkat: userRef.pangkat || '',
+        golongan: userRef.golongan || '',
+        jabatan: userRef.jabatan || '',
+        unit_kerja: 'Pengadilan Agama Indramayu Kelas 1.A.',
+        tmt_lama: tmtLama,
+        tmt_baru: tmtBaru,
+        status: 'Selesai',
+        tgl_selesai: dateNow,
+        is_from_dashboard: false,
+        tanggal_input: dateNow
+      };
+
+      const dIdx = baseKgb.findIndex(k => String(k.id_kgb || '') === ('DRAFT-' + targetNip) || (String(k.nip || '').replace(/['"\s]/g, '') === targetNip && k.status !== 'Selesai'));
+      if (dIdx !== -1) {
+        baseKgb.splice(dIdx, 1, targetDone);
+      } else {
+        baseKgb.unshift(targetDone);
+      }
+    } else if (newStatus === 'Menunggu') {
+      baseKgb = baseKgb.filter(k => String(k.id_kgb || '') !== ('DRAFT-' + targetNip));
+    }
+
+    this.setLocalCache({ kgb: baseKgb, rapat: (cached && cached.rapat) || [] });
+
+    if (typeof window !== 'undefined' && window.vmEoffice) {
+      window.vmEoffice.rawKgbList = baseKgb;
+    }
+
+    // 2. SINKRONISASI KE CLOUD FIRESTORE SECARA ASINKRON (Non-blocking)
+    if (typeof TranskepFirebase !== 'undefined' && TranskepFirebase.isReady && TranskepFirebase.isReady()) {
+      try {
+        if (targetDraft) {
+          await TranskepFirebase.saveKgbToFirestore(targetDraft);
+        } else if (targetDone) {
+          await TranskepFirebase.saveKgbToFirestore(targetDone);
+          await TranskepFirebase.deleteKgbFromFirestore('DRAFT-' + targetNip).catch(() => {});
+        } else if (newStatus === 'Menunggu') {
+          await TranskepFirebase.deleteKgbFromFirestore('DRAFT-' + targetNip).catch(() => {});
+        }
+      } catch (fsErr) {
+        console.warn("⚠️ [E-Office] Firestore sync notice:", fsErr);
+      }
     }
   },
 

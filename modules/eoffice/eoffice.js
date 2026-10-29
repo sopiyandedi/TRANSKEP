@@ -296,7 +296,17 @@ document.addEventListener("DOMContentLoaded", () => {
             if (incomingRapat.length > 0) {
               this.rawRapatList = incomingRapat;
             }
-          } else if (res && res.message) {
+          }
+
+          // SAFETY NET: Jika list masih kosong, paksa sintesiskan dari antrean Dashboard
+          if (this.rawKgbList.length === 0 && window.EofficeDataService && typeof window.EofficeDataService.mergeDashboardQueue === 'function') {
+            const synthesized = window.EofficeDataService.mergeDashboardQueue([]);
+            if (synthesized.length > 0) {
+              this.rawKgbList = synthesized;
+            }
+          }
+
+          if (res && res.message) {
             if (res.message.includes('Akses Ditolak') || !this.isAdmin) {
               console.warn("[E-Office] Akses dibatasi untuk Administrator:", res.message);
             } else if (typeof showNotify === 'function') {

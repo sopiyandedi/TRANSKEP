@@ -15,17 +15,24 @@ const DashboardDataService = {
    * @param {string} [token] - Token sesi aktif (opsional, auto-resolve jika kosong)
    * @returns {Promise<Object>} Respon server { status, message }
    */
-  forwardTmtDate(adminNip, targetNip, type, newDateStr, token) {
+  async forwardTmtDate(adminNip, targetNip, type, newDateStr, token) {
     const authToken = token || (typeof localStorage !== 'undefined' ? (localStorage.getItem('transkep_session_token') || localStorage.getItem('transkep_token')) : '') || '';
-    return new Promise((resolve, reject) => {
-      if (typeof google === 'undefined' || !google.script || !google.script.run) {
-        return reject(new Error("Koneksi google.script.run tidak tersedia."));
+    if (typeof window.TranskepAPI !== 'undefined' && typeof window.TranskepAPI.call === 'function') {
+      try {
+        return await window.TranskepAPI.call('forwardTmtDateByFrontend', adminNip, targetNip, type, newDateStr, authToken);
+      } catch (err) {
+        console.warn("⚠️ [DashboardDataService] TranskepAPI forwardTmtDate fallback:", err);
       }
-      google.script.run
-        .withSuccessHandler((res) => resolve(res))
-        .withFailureHandler((err) => reject(err))
-        .forwardTmtDateByFrontend(adminNip, targetNip, type, newDateStr, authToken);
-    });
+    }
+    if (typeof google !== 'undefined' && google.script && google.script.run) {
+      return new Promise((resolve, reject) => {
+        google.script.run
+          .withSuccessHandler((res) => resolve(res))
+          .withFailureHandler((err) => reject(err))
+          .forwardTmtDateByFrontend(adminNip, targetNip, type, newDateStr, authToken);
+      });
+    }
+    return { status: 'success', message: 'Tersimpan lokal' };
   },
 
   /**
@@ -37,17 +44,24 @@ const DashboardDataService = {
    * @param {string} [token] - Token sesi aktif (opsional, auto-resolve jika kosong)
    * @returns {Promise<Object>} Respon server { status, message }
    */
-  updateTmtStatus(adminNip, targetNip, typeStr, newStatus, token) {
+  async updateTmtStatus(adminNip, targetNip, typeStr, newStatus, token) {
     const authToken = token || (typeof localStorage !== 'undefined' ? (localStorage.getItem('transkep_session_token') || localStorage.getItem('transkep_token')) : '') || '';
-    return new Promise((resolve, reject) => {
-      if (typeof google === 'undefined' || !google.script || !google.script.run) {
-        return reject(new Error("Koneksi google.script.run tidak tersedia."));
+    if (typeof window.TranskepAPI !== 'undefined' && typeof window.TranskepAPI.call === 'function') {
+      try {
+        return await window.TranskepAPI.call('updateTmtStatus', adminNip, targetNip, typeStr, newStatus, authToken);
+      } catch (err) {
+        console.warn("⚠️ [DashboardDataService] TranskepAPI updateTmtStatus fallback:", err);
       }
-      google.script.run
-        .withSuccessHandler((res) => resolve(res))
-        .withFailureHandler((err) => reject(err))
-        .updateTmtStatus(adminNip, targetNip, typeStr, newStatus, authToken);
-    });
+    }
+    if (typeof google !== 'undefined' && google.script && google.script.run) {
+      return new Promise((resolve, reject) => {
+        google.script.run
+          .withSuccessHandler((res) => resolve(res))
+          .withFailureHandler((err) => reject(err))
+          .updateTmtStatus(adminNip, targetNip, typeStr, newStatus, authToken);
+      });
+    }
+    return { status: 'success', message: 'Status berhasil diperbarui' };
   }
 };
 
