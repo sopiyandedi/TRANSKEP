@@ -127,7 +127,7 @@
   <!-- TRANSKEP: Auto-Bust PWA Cache & Stale Service Worker Guard -->
   <script>
     (async function () {
-      const CURRENT_APP_BUILD = 'transkep-v3.6.8';
+      const CURRENT_APP_BUILD = 'transkep-v3.6.9';
       if (localStorage.getItem('transkep_active_build') !== CURRENT_APP_BUILD) {
         localStorage.setItem('transkep_active_build', CURRENT_APP_BUILD);
         try {
@@ -511,7 +511,7 @@
       ];
 
       try {
-        const APP_BUILD_VER = '3.6.8';
+        const APP_BUILD_VER = '3.6.9';
         console.log('🔄 [TRANSKEP Loader] Memuat komponen tampilan views/ secara paralel...');
         await Promise.all(VIEW_SLOTS.map(async item => {
           const res = await fetch(item.file + '?v=' + APP_BUILD_VER);

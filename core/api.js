@@ -100,8 +100,15 @@ const TranskepAPI = (function () {
       redirect: 'follow'
     };
 
+    const controller = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+    const timeoutTimer = controller ? setTimeout(() => controller.abort(), CONFIG.timeout || 30000) : null;
+    if (controller) {
+      fetchOptions.signal = controller.signal;
+    }
+
     try {
       const response = await fetch(CONFIG.apiUrl, fetchOptions);
+      if (timeoutTimer) clearTimeout(timeoutTimer);
       if (!response.ok) {
         throw new Error(`HTTP Error: ${response.status} ${response.statusText}`);
       }
@@ -116,6 +123,10 @@ const TranskepAPI = (function () {
         throw new Error('Respon server tidak valid: ' + rawText.substring(0, 100));
       }
     } catch (err) {
+      if (timeoutTimer) clearTimeout(timeoutTimer);
+      if (err && err.name === 'AbortError') {
+        throw new Error('Koneksi ke server timeout (30s). Silakan periksa jaringan.');
+      }
       console.error('[TranskepAPI Error] Target URL:', CONFIG.apiUrl, err);
       throw err;
     }

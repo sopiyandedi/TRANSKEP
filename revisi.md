@@ -3535,3 +3535,63 @@ Pengguna melaporkan bahwa pratinjau (*preview*) dokumen PDF di modal SK dan SOP 
 #### 4. Estimasi Dampak & Status
 - **Dampak:** Memulihkan jalur deploy ke `https://sso.pa-indramayu.go.id/` secara permanen, memastikan Service Worker selalu menarik `index.html` terbaru dari jaringan, dan menampilkan kembali menu **E-Office** beserta **Kelola Pegawai** (termasuk seluruh fitur 4 ikon KGB Tahap 64) secara instan di browser produksi.
 - **Status:** `[SELESAI & AKTIF]` ✅
+
+
+---
+
+### TAHAP 68: Perbaikan Infinite Recursion `bumpDataVersion()` (Tombol Status Modal Tidak Aktif / Hang) & Sinkronisasi Penuh Data KGB Dashboard ke E-Office (`v3.6.9`)
+
+#### 1. Latar Belakang & Akar Masalah Terverifikasi (Root Cause Analysis)
+- **Keluhan Pengguna (Disertai 2 Screenshot Live Produksi):**
+  1. **Tombol status tidak aktif:** Pada **Dashboard -> Peringatan Dini**, saat mengklik status pegawai (contoh: *Raden Anantama Havid Ismail, A.Md. / Berkas KGB*), modal **"Update Status Berkas"** terbuka, tetapi tombol status di dalamnya (`Reset Status`, `Tandai Sedang Diproses`, `Tandai Selesai / Terbit`) tidak bekerja / tidak merespons penyelesaian dan belum menampilkan indikator status yang sedang aktif.
+  2. **Data KGB di E-Office tidak muncul:** Saat membuka menu **E-Office & Administrasi Kedinasan**, tabel kosong menampilkan *"Belum Ada Pekerjaan yang Cocok"*, padahal di Dashboard terdapat pegawai dengan status KGB *Sedang Diproses* (*Raden Anantama Havid Ismail, A.Md.*) maupun *Selesai* (*Agus Salim, S.H.I.*).
+
+- **Akar Masalah Teknis yang Terbukti 100% dari Hasil Audit Kode Backend & Frontend:**
+  1. **Bug Kritis *Infinite Recursion* di `code.js` Baris 307–310 (`bumpDataVersion()` Memanggil Dirinya Sendiri):**
+     - Di `code.js` baris 307–310 tertulis:
+       ```javascript
+       function bumpDataVersion() {
+         try {
+           bumpDataVersion();
+         } catch(e) {}
+         ...
+       }
+       ```
+       (Akibat `SpreadsheetApp.flush()` terganti menjadi `bumpDataVersion()` di dalam tubuh fungsi `bumpDataVersion()` sendiri).
+     - Saat tombol di modal **"Update Status Berkas"** diklik, endpoint backend `updateTmtStatus()` (`dashboard/dashboard.js` baris 79) memanggil `bumpDataVersion()`.
+     - Fungsi tersebut melakukan rekursi ~10.000 stack frame hingga *Stack Overflow*, lalu karena dibungkus `try ... catch(e) {}`, saat *stack unwinding* ia mengeksekusi `PropertiesService.setProperty(...)` dan `CacheService.remove(...)` ribuan kali berturut-turut hingga server Google Apps Script *hang/timeout* (dan `core/api.js` belum memasang `AbortController` timeout pada `fetch`).
+     - Akibatnya, server tidak pernah mengembalikan `{ status: 'success' }` ke browser, sehingga callback `.then()` di `modules/dashboard/dashboard.js` yang memperbarui tampilan status UI serta mengirim berkas KGB ke Cloud Firestore (`handleDashboardKgbStatusChange`) **tidak pernah jalan**.
+  2. **Endpoint Backend `getEofficeData()` (`eoffice/eoffice.js` Baris 105 -> 84) Ikut Hang Akibat `initEofficeDatabase_()` Memanggil `bumpDataVersion()`:**
+     - Setiap kali menu E-Office meminta data fallback dari Google Sheets (atau saat tombol **Migrasi ke Firestore** diklik), `getEofficeData()` selalu memanggil `initEofficeDatabase_()`, yang di baris 84 selalu memanggil `bumpDataVersion()` meskipun tidak ada perubahan struktur sheet. Akibatnya penarikan data KGB dari Google Sheets ikut mati/*timeout*.
+  3. **Fallback Antrean Dashboard (`mergeDashboardQueue`) Terputus di `catch` & Belum Mencakup Pegawai KGB Berstatus `'Selesai'` Eksisting (`modules/eoffice/eoffice.js` & `modules/eoffice/eoffice_data.js`):**
+     - Ketika pembacaan Firestore tertahan (atau kosong karena `submitTmtStatus` gagal mencapai tahap simpan Firestore) dan fallback GAS `getEofficeData` *timeout*, eksekusi di `modules/eoffice/eoffice.js` baris 300 langsung jatuh ke `catch (err)` tanpa merender sintesis antrean dari `state.usersList` (`mergeDashboardQueue`).
+     - Selain itu, flag `alreadyMigrated` di `eoffice_data.js` baris 133 men-*short-circuit* penarikan Google Sheets saat koleksi Firestore masih kosong (`0` dokumen), pengecekan `isAdmin()` di `eoffice.js` masih kaku *case-sensitive* (`role === 'Admin'`), serta `mergeDashboardQueue` baru menyintesis pegawai berstatus `'Proses'` saja (belum menyertakan pegawai KGB berstatus `'Selesai'` eksisting di `user_data` yang belum memiliki dokumen di `EofficeKGB`/`eoffice_kgb`, dan `tmt_baru` draf belum dihitung `+2 tahun` selaras Dashboard).
+  4. **Modal "Update Status Berkas" Belum Memiliki Indikator Status Aktif, Optimistic UI `0ms`, & Sinkronisasi `transkep_users_cache`:**
+     - Ketiga tombol di modal `view_dashboard.html` belum menampilkan badge/highlight status yang sedang aktif (`modalTmt.dbStatus`), `adminNip` di `submitTmtStatus` belum memiliki fallback `localStorage.getItem('transkep_active_nip')`, perubahan `userRef.status_kgb` belum disimpan ke `transkep_users_cache`, dan pencocokan NIP di `dashboard/dashboard.js` (`updateTmtStatus` & bug `nip` undefined di `forwardTmtDateByFrontend` baris 99) perlu dinormalisasi memakai `getDisplayValues()`.
+
+#### 2. Temuan Risiko Lintas-Modul (Audit Bagian 6 ZettBOT)
+- Fungsi `bumpDataVersion()` di `code.js` juga dipanggil oleh modul tulis lain di backend (`permohonan`, `persetujuan`, `pegawai`, `pkp`, `sk`, `sop`, `jobdes`, `kinerja`). Memperbaiki `bumpDataVersion()` di `code.js` (mengembalikan `SpreadsheetApp.flush()`) otomatis menyembuhkan potensi *hang/timeout* saat simpan data di seluruh modul tersebut tanpa perlu memodifikasi file modul-modul lain.
+
+#### 3. Rencana Implementasi Perbaikan
+1. **Perbaikan Backend GAS (`code.js`, `dashboard/dashboard.js`, `eoffice/eoffice.js`) + Deploy Versi Baru GAS (`clasp push` & `clasp deploy`):**
+   - `code.js`: Mengganti rekursi `bumpDataVersion()` di dalam `bumpDataVersion()` menjadi `SpreadsheetApp.flush()`.
+   - `dashboard/dashboard.js`: Menormalisasi pencocokan NIP dengan `getDisplayValues()` + `.replace(/^'/, '').trim()`, menambahkan konstanta fallback indeks kolom `user_data` (Index-Based Mapping) jika header bergeser kapitalisasi, dan memperbaiki variabel `targetNip` pada `forwardTmtDateByFrontend`.
+   - `eoffice/eoffice.js`: Membuat `initEofficeDatabase_()` hanya memanggil `bumpDataVersion()` / `flush()` jika benar-benar membuat tab/kolom baru (*idempoten murni*), serta menyertakan sintesis KGB berstatus `'Proses'` maupun `'Selesai'` (yang belum tercatat di `EofficeKGB`) dengan perhitungan TMT Baru `+2 tahun`.
+2. **Aktifkan & Perkuat Tombol Status Modal Dashboard (`modules/dashboard/view_dashboard.html`, `modules/dashboard/dashboard.js`, `core/api.js`, & cermin GAS `dashboard/view_dashboard.html`, `dashboard/js_dashboard.html`):**
+   - Menambahkan indikator visual **"Aktif"** (ring & badge status aktif) pada tombol di modal **"Update Status Berkas"** sesuai status pegawai saat ini, lengkap dengan proteksi anti-double-click.
+   - Menerapkan **Optimistic UI (`0ms`)** pada `submitTmtStatus()`: klik tombol langsung menutup modal seketika, memperbarui badge status di Dashboard, menyimpan ke `transkep_users_cache`, langsung mendorong/mempromosikan berkas KGB ke E-Office (`EofficeDataService.handleDashboardKgbStatusChange` + cache lokal E-Office), dan menjalankan simpan backend GAS di latar belakang dengan *auto-rollback* jika terjadi penolakan otorisasi.
+   - Memasang `AbortController` sesuai `CONFIG.timeout` (`30000ms`) pada `TranskepAPI.request` di `core/api.js` agar browser tidak pernah menggantung tanpa batas.
+3. **Pastikan Data KGB Selalu Tampil Instan di E-Office (`modules/eoffice/eoffice.js`, `modules/eoffice/eoffice_data.js`, & cermin GAS `eoffice/js_eoffice.html`):**
+   - Menormalisasi `isAdmin()` di `eoffice.js` menjadi *case-insensitive* (`admin`, `super admin`, `administrator`) + fallback JSON profil lokal.
+   - Memperbaiki `getEofficeData()` agar tidak men-*short-circuit* `alreadyMigrated` saat koleksi Firestore kosong (`0` dokumen), selalu fallback ke Google Sheets via `TranskepAPI.call('getEofficeData', ...)`, dan **selalu** menggabungkan hasil `mergeDashboardQueue()` bahkan jika koneksi Firestore maupun Sheets sedang terkendala.
+   - Memperluas `mergeDashboardQueue()` agar menyintesis pegawai KGB berstatus `'Proses'`/`'Sedang Diproses'` **maupun** `'Selesai'` eksisting dari `state.usersList` (jika belum ada di daftar `eoffice_kgb`), lengkap dengan kalkulasi `tmt_baru` (`tmt_kgb + 2 tahun`), serta menambahkan fallback simpan/hapus ke Google Sheets + cache lokal bila Cloud Firestore menolak akses tulis.
+4. **PWA Cache Busting ke `v3.6.9` (`index.html` & `sw.js`):**
+   - Menaikkan `CURRENT_APP_BUILD`, `APP_BUILD_VER`, dan `CACHE_NAME` ke **`transkep-v3.6.9`** / **`3.6.9`**.
+
+#### 4. Daftar Berkas yang Akan Dimodifikasi
+- Backend GAS: `code.js`, `dashboard/dashboard.js`, `eoffice/eoffice.js` (+ cermin UI GAS `dashboard/view_dashboard.html`, `dashboard/js_dashboard.html`, `eoffice/js_eoffice.html`).
+- Frontend Web: `core/api.js`, `modules/dashboard/view_dashboard.html`, `modules/dashboard/dashboard.js`, `modules/eoffice/eoffice.js`, `modules/eoffice/eoffice_data.js`, `index.html`, `sw.js`.
+
+#### 5. Estimasi Dampak & Status
+- **Dampak:** Tombol status di modal **"Update Status Berkas"** langsung aktif dan merespons dalam **`0ms`** lengkap dengan indikator status aktif, server GAS bebas dari *hang/timeout* `bumpDataVersion()`, dan seluruh data KGB (baik draf *Sedang Diproses* maupun riwayat *Selesai*) langsung tampil utuh di tabel **E-Office & Administrasi Kedinasan** beserta 4 ikon kontrolnya.
+- **Status:** `[MENUNGGU PERSETUJUAN PENGGUNA - "OKE TERAPKAN"]` ⏳

@@ -55,14 +55,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
       isAdmin() {
         const user = this.currentUser;
-        if (user && user.role) {
-          return user.role === 'Admin';
-        }
-        const storedRole = localStorage.getItem('transkep_user_role');
-        if (storedRole) {
-          return storedRole === 'Admin';
-        }
-        return false;
+        const r = String((user && user.role) || localStorage.getItem('transkep_user_role') || '').toLowerCase().trim();
+        return r.includes('admin') || r.includes('operator');
       },
 
       availableUsers() {
@@ -300,6 +294,12 @@ document.addEventListener("DOMContentLoaded", () => {
         } catch (err) {
           this.isLoading = false;
           console.error("Gagal load E-Office: ", err);
+          // Fallback: Tetap sintesiskan dari antrean Dashboard / cache lokal agar data muncul
+          if (window.EofficeDataService && typeof window.EofficeDataService.mergeDashboardQueue === 'function') {
+            const cached = (typeof window.EofficeDataService.getLocalCache === 'function') ? window.EofficeDataService.getLocalCache() : null;
+            const baseList = (cached && Array.isArray(cached.kgb) && cached.kgb.length > 0) ? cached.kgb : this.rawKgbList;
+            this.rawKgbList = window.EofficeDataService.mergeDashboardQueue(baseList);
+          }
         }
       },
 

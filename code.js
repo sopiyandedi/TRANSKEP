@@ -306,7 +306,7 @@ function getServerDataVersion_() {
 
 function bumpDataVersion() {
   try {
-    bumpDataVersion();
+    SpreadsheetApp.flush();
   } catch(e) {}
   const newVersion = String(new Date().getTime());
   try {

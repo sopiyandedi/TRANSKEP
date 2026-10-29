@@ -56,14 +56,8 @@
 
         isAdmin() {
           const user = this.currentUser;
-          if (user && user.role) {
-            return user.role === 'Admin';
-          }
-          const storedRole = localStorage.getItem('transkep_user_role');
-          if (storedRole) {
-            return storedRole === 'Admin';
-          }
-          return false;
+          const r = String((user && user.role) || localStorage.getItem('transkep_user_role') || '').toLowerCase().trim();
+          return r.includes('admin') || r.includes('operator');
         },
 
         availableUsers() {

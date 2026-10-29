@@ -151,6 +151,9 @@ function handleApiPost_(payload, e) {
         return jsonResponse_(simpanDataMassal(payload.users, payload.nip, payload.token));
 
       // E-Office (KGB & Rapat)
+      case 'getEofficeData':
+        return jsonResponse_(getEofficeData(payload.nip, payload.token));
+
       case 'saveOrGenerateKgbDoc':
         return jsonResponse_(saveOrGenerateKgbDoc(payload.data, payload.actionType, payload.nip, payload.token));
 

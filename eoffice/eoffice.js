@@ -81,7 +81,7 @@ function initEofficeDatabase_() {
       });
     }
 
-    if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush();
+    SpreadsheetApp.flush();
     return { status: 'success', message: 'Sheet E-Office berhasil diinisialisasi secara aman.' };
   } catch (err) {
     Logger.log("ERROR initEofficeDatabase_: " + err.toString());
@@ -188,7 +188,7 @@ function getEofficeData(nip, clientToken) {
                 pejabat_lama: '',
                 nomor_sk_lama: '',
                 tanggal_sk_lama: '',
-                tmt_lama: '',
+                tmt_lama: tmtStr,
                 mkg_lama: '',
                 gaji_baru: '',
                 terbilang_gaji: '',
@@ -198,6 +198,48 @@ function getEofficeData(nip, clientToken) {
                 dasar_pp: 'Peraturan Pemerintah Republik Indonesia Nomor : 05 Tahun 2024',
                 nama_ketua: '',
                 status: 'Sedang Diproses',
+                file_doc_url: '',
+                file_pdf_url: '',
+                operator_nip: nip,
+                is_from_dashboard: true
+              });
+            }
+          } else if (statusKgb.toLowerCase() === 'selesai') {
+            const alreadyExists = kgbList.some(item => item.nip === rowNip);
+            if (!alreadyExists) {
+              const tmtRaw = uData[i][tmtKgbCol];
+              let tmtStr = '';
+              if (tmtRaw) {
+                try {
+                  tmtStr = Utilities.formatDate(new Date(tmtRaw), 'Asia/Jakarta', 'yyyy-MM-dd');
+                } catch(e) { tmtStr = String(tmtRaw); }
+              }
+              kgbList.push({
+                id_kgb: 'KGB-' + rowNip + '-' + (tmtStr || 'DONE'),
+                tanggal_input: Utilities.formatDate(new Date(), 'Asia/Jakarta', 'yyyy-MM-dd'),
+                nip: rowNip,
+                nama_pegawai: String(uData[i][namaCol] || ''),
+                pangkat: String(uData[i][pangkatCol] || ''),
+                golongan: '',
+                jabatan: String(uData[i][jabCol] || ''),
+                unit_kerja: 'Pengadilan Agama Indramayu Kelas 1.A.',
+                nomor_surat: '',
+                tanggal_surat: '',
+                tujuan_kppn: 'KPPN Cirebon di CIREBON',
+                gaji_lama: '',
+                pejabat_lama: '',
+                nomor_sk_lama: '',
+                tanggal_sk_lama: '',
+                tmt_lama: tmtStr,
+                mkg_lama: '',
+                gaji_baru: '',
+                terbilang_gaji: '',
+                mkg_baru: '',
+                tmt_baru: tmtStr,
+                tmt_yad: '',
+                dasar_pp: 'Peraturan Pemerintah Republik Indonesia Nomor : 05 Tahun 2024',
+                nama_ketua: '',
+                status: 'Selesai',
                 file_doc_url: '',
                 file_pdf_url: '',
                 operator_nip: nip,

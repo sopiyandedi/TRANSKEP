@@ -146,18 +146,24 @@ const EofficeDataService = {
       }
     }
 
-    // 2. Fallback & Auto-Seed dari Google Apps Script (Google Sheets)
-    return new Promise((resolve, reject) => {
-      if (typeof google === 'undefined' || !google.script || !google.script.run) {
+    // 2. Fallback & Auto-Seed dari Google Apps Script / Cache Lokal
+    return new Promise((resolve) => {
+      const fallbackToQueueOrCache = () => {
         const cached = this.getLocalCache();
-        if (cached && (cached.kgb || cached.rapat)) {
-          return resolve({
-            status: 'success',
-            data: { kgb: this.mergeDashboardQueue(cached.kgb || []), rapat: cached.rapat || [] },
-            source: 'cache_offline'
-          });
-        }
-        return reject(new Error("Koneksi google.script.run dan Cloud Firestore tidak tersedia."));
+        const baseKgb = (cached && Array.isArray(cached.kgb)) ? cached.kgb : [];
+        const mergedKgb = this.mergeDashboardQueue(baseKgb);
+        const rapatData = (cached && Array.isArray(cached.rapat)) ? cached.rapat : [];
+        const finalData = { kgb: mergedKgb, rapat: rapatData };
+        this.setLocalCache(finalData);
+        return {
+          status: 'success',
+          data: finalData,
+          source: (baseKgb.length > 0) ? 'cache_offline' : 'dashboard_synthesized'
+        };
+      };
+
+      if (typeof google === 'undefined' || !google.script || !google.script.run) {
+        return resolve(fallbackToQueueOrCache());
       }
 
       google.script.run
@@ -167,7 +173,6 @@ const EofficeDataService = {
             const rapatData = res.data.rapat || [];
             const finalData = { kgb: mergedKgb, rapat: rapatData };
             this.setLocalCache(finalData);
-
             this.seedSheetsDataToFirestore(mergedKgb, rapatData).catch(() => { });
 
             resolve({
@@ -176,10 +181,13 @@ const EofficeDataService = {
               source: 'sheets_fallback'
             });
           } else {
-            resolve(res);
+            resolve(fallbackToQueueOrCache());
           }
         })
-        .withFailureHandler((err) => reject(err))
+        .withFailureHandler((err) => {
+          console.warn("⚠️ [E-Office] Fallback RPC gagal, menggunakan sintesis antrean dashboard:", err);
+          resolve(fallbackToQueueOrCache());
+        })
         .getEofficeData(userNip, authToken);
     });
   },
@@ -227,19 +235,62 @@ const EofficeDataService = {
    */
   mergeDashboardQueue(kgbList) {
     const list = Array.isArray(kgbList) ? [...kgbList] : [];
-    const uList = (window.vueState && window.vueState.usersList)
+    let uList = (window.vueState && window.vueState.usersList)
       ? window.vueState.usersList
       : (typeof state !== 'undefined' ? state.usersList : []);
+
+    // Fallback ambil dari localStorage jika in-memory usersList belum terisi
+    if (!Array.isArray(uList) || uList.length === 0) {
+      try {
+        const cachedUsers = localStorage.getItem('transkep_users_cache');
+        if (cachedUsers) uList = JSON.parse(cachedUsers);
+      } catch (e) {}
+    }
 
     if (Array.isArray(uList)) {
       uList.forEach(u => {
         const statusKgb = String(u.status_kgb || u.Status_KGB || '').trim().toUpperCase();
+        const strNip = String(u.nip || '').replace(/['"\s]/g, '');
+        if (!strNip) return;
+
+        // 1. KASUS: Pegawai berstatus KGB 'PROSES' (Sedang Diproses)
         if (statusKgb === 'PROSES') {
-          const strNip = String(u.nip || '').trim();
-          const hasActiveCycle = list.some(k => String(k.nip || '').trim() === strNip && String(k.status || '').trim().toLowerCase() !== 'selesai');
+          const hasActiveCycle = list.some(k => String(k.nip || '').replace(/['"\s]/g, '') === strNip && String(k.status || '').trim().toLowerCase() !== 'selesai');
           if (!hasActiveCycle) {
-            list.push({
+            let tmtLama = u.tmt_kgb || '';
+            let tmtBaru = tmtLama;
+            if (tmtLama) {
+              try {
+                const parseFn = (typeof parseTanggalLokal === 'function') ? parseTanggalLokal : (d => new Date(d));
+                const d = parseFn(tmtLama);
+                if (d && !isNaN(d.getTime())) {
+                  const dNew = new Date(d);
+                  dNew.setFullYear(dNew.getFullYear() + 2);
+                  tmtBaru = `${dNew.getFullYear()}-${String(dNew.getMonth() + 1).padStart(2, '0')}-${String(dNew.getDate()).padStart(2, '0')}`;
+                }
+              } catch (e) {}
+            }
+            list.unshift({
               id_kgb: 'DRAFT-' + strNip,
+              nip: strNip,
+              nama_pegawai: u.nama || '',
+              pangkat: u.pangkat || '',
+              golongan: u.golongan || '',
+              jabatan: u.jabatan || '',
+              tmt_lama: tmtLama,
+              tmt_baru: tmtBaru,
+              status: 'Sedang Diproses',
+              is_from_dashboard: true,
+              tanggal_input: new Date().toISOString().split('T')[0]
+            });
+          }
+        }
+        // 2. KASUS: Pegawai berstatus KGB 'SELESAI' (Arsip KGB yang sudah terbit di Dashboard)
+        else if (statusKgb === 'SELESAI') {
+          const hasRecord = list.some(k => String(k.nip || '').replace(/['"\s]/g, '') === strNip);
+          if (!hasRecord) {
+            list.push({
+              id_kgb: 'KGB-' + strNip + '-' + (u.tmt_kgb ? String(u.tmt_kgb).replace(/[^0-9]/g, '') : 'DONE'),
               nip: strNip,
               nama_pegawai: u.nama || '',
               pangkat: u.pangkat || '',
@@ -247,9 +298,10 @@ const EofficeDataService = {
               jabatan: u.jabatan || '',
               tmt_lama: u.tmt_kgb || '',
               tmt_baru: u.tmt_kgb || '',
-              status: 'Sedang Diproses',
+              status: 'Selesai',
+              tgl_selesai: u.tgl_selesai_kgb || new Date().toISOString().split('T')[0],
               is_from_dashboard: true,
-              tanggal_input: new Date().toISOString().split('T')[0]
+              tanggal_input: u.tgl_selesai_kgb || new Date().toISOString().split('T')[0]
             });
           }
         }

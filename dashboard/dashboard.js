@@ -47,27 +47,34 @@ function updateTmtStatus(actorNip, targetNip, type, newStatus, clientToken) {
     const headers = data[0];
 
     let rowIndex = -1;
-    // 2. Cari baris database menggunakan NIP pegawai target (targetNip)
+    // 2. Cari baris database menggunakan NIP pegawai target (targetNip) dengan normalisasi string
+    const cleanTargetNip = String(targetNip || '').replace(/['"\s]/g, '');
     for(let i=1; i<data.length; i++) {
-      if(String(data[i][0]) === String(targetNip)) { rowIndex = i+1; break; }
+      const rowNip = String(data[i][0] || '').replace(/['"\s]/g, '');
+      if(rowNip === cleanTargetNip) { rowIndex = i+1; break; }
     }
-    if(rowIndex === -1) throw new Error("Pegawai tidak ditemukan di database.");
+    if(rowIndex === -1) throw new Error("Pegawai dengan NIP " + targetNip + " tidak ditemukan di database.");
+
+    const findHeaderCol = (name, fallbackIdx) => {
+      const idx = headers.findIndex(h => String(h || '').trim().toLowerCase() === name.toLowerCase());
+      return idx !== -1 ? (idx + 1) : fallbackIdx;
+    };
 
     let colStatus, colTgl;
     if(type === 'KGB') {
-      colStatus = headers.indexOf('Status_KGB') + 1;
-      colTgl = headers.indexOf('Tgl_Selesai_KGB') + 1;
+      colStatus = findHeaderCol('Status_KGB', 20);
+      colTgl = findHeaderCol('Tgl_Selesai_KGB', 21);
     } else if(type === 'Pangkat' || type === 'KNP') {
-      colStatus = headers.indexOf('Status_KNP') + 1;
-      colTgl = headers.indexOf('Tgl_Selesai_KNP') + 1;
+      colStatus = findHeaderCol('Status_KNP', 22);
+      colTgl = findHeaderCol('Tgl_Selesai_KNP', 23);
     } else if(type === 'Pensiun') { 
-      colStatus = headers.indexOf('Status_Pensiun') + 1;
-      colTgl = headers.indexOf('Tgl_Selesai_Pensiun') + 1;
+      colStatus = findHeaderCol('Status_Pensiun', 24);
+      colTgl = findHeaderCol('Tgl_Selesai_Pensiun', 25);
     } else {
       throw new Error("Tipe peringatan tidak valid.");
     }
 
-    if(colStatus === 0) throw new Error("Kolom belum diinisialisasi. Pastikan database lengkap.");
+    if(!colStatus || colStatus <= 0) throw new Error("Kolom belum diinisialisasi. Pastikan database lengkap.");
 
     let todayStr = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'yyyy-MM-dd');
     let valTgl = (newStatus === 'Selesai') ? todayStr : '';
@@ -95,22 +102,29 @@ function forwardTmtDateByFrontend(actorNip, targetNip, type, newDateStr, clientT
     const headers = data[0];
 
     let rowIndex = -1;
+    const cleanTargetNip = String(targetNip || '').replace(/['"\s]/g, '');
     for(let i=1; i<data.length; i++) {
-      if(String(data[i][0]) === String(nip)) { rowIndex = i+1; break; }
+      const rowNip = String(data[i][0] || '').replace(/['"\s]/g, '');
+      if(rowNip === cleanTargetNip) { rowIndex = i+1; break; }
     }
-    if(rowIndex === -1) return { status: 'error', message: 'Pegawai tidak ditemukan' };
+    if(rowIndex === -1) return { status: 'error', message: 'Pegawai dengan NIP ' + targetNip + ' tidak ditemukan' };
+
+    const findHeaderCol = (name, fallbackIdx) => {
+      const idx = headers.findIndex(h => String(h || '').trim().toLowerCase() === name.toLowerCase());
+      return idx !== -1 ? (idx + 1) : fallbackIdx;
+    };
 
     let colTmt, colStatus, colTgl;
     if(type === 'KGB') {
-      colTmt = headers.indexOf('TMT_KGB') + 1;
-      colStatus = headers.indexOf('Status_KGB') + 1;
-      colTgl = headers.indexOf('Tgl_Selesai_KGB') + 1;
+      colTmt = findHeaderCol('TMT_KGB', 17);
+      colStatus = findHeaderCol('Status_KGB', 20);
+      colTgl = findHeaderCol('Tgl_Selesai_KGB', 21);
     } else if(type === 'Pangkat' || type === 'KNP') {
-      colTmt = headers.indexOf('TMT_KNP') + 1;
-      colStatus = headers.indexOf('Status_KNP') + 1;
-      colTgl = headers.indexOf('Tgl_Selesai_KNP') + 1;
+      colTmt = findHeaderCol('TMT_KNP', 18);
+      colStatus = findHeaderCol('Status_KNP', 22);
+      colTgl = findHeaderCol('Tgl_Selesai_KNP', 23);
     } else {
-      return { status: 'error' };
+      return { status: 'error', message: 'Tipe berkas tidak valid.' };
     }
 
     sheet.getRange(rowIndex, colTmt).setValue(newDateStr);

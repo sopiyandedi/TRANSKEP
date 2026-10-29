@@ -479,111 +479,120 @@
           const targetNip = this.modalTmt.nip;
           const typeStr = this.modalTmt.type;
           const token = localStorage.getItem('transkep_session_token') || localStorage.getItem('transkep_token') || '';
-          const adminNip = (this.currentUser && this.currentUser.nip) || (window.state && window.state.user && window.state.user.nip) || '';
+          const adminNip = (this.currentUser && this.currentUser.nip) || localStorage.getItem('transkep_active_nip') || (window.state && window.state.user && window.state.user.nip) || '';
 
-          if(window.showLoading) window.showLoading("Menyimpan status berkas...");
-          
+          // 1. Simpan status lama untuk rollback
+          let userRef = this.usersList.find(u => String(u.nip) === String(targetNip));
+          const oldStatus = userRef ? (typeStr === 'KGB' ? userRef.status_kgb : (typeStr === 'Pangkat' || typeStr === 'KNP' ? userRef.status_knp : userRef.status_pensiun)) : '';
+          const oldTgl = userRef ? (typeStr === 'KGB' ? userRef.tgl_selesai_kgb : (typeStr === 'Pangkat' || typeStr === 'KNP' ? userRef.tgl_selesai_knp : userRef.tgl_selesai_pensiun)) : '';
+
+          // 2. OPTIMISTIC UI: Tutup modal & perbarui Vue state segera (0ms)
+          this.closeModalStatus();
+          const todayYMD = (typeof window.formatYMD === 'function') ? window.formatYMD(new Date()) : new Date().toISOString().split('T')[0];
+
+          if (userRef) {
+              if (typeStr === 'KGB') {
+                  userRef.status_kgb = (newStatus === 'Menunggu') ? '' : newStatus;
+                  userRef.tgl_selesai_kgb = (newStatus === 'Selesai') ? todayYMD : '';
+              } else if (typeStr === 'Pangkat' || typeStr === 'KNP') {
+                  userRef.status_knp = (newStatus === 'Menunggu') ? '' : newStatus;
+                  userRef.tgl_selesai_knp = (newStatus === 'Selesai') ? todayYMD : '';
+              } else if (typeStr === 'Pensiun') {
+                  userRef.status_pensiun = (newStatus === 'Menunggu') ? '' : newStatus;
+                  userRef.tgl_selesai_pensiun = (newStatus === 'Selesai') ? todayYMD : '';
+              }
+
+              // Simpan ke cache lokal
+              try {
+                  localStorage.setItem('transkep_users_cache', JSON.stringify(this.usersList));
+              } catch (e) {}
+
+              // Sinkronkan ke global state jika ada
+              if (window.vueState && Array.isArray(window.vueState.usersList)) {
+                  const vUser = window.vueState.usersList.find(u => String(u.nip) === String(targetNip));
+                  if (vUser && typeStr === 'KGB') {
+                      vUser.status_kgb = userRef.status_kgb;
+                      vUser.tgl_selesai_kgb = userRef.tgl_selesai_kgb;
+                  }
+              }
+
+              // Sinkronisasi ke Cloud Firestore & E-Office
+              if (typeStr === 'KGB') {
+                  if (window.EofficeDataService && typeof window.EofficeDataService.handleDashboardKgbStatusChange === 'function') {
+                      window.EofficeDataService.handleDashboardKgbStatusChange(userRef, newStatus, todayYMD)
+                          .then(() => {
+                              if (window.vmEoffice && typeof window.vmEoffice.loadData === 'function') {
+                                  window.vmEoffice.loadData(true);
+                              }
+                          });
+                  } else if (typeof TranskepFirebase !== 'undefined' && TranskepFirebase.isReady && TranskepFirebase.isReady()) {
+                      if (newStatus === 'Proses') {
+                          TranskepFirebase.saveKgbToFirestore({
+                              id_kgb: 'DRAFT-' + targetNip,
+                              nip: targetNip,
+                              nama_pegawai: userRef.nama || '',
+                              pangkat: userRef.pangkat || '',
+                              golongan: userRef.golongan || '',
+                              jabatan: userRef.jabatan || '',
+                              tmt_lama: userRef.tmt_kgb || '',
+                              tmt_baru: userRef.tmt_kgb || '',
+                              status: 'Sedang Diproses',
+                              is_from_dashboard: true,
+                              tanggal_input: todayYMD
+                          }).catch(e => console.warn("⚠️ [Dashboard GAS] Firestore KGB sync notice:", e));
+                      } else if (newStatus === 'Selesai') {
+                          const periodId = 'KGB-' + targetNip + '-' + todayYMD.slice(0, 7).replace('-', '');
+                          TranskepFirebase.saveKgbToFirestore({
+                              id_kgb: periodId,
+                              nip: targetNip,
+                              nama_pegawai: userRef.nama || '',
+                              pangkat: userRef.pangkat || '',
+                              golongan: userRef.golongan || '',
+                              jabatan: userRef.jabatan || '',
+                              tmt_lama: userRef.tmt_kgb || '',
+                              tmt_baru: userRef.tmt_kgb || '',
+                              status: 'Selesai',
+                              tgl_selesai: todayYMD,
+                              is_from_dashboard: false,
+                              tanggal_input: todayYMD
+                          }).then(() => TranskepFirebase.deleteKgbFromFirestore('DRAFT-' + targetNip).catch(() => {}))
+                            .catch(e => console.warn("⚠️ [Dashboard GAS] Firestore KGB archive notice:", e));
+                      } else if (newStatus === 'Menunggu') {
+                          TranskepFirebase.deleteKgbFromFirestore('DRAFT-' + targetNip).catch(() => {});
+                      }
+                      if (window.vmEoffice && typeof window.vmEoffice.loadData === 'function') {
+                          window.vmEoffice.loadData(true);
+                      }
+                  }
+              }
+          }
+
+          const notifyMsg = (typeStr === 'KGB' && newStatus === 'Proses')
+              ? "Status KGB diubah ke Proses. Pegawai telah masuk antrean E-Office!"
+              : (typeStr === 'KGB' && newStatus === 'Selesai') ? "Status KGB Selesai. Tersimpan di arsip E-Office!" : "Status berkas diperbarui.";
+          if(window.showNotify) window.showNotify("Status Diperbarui", notifyMsg, "success");
+
+          // 3. Simpan ke Backend Google Sheets secara asinkron di latar belakang
           google.script.run
             .withSuccessHandler((res) => {
-                if(window.hideLoading) window.hideLoading();
-                this.closeModalStatus();
-                if (res.status === 'success') {
-                    const notifyMsg = (typeStr === 'KGB' && newStatus === 'Proses')
-                        ? "Status KGB diubah ke Proses. Pegawai telah masuk antrean E-Office!"
-                        : (typeStr === 'KGB' && newStatus === 'Selesai') ? "Status KGB Selesai. Arsip KGB tetap tersimpan di E-Office untuk referensi KGB berikutnya!" : "Status berkas diperbarui.";
-                    if(window.showNotify) window.showNotify("Berhasil Disimpan", notifyMsg, "success");
-                    
-                    // Modifikasi Reactivity Langsung di Vue!
-                    let userRef = this.usersList.find(u => String(u.nip) === String(targetNip));
-                    if (userRef) {
-                        const todayYMD = window.formatYMD(new Date());
-                        if (typeStr === 'KGB') { 
-                            userRef.status_kgb = (newStatus === 'Menunggu') ? '' : newStatus; 
-                            userRef.tgl_selesai_kgb = (newStatus === 'Selesai') ? todayYMD : ''; 
-
-                            // Sinkronisasi & Retensi Permanen Arsip KGB di Cloud Firestore (eoffice_kgb)
-                            if (window.EofficeDataService && typeof window.EofficeDataService.handleDashboardKgbStatusChange === 'function') {
-                                window.EofficeDataService.handleDashboardKgbStatusChange(userRef, newStatus, todayYMD)
-                                  .then(() => {
-                                      if (window.vmEoffice && typeof window.vmEoffice.loadData === 'function') {
-                                          window.vmEoffice.loadData(true);
-                                      }
-                                  });
-                            } else if (typeof TranskepFirebase !== 'undefined' && TranskepFirebase.isReady && TranskepFirebase.isReady()) {
-                                if (newStatus === 'Proses') {
-                                    TranskepFirebase.saveKgbToFirestore({
-                                        id_kgb: 'DRAFT-' + targetNip,
-                                        nip: targetNip,
-                                        nama_pegawai: userRef.nama || '',
-                                        pangkat: userRef.pangkat || '',
-                                        golongan: userRef.golongan || '',
-                                        jabatan: userRef.jabatan || '',
-                                        tmt_lama: userRef.tmt_kgb || '',
-                                        tmt_baru: userRef.tmt_kgb || '',
-                                        status: 'Sedang Diproses',
-                                        is_from_dashboard: true,
-                                        tanggal_input: todayYMD
-                                    }).catch(e => console.warn("⚠️ [Dashboard GAS] Firestore KGB sync notice:", e));
-                                } else if (newStatus === 'Selesai') {
-                                    const periodId = 'KGB-' + targetNip + '-' + todayYMD.slice(0, 7).replace('-', '');
-                                    TranskepFirebase.saveKgbToFirestore({
-                                        id_kgb: periodId,
-                                        nip: targetNip,
-                                        nama_pegawai: userRef.nama || '',
-                                        pangkat: userRef.pangkat || '',
-                                        golongan: userRef.golongan || '',
-                                        jabatan: userRef.jabatan || '',
-                                        tmt_lama: userRef.tmt_kgb || '',
-                                        tmt_baru: userRef.tmt_kgb || '',
-                                        status: 'Selesai',
-                                        tgl_selesai: todayYMD,
-                                        is_from_dashboard: false,
-                                        tanggal_input: todayYMD
-                                    }).then(() => TranskepFirebase.deleteKgbFromFirestore('DRAFT-' + targetNip).catch(() => {}))
-                                      .catch(e => console.warn("⚠️ [Dashboard GAS] Firestore KGB archive notice:", e));
-                                } else if (newStatus === 'Menunggu') {
-                                    TranskepFirebase.deleteKgbFromFirestore('DRAFT-' + targetNip).catch(() => {});
-                                }
-                                if (window.vmEoffice && typeof window.vmEoffice.loadData === 'function') {
-                                    window.vmEoffice.loadData(true);
-                                }
-                            }
-                        }
-                        if (typeStr === 'Pangkat') { 
-                            userRef.status_knp = (newStatus === 'Menunggu') ? '' : newStatus; 
-                            userRef.tgl_selesai_knp = (newStatus === 'Selesai') ? todayYMD : ''; 
-                        }
-                        if (typeStr === 'Pensiun') { 
-                            userRef.status_pensiun = (newStatus === 'Menunggu') ? '' : newStatus; 
-                            userRef.tgl_selesai_pensiun = (newStatus === 'Selesai') ? todayYMD : ''; 
-                        }
-                    }
-                } else {
-                    if(window.showNotify) window.showNotify("Gagal", res.message, "error");
+                if (!res || res.status !== 'success') {
+                    console.warn("⚠️ [Dashboard GAS] Backend update note:", res ? res.message : 'Unknown');
                 }
             })
             .withFailureHandler((err) => {
-                if(window.hideLoading) window.hideLoading();
-                this.closeModalStatus();
-                if(window.showNotify) window.showNotify("Error Sistem", err.toString(), "error");
+                console.error("❌ Gagal simpan ke backend GAS:", err);
+                if (userRef) {
+                    if (typeStr === 'KGB') {
+                        userRef.status_kgb = oldStatus;
+                        userRef.tgl_selesai_kgb = oldTgl;
+                    }
+                    try {
+                        localStorage.setItem('transkep_users_cache', JSON.stringify(this.usersList));
+                    } catch (e) {}
+                }
+                if(window.showNotify) window.showNotify("Gagal Sinkronisasi", "Gagal menyimpan perubahan ke server: " + (err.message || err), "error");
             })
             .updateTmtStatus(adminNip, targetNip, typeStr, newStatus, token);
-      },
-
-      syncFromGlobal(globalState) {
-          if (!globalState) return;
-          if (globalState.user) this.currentUser = globalState.user;
-          if (globalState.usersList) this.usersList = globalState.usersList;
-          this.isBgSyncDone = !!globalState.isBgSyncDone;
-          if (globalState.isBgSyncDone) {
-              this.isSyncing = false;
-          }
-          if (globalState.cutiLogs) this.cutiLogs = globalState.cutiLogs;
-          if (globalState.stList) this.stList = globalState.stList;
-          if (globalState.ipLogs) this.ipLogs = globalState.ipLogs;
-          if (globalState.ikLogs) this.ikLogs = globalState.ikLogs;
-          if (globalState.wfhLogs) this.wfhLogs = globalState.wfhLogs;
-          this.checkAutoForward();
       }
     }
   });
