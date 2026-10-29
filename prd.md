@@ -598,3 +598,18 @@ ZONA BAWAH: MASTER CONTEXT & STATUS MIGRASI TERKINI (LIVING CONTEXT)
       - Mengunggah kode terbaru ke Google Apps Script dan mempublikasikan versi deployment GAS **`@317`**.
       - Versi Service Worker [sw.js](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) dan `APP_BUILD_VER` di [index.html](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) dinaikkan ke **`transkep-v3.7.2`** / **`3.7.2`**.
       - Seluruh pembaruan di-push ke repositori `origin/main` dan `prod/main` (`https://sso.pa-indramayu.go.id/`).
+
+53. **Mitigasi Pemblokiran Firestore Security Rules, Pemasangan Aturan Rules Firebase Console, dan Arsitektur Fail-Safe Lokal E-Office (Tahap 72 - Selesai & Aktif ✅):**
+    - **Penyebab Utama Terblokirnya Berkas KGB**:
+      - Terverifikasi bahwa Cloud Firestore pada Firebase Console (`transkep-314c0`) memerlukan izin eksplisit untuk koleksi baru `eoffice_kgb` dan `eoffice_rapat` pada tab Rules. Tanpa izin ini, Firebase menolak operasi `set()`, `get()`, dan `onSnapshot()` dengan status `permission-denied`.
+      - Selain itu, pada [modules/dashboard/dashboard.js](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/dashboard/dashboard.js), pencocokan NIP target sebelumnya rentan terhadap awalan tanda kutip tunggal (`'`) dari Google Sheets.
+    - **Normalisasi NIP (`safeNip`) & Sinkronisasi Multilapis State**:
+      - Memperbarui fungsi `submitTmtStatus` di [modules/dashboard/dashboard.js](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/dashboard/dashboard.js) dan [dashboard/js_dashboard.html](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/dashboard/js_dashboard.html) menggunakan `safeNip(u.nip) === safeNip(targetNip)` sehingga target pegawai dijamin 100% ditemukan di `this.usersList`, `window.vueState.usersList`, `state.usersList`, dan `localStorage.setItem('transkep_users_cache')`.
+    - **Arsitektur Fail-Safe Lokal & Penyimpanan Dedicated E-Office**:
+      - Memperbarui `handleDashboardKgbStatusChange` di [modules/eoffice/eoffice_data.js](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/eoffice_data.js) agar selalu menyimpan draf KGB ke memori lokal E-Office (`this.rawKgbList`), cache lokal umum, serta kunci dedicated `localStorage.setItem('transkep_eoffice_local_kgbs')`.
+      - Memperkuat fungsi `unifiedList()` pada [modules/eoffice/eoffice.js](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/eoffice.js) dan [eoffice/js_eoffice.html](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/js_eoffice.html): jika daftar memori kosong, E-Office otomatis menyintesiskan antrean dari `mergeDashboardQueue([])` secara mandiri dalam 0ms.
+      - Memasang error callback pada `subscribeFirestoreKgbs` di [core/firebase.js](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/core/firebase.js) dan [javascript_firebase.html](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/javascript_firebase.html) sehingga jika Firestore menolak izin, frontend secara anggun mempertahankan antrean draf lokal tanpa membiarkan tabel menjadi kosong.
+    - **Deployment Google Apps Script `@318` & Cache Invalidation PWA**:
+      - Mengunggah kode terbaru ke Google Apps Script dan mempublikasikan versi deployment GAS **`@318`**.
+      - Versi Service Worker [sw.js](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) dan `APP_BUILD_VER` di [index.html](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) dinaikkan ke **`transkep-v3.7.3`** / **`3.7.3`**.
+      - Seluruh pembaruan di-push ke repositori `origin/main` dan `prod/main` (`https://sso.pa-indramayu.go.id/`).

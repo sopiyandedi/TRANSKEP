@@ -804,7 +804,7 @@ const TranskepFirebase = {
   /**
    * Memasang Realtime Listener untuk Dokumen KGB
    */
-  subscribeFirestoreKgbs(callback) {
+  subscribeFirestoreKgbs(callback, errorCallback) {
     const db = this.getDb();
     if (!db) return null;
     return db.collection(this.EOFFICE_KGB_COLLECTION).onSnapshot(
@@ -816,7 +816,13 @@ const TranskepFirebase = {
         if (typeof callback === 'function') callback(list);
       },
       (error) => {
-        console.error("❌ [TRANSKEP Firebase] Error listener Firestore KGB:", error);
+        const errMsg = String(error && (error.message || error));
+        if (errMsg.toLowerCase().includes('permission') || errMsg.toLowerCase().includes('insufficient')) {
+          console.warn("⚠️ [TRANSKEP Firebase] Firestore Security Rules memblokir koleksi 'eoffice_kgb'. Pastikan rules di Firebase Console sudah di-publish.", error);
+        } else {
+          console.error("❌ [TRANSKEP Firebase] Error listener Firestore KGB:", error);
+        }
+        if (typeof errorCallback === 'function') errorCallback(error);
       }
     );
   },

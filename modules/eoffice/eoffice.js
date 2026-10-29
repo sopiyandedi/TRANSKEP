@@ -70,11 +70,15 @@ document.addEventListener("DOMContentLoaded", () => {
       },
 
       unifiedList() {
+        let kgbs = Array.isArray(this.rawKgbList) ? [...this.rawKgbList] : [];
+        if (kgbs.length === 0 && window.EofficeDataService && typeof window.EofficeDataService.mergeDashboardQueue === 'function') {
+          kgbs = window.EofficeDataService.mergeDashboardQueue([]);
+        }
         const result = [];
 
         // 1. MAPPING LIST KGB (Draf Aktif, Antrean TTE Pimpinan & Arsip Siklus 2 Tahunan)
-        if (Array.isArray(this.rawKgbList)) {
-          this.rawKgbList.forEach((k, idx) => {
+        if (Array.isArray(kgbs)) {
+          kgbs.forEach((k, idx) => {
             const rawStatus = k.status || 'Sedang Diproses';
             const isDone = (rawStatus === 'Selesai');
             const isWaitingTte = (rawStatus === 'Menunggu TTE Pimpinan');
@@ -247,6 +251,22 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (window.EofficeDataService && typeof window.EofficeDataService.setLocalCache === 'function') {
                   window.EofficeDataService.setLocalCache({ kgb: merged, rapat: this.rawRapatList });
                 }
+              } else if (list.length === 0 && this.rawKgbList.length === 0) {
+                // REAKTIF: Jika snapshot Firestore kosong tapi di antrean lokal ada data
+                if (window.EofficeDataService && typeof window.EofficeDataService.mergeDashboardQueue === 'function') {
+                  const merged = window.EofficeDataService.mergeDashboardQueue([]);
+                  if (merged.length > 0) {
+                    this.rawKgbList = merged;
+                  }
+                }
+              }
+            }
+          }, (err) => {
+            console.warn("⚠️ [E-Office Listener] Firestore Rules memblokir akses atau koneksi terputus:", err);
+            if (window.EofficeDataService && typeof window.EofficeDataService.mergeDashboardQueue === 'function') {
+              const merged = window.EofficeDataService.mergeDashboardQueue(this.rawKgbList);
+              if (merged.length > 0) {
+                this.rawKgbList = merged;
               }
             }
           });

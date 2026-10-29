@@ -604,7 +604,7 @@
       return list;
     },
 
-    subscribeFirestoreKgbs(callback) {
+    subscribeFirestoreKgbs(callback, errorCallback) {
       const db = this.getDb();
       if (!db) return null;
       return db.collection(this.EOFFICE_KGB_COLLECTION).onSnapshot(
@@ -613,7 +613,15 @@
           snapshot.forEach(doc => list.push(doc.data()));
           if (typeof callback === 'function') callback(list);
         },
-        (error) => console.error("❌ [TRANSKEP Firebase GAS] Error listener Firestore KGB:", error)
+        (error) => {
+          const errMsg = String(error && (error.message || error));
+          if (errMsg.toLowerCase().includes('permission') || errMsg.toLowerCase().includes('insufficient')) {
+            console.warn("⚠️ [TRANSKEP Firebase GAS] Firestore Security Rules memblokir koleksi 'eoffice_kgb'.", error);
+          } else {
+            console.error("❌ [TRANSKEP Firebase GAS] Error listener Firestore KGB:", error);
+          }
+          if (typeof errorCallback === 'function') errorCallback(error);
+        }
       );
     },
 

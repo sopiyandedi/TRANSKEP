@@ -181,11 +181,19 @@ const EofficeDataService = {
     // 3. Gabungkan antrean & kandidat jatuh tempo dari Dashboard
     kgbList = this.mergeDashboardQueue(kgbList);
 
-    // 4. Jika masih kosong, coba dari Local Cache
+    // 4. Jika masih kosong, coba dari Local Cache & Dedicated Local KGBs
     if (kgbList.length === 0) {
       const cached = this.getLocalCache();
       if (cached && Array.isArray(cached.kgb) && cached.kgb.length > 0) {
         kgbList = this.mergeDashboardQueue(cached.kgb);
+      }
+      if (kgbList.length === 0) {
+        try {
+          const localKgbs = JSON.parse(localStorage.getItem('transkep_eoffice_local_kgbs') || '[]');
+          if (Array.isArray(localKgbs) && localKgbs.length > 0) {
+            kgbList = this.mergeDashboardQueue(localKgbs);
+          }
+        } catch (e) {}
       }
     }
 
@@ -244,6 +252,23 @@ const EofficeDataService = {
    */
   mergeDashboardQueue(kgbList) {
     const list = Array.isArray(kgbList) ? [...kgbList] : [];
+
+    // Prioritas 0: Sertakan draf lokal dari transkep_eoffice_local_kgbs
+    try {
+      const localKgbsRaw = localStorage.getItem('transkep_eoffice_local_kgbs');
+      if (localKgbsRaw) {
+        const localKgbs = JSON.parse(localKgbsRaw);
+        if (Array.isArray(localKgbs)) {
+          localKgbs.forEach(lk => {
+            const lkNip = String(lk.nip || '').replace(/['"\s]/g, '');
+            if (lkNip && !list.some(k => String(k.nip || '').replace(/['"\s]/g, '') === lkNip && String(k.status || '').toLowerCase() === String(lk.status || '').toLowerCase())) {
+              list.unshift(lk);
+            }
+          });
+        }
+      }
+    } catch (e) {}
+
     let uList = (window.vueState && window.vueState.usersList)
       ? window.vueState.usersList
       : (typeof state !== 'undefined' ? state.usersList : []);
@@ -442,9 +467,12 @@ const EofficeDataService = {
     }
 
     this.setLocalCache({ kgb: baseKgb, rapat: (cached && cached.rapat) || [] });
+    try {
+      localStorage.setItem('transkep_eoffice_local_kgbs', JSON.stringify(baseKgb));
+    } catch (e) {}
 
     if (typeof window !== 'undefined' && window.vmEoffice) {
-      window.vmEoffice.rawKgbList = baseKgb;
+      window.vmEoffice.rawKgbList = [...baseKgb];
     }
 
     // 2. SINKRONISASI KE CLOUD FIRESTORE SECARA ASINKRON (Non-blocking)
@@ -459,7 +487,12 @@ const EofficeDataService = {
           await TranskepFirebase.deleteKgbFromFirestore('DRAFT-' + targetNip).catch(() => {});
         }
       } catch (fsErr) {
-        console.warn("⚠️ [E-Office] Firestore sync notice:", fsErr);
+        const msg = String(fsErr && (fsErr.message || fsErr));
+        if (msg.toLowerCase().includes('permission') || msg.toLowerCase().includes('insufficient')) {
+          console.warn("⚠️ [E-Office] Firestore Security Rules memblokir koleksi 'eoffice_kgb'. Data tersimpan aman di penyimpanan lokal.", fsErr);
+        } else {
+          console.warn("⚠️ [E-Office] Firestore sync notice:", fsErr);
+        }
       }
     }
   },
