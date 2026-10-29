@@ -1,8 +1,8 @@
 // ==========================================
 // FILE: eoffice_data.js (TRANSKEP Modular)
 // DESKRIPSI: Data Service Layer Modul E-Office (KGB & Paket Rapat)
-// ARSITEKTUR: Firestore-First (0ms), Realtime, Local Cache Hydration & GAS Document Worker
-// ENGINE: TRANSKEP Core v1.0.0 
+// ARSITEKTUR: Firestore-First (0ms), Realtime, Retensi Siklus 2 Tahunan & GAS Document Worker
+// ENGINE: TRANSKEP Core v1.0.0
 // ==========================================
 
 const EofficeDataService = {
@@ -41,12 +41,75 @@ const EofficeDataService = {
   },
 
   /**
+   * Membuat ID Permanen Unik Per Periode Siklus KGB (mencegah overwrite siklus 2 tahun mendatang)
+   * Contoh: KGB-198607092020121004-202501
+   */
+  buildPermanentKgbId(nip, tmtRefStr) {
+    const cleanNip = String(nip || '').trim() || String(Date.now());
+    const ref = String(tmtRefStr || '').trim();
+    let periodTag = '';
+
+    if (/^\d{4}-\d{2}/.test(ref)) {
+      periodTag = ref.slice(0, 7).replace('-', '');
+    } else {
+      const yMatch = ref.match(/\b(20\d{2})\b/);
+      if (yMatch) {
+        const months = ['januari', 'februari', 'maret', 'april', 'mei', 'juni', 'juli', 'agustus', 'september', 'oktober', 'november', 'desember'];
+        const lower = ref.toLowerCase();
+        let mNum = '01';
+        for (let i = 0; i < months.length; i++) {
+          if (lower.includes(months[i])) {
+            mNum = String(i + 1).padStart(2, '0');
+            break;
+          }
+        }
+        periodTag = yMatch[1] + mNum;
+      }
+    }
+
+    if (!periodTag) {
+      const now = new Date();
+      periodTag = String(now.getFullYear()) + String(now.getMonth() + 1).padStart(2, '0');
+    }
+
+    return `KGB-${cleanNip}-${periodTag}`;
+  },
+
+  /**
+   * Mencari riwayat KGB 'Selesai' terakhir milik pegawai (untuk Auto-Prefill Data Lama pada KGB 2 tahun berikutnya)
+   */
+  findLastCompletedKgb(nip, excludeIdKgb) {
+    const targetNip = String(nip || '').trim();
+    if (!targetNip) return null;
+
+    let pool = [];
+    if (typeof window !== 'undefined' && window.vmEoffice && Array.isArray(window.vmEoffice.rawKgbList)) {
+      pool = window.vmEoffice.rawKgbList;
+    } else {
+      const cached = this.getLocalCache();
+      if (cached && Array.isArray(cached.kgb)) pool = cached.kgb;
+    }
+
+    const completed = pool.filter(k => {
+      if (!k || String(k.nip || '').trim() !== targetNip) return false;
+      if (excludeIdKgb && String(k.id_kgb || '') === String(excludeIdKgb)) return false;
+      return String(k.status || '').trim().toLowerCase() === 'selesai';
+    });
+
+    if (completed.length === 0) return null;
+
+    completed.sort((a, b) => {
+      const dateA = String(a.updated_at || a.tgl_selesai || a.tanggal_input || a.tmt_baru || '');
+      const dateB = String(b.updated_at || b.tgl_selesai || b.tanggal_input || b.tmt_baru || '');
+      return dateB.localeCompare(dateA);
+    });
+
+    return completed[0];
+  },
+
+  /**
    * Mengambil data arsip E-Office (KGB dan Paket Rapat)
    * Mengutamakan Cloud Firestore (0ms), dan otomatis fallback + auto-seed dari Google Sheets
-   * jika koleksi Firestore masih kosong atau belum diizinkan oleh Firestore Rules.
-   * @param {string} nip - NIP pengguna
-   * @param {string} token - Token sesi aktif
-   * @returns {Promise<Object>} Respon { status, data: { kgb, rapat }, source }
    */
   async getEofficeData(nip, token) {
     const authToken = token || (typeof localStorage !== 'undefined' ? localStorage.getItem('transkep_session_token') : '') || '';
@@ -66,8 +129,8 @@ const EofficeDataService = {
         // Integrasikan pegawai dengan status_kgb === 'Proses' dari state.usersList
         kgbList = this.mergeDashboardQueue(kgbList);
 
-        // Jika di Firestore sudah ada data, langsung sajikan dalam 0ms!
-        if (kgbList.length > 0 || rapatList.length > 0) {
+        const alreadyMigrated = (typeof localStorage !== 'undefined' && localStorage.getItem(this.MIGRATION_FLAG_KEY) === 'true');
+        if (kgbList.length > 0 || rapatList.length > 0 || alreadyMigrated) {
           const resultData = { kgb: kgbList, rapat: rapatList };
           this.setLocalCache(resultData);
           return {
@@ -77,7 +140,6 @@ const EofficeDataService = {
           };
         }
 
-        // Jika Firestore masih 0 dokumen, lanjutkan ke Langkah 2 (tarik dari Google Sheets & auto-seed ke Firestore)
         console.log("ℹ️ [E-Office] Koleksi Firestore masih kosong, mengambil data awal dari Google Sheets...");
       } catch (fsErr) {
         console.warn("⚠️ [E-Office] Firestore query tertahan (cek Firestore Rules), fallback ke Google Sheets:", fsErr);
@@ -106,8 +168,7 @@ const EofficeDataService = {
             const finalData = { kgb: mergedKgb, rapat: rapatData };
             this.setLocalCache(finalData);
 
-            // Auto-Seed di latar belakang ke Cloud Firestore jika ada data dari Sheets
-            this.seedSheetsDataToFirestore(mergedKgb, rapatData).catch(() => {});
+            this.seedSheetsDataToFirestore(mergedKgb, rapatData).catch(() => { });
 
             resolve({
               status: 'success',
@@ -136,7 +197,7 @@ const EofficeDataService = {
             await TranskepFirebase.saveKgbToFirestore(k);
             savedAny = true;
           } catch (e) {
-            console.warn("⚠️ [E-Office Auto-Seed] Gagal menulis KGB ke Firestore (cek Rules):", e.message || e);
+            console.warn("⚠️ [E-Office Auto-Seed] Gagal menulis KGB ke Firestore:", e.message || e);
             break;
           }
         }
@@ -149,7 +210,7 @@ const EofficeDataService = {
             await TranskepFirebase.saveRapatToFirestore(r);
             savedAny = true;
           } catch (e) {
-            console.warn("⚠️ [E-Office Auto-Seed] Gagal menulis Rapat ke Firestore (cek Rules):", e.message || e);
+            console.warn("⚠️ [E-Office Auto-Seed] Gagal menulis Rapat ke Firestore:", e.message || e);
             break;
           }
         }
@@ -162,19 +223,21 @@ const EofficeDataService = {
 
   /**
    * Menyintesis antrean pegawai berstatus KGB 'Proses' dari state.usersList ke daftar KGB
-   * Memastikan siapapun yang diubah statusnya di Dashboard langsung muncul di E-Office (0ms)
+   * Catatan: Riwayat KGB berstatus 'Selesai' tetap dipertahankan & berdampingan dengan siklus baru
    */
   mergeDashboardQueue(kgbList) {
     const list = Array.isArray(kgbList) ? [...kgbList] : [];
-    const uList = (window.vueState && window.vueState.usersList) ? window.vueState.usersList : (typeof state !== 'undefined' ? state.usersList : []);
+    const uList = (window.vueState && window.vueState.usersList)
+      ? window.vueState.usersList
+      : (typeof state !== 'undefined' ? state.usersList : []);
 
     if (Array.isArray(uList)) {
       uList.forEach(u => {
         const statusKgb = String(u.status_kgb || u.Status_KGB || '').trim().toUpperCase();
         if (statusKgb === 'PROSES') {
           const strNip = String(u.nip || '').trim();
-          const exists = list.some(k => String(k.nip || '').trim() === strNip && String(k.status || '').toLowerCase() !== 'selesai');
-          if (!exists) {
+          const hasActiveCycle = list.some(k => String(k.nip || '').trim() === strNip && String(k.status || '').trim().toLowerCase() !== 'selesai');
+          if (!hasActiveCycle) {
             list.push({
               id_kgb: 'DRAFT-' + strNip,
               nip: strNip,
@@ -197,6 +260,99 @@ const EofficeDataService = {
   },
 
   /**
+   * Sinkronisasi perubahan status KGB dari Bar Peringatan Dini Dashboard ke Cloud Firestore (eoffice_kgb)
+   * ATURAN RETENSI TAHAP 2:
+   * - 'Proses'  -> Buat/aktifkan draf siklus baru (dengan auto-prefill dari KGB Selesai sebelumnya jika ada)
+   * - 'Selesai' -> JANGAN HAPUS! Promosikan & simpan permanen sebagai status 'Selesai' di eoffice_kgb
+   * - 'Menunggu'-> Hanya hapus draf sementara 'DRAFT-{nip}' yang belum diterbitkan (arsip 'Selesai' tetap aman)
+   */
+  async handleDashboardKgbStatusChange(userRef, newStatus, todayYMD) {
+    if (!userRef || !userRef.nip) return;
+    if (typeof TranskepFirebase === 'undefined' || !TranskepFirebase.isReady || !TranskepFirebase.isReady()) return;
+
+    const targetNip = String(userRef.nip).trim();
+    const dateNow = todayYMD || new Date().toISOString().split('T')[0];
+
+    try {
+      const existingList = await TranskepFirebase.getFirestoreKgbs();
+      const allForNip = Array.isArray(existingList)
+        ? existingList.filter(k => String(k.nip || '').trim() === targetNip)
+        : [];
+      const activeDoc = allForNip.find(k => String(k.status || '').trim().toLowerCase() !== 'selesai');
+
+      if (newStatus === 'Proses') {
+        if (!activeDoc) {
+          // Cek apakah ada riwayat KGB Selesai periode sebelumnya untuk auto-prefill Data Lama
+          const prevDone = allForNip
+            .filter(k => String(k.status || '').trim().toLowerCase() === 'selesai')
+            .sort((a, b) => String(b.updated_at || b.tanggal_input || '').localeCompare(String(a.updated_at || a.tanggal_input || '')))[0];
+
+          const newDraft = {
+            id_kgb: 'DRAFT-' + targetNip,
+            nip: targetNip,
+            nama_pegawai: userRef.nama || '',
+            tanggal_lahir: (prevDone && prevDone.tanggal_lahir) || userRef.tgl_lahir || userRef.tanggal_lahir || '',
+            pangkat: userRef.pangkat || (prevDone && prevDone.pangkat) || '',
+            golongan: userRef.golongan || (prevDone && prevDone.golongan) || '',
+            jabatan: userRef.jabatan || (prevDone && prevDone.jabatan) || '',
+            gaji_lama: (prevDone && prevDone.gaji_baru) || '',
+            pejabat_lama: 'Ketua Pengadilan Agama Indramayu',
+            nomor_sk_lama: (prevDone && prevDone.nomor_surat) || '',
+            tanggal_sk_lama: (prevDone && prevDone.tanggal_surat) || '',
+            tmt_lama: (prevDone && prevDone.tmt_baru) || userRef.tmt_kgb || '',
+            tahun_lama: (prevDone && prevDone.tahun_baru) || '',
+            bulan_lama: (prevDone && prevDone.bulan_baru) || '0',
+            mkg_lama: (prevDone && prevDone.mkg_baru) || '',
+            tmt_baru: (prevDone && prevDone.tmt_yad) || userRef.tmt_kgb || '',
+            status: 'Sedang Diproses',
+            is_from_dashboard: true,
+            tanggal_input: dateNow
+          };
+          await TranskepFirebase.saveKgbToFirestore(newDraft);
+        }
+      } else if (newStatus === 'Selesai') {
+        // PROMOSIKAN & SIMPAN PERMANEN DI E-OFFICE (TIDAK BOLEH DIHAPUS!)
+        const baseRecord = activeDoc || {
+          nip: targetNip,
+          nama_pegawai: userRef.nama || '',
+          pangkat: userRef.pangkat || '',
+          golongan: userRef.golongan || '',
+          jabatan: userRef.jabatan || '',
+          tmt_lama: userRef.tmt_kgb || '',
+          tmt_baru: userRef.tmt_kgb || '',
+          tanggal_input: dateNow
+        };
+
+        const oldId = String(baseRecord.id_kgb || '');
+        const permanentId = (!oldId || oldId.startsWith('DRAFT-'))
+          ? this.buildPermanentKgbId(targetNip, baseRecord.tmt_baru || userRef.tmt_kgb || dateNow)
+          : oldId;
+
+        const completedRecord = {
+          ...baseRecord,
+          id_kgb: permanentId,
+          status: 'Selesai',
+          tgl_selesai: dateNow,
+          is_from_dashboard: false,
+          updated_at: new Date().toISOString()
+        };
+
+        await TranskepFirebase.saveKgbToFirestore(completedRecord);
+
+        // Bersihkan key sementara DRAFT-{nip} hanya jika sudah dipromosikan ke permanentId
+        if (oldId && oldId.startsWith('DRAFT-') && oldId !== permanentId) {
+          await TranskepFirebase.deleteKgbFromFirestore(oldId).catch(() => { });
+        }
+      } else if (newStatus === 'Menunggu') {
+        // Batal antrean: hanya hapus draf sementara DRAFT-{nip}, JANGAN sentuh arsip Selesai
+        await TranskepFirebase.deleteKgbFromFirestore('DRAFT-' + targetNip).catch(() => { });
+      }
+    } catch (err) {
+      console.warn("⚠️ [E-Office] Sinkronisasi status KGB Dashboard -> Firestore notice:", err);
+    }
+  },
+
+  /**
    * Menyinkronkan seluruh data KGB & Rapat dari Google Sheets ke Cloud Firestore secara eksplisit
    */
   async syncAllSheetsToFirestore() {
@@ -207,7 +363,6 @@ const EofficeDataService = {
     const nip = (typeof state !== 'undefined' && state.user ? state.user.nip : '') || localStorage.getItem('transkep_active_nip') || '';
     const token = localStorage.getItem('transkep_session_token') || '';
 
-    // 1. Tarik data dari Google Sheets via TranskepAPI atau google.script.run
     let sheetData = null;
     if (typeof window.TranskepAPI !== 'undefined' && typeof window.TranskepAPI.call === 'function') {
       try {
@@ -235,7 +390,6 @@ const EofficeDataService = {
     let rapatCount = 0;
     let permissionError = null;
 
-    // 2. Gabungkan data KGB dari Sheets + antrean Dashboard
     const allKgbs = this.mergeDashboardQueue((sheetData && Array.isArray(sheetData.kgb)) ? sheetData.kgb : []);
     for (const k of allKgbs) {
       if (k && (k.id_kgb || k.nip)) {
@@ -250,7 +404,6 @@ const EofficeDataService = {
       }
     }
 
-    // 3. Simpan semua riwayat Rapat dari Sheets ke Firestore
     if (!permissionError && sheetData && Array.isArray(sheetData.rapat)) {
       for (const r of sheetData.rapat) {
         if (r && (r.id_rapat || r.agenda)) {
@@ -278,47 +431,90 @@ const EofficeDataService = {
       localStorage.setItem(this.MIGRATION_FLAG_KEY, 'true');
     }
 
-    console.log(`✅ [E-Office Sync] Sukses sinkronisasi ${kgbCount} berkas KGB & ${rapatCount} berkas Rapat ke Cloud Firestore.`);
     return {
       status: 'success',
       message: `Berhasil mengamankan ${kgbCount} berkas KGB dan ${rapatCount} berkas Rapat ke Cloud Firestore!`
     };
   },
 
-  triggerBackgroundMigration(nip, token) {
-    this.syncAllSheetsToFirestore().catch(() => {});
+  triggerBackgroundMigration() {
+    this.syncAllSheetsToFirestore().catch(() => { });
   },
 
   /**
-   * Menyimpan draf atau menerbitkan SK KGB
-   * - Mode 'draft': Instan simpan ke Cloud Firestore (<50ms) + background cold backup ke Sheets
-   * - Mode 'generate': Google Apps Script membuat file fisik Google Docs di Google Drive,
-   *   lalu hasilnya langsung disimpan ke Firestore & state diperbarui
+   * Mengirim berkas KGB ke antrean Persiapan TTE Pimpinan (Ketua)
+   */
+  async sendKgbForTte(kgbRawData, adminNip, token) {
+    const uList = (window.vueState && window.vueState.usersList)
+      ? window.vueState.usersList
+      : (typeof state !== 'undefined' ? state.usersList : []);
+    const ketuaObj = Array.isArray(uList)
+      ? uList.find(u => u.jabatan && u.jabatan.toLowerCase().includes('ketua') && !u.jabatan.toLowerCase().includes('wakil'))
+      : null;
+
+    const payload = {
+      ...kgbRawData,
+      status: 'Menunggu TTE Pimpinan',
+      tte_status: 'Menunggu TTE',
+      tte_pejabat_nip: ketuaObj ? String(ketuaObj.nip || '') : '',
+      tte_pejabat_nama: kgbRawData.nama_ketua || (ketuaObj ? ketuaObj.nama : 'Ketua Pengadilan Agama Indramayu'),
+      tte_submitted_at: new Date().toISOString()
+    };
+
+    return await this.saveOrGenerateKgb(payload, 'tte', adminNip, token);
+  },
+
+  /**
+   * Menyimpan draf, mengajukan TTE, atau menerbitkan SK KGB ke Google Docs
+   * - Mode 'draft': Instan simpan ke Cloud Firestore (<50ms) + mempertahankan status ('Selesai'/'Menunggu TTE') jika sedang diedit
+   * - Mode 'tte'  : Instan promosi status ke 'Menunggu TTE Pimpinan' di Cloud Firestore (<50ms)
+   * - Mode 'generate': Google Apps Script merender Master Google Doc ke Folder Drive 1IwQ96D4dY6HrPCqoXY2opX8FHWaMjAHQ
    */
   async saveOrGenerateKgb(payload, actionType, adminNip, token) {
     const authToken = token || (typeof localStorage !== 'undefined' ? localStorage.getItem('transkep_session_token') : '') || '';
     const creatorNip = adminNip || (typeof localStorage !== 'undefined' ? localStorage.getItem('transkep_active_nip') : '') || '';
 
     // ==========================================
-    // A. MODE DRAFT: INSTANT FIRESTORE SAVE (<50ms)
+    // A. MODE DRAFT ATAU KIRIM TTE: INSTANT FIRESTORE SAVE (<50ms)
     // ==========================================
-    if (actionType === 'draft') {
-      const docId = String(payload.id_kgb || '').trim() || ('DRAFT-' + String(payload.nip || Date.now()).trim());
+    if (actionType === 'draft' || actionType === 'tte') {
+      const rawId = String(payload.id_kgb || '').trim();
+      const docId = (!rawId || rawId.startsWith('DRAFT-') || rawId === ('KGB-' + payload.nip))
+        ? this.buildPermanentKgbId(payload.nip, payload.tmt_baru || payload.tanggal_input)
+        : rawId;
+
+      let targetStatus = 'Sedang Diproses';
+      if (actionType === 'tte') {
+        targetStatus = 'Menunggu TTE Pimpinan';
+      } else if (payload.status === 'Selesai' || payload.status === 'Menunggu TTE Pimpinan') {
+        // Pertahankan status jika Admin mengedit berkas yang sudah Dikirim TTE atau sudah Selesai
+        targetStatus = payload.status;
+      }
+
       const kgbData = {
         ...payload,
         id_kgb: docId,
-        status: 'Sedang Diproses',
+        status: targetStatus,
+        is_from_dashboard: false,
         created_by: creatorNip,
-        tanggal_input: payload.tanggal_input || new Date().toISOString().split('T')[0]
+        tanggal_input: payload.tanggal_input || new Date().toISOString().split('T')[0],
+        updated_at: new Date().toISOString()
       };
 
-      // 1. Simpan langsung ke Firestore
+      // 1. Simpan langsung ke Cloud Firestore
       if (typeof TranskepFirebase !== 'undefined' && TranskepFirebase.isReady && TranskepFirebase.isReady()) {
         try {
           await TranskepFirebase.saveKgbToFirestore(kgbData);
-          console.log("⚡ [E-Office] Draf KGB tersimpan di Cloud Firestore (0ms):", docId);
+          if (rawId && rawId.startsWith('DRAFT-') && rawId !== docId) {
+            await TranskepFirebase.deleteKgbFromFirestore(rawId).catch(() => { });
+          }
+          if (payload.nip && docId !== ('DRAFT-' + payload.nip)) {
+            await TranskepFirebase.deleteKgbFromFirestore('DRAFT-' + payload.nip).catch(() => { });
+          }
+          console.log(`⚡ [E-Office] KGB (${targetStatus}) tersimpan di Cloud Firestore:`, docId);
         } catch (fsErr) {
-          console.error("❌ Gagal simpan draf ke Firestore:", fsErr);
+          console.error("❌ Gagal simpan KGB ke Firestore:", fsErr);
+          throw fsErr;
         }
       }
 
@@ -326,15 +522,18 @@ const EofficeDataService = {
       if (typeof google !== 'undefined' && google.script && google.script.run) {
         try {
           google.script.run
-            .withFailureHandler((err) => console.warn("⚠️ Cold backup KGB draf ke Google Sheets gagal:", err))
-            .saveOrGenerateKgbDoc(payload, 'draft', creatorNip, authToken);
-        } catch (bgErr) {}
+            .withFailureHandler((err) => console.warn("⚠️ Cold backup KGB ke Google Sheets gagal:", err))
+            .saveOrGenerateKgbDoc(kgbData, actionType, creatorNip, authToken);
+        } catch (bgErr) { }
       }
 
       return {
         status: 'success',
-        message: 'Draf KGB berhasil disimpan ke Cloud Firestore.',
-        id_kgb: docId
+        message: actionType === 'tte'
+          ? 'Berkas KGB berhasil dikirim ke antrean persiapan TTE Pimpinan!'
+          : 'Data KGB berhasil disimpan ke Cloud Firestore.',
+        id_kgb: docId,
+        data: kgbData
       };
     }
 
@@ -349,41 +548,44 @@ const EofficeDataService = {
       google.script.run
         .withSuccessHandler(async (res) => {
           if (res && res.status === 'success') {
-            const docUrl = res.url || '';
-            const docId = res.id_kgb || payload.id_kgb || ('KGB-' + Date.now());
+            const docUrl = (res.data && res.data.doc_url) || res.url || '';
+            const pdfUrl = (res.data && res.data.pdf_url) || res.pdf_url || (docUrl ? docUrl.replace('/edit', '/export?format=pdf') : '');
+            const rawId = String(payload.id_kgb || '').trim();
+            const docId = (res.data && res.data.id_kgb) || res.id_kgb || ((!rawId || rawId.startsWith('DRAFT-'))
+              ? this.buildPermanentKgbId(payload.nip, payload.tmt_baru)
+              : rawId);
 
             const completedKgb = {
               ...payload,
               id_kgb: docId,
               status: 'Selesai',
               file_doc_url: docUrl,
-              file_pdf_url: docUrl ? docUrl.replace('/edit', '/export?format=pdf') : '',
+              file_pdf_url: pdfUrl,
               is_from_dashboard: false,
+              tgl_selesai: new Date().toISOString().split('T')[0],
               created_by: creatorNip,
               updated_at: new Date().toISOString()
             };
 
-            // 1. Simpan hasil terbit ke Cloud Firestore
+            // 1. Simpan hasil terbit secara permanen ke Cloud Firestore
             if (typeof TranskepFirebase !== 'undefined' && TranskepFirebase.isReady && TranskepFirebase.isReady()) {
               try {
                 await TranskepFirebase.saveKgbToFirestore(completedKgb);
 
-                // Jika sebelumnya ada dokumen draf sementara (DRAFT-{nip}), bersihkan
+                if (rawId && rawId.startsWith('DRAFT-') && rawId !== docId) {
+                  await TranskepFirebase.deleteKgbFromFirestore(rawId).catch(() => { });
+                }
                 if (payload.nip && docId !== ('DRAFT-' + payload.nip)) {
-                  try {
-                    await TranskepFirebase.deleteKgbFromFirestore('DRAFT-' + payload.nip);
-                  } catch (delErr) {}
+                  await TranskepFirebase.deleteKgbFromFirestore('DRAFT-' + payload.nip).catch(() => { });
                 }
 
                 // Perbarui status pegawai di Firestore collection 'users'
                 if (typeof TranskepFirebase.saveUserToFirestore === 'function' && payload.nip) {
-                  try {
-                    await TranskepFirebase.saveUserToFirestore({
-                      nip: String(payload.nip),
-                      status_kgb: 'Selesai',
-                      tmt_kgb: payload.tmt_yad || payload.tmt_baru || ''
-                    });
-                  } catch (uErr) {}
+                  await TranskepFirebase.saveUserToFirestore({
+                    nip: String(payload.nip),
+                    status_kgb: 'Selesai',
+                    tmt_kgb: payload.tmt_yad || payload.tmt_baru || ''
+                  }).catch(() => { });
                 }
               } catch (fsErr) {
                 console.warn("⚠️ Gagal sinkronisasi SK terbit ke Firestore:", fsErr);
@@ -391,7 +593,9 @@ const EofficeDataService = {
             }
 
             // 2. Perbarui state pegawai di memori lokal
-            const uList = (window.vueState && window.vueState.usersList) ? window.vueState.usersList : (typeof state !== 'undefined' ? state.usersList : []);
+            const uList = (window.vueState && window.vueState.usersList)
+              ? window.vueState.usersList
+              : (typeof state !== 'undefined' ? state.usersList : []);
             if (Array.isArray(uList) && payload.nip) {
               const u = uList.find(x => String(x.nip) === String(payload.nip));
               if (u) {
@@ -433,7 +637,6 @@ const EofficeDataService = {
               created_by: creatorNip
             };
 
-            // Simpan paket rapat ke Cloud Firestore
             if (typeof TranskepFirebase !== 'undefined' && TranskepFirebase.isReady && TranskepFirebase.isReady()) {
               try {
                 await TranskepFirebase.saveRapatToFirestore(rapatData);
@@ -451,13 +654,54 @@ const EofficeDataService = {
   },
 
   /**
-   * Menghapus arsip KGB dari Cloud Firestore
+   * Menghapus berkas KGB dari Cloud Firestore + mencegah ghost draft & membersihkan cold backup Sheets
    */
-  async deleteKgb(idKgb) {
-    if (typeof TranskepFirebase !== 'undefined' && TranskepFirebase.isReady && TranskepFirebase.isReady()) {
-      return await TranskepFirebase.deleteKgbFromFirestore(idKgb);
+  async deleteKgb(idKgb, rawData) {
+    const targetId = String(idKgb || (rawData && rawData.id_kgb) || '').trim();
+    const targetNip = String((rawData && rawData.nip) || '').trim();
+    const isActiveDraft = rawData && String(rawData.status || '').trim().toLowerCase() !== 'selesai';
+
+    if (!targetId) {
+      return { status: 'error', message: 'ID KGB tidak valid untuk dihapus.' };
     }
-    return { status: 'error', message: 'Koneksi Cloud Firestore tidak aktif.' };
+
+    // 1. Jika yang dihapus adalah draf aktif pegawai yang di Dashboard sedang 'Proses', reset status_kgb pegawai di memori
+    // agar mergeDashboardQueue tidak memunculkan kembali ghost draft 'DRAFT-{nip}'
+    if (isActiveDraft && targetNip) {
+      const uList = (window.vueState && window.vueState.usersList)
+        ? window.vueState.usersList
+        : (typeof state !== 'undefined' ? state.usersList : []);
+      if (Array.isArray(uList)) {
+        const uRef = uList.find(u => String(u.nip) === targetNip);
+        if (uRef && String(uRef.status_kgb || '').toUpperCase() === 'PROSES') {
+          uRef.status_kgb = '';
+        }
+      }
+    }
+
+    // 2. Hapus dari Cloud Firestore
+    if (typeof TranskepFirebase !== 'undefined' && TranskepFirebase.isReady && TranskepFirebase.isReady()) {
+      await TranskepFirebase.deleteKgbFromFirestore(targetId);
+      if (isActiveDraft && targetNip && targetId !== ('DRAFT-' + targetNip)) {
+        await TranskepFirebase.deleteKgbFromFirestore('DRAFT-' + targetNip).catch(() => { });
+      }
+      if (isActiveDraft && targetNip && typeof TranskepFirebase.saveUserToFirestore === 'function') {
+        await TranskepFirebase.saveUserToFirestore({ nip: targetNip, status_kgb: '' }).catch(() => { });
+      }
+    }
+
+    // 3. Hapus di Google Sheets (background cold-backup cleanup)
+    const authToken = (typeof localStorage !== 'undefined' ? localStorage.getItem('transkep_session_token') : '') || '';
+    const adminNip = (typeof localStorage !== 'undefined' ? localStorage.getItem('transkep_active_nip') : '') || '';
+    if (typeof google !== 'undefined' && google.script && google.script.run) {
+      try {
+        google.script.run
+          .withFailureHandler(() => { })
+          .deleteKgbDocRecord(targetId, targetNip, Boolean(isActiveDraft), adminNip, authToken);
+      } catch (e) { }
+    }
+
+    return { status: 'success', message: 'Berkas KGB berhasil dihapus dari Cloud Firestore.' };
   },
 
   /**

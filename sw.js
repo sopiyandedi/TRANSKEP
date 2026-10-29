@@ -4,7 +4,7 @@
 // ENGINE: TRANSKEP PWA Engine v1.0.0 
 // =========================================================================
 
-const CACHE_NAME = 'transkep-v3.6.4';
+const CACHE_NAME = 'transkep-v3.6.8';
 
 // Daftar aset inti yang di-cache saat Service Worker dipasang (Install)
 const PRECACHE_ASSETS = [
@@ -25,6 +25,7 @@ const PRECACHE_ASSETS = [
   './core/view_sidebar.html',
   './core/view_mobile_nav.html',
   './core/view_global_modals.html',
+  './core/firebase.js',
   './core/qr_engine.js',
   './core/pdf_signer.js',
   './core/api.js',
@@ -101,6 +102,8 @@ const PRECACHE_ASSETS = [
   './modules/eoffice/eoffice.js',
   './modules/eoffice/kgb.js',
   './modules/eoffice/rapat.js',
+  './modules/eoffice/cetak/cetak_kgb.html',
+  './modules/eoffice/cetak/js_cetak_kgb.js',
   './modules/pegawai/view_pegawai.html',
   './modules/pegawai/pegawai_data.js',
   './modules/pegawai/pegawai.js',
@@ -153,9 +156,16 @@ self.addEventListener('fetch', (event) => {
     return; // Serahkan sepenuhnya ke jaringan langsung (Network Only)
   }
 
-  // B. NETWORK-FIRST untuk Berkas Skrip (.js) dan Tampilan (.html)
-  // Menjamin perubahan kode JavaScript dan HTML selalu diambil segar dari server saat online
-  if (reqUrl.pathname.endsWith('.js') || reqUrl.pathname.endsWith('.html') || reqUrl.search.includes('v=')) {
+  // B. NETWORK-FIRST untuk Navigasi Root ('/'), Berkas Skrip (.js), dan Tampilan (.html)
+  // Menjamin halaman utama index.html serta perubahan kode JavaScript/HTML selalu diambil segar dari server saat online
+  if (
+    event.request.mode === 'navigate' ||
+    reqUrl.pathname === '/' ||
+    reqUrl.pathname.endsWith('/') ||
+    reqUrl.pathname.endsWith('.js') ||
+    reqUrl.pathname.endsWith('.html') ||
+    reqUrl.search.includes('v=')
+  ) {
     event.respondWith(
       fetch(event.request)
         .then((networkResponse) => {
@@ -166,7 +176,11 @@ self.addEventListener('fetch', (event) => {
           return networkResponse;
         })
         .catch(() => {
-          return caches.match(event.request);
+          return caches.match(event.request).then((cached) => {
+            if (cached) return cached;
+            if (event.request.mode === 'navigate') return caches.match('./index.html');
+            return cached;
+          });
         })
     );
     return;

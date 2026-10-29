@@ -3,7 +3,7 @@
 // DESKRIPSI: Headless API Router & Gateway Adapter untuk TRANSKEP v3.0
 // TUJUAN: Menjembatani Frontend Modern (GitHub Pages / domain instansi)
 //         ke Backend Google Apps Script tanpa mengganggu Web App lama (Google Sites)
-// ENGINE: TRANSKEP Core v1.0.0 
+// ENGINE: TRANSKEP Core v3.6.6
 // ==========================================
 
 /**
@@ -153,6 +153,9 @@ function handleApiPost_(payload, e) {
       // E-Office (KGB & Rapat)
       case 'saveOrGenerateKgbDoc':
         return jsonResponse_(saveOrGenerateKgbDoc(payload.data, payload.actionType, payload.nip, payload.token));
+
+      case 'deleteKgbDocRecord':
+        return jsonResponse_(deleteKgbDocRecord(payload.id_kgb || payload.idKgb, payload.targetNip, payload.resetUserStatus, payload.nip, payload.token));
 
       case 'saveOrGenerateRapatDoc':
         return jsonResponse_(saveOrGenerateRapatDoc(payload.data, payload.actionType, payload.nip, payload.token));

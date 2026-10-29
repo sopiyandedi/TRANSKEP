@@ -1,0 +1,347 @@
+<!-- VIEW COMPONENT: modules/eoffice/cetak/cetak_kgb.html -->
+<!-- ==========================================
+     FILE: cetak_kgb.html (Template Surat Pemberitahuan Kenaikan Gaji Berkala)
+     SESUAI MASTER GOOGLE DOCS: 1guFYYKbZ1ylW3i7zjgvFZv1fdbB88XWKJwmaJCKeefg
+     INSTANSI: Pengadilan Agama Indramayu Kelas 1.A.
+     ========================================== -->
+<div id="template-cetak-kgb-container" style="display: none;" class="hidden no-print">
+  <style>
+    @media print {
+      @page {
+        size: A4 portrait;
+        margin: 0mm !important;
+      }
+      html, body {
+        background-color: white !important;
+        color: black !important;
+        font-family: 'Bookman Old Style', 'Times New Roman', serif !important;
+        font-size: 10.5pt !important;
+        line-height: 1.25 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+      .no-print { display: none !important; }
+    }
+
+    .kgb-print-wrapper {
+      width: 100%;
+      max-width: 210mm;
+      margin: 0 auto;
+      padding: 10mm 16mm 10mm 20mm;
+      box-sizing: border-box;
+      font-family: 'Bookman Old Style', 'Times New Roman', serif;
+      font-size: 10.5pt;
+      color: #000000;
+      line-height: 1.28;
+    }
+
+    /* KOP SURAT PENGADILAN AGAMA INDRAMAYU */
+    .kgb-kop-container {
+      display: flex;
+      align-items: center;
+      padding-bottom: 5px;
+      border-bottom: 2.2px solid #000000;
+      margin-bottom: 10px;
+    }
+    .kgb-kop-logo {
+      width: 82px;
+      height: auto;
+      flex-shrink: 0;
+    }
+    .kgb-kop-text {
+      flex-grow: 1;
+      text-align: center;
+      padding-right: 20px;
+    }
+    .kgb-kop-text h3, .kgb-kop-text h2 {
+      margin: 0;
+      font-size: 12.5pt;
+      font-weight: bold;
+      text-transform: uppercase;
+      line-height: 1.18;
+    }
+    .kgb-kop-text p {
+      margin: 3px 0 0 0;
+      font-size: 8pt;
+      line-height: 1.25;
+    }
+
+    /* HEADER NOMOR, LAMPIRAN, PERIHAL & TANGGAL */
+    .kgb-meta-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 10px;
+      font-size: 10.5pt;
+    }
+    .kgb-meta-table td {
+      vertical-align: top;
+      padding: 1px 0;
+    }
+
+    /* TUJUAN KPPN */
+    .kgb-tujuan-box {
+      margin-left: 88px;
+      margin-top: 6px;
+      margin-bottom: 12px;
+      font-size: 10.5pt;
+      line-height: 1.3;
+    }
+
+    /* PARAGRAF PEMBUKA & PENUTUP */
+    .kgb-paragraf {
+      text-align: justify;
+      text-indent: 36px;
+      margin: 8px 0;
+      font-size: 10.5pt;
+      line-height: 1.32;
+    }
+
+    /* TABEL RINCIAN POIN 1 - 10 */
+    .kgb-detail-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-left: 16px;
+      font-size: 10.5pt;
+    }
+    .kgb-detail-table td {
+      vertical-align: top;
+      padding: 1.5px 0;
+    }
+    .kgb-col-no {
+      width: 24px;
+    }
+    .kgb-col-label {
+      width: 175px;
+    }
+    .kgb-col-colon {
+      width: 14px;
+      text-align: center;
+    }
+    .kgb-col-val {
+      text-align: left;
+    }
+
+    .kgb-subnote {
+      margin: 4px 0 4px 16px;
+      font-size: 10.5pt;
+    }
+
+    .kgb-section-banner {
+      margin: 8px 0 6px 0;
+      font-size: 10.5pt;
+      font-weight: normal;
+      text-transform: uppercase;
+    }
+
+    /* TANDA TANGAN KETUA */
+    .kgb-ttd-area {
+      width: 100%;
+      margin-top: 14px;
+    }
+    .kgb-ttd-box {
+      float: right;
+      width: 250px;
+      text-align: left;
+      font-size: 10.5pt;
+    }
+
+    /* TEMBUSAN */
+    .kgb-tembusan {
+      clear: both;
+      margin-top: 12px;
+      font-size: 10pt;
+      line-height: 1.3;
+    }
+    .kgb-tembusan ol {
+      margin: 2px 0 0 0;
+      padding-left: 20px;
+    }
+  </style>
+
+  <div class="kgb-print-wrapper">
+    <!-- 1. KOP SURAT -->
+    <div class="kgb-kop-container">
+      <img src="https://drive.google.com/thumbnail?id=1_Qbv_fdPOa2YEQAXXkvRxXevsd_4u1jZ&sz=w500" onerror="this.onerror=null;this.src='img/Logo_PA_Imy.png';" class="kgb-kop-logo" alt="Logo PA Indramayu">
+      <div class="kgb-kop-text">
+        <h3>MAHKAMAH AGUNG REPUBLIK INDONESIA</h3>
+        <h3>DIREKTORAT JENDERAL BADAN PERADILAN AGAMA</h3>
+        <h3>PENGADILAN TINGGI AGAMA BANDUNG</h3>
+        <h2>PENGADILAN AGAMA INDRAMAYU</h2>
+        <p>
+          Jalan M.T. Haryono No.2A Kel. Sindang Kec.Sindang Kab. Indramayu Kode Pos 45222<br>
+          Telepon (0234) 273880 | Situs : <span style="color: #1d4ed8; text-decoration: underline;">www.pa-indramayu.go.id</span> | e-mail : pa.indramayu_ptabdg@yahoo.co.id
+        </p>
+      </div>
+    </div>
+
+    <!-- 2. NOMOR, LAMPIRAN, PERIHAL & TANGGAL -->
+    <table class="kgb-meta-table">
+      <tr>
+        <td style="width: 76px;">Nomor</td>
+        <td style="width: 12px;">:</td>
+        <td>{{nokgb}}/KPA.W10-A2/KP2.1.2/{{bulan}}/{{tahun}}</td>
+        <td style="text-align: right; white-space: nowrap; padding-left: 10px;">{{tanggal}}</td>
+      </tr>
+      <tr>
+        <td>Lampiran</td>
+        <td>:</td>
+        <td colspan="2">-</td>
+      </tr>
+      <tr>
+        <td>Perihal</td>
+        <td>:</td>
+        <td colspan="2">
+          Pemberitahuan Tentang Kenaikan Gaji<br>
+          <span style="text-decoration: underline;">Berkala a.n. Sdr. <strong>{{nama}}</strong></span>
+        </td>
+      </tr>
+    </table>
+
+    <!-- 3. KEPADA YTH -->
+    <div class="kgb-tujuan-box">
+      Kepada<br>
+      Yth. Kepala Kantor Pelayanan Perbendaharaan<br>
+      Negara Cirebon<br>
+      di-<br>
+      <div style="margin-left: 36px; text-decoration: underline; letter-spacing: 2px;">C I R E B O N</div>
+    </div>
+
+    <!-- 4. PEMBUKA -->
+    <p class="kgb-paragraf">
+      Dengan ini kami beritahukan, bahwa berhubung dengan telah terpenuhinya masa kerja dan syarat- syarat lainnya atas:
+    </p>
+
+    <!-- 5. RINCIAN PEGAWAI & GAJI LAMA (POIN 1 - 5) -->
+    <table class="kgb-detail-table">
+      <tr>
+        <td class="kgb-col-no">1.</td>
+        <td class="kgb-col-label">Nama/Tanggal lahir</td>
+        <td class="kgb-col-colon">:</td>
+        <td class="kgb-col-val">{{nama}}/{{tanggl lahir}}</td>
+      </tr>
+      <tr>
+        <td class="kgb-col-no">2.</td>
+        <td class="kgb-col-label">NIP</td>
+        <td class="kgb-col-colon">:</td>
+        <td class="kgb-col-val">{{NIP}}</td>
+      </tr>
+      <tr>
+        <td class="kgb-col-no">3.</td>
+        <td class="kgb-col-label">Pangkat/Jabatan</td>
+        <td class="kgb-col-colon">:</td>
+        <td class="kgb-col-val">{{pangkat}}/{{jabatan}}</td>
+      </tr>
+      <tr>
+        <td class="kgb-col-no">4.</td>
+        <td class="kgb-col-label">Unit Kerja</td>
+        <td class="kgb-col-colon">:</td>
+        <td class="kgb-col-val">{{unit_kerja}}</td>
+      </tr>
+      <tr>
+        <td class="kgb-col-no">5.</td>
+        <td class="kgb-col-label">Gaji Pokok Lama</td>
+        <td class="kgb-col-colon">:</td>
+        <td class="kgb-col-val">Rp {{gaji_lama}},-</td>
+      </tr>
+    </table>
+
+    <div class="kgb-subnote">
+      (atas dasar Skp. terakhir tentang gaji/pangkat yang di tetapkan)
+    </div>
+
+    <table class="kgb-detail-table" style="margin-left: 32px; width: calc(100% - 32px);">
+      <tr>
+        <td class="kgb-col-no">a.</td>
+        <td class="kgb-col-label" style="width: 159px;">Oleh pejabat</td>
+        <td class="kgb-col-colon">:</td>
+        <td class="kgb-col-val">{{pejabat_lama}}</td>
+      </tr>
+      <tr>
+        <td class="kgb-col-no"></td>
+        <td class="kgb-col-label" style="width: 159px;">Tanggal dan nomor</td>
+        <td class="kgb-col-colon">:</td>
+        <td class="kgb-col-val">
+          {{tanggal_sk_lama}}<br>
+          {{nomor_sk_lama}}
+        </td>
+      </tr>
+      <tr>
+        <td class="kgb-col-no">b.</td>
+        <td class="kgb-col-label" style="width: 159px;">Tanggal mulai gaji</td>
+        <td class="kgb-col-colon">:</td>
+        <td class="kgb-col-val">{{tmt_gaji_lama}}</td>
+      </tr>
+      <tr>
+        <td class="kgb-col-no">c.</td>
+        <td class="kgb-col-label" style="width: 159px;">Masa kerja golongan</td>
+        <td class="kgb-col-colon">:</td>
+        <td class="kgb-col-val">{{tahun_lama}} Tahun {{bulan_lama}} bulan</td>
+      </tr>
+    </table>
+
+    <!-- 6. PENETAPAN KENAIKAN GAJI BERKALA BARU (POIN 6 - 10) -->
+    <div class="kgb-section-banner">
+      DIBERIKAN KENAIKAN GAJI BERKALA HINGGA MEMPEROLEH :
+    </div>
+
+    <table class="kgb-detail-table">
+      <tr>
+        <td class="kgb-col-no">6.</td>
+        <td class="kgb-col-label">Gaji pokok baru</td>
+        <td class="kgb-col-colon">:</td>
+        <td class="kgb-col-val">Rp. {{gaji_baru}},- ({{hurif_gaji}})</td>
+      </tr>
+      <tr>
+        <td class="kgb-col-no">7.</td>
+        <td class="kgb-col-label">Masa kerja</td>
+        <td class="kgb-col-colon">:</td>
+        <td class="kgb-col-val">{{tahun_baru}} Tahun</td>
+      </tr>
+      <tr>
+        <td class="kgb-col-no">8.</td>
+        <td class="kgb-col-label">Golongan/Ruang</td>
+        <td class="kgb-col-colon">:</td>
+        <td class="kgb-col-val">{{golongan}}</td>
+      </tr>
+      <tr>
+        <td class="kgb-col-no">9.</td>
+        <td class="kgb-col-label">Mulai tanggal</td>
+        <td class="kgb-col-colon">:</td>
+        <td class="kgb-col-val">{{tmt_mulai}}</td>
+      </tr>
+      <tr>
+        <td class="kgb-col-no">10.</td>
+        <td class="kgb-col-label">Kenaikan gaji Yad.</td>
+        <td class="kgb-col-colon">:</td>
+        <td class="kgb-col-val">{{tmt_datang}}</td>
+      </tr>
+    </table>
+
+    <!-- 7. PENUTUP -->
+    <p class="kgb-paragraf" style="text-indent: 0; margin-top: 10px;">
+      Kami harap sesuai dengan {{dasar_pp}}, kepada Pegawai tersebut agar dibayarkan penghasilannya berdasarkan gaji pokoknya yang baru.
+    </p>
+
+    <!-- 8. TANDA TANGAN KETUA -->
+    <div class="kgb-ttd-area">
+      <div class="kgb-ttd-box">
+        <div style="font-weight: bold; margin-left: 16px;">Ketua,</div>
+        <div style="min-height: 58px; display: flex; align-items: center; padding: 4px 0;">{{tte_qr_slot}}</div>
+        <div style="font-weight: bold;">{{nama_ttd}}</div>
+      </div>
+    </div>
+
+    <!-- 9. TEMBUSAN -->
+    <div class="kgb-tembusan">
+      <div>Tembusan :</div>
+      <ol>
+        <li>Ketua Pengadilan Tinggi Agama Bandung di Bandung;</li>
+        <li>Kepala Kantor Cabang PT. TASPEN di Cirebon;</li>
+        <li>Sdr. <strong>{{nama}}</strong> di Indramayu.</li>
+      </ol>
+    </div>
+  </div>
+</div>
+

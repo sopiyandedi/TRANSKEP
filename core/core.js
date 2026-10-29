@@ -596,6 +596,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (state.user && typeof renderGlobalHeader === 'function') {
         renderGlobalHeader();
       }
+      initNavigationAccess();
 
       const lastMenu = localStorage.getItem('transkep_last_menu') || 'dashboard';
       if (typeof switchMenu === 'function') {
@@ -1231,6 +1232,7 @@ function handleLogin(event) {
         if (typeof renderGlobalHeader === 'function') {
           renderGlobalHeader();
         }
+        initNavigationAccess();
 
         const isTemporary = !!(response.must_change_password || (typeof pass === 'string' && /^TR-\d{6}$/.test(pass.trim())));
         if (isTemporary) {
@@ -1274,9 +1276,7 @@ function handleLogin(event) {
 
   const handleFailure = function (error) {
     resetBtn();
-    if (typeof LoginRateLimiter !== 'undefined') {
-      LoginRateLimiter.recordFailedAttempt();
-    }
+    // Gangguan jaringan/server tidak dihitung sebagai percobaan salah sandi (anti false-lockout)
     showNotify("Error Server", (error && error.message) ? error.message : "Gagal menghubungi server", "error");
   };
 
@@ -1345,8 +1345,10 @@ function handleLogout() {
 
   window.vueState.currentMenu = 'dashboard';
   window.vueState.user = null;
+  if (typeof state !== 'undefined') state.user = null;
   window.vueState.rendered = {};
   window.vueState.isBgSyncDone = false;
+  initNavigationAccess();
 
   // Reset status tombol login ke 'Masuk Aplikasi' & pulihkan NIP jika Ingatkan Saya aktif
   if (typeof resetLoginFormUI === 'function') {
@@ -1567,12 +1569,13 @@ function syncAllServerData(silent) {
   const handleSuccess = function (response) {
     if (response && response.status === 'NOT_MODIFIED') {
       console.log(`⚡ [Delta Sync] Bulk data sama dengan server (v${response.version}). Short-circuit 0ms.`);
+      initNavigationAccess();
       syncBackgroundData();
       return;
     }
 
     // JANGAN panggil hideLoading() di sini agar overlay menahan layar sampai syncBackgroundData selesai
-    if (response && response.status === 'success') {
+    if (response && (response.status === 'success' || response.status === 'UPDATED') && response.data) {
       const applySyncData = () => {
         state.user = response.data.user;
         if (state.user) {
@@ -1807,15 +1810,18 @@ function syncBackgroundData() {
 
 function switchMenu(menuId) {
   try {
-    if (state.user) {
-      const role = state.user.role;
-      if (menuId === 'persetujuan' && role !== 'Admin' && role !== 'Atasan Langsung' && role !== 'Pejabat Berwenang') {
+    initNavigationAccess();
+    const normRole = resolveCurrentUserRole_();
+    if (normRole) {
+      const isAdminRole = (normRole === 'admin' || normRole === 'super admin' || normRole === 'administrator');
+      const isApproverRole = isAdminRole || normRole === 'atasan langsung' || normRole === 'pejabat berwenang';
+      if (menuId === 'persetujuan' && !isApproverRole) {
         menuId = 'dashboard';
       }
-      if (menuId === 'manajemen' && role !== 'Admin') {
+      if (menuId === 'manajemen' && !isAdminRole) {
         menuId = 'dashboard';
       }
-      if (menuId === 'eoffice' && role !== 'Admin') {
+      if (menuId === 'eoffice' && !isAdminRole) {
         if (typeof showNotify === 'function') {
           showNotify("Akses Ditolak", "Menu E-Office hanya dapat diakses oleh Administrator.", "warning");
         }
@@ -2137,27 +2143,54 @@ if (typeof window !== 'undefined') {
   window.showCustomConfirm = showCustomConfirm;
 }
 
+function resolveCurrentUserRole_() {
+  try {
+    let r = (typeof state !== 'undefined' && state.user && state.user.role)
+      || (window.vueState && window.vueState.user && window.vueState.user.role)
+      || localStorage.getItem('transkep_user_role')
+      || '';
+    if (!r) {
+      const rawProf = localStorage.getItem('transkep_user_profile') || localStorage.getItem('transkep_user') || '';
+      if (rawProf) {
+        const parsed = JSON.parse(rawProf);
+        if (parsed && parsed.role) r = parsed.role;
+      }
+    }
+    return String(r || '').trim().toLowerCase();
+  } catch (e) {
+    return '';
+  }
+}
+
 function initNavigationAccess() {
   try {
-    const role = state.user ? state.user.role : '';
+    const normRole = resolveCurrentUserRole_();
+    const isAdmin = (normRole === 'admin' || normRole === 'super admin' || normRole === 'administrator');
+    const isApprover = isAdmin || normRole === 'atasan langsung' || normRole === 'pejabat berwenang';
     const menuManajemen = document.getElementById('nav-manajemen');
     const menuPersetujuan = document.getElementById('nav-persetujuan');
     const menuEoffice = document.getElementById('nav-eoffice');
 
     if (menuManajemen) {
-      if (role === 'Admin') { menuManajemen.classList.remove('hidden'); menuManajemen.style.display = ''; }
+      if (isAdmin) { menuManajemen.classList.remove('hidden'); menuManajemen.style.display = ''; }
       else { menuManajemen.classList.add('hidden'); menuManajemen.style.display = 'none'; }
     }
     if (menuPersetujuan) {
-      if (role === 'Admin' || role === 'Atasan Langsung' || role === 'Pejabat Berwenang') { menuPersetujuan.classList.remove('hidden'); menuPersetujuan.style.display = ''; }
+      if (isApprover) { menuPersetujuan.classList.remove('hidden'); menuPersetujuan.style.display = ''; }
       else { menuPersetujuan.classList.add('hidden'); menuPersetujuan.style.display = 'none'; }
     }
     if (menuEoffice) {
-      if (role === 'Admin') { menuEoffice.classList.remove('hidden'); menuEoffice.style.display = ''; }
+      if (isAdmin) { menuEoffice.classList.remove('hidden'); menuEoffice.style.display = ''; }
       else { menuEoffice.classList.add('hidden'); menuEoffice.style.display = 'none'; }
     }
   } catch (e) { }
 }
+window.initNavigationAccess = initNavigationAccess;
+try {
+  if (typeof localStorage !== 'undefined' && localStorage.getItem('transkep_active_nip') && localStorage.getItem('transkep_session_token')) {
+    initNavigationAccess();
+  }
+} catch (e) { }
 
 function updateThemeIcon() {
   const isLight = document.body.classList.contains('light-mode');

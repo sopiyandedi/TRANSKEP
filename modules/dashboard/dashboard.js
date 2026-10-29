@@ -85,13 +85,13 @@ window.dashboardApp = Vue.createApp({
       try {
         const rawU = localStorage.getItem('transkep_user_profile') || localStorage.getItem('transkep_user');
         if (rawU) initialUser = JSON.parse(rawU);
-      } catch (e) {}
+      } catch (e) { }
     }
     let cachedDash = null;
     try {
       const raw = localStorage.getItem('transkep_dashboard_cache');
       if (raw) cachedDash = JSON.parse(raw);
-    } catch(e) {}
+    } catch (e) { }
 
     return {
       currentUser: initialUser,
@@ -564,7 +564,7 @@ window.dashboardApp = Vue.createApp({
           if (res && res.status === 'success') {
             const notifyMsg = (typeStr === 'KGB' && newStatus === 'Proses')
               ? "Status KGB diubah ke Proses. Pegawai telah masuk antrean E-Office!"
-              : "Status berkas diperbarui.";
+              : (typeStr === 'KGB' && newStatus === 'Selesai') ? "Status KGB Selesai. Arsip KGB tetap tersimpan di E-Office untuk referensi KGB berikutnya!" : "Status berkas diperbarui.";
             showNotify("Berhasil Disimpan", notifyMsg, "success");
 
             let userRef = this.usersList.find(u => String(u.nip) === String(targetNip));
@@ -574,8 +574,15 @@ window.dashboardApp = Vue.createApp({
                 userRef.status_kgb = (newStatus === 'Menunggu') ? '' : newStatus;
                 userRef.tgl_selesai_kgb = (newStatus === 'Selesai') ? todayYMD : '';
 
-                // Sinkronisasi Instan ke Cloud Firestore (eoffice_kgb)
-                if (typeof TranskepFirebase !== 'undefined' && TranskepFirebase.isReady && TranskepFirebase.isReady()) {
+                // Sinkronisasi & Retensi Permanen Arsip KGB di Cloud Firestore (eoffice_kgb)
+                if (window.EofficeDataService && typeof window.EofficeDataService.handleDashboardKgbStatusChange === 'function') {
+                  window.EofficeDataService.handleDashboardKgbStatusChange(userRef, newStatus, todayYMD)
+                    .then(() => {
+                      if (window.vmEoffice && typeof window.vmEoffice.loadData === 'function') {
+                        window.vmEoffice.loadData(true);
+                      }
+                    });
+                } else if (typeof TranskepFirebase !== 'undefined' && TranskepFirebase.isReady && TranskepFirebase.isReady()) {
                   if (newStatus === 'Proses') {
                     TranskepFirebase.saveKgbToFirestore({
                       id_kgb: 'DRAFT-' + targetNip,
@@ -585,16 +592,34 @@ window.dashboardApp = Vue.createApp({
                       golongan: userRef.golongan || '',
                       jabatan: userRef.jabatan || '',
                       tmt_lama: userRef.tmt_kgb || '',
+                      tmt_baru: userRef.tmt_kgb || '',
                       status: 'Sedang Diproses',
                       is_from_dashboard: true,
                       tanggal_input: todayYMD
                     }).catch(e => console.warn("⚠️ [Dashboard] Firestore KGB sync notice:", e));
-                  } else {
-                    TranskepFirebase.deleteKgbFromFirestore('DRAFT-' + targetNip).catch(() => {});
+                  } else if (newStatus === 'Selesai') {
+                    const periodId = 'KGB-' + targetNip + '-' + todayYMD.slice(0, 7).replace('-', '');
+                    TranskepFirebase.saveKgbToFirestore({
+                      id_kgb: periodId,
+                      nip: targetNip,
+                      nama_pegawai: userRef.nama || '',
+                      pangkat: userRef.pangkat || '',
+                      golongan: userRef.golongan || '',
+                      jabatan: userRef.jabatan || '',
+                      tmt_lama: userRef.tmt_kgb || '',
+                      tmt_baru: userRef.tmt_kgb || '',
+                      status: 'Selesai',
+                      tgl_selesai: todayYMD,
+                      is_from_dashboard: false,
+                      tanggal_input: todayYMD
+                    }).then(() => TranskepFirebase.deleteKgbFromFirestore('DRAFT-' + targetNip).catch(() => { }))
+                      .catch(e => console.warn("⚠️ [Dashboard] Firestore KGB archive notice:", e));
+                  } else if (newStatus === 'Menunggu') {
+                    TranskepFirebase.deleteKgbFromFirestore('DRAFT-' + targetNip).catch(() => { });
                   }
-                }
-                if (window.vmEoffice && typeof window.vmEoffice.loadData === 'function') {
-                  window.vmEoffice.loadData(true);
+                  if (window.vmEoffice && typeof window.vmEoffice.loadData === 'function') {
+                    window.vmEoffice.loadData(true);
+                  }
                 }
               }
               if (typeStr === 'Pangkat') {

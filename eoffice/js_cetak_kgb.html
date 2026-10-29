@@ -1,0 +1,212 @@
+<script>
+  // ==========================================
+  // FILE: eoffice/js_cetak_kgb.html (GAS Mirror - Print Engine KGB)
+  // SINKRON DENGAN GOOGLE DOC: 1guFYYKbZ1ylW3i7zjgvFZv1fdbB88XWKJwmaJCKeefg
+  // ==========================================
+  (function(global) {
+    'use strict';
+
+    var BULAN_INDO_KGB = [
+      'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+      'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+    ];
+    var BULAN_ROMAWI_KGB = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
+
+    function formatTglCetakKgb(val) {
+      if (!val) return '-';
+      var str = String(val).trim();
+      if (!str) return '-';
+      if (/[a-zA-Z]{3,}/.test(str) && !str.includes('T')) return str;
+
+      var d, m, y;
+      if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
+        var parts = str.split('T')[0].split('-');
+        y = parseInt(parts[0], 10); m = parseInt(parts[1], 10) - 1; d = parseInt(parts[2], 10);
+      } else if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(str)) {
+        var sParts = str.split('/');
+        d = parseInt(sParts[0], 10); m = parseInt(sParts[1], 10) - 1; y = parseInt(sParts[2], 10);
+      } else {
+        var parsed = new Date(str);
+        if (!isNaN(parsed.getTime())) { d = parsed.getDate(); m = parsed.getMonth(); y = parsed.getFullYear(); }
+        else return str;
+      }
+      if (isNaN(d) || isNaN(m) || isNaN(y) || m < 0 || m > 11) return str;
+      return d + ' ' + BULAN_INDO_KGB[m] + ' ' + y;
+    }
+
+    function formatNominalGajiKgb(val) {
+      if (val === null || val === undefined) return '-';
+      var raw = String(val).trim();
+      if (!raw) return '-';
+      var digits = raw.replace(/[^0-9]/g, '');
+      if (!digits) return raw;
+      return digits.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    }
+
+    function extractBulanTahunDariTanggalKgb(tglStr) {
+      var now = new Date();
+      var romawi = BULAN_ROMAWI_KGB[now.getMonth()];
+      var tahun = String(now.getFullYear());
+      if (!tglStr) return { bulan: romawi, tahun: tahun };
+      var s = String(tglStr).trim();
+      var yMatch = s.match(/\b(20\d{2})\b/);
+      if (yMatch) tahun = yMatch[1];
+      var lower = s.toLowerCase();
+      for (var i = 0; i < BULAN_INDO_KGB.length; i++) {
+        if (lower.indexOf(BULAN_INDO_KGB[i].toLowerCase()) !== -1) {
+          return { bulan: BULAN_ROMAWI_KGB[i], tahun: tahun };
+        }
+      }
+      if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
+        var mIdx = parseInt(s.split('-')[1], 10) - 1;
+        if (mIdx >= 0 && mIdx <= 11) romawi = BULAN_ROMAWI_KGB[mIdx];
+      }
+      return { bulan: romawi, tahun: tahun };
+    }
+
+    function resolveNomorSuratKgb(kgbData) {
+      var bt = extractBulanTahunDariTanggalKgb(kgbData.tanggal_surat || kgbData.tanggal);
+      var nokgb = String(kgbData.nokgb || '').trim();
+      var bulan = String(kgbData.bulan_surat || kgbData.bulan || '').trim() || bt.bulan;
+      var tahun = String(kgbData.tahun_surat || kgbData.tahun || '').trim() || bt.tahun;
+      var full = String(kgbData.nomor_surat || '').trim();
+
+      if (full && full.indexOf('/') !== -1) {
+        var segs = full.split('/');
+        if (!nokgb && segs[0] && segs[0] !== '...') nokgb = segs[0].trim();
+        if (segs.length >= 5) {
+          if (!kgbData.bulan_surat && segs[3]) bulan = segs[3].trim();
+          if (!kgbData.tahun_surat && segs[4]) tahun = segs[4].trim();
+        }
+      }
+      if (!nokgb) nokgb = '......';
+      var assembled = nokgb + '/KPA.W10-A2/KP2.1.2/' + bulan + '/' + tahun;
+      return {
+        nokgb: nokgb,
+        bulan: bulan,
+        tahun: tahun,
+        full: (full && full.indexOf('KPA.W10-A2') === -1 && full !== '...') ? full : assembled
+      };
+    }
+
+    function resolveMasaKerjaKgb(tahunExplicit, bulanExplicit, combinedStr) {
+      var thn = (tahunExplicit !== undefined && tahunExplicit !== null && String(tahunExplicit).trim() !== '') ? String(tahunExplicit).trim() : '';
+      var bln = (bulanExplicit !== undefined && bulanExplicit !== null && String(bulanExplicit).trim() !== '') ? String(bulanExplicit).trim() : '';
+      if (thn !== '') return { tahun: thn, bulan: bln !== '' ? bln : '0' };
+
+      var raw = String(combinedStr || '').trim();
+      if (!raw) return { tahun: '0', bulan: '0' };
+      var mThn = raw.match(/(\d+)\s*(?:tahun|thn|th)/i);
+      var mBln = raw.match(/(\d+)\s*(?:bulan|bln|bl)/i);
+      if (mThn || mBln) return { tahun: mThn ? mThn[1] : '0', bulan: mBln ? mBln[1] : '0' };
+      var nums = raw.match(/\d+/g);
+      if (nums && nums.length > 0) return { tahun: nums[0], bulan: nums.length > 1 ? nums[1] : '0' };
+      return { tahun: raw, bulan: '0' };
+    }
+
+    function printSuratKgb(kgbObj) {
+      if (!kgbObj || typeof kgbObj !== 'object') {
+        if (typeof showNotify === 'function') showNotify('Gagal Cetak', 'Data KGB tidak ditemukan.', 'error');
+        return;
+      }
+      var template = document.getElementById('template-cetak-kgb-container');
+      if (!template) {
+        if (typeof showNotify === 'function') showNotify('Template Belum Siap', 'Komponen cetak_kgb.html belum termuat.', 'error');
+        return;
+      }
+      if (typeof showLoading === 'function') showLoading('Menyiapkan dokumen cetak SK KGB...');
+
+      var uList = (global.vueState && global.vueState.usersList) ? global.vueState.usersList : (typeof state !== 'undefined' && state.usersList ? state.usersList : []);
+      var userRef = Array.isArray(uList) ? uList.find(function(u) { return String(u.nip) === String(kgbObj.nip); }) : null;
+      var ketuaRef = Array.isArray(uList) ? uList.find(function(u) { return u.jabatan && u.jabatan.toLowerCase().indexOf('ketua') !== -1 && u.jabatan.toLowerCase().indexOf('wakil') === -1; }) : null;
+
+      var noInfo = resolveNomorSuratKgb(kgbObj);
+      var mkgLama = resolveMasaKerjaKgb(kgbObj.tahun_lama, kgbObj.bulan_lama, kgbObj.mkg_lama);
+      var mkgBaru = resolveMasaKerjaKgb(kgbObj.tahun_baru, kgbObj.bulan_baru, kgbObj.mkg_baru);
+      var namaPegawai = kgbObj.nama_pegawai || (userRef ? userRef.nama : '') || '-';
+      var tglLahir = formatTglCetakKgb(kgbObj.tanggal_lahir || (userRef ? (userRef.tgl_lahir || userRef.tanggal_lahir) : ''));
+      var nipPegawai = String(kgbObj.nip || (userRef ? userRef.nip : '') || '-');
+      var namaTtd = kgbObj.nama_ketua || kgbObj.nama_ttd || (ketuaRef ? ketuaRef.nama : '-');
+      var hurufGaji = kgbObj.terbilang_gaji || (typeof terbilangRupiah === 'function' ? terbilangRupiah(kgbObj.gaji_baru) : '') || '-';
+
+      var htmlContent = template.innerHTML;
+      if (kgbObj.nomor_surat && kgbObj.nomor_surat.indexOf('KPA.W10-A2') === -1 && kgbObj.nomor_surat.indexOf('...') === -1) {
+        htmlContent = htmlContent.split('{{nokgb}}/KPA.W10-A2/KP2.1.2/{{bulan}}/{{tahun}}').join(kgbObj.nomor_surat);
+      }
+
+      var replacements = {
+        '{{nokgb}}': noInfo.nokgb,
+        '{{bulan}}': noInfo.bulan,
+        '{{tahun}}': noInfo.tahun,
+        '{{nomor_surat}}': noInfo.full,
+        '{{tanggal}}': formatTglCetakKgb(kgbObj.tanggal_surat || new Date()),
+        '{{tanggal_surat}}': formatTglCetakKgb(kgbObj.tanggal_surat || new Date()),
+        '{{nama}}': namaPegawai,
+        '{{nama_gelar}}': namaPegawai,
+        '{{tanggl lahir}}': tglLahir,
+        '{{tanggal lahir}}': tglLahir,
+        '{{tanggal_lahir}}': tglLahir,
+        '{{NIP}}': nipPegawai,
+        '{{nip}}': nipPegawai,
+        '{{pangkat}}': kgbObj.pangkat || (userRef ? userRef.pangkat : '-') || '-',
+        '{{jabatan}}': kgbObj.jabatan || (userRef ? userRef.jabatan : '-') || '-',
+        '{{unit_kerja}}': kgbObj.unit_kerja || 'Pengadilan Agama Indramayu Kelas 1.A.',
+        '{{gaji_lama}}': formatNominalGajiKgb(kgbObj.gaji_lama),
+        '{{pejabat_lama}}': kgbObj.pejabat_lama || 'Ketua Pengadilan Agama Indramayu',
+        '{{tanggal_sk_lama}}': formatTglCetakKgb(kgbObj.tanggal_sk_lama),
+        '{{nomor_sk_lama}}': kgbObj.nomor_sk_lama || '-',
+        '{{tmt_gaji_lama}}': formatTglCetakKgb(kgbObj.tmt_lama),
+        '{{tmt_lama}}': formatTglCetakKgb(kgbObj.tmt_lama),
+        '{{tahun_lama}}': mkgLama.tahun,
+        '{{bulan_lama}}': mkgLama.bulan,
+        '{{gaji_baru}}': formatNominalGajiKgb(kgbObj.gaji_baru),
+        '{{hurif_gaji}}': hurufGaji,
+        '{{huruf_gaji}}': hurufGaji,
+        '{{terbilang_gaji}}': hurufGaji,
+        '{{tahun_baru}}': mkgBaru.tahun,
+        '{{bulan_baru}}': mkgBaru.bulan,
+        '{{golongan}}': kgbObj.golongan || (userRef ? userRef.golongan : '-') || '-',
+        '{{tmt_mulai}}': formatTglCetakKgb(kgbObj.tmt_baru),
+        '{{tmt_baru}}': formatTglCetakKgb(kgbObj.tmt_baru),
+        '{{tmt_datang}}': formatTglCetakKgb(kgbObj.tmt_yad),
+        '{{tmt_yad}}': formatTglCetakKgb(kgbObj.tmt_yad),
+        '{{dasar_pp}}': kgbObj.dasar_pp || 'Peraturan Pemerintah Republik Indonesia Nomor : 05 Tahun 2024',
+        '{{nama_ttd}}': namaTtd,
+        '{{nama_ketua}}': namaTtd,
+        '{{tte_qr_slot}}': kgbObj.tte_qr_url ? '<img src="' + kgbObj.tte_qr_url + '" style="width:62px;height:62px;" alt="QR TTE">' : ''
+      };
+
+      for (var key in replacements) {
+        if (Object.prototype.hasOwnProperty.call(replacements, key)) {
+          htmlContent = htmlContent.split(key).join(replacements[key]);
+        }
+      }
+
+      var finalHTML = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Cetak SK KGB</title></head><body>' + htmlContent + '</body></html>';
+      var iframe = document.createElement('iframe');
+      iframe.style.position = 'fixed'; iframe.style.right = '0'; iframe.style.bottom = '0';
+      iframe.style.width = '0'; iframe.style.height = '0'; iframe.style.border = 'none';
+      document.body.appendChild(iframe);
+
+      var doc = iframe.contentWindow.document;
+      doc.open(); doc.write(finalHTML); doc.close();
+
+      setTimeout(function() {
+        if (typeof hideLoading === 'function') hideLoading();
+        iframe.contentWindow.focus();
+        iframe.contentWindow.print();
+        setTimeout(function() { if (document.body.contains(iframe)) document.body.removeChild(iframe); }, 3500);
+      }, 900);
+    }
+
+    global.printSuratKgb = printSuratKgb;
+    global.KgbPrintHelper = {
+      formatTglCetakKgb: formatTglCetakKgb,
+      formatNominalGajiKgb: formatNominalGajiKgb,
+      extractBulanTahunDariTanggalKgb: extractBulanTahunDariTanggalKgb,
+      resolveNomorSuratKgb: resolveNomorSuratKgb,
+      resolveMasaKerjaKgb: resolveMasaKerjaKgb
+    };
+  })(typeof window !== 'undefined' ? window : this);
+</script>
+

@@ -1,7 +1,7 @@
 # ==========================================
 # .claspignore (TRANSKEP Backend GAS Isolation)
 # ==========================================
-# Mencegah berkas frontend PWA, dokumentasi, dan aset
+# Mencegah berkas frontend PWA, skrip CLI Node.js lokal, dokumentasi, dan aset
 # ikut terunggah ke Google Apps Script saat 'clasp push'
 
 .git/**
@@ -10,6 +10,8 @@ CNAME
 .nojekyll
 core/**
 modules/**
+scripts/**
+node_modules/**
 css/**
 img/**
 vendor/**

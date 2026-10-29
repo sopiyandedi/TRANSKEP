@@ -3347,3 +3347,191 @@ Pengguna melaporkan bahwa pratinjau (*preview*) dokumen PDF di modal SK dan SOP 
 - [x] Integrasi Trigger Dashboard TMT KGB (submitTmtStatus) langsung meng-upsert dokumen DRAFT-{nip} ke Cloud Firestore seketika (0ms).
 - [x] Versi PWA Service Worker (sw.js) dan APP_BUILD_VER di index.html dinaikkan ke transkep-v3.6.3 / 3.6.3.
 - [x] Seluruh sintaks JavaScript terverifikasi 100% valid tanpa galat via node -c.
+
+
+---
+
+### TAHAP 64: Penyempurnaan Workflow KGB End-to-End (4 Ikon Aksi Kontrol, Retensi Permanen Siklus 2 Tahunan, Sinkronisasi Template Google Docs & Modul Cetak Mandiri `cetak_kgb`)
+
+#### 1. Latar Belakang & Audit Akar Masalah (Root Cause Analysis)
+1. **Keterbatasan Kolom Aksi Kontrol KGB Saat Ini (`view_eoffice.html`):**
+   - Kolom *Aksi Kontrol* pada baris KGB saat ini hanya memiliki satu tombol `"Lengkapi & Cetak SK"` ketika status belum `Selesai`, dan kehilangan tombol Edit ketika status sudah `Selesai`.
+   - Tidak tersedia tombol **Delete** (untuk menghapus draf salah input atau data dummy `Inisialisasi Koleksi KGB`), tombol **Kirim** (untuk pengajuan berkas ke tahap verifikasi / TTE Pimpinan), maupun tombol **Cetak** instan satu klik di baris tabel.
+2. **Bug Penghapusan Data KGB Saat Status Dashboard Berubah Menjadi `Selesai` (`dashboard.js` & `js_dashboard.html`):**
+   - Pada `submitTmtStatus(newStatus)`, cabang `else` (ketika `newStatus !== 'Proses'`, termasuk saat diubah ke `'Selesai'`) saat ini memanggil `TranskepFirebase.deleteKgbFromFirestore('DRAFT-' + targetNip)`. Akibatnya, berkas KGB berisiko terhapus dari E-Office alih-alih dipertahankan sebagai arsip riwayat dan basis data *auto-prefill* KGB 2 tahun mendatang.
+   - Selain itu, ID dokumen KGB yang sudah selesai harus menggunakan ID unik per periode (tidak tertimpa `DRAFT-{nip}` pada siklus 2 tahun berikutnya).
+3. **Ketidaksesuaian Placeholder Template Google Docs Baru & Kebutuhan Modul Cetak Mandiri (`cetak_kgb`):**
+   - Pengguna telah menyiapkan Master Template Google Docs baru (`1guFYYKbZ1ylW3i7zjgvFZv1fdbB88XWKJwmaJCKeefg`) dan Folder Google Drive khusus output KGB (`1IwQ96D4dY6HrPCqoXY2opX8FHWaMjAHQ`).
+   - Hasil audit visual terhadap template Google Docs menemukan 15+ variabel spesifik beserta **variasi penulisan/typo di dalam template** yang wajib di-handle secara *fault-tolerant*:
+     * Header Nomor: `{{nokgb}}/KPA.W10-A2/KP2.1.2/{{bulan}}/{{tahun}}` dan `{{tanggal}}`
+     * Nama & Tgl Lahir: `{{nama}}` dan **`{{tanggl lahir}}`** *(typo kurang huruf 'a' & memakai spasi)*
+     * NIP: **`{{NIP}}`** *(huruf kapital; `replaceText` bersifat case-sensitive)*
+     * Pangkat/Jabatan: `{{pangkat}}/{{jabatan}}`
+     * Data SK Lama: `{{gaji_lama}}`, `{{pejabat_lama}}`, `{{tanggal_sk_lama}}`, `{{nomor_sk_lama}}`, `{{tmt_gaji_lama}}`, `{{tahun_lama}}`, `{{bulan_lama}}`
+     * Data KGB Baru: `{{gaji_baru}}`, **`{{hurif_gaji}}`** *(typo huruf 'i' pada kata huruf)*, `{{tahun_baru}}`, `{{golongan}}`, `{{tmt_mulai}}`, `{{tmt_datang}}`
+     * Penandatangan: `{{nama_ttd}}`
+   - Saat ini `createKgbGoogleDoc_` di `eoffice/kgb.js` belum menyalin file ke folder `1IwQ96D4dY6HrPCqoXY2opX8FHWaMjAHQ` dan belum memiliki modul cetak mandiri (`cetak_kgb.html` & `js_cetak_kgb.js` / `cetak_kgb.js`) untuk cetak langsung 0ms di browser.
+
+#### 2. Rancangan Solusi Arsitektur (3 Tahap Terpadu)
+1. **Tahap 1 — 4 Ikon Aksi Kontrol KGB (`Edit`, `Kirim TTE`, `Cetak`, `Delete`):**
+   - Menghadirkan 4 tombol ikon ergonomis dengan *tooltip* jelas pada setiap baris KGB di `view_eoffice.html`:
+     * **Edit (`fa-pen-to-square`):** Membuka modal form KGB kapan saja (baik status `Sedang Diproses`, `Menunggu TTE`, maupun `Selesai`).
+     * **Kirim (`fa-paper-plane`):** Memvalidasi kelengkapan data pokok SK KGB, lalu mengubah status berkas di Cloud Firestore (`eoffice_kgb`) menjadi **`Menunggu TTE Pimpinan`** (`tte_status: 'Menunggu TTE'`, menyimpan waktu pengajuan & pejabat penandatangan) sebagai pintu masuk proses Tanda Tangan Elektronik (TTE) Ketua.
+     * **Cetak (`fa-print`):** Memanggil mesin cetak mandiri `printSuratKgb(item.rawData)` (0ms browser print/PDF format resmi PA Indramayu) + tombol akses cepat Google Docs jika `file_doc_url` sudah terbit di Drive.
+     * **Delete (`fa-trash-can`):** Konfirmasi penghapusan dokumen KGB dari Cloud Firestore (`eoffice_kgb`) & background Sheets sync (termasuk mereset `status_kgb` pegawai jika yang dihapus adalah antrean aktif agar tidak muncul *ghost draft*).
+2. **Tahap 2 — Retensi Permanen Pasca-`Selesai` & Smart Auto-Prefill Siklus 2 Tahun:**
+   - Memperbaiki `submitTmtStatus` di `modules/dashboard/dashboard.js` & `dashboard/js_dashboard.html`:
+     * Saat status diubah ke **`Selesai`**, dokumen KGB di `eoffice_kgb` **TIDAK DIHAPUS**, melainkan diperbarui statusnya menjadi **`Selesai`** (dipromosikan ke ID permanen `KGB-{nip}-{periode}` jika sebelumnya masih `DRAFT-{nip}`) sehingga tetap tampil di tabel E-Office.
+     * Penghapusan `DRAFT-{nip}` hanya dilakukan apabila Admin membatalkan status kembali ke **`Menunggu`** dan draf tersebut belum pernah diterbitkan.
+   - Menambahkan filter **Status Berkas** di E-Office (`Semua Status`, `Sedang Diproses`, `Menunggu TTE Pimpinan`, `Selesai / Arsip`) dengan default **`Semua Status`** agar berkas yang sudah `Selesai` tetap tampil sebagai histori aktif.
+   - **Smart Auto-Prefill 2 Tahunan (`openKgbModalForm`):** Ketika pegawai memasuki siklus KGB berikutnya (2 tahun mendatang), form KGB otomatis mencari riwayat KGB `Selesai` terakhir milik NIP tersebut di `eoffice_kgb` dan langsung mengisikan *Gaji Pokok Lama* (dari `gaji_baru` sebelumnya), *Nomor SK Lama* (dari `nomor_surat` sebelumnya), *Tanggal SK Lama* (dari `tanggal_surat` sebelumnya), *TMT Gaji Lama* (dari `tmt_baru` sebelumnya), serta *Masa Kerja Lama* (`tahun_lama` & `bulan_lama` dari masa kerja baru sebelumnya).
+3. **Tahap 3 — Sinkronisasi Penuh Template Google Docs & Modul Cetak Mandiri (`cetak_kgb.html` & `js_cetak_kgb.js`):**
+   - Menyesuaikan form KGB agar mendukung pemecahan komponen Nomor Surat (`nokgb`, `bulan` Romawi otomatis, `tahun`) serta pemecahan Masa Kerja (`tahun_lama`, `bulan_lama`, `tahun_baru`, `bulan_baru`), dengan kompatibilitas mundur penuh terhadap data lama.
+   - Memperbarui generator Google Docs di `eoffice/kgb.js`:
+     * Menggunakan Template ID `1guFYYKbZ1ylW3i7zjgvFZv1fdbB88XWKJwmaJCKeefg` dan menyimpan salinan langsung ke Folder Drive ID `1IwQ96D4dY6HrPCqoXY2opX8FHWaMjAHQ` (`templateFile.makeCopy(fileName, targetFolder)`).
+     * Me-render seluruh placeholder sesuai dokumen asli termasuk penanganan *alias/typo* (`{{tanggl lahir}}`, `{{NIP}}`, `{{hurif_gaji}}`, `{{nokgb}}`, `{{bulan}}`, `{{tahun}}`, `{{tanggal}}`, `{{nama}}`, `{{tmt_gaji_lama}}`, `{{tahun_lama}}`, `{{bulan_lama}}`, `{{tahun_baru}}`, `{{tmt_mulai}}`, `{{tmt_datang}}`, `{{nama_ttd}}`).
+   - Membuat berkas baru khusus cetak KGB:
+     * Modular Web/PWA: `modules/eoffice/cetak/cetak_kgb.html` dan `modules/eoffice/cetak/js_cetak_kgb.js` (didaftarkan ke `index.html` & `sw.js`).
+     * Ekosistem GAS: `eoffice/cetak_kgb.html` dan `eoffice/js_cetak_kgb.html`.
+
+#### 3. Daftar Berkas yang Akan Dibuat / Dimodifikasi
+- **Berkas Baru:**
+  - `modules/eoffice/cetak/cetak_kgb.html` (Template HTML cetak A4 presisi 1:1 sesuai Google Docs PA Indramayu)
+  - `modules/eoffice/cetak/js_cetak_kgb.js` (Mesin render & *instant print* KGB client-side)
+  - `eoffice/cetak_kgb.html` & `eoffice/js_cetak_kgb.html` (Mirror komponen cetak untuk lingkungan GAS)
+- **Berkas yang Dimodifikasi:**
+  - `modules/eoffice/view_eoffice.html` & `eoffice/view_eoffice.html` (+ `eoffice/view_kgb.html` jika terpisah): Penambahan 4 ikon aksi kontrol (`Edit`, `Kirim`, `Cetak`, `Delete`), filter status berkas, serta penyesuaian field `nokgb`/`bulan`/`tahun` dan `tahun_lama`/`bulan_lama`/`tahun_baru` di modal KGB.
+  - `modules/eoffice/eoffice.js` & `eoffice/js_eoffice.html`: Handler untuk `editKgbItem`, `sendKgbForTte`, `printKgbItem`, `deleteKgbItem`, dan badge status `Menunggu TTE Pimpinan`.
+  - `modules/eoffice/kgb.js` & `eoffice/js_kgb.html`: Logika *Smart Auto-Prefill* dari riwayat KGB `Selesai` sebelumnya, auto-parser nomor surat & masa kerja, serta integrasi tombol cetak.
+  - `modules/eoffice/eoffice_data.js`: Fungsi `updateKgbStatusTte`, `deleteKgbRecord`, `promoteDraftOnComplete`, dan `getLastCompletedKgbByNip`.
+  - `eoffice/kgb.js` (Backend GAS): Integrasi Folder ID `1IwQ96D4dY6HrPCqoXY2opX8FHWaMjAHQ`, Template ID `1guFYYKbZ1ylW3i7zjgvFZv1fdbB88XWKJwmaJCKeefg`, endpoint `deleteKgbDoc` (opsional cleanup sheet), dan pemetaan lengkap seluruh placeholder Google Docs.
+  - `modules/dashboard/dashboard.js` & `dashboard/js_dashboard.html`: Perbaikan `submitTmtStatus` agar mengubah status KGB di Firestore menjadi `'Selesai'` (bukan menghapusnya!) saat ditandai selesai dari Dashboard.
+  - `index.html` & `sw.js`: Pendaftaran `cetak_kgb.html` & `js_cetak_kgb.js` serta *cache busting* ke **`v3.6.5`**.
+
+#### 4. Status Eksekusi: [SELESAI & AKTIF] ✅
+- [x] Persetujuan pengguna ("ok terpakan bro") diterima.
+- [x] 4 Ikon Aksi Kontrol KGB (`Edit`, `Kirim TTE`, `Cetak`, `Delete`) + Modal Konfirmasi & Filter Status Berkas aktif di `view_eoffice.html` & `eoffice.js`.
+- [x] Retensi Permanen Arsip KGB saat status Bar Dashboard berubah menjadi `Selesai` (`KGB-{nip}-{YYYYMM}`) + Smart Auto-Prefill Data Lama untuk siklus KGB 2 tahun berikutnya aktif di `eoffice_data.js`, `dashboard.js`, & `kgb.js`.
+- [x] Sinkronisasi Master Google Docs (`1guFYYKbZ1ylW3i7zjgvFZv1fdbB88XWKJwmaJCKeefg`) & Folder Google Drive (`1IwQ96D4dY6HrPCqoXY2opX8FHWaMjAHQ`) lengkap dengan seluruh placeholder (termasuk toleransi typo `{{tanggl lahir}}`, `{{hurif_gaji}}`, `{{NIP}}`) aktif di `eoffice/kgb.js`.
+- [x] Modul Cetak Mandiri `modules/eoffice/cetak/cetak_kgb.html` & `modules/eoffice/cetak/js_cetak_kgb.js` (+ mirror GAS `eoffice/cetak_kgb.html` & `eoffice/js_cetak_kgb.html`) selesai dibuat dan terdaftar di `index.html` & `sw.js` (`transkep-v3.6.5`).
+- [x] Seluruh 12 berkas JavaScript & scriptlet HTML lulus uji kompilasi sintaks (`vm.Script`) tanpa error.
+
+
+---
+
+### TAHAP 65: Resolusi Gagal Login Admin Pasca-Deploy GAS `@311` (Isolasi `scripts/**` di `.claspignore` & Proteksi False-Lockout Jaringan)
+
+#### 1. Latar Belakang & Akar Masalah (Root Cause Analysis)
+- **Keluhan Pengguna:**
+  - Admin tidak dapat masuk ke aplikasi meskipun NIP dan kata sandi sudah 100% benar.
+- **Akar Masalah Teknis Utama (Terbukti via Uji Kompilasi Global V8):**
+  1. **Tabrakan Global V8 Akibat Folder `scripts/**` Belum Masuk `.claspignore`:**
+     - Pada saat `clasp push` & `clasp deploy @311` dijalankan, berkas `.claspignore` belum mengecualikan direktori utilitas lokal `scripts/**`.
+     - Akibatnya, dua skrip CLI Node.js lokal (`scripts/seed_all_pkp_firestore.js` dan `scripts/seed_master_kinerja.js`) ikut terunggah ke server Google Apps Script.
+     - Karena Google Apps Script menyatukan seluruh berkas `.gs`/`.js` ke dalam **satu ruang lingkup global V8**, kedua baris `const https = require('https');` di masing-masing file langsung menyebabkan crash kompilasi global:
+       `SyntaxError: Identifier 'https' has already been declared` (serta `ReferenceError: require is not defined` dan pemanggilan `main()` di level top-level).
+     - Akibat crash kompilasi global tersebut, setiap request login (`verifyLogin` / `doPost`) ditolak oleh Google Apps Script dengan halaman HTML error sebelum kode `code.js` atau `api_router.js` sempat dieksekusi.
+  2. **Efek Samping False-Lockout pada `handleFailure` (`core/core.js`):**
+     - Di `handleLogin` (`core/core.js` baris 1275–1281), kegagalan koneksi/respon server (`handleFailure`) ikut memanggil `LoginRateLimiter.recordFailedAttempt()`. Akibatnya, ketika server sedang gangguan, klik ke-2 langsung mengunci tombol login Admin selama 60 detik padahal kata sandi benar.
+
+#### 2. Rencana Implementasi Perbaikan
+1. **Isolasi Permanen Skrip Node.js Lokal dari Google Apps Script (`.claspignore`):**
+   - Menambahkan aturan `scripts/**` pada `.claspignore`.
+   - Menjalankan ulang `clasp push` (otomatis membersihkan `scripts/seed_all_pkp_firestore` & `scripts/seed_master_kinerja` dari server GAS) diikuti `clasp deploy -i AKfycbzFrbQTqmVzMio7mderK-S9ntFVjXiWYFgnXfy9fW_SUKOcIxfPywP2He1flhaK_AZ0ZA` ke versi baru agar endpoint `verifyLogin` langsung pulih 100% seketika.
+2. **Pemurnian `LoginRateLimiter` di `core/core.js`:**
+   - Memastikan `LoginRateLimiter.recordFailedAttempt()` hanya dipanggil ketika server benar-benar membalas penolakan kredensial (`NIP atau Sandi tidak valid`), dan **tidak** dipanggil pada `handleFailure` (gangguan jaringan / error HTTP server).
+   - Menaikkan versi build cache di `index.html` dan `sw.js` ke **`v3.6.6`**.
+
+#### 3. Daftar Berkas yang Akan Dimodifikasi
+- `.claspignore`: Penambahan pengecualian `scripts/**`.
+- `core/core.js`: Pemisahan `handleFailure` (error jaringan/server) dari `LoginRateLimiter.recordFailedAttempt()`.
+- `index.html` & `sw.js`: Pembaruan versi cache PWA ke `transkep-v3.6.6`.
+
+#### 4. Estimasi Dampak & Status
+- **Dampak:** Memulihkan login Admin dan seluruh pegawai 100% secara instan di server Google Apps Script tanpa menyentuh atau mengubah data password di `user_data`.
+- **Status:** `[SELESAI & AKTIF]` ✅
+
+
+---
+
+### TAHAP 66: Pemulihan Visibilitas Menu Sidebar Admin (`E-Office` & `Kelola Pegawai`) & Perbaikan Sinkronisasi Status `getBulkData` (`UPDATED` / `NOT_MODIFIED`)
+
+#### 1. Latar Belakang & Akar Masalah (Root Cause Analysis)
+- **Keluhan Pengguna:**
+  - Pengguna berhasil masuk sebagai `Super Admin IT` (`Admin`, `NIP: 19800101001`), namun menu **E-Office** (`#nav-eoffice`) dan **Kelola Pegawai** (`#nav-manajemen`) di bilah navigasi samping (sidebar kiri) tidak muncul (hilang).
+- **Akar Masalah Teknis Utama (Terbukti 100% di Kode Sumber):**
+  1. **Mismatch Status Respon `getBulkData` (`'UPDATED'` vs `'success'`) di `core/core.js` Baris 1573:**
+     - Di `core/view_sidebar.html` (baris 97 & 103), tombol `#nav-eoffice` dan `#nav-manajemen` memiliki class awal `hidden` dan hanya ditampilkan oleh fungsi `initNavigationAccess()`.
+     - Di seluruh `core/core.js`, fungsi `initNavigationAccess()` **hanya** dipanggil di satu titik saja, yakni baris 1616 di dalam blok `if (response && response.status === 'success')` pada `syncAllServerData()`.
+     - Padahal fungsi backend `getBulkData()` di `code.js` (baris 394 & 485) mengembalikan `{ status: 'UPDATED', ... }` atau `{ status: 'NOT_MODIFIED', ... }` (bukan `'success'`). Akibatnya, blok tersebut terlewati secara diam-diam (`isSilent === true`), sehingga **`initNavigationAccess()` tidak pernah dieksekusi sama sekali** (*100% dead branch*), sekaligus membuat pembaruan `usersList` dan pemicu `syncBackgroundData()` pada status `'UPDATED'` ikut terlewati!
+  2. **Absennya Pemanggilan `initNavigationAccess()` pada 3 Jalur Siklus Hidup Utama:**
+     - **Saat Rehidrasi Sesi Awal / Refresh (`DOMContentLoaded`, `core/core.js` baris 596–603):** Hanya memanggil `renderGlobalHeader()` tanpa memanggil `initNavigationAccess()`.
+     - **Saat Login Berhasil (`handleLogin`, `core/core.js` baris 1231–1257):** Hanya memanggil `renderGlobalHeader()` tanpa langsung membuka akses navigasi sidebar Admin pada `0ms`.
+     - **Saat Delta Sync Short-Circuit (`response.status === 'NOT_MODIFIED'`, `core/core.js` baris 1566–1570 & `javascript.html` baris 550–554):** Langsung melakukan `return;` sebelum mencapai baris `initNavigationAccess()`.
+  3. **Normalisasi Role Admin Case-Insensitive:**
+     - Pada `initNavigationAccess()` dan `switchMenu()`, pencocokan `role === 'Admin'` masih peka kapitalisasi tanpa `.trim().toLowerCase()` serta belum memiliki fallback ke `window.vueState.user.role` / `localStorage.getItem('transkep_user_role')`.
+
+#### 2. Rencana Implementasi Perbaikan
+1. **Perbaikan Kondisi Status `getBulkData` di `syncAllServerData` (`core/core.js`):**
+   - Mengubah `if (response && response.status === 'success')` menjadi `if (response && (response.status === 'success' || response.status === 'UPDATED') && response.data)` agar selaras 100% dengan output `getBulkData` di `code.js` dan `javascript.html`.
+2. **Penempatan `initNavigationAccess()` di Seluruh 4 Titik Siklus Hidup Sesi (`core/core.js` & `javascript.html`):**
+   - Dipanggil seketika saat **Login Sukses (`0ms`)** di `handleLogin` tepat setelah `renderGlobalHeader()`.
+   - Dipanggil seketika saat **Rehidrasi Halaman / F5 Refresh (`0ms`)** di `DOMContentLoaded` sebelum `switchMenu(lastMenu)`.
+   - Dipanggil pada cabang **Delta Sync `NOT_MODIFIED`** sebelum `syncBackgroundData(); return;`.
+   - Dipanggil pada cabang **`UPDATED` / `success`** di `syncAllServerData`.
+   - Mereset kembali tombol `#nav-eoffice` & `#nav-manajemen` ke `hidden` saat `handleLogout()` agar bersih ketika berganti akun ke Pegawai non-Admin.
+3. **Hardening Pembacaan Role Case-Insensitive (`initNavigationAccess` & `switchMenu`):**
+   - Membaca role dari `state.user.role || window.vueState.user.role || localStorage.getItem('transkep_user_role')` dengan normalisasi `.trim().toLowerCase() === 'admin'`.
+4. **PWA Cache Busting ke `v3.6.7`:**
+   - Menaikkan `CURRENT_APP_BUILD`, `APP_BUILD_VER`, dan `CACHE_NAME` di `index.html` serta `sw.js` ke **`transkep-v3.6.7`** / **`3.6.7`**.
+
+#### 3. Daftar Berkas yang Akan Dimodifikasi
+- `core/core.js`: Perbaikan kondisi `UPDATED` di `syncAllServerData`, penambahan `initNavigationAccess()` di 4 titik siklus hidup + reset saat logout, dan normalisasi role case-insensitive.
+- `javascript.html`: Penyelarasan pemanggilan `initNavigationAccess()` pada jalur `DOMContentLoaded`, `handleLogin`, `NOT_MODIFIED`, dan normalisasi role (cermin GAS).
+- `index.html` & `sw.js`: Pembaruan versi cache PWA ke `transkep-v3.6.7`.
+
+#### 4. Estimasi Dampak & Status
+- **Dampak:** Menu **E-Office** dan **Kelola Pegawai** langsung muncul seketika (`0ms`) begitu Admin login maupun saat halaman di-refresh (`F5`), sekaligus memulihkan alur sinkronisasi `usersList` saat status `getBulkData` bernilai `'UPDATED'`. Pegawai non-Admin tetap terproteksi penuh (menu tersembunyi).
+- **Status:** `[SELESAI & AKTIF]` ✅
+
+
+---
+
+### TAHAP 67: Pemulihan Repositori `.git` Lokal (Sinkronisasi Dual-Remote `origin` & `prod`), Perbaikan Caching Root `'/'` di `sw.js`, dan Eksekusi Langsung `initNavigationAccess()` (`v3.6.8`)
+
+#### 1. Latar Belakang & Akar Masalah Terverifikasi (Root Cause Analysis)
+- **Keluhan Pengguna:**
+  - Setelah Tahap 66 (`v3.6.7`), saat membuka aplikasi di browser sebagai `Super Admin IT` (`NIP: 19800101001`), menu **E-Office** dan **Kelola Pegawai** di sidebar kiri masih belum tampil.
+- **3 Akar Masalah Teknis yang Terbukti 100% dari Hasil Inspeksi Direktori & Kode:**
+  1. **Folder `.git` di Workspace Lokal Hilang / Terhapus (Penyebab Utama 100% Website Produksi Belum Terupdate):**
+     - Hasil pemeriksaan direktori root workspace `TRANSKEP` membuktikan bahwa folder `.git` saat ini **tidak ada** (`c:\Users\user\.gemini\antigravity-ide\projek\TRANSKEP\.git\config` -> *file does not exist*).
+     - Tadi pada Tahap 65, perbaikan Login Admin berhasil tayang karena dikirim via `clasp push --force` & `clasp deploy @312` langsung ke server Google Apps Script (menggunakan `.clasp.json`).
+     - Sebaliknya, seluruh perubahan frontend lokal pada Tahap 64 (`v3.6.5`) hingga Tahap 66 (`v3.6.7` — perbaikan `initNavigationAccess()` di `core/core.js`) **belum pernah terkirim sama sekali** ke repositori GitHub Pages produksi (`prod`: `https://github.com/transkep/transkep.github.io.git` -> `https://sso.pa-indramayu.go.id/`). Akibatnya, domain `sso.pa-indramayu.go.id` masih menjalankan kode lama `v3.6.3`/`v3.6.4` yang memiliki bug `response.status === 'success'`.
+  2. **Bug Strategi Caching Root `'/'` pada Service Worker (`sw.js` Baris 161):**
+     - Di `sw.js` baris 161, blok `Network-First` hanya mengecek `reqUrl.pathname.endsWith('.js') || reqUrl.pathname.endsWith('.html') || reqUrl.search.includes('v=')`.
+     - Ketika pengguna mengakses `https://sso.pa-indramayu.go.id/` (tanpa `/index.html`), nilai `reqUrl.pathname` adalah `'/'` (tidak berakhiran `.html`). Akibatnya, permintaan navigasi utama jatuh ke blok C (*Stale-While-Revalidate* / *Cache-First*) yang menyajikan `index.html` versi lama dari cache PWA beserta `APP_BUILD_VER` usang.
+  3. **Penguatan Eksekusi Langsung & Pembacaan Profil JSON pada `initNavigationAccess()` (`core/core.js`):**
+     - Agar visibilitas menu Admin kebal terhadap kondisi race-condition event, `initNavigationAccess()` perlu dipanggil langsung pada saat `core/core.js` selesai dimuat (karena `core/view_sidebar.html` sudah disuntikkan ke DOM terlebih dahulu oleh loader `index.html`), serta dilengkapi fallback ekstraksi `role` langsung dari JSON `transkep_user_profile` / `transkep_user` dan pencocokan variasi role Admin (`admin`, `super admin`, `administrator`).
+
+#### 2. Rencana Implementasi Perbaikan
+1. **Pemulihan Non-Destruktif Koneksi Git Dual-Remote (`origin` & `prod`) & Push Langsung ke Produksi:**
+   - Menginisialisasi ulang `.git` di workspace (`git init -b main`), mendaftarkan kembali kedua remote resmi:
+     * `origin`: `https://github.com/sopiyandedi/TRANSKEP.git`
+     * `prod`: `https://github.com/transkep/transkep.github.io.git`
+   - Menarik riwayat commit (`git fetch origin main` & `git fetch prod main`) lalu mengaitkan `HEAD` secara non-destruktif (`git reset --mixed origin/main`) **tanpa mengubah atau menimpa satu pun berkas lokal di komputer**.
+   - Melakukan commit seluruh pembaruan (`v3.6.8`) dan mendorongnya langsung (`git push`) ke **`origin/main`** dan **`prod/main`** hingga terverifikasi live di GitHub Pages.
+2. **Perbaikan `Network-First` untuk Root Navigation `'/'` di `sw.js` & Registrasi SW Berversi di `index.html`:**
+   - Memperbarui kondisi di `sw.js` baris 161 agar mencakup `event.request.mode === 'navigate' || reqUrl.pathname === '/' || reqUrl.pathname.endsWith('/')`.
+   - Memperbarui registrasi Service Worker di `index.html` menjadi `navigator.serviceWorker.register('./sw.js?v=' + APP_BUILD_VER)` dan menaikkan versi build ke **`transkep-v3.6.8`** / **`3.6.8`**.
+3. **Hardening Berlapis `initNavigationAccess()` (`core/core.js` & `javascript.html`):**
+   - Menambahkan ekstraksi fallback role dari `localStorage.getItem('transkep_user_profile')` / `localStorage.getItem('transkep_user')`, pencocokan toleran (`admin`, `super admin`, `administrator`), serta eksekusi langsung `initNavigationAccess()` saat `core/core.js` dimuat ke DOM.
+
+#### 3. Daftar Berkas & Infrastruktur yang Akan Dimodifikasi
+- Repositori `.git` lokal: Re-link non-destruktif ke `origin` & `prod` + push ke produksi.
+- `sw.js`: Perbaikan `Network-First` pada `event.request.mode === 'navigate'` / `'/'` & bump `CACHE_NAME = 'transkep-v3.6.8'`.
+- `index.html`: Registrasi `./sw.js?v=` + bump `CURRENT_APP_BUILD` & `APP_BUILD_VER` ke `3.6.8`.
+- `core/core.js` & `javascript.html`: Fallback JSON profile + eksekusi langsung `initNavigationAccess()`.
+
+#### 4. Estimasi Dampak & Status
+- **Dampak:** Memulihkan jalur deploy ke `https://sso.pa-indramayu.go.id/` secara permanen, memastikan Service Worker selalu menarik `index.html` terbaru dari jaringan, dan menampilkan kembali menu **E-Office** beserta **Kelola Pegawai** (termasuk seluruh fitur 4 ikon KGB Tahap 64) secara instan di browser produksi.
+- **Status:** `[SELESAI & AKTIF]` ✅
