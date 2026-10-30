@@ -176,7 +176,7 @@
            <div class="w-28 text-center flex flex-col justify-center">
               <div class="text-[8px] uppercase font-bold text-slate-500 mb-0.5">Status</div>
               <!-- Tombol Interaktif untuk Admin / Operator -->
-              <button v-if="isAdmin" type="button" @click="openModalStatus(item)" :class="['px-2 py-1.5 rounded-lg text-[9px] font-bold border uppercase tracking-wider hover:scale-105 hover:brightness-125 transition w-full flex items-center justify-center gap-1.5 group cursor-pointer shadow-sm', item.statusClass]" title="Klik untuk Ubah Status Berkas">
+              <button v-if="isAdmin" type="button" @click="openModalStatus(item)" :class="['px-2 py-1.5 rounded-lg text-[9px] font-bold border uppercase tracking-wider hover:scale-105 hover:brightness-125 transition w-full flex items-center justify-center gap-1.5 group cursor-pointer shadow-sm', item.statusClass]" :title="item.status === 'TMS' ? 'Status: TMS (Tidak Memenuhi Syarat)' : 'Klik untuk Ubah Status Berkas'">
                  <span class="truncate">{{ item.status }}</span>
                  <i class="fa-solid fa-chevron-down text-[8px] opacity-50 group-hover:opacity-100 transition-opacity"></i>
               </button>
@@ -251,7 +251,7 @@
          </div>
          <div class="w-28 text-center flex flex-col justify-center">
             <div class="text-[8px] uppercase font-bold text-slate-500 mb-0.5">Status</div>
-            <div :class="['px-2 py-1.5 rounded-lg text-[9px] font-bold border uppercase tracking-wider flex justify-center', item.statusClass]">{{ item.status }}</div>
+            <div :class="['px-2 py-1.5 rounded-lg text-[9px] font-bold border uppercase tracking-wider flex justify-center', item.statusClass]" :title="item.status === 'TMS' ? 'Status: TMS (Tidak Memenuhi Syarat)' : ('Status Berkas: ' + item.status)">{{ item.status }}</div>
          </div>
       </div>
    </div>

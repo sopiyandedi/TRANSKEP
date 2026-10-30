@@ -263,6 +263,21 @@ window.dashboardApp = Vue.createApp({
       today.setHours(0, 0, 0, 0);
 
       const createWarningObj = (user, type, targetDate, today, dbStatus) => {
+        if (!targetDate || isNaN(targetDate.getTime())) {
+          return {
+            user: user,
+            type: type,
+            rawDate: new Date(2099, 11, 31),
+            dateStr: 'Belum Ditentukan',
+            status: 'TMS',
+            statusClass: 'text-slate-400 border-slate-700/60 bg-slate-800/40 font-bold',
+            targetText: 'Belum Diatur',
+            targetClass: 'text-slate-500',
+            month: -1,
+            year: -1,
+            dbStatus: ''
+          };
+        }
         let diffTime = targetDate.getTime() - today.getTime();
         let diffDays = Math.ceil(diffTime / (1000 * 3600 * 24));
         let status = 'Menunggu', statusClass = 'text-amber-400 border-amber-500/30 bg-amber-500/10', targetText = '', isCompleted = false, targetClass = 'text-indigo-400';
@@ -368,8 +383,8 @@ window.dashboardApp = Vue.createApp({
             type: type,
             rawDate: new Date(2099, 11, 31),
             dateStr: tmtAwal ? String(tmtAwal) : 'Belum Ditentukan',
-            status: 'Belum Terjadwal',
-            statusClass: 'text-slate-400 border-slate-700/60 bg-slate-800/40',
+            status: 'TMS',
+            statusClass: 'text-slate-400 border-slate-700/60 bg-slate-800/40 font-bold',
             targetText: 'Belum Diatur',
             targetClass: 'text-slate-500',
             month: -1,

@@ -613,3 +613,15 @@ ZONA BAWAH: MASTER CONTEXT & STATUS MIGRASI TERKINI (LIVING CONTEXT)
       - Mengunggah kode terbaru ke Google Apps Script dan mempublikasikan versi deployment GAS **`@318`**.
       - Versi Service Worker [sw.js](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) dan `APP_BUILD_VER` di [index.html](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) dinaikkan ke **`transkep-v3.7.3`** / **`3.7.3`**.
       - Seluruh pembaruan di-push ke repositori `origin/main` dan `prod/main` (`https://sso.pa-indramayu.go.id/`).
+
+54. **Penggantian Keterangan Status 'Belum Terjadwal' Menjadi 'TMS' pada Kartu Peringatan Dini Dashboard (Tahap 73 - Selesai & Aktif ✅):**
+    - **Latar Belakang & Analisis Status Kepegawaian**:
+      - Pada kartu **Peringatan Dini (KGB, KP & Pensiun)**, pegawai yang belum atau tidak memiliki tanggal TMT (khususnya pegawai PPPK yang tidak memiliki siklus KP/KGB PNS) sebelumnya menampilkan badge berstatus *'BELUM TERJADWAL'*.
+      - Sesuai standar tata kelola dan administrasi kepegawaian BKN, status tersebut diganti menjadi istilah resmi **TMS** (*Tidak Memenuhi Syarat*), dengan visual badge ringkas yang hanya bertuliskan **'TMS'** saja.
+    - **Implementasi Controller & Tampilan UI**:
+      - Memperbarui fungsi pembentuk objek peringatan (`createWarningObj` dan `createCustomWarning`) pada [modules/dashboard/dashboard.js](file:///c:/Users/user/.gemini/antigravity-ideprojek/TRANSKEP/modules/dashboard/dashboard.js) dan [dashboard/js_dashboard.html](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/dashboard/js_dashboard.html) agar menyematkan nilai status `TMS` dengan kelas badge `text-slate-400 border-slate-700/60 bg-slate-800/40 font-bold`.
+      - Menambahkan atribut penjelas tooltip pada [modules/dashboard/view_dashboard.html](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/dashboard/view_dashboard.html) dan [dashboard/view_dashboard.html](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/dashboard/view_dashboard.html) agar saat kursor diarahkan ke badge, sistem menampilkan *'Status: TMS (Tidak Memenuhi Syarat)'*.
+    - **Deployment Google Apps Script `@319` & Cache Invalidation PWA**:
+      - Mengunggah kode terbaru ke Google Apps Script dan mempublikasikan versi deployment GAS **`@319`**.
+      - Versi Service Worker [sw.js](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) dan `APP_BUILD_VER` di [index.html](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) dinaikkan ke **`transkep-v3.7.4`** / **`3.7.4`**.
+      - Seluruh pembaruan di-push ke repositori `origin/main` dan `prod/main` (`https://sso.pa-indramayu.go.id/`).

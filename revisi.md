@@ -3650,3 +3650,32 @@ Pengguna melaporkan bahwa pratinjau (*preview*) dokumen PDF di modal SK dan SOP 
 #### 4. Estimasi Dampak & Status
 - **Dampak:** Data KGB dari Dashboard dijamin **100% langsung muncul di E-Office dalam 0ms** tanpa bisa dicegat oleh kendala Firestore Security Rules maupun masalah format NIP. Pengguna juga mendapatkan panduan jelas untuk meloloskan rules di Firebase Console.
 - **Status:** `[SELESAI & AKTIF] ?
+
+
+---
+
+### TAHAP 73: Penggantian Keterangan Status 'Belum Terjadwal' Menjadi 'TMS' (Tidak Memenuhi Syarat) pada Kartu Peringatan Dini Dashboard (v3.7.4)
+
+#### 1. Latar Belakang & Analisis Kebutuhan
+- **Permintaan Pengguna (Disertai Tangkapan Layar):**
+  * Pengguna meminta agar keterangan status pada kartu **Peringatan Dini (KGB, KP & Pensiun)** untuk pegawai yang belum memiliki tanggal / belum diinput tanggal (sebelumnya bertuliskan *'BELUM TERJADWAL'*) diganti menjadi **'TMS'** (*Tidak Memenuhi Syarat*), dengan tampilan teks di badge hanya ditulis **'TMS'** saja.
+  * Kasus nyata terlihat pada pegawai PPPK (contoh: *Novi Iriani, S.E. / PPPK Golongan IX*), di mana berkas Pangkat dan KGB memang belum memiliki jadwal TMT sehingga status *'TMS'* jauh lebih tepat dan standar secara administrasi kepegawaian.
+
+#### 2. Rencana Implementasi Perbaikan
+1. **Pembaruan Logika Status di Dashboard Controller (`modules/dashboard/dashboard.js` & `dashboard/js_dashboard.html`):**
+   - Pada fungsi pembentuk objek peringatan (`createCustomWarning` & fallback `createWarningObj`):
+     * Mengganti nilai atribut `status: 'Belum Terjadwal'` menjadi `status: 'TMS'`.
+     * Mempertahankan styling badge dark slate yang elegan (`text-slate-400 border-slate-700/60 bg-slate-800/40 font-bold`).
+2. **Penyempurnaan Tooltip Aksesibilitas (`modules/dashboard/view_dashboard.html` & `dashboard/view_dashboard.html`):**
+   - Teks badge visual tetap 100% ringkas hanya menampilkan tulisan **'TMS'** (otomatis di-uppercase oleh CSS menjadi `TMS`).
+   - Pada atribut hover/tooltip (`:title`), jika status adalah `TMS`, dapat menampilkan keterangan penjelas: *'Status Berkas: TMS (Tidak Memenuhi Syarat / Belum Ada Jadwal)'*.
+3. **PWA Cache Busting & GAS Deployment ke `v3.7.4` (`index.html` & `sw.js`):**
+   - Bump versi build ke **`transkep-v3.7.4`** / **`3.7.4`**, clasp push & deploy **`@319`**, serta git push ke `origin/main` dan `prod/main`.
+
+#### 3. Daftar Berkas yang Akan Dimodifikasi
+- Frontend: `modules/dashboard/dashboard.js`, `modules/dashboard/view_dashboard.html`, `index.html`, `sw.js`.
+- Cermin GAS: `dashboard/js_dashboard.html`, `dashboard/view_dashboard.html`.
+
+#### 4. Estimasi Dampak & Status
+- **Dampak:** Seluruh kartu peringatan dini pegawai yang belum memiliki tanggal TMT (baik di tampilan Pegawai / Data Jadwal Pribadi maupun Admin) akan langsung menampilkan badge berlabel ringkas **'TMS'** yang rapi, profesional, dan sesuai terminologi resmi BKN/Kepegawaian.
+- **Status:** `[SELESAI & AKTIF] ?
