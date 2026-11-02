@@ -755,7 +755,7 @@ function requestPasswordReset(no_wa) {
       "👤 *NIP:* " + userFound.nip + "\n" +
       "🔑 *Sandi Sementara:* *" + tempPass + "*\n\n" +
       "⚠️ *Perhatian:* Segera login ke portal dan perbarui kata sandi Anda di menu profil demi keamanan akun.\n\n" +
-      "🔗 *Link Login Portal:* https://transkep.github.io/";
+      "🔗 *Link Login Portal:* https://sso.pa-indramayu.go.id/";
 
     let waResult = sendWhatsAppMessage_(userFound.no_wa, waText, {
       jenis_pesan: 'reset_password',

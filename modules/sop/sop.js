@@ -532,7 +532,9 @@ document.addEventListener("DOMContentLoaded", () => {
                                "*" + this.waTargetSopObj.judul_sop + "*\n" +
                                "Nomor: " + this.waTargetSopObj.nomor_sop + "\n" +
                                "Peran Anda: " + peran + "\n\n" +
-                               "Harap buka portal *TRANSKEP* untuk membaca dan mengkonfirmasi pemahaman Anda (Acknowledgment). Terima kasih.";
+                               "Harap buka portal *TRANSKEP* untuk membaca dan mengkonfirmasi pemahaman Anda (Acknowledgment):\n" +
+                               "🔗 https://sso.pa-indramayu.go.id/\n\n" +
+                               "Terima kasih.";
                                
                 return "https://api.whatsapp.com/send?phone=" + phone + "&text=" + encodeURIComponent(rawMsg);
             },
@@ -578,7 +580,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     }
                 });
 
-                msg += "Harap segera membuka portal *TRANSKEP* untuk mengunduh PDF dan menekan tombol *Telah Dibaca & Dipahami* sebagai bukti kepatuhan (Acknowledgment). Terima kasih.";
+                msg += "Harap segera membuka portal *TRANSKEP* untuk mengunduh PDF dan menekan tombol *Telah Dibaca & Dipahami* sebagai bukti kepatuhan (Acknowledgment):\n🔗 https://sso.pa-indramayu.go.id/\n\nTerima kasih.";
 
                 const waLink = "https://api.whatsapp.com/send?phone=" + phone + "&text=" + encodeURIComponent(msg);
                 window.open(waLink, '_blank');

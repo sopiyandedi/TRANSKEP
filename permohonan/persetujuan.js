@@ -349,7 +349,7 @@ function processMagicLinkApproval(token, decision, notes) {
         
         // Teruskan Magic Link ke Pejabat Berwenang via WAHA
         if (pejabat.no_wa && pejabat.no_wa.length > 8) {
-          const magicLink = "https://transkep.github.io/?action=review_cuti&token=" + token;
+          const magicLink = "https://sso.pa-indramayu.go.id/?action=review_cuti&token=" + token;
           const msgPejabat = "*TRANSKEP - PERSETUJUAN CUTI TINGKAT AKHIR* 🏛️\n\n" +
             "Yth. Bapak/Ibu *" + pejabat.nama + "* (Pejabat Berwenang),\n\n" +
             "Permohonan cuti pegawai telah *DISETUJUI* oleh Atasan Langsung (" + atasan.nama + ") dan kini menunggu persetujuan akhir Anda:\n\n" +
@@ -392,6 +392,8 @@ function processMagicLinkApproval(token, decision, notes) {
             "Halo *" + pemohon.nama + "*,\n\n" +
             "Pengajuan cuti " + jenisCuti + " Anda untuk periode *" + periode + "* tidak dapat disetujui oleh Atasan Langsung (" + atasan.nama + ").\n\n" +
             "📝 *Alasan Penolakan:* " + (catatanBersih || 'Tidak ada catatan khusus.') + "\n\n" +
+            "🔗 *Link Portal:* https://sso.pa-indramayu.go.id/";
+
           sendWhatsAppMessage_(pemohon.no_wa, msgReject, {
             jenis_pesan: 'cuti_keputusan',
             nama_pemohon: pemohon.nama,
@@ -426,7 +428,7 @@ function processMagicLinkApproval(token, decision, notes) {
             "📅 *Periode:* " + periode + " (" + durasi + " hari kerja)\n" +
             "📄 *ID Transaksi:* " + targetRow[0] + "\n\n" +
             "Silakan unduh atau cetak surat permohonan cuti Anda melalui portal TRANSKEP:\n" +
-            "👉 https://transkep.github.io/";
+            "👉 https://sso.pa-indramayu.go.id/";
 
           sendWhatsAppMessage_(pemohon.no_wa, msgAcc, {
             jenis_pesan: 'cuti_keputusan',
@@ -453,6 +455,8 @@ function processMagicLinkApproval(token, decision, notes) {
             "Halo *" + pemohon.nama + "*,\n\n" +
             "Pengajuan cuti " + jenisCuti + " Anda untuk periode *" + periode + "* tidak disetujui oleh Pejabat Berwenang (" + pejabat.nama + ").\n\n" +
             "📝 *Catatan:* " + (catatanBersih || 'Tidak ada catatan khusus.') + "\n\n" +
+            "🔗 *Link Portal:* https://sso.pa-indramayu.go.id/";
+
           sendWhatsAppMessage_(pemohon.no_wa, msgReject, {
             jenis_pesan: 'cuti_keputusan',
             nama_pemohon: pemohon.nama,
@@ -583,7 +587,7 @@ function resendCutiWhatsApp(cutiId, adminNip, clientToken) {
     }
     
     const pemohon = userMap[String(targetRow[2]).trim()] || { nama: 'Pegawai' };
-    const magicLink = "https://transkep.github.io/?action=review_cuti&token=" + magicToken;
+    const magicLink = "https://sso.pa-indramayu.go.id/?action=review_cuti&token=" + magicToken;
     const periode = targetRow[4] + " s.d " + targetRow[5];
     
     // Jika menunggu persetujuan Atasan Langsung

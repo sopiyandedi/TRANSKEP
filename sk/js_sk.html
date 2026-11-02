@@ -569,6 +569,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 const pesanWa = "Yth. " + sapaan + " *" + pns.nama + "*,\n\n" +
                                 "Kami informasikan bahwa Anda telah ditetapkan sebagai *" + peranAktual + "* ke dalam *" + this.waTargetSkObj.judul_sk + "*.\n\n" +
                                 "Mohon mengunduh & mempelajari surat keputusan resmi melalui tautan PDF berikut:\n" + this.waTargetSkObj.link_drive + "\n\n" +
+                                "🔗 *Portal TRANSKEP:* https://sso.pa-indramayu.go.id/\n\n" +
                                 "Terima Kasih.\n_Sistem Kepegawaian TRANSKEP_";
                                 
                 return "https://api.whatsapp.com/send?phone=" + formattedNo + "&text=" + encodeURIComponent(pesanWa);
@@ -609,7 +610,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     }
                 });
           
-                pesan += "Terima Kasih.\n_Sistem Kepegawaian TRANSKEP_";
+                pesan += "🔗 *Portal TRANSKEP:* https://sso.pa-indramayu.go.id/\n\nTerima Kasih.\n_Sistem Kepegawaian TRANSKEP_";
           
                 const cleanNo = this.waTargetPegawaiObj.no_hp.replace(/[^0-9]/g, "");
                 const formattedNo = cleanNo.startsWith("0") ? "62" + cleanNo.slice(1) : cleanNo;

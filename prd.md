@@ -625,3 +625,26 @@ ZONA BAWAH: MASTER CONTEXT & STATUS MIGRASI TERKINI (LIVING CONTEXT)
       - Mengunggah kode terbaru ke Google Apps Script dan mempublikasikan versi deployment GAS **`@319`**.
       - Versi Service Worker [sw.js](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) dan `APP_BUILD_VER` di [index.html](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) dinaikkan ke **`transkep-v3.7.4`** / **`3.7.4`**.
       - Seluruh pembaruan di-push ke repositori `origin/main` dan `prod/main` (`https://sso.pa-indramayu.go.id/`).
+
+
+55. **Pembaruan Menyeluruh Domain Tautan Notifikasi WhatsApp dari `transkep.github.io` ke `sso.pa-indramayu.go.id` (Tahap 74 - Selesai & Aktif ✅):**
+    - **Latar Belakang & Inventaris Notifikasi WhatsApp**:
+      - Seluruh notifikasi resmi yang dikirimkan kepada pegawai/pejabat melalui gateway WhatsApp (WAHA / n8n maupun deep-link `api.whatsapp.com`) diselaraskan agar mengarahkan pengguna langsung ke domain resmi instansi **`https://sso.pa-indramayu.go.id/`**, menggantikan alamat lama `https://transkep.github.io/`.
+    - **Pembaruan Modul Notifikasi**:
+      - **Reset Kata Sandi Akun**:
+        * Reset otomatis via gateway WAHA pada [code.js](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/code.js) (`requestPasswordReset`) diperbarui menjadi `🔗 *Link Login Portal:* https://sso.pa-indramayu.go.id/`.
+        * Antrean reset manual Admin pada [modules/pegawai/pegawai.js](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/pegawai/pegawai.js) dan [pegawai/js_manajemen_pegawai.html](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/pegawai/js_manajemen_pegawai.html) (`processManualWAReset`) diperbarui menjadi `https://sso.pa-indramayu.go.id/`.
+        * Tombol kirim kredensial pegawai (`sendCredentialViaWA`) diperbarui dari Google Sites usang menjadi `https://sso.pa-indramayu.go.id/`.
+      - **Permohonan & Persetujuan Cuti Pegawai**:
+        * Tautan Magic Link usulan cuti ke Atasan Langsung pada [permohonan/permohonan.js](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/permohonan.js) (`submitCuti`) diperbarui menjadi `https://sso.pa-indramayu.go.id/?action=review_cuti&token=...`.
+        * Tautan Magic Link tahap Pejabat Berwenang pada [permohonan/persetujuan.js](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/persetujuan.js) (`processMagicLinkApproval`) diperbarui menjadi `https://sso.pa-indramayu.go.id/?action=review_cuti&token=...`.
+        * Notifikasi resmi Cuti Disetujui kepada pemohon pada [permohonan/persetujuan.js](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/persetujuan.js) diperbarui menjadi `👉 https://sso.pa-indramayu.go.id/`.
+        * Pengiriman ulang notifikasi WA Cuti oleh Admin (`resendCutiWhatsApp`) diperbarui menjadi `https://sso.pa-indramayu.go.id/?action=review_cuti&token=...`.
+        * Perbaikan bug kritis operator `+` menggantung pada pesan penolakan cuti (`msgReject`) Atasan dan Pejabat di [permohonan/persetujuan.js](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/persetujuan.js), kini ditutup rapi dengan `🔗 *Link Portal:* https://sso.pa-indramayu.go.id/` sehingga bebas dari `ReferenceError`.
+      - **Modul SOP & Surat Keputusan (SK)**:
+        * Pesan WA pemberitahuan dokumen SOP satuan maupun rekap massal pada [modules/sop/sop.js](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/sop/sop.js) dan [sop/js_sop.html](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sop/js_sop.html) disematkan tautan langsung `🔗 https://sso.pa-indramayu.go.id/`.
+        * Pesan WA penetapan SK satuan maupun rekap massal pada [modules/sk/sk.js](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/sk/sk.js) dan [sk/js_sk.html](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sk/js_sk.html) disematkan tautan `🔗 *Portal TRANSKEP:* https://sso.pa-indramayu.go.id/` agar status pembacaan otomatis terkonfirmasi saat dibuka via portal.
+    - **Deployment Google Apps Script `@320` & Cache Invalidation PWA**:
+      - Mengunggah kode terbaru ke Google Apps Script dan mempublikasikan versi deployment GAS **`@320`**.
+      - Versi Service Worker [sw.js](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) dan `APP_BUILD_VER` di [index.html](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) dinaikkan ke **`transkep-v3.7.5`** / **`3.7.5`**.
+      - Seluruh pembaruan di-push ke repositori `origin/main` dan `prod/main` (`https://sso.pa-indramayu.go.id/`).

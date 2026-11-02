@@ -226,7 +226,7 @@
           if (displayPass && String(displayPass).startsWith('SHA256$')) {
               displayPass = "[Telah dienkripsi oleh Pegawai]";
           }
-          const appUrl = "https://sites.google.com/view/transkepv2/transkep-v2-1";
+          const appUrl = "https://sso.pa-indramayu.go.id/";
           const msg = `*INFORMASI AKUN TRANSKEP* 🏢\nHalo ${sapaan} *${user.nama}*,\n\nBerikut kredensial login Anda:\n\n👤 *NIP / Username:* ${user.nip}\n🔑 *Kata Sandi:* ${displayPass}\n\n🔗 *Link Login:*\n${appUrl}`;
           window.open("https://api.whatsapp.com/send?phone=" + phone + "&text=" + encodeURIComponent(msg), '_blank');
         },
@@ -311,7 +311,7 @@
           this.showModalAntrean = false;
         },
         processManualWAReset(q) {
-            const appUrl = "https://transkep.github.io/";
+            const appUrl = "https://sso.pa-indramayu.go.id/";
             const msg = `*RESET AKUN TRANSKEP* 🏢\nHalo *${q.nama}*,\n\nIni kredensial baru Anda:\n👤 *NIP:* ${q.nip}\n🔑 *Sandi:* ${q.pass}\n\n🔗 *Link Login:*\n${appUrl}`;
             
             const runProcess = () => {

@@ -3679,3 +3679,55 @@ Pengguna melaporkan bahwa pratinjau (*preview*) dokumen PDF di modal SK dan SOP 
 #### 4. Estimasi Dampak & Status
 - **Dampak:** Seluruh kartu peringatan dini pegawai yang belum memiliki tanggal TMT (baik di tampilan Pegawai / Data Jadwal Pribadi maupun Admin) akan langsung menampilkan badge berlabel ringkas **'TMS'** yang rapi, profesional, dan sesuai terminologi resmi BKN/Kepegawaian.
 - **Status:** `[SELESAI & AKTIF] ?
+
+
+---
+
+### TAHAP 74: Pembaruan Menyeluruh Domain Tautan Notifikasi WhatsApp dari `transkep.github.io` Menjadi `sso.pa-indramayu.go.id` (`v3.7.5`)
+
+#### 1. Latar Belakang & Hasil Audit Menyeluruh (Root Cause & Codebase Inventory)
+- **Permintaan Pengguna:**
+  Mengubah seluruh ketentuan alamat portal pada notifikasi yang berkaitan dengan WhatsApp (seperti **SK**, **SOP**, **Cuti**, dan **Lupa Password**) dari `transkep.github.io` menjadi `sso.pa-indramayu.go.id`.
+
+- **Hasil Pemindaian 225 Berkas Repositori (Backend GAS + Modular Frontend + Cermin UI GAS):**
+  1. **Lupa Password — Reset Otomatis via WAHA (`code.js` Baris 758):**
+     - Fungsi `requestPasswordReset` masih merakit tautan `"🔗 *Link Login Portal:* https://transkep.github.io/";`.
+  2. **Lupa Password — Antrean Reset Manual Admin (`modules/pegawai/pegawai.js` Baris 312 & `pegawai/js_manajemen_pegawai.html` Baris 314):**
+     - Fungsi `processManualWAReset` masih memakai `const appUrl = "https://transkep.github.io/";`.
+  3. **Permohonan Cuti — Magic Link Pengajuan Baru ke Atasan (`permohonan/permohonan.js` Baris 105):**
+     - Fungsi `submitCuti` masih merakit `const magicLink = "https://transkep.github.io/?action=review_cuti&token=" + magicToken;`.
+  4. **Persetujuan Cuti — Magic Link Pejabat, Konfirmasi ACC Pemohon, & Kirim Ulang WA (`permohonan/persetujuan.js` Baris 352, 429, 586):**
+     - Baris 352 (`processMagicLinkApproval` tahap Pejabat): masih `https://transkep.github.io/?action=review_cuti&token=...`
+     - Baris 429 (`processMagicLinkApproval` konfirmasi cuti resmi disetujui ke pemohon): masih `"👉 https://transkep.github.io/";`
+     - Baris 586 (`resendCutiWhatsApp` kirim ulang WA/Magic Link oleh Admin): masih `https://transkep.github.io/?action=review_cuti&token=...`
+  5. **Notifikasi WA Modul SOP & SK (`modules/sop/sop.js`, `sop/js_sop.html`, `modules/sk/sk.js`, `sk/js_sk.html`):**
+     - Pada SOP (`generateWaSopLink` & `sendBulkWaRekapSop`), teks WA meminta pegawai membuka *"portal \*TRANSKEP\*"* untuk *Acknowledgment* tetapi belum menyertakan tautan klik `https://sso.pa-indramayu.go.id/`.
+     - Pada SK (`generateWaLinkSk` & `executeWaPegawai`), teks WA menyertakan `link_drive` PDF tanpa menyertakan tautan portal `https://sso.pa-indramayu.go.id/` (padahal status *Sudah Dibaca* SK tercatat otomatis saat dibuka melalui portal).
+     - Keduanya akan disempurnakan dengan menyematkan tautan resmi `https://sso.pa-indramayu.go.id/`.
+
+#### 2. Temuan Risiko Lintas-Modul & Bug Terkait WA (Audit Proaktif Bagian 6 ZettBOT — Menunggu Konfirmasi Pengguna)
+1. **Tombol "Kirim Kredensial Akun via WA" di Kelola Pegawai (`modules/pegawai/pegawai.js` Baris 229 & `pegawai/js_manajemen_pegawai.html` Baris 229):**
+   - Fungsi `sendCredentialViaWA` masih menggunakan URL Google Sites generasi lama: `https://sites.google.com/view/transkepv2/transkep-v2-1`. Disarankan ikut diselaraskan ke `https://sso.pa-indramayu.go.id/`.
+2. **Bug Sintaks Operator `+` Menggantung pada WA Penolakan Cuti (`permohonan/persetujuan.js` Baris 394–395 & 455–456):**
+   - Variabel `const msgReject` diakhiri tanda `+` tanpa string penutup sehingga menabrak pemanggilan `sendWhatsAppMessage_(pemohon.no_wa, msgReject, ...)` dan memicu `ReferenceError` (TDZ) saat cuti ditolak via Magic Link. Disarankan ditutup rapi dengan `"🔗 *Link Portal:* https://sso.pa-indramayu.go.id/";` agar WA penolakan cuti kembali terkirim lancar.
+3. **Notifikasi WA Uraian Tugas / Jobdes (`modules/jobdes/jobdes.js` Baris 356 & `jobdes/js_jobdes.html` Baris 357):**
+   - Saat ini hanya mengirimkan URL PDF Drive tanpa tautan portal (opsional jika ingin diselaraskan).
+4. **Catatan Eksternal n8n Gateway:**
+   - Variabel `pesan` dan `magic_link` yang dikirim dari GAS ke webhook n8n akan otomatis berisi `https://sso.pa-indramayu.go.id/`. Apabila di dashboard n8n eksternal terdapat node pesan yang meng-hardcode teks `transkep.github.io` secara terpisah, node n8n tersebut juga perlu disesuaikan.
+5. **Keamanan Whitelist Hostname (`core/core.js` Baris 94–97):**
+   - `ALLOWED_HOSTS` tidak diubah (`sso.pa-indramayu.go.id` sudah menjadi domain utama dan `transkep.github.io` tetap dipertahankan sebagai host infrastruktur GitHub Pages).
+
+#### 3. Rencana Perubahan Teknis (Daftar Berkas Target)
+| No | Berkas Target | Fungsi / Baris | Perubahan Teknis |
+| :---: | :--- | :--- | :--- |
+| **01** | `code.js` | `requestPasswordReset` (`L758`) | Ubah link login reset sandi otomatis WAHA dari `https://transkep.github.io/` menjadi `https://sso.pa-indramayu.go.id/`. |
+| **02** | `modules/pegawai/pegawai.js` & `pegawai/js_manajemen_pegawai.html` | `processManualWAReset` (`L312` / `L314`) (+ opsional `sendCredentialViaWA` `L229` atas izin pengguna) | Ubah `appUrl` dari `https://transkep.github.io/` (dan `sites.google.com/...` bila disetujui) menjadi `https://sso.pa-indramayu.go.id/`. |
+| **03** | `permohonan/permohonan.js` | `submitCuti` (`L105`) | Ubah `magicLink` usulan cuti Atasan Langsung menjadi `https://sso.pa-indramayu.go.id/?action=review_cuti&token=...`. |
+| **04** | `permohonan/persetujuan.js` | `processMagicLinkApproval` (`L352`, `L429`, + perbaikan `msgReject` `L394` & `L455` bila disetujui) & `resendCutiWhatsApp` (`L586`) | Ubah seluruh `magicLink` dan link portal keputusan cuti dari `https://transkep.github.io/...` menjadi `https://sso.pa-indramayu.go.id/...`. |
+| **05** | `modules/sop/sop.js` & `sop/js_sop.html` | `generateWaSopLink` (`L535` / `L553`) & `sendBulkWaRekapSop` (`L581` / `L599`) | Sertakan tautan resmi `https://sso.pa-indramayu.go.id/` pada pesan WA pemberitahuan SOP satuan maupun rekap bulk. |
+| **06** | `modules/sk/sk.js` & `sk/js_sk.html` | `generateWaLinkSk` (`L659` / `L572`) & `executeWaPegawai` (`L699` / `L612`) | Sertakan tautan akses portal resmi `https://sso.pa-indramayu.go.id/` pada pesan WA SK satuan maupun rekap bulk. |
+| **07** | `index.html` & `sw.js` | Cache & Build Version | Naikkan versi rilis ke **`transkep-v3.7.5`** / **`3.7.5`**, deploy GAS **`@320`**, dan push ke `origin/main` serta `prod/main`. |
+
+#### 4. Estimasi Dampak & Status
+- **Dampak:** Seluruh tautan notifikasi WhatsApp (Lupa Password otomatis/manual, Magic Link & keputusan Cuti, pemberitahuan SK, serta SOP) 100% mengarah secara konsisten ke domain resmi instansi **`https://sso.pa-indramayu.go.id/`** tanpa merusak kompatibilitas infrastruktur GitHub Pages.
+- **Status:** `[SELESAI & AKTIF]` ✅

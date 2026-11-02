@@ -102,7 +102,7 @@ function addCutiLog(payload, aktorNip, clientToken) {
         }
         
         if (atasanPhone && atasanPhone.length > 8) {
-          const magicLink = "https://transkep.github.io/?action=review_cuti&token=" + magicToken;
+          const magicLink = "https://sso.pa-indramayu.go.id/?action=review_cuti&token=" + magicToken;
           const msgWa = "*TRANSKEP - USULAN CUTI PEGAWAI* 📋\n\n" +
             "Yth. Bapak/Ibu *" + namaAtasan + "* (Atasan Langsung),\n\n" +
             "Terdapat pengajuan cuti baru yang membutuhkan persetujuan Anda:\n\n" +
