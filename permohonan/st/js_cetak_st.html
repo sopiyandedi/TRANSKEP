@@ -74,29 +74,25 @@
         
         // FIX: Penentuan Class Layout Dinamis untuk Spacing CSS A4
         var layoutClass = "st-layout-normal";
-        if (totalPeserta === 1) layoutClass = "st-layout-single";
-        else if (totalPeserta === 2) layoutClass = "st-layout-double";
-
-        // FIX: Logika Chunking (Pemecahan array per 3 orang) & Page Break Dinamis
-        // Merakit HTML murni dengan String Concatenation klasik anti-error
-        var trHTML = "";
-        var chunks = [];
-        for (var i = 0; i < totalPeserta; i += 3) {
-            chunks.push(listPeserta.slice(i, i + 3));
+        if (totalPeserta === 1) {
+            layoutClass = "st-layout-single";
+        } else if (totalPeserta === 2) {
+            layoutClass = "st-layout-double";
+        } else if (totalPeserta === 3) {
+            layoutClass = "st-layout-normal";
+        } else {
+            layoutClass = "st-layout-multi";
         }
 
-        for (var c = 0; c < chunks.length; c++) {
-            var isLastChunk = (c === chunks.length - 1);
-            var pageBreakStyle = isLastChunk ? "" : "page-break-after: always; padding-bottom: 20px;";
-            
-            trHTML += '<div class="chunk-container" style="' + pageBreakStyle + '">';
-            
-            for (var j = 0; j < chunks[c].length; j++) {
-                var p = chunks[c][j];
-                var globalIndex = (c * 3) + j;
-                
-                // Jika total pegawai > 1, maka buat kolom nomor urut. Jika 1, sembunyikan.
-                var colNumTag = (totalPeserta > 1) ? '<td class="p-col-num">' + (globalIndex + 1) + '.</td>' : '';
+        // FIX: Logika Chunking & Page Break Dinamis
+        // 1-4 orang: Seluruh peserta diletakkan di Halaman 1 tanpa pemotongan page-break.
+        // >4 orang: Pemotongan dinamis per 4 orang.
+        var trHTML = "";
+        if (totalPeserta <= 4) {
+            trHTML += '<div class="chunk-container">';
+            for (var j = 0; j < listPeserta.length; j++) {
+                var p = listPeserta[j];
+                var colNumTag = (totalPeserta > 1) ? '<td class="p-col-num">' + (j + 1) + '.</td>' : '';
                 var colEmptyTag = (totalPeserta > 1) ? '<td class="p-col-num"></td>' : '';
                 var paddingNama = (totalPeserta === 1) ? ' style="width: 25%;"' : '';
                 
@@ -129,8 +125,57 @@
                              '</table>' +
                           '</div>';
             }
-            
             trHTML += '</div>';
+        } else {
+            var chunks = [];
+            for (var i = 0; i < totalPeserta; i += 4) {
+                chunks.push(listPeserta.slice(i, i + 4));
+            }
+
+            for (var c = 0; c < chunks.length; c++) {
+                var isLastChunk = (c === chunks.length - 1);
+                var pageBreakStyle = isLastChunk ? "" : "page-break-after: always; padding-bottom: 20px;";
+                
+                trHTML += '<div class="chunk-container" style="' + pageBreakStyle + '">';
+                
+                for (var j = 0; j < chunks[c].length; j++) {
+                    var p = chunks[c][j];
+                    var globalIndex = (c * 4) + j;
+                    var colNumTag = '<td class="p-col-num">' + (globalIndex + 1) + '.</td>';
+                    var colEmptyTag = '<td class="p-col-num"></td>';
+                    
+                    trHTML += '<div class="peserta-item">' +
+                                 '<table class="peserta-table">' +
+                                    '<tr>' +
+                                       colNumTag +
+                                       '<td class="p-col-label">N a m a</td>' +
+                                       '<td class="p-col-colon">:</td>' +
+                                       '<td class="p-col-value"><b>' + p.nama + '</b></td>' +
+                                    '</tr>' +
+                                    '<tr>' +
+                                       colEmptyTag +
+                                       '<td class="p-col-label">N I P</td>' +
+                                       '<td class="p-col-colon">:</td>' +
+                                       '<td class="p-col-value">' + p.nip + '</td>' +
+                                    '</tr>' +
+                                    '<tr>' +
+                                       colEmptyTag +
+                                       '<td class="p-col-label">Pangkat/Golongan</td>' +
+                                       '<td class="p-col-colon">:</td>' +
+                                       '<td class="p-col-value">' + (p.pangkat || '-') + '</td>' +
+                                    '</tr>' +
+                                    '<tr>' +
+                                       colEmptyTag +
+                                       '<td class="p-col-label">J a b a t a n</td>' +
+                                       '<td class="p-col-colon">:</td>' +
+                                       '<td class="p-col-value">' + (p.jabatan || '-') + '</td>' +
+                                    '</tr>' +
+                                 '</table>' +
+                              '</div>';
+                }
+                
+                trHTML += '</div>';
+            }
         }
 
         var pejabat = state.usersList.find(function(u) { return u.nip === stDataObj.pejabat_ttd; }) || {nama: '-', nip: '-', jabatan: '-'};

@@ -141,7 +141,7 @@
     .st-layout-single .st-memberi-tugas { margin-top: 10px; margin-bottom: 10px; }
     
     /* 4. Jarak Paragraf Penutup (Anggaran & Tanggung Jawab) */
-    .st-layout-single > p { margin-top: 15px !important; margin-bottom: 10px !important; line-height: 1.3; }
+    .st-layout-single > p, .st-layout-single .st-section-sisa > p { margin-top: 15px !important; margin-bottom: 10px !important; line-height: 1.3; }
     
     /* 5. Dorongan Tanda Tangan ke bawah kertas (FIX: Dikurangi jadi 30px) */
     .st-layout-single .st-ttd-container { margin-top: 30px; }
@@ -186,7 +186,7 @@
     .st-layout-double .st-memberi-tugas { margin-top: 10px; margin-bottom: 10px; }
     
     /* 4. Jarak Paragraf Penutup (Anggaran & Tanggung Jawab) */
-    .st-layout-double > p { margin-top: 8px !important; margin-bottom: 10px !important; line-height: 1.25; }
+    .st-layout-double > p, .st-layout-double .st-section-sisa > p { margin-top: 8px !important; margin-bottom: 10px !important; line-height: 1.25; }
     
     /* 5. Dorongan Tanda Tangan ke bawah kertas */
     .st-layout-double .st-ttd-container { margin-top: 25px; }
@@ -227,7 +227,7 @@
     .st-layout-normal .st-memberi-tugas { margin-top: 5px; margin-bottom: 5px; }
     
     /* 4. Jarak Paragraf Penutup (Anggaran & Tanggung Jawab) */
-    .st-layout-normal > p { margin-top: 3px !important; margin-bottom: 3px !important; line-height: 1.2; }
+    .st-layout-normal > p, .st-layout-normal .st-section-sisa > p { margin-top: 3px !important; margin-bottom: 3px !important; line-height: 1.2; }
     
     /* 5. Dorongan Tanda Tangan ke bawah kertas */
     .st-layout-normal .st-ttd-container { margin-top: 15px; }
@@ -254,37 +254,45 @@
     /* === END TAG KHUSUS ST 3 ORANG === */
 
 
- /* === START TAG KHUSUS ST 4 ORANG ATAU LEBIH (Multi Layout / 2 Halaman) === */
-    /* FIX: Menggabungkan ide padding 3 orang + Penurunan Font Size 1pt */
-    
-    /* 1. MANTRA SIHIR: Mengecilkan font area isi agar muat banyak */
-    .st-layout-multi .st-content-table { font-size: 10pt; } 
-    .st-layout-multi .peserta-table { font-size: 10pt; }
-    .st-layout-multi .tabel-untuk { font-size: 10pt; }
-    .st-layout-multi .st-memberi-tugas { font-size: 10.5pt; margin-top: 5px; margin-bottom: 5px; }
+ /* Kontainer Sisa Teks (Untuk, Anggaran, Penutup, TTD) */
+    .st-section-sisa { display: block; }
 
-    /* 2. Pading dikunci rapat seperti layout 4 orang */
-    .st-layout-multi .st-content-table td { padding: 3px 0; } 
-    .st-layout-multi .peserta-table td { padding: 1px 0; } 
+    /* === START TAG KHUSUS ST 4 ORANG ATAU LEBIH (Multi Layout / 2 Halaman) === */
+    /* Page 1: Kop, Judul, Menimbang, Dasar, Memberi Tugas, Kepada (4 Peserta Lengkap) */
+    .st-layout-multi .st-kop-container { margin-bottom: 22px !important; }
+    .st-layout-multi .st-title { margin-bottom: 20px !important; }
+    .st-layout-multi .st-sub-title { margin-bottom: 5px !important; font-size: 10.5pt; }
+    .st-layout-multi .st-memberi-tugas { font-size: 10.5pt; margin-top: 6px !important; margin-bottom: 6px !important; }
+
+    /* Spacing & Ukuran Font di Halaman 1 agar 4 Orang Muat Nyaman */
+    .st-layout-multi .st-content-table { font-size: 10.5pt; } 
+    .st-layout-multi .st-content-table td { padding: 2px 0; } 
+    .st-layout-multi .peserta-table { font-size: 10.5pt; }
+    .st-layout-multi .peserta-table td { padding: 0.5px 0; } 
+    .st-layout-multi .peserta-item { margin-bottom: 3px; }
     
-    .st-layout-multi .baris-menimbang td { padding-bottom: 3px; }
-    .st-layout-multi .baris-dasar td { padding-bottom: 3px; }
+    .st-layout-multi .baris-menimbang td { padding-bottom: 2px; }
+    .st-layout-multi .baris-dasar td { padding-bottom: 2px; }
     .st-layout-multi .baris-menimbang .col-value table td,
-    .st-layout-multi .baris-dasar .col-value table td { line-height: 1.2; padding-bottom: 2px !important; font-size: 10pt;}
-    .st-layout-multi .baris-untuk .col-value > div:first-child { line-height: 1.2; padding-bottom: 2px; }
+    .st-layout-multi .baris-dasar .col-value table td { line-height: 1.2; padding-bottom: 2px !important; font-size: 10.5pt; }
     
     .st-layout-multi .baris-kepada td { padding-bottom: 0px !important; }
-    .st-layout-multi .baris-untuk td { padding-top: 0px !important; }
     
-    /* 3. INI KUNCI UTAMANYA: Memaksa area Footer melompat ke Hal 2 */
-    .st-layout-multi .st-footer-section { 
-        page-break-before: always; 
-        padding-top: 20px; 
+    /* Page 2: Memaksa area Sisa Teks (Untuk, Anggaran, Penutup, TTD) melompat ke Halaman 2 */
+    .st-layout-multi .st-section-sisa { 
+        page-break-before: always !important; 
+        break-before: page !important;
+        padding-top: 15mm !important; 
     }
     
-    /* Font di Hal 2 (Anggaran & TTD) dikembalikan ke 11pt agar tetap elegan */
-    .st-layout-multi .st-footer-section > p { margin-top: 15px !important; margin-bottom: 10px !important; line-height: 1.3; font-size: 11pt; }
-    .st-layout-multi .st-ttd-container { margin-top: 30px; font-size: 11pt; }
+    /* Font & Spacing di Halaman 2 (Untuk, Anggaran & TTD) elegan dan proporsional */
+    .st-layout-multi .st-section-sisa .st-content-table { font-size: 11pt !important; }
+    .st-layout-multi .st-section-sisa .baris-untuk td { padding-top: 0px !important; }
+    .st-layout-multi .st-section-sisa .baris-untuk .col-value > div:first-child { line-height: 1.3; padding-bottom: 4px; }
+    .st-layout-multi .st-section-sisa .tabel-untuk { font-size: 11pt !important; }
+    .st-layout-multi .st-section-sisa .tabel-untuk td { padding: 2px 0 !important; }
+    .st-layout-multi .st-section-sisa > p { margin-top: 14px !important; margin-bottom: 10px !important; line-height: 1.3; font-size: 11pt !important; }
+    .st-layout-multi .st-section-sisa .st-ttd-container { margin-top: 35px !important; font-size: 11pt !important; }
     /* === END TAG KHUSUS ST 4 ORANG === */
 
 
@@ -341,7 +349,11 @@
            {{baris_peserta_html}}
         </td>
       </tr>
-      <tr class="baris-untuk">
+    </table>
+
+    <div class="st-section-sisa">
+      <table class="st-content-table">
+        <tr class="baris-untuk">
         <td class="col-label">Untuk</td>
         <td class="col-colon">:</td>
         <td class="col-value">
@@ -390,6 +402,7 @@
         
         <div style="font-weight: bold;">{{nama_pejabat_ttd}}</div>
       </div>
+    </div>
     </div>
     <!-- END ZONA DINAMIS -->
   </div>

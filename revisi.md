@@ -3731,3 +3731,47 @@ Pengguna melaporkan bahwa pratinjau (*preview*) dokumen PDF di modal SK dan SOP 
 #### 4. Estimasi Dampak & Status
 - **Dampak:** Seluruh tautan notifikasi WhatsApp (Lupa Password otomatis/manual, Magic Link & keputusan Cuti, pemberitahuan SK, serta SOP) 100% mengarah secara konsisten ke domain resmi instansi **`https://sso.pa-indramayu.go.id/`** tanpa merusak kompatibilitas infrastruktur GitHub Pages.
 - **Status:** `[SELESAI & AKTIF]` ✅
+
+
+---
+
+### TAHAP 75: Penataan Ulang Tata Letak Cetak Surat Tugas (Smart Size Padding 4 Orang & Pemisahan Bersih Sisa Teks ke Halaman 2) (`v3.7.6`)
+
+#### 1. Latar Belakang & Analisis Masalah
+- **Keluhan & Bukti Visual Pengguna:**
+  * Pada modul cetak Surat Tugas (ST), smart size padding untuk 1 orang (`.st-layout-single`), 2 orang (`.st-layout-double`), dan 3 orang (`.st-layout-normal`) sudah bekerja sempurna menghasilkan 1 lembar A4 penuh yang proporsional.
+  * Namun pada saat pegawai yang ditugaskan berjumlah **4 orang**, tampilannya menjadi rusak:
+    - Di **Halaman 1**: Hanya muncul 3 orang pertama, sedangkan bagian bawah kertas menyisakan ruang kosong putih lebar (~4–5 cm).
+    - Di **Halaman 2**: Orang ke-4 (Daryatno) terlempar sendirian ke puncak halaman tanpa label "Kepada", baru kemudian diikuti bagian "Untuk:", jadwal, beban anggaran, dan tanda tangan.
+- **Akar Masalah Teknis:**
+  1. *Hardcoded Chunking 3 Orang di Script*: Di `cetak_st.js` dan `js_cetak_st.html`, loop pemecahan peserta di-hardcode dengan langkah `i += 3` dan menyisipkan `page-break-after: always;` di akhir potongan pertama. Akibatnya peserta ke-4 selalu dipaksa loncat ke halaman 2.
+  2. *Kelas Layout Multi/4 Orang Tidak Pernah Diterapkan*: Logika JS hanya memetakan `layoutClass` untuk 1 orang dan 2 orang, selebihnya selalu memakai `st-layout-normal` (layout 3 orang), sehingga jarak Kop Surat (45px) dan Judul Surat (40px) tidak dirapatkan.
+  3. *Ketiadaan Wadah Pemisah Mandiri*: Baris `baris-kepada` dan `baris-untuk` digabung di dalam tabel yang sama tanpa kontainer pemisah halaman (*page-break container*) khusus.
+
+#### 2. Rencana Implementasi Teknis
+1. **Pembaruan Template HTML (`modules/permohonan/cetak/cetak_st.html` & `permohonan/st/template_cetak_st.html`):**
+   - Mengelompokkan bagian "Untuk:", jadwal kegiatan, beban anggaran, paragraf penutup, dan tanda tangan ke dalam kontainer mandiri `.st-section-sisa`.
+   - Untuk 1, 2, dan 3 orang: `.st-section-sisa` tidak memicu page-break (`page-break-before: auto;`), mempertahankan layout 1 lembar utuh 100% tanpa perubahan.
+   - Untuk 4 orang (`.st-layout-multi` / `.st-layout-4`):
+     * Jarak bawah Kop Surat dirapatkan ke `25px !important` (hemat ~20px).
+     * Jarak bawah Judul Surat Tugas dirapatkan ke `22px !important` (hemat ~18px).
+     * Font isi disesuaikan ke `10.5pt`, padding baris tabel `2px 0`, jarak item peserta `4px`.
+     * Menjamin **ke-4 orang pegawai (No. 1, 2, 3, dan 4) tampil lengkap dan proporsional di Halaman 1**.
+     * Kontainer `.st-section-sisa` memicu perpindahan halaman rapi:
+       `page-break-before: always !important; break-before: page !important; padding-top: 15mm;`
+     * **Halaman 2** diawali bersih dan elegan oleh baris **"Untuk :"**, jadwal, anggaran, kalimat penutup, dan **Tanda Tangan**.
+2. **Pembaruan Logika Controller (`modules/permohonan/cetak/cetak_st.js` & `permohonan/st/js_cetak_st.html`):**
+   - Menambahkan pemetaan kelas:
+     `if (totalPeserta === 1) layoutClass = "st-layout-single";`
+     `else if (totalPeserta === 2) layoutClass = "st-layout-double";`
+     `else if (totalPeserta === 3) layoutClass = "st-layout-normal";`
+     `else if (totalPeserta >= 4) layoutClass = "st-layout-multi";`
+   - Memperbaiki chunking peserta: jika `totalPeserta <= 4`, seluruh peserta digabungkan ke Halaman 1 tanpa memotong di orang ke-3.
+3. **PWA Cache Busting & Git Push Terbatas ke `origin`:**
+   - Naikkan versi ke **`v3.7.6`** / **`3.7.6`**.
+   - Deploy ke Google Apps Script (Clasp) `@321`.
+   - Sesuai instruksi khusus pengguna, perubahan di-*push* **HANYA ke remote `origin`** (`sopiyandedi/TRANSKEP.git`) untuk pengujian dan evaluasi, **TIDAK di-push ke remote `prod`**.
+
+#### 3. Estimasi Dampak & Status
+- **Dampak:** Surat tugas 4 orang kini tampil rapi sempurna: 4 orang utuh di Halaman 1, sisa teks (Untuk + Jadwal + TTD) bersih di Halaman 2.
+- **Status:** `[SELESAI & AKTIF]` ✅

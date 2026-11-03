@@ -648,3 +648,26 @@ ZONA BAWAH: MASTER CONTEXT & STATUS MIGRASI TERKINI (LIVING CONTEXT)
       - Mengunggah kode terbaru ke Google Apps Script dan mempublikasikan versi deployment GAS **`@320`**.
       - Versi Service Worker [sw.js](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) dan `APP_BUILD_VER` di [index.html](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) dinaikkan ke **`transkep-v3.7.5`** / **`3.7.5`**.
       - Seluruh pembaruan di-push ke repositori `origin/main` dan `prod/main` (`https://sso.pa-indramayu.go.id/`).
+
+56. **Penataan Ulang Smart Size Padding Cetak Surat Tugas 4 Orang & Pemisahan Sisa Teks ke Halaman 2 (Tahap 75 - Selesai & Aktif ✅):**
+    - **Latar Belakang & Analisis Layout Cetak**:
+      - Pada cetak Surat Tugas (ST), tata letak untuk 1 orang (`.st-layout-single`), 2 orang (`.st-layout-double`), dan 3 orang (`.st-layout-normal`) telah sempurna menghasilkan 1 lembar A4 utuh.
+      - Namun untuk penugasan **4 orang**, sebelumnya terjadi pemotongan kaku pada orang ke-3 karena loop chunking script memotong per 3 orang (`i += 3`) dengan `page-break-after: always;` di orang ke-3. Hal ini menyebabkan Halaman 1 menyisakan ruang kosong besar di bagian bawah, sementara orang ke-4 terlempar sendirian ke puncak Halaman 2.
+    - **Implementasi CSS Smart Padding & Kontainer Mandiri**:
+      - Memperbarui [modules/permohonan/cetak/cetak_st.html](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/permohonan/cetak/cetak_st.html) dan [permohonan/st/template_cetak_st.html](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/st/template_cetak_st.html) dengan membungkus seluruh baris "Untuk :", rincian kegiatan, beban anggaran, penutup, dan tanda tangan ke dalam kontainer mandiri `<div class="st-section-sisa">`.
+      - Menetapkan aturan `.st-layout-multi` (4 orang atau lebih):
+        * Jarak bawah Kop Surat dirapatkan menjadi `22px !important`.
+        * Jarak bawah Judul Surat Tugas dirapatkan menjadi `20px !important`.
+        * Font isi Halaman 1 disesuaikan ke `10.5pt`, padding baris tabel `2px 0`, jarak item peserta `3px`.
+        * Menjamin **ke-4 pegawai (No. 1, 2, 3, dan 4) muat lengkap, proporsional, dan elegan di Halaman 1**.
+        * Kontainer `.st-section-sisa` memicu perpindahan halaman rapi:
+          `page-break-before: always !important; break-before: page !important; padding-top: 15mm !important;`
+        * **Halaman 2** diawali bersih oleh baris "Untuk :", jadwal, beban anggaran, penutup, dan tanda tangan pejabat dengan ukuran font standar 11pt.
+      - Untuk penugasan 1, 2, dan 3 orang: kontainer `.st-section-sisa` tetap `display: block` tanpa page-break sehingga layout 1 lembar utuh dipertahankan 100%.
+    - **Pembaruan Logika Controller & Chunking**:
+      - Memperbarui [modules/permohonan/cetak/cetak_st.js](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/permohonan/cetak/cetak_st.js) dan [permohonan/st/js_cetak_st.html](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/st/js_cetak_st.html):
+        * Menetapkan `layoutClass = "st-layout-multi"` ketika `totalPeserta >= 4`.
+        * Menyatukan seluruh peserta ke dalam satu container tanpa page break jika `totalPeserta <= 4`.
+    - **Deployment Google Apps Script `@321` & Versioning**:
+      - Versi Service Worker [sw.js](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) dan `APP_BUILD_VER` di [index.html](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) dinaikkan ke **`transkep-v3.7.6`** / **`3.7.6`**.
+      - Sesuai instruksi khusus pengguna, perubahan di-*push* **HANYA ke remote `origin/main`** untuk pengujian dan evaluasi, **TIDAK di-push ke remote `prod`**.
