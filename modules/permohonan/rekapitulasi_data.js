@@ -33,6 +33,9 @@ window.RekapitulasiDataService = {
    * @returns {Promise<object>} Result status dan pesan dari backend
    */
   deleteST(id, nip, token) {
+    if (typeof StDataService !== 'undefined' && typeof StDataService.deleteSuratTugasLog === 'function') {
+      return StDataService.deleteSuratTugasLog(id, nip, token);
+    }
     return new Promise((resolve, reject) => {
       if (!window.google || !google.script || !google.script.run) {
         return reject(new Error("Koneksi Google Apps Script (google.script.run) tidak tersedia."));

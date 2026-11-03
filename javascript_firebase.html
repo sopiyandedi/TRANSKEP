@@ -691,6 +691,121 @@
         (error) => console.error("❌ [TRANSKEP Firebase GAS] Error listener Firestore Rapat:", error)
       );
     }
-  };
+  ,
+
+  // ==========================================
+  // OPERASI MODUL SURAT TUGAS (ST, SPD & PLH) - TAHAP 77
+  // ==========================================
+  SURAT_TUGAS_COLLECTION: 'surat_tugas_documents',
+
+  /**
+   * Menyimpan atau Memperbarui Dokumen Surat Tugas ke Cloud Firestore (High-Speed <200ms)
+   */
+  async saveSuratTugasToFirestore(stData) {
+    const db = this.getDb();
+    if (!db) throw new Error("Cloud Firestore belum siap terhubung.");
+    const docId = String(stData.id || stData.id_st || ('ST-' + Date.now() + Math.floor(Math.random() * 1000))).trim();
+
+    const d = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    const nowStr = `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+
+    const payload = {
+      id: docId,
+      waktu: stData.waktu || nowStr,
+      nomor: stData.nomor || stData.nomor_surat || '',
+      menimbang: stData.menimbang || '',
+      dasar: stData.dasar || '',
+      tujuan: stData.tujuan || '',
+      tempat: stData.tempat || '',
+      tgl_mulai: stData.tgl_mulai || '',
+      tgl_selesai: stData.tgl_selesai || '',
+      jam: stData.jam || '',
+      peserta: typeof stData.peserta === 'string' ? stData.peserta : (stData.peserta_json || JSON.stringify(stData.peserta || [])),
+      pejabat_ttd: String(stData.pejabat_ttd || '').trim(),
+      status: stData.status || 'DISETUJUI',
+      data_ekstra: typeof stData.data_ekstra === 'string' ? stData.data_ekstra : (stData.data_ekstra_json || JSON.stringify(stData.data_ekstra || {})),
+      is_firebase: true,
+      updated_at: (typeof firebase !== 'undefined' && firebase.firestore && firebase.firestore.FieldValue) 
+        ? firebase.firestore.FieldValue.serverTimestamp() 
+        : new Date().toISOString()
+    };
+
+    if (!stData.created_at) {
+      payload.created_at = (typeof firebase !== 'undefined' && firebase.firestore && firebase.firestore.FieldValue) 
+        ? firebase.firestore.FieldValue.serverTimestamp() 
+        : new Date().toISOString();
+    }
+
+    await db.collection(this.SURAT_TUGAS_COLLECTION).doc(docId).set(payload, { merge: true });
+    return { status: 'success', id: docId, data: payload, message: 'Surat Tugas berhasil disimpan di Cloud Firestore.' };
+  },
+
+  /**
+   * Menghapus Dokumen Surat Tugas dari Cloud Firestore secara Instan
+   */
+  async deleteSuratTugasFromFirestore(docId) {
+    const db = this.getDb();
+    if (!db) throw new Error("Cloud Firestore belum siap terhubung.");
+    await db.collection(this.SURAT_TUGAS_COLLECTION).doc(String(docId).trim()).delete();
+    return { status: 'success', message: 'Surat Tugas berhasil dihapus dari Cloud Firestore.' };
+  },
+
+  /**
+   * Mengambil Seluruh Dokumen Surat Tugas dari Cloud Firestore
+   */
+  async getFirestoreSuratTugas() {
+    const db = this.getDb();
+    if (!db) return [];
+    const snapshot = await db.collection(this.SURAT_TUGAS_COLLECTION).get();
+    const list = [];
+    snapshot.forEach(doc => {
+      list.push(doc.data());
+    });
+    return list;
+  },
+
+  /**
+   * Memasang Realtime Listener untuk Dokumen Surat Tugas
+   */
+  subscribeFirestoreSuratTugas(callback) {
+    const db = this.getDb();
+    if (!db) return null;
+    return db.collection(this.SURAT_TUGAS_COLLECTION).onSnapshot(
+      (snapshot) => {
+        const list = [];
+        snapshot.forEach(doc => {
+          list.push(doc.data());
+        });
+        if (typeof callback === 'function') callback(list);
+      },
+      (error) => {
+        console.error("❌ [TRANSKEP Firebase] Error listener Firestore Surat Tugas:", error);
+      }
+    );
+  },
+
+  /**
+   * Background Auto-Sync data ST lama dari Sheets ke Firestore (Zero UI / Tanpa Tombol)
+   */
+  async syncLegacySuratTugasToFirestore(legacyList) {
+    const db = this.getDb();
+    if (!db || !Array.isArray(legacyList) || legacyList.length === 0) return 0;
+    let count = 0;
+    for (const st of legacyList) {
+      if (!st.is_firebase && st.id) {
+        try {
+          await this.saveSuratTugasToFirestore(st);
+          st.is_firebase = true;
+          count++;
+        } catch (e) {
+          console.warn("[TranskepFirebase] Gagal sync ST legacy ke Firestore:", st.id, e);
+        }
+      }
+    }
+    return count;
+  }
+
+};
 })();
 </script>

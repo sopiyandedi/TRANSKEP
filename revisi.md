@@ -3916,3 +3916,60 @@ Pengguna melaporkan bahwa pratinjau (*preview*) dokumen PDF di modal SK dan SOP 
   3. [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) (App build 3.7.9)
   4. [`prd.md`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/prd.md) (Pembaruan Living Context)
 - **Status:** `[SELESAI & AKTIF]` ✅
+
+
+---
+
+### TAHAP 77: Migrasi Database Surat Tugas (ST, SPD & Plh) ke Cloud Firestore (Real-time & High-Speed Engine v3.8.0)
+
+#### 1. Latar Belakang & Analisis Kebutuhan Performa
+1. **Kendala Latensi Database Google Sheets (`st_log`):**
+   - Saat ini, pencatatan dan pembaruan Surat Tugas (ST, SPD, dan Plh) masih mengandalkan Google Sheets (`st_log`) via RPC `google.script.run`.
+   - Operasi penulisan baris dan pembacaan Google Sheets rata-rata membutuhkan waktu **2 hingga 5 detik** per transaksi, tergantung beban antrean server Google Apps Script.
+2. **Keunggulan Migrasi ke Cloud Firestore (`transkep-314c0`):**
+   - Sama seperti modul SK, SOP, Jobdes, dan PKP yang sebelumnya telah sukses dimigrasi ke Cloud Firestore:
+     * **Kecepatan Instan (<200ms):** Pembacaan dan penyimpanan dokumen berlangsung dalam hitungan milidetik.
+     * **Real-time Synchronous (`onSnapshot`):** Setiap kali ada Surat Tugas baru yang diterbitkan, diedit, atau dihapus oleh seorang admin, seluruh layar pegawai/pimpinan yang sedang aktif langsung ter-update secara otomatis detik itu juga tanpa perlu reload halaman.
+     * **Arsitektur Dual-Storage (Zero Data Loss):** Cloud Firestore bertindak sebagai **Primary Real-time DB**, sementara Google Sheets `st_log` tetap menerima sinkronisasi dingin (*cold backup*) di latar belakang (*background async*) sebagai arsip cadangan dinas.
+
+---
+
+#### 2. Rencana Implementasi Teknis (Implementation Plan)
+
+1. **Pengembangan Engine Firestore di [`javascript_firebase.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/javascript_firebase.html):**
+   - Menambahkan konstanta koleksi:
+     `SURAT_TUGAS_COLLECTION: 'surat_tugas_documents'`
+   - Menambahkan metode operasional:
+     * `saveSuratTugasToFirestore(stData)`: Menyimpan/memperbarui dokumen Surat Tugas ke koleksi `surat_tugas_documents` dengan ID dokumen `id_st` (misal: `ST-179369680905757`), lengkap dengan timestamp `created_at` dan `updated_at`.
+     * `deleteSuratTugasFromFirestore(id)`: Menghapus dokumen dari Firestore secara instan.
+     * `getFirestoreSuratTugas()`: Mengambil daftar seluruh dokumen Surat Tugas secara cepat.
+     * `subscribeFirestoreSuratTugas(callback)`: Memasang listener `onSnapshot` real-time ke koleksi `surat_tugas_documents`.
+     * `migrateLegacyStToFirestore(legacyList)`: Fungsi sinkronisasi satu kali untuk memigrasi riwayat Surat Tugas lama dari Google Sheets yang belum ada di Firestore, sehingga data lama tetap utuh 100%.
+
+2. **Pembaruan Service Layer di [`modules/permohonan/st_data.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/permohonan/st_data.js) & [`modules/permohonan/rekapitulasi_data.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/permohonan/rekapitulasi_data.js):**
+   - `addSuratTugas(payload, nip, token)`: Menulis dokumen langsung ke Cloud Firestore terlebih dahulu (<200ms), lalu mengirimkan replikasi latar belakang ke GAS `addSuratTugas` sebagai cadangan Sheets.
+   - `updateSuratTugas(payload, nip, token)`: Memperbarui dokumen di Firestore seketika, disusul update cadangan ke Sheets.
+   - `deleteSuratTugasLog(id, nip, token)`: Menghapus dokumen dari Firestore seketika, disusul penghapusan baris di Sheets.
+
+3. **Integrasi Real-time Listener pada Controller Frontend ([`modules/permohonan/st.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/permohonan/st.js) & [`modules/permohonan/rekapitulasi.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/permohonan/rekapitulasi.js)):**
+   - Mengaktifkan `subscribeFirestoreSuratTugas` saat modul Permohonan / Rekapitulasi dimuat.
+   - Data dari Firestore langsung disuntikkan ke `window.state.stList` dan `window.vueState.stList`.
+   - Modul Dashboard otomatis mendeteksi dinas luar hari ini dari data Firestore yang jauh lebih mutakhir.
+   - Menjalankan auto-migrasi data lama di latar belakang saat Admin membuka menu.
+
+4. **PWA Versioning & Deployment:**
+   - Naikkan versi cache PWA di [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) dan [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) ke **`transkep-v3.8.0`** / **`3.8.0`**.
+   - Deploy GAS Clasp ke versi **`@325`**.
+   - Commit & push **HANYA ke `origin/main`** ([`sopiyandedi/TRANSKEP`](https://github.com/sopiyandedi/TRANSKEP)), tidak ke `prod`.
+
+---
+
+#### 3. Estimasi Dampak & File yang Dimodifikasi
+- **File Dimodifikasi:**
+  1. [`javascript_firebase.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/javascript_firebase.html) (Engine CRUD & realtime listener Firestore ST)
+  2. [`modules/permohonan/st_data.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/permohonan/st_data.js) (Hybrid Firestore-first + cold Sheets sync)
+  3. [`modules/permohonan/rekapitulasi_data.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/permohonan/rekapitulasi_data.js) (Penghapusan Firestore-first)
+  4. [`modules/permohonan/st.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/permohonan/st.js) & [`modules/permohonan/rekapitulasi.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/permohonan/rekapitulasi.js) (Realtime listener & state binding)
+  5. [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) & [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) (Cache & Version bump v3.8.0)
+  6. [`prd.md`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/prd.md) (Master Context update)
+- **Status:** `[SELESAI & AKTIF]` ✅

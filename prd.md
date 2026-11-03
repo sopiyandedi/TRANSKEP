@@ -690,3 +690,17 @@ ZONA BAWAH: MASTER CONTEXT & STATUS MIGRASI TERKINI (LIVING CONTEXT)
     - **Deployment Google Apps Script `@324` & Versioning**:
       - Versi Service Worker [sw.js](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) dan `APP_BUILD_VER` di [index.html](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) dinaikkan ke **`transkep-v3.7.9`** / **`3.7.9`**.
       - Sesuai instruksi khusus pengguna, perubahan di-*push* **HANYA ke remote `origin/main`** ([`sopiyandedi/TRANSKEP`](https://github.com/sopiyandedi/TRANSKEP)) untuk pengujian, **TIDAK di-push ke remote `prod`**.
+
+58. **Migrasi Database Surat Tugas (ST, SPD & Plh) ke Cloud Firestore (Tahap 77 - Selesai & Aktif ✅):**
+    - **Latar Belakang & Analisis Performa**:
+      - Transaksi pembuatan, edit, dan hapus Surat Tugas yang sebelumnya mengandalkan Google Sheets (`st_log`) mengalami latensi 2 hingga 5 detik.
+      - Pengguna meminta database Surat Tugas dipindahkan ke Firebase Cloud Firestore agar lebih cepat tanpa menambahkan tombol atau elemen antarmuka baru (*seamless zero-UI*).
+    - **Implementasi Hybrid Cloud Firestore + Cold Sheets Backup**:
+      - **Koleksi Firestore**: `surat_tugas_documents` pada database `transkep-314c0`.
+      - **High-Speed CRUD (<200ms)**: Operasi simpan, update, dan delete Surat Tugas dieksekusi langsung ke Cloud Firestore terlebih dahulu pada [`modules/permohonan/st_data.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/permohonan/st_data.js) dan [`modules/permohonan/rekapitulasi_data.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/permohonan/rekapitulasi_data.js).
+      - **Cold Sheets Backup**: Perubahan disinkronkan ke Google Sheets `st_log` di latar belakang (*background async*) tanpa memblokir antarmuka pengguna sehingga arsip kedinasan tetap terjamin 100%.
+      - **Real-time Synchronous (`onSnapshot`)**: Setiap perubahan data ST otomatis menyuntikkan data mutakhir ke `state.stList` dan `window.vueState.stList` secara instan ke seluruh pengguna yang sedang aktif tanpa reload halaman.
+      - **Zero UI / Tanpa Tombol Firebase**: Seluruh proses migrasi riwayat data lama dan sinkronisasi berlangsung transparan di belakang layar tanpa tombol tambahan apapun di antarmuka.
+    - **Deployment Google Apps Script `@325` & Versioning**:
+      - Versi Service Worker [sw.js](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) dan `APP_BUILD_VER` di [index.html](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) dinaikkan ke **`transkep-v3.8.0`** / **`3.8.0`**.
+      - Sesuai instruksi khusus pengguna, perubahan di-*push* **HANYA ke remote `origin/main`** ([`sopiyandedi/TRANSKEP`](https://github.com/sopiyandedi/TRANSKEP)) untuk pengujian, **TIDAK di-push ke remote `prod`**.

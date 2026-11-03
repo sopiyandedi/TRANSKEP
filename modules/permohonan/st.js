@@ -430,6 +430,11 @@ document.addEventListener("DOMContentLoaded", () => {
                         if(window.showNotify) window.showNotify("Error", err.toString(), "error"); 
                     });
             }
+        },
+        mounted() {
+            if (window.StDataService && typeof window.StDataService.initRealtimeSync === 'function') {
+                window.StDataService.initRealtimeSync();
+            }
         }
     }).mount('#vue-form-st-wrapper');
 

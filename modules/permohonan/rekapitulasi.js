@@ -453,6 +453,9 @@
               }
           },
           mounted() {
+              if (window.StDataService && typeof window.StDataService.initRealtimeSync === 'function') {
+                  window.StDataService.initRealtimeSync();
+              }
               // TAHAP 43: Auto-close dropdown rekap saat klik di luar
               document.addEventListener('click', (e) => {
                   if (!e.target.closest('.dropdown-rekap-container')) {
