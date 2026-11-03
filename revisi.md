@@ -3775,3 +3775,31 @@ Pengguna melaporkan bahwa pratinjau (*preview*) dokumen PDF di modal SK dan SOP 
 #### 3. Estimasi Dampak & Status
 - **Dampak:** Surat tugas 4 orang kini tampil rapi sempurna: 4 orang utuh di Halaman 1, sisa teks (Untuk + Jadwal + TTD) bersih di Halaman 2.
 - **Status:** `[SELESAI & AKTIF]` ✅
+
+---
+
+### TAHAP 75.1: Penyempurnaan Proporsi Spacing Halaman 1 Cetak Surat Tugas 4 Orang (`v3.7.7`)
+
+#### 1. Latar Belakang & Analisis Tampilan
+- Setelah evaluasi pratinjau cetak pada penugasan 4 orang, ke-4 pegawai telah berhasil masuk seluruhnya ke Halaman 1 dan sisa teks berpindah rapi ke Halaman 2.
+- Namun jarak/padding pada Halaman 1 sebelumnya terlalu rapat (`margin-bottom: 22px` pada Kop, `20px` pada Judul, font `10.5pt`, dan jarak antar pegawai hanya `3px`), sehingga teks berkumpul di bagian atas dan menyisakan ruang kosong yang cukup lebar di bawah Halaman 1.
+
+#### 2. Penyesuaian Spacing Proporsional
+1. **Penyelarasan Margin Kop & Judul:**
+   - Jarak bawah Kop Surat disesuaikan menjadi `36px !important` (proporsional dan berwibawa).
+   - Jarak bawah Judul Surat Tugas disesuaikan menjadi `30px !important`.
+   - Jarak bawah Sub-Judul disesuaikan menjadi `8px !important` dengan font `11pt`.
+2. **Penyelarasan Spacing Isi & Pegawai:**
+   - Font isi Halaman 1 dikembalikan ke standar elegan `11pt`.
+   - Jarak paragraf Menimbang dan Dasar diberi ruang napas `padding-bottom: 6px` dengan `line-height: 1.35`.
+   - Teks "Memberi Tugas" diberi margin vertikal `10px` seimbang.
+   - Jarak baris data tabel pegawai dinaikkan ke `padding: 1.5px 0`.
+   - Jarak pemisah antar pegawai (`.peserta-item`) diperlebar menjadi `margin-bottom: 8px` sehingga pegawai 1, 2, 3, dan 4 terpisah jelas dan terbaca rapi.
+3. **Deployment & Git Remote:**
+   - Deploy ke Google Apps Script (Clasp) **`@322`**.
+   - Build PWA dinaikkan ke **`transkep-v3.7.7`** / **`3.7.7`**.
+   - Perubahan di-*push* **HANYA ke `origin/main`** (`sopiyandedi/TRANSKEP.git`), tetap **TIDAK di-push ke remote `prod`**.
+
+#### 3. Estimasi Dampak & Status
+- **Dampak:** Halaman 1 terisi proporsional (~80–85% tinggi lembar A4), tidak ada lagi kesan teks terdesak di atas maupun ruang kosong berlebih di bawah.
+- **Status:** `[SELESAI & AKTIF]` ✅

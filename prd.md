@@ -656,10 +656,10 @@ ZONA BAWAH: MASTER CONTEXT & STATUS MIGRASI TERKINI (LIVING CONTEXT)
     - **Implementasi CSS Smart Padding & Kontainer Mandiri**:
       - Memperbarui [modules/permohonan/cetak/cetak_st.html](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/permohonan/cetak/cetak_st.html) dan [permohonan/st/template_cetak_st.html](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/st/template_cetak_st.html) dengan membungkus seluruh baris "Untuk :", rincian kegiatan, beban anggaran, penutup, dan tanda tangan ke dalam kontainer mandiri `<div class="st-section-sisa">`.
       - Menetapkan aturan `.st-layout-multi` (4 orang atau lebih):
-        * Jarak bawah Kop Surat dirapatkan menjadi `22px !important`.
-        * Jarak bawah Judul Surat Tugas dirapatkan menjadi `20px !important`.
-        * Font isi Halaman 1 disesuaikan ke `10.5pt`, padding baris tabel `2px 0`, jarak item peserta `3px`.
-        * Menjamin **ke-4 pegawai (No. 1, 2, 3, dan 4) muat lengkap, proporsional, dan elegan di Halaman 1**.
+        * Jarak bawah Kop Surat disempurnakan menjadi `36px !important`.
+        * Jarak bawah Judul Surat Tugas disempurnakan menjadi `30px !important`.
+        * Font isi Halaman 1 standar `11pt`, padding baris tabel `1.5px 0`, jarak pemisah antar pegawai (`.peserta-item`) diperlebar menjadi `8px` agar proporsional dan tidak menumpuk di atas.
+        * Menjamin **ke-4 pegawai (No. 1, 2, 3, dan 4) muat lengkap, proporsional, dan terdistribusi elegan di Halaman 1**.
         * Kontainer `.st-section-sisa` memicu perpindahan halaman rapi:
           `page-break-before: always !important; break-before: page !important; padding-top: 15mm !important;`
         * **Halaman 2** diawali bersih oleh baris "Untuk :", jadwal, beban anggaran, penutup, dan tanda tangan pejabat dengan ukuran font standar 11pt.
@@ -668,6 +668,6 @@ ZONA BAWAH: MASTER CONTEXT & STATUS MIGRASI TERKINI (LIVING CONTEXT)
       - Memperbarui [modules/permohonan/cetak/cetak_st.js](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/permohonan/cetak/cetak_st.js) dan [permohonan/st/js_cetak_st.html](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/st/js_cetak_st.html):
         * Menetapkan `layoutClass = "st-layout-multi"` ketika `totalPeserta >= 4`.
         * Menyatukan seluruh peserta ke dalam satu container tanpa page break jika `totalPeserta <= 4`.
-    - **Deployment Google Apps Script `@321` & Versioning**:
-      - Versi Service Worker [sw.js](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) dan `APP_BUILD_VER` di [index.html](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) dinaikkan ke **`transkep-v3.7.6`** / **`3.7.6`**.
+    - **Deployment Google Apps Script `@322` & Versioning**:
+      - Versi Service Worker [sw.js](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) dan `APP_BUILD_VER` di [index.html](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) dinaikkan ke **`transkep-v3.7.7`** / **`3.7.7`**.
       - Sesuai instruksi khusus pengguna, perubahan di-*push* **HANYA ke remote `origin/main`** untuk pengujian dan evaluasi, **TIDAK di-push ke remote `prod`**.
