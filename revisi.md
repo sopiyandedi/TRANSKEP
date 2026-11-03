@@ -3834,3 +3834,85 @@ Pengguna melaporkan bahwa pratinjau (*preview*) dokumen PDF di modal SK dan SOP 
 #### 3. Estimasi Dampak & Status
 - **Dampak:** Halaman 1 kini membentang pas hingga batas tanda kuning, tabel pegawai lapang dan elegan, serta setiap parameter jarak telah dilengkapi tag penjelas lengkap.
 - **Status:** `[SELESAI & AKTIF]` ✅
+
+---
+
+### TAHAP 76: Re-Aktivasi Idle Timeout 13 Menit untuk Semua Role & Kenaikan Limit Percobaan Login ke 3 Kali (`v3.7.9`)
+
+#### 1. Latar Belakang Masalah & Analisis Akar Penyebab (Root Cause Analysis)
+1. **Mengapa Fitur Idle Timeout 13 Menit Terlihat Tidak Aktif?**
+   - **Pengecualian Role Admin & Operator (Tahap 60):** Pada revisi Tahap 60, di dalam `IdleTimeoutGuard` pada [`core/core.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/core/core.js#L865-L874), dipasang fungsi `isExemptRole()`:
+     ```javascript
+     isExemptRole() {
+       const r = (storedRole || stateRole || '').toLowerCase().trim();
+       return r === 'admin' || r === 'operator';
+     }
+     ```
+     Fungsi ini kemudian dipanggil di `checkIdleStatus()`, `start()`, dan `init()`. Jika pengguna berstatus **Admin** atau **Operator**, guard langsung mengeksekusi `this.stop(); return;`.
+   - **Konteks Akun Pengguna:** Pengguna saat ini sedang login menggunakan akun **Admin** (terlihat pada tangkapan layar dengan menu "Kelola Pegawai"). Akibatnya, timer inaktivitas sama sekali tidak berjalan untuk akun Admin dan tidak pernah memicu modal peringatan maupun auto-logout.
+   - **Durasi Awal Belum 13 Menit:** Pada kode eksisting, durasi `IDLE_LIMIT_MS` masih terpasang `15 * 60 * 1000` (15 menit) dengan modal peringatan di menit ke-13, sedangkan instruksi pengguna menghendaki batas waktu inaktif total **13 menit**.
+
+2. **Kebutuhan Batas Percobaan Password:**
+   - Pada `LoginRateLimiter` di [`core/core.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/core/core.js#L990), nilai `MAX_ATTEMPTS` masih bernilai `2`, dan teks peringatan sisa kesempatan tertulis statis `"Sisa 1 kesempatan."`.
+   - Pengguna meminta agar batas percobaan ditingkatkan menjadi maksimal **3 kali**, dengan perhitungan sisa kesempatan yang dinamis dan lockout cooldown 60 detik saat kesempatan habis.
+
+---
+
+#### 2. Rencana Implementasi Teknis (Implementation Plan)
+
+1. **Pembaruan `IdleTimeoutGuard` pada [`core/core.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/core/core.js):**
+   - **Penyesuaian Durasi Idle:**
+     ```javascript
+     IDLE_LIMIT_MS: 13 * 60 * 1000,    // 13 Menit (780.000 ms)
+     WARNING_BEFORE_MS: 2 * 60 * 1000, // Peringatan 2 Menit (120 Detik) sebelum logout
+     ```
+     *Mekanisme alur waktu:*
+     - 0 s.d. 11 menit tidak ada interaksi (mouse, keyboard, touch, scroll) -> background tracking.
+     - Memasuki menit ke-11 (tersisa 120 detik) -> Modal `#modalIdleWarning` muncul dengan hitung mundur detik.
+     - Jika pengguna mengklik "Tetap Masuk" atau ada aktivitas -> timer di-reset ke 13 menit.
+     - Jika diabaikan hingga 120 detik habis (total inaktif tepat 13 menit) -> Sesi diputus otomatis (`handleTimeoutLogout()`).
+   - **Penghapusan Pengecualian Role Admin & Operator:**
+     Ubah `isExemptRole()` agar mengembalikan `false` tanpa pengecualian:
+     ```javascript
+     isExemptRole() {
+       return false; // Berlaku untuk SELURUH pengguna (Admin, Operator, Pegawai)
+     }
+     ```
+   - **Pembaruan Teks Notifikasi Logout:**
+     Pada `handleTimeoutLogout()`, sesuaikan teks notifikasi menjadi:
+     *"Anda telah keluar otomatis demi keamanan karena tidak ada aktivitas selama 13 menit."*
+
+2. **Pembaruan `LoginRateLimiter` pada [`core/core.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/core/core.js):**
+   - **Kenaikan Maksimal Percobaan:**
+     ```javascript
+     MAX_ATTEMPTS: 3, // Maksimal 3 kali percobaan
+     ```
+   - **Pesan Kegagalan Dinamis:**
+     ```javascript
+     const sisa = this.MAX_ATTEMPTS - attempts;
+     showNotify(
+       "Login Gagal",
+       `NIP atau kata sandi salah. Sisa ${sisa} kesempatan.`,
+       "warning"
+     );
+     ```
+     - Salah 1x: *"Login Gagal: NIP atau kata sandi salah. Sisa 2 kesempatan."*
+     - Salah 2x: *"Login Gagal: NIP atau kata sandi salah. Sisa 1 kesempatan."*
+     - Salah 3x: *"Akses Terkunci: Terlalu banyak percobaan. Silakan tunggu 60 detik."* (Form terkunci selama 60 detik).
+   - **Audit Incident Security:**
+     Detail insiden diubah menjadi `'Login gagal 3 kali. Cooldown 60 detik.'`.
+
+3. **PWA Versioning & Deployment:**
+   - Naikkan cache build di [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) dan [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) ke **`transkep-v3.7.9`** / **`3.7.9`**.
+   - Push & deploy GAS Clasp versi **`@324`**.
+   - Push git **HANYA ke `origin/main`** ([`sopiyandedi/TRANSKEP`](https://github.com/sopiyandedi/TRANSKEP)), tidak ke `prod`.
+
+---
+
+#### 3. Estimasi Dampak & File yang Dimodifikasi
+- **File Dimodifikasi:**
+  1. [`core/core.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/core/core.js) (Guard timeout 13 menit & limiter 3x)
+  2. [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) (Cache PWA v3.7.9)
+  3. [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) (App build 3.7.9)
+  4. [`prd.md`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/prd.md) (Pembaruan Living Context)
+- **Status:** `[SELESAI & AKTIF]` ✅

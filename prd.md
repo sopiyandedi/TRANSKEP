@@ -672,3 +672,21 @@ ZONA BAWAH: MASTER CONTEXT & STATUS MIGRASI TERKINI (LIVING CONTEXT)
     - **Deployment Google Apps Script `@323` & Versioning**:
       - Versi Service Worker [sw.js](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) dan `APP_BUILD_VER` di [index.html](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) dinaikkan ke **`transkep-v3.7.8`** / **`3.7.8`**.
       - Sesuai instruksi khusus pengguna, perubahan di-*push* **HANYA ke remote `origin/main`** untuk pengujian dan evaluasi, **TIDAK di-push ke remote `prod`**.
+
+57. **Re-Aktivasi Idle Timeout 13 Menit untuk Seluruh Role & Limitasi Percobaan Login 3 Kali (Tahap 76 - Selesai & Aktif ✅):**
+    - **Latar Belakang & Analisis Akar Masalah**:
+      - Pada implementasi sebelumnya, peran Admin dan Operator dikecualikan (`isExemptRole()`) sehingga pengawas inaktivitas berhenti dan akun Admin tidak pernah terkena timeout otomatis.
+      - Selain itu, durasi inaktivitas masih disetel 15 menit, dan batas percobaan kata sandi salah masih dibatasi 2 kali.
+    - **Implementasi Proteksi Sesi & Rate Limiting ([`core/core.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/core/core.js))**:
+      - **Idle Timeout Guard**:
+        * Menetapkan batas inaktivitas pas **13 menit** (`IDLE_LIMIT_MS: 13 * 60 * 1000`).
+        * Modal peringatan hitung mundur 120 detik muncul tepat di menit ke-11.
+        * Menghapus seluruh pengecualian peran (`isExemptRole() { return false; }`) sehingga **seluruh pengguna termasuk Admin dan Operator** dilindungi proteksi logout otomatis saat inaktif.
+        * Memperbarui teks notifikasi logout menjadi *"Anda telah keluar otomatis demi keamanan karena tidak ada aktivitas selama 13 menit."*.
+      - **Login Rate Limiter**:
+        * Menaikkan batas gagal login menjadi maksimal **3 kali** (`MAX_ATTEMPTS: 3`).
+        * Notifikasi kegagalan dihitung secara dinamis: salah ke-1 (sisa 2 kesempatan), salah ke-2 (sisa 1 kesempatan), dan salah ke-3 form login terkunci 60 detik (*cooldown*).
+        * Detail audit insiden diperbarui menjadi `'Login gagal 3 kali. Cooldown 60 detik.'`.
+    - **Deployment Google Apps Script `@324` & Versioning**:
+      - Versi Service Worker [sw.js](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) dan `APP_BUILD_VER` di [index.html](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) dinaikkan ke **`transkep-v3.7.9`** / **`3.7.9`**.
+      - Sesuai instruksi khusus pengguna, perubahan di-*push* **HANYA ke remote `origin/main`** ([`sopiyandedi/TRANSKEP`](https://github.com/sopiyandedi/TRANSKEP)) untuk pengujian, **TIDAK di-push ke remote `prod`**.

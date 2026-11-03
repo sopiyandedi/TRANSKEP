@@ -715,10 +715,10 @@ function toggleAppVisibility(isLoggedIn, animate) {
 
 // =========================================================================
 // SESSION IDLE TIMEOUT GUARD (TAHAP 58)
-// Auto-Logout 15 Menit saat Inaktif + Modal Peringatan 120 Detik
+// Auto-Logout 13 Menit saat Inaktif + Modal Peringatan 120 Detik (TAHAP 76)
 // =========================================================================
 const IdleTimeoutGuard = {
-  IDLE_LIMIT_MS: 15 * 60 * 1000,    // 15 Menit (900.000 ms)
+  IDLE_LIMIT_MS: 13 * 60 * 1000,    // 13 Menit (780.000 ms)
   WARNING_BEFORE_MS: 2 * 60 * 1000, // Peringatan 2 Menit (120.000 ms) sebelum logout
   STORAGE_KEY_LAST_ACTIVE: 'transkep_last_active_time',
 
@@ -867,7 +867,8 @@ const IdleTimeoutGuard = {
       const storedRole = localStorage.getItem('transkep_user_role') || '';
       const stateRole = (typeof state !== 'undefined' && state.user && state.user.role) ? state.user.role : '';
       const r = (storedRole || stateRole || '').toLowerCase().trim();
-      return r === 'admin' || r === 'operator';
+      // TAHAP 76: Seluruh role (Admin, Operator, Pegawai) diproteksi idle timeout 13 menit
+      return false;
     } catch (e) {
       return false;
     }
@@ -882,7 +883,7 @@ const IdleTimeoutGuard = {
     const now = Date.now();
     const lastActive = this.getLastActiveTime();
     const elapsed = now - lastActive;
-    const warningThreshold = this.IDLE_LIMIT_MS - this.WARNING_BEFORE_MS; // 13 Menit
+    const warningThreshold = this.IDLE_LIMIT_MS - this.WARNING_BEFORE_MS; // 11 Menit (Peringatan muncul di menit ke-11)
 
     if (elapsed >= this.IDLE_LIMIT_MS) {
       // Waktu habis -> Paksa logout
@@ -907,7 +908,7 @@ const IdleTimeoutGuard = {
       if (typeof showNotify === 'function') {
         showNotify(
           "Sesi Berakhir",
-          "Anda telah keluar otomatis demi keamanan karena tidak ada aktivitas selama 15 menit.",
+          "Anda telah keluar otomatis demi keamanan karena tidak ada aktivitas selama 13 menit.",
           "warning"
         );
       }
@@ -987,7 +988,7 @@ try {
 // ANTI-BRUTE FORCE & LOGIN RATE LIMITER (TAHAP 56)
 // =========================================================================
 const LoginRateLimiter = {
-  MAX_ATTEMPTS: 2,
+  MAX_ATTEMPTS: 3,
   LOCKOUT_DURATION_MS: 60 * 1000, // 60 Detik
   STORAGE_KEY_ATTEMPTS: 'transkep_login_fail_count',
   STORAGE_KEY_LOCKED_UNTIL: 'transkep_login_lock_until',
@@ -1042,7 +1043,7 @@ const LoginRateLimiter = {
             userAgent: navigator.userAgent,
             jenis_pelanggaran: 'RATE_LIMIT_LOCKOUT',
             nip: 'SECURITY_SYSTEM',
-            detail: 'Login gagal 2 kali. Cooldown 60 detik.',
+            detail: 'Login gagal 3 kali. Cooldown 60 detik.',
             timestamp: firebase.firestore.FieldValue.serverTimestamp()
           }).catch(() => {});
         }
@@ -1051,7 +1052,7 @@ const LoginRateLimiter = {
     } else {
       showNotify(
         "Login Gagal",
-        "NIP atau kata sandi salah. Sisa 1 kesempatan.",
+        "NIP atau kata sandi salah. Sisa " + (this.MAX_ATTEMPTS - attempts) + " kesempatan.",
         "warning"
       );
       return false;
