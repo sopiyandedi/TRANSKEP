@@ -3973,3 +3973,70 @@ Pengguna melaporkan bahwa pratinjau (*preview*) dokumen PDF di modal SK dan SOP 
   5. [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) & [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) (Cache & Version bump v3.8.0)
   6. [`prd.md`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/prd.md) (Master Context update)
 - **Status:** `[SELESAI & AKTIF]` ✅
+
+
+---
+
+### TAHAP 78: Perbaikan Sinkronisasi & Rehidrasi Instan Data Dashboard Saat Login Pertama Kali (Zero-Blank Dashboard & Delta Sync Memory Self-Healing v3.8.1)
+
+#### 1. Latar Belakang & Analisis Akar Masalah (Root Cause Analysis - RCA)
+1. **Gejala Permasalahan yang Ditemukan:**
+   - Ketika pengguna pertama kali melakukan login (memasukkan NIP & Password dari halaman login), antarmuka berhasil masuk ke Dashboard, namun:
+     1. Blok Header Dashboard (`🏠 Dashboard`, ucapan selamat datang, tombol kode surat, tombol referensi, dan input pencarian pegawai) **hilang/tidak tampil sama sekali**.
+     2. Kartu Ketidakhadiran kosong dengan pesan *"Luar Biasa! 100% Personel Hadir dan Siap Bertugas Hari Ini"*, padahal ada pegawai yang sedang cuti atau dinas luar.
+     3. Kartu Peringatan Dini kosong dengan pesan *"Tidak ada jadwal peringatan aktif"*, padahal ada pegawai dengan jadwal TMT KGB/Pangkat/Pensiun.
+   - Namun, ketika pengguna menekan tombol **Refresh Browser (F5)**, seluruh elemen di atas mendadak muncul secara lengkap, utuh, dan normal tanpa ada kekurangan apapun.
+
+2. **Akar Masalah Teknis (Deep Technical RCA):**
+   - **Akar Masalah 1: `currentUser` pada Instance Vue `dashboardApp` Tidak Terisi Saat Login:**
+     - Instance Vue Dashboard (`dashboardApp.mount('#section-dashboard')`) dimuat saat pertama kali halaman dibuka oleh browser. Ketika belum login, fungsi `data()` membaca user dan mendapatkan nilai `null`.
+     - Ketika pengguna berhasil login via `handleLogin` -> `applyLoginSuccess` di [`core/core.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/core/core.js), profil user disimpan ke `state.user` dan `window.vueState.user`.
+     - **Namun `window.vmDashboard.currentUser` TIDAK diperbarui**, dan fungsi `renderDashboardView()` **tidak pernah dipanggil** dari dalam `applyLoginSuccess`.
+     - Di template [`modules/dashboard/view_dashboard.html: L45`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/dashboard/view_dashboard.html#L45), kontainer header dipasangi direktif `v-show="currentUser"`. Karena `currentUser` di `vmDashboard` masih `null`, header tersembunyi (`display: none`).
+     - Di controller [`modules/dashboard/dashboard.js: L361`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/dashboard/dashboard.js#L361), getter peringatan dini memiliki guard `if (!this.currentUser) return [];`, sehingga kartu peringatan dini langsung menghasilkan array kosong ("Tidak ada jadwal peringatan aktif").
+   - **Akar Masalah 2: Delta Sync Short-Circuit `NOT_MODIFIED` Menahan Data pada Memori Kosong:**
+     - Saat login sukses, sistem memanggil `syncAllServerData(true)`.
+     - Klien mengirimkan parameter `clientVersion` yang dibaca dari `localStorage.getItem('TRANSKEP_DATA_VERSION')`. Jika browser sebelumnya pernah membuka aplikasi, nilai versi tersebut sudah tersimpan di browser.
+     - Server Google Apps Script memeriksa versi tersebut dan mendeteksi versi cocok, sehingga mengembalikan respons: `{ status: 'NOT_MODIFIED' }`.
+     - Pada handler `NOT_MODIFIED` di `syncAllServerData()` dan `syncBackgroundData()`, sistem melakukan short-circuit `return;` tanpa mengecek apakah variabel memori runtime (`state.usersList`, `state.cutiLogs`, `state.stList`) saat ini masih kosong (`length === 0`).
+     - Akibatnya, `state.usersList` tetap berupa array kosong `[]`, `vmDashboard.syncFromGlobal` tidak memuat data pegawai, dan kalkulasi `absensiHariIni` menganggap 0 orang cuti ("100% Hadir").
+   - **Mengapa Saat Refresh (F5) Data Langsung Muncul?**
+     - Saat ditekan F5, lifecycle script dieksekusi ulang dari baris 567–593 di [`core/core.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/core/core.js#L567-L593). Kode tersebut secara otomatis membaca cache `transkep_users_cache` dan `transkep_dashboard_cache` dari `localStorage` ke dalam `state`, dan `dashboardApp.data()` mengambil `transkep_user_profile` ke `currentUser`. Sehingga setelah F5, semua data langsung muncul seketika.
+
+---
+
+#### 2. Rencana Solusi & Implementasi Teknis (Implementation Plan)
+
+1. **Rehidrasi Instan Memori & Inisialisasi Vue Dashboard di `applyLoginSuccess` ([`core/core.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/core/core.js)):**
+   - Di dalam fungsi `applyLoginSuccess` saat verifikasi login berhasil:
+     * Lakukan rehidrasi instan 0ms dari `localStorage` (`transkep_users_cache` dan `transkep_dashboard_cache`) ke `state` dan `window.vueState` agar memori langsung terisi penuh tanpa menunggu panggilan server.
+     * Segera isi `window.vmDashboard.currentUser = response.data`.
+     * Panggil `window.vmDashboard.syncFromGlobal(state)`.
+     * Panggil `renderDashboardView()` seketika sehingga Header Dashboard (`🏠 Dashboard`) dan kartu analitik langsung muncul seketika dalam 0ms.
+
+2. **Force Fresh Sync Saat Login Pertama (`forceRefresh = true`):**
+   - Tambahkan parameter `forceRefresh` pada `syncAllServerData(silent, forceRefresh)` dan `syncBackgroundData(forceRefresh)`.
+   - Di `applyLoginSuccess`, panggil `syncAllServerData(false, true)` jika memori cache kosong, atau `syncAllServerData(true, true)` jika cache ada, dengan flag `forceRefresh = true`.
+   - Jika `forceRefresh === true` atau memori `state.usersList` masih kosong, sistem akan mengosongkan parameter `clientVersion = ''` yang dikirim ke server. Hal ini menjamin server Apps Script **wajib mengembalikan payload data penuh terbaru**, bukan `NOT_MODIFIED`.
+
+3. **Self-Healing pada Handler `NOT_MODIFIED` (`syncAllServerData` & `syncBackgroundData`):**
+   - Pada blok `NOT_MODIFIED`: jika dideteksi memori in-memory (`state.usersList` atau `state.cutiLogs`) masih kosong (`length === 0`), sistem secara otomatis memulihkan data dari cache `localStorage` (`transkep_users_cache` & `transkep_dashboard_cache`), menetapkan `isBgSyncDone = true`, memicu `vmDashboard.syncFromGlobal(state)`, men-dispatch event `transkep:sync-complete`, dan memanggil `renderDashboardView()` sebelum short-circuit `return;`.
+
+4. **Sinkronisasi Kode Klasik GAS di [`javascript.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/javascript.html):**
+   - Menyelaraskan logika `handleLogin`, `syncAllServerData`, dan `syncBackgroundData` pada `javascript.html` agar identik dengan perbaikan di `core/core.js`.
+
+5. **PWA Versioning & Deployment:**
+   - Naikkan versi Service Worker di [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) dan `APP_BUILD_VER` di [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) ke **`transkep-v3.8.1`** / **`3.8.1`**.
+   - Deploy build Google Apps Script Clasp ke versi **`@326`**.
+   - Git commit dan push **HANYA ke `origin/main`** ([`sopiyandedi/TRANSKEP`](https://github.com/sopiyandedi/TRANSKEP)), **TIDAK ke `prod`**.
+
+---
+
+#### 3. Estimasi Dampak & File yang Dimodifikasi
+- **File Dimodifikasi:**
+  1. [`core/core.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/core/core.js) (Rehidrasi instan login, force refresh, & self-healing delta sync)
+  2. [`javascript.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/javascript.html) (Sinkronisasi runtime GAS)
+  3. [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) (Cache PWA v3.8.1)
+  4. [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) (App build 3.8.1)
+  5. [`prd.md`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/prd.md) (Pembaruan Living Context Poin 59)
+- **Status:** `[SELESAI & AKTIF]` ✅

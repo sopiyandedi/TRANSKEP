@@ -704,3 +704,17 @@ ZONA BAWAH: MASTER CONTEXT & STATUS MIGRASI TERKINI (LIVING CONTEXT)
     - **Deployment Google Apps Script `@325` & Versioning**:
       - Versi Service Worker [sw.js](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) dan `APP_BUILD_VER` di [index.html](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) dinaikkan ke **`transkep-v3.8.0`** / **`3.8.0`**.
       - Sesuai instruksi khusus pengguna, perubahan di-*push* **HANYA ke remote `origin/main`** ([`sopiyandedi/TRANSKEP`](https://github.com/sopiyandedi/TRANSKEP)) untuk pengujian, **TIDAK di-push ke remote `prod`**.
+
+59. **Perbaikan Sinkronisasi & Rehidrasi Instan Data Dashboard Saat Login Pertama Kali (Tahap 78 - Selesai & Aktif ✅):**
+    - **Latar Belakang & Analisis Akar Masalah (RCA)**:
+      - Saat login pertama kali dari halaman autentikasi, Header Dashboard (`🏠 Dashboard`, ucapan selamat datang, input pencarian) hilang/tersembunyi, kartu Ketidakhadiran kosong (*"100% Personel Hadir"*), dan kartu Peringatan Dini kosong (*"Tidak ada jadwal peringatan aktif"*).
+      - Setelah ditekan Refresh (F5), seluruh data langsung tampil normal dan lengkap.
+      - *Penyebab*: Instance Vue Dashboard (`dashboardApp`) dimuat saat awal dengan `currentUser = null`. Saat login berhasil, `window.vmDashboard.currentUser` tidak diisi dan `renderDashboardView()` tidak dipanggil sehingga `v-show="currentUser"` menyembunyikan header dan membatalkan kalkulasi peringatan dini. Selain itu, sinkronisasi awal membawa cache version lama sehingga server merespons `NOT_MODIFIED`, yang melakukan short-circuit keluar tanpa mengisi variabel data di memori runtime.
+    - **Implementasi Perbaikan**:
+      - **Rehidrasi Instan 0ms Memori**: Pada `applyLoginSuccess` di [`core/core.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/core/core.js) dan [`javascript.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/javascript.html), data cache (`transkep_users_cache` & `transkep_dashboard_cache`) langsung disuntikkan ke `state` seketika.
+      - **Inisialisasi Vue Dashboard**: Mengisi `window.vmDashboard.currentUser = response.data`, mengeksekusi `vmDashboard.syncFromGlobal(state)`, dan memanggil `renderDashboardView()` seketika saat login sehingga antarmuka dashboard langsung terbuka 0ms tanpa ada elemen yang blank.
+      - **Force Fresh Sync (`forceRefresh = true`)**: Menambahkan parameter `forceRefresh` pada `syncAllServerData` dan `syncBackgroundData`. Khusus saat login berhasil, sistem mengirimkan `clientVersion = ''` sehingga server Apps Script dijamin mengirimkan data penuh terbaru, bukan `NOT_MODIFIED`.
+      - **Self-Healing Delta Sync**: Jika respons server adalah `NOT_MODIFIED` namun memori runtime masih kosong (`length === 0`), sistem secara otomatis memulihkan memori dari cache lokal, men-dispatch event `transkep:sync-complete`, dan me-render ulang dashboard sebelum short-circuit keluar.
+    - **Deployment Google Apps Script `@326` & Versioning**:
+      - Versi Service Worker [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) dan `APP_BUILD_VER` di [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) dinaikkan ke **`transkep-v3.8.1`** / **`3.8.1`**.
+      - Perubahan di-*push* **HANYA ke remote `origin/main`** ([`sopiyandedi/TRANSKEP`](https://github.com/sopiyandedi/TRANSKEP)) untuk pengujian, **TIDAK di-push ke remote `prod`**.
