@@ -33,75 +33,9 @@ const StDataService = {
    * @returns {Promise<Object>} Respon { status, message, id }
    */
   addSuratTugas(payload, nip, token) {
-    const authToken = token || (typeof localStorage !== 'undefined' ? localStorage.getItem('transkep_session_token') : '') || '';
     const idST = payload.id_st || ("ST-" + Date.now() + Math.floor(Math.random() * 1000));
 
-    // PILAR UTAMA: Cloud Firestore (High-Speed Engine <200ms)
-    if (typeof TranskepFirebase !== 'undefined' && TranskepFirebase.isReady && TranskepFirebase.isReady()) {
-      const stObj = {
-        id: idST,
-        nomor: payload.nomor_surat || '',
-        menimbang: payload.menimbang || '',
-        dasar: payload.dasar || '',
-        tujuan: payload.tujuan || '',
-        tempat: payload.tempat || '',
-        tgl_mulai: payload.tgl_mulai || '',
-        tgl_selesai: payload.tgl_selesai || '',
-        jam: payload.jam || '',
-        pejabat_ttd: payload.pejabat_ttd || '',
-        peserta: payload.peserta_json || '[]',
-        data_ekstra: payload.data_ekstra_json || '{}',
-        status: 'DISETUJUI',
-        is_firebase: true
-      };
-
-      return TranskepFirebase.saveSuratTugasToFirestore(stObj)
-        .then((res) => {
-          // Cold Backup di Latar Belakang (Sheets tetap terarsip tanpa memperlambat antarmuka)
-          if (typeof google !== 'undefined' && google.script && google.script.run) {
-            google.script.run
-              .withSuccessHandler(() => {})
-              .withFailureHandler(err => console.warn("[StDataService] Gagal cold backup ke Sheets:", err))
-              .addSuratTugas({ ...payload, id_st: idST }, nip, authToken);
-          }
-          return { status: 'success', message: 'Surat Tugas berhasil diterbitkan.', id: idST };
-        })
-        .catch((err) => {
-          console.warn("[StDataService] Firestore error, fallback ke GAS Sheets:", err);
-          return new Promise((resolve, reject) => {
-            if (typeof google === 'undefined' || !google.script || !google.script.run) return reject(err);
-            google.script.run
-              .withSuccessHandler((r) => resolve(r))
-              .withFailureHandler((e) => reject(e))
-              .addSuratTugas(payload, nip, authToken);
-          });
-        });
-    }
-
-    // Fallback standard Google Apps Script
-    return new Promise((resolve, reject) => {
-      if (typeof google === 'undefined' || !google.script || !google.script.run) {
-        return reject(new Error("Koneksi google.script.run tidak tersedia."));
-      }
-      google.script.run
-        .withSuccessHandler((res) => resolve(res))
-        .withFailureHandler((err) => reject(err))
-        .addSuratTugas(payload, nip, authToken);
-    });
-  },
-
-  /**
-   * Memperbarui data Surat Tugas yang diedit
-   * Menggunakan Cloud Firestore untuk update seketika (<200ms) dengan Cold Backup ke Sheets
-   * @param {Object} payload - Objek data formulir ST lengkap dengan id_st
-   * @param {string} nip - NIP pembuat/admin
-   * @param {string} token - Token sesi otentikasi
-   * @returns {Promise<Object>} Respon { status, message }
-   */
-  updateSuratTugas(payload, nip, token) {
-    const authToken = token || (typeof localStorage !== 'undefined' ? localStorage.getItem('transkep_session_token') : '') || '';
-    const idST = payload.id_st || payload.id;
-
+    // TAHAP 79: Cloud Firestore Mandiri (Inputan ke Sheets Resmi Diputus)
     if (typeof TranskepFirebase !== 'undefined' && TranskepFirebase.isReady && TranskepFirebase.isReady()) {
       const stObj = {
         id: idST,
@@ -122,35 +56,60 @@ const StDataService = {
 
       return TranskepFirebase.saveSuratTugasToFirestore(stObj)
         .then(() => {
-          if (typeof google !== 'undefined' && google.script && google.script.run) {
-            google.script.run
-              .withSuccessHandler(() => {})
-              .withFailureHandler(err => console.warn("[StDataService] Gagal cold backup update ke Sheets:", err))
-              .updateSuratTugas(payload, nip, authToken);
-          }
-          return { status: 'success', message: 'Data Surat Tugas berhasil diperbarui secara permanen.' };
+          console.log("⚡ [StDataService] Surat Tugas berhasil diterbitkan murni di Cloud Firestore:", idST);
+          return { status: 'success', message: 'Surat Tugas berhasil diterbitkan.', id: idST };
         })
         .catch((err) => {
-          console.warn("[StDataService] Firestore error, fallback ke GAS Sheets:", err);
-          return new Promise((resolve, reject) => {
-            if (typeof google === 'undefined' || !google.script || !google.script.run) return reject(err);
-            google.script.run
-              .withSuccessHandler((r) => resolve(r))
-              .withFailureHandler((e) => reject(e))
-              .updateSuratTugas(payload, nip, authToken);
-          });
+          console.error("❌ [StDataService] Gagal simpan Surat Tugas ke Firestore:", err);
+          throw err;
         });
     }
 
-    return new Promise((resolve, reject) => {
-      if (typeof google === 'undefined' || !google.script || !google.script.run) {
-        return reject(new Error("Koneksi google.script.run tidak tersedia."));
-      }
-      google.script.run
-        .withSuccessHandler((res) => resolve(res))
-        .withFailureHandler((err) => reject(err))
-        .updateSuratTugas(payload, nip, authToken);
-    });
+    return Promise.reject(new Error("Koneksi Cloud Firestore tidak aktif."));
+  },
+
+  /**
+   * Memperbarui data Surat Tugas yang diedit
+   * Menggunakan Cloud Firestore untuk update seketika (<200ms) dengan Cold Backup ke Sheets
+   * @param {Object} payload - Objek data formulir ST lengkap dengan id_st
+   * @param {string} nip - NIP pembuat/admin
+   * @param {string} token - Token sesi otentikasi
+   * @returns {Promise<Object>} Respon { status, message }
+   */
+  updateSuratTugas(payload, nip, token) {
+    const idST = payload.id_st || payload.id;
+
+    // TAHAP 79: Cloud Firestore Mandiri (Inputan ke Sheets Resmi Diputus)
+    if (typeof TranskepFirebase !== 'undefined' && TranskepFirebase.isReady && TranskepFirebase.isReady()) {
+      const stObj = {
+        id: idST,
+        nomor: payload.nomor_surat || '',
+        menimbang: payload.menimbang || '',
+        dasar: payload.dasar || '',
+        tujuan: payload.tujuan || '',
+        tempat: payload.tempat || '',
+        tgl_mulai: payload.tgl_mulai || '',
+        tgl_selesai: payload.tgl_selesai || '',
+        jam: payload.jam || '',
+        pejabat_ttd: payload.pejabat_ttd || '',
+        peserta: payload.peserta_json || '[]',
+        data_ekstra: payload.data_ekstra_json || '{}',
+        status: 'DISETUJUI',
+        is_firebase: true
+      };
+
+      return TranskepFirebase.saveSuratTugasToFirestore(stObj)
+        .then(() => {
+          console.log("⚡ [StDataService] Pembaruan Surat Tugas berhasil disimpan murni di Cloud Firestore:", idST);
+          return { status: 'success', message: 'Data Surat Tugas berhasil diperbarui secara permanen.' };
+        })
+        .catch((err) => {
+          console.error("❌ [StDataService] Gagal update Surat Tugas ke Firestore:", err);
+          throw err;
+        });
+    }
+
+    return Promise.reject(new Error("Koneksi Cloud Firestore tidak aktif."));
   },
 
   /**
@@ -182,40 +141,20 @@ const StDataService = {
    * @returns {Promise<Object>} Respon { status, message }
    */
   deleteSuratTugasLog(id, nip, token) {
-    const authToken = token || (typeof localStorage !== 'undefined' ? localStorage.getItem('transkep_session_token') : '') || '';
-
+    // TAHAP 79: Cloud Firestore Mandiri (Inputan ke Sheets Resmi Diputus)
     if (typeof TranskepFirebase !== 'undefined' && TranskepFirebase.isReady && TranskepFirebase.isReady()) {
       return TranskepFirebase.deleteSuratTugasFromFirestore(id)
         .then(() => {
-          if (typeof google !== 'undefined' && google.script && google.script.run) {
-            google.script.run
-              .withSuccessHandler(() => {})
-              .withFailureHandler(err => console.warn("[StDataService] Gagal cold backup delete ke Sheets:", err))
-              .deleteSuratTugasLog(id, nip, authToken);
-          }
+          console.log("⚡ [StDataService] Surat Tugas berhasil dihapus murni dari Cloud Firestore:", id);
           return { status: 'success', message: 'Surat Tugas berhasil dihapus permanen.' };
         })
         .catch((err) => {
-          console.warn("[StDataService] Firestore error, fallback ke GAS Sheets:", err);
-          return new Promise((resolve, reject) => {
-            if (typeof google === 'undefined' || !google.script || !google.script.run) return reject(err);
-            google.script.run
-              .withSuccessHandler((r) => resolve(r))
-              .withFailureHandler((e) => reject(e))
-              .deleteSuratTugasLog(id, nip, authToken);
-          });
+          console.error("❌ [StDataService] Gagal hapus Surat Tugas dari Firestore:", err);
+          throw err;
         });
     }
 
-    return new Promise((resolve, reject) => {
-      if (typeof google === 'undefined' || !google.script || !google.script.run) {
-        return reject(new Error("Koneksi google.script.run tidak tersedia."));
-      }
-      google.script.run
-        .withSuccessHandler((res) => resolve(res))
-        .withFailureHandler((err) => reject(err))
-        .deleteSuratTugasLog(id, nip, authToken);
-    });
+    return Promise.reject(new Error("Koneksi Cloud Firestore tidak aktif."));
   },
 
   /**
@@ -238,19 +177,11 @@ const StDataService = {
           return;
         }
 
-        // Merge dokumen Firestore dengan memori lokal
-        const map = new Map();
-        currentList.forEach(item => {
-          if (item && item.id) map.set(String(item.id), item);
-        });
-
-        list.forEach(fSt => {
-          if (fSt && fSt.id) {
-            map.set(String(fSt.id), { ...fSt, is_firebase: true });
-          }
-        });
-
-        const merged = Array.from(map.values());
+        // TAHAP 79: Firestore sebagai Single Source of Truth
+        const fIds = new Set(list.map(x => String(x.id)));
+        // Pertahankan hanya item legacy non-firebase dari Sheets yang belum termigrasi
+        const unmigratedLegacy = currentList.filter(item => item && item.id && !item.is_firebase && !fIds.has(String(item.id)));
+        const merged = [...list.map(f => ({ ...f, is_firebase: true })), ...unmigratedLegacy];
         
         // Sort descending berdasarkan timestamp/ID
         merged.sort((a, b) => {

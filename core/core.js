@@ -1802,7 +1802,12 @@ function syncBackgroundData(forceRefresh) {
       }
       const d = res.data;
       state.cutiLogs = d.cutiLogs || [];
-      state.stList = d.stList || [];
+      // TAHAP 79: Proteksi anti-overwrite state.stList dari Sheets jika data Firestore sudah aktif
+      if (!state.stList || state.stList.length === 0 || !state.stList.some(x => x && x.is_firebase)) {
+        state.stList = d.stList || [];
+      } else {
+        console.log("🔥 [Sync] state.stList dipertahankan dari Cloud Firestore.");
+      }
       state.ikLogs = d.ikLogs || [];
       state.ipLogs = d.ipLogs || [];
       state.wfhLogs = d.wfhLogs || [];

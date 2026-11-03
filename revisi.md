@@ -4040,3 +4040,69 @@ Pengguna melaporkan bahwa pratinjau (*preview*) dokumen PDF di modal SK dan SOP 
   4. [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) (App build 3.8.1)
   5. [`prd.md`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/prd.md) (Pembaruan Living Context Poin 59)
 - **Status:** `[SELESAI & AKTIF]` ✅
+
+
+---
+
+### TAHAP 79: Pemutusan Inputan Lanjutan Database Surat Tugas ke Google Sheets & Beralih 100% Mandiri ke Cloud Firestore (v3.8.2)
+
+#### 1. Latar Belakang & Analisis Arsitektur
+1. **Latar Belakang Kebutuhan:**
+   - Pada Tahap 77, database Surat Tugas (ST, SPD, dan Plh) telah berhasil diintegrasikan dengan Cloud Firestore (`surat_tugas_documents`).
+   - Namun, sistem masih menerapkan pola *Dual-Storage* (*cold backup* ke Google Sheets `st_log`), di mana setiap penambahan, pengubahan, atau penghapusan Surat Tugas masih mengirim panggilan `google.script.run.addSuratTugas`, `updateSuratTugas`, dan `deleteSuratTugasLog` ke Apps Script.
+   - Pengguna meminta agar inputan lanjutan ke Google Sheets untuk Surat Tugas **diputus 100%**, sehingga seluruh transaksi penugasan pegawai murni tersimpan dan dikelola langsung di Cloud Firestore saja (*Single Source of Truth*). Data riwayat lama di Google Sheets tetap dipreservasi utuh sebagai arsip statis (*cold archive*).
+
+2. **Tantangan Arsitektur & Langkah Pengamanan:**
+   - **Tantangan 1 (Proteksi Penimpaan Memori Saat Delta Sync):**
+     * Pada `core/core.js` dan `javascript.html`, fungsi `syncBackgroundData()` memanggil `getBackgroundData()` ke server Apps Script yang membaca sheet `st_log`.
+     * Jika sheet `st_log` tidak lagi menerima data baru, respon `d.stList` dari server hanya berisi data lama/statis.
+     * **Solusi Pengamanan:** Variabel `state.stList` dan `window.vueState.stList` diproteksi agar **TIDAK lagi ditimpa** oleh respon `d.stList` dari Sheets jika di memori sudah aktif data Cloud Firestore (`is_firebase`). Data Surat Tugas murni di-hydrate dan disinkronkan secara real-time via `onSnapshot` Firestore.
+   - **Tantangan 2 (Konsistensi Sinkronisasi Penghapusan Dokumen):**
+     * Pada logika penggabungan (*merge*) di `initRealtimeSync()`, ketika sebuah dokumen ST dihapus di Firestore, sistem harus memastikan item tersebut langsung terhapus dari memori lokal dan tidak dibangkitkan kembali oleh sisa array memori.
+
+---
+
+#### 2. Rencana Implementasi Teknis (Implementation Plan)
+
+1. **Pemutusan Panggilan Google Sheets di Service Layer ([`modules/permohonan/st_data.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/permohonan/st_data.js)):**
+   - **`addSuratTugas(payload, nip, token)`**:
+     * Hapus pemanggilan `google.script.run.addSuratTugas(...)`.
+     * Simpan dokumen murni ke Cloud Firestore via `TranskepFirebase.saveSuratTugasToFirestore(stObj)`.
+     * Kembalikan respons sukses instan `<100ms` ke antarmuka pengguna tanpa jeda antrean Apps Script.
+   - **`updateSuratTugas(payload, nip, token)`**:
+     * Hapus pemanggilan `google.script.run.updateSuratTugas(...)`.
+     * Perbarui dokumen murni di Cloud Firestore via `TranskepFirebase.saveSuratTugasToFirestore(stObj)`.
+     * Kembalikan respons sukses instan `<100ms`.
+   - **`deleteSuratTugasLog(id, nip, token)`**:
+     * Hapus pemanggilan `google.script.run.deleteSuratTugasLog(...)`.
+     * Hapus dokumen murni dari Cloud Firestore via `TranskepFirebase.deleteSuratTugasFromFirestore(id)`.
+     * Kembalikan respons sukses instan `<100ms`.
+   - **Penyempurnaan `initRealtimeSync()`**:
+     * Perbarui logika filter agar dokumen yang dihapus di Firestore langsung lenyap dari memori dan tampilan tabel tanpa residu.
+
+2. **Pembersihan Pemanggilan Sheets pada File Template Klasik:**
+   - Di [`permohonan/st/js_st.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/st/js_st.html): Hapus blok pemanggilan `runner.addSuratTugas` dan `runner.updateSuratTugas`.
+   - Di [`permohonan/js_rekapitulasi.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/js_rekapitulasi.html): Hapus pemanggilan `google.script.run.deleteSuratTugasLog` pada `deleteSTRecord`.
+
+3. **Proteksi Anti-Overwrite Delta Sync di [`core/core.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/core/core.js) & [`javascript.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/javascript.html):**
+   - Pada `syncBackgroundData()`, sebelum mengeksekusi `state.stList = d.stList || [];`:
+     * Pasang pengecekan: jika `state.stList` sudah terisi dokumen Firestore (`x.is_firebase`), abaikan penimpaan dari respon Sheets `d.stList`. Pertahankan data murni dari Cloud Firestore.
+
+4. **PWA Versioning & Deployment:**
+   - Naikkan versi Service Worker di [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) dan `APP_BUILD_VER` di [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) ke **`transkep-v3.8.2`** / **`3.8.2`**.
+   - Deploy build Google Apps Script Clasp ke versi **`@327`**.
+   - Git commit dan push **HANYA ke `origin/main`** ([`sopiyandedi/TRANSKEP`](https://github.com/sopiyandedi/TRANSKEP)), **TIDAK ke `prod`**.
+
+---
+
+#### 3. Estimasi Dampak & File yang Dimodifikasi
+- **File Dimodifikasi:**
+  1. [`modules/permohonan/st_data.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/permohonan/st_data.js) (Pemutusan simpan/update/hapus Sheets & Firestore standalone)
+  2. [`permohonan/st/js_st.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/st/js_st.html) (Pembersihan pemanggilan GAS ST)
+  3. [`permohonan/js_rekapitulasi.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/js_rekapitulasi.html) (Pembersihan pemanggilan GAS Hapus ST)
+  4. [`core/core.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/core/core.js) (Proteksi anti-overwrite state ST dari Sheets)
+  5. [`javascript.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/javascript.html) (Sinkronisasi runtime GAS)
+  6. [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) (Cache PWA v3.8.2)
+  7. [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) (App build 3.8.2)
+  8. [`prd.md`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/prd.md) (Pembaruan Living Context Poin 60)
+- **Status:** `[SELESAI & AKTIF]` ✅

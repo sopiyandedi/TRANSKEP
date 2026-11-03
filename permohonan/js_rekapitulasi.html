@@ -349,22 +349,14 @@
                       if (logIndex !== -1) this.s.stList.splice(logIndex, 1);
                       if(window.showNotify) window.showNotify("Surat Tugas Dihapus ⚡", "Dokumen telah dihapus dari daftar (0ms).", "success");
 
+                      // TAHAP 79: Hapus murni dari Cloud Firestore (Input Sheets diputus)
                       if (typeof TranskepFirebase !== 'undefined' && TranskepFirebase.isReady && TranskepFirebase.isReady()) {
-                          TranskepFirebase.deleteSuratTugasFromFirestore(id).catch(e => console.warn('Firestore delete ST error:', e));
-                      }
-
-                      google.script.run
-                          .withSuccessHandler(res => {
-                              if (!res || res.status !== 'success') {
-                                  this.s.stList = backupSt;
-                                  if(window.showNotify) window.showNotify("Gagal Menghapus", (res ? res.message : "Terjadi kesalahan.") + " (Data dikembalikan)", "error");
-                              }
-                          })
-                          .withFailureHandler(err => {
+                          TranskepFirebase.deleteSuratTugasFromFirestore(id).catch(e => {
+                              console.warn('Firestore delete ST error:', e);
                               this.s.stList = backupSt;
-                              if(window.showNotify) window.showNotify("Error Jaringan", err.toString() + " (Data dikembalikan)", "error");
-                          })
-                          .deleteSuratTugasLog(id, this.s.user.nip, token);
+                              if(window.showNotify) window.showNotify("Gagal Menghapus", "Gagal menghapus dari Cloud Firestore. (Data dikembalikan)", "error");
+                          });
+                      }
                   });
               },
               deleteIKFromRekap(id) {

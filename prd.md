@@ -718,3 +718,16 @@ ZONA BAWAH: MASTER CONTEXT & STATUS MIGRASI TERKINI (LIVING CONTEXT)
     - **Deployment Google Apps Script `@326` & Versioning**:
       - Versi Service Worker [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) dan `APP_BUILD_VER` di [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) dinaikkan ke **`transkep-v3.8.1`** / **`3.8.1`**.
       - Perubahan di-*push* **HANYA ke remote `origin/main`** ([`sopiyandedi/TRANSKEP`](https://github.com/sopiyandedi/TRANSKEP)) untuk pengujian, **TIDAK di-push ke remote `prod`**.
+
+60. **Pemutusan Inputan Lanjutan Database Surat Tugas ke Google Sheets & Standalone Cloud Firestore (Tahap 79 - Selesai & Aktif ✅):**
+    - **Latar Belakang & Analisis Arsitektur**:
+      - Setelah migrasi ke Cloud Firestore (`surat_tugas_documents`) di Tahap 77, sistem masih mempertahankan sinkronisasi latar belakang (*cold backup*) ke sheet `st_log`.
+      - Pengguna meminta agar penulisan ke Google Sheets diputus total untuk Surat Tugas agar proses penerbitan, pengubahan, dan penghapusan menjadi 100% mandiri di Cloud Firestore, mempercepat transaksi kedinasan menjadi instan (<100ms) tanpa membebani kuota Apps Script. Data lama di Google Sheets tetap dipreservasi utuh sebagai arsip statis (*cold archive*).
+    - **Implementasi Pemutusan & Pengamanan**:
+      - **Service Layer Mandiri (Firestore-Only)**: Di [`modules/permohonan/st_data.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/permohonan/st_data.js), seluruh pemanggilan `google.script.run.addSuratTugas`, `updateSuratTugas`, dan `deleteSuratTugasLog` diputus total. Operasi simpan, update, dan delete berjalan 100% langsung ke Cloud Firestore.
+      - **Pembersihan File Klasik**: Di [`permohonan/st/js_st.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/st/js_st.html) dan [`permohonan/js_rekapitulasi.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/js_rekapitulasi.html), seluruh pemanggilan GAS untuk Surat Tugas dibersihkan.
+      - **Proteksi Anti-Overwrite Delta Sync**: Pada `syncBackgroundData()` di [`core/core.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/core/core.js) dan [`javascript.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/javascript.html), variabel `state.stList` diproteksi agar tidak ditimpa oleh respon statis Sheets `d.stList` saat data Firestore aktif (`is_firebase`).
+      - **Realtime Sync Garbage Collection**: Memperbaiki logika filter `initRealtimeSync()` agar dokumen yang dihapus di Firestore langsung bersih seketika dari memori dan antarmuka tabel.
+    - **Deployment Google Apps Script `@327` & Versioning**:
+      - Versi Service Worker [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) dan `APP_BUILD_VER` di [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) dinaikkan ke **`transkep-v3.8.2`** / **`3.8.2`**.
+      - Perubahan di-*push* **HANYA ke remote `origin/main`** ([`sopiyandedi/TRANSKEP`](https://github.com/sopiyandedi/TRANSKEP)) untuk pengujian, **TIDAK di-push ke remote `prod`**.

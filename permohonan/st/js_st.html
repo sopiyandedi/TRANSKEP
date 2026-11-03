@@ -320,26 +320,14 @@ document.addEventListener("DOMContentLoaded", () => {
                     window.showNotify("Surat Tugas Diterbitkan ⚡", this.currentEditId ? "Perubahan Surat Tugas disimpan (0ms)." : "Surat Tugas & rombongan dinas diterbitkan (0ms).", "success");
                 }
 
-                const token = localStorage.getItem('transkep_session_token');
                 const idST = this.currentEditId || tempStId;
+                // TAHAP 79: Simpan murni ke Cloud Firestore (Input Sheets diputus)
                 if (typeof TranskepFirebase !== 'undefined' && TranskepFirebase.isReady && TranskepFirebase.isReady()) {
-                    TranskepFirebase.saveSuratTugasToFirestore({ ...payload, id: idST, id_st: idST }).catch(e => console.warn('Firestore ST error:', e));
-                } 
-                if (typeof google !== 'undefined') {
-                    const runner = google.script.run
-                      .withSuccessHandler((res) => {
-                          if (!res || res.status !== 'success') {
-                              this.s.stList = backupSt;
-                              if(window.showNotify) window.showNotify("Gagal Menerbitkan ST", (res ? res.message : "Terjadi kesalahan.") + " (Data dikembalikan)", "error");
-                          }
-                      })
-                      .withFailureHandler((err) => { 
-                          this.s.stList = backupSt;
-                          if(window.showNotify) window.showNotify("Error Koneksi", err.toString() + " (Data dikembalikan)", "error"); 
-                      });
-                      
-                    if (this.currentEditId) runner.updateSuratTugas(payload, this.s.user.nip, token);
-                    else runner.addSuratTugas(payload, this.s.user.nip, token);
+                    TranskepFirebase.saveSuratTugasToFirestore({ ...payload, id: idST, id_st: idST, is_firebase: true }).catch(e => {
+                        console.warn('Firestore ST error:', e);
+                        this.s.stList = backupSt;
+                        if(window.showNotify) window.showNotify("Gagal Simpan", "Gagal menyimpan ke Cloud Firestore. (Data dikembalikan)", "error");
+                    });
                 }
             },
 
