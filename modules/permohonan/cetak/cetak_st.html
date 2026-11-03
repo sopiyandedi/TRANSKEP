@@ -257,42 +257,117 @@
  /* Kontainer Sisa Teks (Untuk, Anggaran, Penutup, TTD) */
     .st-section-sisa { display: block; }
 
-    /* === START TAG KHUSUS ST 4 ORANG ATAU LEBIH (Multi Layout / 2 Halaman) === */
-    /* Page 1: Kop, Judul, Menimbang, Dasar, Memberi Tugas, Kepada (4 Peserta Lengkap & Proporsional) */
-    .st-layout-multi .st-kop-container { margin-bottom: 36px !important; }
-    .st-layout-multi .st-title { margin-bottom: 30px !important; }
-    .st-layout-multi .st-sub-title { margin-bottom: 8px !important; font-size: 11pt; }
-    .st-layout-multi .st-memberi-tugas { font-size: 11pt; margin-top: 10px !important; margin-bottom: 10px !important; }
+    /* =========================================================================
+       START TAG KHUSUS ST 4 ORANG ATAU LEBIH (Multi Layout / 2 Halaman)
+       ========================================================================= */
 
-    /* Spacing & Ukuran Font di Halaman 1: Proporsional, Elegan, Nyaman Dibaca */
-    .st-layout-multi .st-content-table { font-size: 11pt; } 
-    .st-layout-multi .st-content-table td { padding: 3px 0; } 
-    .st-layout-multi .peserta-table { font-size: 11pt; }
-    .st-layout-multi .peserta-table td { padding: 1.5px 0; } 
-    .st-layout-multi .peserta-item { margin-bottom: 8px; }
-    
-    .st-layout-multi .baris-menimbang td { padding-bottom: 6px; }
-    .st-layout-multi .baris-dasar td { padding-bottom: 6px; }
-    .st-layout-multi .baris-menimbang .col-value table td,
-    .st-layout-multi .baris-dasar .col-value table td { line-height: 1.35; padding-bottom: 3px !important; font-size: 11pt; }
-    
-    .st-layout-multi .baris-kepada td { padding-bottom: 0px !important; }
-    
-    /* Page 2: Memaksa area Sisa Teks (Untuk, Anggaran, Penutup, TTD) melompat ke Halaman 2 */
-    .st-layout-multi .st-section-sisa { 
-        page-break-before: always !important; 
-        break-before: page !important;
-        padding-top: 15mm !important; 
+    /* ⬇️ TAG 1-M4: JARAK GARIS KOP SURAT DENGAN KATA "SURAT TUGAS" (Halaman 1) ⬇️ */
+    .st-layout-multi .st-kop-container {
+      margin-bottom: 42px !important;
     }
-    
-    /* Font & Spacing di Halaman 2 (Untuk, Anggaran & TTD) elegan dan proporsional */
-    .st-layout-multi .st-section-sisa .st-content-table { font-size: 11pt !important; }
-    .st-layout-multi .st-section-sisa .baris-untuk td { padding-top: 0px !important; }
-    .st-layout-multi .st-section-sisa .baris-untuk .col-value > div:first-child { line-height: 1.3; padding-bottom: 4px; }
-    .st-layout-multi .st-section-sisa .tabel-untuk { font-size: 11pt !important; }
-    .st-layout-multi .st-section-sisa .tabel-untuk td { padding: 2px 0 !important; }
-    .st-layout-multi .st-section-sisa > p { margin-top: 14px !important; margin-bottom: 10px !important; line-height: 1.3; font-size: 11pt !important; }
-    .st-layout-multi .st-section-sisa .st-ttd-container { margin-top: 35px !important; font-size: 11pt !important; }
+
+    /* ⬇️ TAG 2-M4: JARAK NOMOR SURAT DENGAN "SEKRETARIS/KETUA PENGADILAN AGAMA..." (Halaman 1) ⬇️ */
+    .st-layout-multi .st-title {
+      margin-bottom: 45px !important;
+    }
+
+    /* ⬇️ TAG 3-M4: JARAK KATA "SEKRETARIS..." DENGAN KATA "MENIMBANG" (Halaman 1) ⬇️ */
+    .st-layout-multi .st-sub-title {
+      margin-bottom: 12px !important;
+      font-size: 11pt;
+    }
+
+    /* ⬇️ TAG 4-M4: JARAK ATAS & BAWAH TEKS "MEMBERI TUGAS" (Halaman 1) ⬇️ */
+    .st-layout-multi .st-memberi-tugas {
+      font-size: 11pt;
+      margin-top: 14px !important;
+      margin-bottom: 14px !important;
+    }
+
+    /* ⬇️ TAG 5-M4: UKURAN FONT & PADDING TABEL UTAMA (MENIMBANG & DASAR) (Halaman 1) ⬇️ */
+    .st-layout-multi .st-content-table {
+      font-size: 11pt;
+    }
+
+    .st-layout-multi .st-content-table td {
+      padding: 3px 0;
+    }
+
+    /* ⬇️ TAG 6-M4: PADDING JARAK BAWAH POIN MENIMBANG & DASAR (Halaman 1) ⬇️ */
+    .st-layout-multi .baris-menimbang td {
+      padding-bottom: 8px !important;
+    }
+
+    .st-layout-multi .baris-dasar td {
+      padding-bottom: 8px !important;
+    }
+
+    .st-layout-multi .baris-menimbang .col-value table td,
+    .st-layout-multi .baris-dasar .col-value table td {
+      line-height: 1.4;
+      padding-bottom: 4px !important;
+      font-size: 11pt;
+    }
+
+    .st-layout-multi .baris-kepada td {
+      padding-bottom: 0px !important;
+    }
+
+    /* ⬇️ TAG 7-M4: PADDING AREA PESERTA - JARAK ANTAR BARIS DATA PEGAWAI (NAMA, NIP, PANGKAT, JABATAN) ⬇️ */
+    .st-layout-multi .peserta-table {
+      font-size: 11pt;
+    }
+
+    .st-layout-multi .peserta-table td {
+      padding: 4.5px 0 !important; /* Menaikkan padding baris pegawai agar meregang proporsional */
+    }
+
+    /* ⬇️ TAG 8-M4: PADDING AREA PESERTA - JARAK PEMISAH ANTAR PEGAWAI (1 -> 2 -> 3 -> 4) ⬇️ */
+    .st-layout-multi .peserta-item {
+      margin-bottom: 15px !important; /* Memberikan jeda antar pegawai hingga menyentuh batas proporsional */
+    }
+
+    /* ⬇️ TAG 9-M4: PEMISAH HALAMAN - MEMAKSA SISA TEKS (UNTUK, JADWAL, ANGGARAN, TTD) KE HALAMAN 2 ⬇️ */
+    .st-layout-multi .st-section-sisa {
+      page-break-before: always !important;
+      break-before: page !important;
+      padding-top: 15mm !important;
+    }
+
+    /* ⬇️ TAG 10-M4: PADDING & FONT AREA SISA TEKS DI HALAMAN 2 (UNTUK, ANGGARAN, TTD) ⬇️ */
+    .st-layout-multi .st-section-sisa .st-content-table {
+      font-size: 11pt !important;
+    }
+
+    .st-layout-multi .st-section-sisa .baris-untuk td {
+      padding-top: 0px !important;
+    }
+
+    .st-layout-multi .st-section-sisa .baris-untuk .col-value>div:first-child {
+      line-height: 1.3;
+      padding-bottom: 4px;
+    }
+
+    .st-layout-multi .st-section-sisa .tabel-untuk {
+      font-size: 11pt !important;
+    }
+
+    .st-layout-multi .st-section-sisa .tabel-untuk td {
+      padding: 2px 0 !important;
+    }
+
+    .st-layout-multi .st-section-sisa>p {
+      margin-top: 14px !important;
+      margin-bottom: 10px !important;
+      line-height: 1.3;
+      font-size: 11pt !important;
+    }
+
+    .st-layout-multi .st-section-sisa .st-ttd-container {
+      margin-top: 35px !important;
+      font-size: 11pt !important;
+    }
+
     /* === END TAG KHUSUS ST 4 ORANG === */
 
 

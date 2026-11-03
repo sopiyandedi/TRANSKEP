@@ -3803,3 +3803,34 @@ Pengguna melaporkan bahwa pratinjau (*preview*) dokumen PDF di modal SK dan SOP 
 #### 3. Estimasi Dampak & Status
 - **Dampak:** Halaman 1 terisi proporsional (~80–85% tinggi lembar A4), tidak ada lagi kesan teks terdesak di atas maupun ruang kosong berlebih di bawah.
 - **Status:** `[SELESAI & AKTIF]` ✅
+
+---
+
+### TAHAP 75.2: Peregangan Spacing Area Peserta & Pemasangan Tag Jarak Dokumen Template ST (`v3.7.8`)
+
+#### 1. Latar Belakang & Analisis Permintaan Pengguna
+- Pengguna memberikan tanda acuan visual warna kuning pada bagian bawah Halaman 1 agar ujung data peserta ke-4 meregang pas menyentuh batas bawah proporsional kertas.
+- Selain itu, pengguna meminta agar:
+  1. Jarak antara nomor surat dengan "Sekretaris Pengadilan Agama Indramayu" diperlebar.
+  2. Padding baris data pegawai dan pemisah antar pegawai pada area peserta diperlebar.
+  3. Diberikan tag keterangan jarak yang jelas dan mudah dipahami (`TAG 1-M4` s.d. `TAG 10-M4`) pada berkas `template_cetak_st.html` dan `cetak_st.html`.
+
+#### 2. Implementasi Teknis & Parameter Baru
+1. **Pemasangan Tag & Parameter Spacing:**
+   - `TAG 1-M4 (Jarak Kop Surat ke Judul)`: `margin-bottom: 42px !important;`
+   - `TAG 2-M4 (Jarak Nomor Surat ke Sekretaris/Ketua)`: dinaikkan menjadi `margin-bottom: 45px !important;`
+   - `TAG 3-M4 (Jarak Sekretaris ke Menimbang)`: `margin-bottom: 12px !important;`
+   - `TAG 4-M4 (Jarak Atas/Bawah Memberi Tugas)`: `margin: 14px 0 !important;`
+   - `TAG 6-M4 (Padding Bawah Menimbang & Dasar)`: `padding-bottom: 8px !important; line-height: 1.4;`
+   - `TAG 7-M4 (Padding Baris Data Pegawai)`: dinaikkan menjadi `padding: 4.5px 0 !important;`
+   - `TAG 8-M4 (Jarak Pemisah Antar Pegawai)`: diperlebar menjadi `margin-bottom: 15px !important;`
+2. **Hasil Distribusi Halaman 1:**
+   - Total penambahan tinggi secara vertikal mencapai ~`150px`, secara tepat meregangkan posisi pegawai ke-4 menyentuh tanda kuning di bagian bawah Halaman 1.
+3. **Deployment & Git Remote:**
+   - Deploy ke Google Apps Script (Clasp) **`@323`**.
+   - Build PWA dinaikkan ke **`transkep-v3.7.8`** / **`3.7.8`**.
+   - Perubahan di-*push* **HANYA ke `origin/main`** ([`sopiyandedi/TRANSKEP`](https://github.com/sopiyandedi/TRANSKEP)), tetap **TIDAK di-push ke remote `prod`**.
+
+#### 3. Estimasi Dampak & Status
+- **Dampak:** Halaman 1 kini membentang pas hingga batas tanda kuning, tabel pegawai lapang dan elegan, serta setiap parameter jarak telah dilengkapi tag penjelas lengkap.
+- **Status:** `[SELESAI & AKTIF]` ✅
