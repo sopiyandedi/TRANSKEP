@@ -784,8 +784,31 @@ let gSyncWatchdog = null;
                 } else {
                   console.log("🔥 [Sync] state.jobdesList dipertahankan dari Cloud Firestore.");
                 }
-                state.skList = d.skList || [];
-                state.skAckList = d.skAckList || [];
+                // TAHAP 81: Proteksi anti-overwrite state.skList dari Sheets jika data Firestore sudah aktif
+                if (!state.skList || state.skList.length === 0 || !state.skList.some(x => x && x.is_firebase)) {
+                  state.skList = d.skList || [];
+                  state.skAckList = d.skAckList || [];
+                } else {
+                  console.log("🔥 [Sync] state.skList dipertahankan dari Cloud Firestore.");
+                  if (state.skList && Array.isArray(state.skList)) {
+                    const extractedAck = [];
+                    state.skList.forEach(sk => {
+                      if (sk.acknowledgments && Array.isArray(sk.acknowledgments)) {
+                        sk.acknowledgments.forEach(ack => {
+                          extractedAck.push({
+                            id: 'ACK-' + sk.id + '-' + ack.nip,
+                            sk_id: sk.id,
+                            nip: ack.nip,
+                            tanggal_baca: ack.tanggal_baca || ''
+                          });
+                        });
+                      }
+                    });
+                    if (extractedAck.length > 0) {
+                      state.skAckList = extractedAck;
+                    }
+                  }
+                }
                 state.kinerjaList = d.kinerjaList || [];
                 state.sopList = d.sopList || [];
                 state.sopAckList = d.sopAckList || [];
@@ -999,7 +1022,13 @@ let gSyncWatchdog = null;
               state.skList.forEach(sk => {
                   const baseSkId = String(sk.id).replace(/'/g, "").trim().split('-').slice(0, 2).join('-');
                   if (!skMap[baseSkId]) skMap[baseSkId] = [];
-                  skMap[baseSkId].push({ nip: String(sk.nip).replace(/'/g, "").trim(), peran: '-' });
+                  if (Array.isArray(sk.members) && sk.members.length > 0) {
+                    sk.members.forEach(m => {
+                      skMap[baseSkId].push({ nip: String(m.nip || m).replace(/'/g, "").trim(), peran: m.peran || '-' });
+                    });
+                  } else if (sk.nip) {
+                    skMap[baseSkId].push({ nip: String(sk.nip).replace(/'/g, "").trim(), peran: '-' });
+                  }
               });
 
               Object.keys(skMap).forEach(baseSkId => {

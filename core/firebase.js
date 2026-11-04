@@ -167,6 +167,32 @@ const TranskepFirebase = {
     );
   },
 
+  /**
+   * TAHAP 81: Menyimpan Konfirmasi Baca (Acknowledgment) SK ke Cloud Firestore
+   * Disimpan langsung di dalam array acknowledgments pada dokumen SK (1 koleksi terpadu)
+   */
+  async acknowledgeSkInFirestore(skId, nip, tanggalBaca) {
+    const db = this.getDb();
+    if (!db) throw new Error("Cloud Firestore belum siap terhubung.");
+
+    const cleanSkId = String(skId).replace(/'/g, "").trim().split('-').slice(0, 2).join('-');
+    const cleanNip = String(nip).trim();
+    let tgl = tanggalBaca;
+    if (!tgl) {
+      const d = new Date();
+      tgl = (("0"+d.getDate()).slice(-2)) + '/' + (("0"+(d.getMonth()+1)).slice(-2)) + '/' + d.getFullYear() + ' ' + d.toLocaleTimeString('en-GB');
+    }
+
+    const ackItem = { nip: cleanNip, tanggal_baca: tgl };
+
+    await db.collection(this.SK_COLLECTION).doc(cleanSkId).update({
+      acknowledgments: firebase.firestore.FieldValue.arrayUnion(ackItem),
+      updated_at: firebase.firestore.FieldValue.serverTimestamp()
+    });
+
+    return { status: 'success', sk_id: cleanSkId, nip: cleanNip, tanggal_baca: tgl, message: 'Acknowledgment SK berhasil dicatat di Cloud Firestore.' };
+  },
+
   // ==========================================
   // OPERASI DOKUMEN URAIAN TUGAS (JOBDES)
   // ==========================================

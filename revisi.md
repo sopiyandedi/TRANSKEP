@@ -4170,3 +4170,71 @@ Pengguna melaporkan bahwa pratinjau (*preview*) dokumen PDF di modal SK dan SOP 
   6. [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) (App build 3.8.3)
   7. [`prd.md`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/prd.md) (Pembaruan Living Context Poin 61)
 - **Status:** `[SELESAI & AKTIF]` ✅
+
+
+---
+
+### TAHAP 81: Pemutusan Inputan Lanjutan Database Surat Keputusan (SK) ke Google Sheets & Standalone Cloud Firestore (v3.8.4)
+
+#### 1. Latar Belakang & Analisis Kebutuhan
+1. **Latar Belakang:**
+   - Setelah Surat Tugas (Tahap 79) dan Uraian Tugas/Jobdes (Tahap 80) berhasil diputus dari Google Sheets dan 100% mandiri di Cloud Firestore, modul berikutnya dalam urutan migrasi adalah **Modul Surat Keputusan (SK)**.
+   - Modul SK mengelola arsip penugasan SK dinas (`sk_documents`), susunan tim/keanggotaan pegawai per SK, riwayat revisi SK, serta tanda telah membaca (*acknowledgment*) tugas oleh pegawai terkait.
+   - Saat ini, data service layer [`modules/sk/sk_data.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/sk/sk_data.js) dan backend [`sk/sk.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sk/sk.js) masih menjalankan *Dual-Storage*:
+     * Saat SK disimpan via form input, sistem menyimpan dokumen ke Firestore via `TranskepFirebase.saveSkToFirestore`, lalu memanggil `SkDataService.saveSk` yang mengunggah PDF ke Google Drive DAN menulis baris ganda ke sheet `sk_data` (satu baris per anggota tim).
+     * Saat SK dihapus, sistem menghapus dari Firestore, lalu memanggil `SkDataService.deleteSk` yang menghapus baris dari sheet `sk_data`.
+     * Saat pegawai mengonfirmasi tanda baca SK, sistem memanggil `SkDataService.acknowledgeSk` yang menulis baris ke sheet `sk_ack`.
+
+2. **Sasaran Perubahan:**
+   - **Pemutusan Penulisan Baris Sheets (`sk_data` & `sk_ack`)**: Pendaftaran SK baru, amandemen SK, penghapusan SK, dan pencatatan tanda baca 100% murni dikelola di Cloud Firestore.
+   - **Preservasi Google Drive Upload**: Google Apps Script tetap melayani tugas unggah berkas fisik PDF ke folder Google Drive (`TRANSKEP SK/<Tahun>/<PJ>`) dan mengembalikan tautan `link_drive`, namun dibebaskan dari kewajiban menulis ratusan baris ke sheet `sk_data`.
+   - **Pencatatan Acknowledgment Terpadu di Firestore**: Menambahkan metode `acknowledgeSkInFirestore(skId, nip)` di Firestore (`acknowledgments: arrayUnion`) identik dengan modul SOP, sehingga tanda baca tercatat instan tanpa RPC sheet `sk_ack`.
+   - **Proteksi Anti-Overwrite Delta Sync**: Mengunci `state.skList` dan `state.skAckList` pada `syncBackgroundData()` agar tidak ditimpa oleh respon Sheets statis `d.skList` saat data Firestore aktif.
+
+---
+
+#### 2. Rencana Implementasi Teknis (Implementation Plan)
+
+1. **Pengembangan Engine Firestore di [`core/firebase.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/core/firebase.js) & [`javascript_firebase.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/javascript_firebase.html):**
+   - Menambahkan metode `acknowledgeSkInFirestore(skId, nip, tanggalBaca)`:
+     * Mencatat tanda baca pegawai langsung ke dalam array `acknowledgments` pada dokumen koleksi `sk_documents` menggunakan `FieldValue.arrayUnion`.
+
+2. **Pembaruan Service Layer & Controller Frontend ([`modules/sk/sk_data.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/sk/sk_data.js) & [`modules/sk/sk.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/sk/sk.js)):**
+   - **`saveSk(payload, userNip, token)`**:
+     * Jika ada berkas PDF baru (`payload.fileBase64`), panggil GAS khusus untuk mengunggah ke Google Drive dan mendapatkan `link_drive`.
+     * Simpan dokumen lengkap (metadata, susunan anggota, revisi history) 100% murni ke Cloud Firestore via `TranskepFirebase.saveSkToFirestore(...)`.
+     * Hapus kewajiban penulisan baris ke sheet `sk_data`.
+   - **`deleteSk(id, userNip, token)`**:
+     * Hapus 100% murni dari Cloud Firestore via `TranskepFirebase.deleteSkFromFirestore(id)`.
+     * Hapus pemanggilan penghapusan baris ke sheet `sk_data`.
+   - **`acknowledgeSk(skId, nip, token)`**:
+     * Catat tanda baca 100% murni ke Cloud Firestore via `TranskepFirebase.acknowledgeSkInFirestore(skId, nip)`.
+     * Hapus pemanggilan penulisan baris ke sheet `sk_ack`.
+
+3. **Pembersihan Backend Google Apps Script ([`sk/sk.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sk/sk.js)):**
+   - Di fungsi `saveSk`: Pertahankan logika pembuatan folder dan unggah PDF ke Google Drive (baris 59–102), namun hapus penulisan baris ke sheet `sk_data` (baris 105–155). Cukup kembalikan `{ status: 'success', link_drive: payload.link_drive, message: 'File SK berhasil diunggah ke Google Drive.' }`.
+   - Di fungsi `deleteSk`: Cukup kembalikan `{ status: 'success', message: 'SK dihapus.' }` tanpa memanipulasi sheet `sk_data`.
+   - Di fungsi `acknowledgeSk`: Cukup kembalikan `{ status: 'success', message: 'Tanda baca dicatat.' }` tanpa memanipulasi sheet `sk_ack`.
+
+4. **Proteksi Anti-Overwrite Delta Sync di [`core/core.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/core/core.js) & [`javascript.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/javascript.html):**
+   - Pada `syncBackgroundData()`, proteksi `state.skList`: jika sudah terisi data Cloud Firestore (`x.is_firebase`), abaikan penimpaan dari respon Sheets `d.skList`.
+   - Ekstrak seluruh `acknowledgments` dari dokumen Firestore ke `state.skAckList` agar indikator hijau "Telah Dibaca" tetap menyala seketika.
+
+5. **PWA Versioning & Deployment:**
+   - Naikkan versi Service Worker di [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) dan `APP_BUILD_VER` di [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) ke **`transkep-v3.8.4`** / **`3.8.4`**.
+   - Deploy build Google Apps Script Clasp ke versi **`@329`**.
+   - Git commit dan push **HANYA ke `origin/main`** ([`sopiyandedi/TRANSKEP`](https://github.com/sopiyandedi/TRANSKEP)), **TIDAK ke `prod`**.
+
+---
+
+#### 3. Estimasi Dampak & File yang Dimodifikasi
+- **File Dimodifikasi:**
+  1. [`core/firebase.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/core/firebase.js) & [`javascript_firebase.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/javascript_firebase.html) (Metode `acknowledgeSkInFirestore`)
+  2. [`modules/sk/sk_data.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/sk/sk_data.js) (Pemutusan simpan/hapus/ack Sheets & Firestore standalone)
+  3. [`modules/sk/sk.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/sk/sk.js) (Pengalihan tanda baca & simpan ke Firestore)
+  4. [`sk/sk.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sk/sk.js) (Pembersihan operasi penulisan sheet `sk_data` & `sk_ack` pada backend GAS)
+  5. [`core/core.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/core/core.js) & [`javascript.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/javascript.html) (Proteksi anti-overwrite state SK dari Sheets)
+  6. [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) (Cache PWA v3.8.4)
+  7. [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) (App build 3.8.4)
+  8. [`prd.md`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/prd.md) (Pembaruan Living Context Poin 62)
+- **Status:** `[SELESAI & AKTIF]` ✅

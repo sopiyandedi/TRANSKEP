@@ -101,49 +101,13 @@ function saveSk(payload, userNip, clientToken) {
        }
     }
     // ========================================================
-
-    let ss = getDB();
-    let sheet = ss.getSheetByName('sk_data');
-    if (!sheet) {
-        autoInitSkSheets(ss);
-        sheet = ss.getSheetByName('sk_data');
-    }
-
-    const isNew = !payload.id;
-    const baseId = isNew ? "SK-" + new Date().getTime() : payload.id;
-    const tglInput = isNew ? Utilities.formatDate(new Date(), 'Asia/Jakarta', 'dd/MM/yyyy') : payload.tgl_input;
-    const timestamp = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'dd/MM/yyyy HH:mm:ss');
-
-    if (!isNew) {
-       const data = sheet.getDataRange().getValues();
-       for (let i = data.length - 1; i >= 1; i--) {
-          const rowId = String(data[i][0]).split('-').slice(0, 2).join('-');
-          if (rowId === baseId) sheet.deleteRow(i + 1);
-       }
-    }
-
-    const rowsToInsert = [];
-    payload.members.forEach((m, index) => {
-        const uniqueId = baseId + "-" + (index + 1); 
-        const tugasSkJson = JSON.stringify({
-           no_sk: payload.no_sk,
-           tgl_sk: payload.tgl_sk,
-           pj: payload.pj_sk,
-           peran: m.peran
-        });
-
-        rowsToInsert.push([
-           uniqueId, payload.judul_sk, payload.no_sk, payload.pj_sk, payload.link_drive, 
-           tugasSkJson, tglInput, timestamp, m.nip
-        ]);
-    });
-
-    if (rowsToInsert.length > 0) {
-        sheet.getRange(sheet.getLastRow() + 1, 1, rowsToInsert.length, rowsToInsert[0].length).setValues(rowsToInsert);
-    }
-
-    if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush();
-    return { status: 'success', message: 'Dokumen SK berhasil disimpan dengan sempurna!' };
+    // TAHAP 81: Pemutusan penulisan baris ke sheet sk_data.
+    // Seluruh data dokumen SK tersimpan murni di Cloud Firestore (sk_documents).
+    return { 
+      status: 'success', 
+      link_drive: payload.link_drive || '', 
+      message: 'Berkas SK berhasil diproses dan diunggah ke Google Drive.' 
+    };
   } catch (e) {
     return { status: 'error', message: e.toString() };
   }
@@ -153,33 +117,8 @@ function deleteSk(id, userNip, clientToken) {
   try {
     if (!cekOtorisasi(userNip, clientToken)) return { status: 'error', message: 'Akses Ditolak: Sesi tidak valid.' };
 
-    const ss = getDB();
-    const sheet = ss.getSheetByName('sk_data');
-    if(!sheet) throw new Error("Tabel sk_data tidak ditemukan.");
-
-    const data = sheet.getDataRange().getValues();
-    const targetBaseId = String(id).split('-').slice(0, 2).join('-');
-
-    for (let i = data.length - 1; i >= 1; i--) {
-      const rowId = String(data[i][0]);
-      if (rowId === String(id) || rowId === targetBaseId || rowId.startsWith(targetBaseId + '-')) {
-        sheet.deleteRow(i + 1);
-      }
-    }
-
-    const ackSheet = ss.getSheetByName('sk_ack');
-    if(ackSheet) {
-       const ackData = ackSheet.getDataRange().getValues();
-       for (let j = ackData.length - 1; j >= 1; j--) {
-          const ackId = String(ackData[j][1]);
-          if (ackId === String(id) || ackId === targetBaseId || ackId.startsWith(targetBaseId + '-')) {
-             ackSheet.deleteRow(j + 1);
-          }
-       }
-    }
-
-    if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush();
-    return { status: 'success', message: 'Surat Keputusan berhasil dihapus secara keseluruhan.' };
+    // TAHAP 81: Penghapusan SK murni dikelola di Cloud Firestore (sk_documents).
+    return { status: 'success', message: 'Surat Keputusan berhasil dihapus dari Cloud Firestore.' };
   } catch(e) {
     return { status: 'error', message: e.toString() };
   }
@@ -189,26 +128,8 @@ function acknowledgeSk(skId, nip, clientToken) {
   try {
     if (!cekOtorisasi(nip, clientToken)) return { status: 'error', message: 'Akses Ditolak: Sesi tidak valid.' };
 
-    let ss = getDB();
-    let sheet = ss.getSheetByName('sk_ack');
-    if(!sheet) {
-       autoInitSkSheets(ss);
-       sheet = ss.getSheetByName('sk_ack');
-    }
-
-    const data = sheet.getDataRange().getDisplayValues();
-    for(let i=1; i<data.length; i++) {
-        if(String(data[i][1]).trim() === String(skId).trim() && String(data[i][2]).trim() === String(nip).trim()) {
-            return { status: 'success', message: 'Sudah ditandai sebelumnya.' };
-        }
-    }
-
-    const newId = 'ACK-SK-' + new Date().getTime();
-    const now = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'dd/MM/yyyy HH:mm:ss');
-
-    sheet.appendRow([newId, skId, nip, now]);
-    if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush();
-    return { status: 'success', message: 'Dokumen SK telah ditandai sebagai dibaca.' };
+    // TAHAP 81: Acknowledgment SK murni dikelola di Cloud Firestore via arrayUnion.
+    return { status: 'success', message: 'Dokumen SK telah ditandai sebagai dibaca di Cloud Firestore.' };
   } catch(e) {
     return { status: 'error', message: e.toString() };
   }
