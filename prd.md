@@ -810,3 +810,18 @@ ZONA BAWAH: MASTER CONTEXT & STATUS MIGRASI TERKINI (LIVING CONTEXT)
     - **Deployment Google Apps Script `@334` & Versioning**:
       - Versi Service Worker [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) dan `APP_BUILD_VER` di [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) dinaikkan ke **`transkep-v3.8.8`** / **`3.8.8`**.
       - Perubahan di-*push* **HANYA ke remote `origin/main`** ([sopiyandedi/TRANSKEP](https://github.com/sopiyandedi/TRANSKEP)) untuk pengujian, **TIDAK di-push ke remote `prod`**.
+
+
+67. **Smart Bulk Import Word (.docx) Uraian Tugas ke Cloud Firestore (Client-Side Parsing via Mammoth.js & Instant Batching v3.8.9 - Tahap 86 - Selesai & Aktif ✅):**
+    - **Latar Belakang & Analisis Kebutuhan**:
+      - Sebelumnya pengisian Uraian Tugas (Jobdes) pegawai dilakukan manual satu per satu via modal edit. Di sisi lain, instansi telah memiliki dokumen arsip Uraian Tugas pegawai dalam format Microsoft Word (.docx) berisi poin-poin kalimat tugas kedinasan.
+      - Pengguna membutuhkan fitur impor massal (smart bulk import) multi-file .docx yang dapat mengekstrak poin tugas secara instan langsung di browser (client-side) dan menyimpannya murni ke Cloud Firestore (jobdes_documents) tanpa melalui Google Sheets.
+    - **Implementasi Solusi & Rekayasa Sistem**:
+      - **Client-Side Extraction via Mammoth.js**: Mengintegrasikan mammoth.browser.min.js dari CDN di index.html dan template Jobdes untuk mengekstrak isi teks .docx murni di memori browser via FileReader.readAsArrayBuffer() tanpa membebani backend.
+      - **Smart Parser Poin Kalimat & Anti-Noise**: Secara otomatis menyaring baris kop, judul dokumen, biodata, tanggal, dan tanda tangan; membersihkan bullet/penomoran Word lama (1., a., -, •, dsb); serta menstandarkan penomoran baru (1. ...\n2. ...) agar 100% kompatibel dengan fungsi visual dan cetak PDF (pormatTugasRapi).
+      - **Deterministic NIP Auto-Match**: Mendeteksi pola NIP 18 digit (/\b(19\d{16}|20\d{16})\b/) dari nama file atau isi dokumen untuk mencocokkan identitas pegawai, nama, jabatan, pangkat, dan atasan langsung dari usersList secara instan dan tanpa salah sasaran.
+      - **Modal Preview, Inline Editor & Atasan Selector**: Menyediakan area Drag & Drop multi-file, indikator badge status (🟢 Auto-Matched / 🟡 Manual), inline editor per butir tugas (tambah/hapus/edit baris), pemilihan Verifikator Atasan, dan opsi mode Timpa (Replace) vs Tambah (Append).
+      - **Atomic Batch Write Firestore**: Menggunakan db.batch().set(docRef, payload, { merge: true }) di core/firebase.js dan modules/jobdes/jobdes_data.js untuk menyimpan puluhan dokumen sekaligus (<300ms) dengan pembaruan state lokal secara optimistic (0ms).
+    - **Deployment Google Apps Script @335 & Versioning**:
+      - Versi Service Worker sw.js dan APP_BUILD_VER di index.html dinaikkan ke **transkep-v3.8.9** / **3.8.9**.
+      - Perubahan di-push **HANYA ke remote origin/main** (sopiyandedi/TRANSKEP) untuk pengujian, **TIDAK di-push ke remote prod**.

@@ -1,4 +1,5 @@
 <!-- VIEW COMPONENT: jobdes/view_jobdes.html -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
 <div id="section-jobdes" class="menu-section space-y-6 hidden">
   <div id="vue-jobdes-app" v-cloak>
     
@@ -44,6 +45,11 @@
         <button v-if="hasAdminAccess" @click="modals.notifAdmin = true" class="flex relative w-full sm:w-auto px-3 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl border border-slate-700 transition shadow-lg items-center justify-center z-[90]" title="Lihat Usulan Reposisi">
           <i class="fa-solid fa-bell animate-bounce text-amber-400 text-sm"></i>
           <span v-show="notifUsulan.length > 0" class="absolute -top-1.5 -right-1.5 bg-rose-500 text-white text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full shadow-md">{{ notifUsulan.length }}</span>
+        </button>
+
+        <!-- TOMBOL SMART BULK IMPORT WORD (.DOCX) -->
+        <button v-if="hasAdminAccess" @click="openModalImportDocx" class="flex w-full sm:w-auto px-4 py-2.5 bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 hover:text-sky-300 border border-sky-500/30 font-bold rounded-xl transition items-center justify-center gap-2 text-xs shadow-lg whitespace-nowrap relative z-[90]" title="Smart Bulk Import File Word (.docx) Uraian Tugas">
+          <i class="fa-solid fa-file-word text-sm text-sky-400"></i> Import Word (.docx)
         </button>
       </div>
 
@@ -290,6 +296,195 @@
                <div class="text-xs text-slate-400 bg-slate-950 p-3 rounded-lg border border-slate-800 whitespace-pre-line">{{ u.isi }}</div>
             </div>
           </div>
+        </div>
+      </div>
+
+      <!-- MODAL SMART BULK IMPORT WORD (.DOCX) -->
+      <div v-if="modals.importDocx" class="fixed inset-0 bg-black/75 backdrop-blur-md z-[9999] flex items-center justify-center p-3 sm:p-5 animate-fade-in" @dragover.prevent="importDocx.isDragging = true" @dragleave.prevent="importDocx.isDragging = false" @drop.prevent="handleFileDrop">
+        <div class="w-full max-w-5xl max-h-[92vh] glass border border-slate-700/60 rounded-3xl shadow-2xl flex flex-col overflow-hidden bg-slate-900/95 transition-all text-slate-200">
+          
+          <!-- Header Modal -->
+          <div class="flex items-center justify-between p-5 border-b border-slate-800 bg-slate-950/40 shrink-0">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-sky-500/10 border border-sky-500/30 flex items-center justify-center text-sky-400 shrink-0">
+                <i class="fa-solid fa-file-word text-xl"></i>
+              </div>
+              <div>
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                  Smart Bulk Import Word (.docx) Uraian Tugas
+                </h3>
+                <p class="text-xs text-slate-400 mt-0.5">Ekstrak poin kalimat tugas dari multi-file Word dan simpan instan ke Cloud Firestore.</p>
+              </div>
+            </div>
+            <button @click="closeModalImportDocx" type="button" class="w-8 h-8 rounded-lg bg-slate-800/60 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 flex items-center justify-center transition">
+              <i class="fa-solid fa-xmark text-sm"></i>
+            </button>
+          </div>
+
+          <!-- Body Modal (Scrollable) -->
+          <div class="p-5 overflow-y-auto custom-scrollbar flex-1 space-y-5">
+            
+            <!-- Area 1: Dropzone Upload Multi-File -->
+            <div :class="['border-2 border-dashed rounded-2xl p-6 text-center transition cursor-pointer relative', importDocx.isDragging ? 'border-sky-400 bg-sky-500/10' : 'border-slate-700/80 bg-slate-950/30 hover:border-sky-500/50 hover:bg-slate-900/40']"
+                 @click="$refs.docxFileInput && $refs.docxFileInput.click()">
+              <input type="file" ref="docxFileInput" accept=".docx" multiple class="hidden" @change="handleFileInputChange">
+              
+              <div class="flex flex-col items-center justify-center pointer-events-none space-y-2">
+                <div class="w-12 h-12 rounded-2xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-400 mb-1">
+                  <i class="fa-solid fa-cloud-arrow-up text-2xl"></i>
+                </div>
+                <div class="text-sm font-bold text-slate-200">
+                  <span class="text-sky-400 hover:underline">Pilih file .docx</span> atau seret dan lepas file ke sini
+                </div>
+                <p class="text-[11px] text-slate-400 max-w-md">
+                  Mendukung multi-file sekaligus. Sistem akan mendeteksi <strong class="text-slate-300">NIP 18 digit</strong> pada dokumen/nama file untuk pencocokan otomatis ke database pegawai.
+                </p>
+              </div>
+
+              <!-- Loading Indicator Parsing -->
+              <div v-if="importDocx.isParsing" class="absolute inset-0 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center gap-3 rounded-2xl z-10">
+                <i class="fa-solid fa-spinner fa-spin text-sky-400 text-xl"></i>
+                <span class="text-xs font-bold text-slate-200">Mengekstrak file Word via Mammoth.js...</span>
+              </div>
+            </div>
+
+            <!-- Area 2: Opsi & Toolbar Filter (Tampil jika sudah ada file) -->
+            <div v-if="importDocx.filesQueue.length > 0" class="flex flex-wrap items-center justify-between gap-3 bg-slate-950/40 border border-slate-800 p-3.5 rounded-2xl">
+              
+              <!-- Opsi Mode: Timpa (Replace) vs Tambah (Append) -->
+              <div class="flex items-center gap-4 text-xs">
+                <span class="font-bold text-slate-400 uppercase tracking-wider text-[10px]">Mode Simpan:</span>
+                <label class="flex items-center gap-2 cursor-pointer text-slate-300 hover:text-white">
+                  <input type="radio" value="replace" v-model="importDocx.mode" class="text-sky-500 focus:ring-sky-500">
+                  <span>Timpa Tugas Lama (Replace)</span>
+                </label>
+                <label class="flex items-center gap-2 cursor-pointer text-slate-300 hover:text-white">
+                  <input type="radio" value="append" v-model="importDocx.mode" class="text-sky-500 focus:ring-sky-500">
+                  <span>Tambahkan ke Tugas Ada (Append)</span>
+                </label>
+              </div>
+
+              <!-- Ringkasan Status -->
+              <div class="flex items-center gap-2 text-xs">
+                <span class="px-2.5 py-1 bg-slate-800 rounded-lg text-slate-300 font-medium">Total: {{ importDocx.filesQueue.length }} Dokumen</span>
+                <span class="px-2.5 py-1 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-lg font-bold">🟢 Dikenali: {{ matchedCount }}</span>
+                <span v-if="unmatchedCount > 0" class="px-2.5 py-1 bg-amber-500/10 text-amber-400 border border-amber-500/20 rounded-lg font-bold">🟡 Perlu Dicek: {{ unmatchedCount }}</span>
+              </div>
+            </div>
+
+            <!-- Area 3: Daftar Kartu Pegawai & Poin Tugas -->
+            <div v-if="importDocx.filesQueue.length > 0" class="space-y-4">
+              <div v-for="(item, idx) in importDocx.filesQueue" :key="item.id" 
+                   :class="['border rounded-2xl p-4 transition-all bg-slate-900/60 shadow-md', item.matched ? 'border-slate-800 hover:border-slate-700' : 'border-amber-500/40 bg-amber-500/5']">
+                
+                <!-- Header Kartu Pegawai -->
+                <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-3 border-b border-slate-800/80">
+                  <div class="flex items-start sm:items-center gap-3">
+                    <div :class="['w-8 h-8 rounded-xl flex items-center justify-center font-bold text-xs shrink-0', item.matched ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-amber-500/10 text-amber-400 border border-amber-500/20']">
+                      {{ idx + 1 }}
+                    </div>
+                    <div>
+                      <div class="flex flex-wrap items-center gap-2">
+                        <!-- Badge Status Match -->
+                        <span v-if="item.matched" class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
+                          <i class="fa-solid fa-circle-check text-[9px]"></i> Auto-Matched: {{ item.nama }}
+                        </span>
+                        <span v-else class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center gap-1">
+                          <i class="fa-solid fa-triangle-exclamation text-[9px]"></i> Pilih Pegawai Manual
+                        </span>
+                        <span class="text-[10px] text-slate-500 font-mono">File: {{ item.filename }}</span>
+                      </div>
+                      
+                      <!-- Info Jabatan & NIP -->
+                      <div v-if="item.matched" class="text-xs text-slate-300 font-medium mt-1">
+                        {{ item.jabatan || '-' }} • <span class="font-mono text-indigo-400">{{ item.nip }}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Dropdown Pemilihan Pegawai (Jika Belum Matched) & Atasan -->
+                  <div class="flex flex-wrap items-center gap-3">
+                    
+                    <!-- Dropdown Pilih Pegawai Manual -->
+                    <div v-if="!item.matched" class="w-full sm:w-64">
+                      <select v-model="item.nip" @change="onManualSelectUser(item)" class="w-full px-3 py-1.5 bg-slate-950 border border-amber-500/50 rounded-xl text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-amber-400">
+                        <option value="">-- Pilih Target Pegawai --</option>
+                        <option v-for="u in globalState.usersList" :key="u.nip" :value="u.nip">
+                          {{ u.nama }} ({{ u.nip }})
+                        </option>
+                      </select>
+                    </div>
+
+                    <!-- Dropdown Verifikator Atasan -->
+                    <div class="w-full sm:w-56">
+                      <select v-model="item.atasanNip" class="w-full px-3 py-1.5 bg-slate-950 border border-slate-700 rounded-xl text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-400" :title="'Verifikator Atasan untuk ' + (item.nama || 'pegawai ini')">
+                        <option value="">-- Pilih Atasan Langsung --</option>
+                        <option v-for="a in listAtasan" :key="a.nip" :value="a.nip">
+                          {{ a.nama }} ({{ a.jabatan }})
+                        </option>
+                      </select>
+                    </div>
+
+                    <!-- Tombol Hapus File dari Antrean -->
+                    <button @click="removeFileFromQueue(idx)" type="button" class="px-2.5 py-1.5 text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-xl text-xs transition" title="Hapus Dokumen ini">
+                      <i class="fa-solid fa-trash-can"></i>
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Daftar Poin Tugas (Inline Editable) -->
+                <div class="pt-3 space-y-2">
+                  <div class="flex items-center justify-between text-xs text-slate-400 mb-1">
+                    <span class="font-semibold text-slate-300">Poin Uraian Tugas Pokok ({{ item.points.length }} butir):</span>
+                    <button @click="addPointToItem(item)" type="button" class="text-sky-400 hover:text-sky-300 text-xs font-bold flex items-center gap-1 hover:underline">
+                      <i class="fa-solid fa-plus text-[10px]"></i> Tambah Baris Poin
+                    </button>
+                  </div>
+
+                  <div v-if="item.points.length === 0" class="p-3 text-center text-xs text-slate-500 italic bg-slate-950/30 rounded-xl">
+                    Tidak ada butir tugas yang terdeteksi dari file ini. Klik "+ Tambah Baris Poin" untuk mengisi manual.
+                  </div>
+
+                  <div v-for="(pt, pIdx) in item.points" :key="pIdx" class="flex items-start gap-2 group">
+                    <span class="w-6 text-right text-slate-500 font-mono text-xs pt-2 shrink-0">{{ pIdx + 1 }}.</span>
+                    <textarea v-model="item.points[pIdx]" rows="1" class="flex-1 px-3 py-1.5 bg-slate-950/70 border border-slate-800 rounded-xl text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-sky-500 custom-scrollbar resize-y transition"></textarea>
+                    <button @click="removePointFromItem(item, pIdx)" type="button" class="p-1.5 text-slate-600 hover:text-rose-400 opacity-60 group-hover:opacity-100 transition pt-2" title="Hapus baris ini">
+                      <i class="fa-solid fa-xmark text-xs"></i>
+                    </button>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
+            <!-- State Kosong (Belum ada file) -->
+            <div v-else class="text-center py-6 text-slate-500 text-xs">
+              Belum ada file Word yang dipilih. Silakan unggah satu atau beberapa file .docx di area atas.
+            </div>
+
+          </div>
+
+          <!-- Footer Modal -->
+          <div class="p-4 border-t border-slate-800 bg-slate-950/60 flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
+            <div class="text-xs text-slate-400">
+              <span v-if="importDocx.filesQueue.length > 0">
+                <i class="fa-solid fa-info-circle text-sky-400 mr-1"></i> Data disimpan murni ke <strong class="text-slate-200">Cloud Firestore</strong> (<span class="font-mono text-sky-400">jobdes_documents</span>).
+              </span>
+            </div>
+
+            <div class="flex items-center gap-3 w-full sm:w-auto justify-end">
+              <button @click="closeModalImportDocx" type="button" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition">
+                Batal
+              </button>
+              <button @click="submitBulkImportJobdes" :disabled="importDocx.isSaving || importDocx.filesQueue.length === 0 || matchedCount === 0" 
+                      class="px-5 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 disabled:opacity-50 disabled:pointer-events-none text-white text-xs font-bold flex items-center gap-2 shadow-lg shadow-sky-600/30 transition">
+                <i v-if="!importDocx.isSaving" class="fa-solid fa-cloud-arrow-up"></i>
+                <i v-else class="fa-solid fa-spinner fa-spin"></i>
+                <span>{{ importDocx.isSaving ? 'Menyimpan ke Firebase...' : 'Simpan Semua ke Firebase' }}</span>
+              </button>
+            </div>
+          </div>
+
         </div>
       </div>
 

@@ -66,7 +66,15 @@ function escapeHtml(str) {
             dasarSk: false,
             editJobdes: false,
             usulan: false,
-            notifAdmin: false
+            notifAdmin: false,
+            importDocx: false
+          },
+          importDocx: {
+            isDragging: false,
+            isParsing: false,
+            isSaving: false,
+            mode: 'replace',
+            filesQueue: []
           },
           formEdit: { nip: '', nama: '', atasan: '', ikhtisar: '', pokok: '', tambahan: '', tanggung: '', hasil: '' },
           formUsulan: { namaPegawai: '', isi: '' },
@@ -81,6 +89,12 @@ function escapeHtml(str) {
       computed: {
         globalState() {
           return window.vueState || {};
+        },
+        matchedCount() {
+          return (this.importDocx.filesQueue || []).filter(f => f.matched && f.nip).length;
+        },
+        unmatchedCount() {
+          return (this.importDocx.filesQueue || []).filter(f => !f.matched || !f.nip).length;
         },
         hasAdminAccess() {
           const role = (this.globalState.user?.role || "").toLowerCase();
@@ -447,6 +461,267 @@ function escapeHtml(str) {
               }
             }
           );
+        },
+
+        // ==========================================
+        // SMART BULK IMPORT WORD (.DOCX) METHODS
+        // ==========================================
+        openModalImportDocx() {
+          this.importDocx.isDragging = false;
+          this.importDocx.isParsing = false;
+          this.importDocx.isSaving = false;
+          this.importDocx.filesQueue = [];
+          this.importDocx.mode = 'replace';
+          this.modals.importDocx = true;
+        },
+        closeModalImportDocx() {
+          this.modals.importDocx = false;
+        },
+        handleFileInputChange(e) {
+          const files = e.target.files;
+          if (files && files.length > 0) {
+            this.processDocxFiles(Array.from(files));
+          }
+          if (this.$refs.docxFileInput) {
+            this.$refs.docxFileInput.value = '';
+          }
+        },
+        handleFileDrop(e) {
+          this.importDocx.isDragging = false;
+          const files = e.dataTransfer.files;
+          if (files && files.length > 0) {
+            this.processDocxFiles(Array.from(files));
+          }
+        },
+        extractNipFromDoc(text, filename) {
+          // 1. Prioritas 1: Cek dari nama file terlebih dahulu
+          const mFile = (filename || '').match(/\b(19\d{16}|20\d{16})\b/);
+          if (mFile) return mFile[1];
+
+          // 2. Prioritas 2: Cek dari teks isi dokumen (pola NIP 18 digit)
+          const mText = (text || '').match(/(?:NIP\s*[:.\s]*)?\b(19\d{16}|20\d{16})\b/i);
+          if (mText) return mText[1];
+
+          return null;
+        },
+        cleanDocxTextPoints(rawText) {
+          if (!rawText) return [];
+          const lines = rawText.split(/\r?\n/);
+          const points = [];
+
+          const noisePatterns = [
+            /^uraian\s+tugas/i,
+            /^job\s+description/i,
+            /^daftar\s+rincian\s+tugas/i,
+            /^lampiran/i,
+            /^surat\s+keputusan/i,
+            /^nama\s*[:]/i,
+            /^nip\s*[:]/i,
+            /^jabatan\s*[:]/i,
+            /^pangkat\s*[:]/i,
+            /^golongan\s*[:]/i,
+            /^unit\s+kerja\s*[:]/i,
+            /^atasan\s+langsung\s*[:]/i,
+            /^ikhtisar\s+jabatan\s*[:]/i,
+            /^uraian\s+tugas\s+pokok\s*[:]/i,
+            /^tugas\s+pokok\s*[:]/i,
+            /^tugas\s+tambahan\s*[:]/i,
+            /^tanggung\s+jawab\s*[:]/i,
+            /^hasil\s+kerja\s*[:]/i,
+            /^indramayu,\s*\d+/i,
+            /^mengetahui/i,
+            /^ketua\s+pengadilan/i,
+            /^pejabat\s+penilai/i,
+            /^yang\s+membuat\s+pernyataan/i
+          ];
+
+          for (let i = 0; i < lines.length; i++) {
+            let line = lines[i].trim();
+            if (!line || line.length < 5) continue;
+
+            const isNoise = noisePatterns.some(pattern => pattern.test(line));
+            if (isNoise) continue;
+
+            // Bersihkan bullet atau penomoran Word lama
+            const cleaned = line.replace(/^(\d+[\.\)]|[a-zA-Z][\.\)]|[-–—•*▪▫◦●])\s*/, '').trim();
+            if (cleaned.length >= 5) {
+              points.push(cleaned);
+            }
+          }
+
+          return points;
+        },
+        async processDocxFiles(files) {
+          const docxFiles = files.filter(f => f.name.toLowerCase().endsWith('.docx'));
+          if (docxFiles.length === 0) {
+            if (typeof showNotify === 'function') {
+              showNotify('Peringatan', 'Silakan pilih file dokumen berformat Word (.docx).', 'error');
+            }
+            return;
+          }
+
+          if (typeof mammoth === 'undefined') {
+            if (typeof showNotify === 'function') {
+              showNotify('Peringatan', 'Library Mammoth.js belum siap dimuat.', 'error');
+            }
+            return;
+          }
+
+          this.importDocx.isParsing = true;
+          const usersList = this.globalState.usersList || [];
+
+          for (const file of docxFiles) {
+            try {
+              const arrayBuffer = await file.arrayBuffer();
+              const result = await mammoth.extractRawText({ arrayBuffer: arrayBuffer });
+              const fullText = result.value || '';
+
+              const detectedNip = this.extractNipFromDoc(fullText, file.name);
+              const points = this.cleanDocxTextPoints(fullText);
+
+              let matchedUser = null;
+              if (detectedNip) {
+                matchedUser = usersList.find(u => String(u.nip) === String(detectedNip));
+              }
+
+              let existingPokok = '';
+              let existingAtasan = '';
+              const targetNip = matchedUser ? matchedUser.nip : (detectedNip || '');
+              if (targetNip) {
+                const existingJd = (this.firestoreJobdes || []).find(j => String(j.nip) === String(targetNip)) ||
+                                   (this.globalState.jobdesList || []).find(j => String(j.nip) === String(targetNip));
+                if (existingJd) {
+                  existingPokok = existingJd.tugas_pokok || '';
+                  existingAtasan = existingJd.atasan_nip || '';
+                }
+              }
+
+              this.importDocx.filesQueue.push({
+                id: 'doc_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
+                filename: file.name,
+                nip: matchedUser ? matchedUser.nip : (detectedNip || ''),
+                nama: matchedUser ? matchedUser.nama : '',
+                jabatan: matchedUser ? matchedUser.jabatan : '',
+                matched: !!matchedUser,
+                atasanNip: existingAtasan || '',
+                points: points,
+                existingPokok: existingPokok
+              });
+            } catch (err) {
+              console.error('Gagal mengekstrak docx:', file.name, err);
+            }
+          }
+
+          this.importDocx.isParsing = false;
+        },
+        onManualSelectUser(item) {
+          const selected = (this.globalState.usersList || []).find(u => String(u.nip) === String(item.nip));
+          if (selected) {
+            item.nama = selected.nama;
+            item.jabatan = selected.jabatan;
+            item.matched = true;
+
+            const existingJd = (this.firestoreJobdes || []).find(j => String(j.nip) === String(selected.nip)) ||
+                               (this.globalState.jobdesList || []).find(j => String(j.nip) === String(selected.nip));
+            if (existingJd) {
+              item.existingPokok = existingJd.tugas_pokok || '';
+              if (!item.atasanNip && existingJd.atasan_nip) {
+                item.atasanNip = existingJd.atasan_nip;
+              }
+            }
+          } else {
+            item.nama = '';
+            item.jabatan = '';
+            item.matched = false;
+          }
+        },
+        addPointToItem(item) {
+          item.points.push('Melaksanakan tugas kedinasan lainnya yang diberikan atasan...');
+        },
+        removePointFromItem(item, pIdx) {
+          item.points.splice(pIdx, 1);
+        },
+        removeFileFromQueue(idx) {
+          this.importDocx.filesQueue.splice(idx, 1);
+        },
+        async submitBulkImportJobdes() {
+          const validItems = this.importDocx.filesQueue.filter(f => f.matched && f.nip && f.points.length > 0);
+          if (validItems.length === 0) {
+            if (typeof showNotify === 'function') {
+              showNotify('Peringatan', 'Tidak ada data pegawai dan butir tugas valid untuk disimpan.', 'error');
+            }
+            return;
+          }
+
+          this.importDocx.isSaving = true;
+          const adminNip = this.globalState.user ? this.globalState.user.nip : 'Admin';
+
+          try {
+            const payloads = validItems.map(item => {
+              let finalTugasPokok = '';
+
+              if (this.importDocx.mode === 'append' && item.existingPokok && item.existingPokok.trim() !== '' && item.existingPokok !== '- Belum diisi.') {
+                const existingLines = item.existingPokok.split('\n').filter(l => l.trim().length > 0);
+                const existingClean = existingLines.map(l => l.replace(/^(\d+[\.\)]|[a-zA-Z][\.\)]|[-–—•*▪▫◦●])\s*/, '').trim()).filter(l => l.length > 0);
+                const combined = [...existingClean, ...item.points];
+                finalTugasPokok = combined.map((p, i) => `${i + 1}. ${p.trim()}`).join('\n');
+              } else {
+                finalTugasPokok = item.points.map((p, i) => `${i + 1}. ${p.trim()}`).join('\n');
+              }
+
+              return {
+                nip: item.nip,
+                atasan_nip: item.atasanNip || '',
+                dasar_lampiran: '-',
+                tugas_pokok: finalTugasPokok,
+                updated_by: adminNip
+              };
+            });
+
+            const res = await window.JobdesDataService.bulkSaveJobdesBatch(payloads, adminNip);
+
+            // Optimistic Local State Update
+            payloads.forEach(p => {
+              const existingIdx = (this.globalState.jobdesList || []).findIndex(j => String(j.nip) === String(p.nip));
+              if (existingIdx > -1) {
+                this.globalState.jobdesList[existingIdx] = {
+                  ...this.globalState.jobdesList[existingIdx],
+                  ...p
+                };
+              } else {
+                if (this.globalState.jobdesList) {
+                  this.globalState.jobdesList.push({ ...p });
+                }
+              }
+
+              const fsIdx = (this.firestoreJobdes || []).findIndex(j => String(j.nip) === String(p.nip));
+              if (fsIdx > -1) {
+                this.firestoreJobdes[fsIdx] = {
+                  ...this.firestoreJobdes[fsIdx],
+                  ...p
+                };
+              } else {
+                this.firestoreJobdes.push({ ...p });
+              }
+            });
+
+            this.importDocx.isSaving = false;
+            this.modals.importDocx = false;
+
+            if (typeof showNotify === 'function') {
+              showNotify('Sukses', `Berhasil mengimpor ${payloads.length} dokumen Uraian Tugas ke Cloud Firestore!`, 'success');
+            } else {
+              alert(`Berhasil mengimpor ${payloads.length} dokumen Uraian Tugas ke Cloud Firestore!`);
+            }
+          } catch (err) {
+            this.importDocx.isSaving = false;
+            console.error('Gagal import massal jobdes:', err);
+            if (typeof showNotify === 'function') {
+              showNotify('Error', 'Gagal menyimpan ke Cloud Firestore: ' + (err.message || err), 'error');
+            } else {
+              alert('Gagal menyimpan ke Cloud Firestore: ' + (err.message || err));
+            }
+          }
         }
       },
       mounted() {

@@ -29,6 +29,22 @@ const JobdesDataService = {
     }
     return Promise.reject(new Error("Koneksi Cloud Firestore tidak aktif."));
   },
+  /**
+   * Menyimpan Banyak Dokumen Jobdes Sekaligus (Bulk Batch) murni ke Cloud Firestore
+   */
+  async bulkSaveJobdesBatch(itemsList, adminNip) {
+    if (typeof TranskepFirebase !== 'undefined' && typeof TranskepFirebase.bulkSaveJobdesBatchToFirestore === 'function') {
+      try {
+        const res = await TranskepFirebase.bulkSaveJobdesBatchToFirestore(itemsList, adminNip);
+        console.log(`⚡ [JobdesDataService] Bulk Batch ${res.count} Jobdes tersimpan murni di Cloud Firestore.`);
+        return res;
+      } catch (err) {
+        console.error("❌ [JobdesDataService] Gagal bulk save ke Cloud Firestore:", err);
+        throw err;
+      }
+    }
+    return Promise.reject(new Error("Koneksi Cloud Firestore bulkSaveJobdesBatchToFirestore tidak aktif."));
+  },
 
   /**
    * Menyimpan usulan reposisi / revisi uraian tugas dari pegawai
@@ -46,6 +62,22 @@ const JobdesDataService = {
       }
     }
     return Promise.reject(new Error("Koneksi Cloud Firestore tidak aktif."));
+  },
+  /**
+   * Menyimpan Banyak Dokumen Jobdes Sekaligus (Bulk Batch) murni ke Cloud Firestore
+   */
+  async bulkSaveJobdesBatch(itemsList, adminNip) {
+    if (typeof TranskepFirebase !== 'undefined' && typeof TranskepFirebase.bulkSaveJobdesBatchToFirestore === 'function') {
+      try {
+        const res = await TranskepFirebase.bulkSaveJobdesBatchToFirestore(itemsList, adminNip);
+        console.log(`⚡ [JobdesDataService] Bulk Batch ${res.count} Jobdes tersimpan murni di Cloud Firestore.`);
+        return res;
+      } catch (err) {
+        console.error("❌ [JobdesDataService] Gagal bulk save ke Cloud Firestore:", err);
+        throw err;
+      }
+    }
+    return Promise.reject(new Error("Koneksi Cloud Firestore bulkSaveJobdesBatchToFirestore tidak aktif."));
   },
 
   /**
@@ -80,6 +112,22 @@ const JobdesDataService = {
       }
     }
     return Promise.reject(new Error("Koneksi Cloud Firestore tidak aktif."));
+  },
+  /**
+   * Menyimpan Banyak Dokumen Jobdes Sekaligus (Bulk Batch) murni ke Cloud Firestore
+   */
+  async bulkSaveJobdesBatch(itemsList, adminNip) {
+    if (typeof TranskepFirebase !== 'undefined' && typeof TranskepFirebase.bulkSaveJobdesBatchToFirestore === 'function') {
+      try {
+        const res = await TranskepFirebase.bulkSaveJobdesBatchToFirestore(itemsList, adminNip);
+        console.log(`⚡ [JobdesDataService] Bulk Batch ${res.count} Jobdes tersimpan murni di Cloud Firestore.`);
+        return res;
+      } catch (err) {
+        console.error("❌ [JobdesDataService] Gagal bulk save ke Cloud Firestore:", err);
+        throw err;
+      }
+    }
+    return Promise.reject(new Error("Koneksi Cloud Firestore bulkSaveJobdesBatchToFirestore tidak aktif."));
   },
 
   /**

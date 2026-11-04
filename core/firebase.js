@@ -231,6 +231,70 @@ const TranskepFirebase = {
   },
 
   /**
+   * Menyimpan Banyak Dokumen Jobdes Sekaligus (Batch Write) ke Firestore
+   * Mendukung hingga 500 dokumen per batch secara atomik & instan
+   */
+  async bulkSaveJobdesBatchToFirestore(jobdesList, updatedByNip) {
+    const db = this.getDb();
+    if (!db) throw new Error("Cloud Firestore belum siap terhubung.");
+    if (!Array.isArray(jobdesList) || jobdesList.length === 0) {
+      return { status: 'success', count: 0, message: 'Tidak ada data untuk disimpan.' };
+    }
+
+    const CHUNK_SIZE = 450;
+    let savedCount = 0;
+
+    for (let i = 0; i < jobdesList.length; i += CHUNK_SIZE) {
+      const chunk = jobdesList.slice(i, i + CHUNK_SIZE);
+      const batch = db.batch();
+
+      chunk.forEach(item => {
+        const docId = String(item.nip || '').trim();
+        if (!docId) return;
+
+        const docRef = db.collection(this.JOBDES_COLLECTION).doc(docId);
+        const payload = {
+          nip: docId,
+          dasar_lampiran: item.dasar_lampiran || '-',
+          tugas_pokok: item.tugas_pokok || '',
+          is_firebase: true,
+          updated_at: firebase.firestore.FieldValue.serverTimestamp()
+        };
+
+        if (item.atasan_nip) {
+          payload.atasan_nip = String(item.atasan_nip).trim();
+        }
+        if (item.ikhtisar_jabatan !== undefined) {
+          payload.ikhtisar_jabatan = item.ikhtisar_jabatan;
+        }
+        if (item.tugas_tambahan !== undefined) {
+          payload.tugas_tambahan = item.tugas_tambahan;
+        }
+        if (item.tanggung_jawab !== undefined) {
+          payload.tanggung_jawab = item.tanggung_jawab;
+        }
+        if (item.hasil_kerja !== undefined) {
+          payload.hasil_kerja = item.hasil_kerja;
+        }
+        if (updatedByNip) {
+          payload.updated_by = updatedByNip;
+        }
+
+        batch.set(docRef, payload, { merge: true });
+        savedCount++;
+      });
+
+      await batch.commit();
+    }
+
+    return {
+      status: 'success',
+      count: savedCount,
+      message: `Berhasil menyimpan ${savedCount} Uraian Tugas ke Cloud Firestore.`
+    };
+  },
+
+  /**
    * Mengambil Seluruh Dokumen Jobdes dari Firestore
    */
   async getFirestoreJobdes() {

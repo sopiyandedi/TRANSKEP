@@ -40,6 +40,8 @@
 
   <!-- SheetJS (Excel Importer/Exporter) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <!-- Mammoth.js (.docx Word Parser) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
 
   <!-- Firebase SDK v10 (Cloud Firestore & App Check Compat Library) -->
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
@@ -511,7 +513,7 @@
       ];
 
       try {
-        const APP_BUILD_VER = '3.8.8';
+        const APP_BUILD_VER = '3.8.9';
         console.log('🔄 [TRANSKEP Loader] Memuat komponen tampilan views/ secara paralel...');
         await Promise.all(VIEW_SLOTS.map(async item => {
           const res = await fetch(item.file + '?v=' + APP_BUILD_VER);

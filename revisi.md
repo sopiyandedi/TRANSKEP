@@ -3451,6 +3451,48 @@ Pengguna melaporkan bahwa pratinjau (*preview*) dokumen PDF di modal SK dan SOP 
 - **Dampak:** Memulihkan login Admin dan seluruh pegawai 100% secara instan di server Google Apps Script tanpa menyentuh atau mengubah data password di `user_data`.
 - **Status:** `[SELESAI & AKTIF]` ✅
 
+---
+
+### TAHAP 85: Peningkatan Blur & Opasitas Searchable Dropdown di Mode Light (Anti-Transparan / Heavy Frosted Glass & Solid Contrast v3.8.8)
+
+#### 1. Latar Belakang & Akar Masalah
+- **Latar Belakang:** Pada mode tampilan terang (Light Mode), dropdown hasil pencarian pegawai di dashboard (`searchKeyword`) serta dropdown saring/filter pegawai di berbagai modul terlihat terlalu transparan/tembus pandang (5% - 15% opacity), sehingga kartu dan teks di belakangnya ("Ketidakhadiran", "Peringatan Dini", nama pegawai lain) tembus terlihat dan bertabrakan dengan teks hasil pencarian.
+- **Akar Masalah:**
+  1. Kontainer hasil pencarian di dashboard menggunakan class `.glass`.
+  2. Aturan CSS `.light-mode #app-container .glass` memaksa seluruh elemen `.glass` menjadi sangat transparan (`rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.05) 100%`).
+  3. Selector spesifik `.light-mode #searchResultPanel` yang sudah ada sebelumnya tidak aktif karena elemen di HTML belum dipasangi ID `#searchResultPanel`.
+
+#### 2. Rencana Implementasi & Rekayasa UI/UX
+1. **Pelepasan Class Glass & Pemasangan ID Spesifik:**
+   - Di [`modules/dashboard/view_dashboard.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/dashboard/view_dashboard.html) dan [`dashboard/view_dashboard.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/dashboard/view_dashboard.html):
+     * Melepaskan class `.glass` dari kontainer hasil pencarian.
+     * Memasang `id="searchResultPanel"` dan class `dashboard-search-dropdown`.
+     * Memasang `id="searchResultContent"` pada wadah daftar.
+     * Memberi tanda class `.search-item-row`, `.search-item-nama`, `.search-item-meta`, dan `.search-empty-state`.
+2. **Penerapan Heavy Frosted Blur & High Opacity (Anti-Tembus Pandang):**
+   - Di [`stylesheet.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/stylesheet.html) dan [`css/stylesheet.css`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/css/stylesheet.css):
+     * Mengatur latar belakang panel pencarian menjadi putih frosted 98% (`rgba(255, 255, 255, 0.98)`).
+     * Menerapkan filter blur ekstrim `backdrop-filter: blur(36px) saturate(200%)` sehingga elemen di belakangnya lebur total dan 100% tidak tampak.
+     * Menambahkan border presisi `rgba(203, 213, 225, 0.95)` dan elevated drop shadow `box-shadow: 0 25px 60px -15px rgba(15, 23, 42, 0.25)`.
+     * Menyesuaikan baris hasil pencarian dengan teks gelap kontras `#0f172a` (nama), `#475569` (jabatan/NIP), dan hover state halus `#f1f5f9`.
+3. **Proteksi Menyeluruh Searchable Dropdowns Lintas Modul:**
+   - Menambahkan aturan styling global pada mode terang untuk dropdown pemilih atasan di Jobdes, pejabat penilai di Kinerja, filter saring pegawai di E-Office & Permohonan, serta mode bypass cuti.
+4. **PWA Versioning & Deployment:**
+   - Menaikkan versi Service Worker [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) dan `APP_BUILD_VER` di [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) ke **`transkep-v3.8.8`** / **`3.8.8`**.
+   - Deploy build Google Apps Script Clasp ke versi **`@334`**.
+   - Git commit dan push **HANYA ke `origin/main`** ([`sopiyandedi/TRANSKEP`](https://github.com/sopiyandedi/TRANSKEP)), **TIDAK ke `prod`**.
+
+#### 3. Estimasi Dampak & File yang Dimodifikasi
+- **File Dimodifikasi:**
+  1. [`modules/dashboard/view_dashboard.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/dashboard/view_dashboard.html) (Pelepasan `.glass`, penambahan `#searchResultPanel`, `#searchResultContent`, `.dashboard-search-dropdown`, dan struktur baris)
+  2. [`dashboard/view_dashboard.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/dashboard/view_dashboard.html) (Penyelarasan cermin GAS dashboard)
+  3. [`stylesheet.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/stylesheet.html) (Heavy frosted blur 36px, 98% opacity, border & shadow anti-tembus pandang, dan proteksi global searchable dropdown)
+  4. [`css/stylesheet.css`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/css/stylesheet.css) (Penyelarasan stylesheet CSS PWA)
+  5. [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) (Cache PWA v3.8.8)
+  6. [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) (App build 3.8.8)
+  7. [`prd.md`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/prd.md) (Pembaruan Living Context Poin 66)
+- **Status:** `[SELESAI & AKTIF]` ✅
+
 
 ---
 
@@ -3494,6 +3536,48 @@ Pengguna melaporkan bahwa pratinjau (*preview*) dokumen PDF di modal SK dan SOP 
 - **Dampak:** Menu **E-Office** dan **Kelola Pegawai** langsung muncul seketika (`0ms`) begitu Admin login maupun saat halaman di-refresh (`F5`), sekaligus memulihkan alur sinkronisasi `usersList` saat status `getBulkData` bernilai `'UPDATED'`. Pegawai non-Admin tetap terproteksi penuh (menu tersembunyi).
 - **Status:** `[SELESAI & AKTIF]` ✅
 
+---
+
+### TAHAP 85: Peningkatan Blur & Opasitas Searchable Dropdown di Mode Light (Anti-Transparan / Heavy Frosted Glass & Solid Contrast v3.8.8)
+
+#### 1. Latar Belakang & Akar Masalah
+- **Latar Belakang:** Pada mode tampilan terang (Light Mode), dropdown hasil pencarian pegawai di dashboard (`searchKeyword`) serta dropdown saring/filter pegawai di berbagai modul terlihat terlalu transparan/tembus pandang (5% - 15% opacity), sehingga kartu dan teks di belakangnya ("Ketidakhadiran", "Peringatan Dini", nama pegawai lain) tembus terlihat dan bertabrakan dengan teks hasil pencarian.
+- **Akar Masalah:**
+  1. Kontainer hasil pencarian di dashboard menggunakan class `.glass`.
+  2. Aturan CSS `.light-mode #app-container .glass` memaksa seluruh elemen `.glass` menjadi sangat transparan (`rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.05) 100%`).
+  3. Selector spesifik `.light-mode #searchResultPanel` yang sudah ada sebelumnya tidak aktif karena elemen di HTML belum dipasangi ID `#searchResultPanel`.
+
+#### 2. Rencana Implementasi & Rekayasa UI/UX
+1. **Pelepasan Class Glass & Pemasangan ID Spesifik:**
+   - Di [`modules/dashboard/view_dashboard.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/dashboard/view_dashboard.html) dan [`dashboard/view_dashboard.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/dashboard/view_dashboard.html):
+     * Melepaskan class `.glass` dari kontainer hasil pencarian.
+     * Memasang `id="searchResultPanel"` dan class `dashboard-search-dropdown`.
+     * Memasang `id="searchResultContent"` pada wadah daftar.
+     * Memberi tanda class `.search-item-row`, `.search-item-nama`, `.search-item-meta`, dan `.search-empty-state`.
+2. **Penerapan Heavy Frosted Blur & High Opacity (Anti-Tembus Pandang):**
+   - Di [`stylesheet.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/stylesheet.html) dan [`css/stylesheet.css`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/css/stylesheet.css):
+     * Mengatur latar belakang panel pencarian menjadi putih frosted 98% (`rgba(255, 255, 255, 0.98)`).
+     * Menerapkan filter blur ekstrim `backdrop-filter: blur(36px) saturate(200%)` sehingga elemen di belakangnya lebur total dan 100% tidak tampak.
+     * Menambahkan border presisi `rgba(203, 213, 225, 0.95)` dan elevated drop shadow `box-shadow: 0 25px 60px -15px rgba(15, 23, 42, 0.25)`.
+     * Menyesuaikan baris hasil pencarian dengan teks gelap kontras `#0f172a` (nama), `#475569` (jabatan/NIP), dan hover state halus `#f1f5f9`.
+3. **Proteksi Menyeluruh Searchable Dropdowns Lintas Modul:**
+   - Menambahkan aturan styling global pada mode terang untuk dropdown pemilih atasan di Jobdes, pejabat penilai di Kinerja, filter saring pegawai di E-Office & Permohonan, serta mode bypass cuti.
+4. **PWA Versioning & Deployment:**
+   - Menaikkan versi Service Worker [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) dan `APP_BUILD_VER` di [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) ke **`transkep-v3.8.8`** / **`3.8.8`**.
+   - Deploy build Google Apps Script Clasp ke versi **`@334`**.
+   - Git commit dan push **HANYA ke `origin/main`** ([`sopiyandedi/TRANSKEP`](https://github.com/sopiyandedi/TRANSKEP)), **TIDAK ke `prod`**.
+
+#### 3. Estimasi Dampak & File yang Dimodifikasi
+- **File Dimodifikasi:**
+  1. [`modules/dashboard/view_dashboard.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/dashboard/view_dashboard.html) (Pelepasan `.glass`, penambahan `#searchResultPanel`, `#searchResultContent`, `.dashboard-search-dropdown`, dan struktur baris)
+  2. [`dashboard/view_dashboard.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/dashboard/view_dashboard.html) (Penyelarasan cermin GAS dashboard)
+  3. [`stylesheet.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/stylesheet.html) (Heavy frosted blur 36px, 98% opacity, border & shadow anti-tembus pandang, dan proteksi global searchable dropdown)
+  4. [`css/stylesheet.css`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/css/stylesheet.css) (Penyelarasan stylesheet CSS PWA)
+  5. [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) (Cache PWA v3.8.8)
+  6. [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) (App build 3.8.8)
+  7. [`prd.md`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/prd.md) (Pembaruan Living Context Poin 66)
+- **Status:** `[SELESAI & AKTIF]` ✅
+
 
 ---
 
@@ -3534,6 +3618,48 @@ Pengguna melaporkan bahwa pratinjau (*preview*) dokumen PDF di modal SK dan SOP 
 
 #### 4. Estimasi Dampak & Status
 - **Dampak:** Memulihkan jalur deploy ke `https://sso.pa-indramayu.go.id/` secara permanen, memastikan Service Worker selalu menarik `index.html` terbaru dari jaringan, dan menampilkan kembali menu **E-Office** beserta **Kelola Pegawai** (termasuk seluruh fitur 4 ikon KGB Tahap 64) secara instan di browser produksi.
+- **Status:** `[SELESAI & AKTIF]` ✅
+
+---
+
+### TAHAP 85: Peningkatan Blur & Opasitas Searchable Dropdown di Mode Light (Anti-Transparan / Heavy Frosted Glass & Solid Contrast v3.8.8)
+
+#### 1. Latar Belakang & Akar Masalah
+- **Latar Belakang:** Pada mode tampilan terang (Light Mode), dropdown hasil pencarian pegawai di dashboard (`searchKeyword`) serta dropdown saring/filter pegawai di berbagai modul terlihat terlalu transparan/tembus pandang (5% - 15% opacity), sehingga kartu dan teks di belakangnya ("Ketidakhadiran", "Peringatan Dini", nama pegawai lain) tembus terlihat dan bertabrakan dengan teks hasil pencarian.
+- **Akar Masalah:**
+  1. Kontainer hasil pencarian di dashboard menggunakan class `.glass`.
+  2. Aturan CSS `.light-mode #app-container .glass` memaksa seluruh elemen `.glass` menjadi sangat transparan (`rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.05) 100%`).
+  3. Selector spesifik `.light-mode #searchResultPanel` yang sudah ada sebelumnya tidak aktif karena elemen di HTML belum dipasangi ID `#searchResultPanel`.
+
+#### 2. Rencana Implementasi & Rekayasa UI/UX
+1. **Pelepasan Class Glass & Pemasangan ID Spesifik:**
+   - Di [`modules/dashboard/view_dashboard.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/dashboard/view_dashboard.html) dan [`dashboard/view_dashboard.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/dashboard/view_dashboard.html):
+     * Melepaskan class `.glass` dari kontainer hasil pencarian.
+     * Memasang `id="searchResultPanel"` dan class `dashboard-search-dropdown`.
+     * Memasang `id="searchResultContent"` pada wadah daftar.
+     * Memberi tanda class `.search-item-row`, `.search-item-nama`, `.search-item-meta`, dan `.search-empty-state`.
+2. **Penerapan Heavy Frosted Blur & High Opacity (Anti-Tembus Pandang):**
+   - Di [`stylesheet.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/stylesheet.html) dan [`css/stylesheet.css`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/css/stylesheet.css):
+     * Mengatur latar belakang panel pencarian menjadi putih frosted 98% (`rgba(255, 255, 255, 0.98)`).
+     * Menerapkan filter blur ekstrim `backdrop-filter: blur(36px) saturate(200%)` sehingga elemen di belakangnya lebur total dan 100% tidak tampak.
+     * Menambahkan border presisi `rgba(203, 213, 225, 0.95)` dan elevated drop shadow `box-shadow: 0 25px 60px -15px rgba(15, 23, 42, 0.25)`.
+     * Menyesuaikan baris hasil pencarian dengan teks gelap kontras `#0f172a` (nama), `#475569` (jabatan/NIP), dan hover state halus `#f1f5f9`.
+3. **Proteksi Menyeluruh Searchable Dropdowns Lintas Modul:**
+   - Menambahkan aturan styling global pada mode terang untuk dropdown pemilih atasan di Jobdes, pejabat penilai di Kinerja, filter saring pegawai di E-Office & Permohonan, serta mode bypass cuti.
+4. **PWA Versioning & Deployment:**
+   - Menaikkan versi Service Worker [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) dan `APP_BUILD_VER` di [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) ke **`transkep-v3.8.8`** / **`3.8.8`**.
+   - Deploy build Google Apps Script Clasp ke versi **`@334`**.
+   - Git commit dan push **HANYA ke `origin/main`** ([`sopiyandedi/TRANSKEP`](https://github.com/sopiyandedi/TRANSKEP)), **TIDAK ke `prod`**.
+
+#### 3. Estimasi Dampak & File yang Dimodifikasi
+- **File Dimodifikasi:**
+  1. [`modules/dashboard/view_dashboard.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/dashboard/view_dashboard.html) (Pelepasan `.glass`, penambahan `#searchResultPanel`, `#searchResultContent`, `.dashboard-search-dropdown`, dan struktur baris)
+  2. [`dashboard/view_dashboard.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/dashboard/view_dashboard.html) (Penyelarasan cermin GAS dashboard)
+  3. [`stylesheet.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/stylesheet.html) (Heavy frosted blur 36px, 98% opacity, border & shadow anti-tembus pandang, dan proteksi global searchable dropdown)
+  4. [`css/stylesheet.css`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/css/stylesheet.css) (Penyelarasan stylesheet CSS PWA)
+  5. [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) (Cache PWA v3.8.8)
+  6. [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) (App build 3.8.8)
+  7. [`prd.md`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/prd.md) (Pembaruan Living Context Poin 66)
 - **Status:** `[SELESAI & AKTIF]` ✅
 
 
@@ -3594,6 +3720,48 @@ Pengguna melaporkan bahwa pratinjau (*preview*) dokumen PDF di modal SK dan SOP 
 
 #### 5. Estimasi Dampak & Status
 - **Dampak:** Tombol status di modal **"Update Status Berkas"** langsung aktif dan merespons dalam **`0ms`** lengkap dengan indikator status aktif, server GAS bebas dari *hang/timeout* `bumpDataVersion()`, dan seluruh data KGB (baik draf *Sedang Diproses* maupun riwayat *Selesai*) langsung tampil utuh di tabel **E-Office & Administrasi Kedinasan** beserta 4 ikon kontrolnya.
+- **Status:** `[SELESAI & AKTIF]` ✅
+
+---
+
+### TAHAP 85: Peningkatan Blur & Opasitas Searchable Dropdown di Mode Light (Anti-Transparan / Heavy Frosted Glass & Solid Contrast v3.8.8)
+
+#### 1. Latar Belakang & Akar Masalah
+- **Latar Belakang:** Pada mode tampilan terang (Light Mode), dropdown hasil pencarian pegawai di dashboard (`searchKeyword`) serta dropdown saring/filter pegawai di berbagai modul terlihat terlalu transparan/tembus pandang (5% - 15% opacity), sehingga kartu dan teks di belakangnya ("Ketidakhadiran", "Peringatan Dini", nama pegawai lain) tembus terlihat dan bertabrakan dengan teks hasil pencarian.
+- **Akar Masalah:**
+  1. Kontainer hasil pencarian di dashboard menggunakan class `.glass`.
+  2. Aturan CSS `.light-mode #app-container .glass` memaksa seluruh elemen `.glass` menjadi sangat transparan (`rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.05) 100%`).
+  3. Selector spesifik `.light-mode #searchResultPanel` yang sudah ada sebelumnya tidak aktif karena elemen di HTML belum dipasangi ID `#searchResultPanel`.
+
+#### 2. Rencana Implementasi & Rekayasa UI/UX
+1. **Pelepasan Class Glass & Pemasangan ID Spesifik:**
+   - Di [`modules/dashboard/view_dashboard.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/dashboard/view_dashboard.html) dan [`dashboard/view_dashboard.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/dashboard/view_dashboard.html):
+     * Melepaskan class `.glass` dari kontainer hasil pencarian.
+     * Memasang `id="searchResultPanel"` dan class `dashboard-search-dropdown`.
+     * Memasang `id="searchResultContent"` pada wadah daftar.
+     * Memberi tanda class `.search-item-row`, `.search-item-nama`, `.search-item-meta`, dan `.search-empty-state`.
+2. **Penerapan Heavy Frosted Blur & High Opacity (Anti-Tembus Pandang):**
+   - Di [`stylesheet.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/stylesheet.html) dan [`css/stylesheet.css`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/css/stylesheet.css):
+     * Mengatur latar belakang panel pencarian menjadi putih frosted 98% (`rgba(255, 255, 255, 0.98)`).
+     * Menerapkan filter blur ekstrim `backdrop-filter: blur(36px) saturate(200%)` sehingga elemen di belakangnya lebur total dan 100% tidak tampak.
+     * Menambahkan border presisi `rgba(203, 213, 225, 0.95)` dan elevated drop shadow `box-shadow: 0 25px 60px -15px rgba(15, 23, 42, 0.25)`.
+     * Menyesuaikan baris hasil pencarian dengan teks gelap kontras `#0f172a` (nama), `#475569` (jabatan/NIP), dan hover state halus `#f1f5f9`.
+3. **Proteksi Menyeluruh Searchable Dropdowns Lintas Modul:**
+   - Menambahkan aturan styling global pada mode terang untuk dropdown pemilih atasan di Jobdes, pejabat penilai di Kinerja, filter saring pegawai di E-Office & Permohonan, serta mode bypass cuti.
+4. **PWA Versioning & Deployment:**
+   - Menaikkan versi Service Worker [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) dan `APP_BUILD_VER` di [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) ke **`transkep-v3.8.8`** / **`3.8.8`**.
+   - Deploy build Google Apps Script Clasp ke versi **`@334`**.
+   - Git commit dan push **HANYA ke `origin/main`** ([`sopiyandedi/TRANSKEP`](https://github.com/sopiyandedi/TRANSKEP)), **TIDAK ke `prod`**.
+
+#### 3. Estimasi Dampak & File yang Dimodifikasi
+- **File Dimodifikasi:**
+  1. [`modules/dashboard/view_dashboard.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/dashboard/view_dashboard.html) (Pelepasan `.glass`, penambahan `#searchResultPanel`, `#searchResultContent`, `.dashboard-search-dropdown`, dan struktur baris)
+  2. [`dashboard/view_dashboard.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/dashboard/view_dashboard.html) (Penyelarasan cermin GAS dashboard)
+  3. [`stylesheet.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/stylesheet.html) (Heavy frosted blur 36px, 98% opacity, border & shadow anti-tembus pandang, dan proteksi global searchable dropdown)
+  4. [`css/stylesheet.css`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/css/stylesheet.css) (Penyelarasan stylesheet CSS PWA)
+  5. [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) (Cache PWA v3.8.8)
+  6. [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) (App build 3.8.8)
+  7. [`prd.md`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/prd.md) (Pembaruan Living Context Poin 66)
 - **Status:** `[SELESAI & AKTIF]` ✅
 
 
@@ -3732,6 +3900,48 @@ Pengguna melaporkan bahwa pratinjau (*preview*) dokumen PDF di modal SK dan SOP 
 - **Dampak:** Seluruh tautan notifikasi WhatsApp (Lupa Password otomatis/manual, Magic Link & keputusan Cuti, pemberitahuan SK, serta SOP) 100% mengarah secara konsisten ke domain resmi instansi **`https://sso.pa-indramayu.go.id/`** tanpa merusak kompatibilitas infrastruktur GitHub Pages.
 - **Status:** `[SELESAI & AKTIF]` ✅
 
+---
+
+### TAHAP 85: Peningkatan Blur & Opasitas Searchable Dropdown di Mode Light (Anti-Transparan / Heavy Frosted Glass & Solid Contrast v3.8.8)
+
+#### 1. Latar Belakang & Akar Masalah
+- **Latar Belakang:** Pada mode tampilan terang (Light Mode), dropdown hasil pencarian pegawai di dashboard (`searchKeyword`) serta dropdown saring/filter pegawai di berbagai modul terlihat terlalu transparan/tembus pandang (5% - 15% opacity), sehingga kartu dan teks di belakangnya ("Ketidakhadiran", "Peringatan Dini", nama pegawai lain) tembus terlihat dan bertabrakan dengan teks hasil pencarian.
+- **Akar Masalah:**
+  1. Kontainer hasil pencarian di dashboard menggunakan class `.glass`.
+  2. Aturan CSS `.light-mode #app-container .glass` memaksa seluruh elemen `.glass` menjadi sangat transparan (`rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.05) 100%`).
+  3. Selector spesifik `.light-mode #searchResultPanel` yang sudah ada sebelumnya tidak aktif karena elemen di HTML belum dipasangi ID `#searchResultPanel`.
+
+#### 2. Rencana Implementasi & Rekayasa UI/UX
+1. **Pelepasan Class Glass & Pemasangan ID Spesifik:**
+   - Di [`modules/dashboard/view_dashboard.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/dashboard/view_dashboard.html) dan [`dashboard/view_dashboard.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/dashboard/view_dashboard.html):
+     * Melepaskan class `.glass` dari kontainer hasil pencarian.
+     * Memasang `id="searchResultPanel"` dan class `dashboard-search-dropdown`.
+     * Memasang `id="searchResultContent"` pada wadah daftar.
+     * Memberi tanda class `.search-item-row`, `.search-item-nama`, `.search-item-meta`, dan `.search-empty-state`.
+2. **Penerapan Heavy Frosted Blur & High Opacity (Anti-Tembus Pandang):**
+   - Di [`stylesheet.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/stylesheet.html) dan [`css/stylesheet.css`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/css/stylesheet.css):
+     * Mengatur latar belakang panel pencarian menjadi putih frosted 98% (`rgba(255, 255, 255, 0.98)`).
+     * Menerapkan filter blur ekstrim `backdrop-filter: blur(36px) saturate(200%)` sehingga elemen di belakangnya lebur total dan 100% tidak tampak.
+     * Menambahkan border presisi `rgba(203, 213, 225, 0.95)` dan elevated drop shadow `box-shadow: 0 25px 60px -15px rgba(15, 23, 42, 0.25)`.
+     * Menyesuaikan baris hasil pencarian dengan teks gelap kontras `#0f172a` (nama), `#475569` (jabatan/NIP), dan hover state halus `#f1f5f9`.
+3. **Proteksi Menyeluruh Searchable Dropdowns Lintas Modul:**
+   - Menambahkan aturan styling global pada mode terang untuk dropdown pemilih atasan di Jobdes, pejabat penilai di Kinerja, filter saring pegawai di E-Office & Permohonan, serta mode bypass cuti.
+4. **PWA Versioning & Deployment:**
+   - Menaikkan versi Service Worker [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) dan `APP_BUILD_VER` di [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) ke **`transkep-v3.8.8`** / **`3.8.8`**.
+   - Deploy build Google Apps Script Clasp ke versi **`@334`**.
+   - Git commit dan push **HANYA ke `origin/main`** ([`sopiyandedi/TRANSKEP`](https://github.com/sopiyandedi/TRANSKEP)), **TIDAK ke `prod`**.
+
+#### 3. Estimasi Dampak & File yang Dimodifikasi
+- **File Dimodifikasi:**
+  1. [`modules/dashboard/view_dashboard.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/dashboard/view_dashboard.html) (Pelepasan `.glass`, penambahan `#searchResultPanel`, `#searchResultContent`, `.dashboard-search-dropdown`, dan struktur baris)
+  2. [`dashboard/view_dashboard.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/dashboard/view_dashboard.html) (Penyelarasan cermin GAS dashboard)
+  3. [`stylesheet.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/stylesheet.html) (Heavy frosted blur 36px, 98% opacity, border & shadow anti-tembus pandang, dan proteksi global searchable dropdown)
+  4. [`css/stylesheet.css`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/css/stylesheet.css) (Penyelarasan stylesheet CSS PWA)
+  5. [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) (Cache PWA v3.8.8)
+  6. [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) (App build 3.8.8)
+  7. [`prd.md`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/prd.md) (Pembaruan Living Context Poin 66)
+- **Status:** `[SELESAI & AKTIF]` ✅
+
 
 ---
 
@@ -3778,6 +3988,48 @@ Pengguna melaporkan bahwa pratinjau (*preview*) dokumen PDF di modal SK dan SOP 
 
 ---
 
+### TAHAP 85: Peningkatan Blur & Opasitas Searchable Dropdown di Mode Light (Anti-Transparan / Heavy Frosted Glass & Solid Contrast v3.8.8)
+
+#### 1. Latar Belakang & Akar Masalah
+- **Latar Belakang:** Pada mode tampilan terang (Light Mode), dropdown hasil pencarian pegawai di dashboard (`searchKeyword`) serta dropdown saring/filter pegawai di berbagai modul terlihat terlalu transparan/tembus pandang (5% - 15% opacity), sehingga kartu dan teks di belakangnya ("Ketidakhadiran", "Peringatan Dini", nama pegawai lain) tembus terlihat dan bertabrakan dengan teks hasil pencarian.
+- **Akar Masalah:**
+  1. Kontainer hasil pencarian di dashboard menggunakan class `.glass`.
+  2. Aturan CSS `.light-mode #app-container .glass` memaksa seluruh elemen `.glass` menjadi sangat transparan (`rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.05) 100%`).
+  3. Selector spesifik `.light-mode #searchResultPanel` yang sudah ada sebelumnya tidak aktif karena elemen di HTML belum dipasangi ID `#searchResultPanel`.
+
+#### 2. Rencana Implementasi & Rekayasa UI/UX
+1. **Pelepasan Class Glass & Pemasangan ID Spesifik:**
+   - Di [`modules/dashboard/view_dashboard.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/dashboard/view_dashboard.html) dan [`dashboard/view_dashboard.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/dashboard/view_dashboard.html):
+     * Melepaskan class `.glass` dari kontainer hasil pencarian.
+     * Memasang `id="searchResultPanel"` dan class `dashboard-search-dropdown`.
+     * Memasang `id="searchResultContent"` pada wadah daftar.
+     * Memberi tanda class `.search-item-row`, `.search-item-nama`, `.search-item-meta`, dan `.search-empty-state`.
+2. **Penerapan Heavy Frosted Blur & High Opacity (Anti-Tembus Pandang):**
+   - Di [`stylesheet.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/stylesheet.html) dan [`css/stylesheet.css`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/css/stylesheet.css):
+     * Mengatur latar belakang panel pencarian menjadi putih frosted 98% (`rgba(255, 255, 255, 0.98)`).
+     * Menerapkan filter blur ekstrim `backdrop-filter: blur(36px) saturate(200%)` sehingga elemen di belakangnya lebur total dan 100% tidak tampak.
+     * Menambahkan border presisi `rgba(203, 213, 225, 0.95)` dan elevated drop shadow `box-shadow: 0 25px 60px -15px rgba(15, 23, 42, 0.25)`.
+     * Menyesuaikan baris hasil pencarian dengan teks gelap kontras `#0f172a` (nama), `#475569` (jabatan/NIP), dan hover state halus `#f1f5f9`.
+3. **Proteksi Menyeluruh Searchable Dropdowns Lintas Modul:**
+   - Menambahkan aturan styling global pada mode terang untuk dropdown pemilih atasan di Jobdes, pejabat penilai di Kinerja, filter saring pegawai di E-Office & Permohonan, serta mode bypass cuti.
+4. **PWA Versioning & Deployment:**
+   - Menaikkan versi Service Worker [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) dan `APP_BUILD_VER` di [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) ke **`transkep-v3.8.8`** / **`3.8.8`**.
+   - Deploy build Google Apps Script Clasp ke versi **`@334`**.
+   - Git commit dan push **HANYA ke `origin/main`** ([`sopiyandedi/TRANSKEP`](https://github.com/sopiyandedi/TRANSKEP)), **TIDAK ke `prod`**.
+
+#### 3. Estimasi Dampak & File yang Dimodifikasi
+- **File Dimodifikasi:**
+  1. [`modules/dashboard/view_dashboard.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/dashboard/view_dashboard.html) (Pelepasan `.glass`, penambahan `#searchResultPanel`, `#searchResultContent`, `.dashboard-search-dropdown`, dan struktur baris)
+  2. [`dashboard/view_dashboard.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/dashboard/view_dashboard.html) (Penyelarasan cermin GAS dashboard)
+  3. [`stylesheet.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/stylesheet.html) (Heavy frosted blur 36px, 98% opacity, border & shadow anti-tembus pandang, dan proteksi global searchable dropdown)
+  4. [`css/stylesheet.css`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/css/stylesheet.css) (Penyelarasan stylesheet CSS PWA)
+  5. [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) (Cache PWA v3.8.8)
+  6. [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) (App build 3.8.8)
+  7. [`prd.md`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/prd.md) (Pembaruan Living Context Poin 66)
+- **Status:** `[SELESAI & AKTIF]` ✅
+
+---
+
 ### TAHAP 75.1: Penyempurnaan Proporsi Spacing Halaman 1 Cetak Surat Tugas 4 Orang (`v3.7.7`)
 
 #### 1. Latar Belakang & Analisis Tampilan
@@ -3802,6 +4054,48 @@ Pengguna melaporkan bahwa pratinjau (*preview*) dokumen PDF di modal SK dan SOP 
 
 #### 3. Estimasi Dampak & Status
 - **Dampak:** Halaman 1 terisi proporsional (~80–85% tinggi lembar A4), tidak ada lagi kesan teks terdesak di atas maupun ruang kosong berlebih di bawah.
+- **Status:** `[SELESAI & AKTIF]` ✅
+
+---
+
+### TAHAP 85: Peningkatan Blur & Opasitas Searchable Dropdown di Mode Light (Anti-Transparan / Heavy Frosted Glass & Solid Contrast v3.8.8)
+
+#### 1. Latar Belakang & Akar Masalah
+- **Latar Belakang:** Pada mode tampilan terang (Light Mode), dropdown hasil pencarian pegawai di dashboard (`searchKeyword`) serta dropdown saring/filter pegawai di berbagai modul terlihat terlalu transparan/tembus pandang (5% - 15% opacity), sehingga kartu dan teks di belakangnya ("Ketidakhadiran", "Peringatan Dini", nama pegawai lain) tembus terlihat dan bertabrakan dengan teks hasil pencarian.
+- **Akar Masalah:**
+  1. Kontainer hasil pencarian di dashboard menggunakan class `.glass`.
+  2. Aturan CSS `.light-mode #app-container .glass` memaksa seluruh elemen `.glass` menjadi sangat transparan (`rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.05) 100%`).
+  3. Selector spesifik `.light-mode #searchResultPanel` yang sudah ada sebelumnya tidak aktif karena elemen di HTML belum dipasangi ID `#searchResultPanel`.
+
+#### 2. Rencana Implementasi & Rekayasa UI/UX
+1. **Pelepasan Class Glass & Pemasangan ID Spesifik:**
+   - Di [`modules/dashboard/view_dashboard.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/dashboard/view_dashboard.html) dan [`dashboard/view_dashboard.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/dashboard/view_dashboard.html):
+     * Melepaskan class `.glass` dari kontainer hasil pencarian.
+     * Memasang `id="searchResultPanel"` dan class `dashboard-search-dropdown`.
+     * Memasang `id="searchResultContent"` pada wadah daftar.
+     * Memberi tanda class `.search-item-row`, `.search-item-nama`, `.search-item-meta`, dan `.search-empty-state`.
+2. **Penerapan Heavy Frosted Blur & High Opacity (Anti-Tembus Pandang):**
+   - Di [`stylesheet.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/stylesheet.html) dan [`css/stylesheet.css`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/css/stylesheet.css):
+     * Mengatur latar belakang panel pencarian menjadi putih frosted 98% (`rgba(255, 255, 255, 0.98)`).
+     * Menerapkan filter blur ekstrim `backdrop-filter: blur(36px) saturate(200%)` sehingga elemen di belakangnya lebur total dan 100% tidak tampak.
+     * Menambahkan border presisi `rgba(203, 213, 225, 0.95)` dan elevated drop shadow `box-shadow: 0 25px 60px -15px rgba(15, 23, 42, 0.25)`.
+     * Menyesuaikan baris hasil pencarian dengan teks gelap kontras `#0f172a` (nama), `#475569` (jabatan/NIP), dan hover state halus `#f1f5f9`.
+3. **Proteksi Menyeluruh Searchable Dropdowns Lintas Modul:**
+   - Menambahkan aturan styling global pada mode terang untuk dropdown pemilih atasan di Jobdes, pejabat penilai di Kinerja, filter saring pegawai di E-Office & Permohonan, serta mode bypass cuti.
+4. **PWA Versioning & Deployment:**
+   - Menaikkan versi Service Worker [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) dan `APP_BUILD_VER` di [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) ke **`transkep-v3.8.8`** / **`3.8.8`**.
+   - Deploy build Google Apps Script Clasp ke versi **`@334`**.
+   - Git commit dan push **HANYA ke `origin/main`** ([`sopiyandedi/TRANSKEP`](https://github.com/sopiyandedi/TRANSKEP)), **TIDAK ke `prod`**.
+
+#### 3. Estimasi Dampak & File yang Dimodifikasi
+- **File Dimodifikasi:**
+  1. [`modules/dashboard/view_dashboard.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/dashboard/view_dashboard.html) (Pelepasan `.glass`, penambahan `#searchResultPanel`, `#searchResultContent`, `.dashboard-search-dropdown`, dan struktur baris)
+  2. [`dashboard/view_dashboard.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/dashboard/view_dashboard.html) (Penyelarasan cermin GAS dashboard)
+  3. [`stylesheet.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/stylesheet.html) (Heavy frosted blur 36px, 98% opacity, border & shadow anti-tembus pandang, dan proteksi global searchable dropdown)
+  4. [`css/stylesheet.css`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/css/stylesheet.css) (Penyelarasan stylesheet CSS PWA)
+  5. [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) (Cache PWA v3.8.8)
+  6. [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) (App build 3.8.8)
+  7. [`prd.md`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/prd.md) (Pembaruan Living Context Poin 66)
 - **Status:** `[SELESAI & AKTIF]` ✅
 
 ---
@@ -3833,6 +4127,48 @@ Pengguna melaporkan bahwa pratinjau (*preview*) dokumen PDF di modal SK dan SOP 
 
 #### 3. Estimasi Dampak & Status
 - **Dampak:** Halaman 1 kini membentang pas hingga batas tanda kuning, tabel pegawai lapang dan elegan, serta setiap parameter jarak telah dilengkapi tag penjelas lengkap.
+- **Status:** `[SELESAI & AKTIF]` ✅
+
+---
+
+### TAHAP 85: Peningkatan Blur & Opasitas Searchable Dropdown di Mode Light (Anti-Transparan / Heavy Frosted Glass & Solid Contrast v3.8.8)
+
+#### 1. Latar Belakang & Akar Masalah
+- **Latar Belakang:** Pada mode tampilan terang (Light Mode), dropdown hasil pencarian pegawai di dashboard (`searchKeyword`) serta dropdown saring/filter pegawai di berbagai modul terlihat terlalu transparan/tembus pandang (5% - 15% opacity), sehingga kartu dan teks di belakangnya ("Ketidakhadiran", "Peringatan Dini", nama pegawai lain) tembus terlihat dan bertabrakan dengan teks hasil pencarian.
+- **Akar Masalah:**
+  1. Kontainer hasil pencarian di dashboard menggunakan class `.glass`.
+  2. Aturan CSS `.light-mode #app-container .glass` memaksa seluruh elemen `.glass` menjadi sangat transparan (`rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.05) 100%`).
+  3. Selector spesifik `.light-mode #searchResultPanel` yang sudah ada sebelumnya tidak aktif karena elemen di HTML belum dipasangi ID `#searchResultPanel`.
+
+#### 2. Rencana Implementasi & Rekayasa UI/UX
+1. **Pelepasan Class Glass & Pemasangan ID Spesifik:**
+   - Di [`modules/dashboard/view_dashboard.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/dashboard/view_dashboard.html) dan [`dashboard/view_dashboard.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/dashboard/view_dashboard.html):
+     * Melepaskan class `.glass` dari kontainer hasil pencarian.
+     * Memasang `id="searchResultPanel"` dan class `dashboard-search-dropdown`.
+     * Memasang `id="searchResultContent"` pada wadah daftar.
+     * Memberi tanda class `.search-item-row`, `.search-item-nama`, `.search-item-meta`, dan `.search-empty-state`.
+2. **Penerapan Heavy Frosted Blur & High Opacity (Anti-Tembus Pandang):**
+   - Di [`stylesheet.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/stylesheet.html) dan [`css/stylesheet.css`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/css/stylesheet.css):
+     * Mengatur latar belakang panel pencarian menjadi putih frosted 98% (`rgba(255, 255, 255, 0.98)`).
+     * Menerapkan filter blur ekstrim `backdrop-filter: blur(36px) saturate(200%)` sehingga elemen di belakangnya lebur total dan 100% tidak tampak.
+     * Menambahkan border presisi `rgba(203, 213, 225, 0.95)` dan elevated drop shadow `box-shadow: 0 25px 60px -15px rgba(15, 23, 42, 0.25)`.
+     * Menyesuaikan baris hasil pencarian dengan teks gelap kontras `#0f172a` (nama), `#475569` (jabatan/NIP), dan hover state halus `#f1f5f9`.
+3. **Proteksi Menyeluruh Searchable Dropdowns Lintas Modul:**
+   - Menambahkan aturan styling global pada mode terang untuk dropdown pemilih atasan di Jobdes, pejabat penilai di Kinerja, filter saring pegawai di E-Office & Permohonan, serta mode bypass cuti.
+4. **PWA Versioning & Deployment:**
+   - Menaikkan versi Service Worker [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) dan `APP_BUILD_VER` di [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) ke **`transkep-v3.8.8`** / **`3.8.8`**.
+   - Deploy build Google Apps Script Clasp ke versi **`@334`**.
+   - Git commit dan push **HANYA ke `origin/main`** ([`sopiyandedi/TRANSKEP`](https://github.com/sopiyandedi/TRANSKEP)), **TIDAK ke `prod`**.
+
+#### 3. Estimasi Dampak & File yang Dimodifikasi
+- **File Dimodifikasi:**
+  1. [`modules/dashboard/view_dashboard.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/dashboard/view_dashboard.html) (Pelepasan `.glass`, penambahan `#searchResultPanel`, `#searchResultContent`, `.dashboard-search-dropdown`, dan struktur baris)
+  2. [`dashboard/view_dashboard.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/dashboard/view_dashboard.html) (Penyelarasan cermin GAS dashboard)
+  3. [`stylesheet.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/stylesheet.html) (Heavy frosted blur 36px, 98% opacity, border & shadow anti-tembus pandang, dan proteksi global searchable dropdown)
+  4. [`css/stylesheet.css`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/css/stylesheet.css) (Penyelarasan stylesheet CSS PWA)
+  5. [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) (Cache PWA v3.8.8)
+  6. [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) (App build 3.8.8)
+  7. [`prd.md`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/prd.md) (Pembaruan Living Context Poin 66)
 - **Status:** `[SELESAI & AKTIF]` ✅
 
 ---
@@ -3917,6 +4253,48 @@ Pengguna melaporkan bahwa pratinjau (*preview*) dokumen PDF di modal SK dan SOP 
   4. [`prd.md`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/prd.md) (Pembaruan Living Context)
 - **Status:** `[SELESAI & AKTIF]` ✅
 
+---
+
+### TAHAP 85: Peningkatan Blur & Opasitas Searchable Dropdown di Mode Light (Anti-Transparan / Heavy Frosted Glass & Solid Contrast v3.8.8)
+
+#### 1. Latar Belakang & Akar Masalah
+- **Latar Belakang:** Pada mode tampilan terang (Light Mode), dropdown hasil pencarian pegawai di dashboard (`searchKeyword`) serta dropdown saring/filter pegawai di berbagai modul terlihat terlalu transparan/tembus pandang (5% - 15% opacity), sehingga kartu dan teks di belakangnya ("Ketidakhadiran", "Peringatan Dini", nama pegawai lain) tembus terlihat dan bertabrakan dengan teks hasil pencarian.
+- **Akar Masalah:**
+  1. Kontainer hasil pencarian di dashboard menggunakan class `.glass`.
+  2. Aturan CSS `.light-mode #app-container .glass` memaksa seluruh elemen `.glass` menjadi sangat transparan (`rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.05) 100%`).
+  3. Selector spesifik `.light-mode #searchResultPanel` yang sudah ada sebelumnya tidak aktif karena elemen di HTML belum dipasangi ID `#searchResultPanel`.
+
+#### 2. Rencana Implementasi & Rekayasa UI/UX
+1. **Pelepasan Class Glass & Pemasangan ID Spesifik:**
+   - Di [`modules/dashboard/view_dashboard.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/dashboard/view_dashboard.html) dan [`dashboard/view_dashboard.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/dashboard/view_dashboard.html):
+     * Melepaskan class `.glass` dari kontainer hasil pencarian.
+     * Memasang `id="searchResultPanel"` dan class `dashboard-search-dropdown`.
+     * Memasang `id="searchResultContent"` pada wadah daftar.
+     * Memberi tanda class `.search-item-row`, `.search-item-nama`, `.search-item-meta`, dan `.search-empty-state`.
+2. **Penerapan Heavy Frosted Blur & High Opacity (Anti-Tembus Pandang):**
+   - Di [`stylesheet.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/stylesheet.html) dan [`css/stylesheet.css`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/css/stylesheet.css):
+     * Mengatur latar belakang panel pencarian menjadi putih frosted 98% (`rgba(255, 255, 255, 0.98)`).
+     * Menerapkan filter blur ekstrim `backdrop-filter: blur(36px) saturate(200%)` sehingga elemen di belakangnya lebur total dan 100% tidak tampak.
+     * Menambahkan border presisi `rgba(203, 213, 225, 0.95)` dan elevated drop shadow `box-shadow: 0 25px 60px -15px rgba(15, 23, 42, 0.25)`.
+     * Menyesuaikan baris hasil pencarian dengan teks gelap kontras `#0f172a` (nama), `#475569` (jabatan/NIP), dan hover state halus `#f1f5f9`.
+3. **Proteksi Menyeluruh Searchable Dropdowns Lintas Modul:**
+   - Menambahkan aturan styling global pada mode terang untuk dropdown pemilih atasan di Jobdes, pejabat penilai di Kinerja, filter saring pegawai di E-Office & Permohonan, serta mode bypass cuti.
+4. **PWA Versioning & Deployment:**
+   - Menaikkan versi Service Worker [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) dan `APP_BUILD_VER` di [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) ke **`transkep-v3.8.8`** / **`3.8.8`**.
+   - Deploy build Google Apps Script Clasp ke versi **`@334`**.
+   - Git commit dan push **HANYA ke `origin/main`** ([`sopiyandedi/TRANSKEP`](https://github.com/sopiyandedi/TRANSKEP)), **TIDAK ke `prod`**.
+
+#### 3. Estimasi Dampak & File yang Dimodifikasi
+- **File Dimodifikasi:**
+  1. [`modules/dashboard/view_dashboard.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/dashboard/view_dashboard.html) (Pelepasan `.glass`, penambahan `#searchResultPanel`, `#searchResultContent`, `.dashboard-search-dropdown`, dan struktur baris)
+  2. [`dashboard/view_dashboard.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/dashboard/view_dashboard.html) (Penyelarasan cermin GAS dashboard)
+  3. [`stylesheet.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/stylesheet.html) (Heavy frosted blur 36px, 98% opacity, border & shadow anti-tembus pandang, dan proteksi global searchable dropdown)
+  4. [`css/stylesheet.css`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/css/stylesheet.css) (Penyelarasan stylesheet CSS PWA)
+  5. [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) (Cache PWA v3.8.8)
+  6. [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) (App build 3.8.8)
+  7. [`prd.md`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/prd.md) (Pembaruan Living Context Poin 66)
+- **Status:** `[SELESAI & AKTIF]` ✅
+
 
 ---
 
@@ -3972,6 +4350,48 @@ Pengguna melaporkan bahwa pratinjau (*preview*) dokumen PDF di modal SK dan SOP 
   4. [`modules/permohonan/st.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/permohonan/st.js) & [`modules/permohonan/rekapitulasi.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/permohonan/rekapitulasi.js) (Realtime listener & state binding)
   5. [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) & [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) (Cache & Version bump v3.8.0)
   6. [`prd.md`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/prd.md) (Master Context update)
+- **Status:** `[SELESAI & AKTIF]` ✅
+
+---
+
+### TAHAP 85: Peningkatan Blur & Opasitas Searchable Dropdown di Mode Light (Anti-Transparan / Heavy Frosted Glass & Solid Contrast v3.8.8)
+
+#### 1. Latar Belakang & Akar Masalah
+- **Latar Belakang:** Pada mode tampilan terang (Light Mode), dropdown hasil pencarian pegawai di dashboard (`searchKeyword`) serta dropdown saring/filter pegawai di berbagai modul terlihat terlalu transparan/tembus pandang (5% - 15% opacity), sehingga kartu dan teks di belakangnya ("Ketidakhadiran", "Peringatan Dini", nama pegawai lain) tembus terlihat dan bertabrakan dengan teks hasil pencarian.
+- **Akar Masalah:**
+  1. Kontainer hasil pencarian di dashboard menggunakan class `.glass`.
+  2. Aturan CSS `.light-mode #app-container .glass` memaksa seluruh elemen `.glass` menjadi sangat transparan (`rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.05) 100%`).
+  3. Selector spesifik `.light-mode #searchResultPanel` yang sudah ada sebelumnya tidak aktif karena elemen di HTML belum dipasangi ID `#searchResultPanel`.
+
+#### 2. Rencana Implementasi & Rekayasa UI/UX
+1. **Pelepasan Class Glass & Pemasangan ID Spesifik:**
+   - Di [`modules/dashboard/view_dashboard.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/dashboard/view_dashboard.html) dan [`dashboard/view_dashboard.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/dashboard/view_dashboard.html):
+     * Melepaskan class `.glass` dari kontainer hasil pencarian.
+     * Memasang `id="searchResultPanel"` dan class `dashboard-search-dropdown`.
+     * Memasang `id="searchResultContent"` pada wadah daftar.
+     * Memberi tanda class `.search-item-row`, `.search-item-nama`, `.search-item-meta`, dan `.search-empty-state`.
+2. **Penerapan Heavy Frosted Blur & High Opacity (Anti-Tembus Pandang):**
+   - Di [`stylesheet.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/stylesheet.html) dan [`css/stylesheet.css`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/css/stylesheet.css):
+     * Mengatur latar belakang panel pencarian menjadi putih frosted 98% (`rgba(255, 255, 255, 0.98)`).
+     * Menerapkan filter blur ekstrim `backdrop-filter: blur(36px) saturate(200%)` sehingga elemen di belakangnya lebur total dan 100% tidak tampak.
+     * Menambahkan border presisi `rgba(203, 213, 225, 0.95)` dan elevated drop shadow `box-shadow: 0 25px 60px -15px rgba(15, 23, 42, 0.25)`.
+     * Menyesuaikan baris hasil pencarian dengan teks gelap kontras `#0f172a` (nama), `#475569` (jabatan/NIP), dan hover state halus `#f1f5f9`.
+3. **Proteksi Menyeluruh Searchable Dropdowns Lintas Modul:**
+   - Menambahkan aturan styling global pada mode terang untuk dropdown pemilih atasan di Jobdes, pejabat penilai di Kinerja, filter saring pegawai di E-Office & Permohonan, serta mode bypass cuti.
+4. **PWA Versioning & Deployment:**
+   - Menaikkan versi Service Worker [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) dan `APP_BUILD_VER` di [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) ke **`transkep-v3.8.8`** / **`3.8.8`**.
+   - Deploy build Google Apps Script Clasp ke versi **`@334`**.
+   - Git commit dan push **HANYA ke `origin/main`** ([`sopiyandedi/TRANSKEP`](https://github.com/sopiyandedi/TRANSKEP)), **TIDAK ke `prod`**.
+
+#### 3. Estimasi Dampak & File yang Dimodifikasi
+- **File Dimodifikasi:**
+  1. [`modules/dashboard/view_dashboard.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/dashboard/view_dashboard.html) (Pelepasan `.glass`, penambahan `#searchResultPanel`, `#searchResultContent`, `.dashboard-search-dropdown`, dan struktur baris)
+  2. [`dashboard/view_dashboard.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/dashboard/view_dashboard.html) (Penyelarasan cermin GAS dashboard)
+  3. [`stylesheet.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/stylesheet.html) (Heavy frosted blur 36px, 98% opacity, border & shadow anti-tembus pandang, dan proteksi global searchable dropdown)
+  4. [`css/stylesheet.css`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/css/stylesheet.css) (Penyelarasan stylesheet CSS PWA)
+  5. [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) (Cache PWA v3.8.8)
+  6. [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) (App build 3.8.8)
+  7. [`prd.md`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/prd.md) (Pembaruan Living Context Poin 66)
 - **Status:** `[SELESAI & AKTIF]` ✅
 
 
@@ -4041,6 +4461,48 @@ Pengguna melaporkan bahwa pratinjau (*preview*) dokumen PDF di modal SK dan SOP 
   5. [`prd.md`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/prd.md) (Pembaruan Living Context Poin 59)
 - **Status:** `[SELESAI & AKTIF]` ✅
 
+---
+
+### TAHAP 85: Peningkatan Blur & Opasitas Searchable Dropdown di Mode Light (Anti-Transparan / Heavy Frosted Glass & Solid Contrast v3.8.8)
+
+#### 1. Latar Belakang & Akar Masalah
+- **Latar Belakang:** Pada mode tampilan terang (Light Mode), dropdown hasil pencarian pegawai di dashboard (`searchKeyword`) serta dropdown saring/filter pegawai di berbagai modul terlihat terlalu transparan/tembus pandang (5% - 15% opacity), sehingga kartu dan teks di belakangnya ("Ketidakhadiran", "Peringatan Dini", nama pegawai lain) tembus terlihat dan bertabrakan dengan teks hasil pencarian.
+- **Akar Masalah:**
+  1. Kontainer hasil pencarian di dashboard menggunakan class `.glass`.
+  2. Aturan CSS `.light-mode #app-container .glass` memaksa seluruh elemen `.glass` menjadi sangat transparan (`rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.05) 100%`).
+  3. Selector spesifik `.light-mode #searchResultPanel` yang sudah ada sebelumnya tidak aktif karena elemen di HTML belum dipasangi ID `#searchResultPanel`.
+
+#### 2. Rencana Implementasi & Rekayasa UI/UX
+1. **Pelepasan Class Glass & Pemasangan ID Spesifik:**
+   - Di [`modules/dashboard/view_dashboard.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/dashboard/view_dashboard.html) dan [`dashboard/view_dashboard.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/dashboard/view_dashboard.html):
+     * Melepaskan class `.glass` dari kontainer hasil pencarian.
+     * Memasang `id="searchResultPanel"` dan class `dashboard-search-dropdown`.
+     * Memasang `id="searchResultContent"` pada wadah daftar.
+     * Memberi tanda class `.search-item-row`, `.search-item-nama`, `.search-item-meta`, dan `.search-empty-state`.
+2. **Penerapan Heavy Frosted Blur & High Opacity (Anti-Tembus Pandang):**
+   - Di [`stylesheet.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/stylesheet.html) dan [`css/stylesheet.css`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/css/stylesheet.css):
+     * Mengatur latar belakang panel pencarian menjadi putih frosted 98% (`rgba(255, 255, 255, 0.98)`).
+     * Menerapkan filter blur ekstrim `backdrop-filter: blur(36px) saturate(200%)` sehingga elemen di belakangnya lebur total dan 100% tidak tampak.
+     * Menambahkan border presisi `rgba(203, 213, 225, 0.95)` dan elevated drop shadow `box-shadow: 0 25px 60px -15px rgba(15, 23, 42, 0.25)`.
+     * Menyesuaikan baris hasil pencarian dengan teks gelap kontras `#0f172a` (nama), `#475569` (jabatan/NIP), dan hover state halus `#f1f5f9`.
+3. **Proteksi Menyeluruh Searchable Dropdowns Lintas Modul:**
+   - Menambahkan aturan styling global pada mode terang untuk dropdown pemilih atasan di Jobdes, pejabat penilai di Kinerja, filter saring pegawai di E-Office & Permohonan, serta mode bypass cuti.
+4. **PWA Versioning & Deployment:**
+   - Menaikkan versi Service Worker [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) dan `APP_BUILD_VER` di [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) ke **`transkep-v3.8.8`** / **`3.8.8`**.
+   - Deploy build Google Apps Script Clasp ke versi **`@334`**.
+   - Git commit dan push **HANYA ke `origin/main`** ([`sopiyandedi/TRANSKEP`](https://github.com/sopiyandedi/TRANSKEP)), **TIDAK ke `prod`**.
+
+#### 3. Estimasi Dampak & File yang Dimodifikasi
+- **File Dimodifikasi:**
+  1. [`modules/dashboard/view_dashboard.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/dashboard/view_dashboard.html) (Pelepasan `.glass`, penambahan `#searchResultPanel`, `#searchResultContent`, `.dashboard-search-dropdown`, dan struktur baris)
+  2. [`dashboard/view_dashboard.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/dashboard/view_dashboard.html) (Penyelarasan cermin GAS dashboard)
+  3. [`stylesheet.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/stylesheet.html) (Heavy frosted blur 36px, 98% opacity, border & shadow anti-tembus pandang, dan proteksi global searchable dropdown)
+  4. [`css/stylesheet.css`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/css/stylesheet.css) (Penyelarasan stylesheet CSS PWA)
+  5. [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) (Cache PWA v3.8.8)
+  6. [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) (App build 3.8.8)
+  7. [`prd.md`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/prd.md) (Pembaruan Living Context Poin 66)
+- **Status:** `[SELESAI & AKTIF]` ✅
+
 
 ---
 
@@ -4107,6 +4569,48 @@ Pengguna melaporkan bahwa pratinjau (*preview*) dokumen PDF di modal SK dan SOP 
   8. [`prd.md`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/prd.md) (Pembaruan Living Context Poin 60)
 - **Status:** `[SELESAI & AKTIF]` ✅
 
+---
+
+### TAHAP 85: Peningkatan Blur & Opasitas Searchable Dropdown di Mode Light (Anti-Transparan / Heavy Frosted Glass & Solid Contrast v3.8.8)
+
+#### 1. Latar Belakang & Akar Masalah
+- **Latar Belakang:** Pada mode tampilan terang (Light Mode), dropdown hasil pencarian pegawai di dashboard (`searchKeyword`) serta dropdown saring/filter pegawai di berbagai modul terlihat terlalu transparan/tembus pandang (5% - 15% opacity), sehingga kartu dan teks di belakangnya ("Ketidakhadiran", "Peringatan Dini", nama pegawai lain) tembus terlihat dan bertabrakan dengan teks hasil pencarian.
+- **Akar Masalah:**
+  1. Kontainer hasil pencarian di dashboard menggunakan class `.glass`.
+  2. Aturan CSS `.light-mode #app-container .glass` memaksa seluruh elemen `.glass` menjadi sangat transparan (`rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.05) 100%`).
+  3. Selector spesifik `.light-mode #searchResultPanel` yang sudah ada sebelumnya tidak aktif karena elemen di HTML belum dipasangi ID `#searchResultPanel`.
+
+#### 2. Rencana Implementasi & Rekayasa UI/UX
+1. **Pelepasan Class Glass & Pemasangan ID Spesifik:**
+   - Di [`modules/dashboard/view_dashboard.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/dashboard/view_dashboard.html) dan [`dashboard/view_dashboard.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/dashboard/view_dashboard.html):
+     * Melepaskan class `.glass` dari kontainer hasil pencarian.
+     * Memasang `id="searchResultPanel"` dan class `dashboard-search-dropdown`.
+     * Memasang `id="searchResultContent"` pada wadah daftar.
+     * Memberi tanda class `.search-item-row`, `.search-item-nama`, `.search-item-meta`, dan `.search-empty-state`.
+2. **Penerapan Heavy Frosted Blur & High Opacity (Anti-Tembus Pandang):**
+   - Di [`stylesheet.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/stylesheet.html) dan [`css/stylesheet.css`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/css/stylesheet.css):
+     * Mengatur latar belakang panel pencarian menjadi putih frosted 98% (`rgba(255, 255, 255, 0.98)`).
+     * Menerapkan filter blur ekstrim `backdrop-filter: blur(36px) saturate(200%)` sehingga elemen di belakangnya lebur total dan 100% tidak tampak.
+     * Menambahkan border presisi `rgba(203, 213, 225, 0.95)` dan elevated drop shadow `box-shadow: 0 25px 60px -15px rgba(15, 23, 42, 0.25)`.
+     * Menyesuaikan baris hasil pencarian dengan teks gelap kontras `#0f172a` (nama), `#475569` (jabatan/NIP), dan hover state halus `#f1f5f9`.
+3. **Proteksi Menyeluruh Searchable Dropdowns Lintas Modul:**
+   - Menambahkan aturan styling global pada mode terang untuk dropdown pemilih atasan di Jobdes, pejabat penilai di Kinerja, filter saring pegawai di E-Office & Permohonan, serta mode bypass cuti.
+4. **PWA Versioning & Deployment:**
+   - Menaikkan versi Service Worker [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) dan `APP_BUILD_VER` di [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) ke **`transkep-v3.8.8`** / **`3.8.8`**.
+   - Deploy build Google Apps Script Clasp ke versi **`@334`**.
+   - Git commit dan push **HANYA ke `origin/main`** ([`sopiyandedi/TRANSKEP`](https://github.com/sopiyandedi/TRANSKEP)), **TIDAK ke `prod`**.
+
+#### 3. Estimasi Dampak & File yang Dimodifikasi
+- **File Dimodifikasi:**
+  1. [`modules/dashboard/view_dashboard.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/dashboard/view_dashboard.html) (Pelepasan `.glass`, penambahan `#searchResultPanel`, `#searchResultContent`, `.dashboard-search-dropdown`, dan struktur baris)
+  2. [`dashboard/view_dashboard.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/dashboard/view_dashboard.html) (Penyelarasan cermin GAS dashboard)
+  3. [`stylesheet.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/stylesheet.html) (Heavy frosted blur 36px, 98% opacity, border & shadow anti-tembus pandang, dan proteksi global searchable dropdown)
+  4. [`css/stylesheet.css`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/css/stylesheet.css) (Penyelarasan stylesheet CSS PWA)
+  5. [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) (Cache PWA v3.8.8)
+  6. [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) (App build 3.8.8)
+  7. [`prd.md`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/prd.md) (Pembaruan Living Context Poin 66)
+- **Status:** `[SELESAI & AKTIF]` ✅
+
 
 ---
 
@@ -4169,6 +4673,48 @@ Pengguna melaporkan bahwa pratinjau (*preview*) dokumen PDF di modal SK dan SOP 
   5. [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) (Cache PWA v3.8.3)
   6. [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) (App build 3.8.3)
   7. [`prd.md`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/prd.md) (Pembaruan Living Context Poin 61)
+- **Status:** `[SELESAI & AKTIF]` ✅
+
+---
+
+### TAHAP 85: Peningkatan Blur & Opasitas Searchable Dropdown di Mode Light (Anti-Transparan / Heavy Frosted Glass & Solid Contrast v3.8.8)
+
+#### 1. Latar Belakang & Akar Masalah
+- **Latar Belakang:** Pada mode tampilan terang (Light Mode), dropdown hasil pencarian pegawai di dashboard (`searchKeyword`) serta dropdown saring/filter pegawai di berbagai modul terlihat terlalu transparan/tembus pandang (5% - 15% opacity), sehingga kartu dan teks di belakangnya ("Ketidakhadiran", "Peringatan Dini", nama pegawai lain) tembus terlihat dan bertabrakan dengan teks hasil pencarian.
+- **Akar Masalah:**
+  1. Kontainer hasil pencarian di dashboard menggunakan class `.glass`.
+  2. Aturan CSS `.light-mode #app-container .glass` memaksa seluruh elemen `.glass` menjadi sangat transparan (`rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.05) 100%`).
+  3. Selector spesifik `.light-mode #searchResultPanel` yang sudah ada sebelumnya tidak aktif karena elemen di HTML belum dipasangi ID `#searchResultPanel`.
+
+#### 2. Rencana Implementasi & Rekayasa UI/UX
+1. **Pelepasan Class Glass & Pemasangan ID Spesifik:**
+   - Di [`modules/dashboard/view_dashboard.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/dashboard/view_dashboard.html) dan [`dashboard/view_dashboard.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/dashboard/view_dashboard.html):
+     * Melepaskan class `.glass` dari kontainer hasil pencarian.
+     * Memasang `id="searchResultPanel"` dan class `dashboard-search-dropdown`.
+     * Memasang `id="searchResultContent"` pada wadah daftar.
+     * Memberi tanda class `.search-item-row`, `.search-item-nama`, `.search-item-meta`, dan `.search-empty-state`.
+2. **Penerapan Heavy Frosted Blur & High Opacity (Anti-Tembus Pandang):**
+   - Di [`stylesheet.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/stylesheet.html) dan [`css/stylesheet.css`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/css/stylesheet.css):
+     * Mengatur latar belakang panel pencarian menjadi putih frosted 98% (`rgba(255, 255, 255, 0.98)`).
+     * Menerapkan filter blur ekstrim `backdrop-filter: blur(36px) saturate(200%)` sehingga elemen di belakangnya lebur total dan 100% tidak tampak.
+     * Menambahkan border presisi `rgba(203, 213, 225, 0.95)` dan elevated drop shadow `box-shadow: 0 25px 60px -15px rgba(15, 23, 42, 0.25)`.
+     * Menyesuaikan baris hasil pencarian dengan teks gelap kontras `#0f172a` (nama), `#475569` (jabatan/NIP), dan hover state halus `#f1f5f9`.
+3. **Proteksi Menyeluruh Searchable Dropdowns Lintas Modul:**
+   - Menambahkan aturan styling global pada mode terang untuk dropdown pemilih atasan di Jobdes, pejabat penilai di Kinerja, filter saring pegawai di E-Office & Permohonan, serta mode bypass cuti.
+4. **PWA Versioning & Deployment:**
+   - Menaikkan versi Service Worker [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) dan `APP_BUILD_VER` di [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) ke **`transkep-v3.8.8`** / **`3.8.8`**.
+   - Deploy build Google Apps Script Clasp ke versi **`@334`**.
+   - Git commit dan push **HANYA ke `origin/main`** ([`sopiyandedi/TRANSKEP`](https://github.com/sopiyandedi/TRANSKEP)), **TIDAK ke `prod`**.
+
+#### 3. Estimasi Dampak & File yang Dimodifikasi
+- **File Dimodifikasi:**
+  1. [`modules/dashboard/view_dashboard.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/dashboard/view_dashboard.html) (Pelepasan `.glass`, penambahan `#searchResultPanel`, `#searchResultContent`, `.dashboard-search-dropdown`, dan struktur baris)
+  2. [`dashboard/view_dashboard.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/dashboard/view_dashboard.html) (Penyelarasan cermin GAS dashboard)
+  3. [`stylesheet.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/stylesheet.html) (Heavy frosted blur 36px, 98% opacity, border & shadow anti-tembus pandang, dan proteksi global searchable dropdown)
+  4. [`css/stylesheet.css`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/css/stylesheet.css) (Penyelarasan stylesheet CSS PWA)
+  5. [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) (Cache PWA v3.8.8)
+  6. [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) (App build 3.8.8)
+  7. [`prd.md`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/prd.md) (Pembaruan Living Context Poin 66)
 - **Status:** `[SELESAI & AKTIF]` ✅
 
 
@@ -4239,6 +4785,48 @@ Pengguna melaporkan bahwa pratinjau (*preview*) dokumen PDF di modal SK dan SOP 
   8. [`prd.md`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/prd.md) (Pembaruan Living Context Poin 62)
 - **Status:** `[SELESAI & AKTIF]` ✅
 
+---
+
+### TAHAP 85: Peningkatan Blur & Opasitas Searchable Dropdown di Mode Light (Anti-Transparan / Heavy Frosted Glass & Solid Contrast v3.8.8)
+
+#### 1. Latar Belakang & Akar Masalah
+- **Latar Belakang:** Pada mode tampilan terang (Light Mode), dropdown hasil pencarian pegawai di dashboard (`searchKeyword`) serta dropdown saring/filter pegawai di berbagai modul terlihat terlalu transparan/tembus pandang (5% - 15% opacity), sehingga kartu dan teks di belakangnya ("Ketidakhadiran", "Peringatan Dini", nama pegawai lain) tembus terlihat dan bertabrakan dengan teks hasil pencarian.
+- **Akar Masalah:**
+  1. Kontainer hasil pencarian di dashboard menggunakan class `.glass`.
+  2. Aturan CSS `.light-mode #app-container .glass` memaksa seluruh elemen `.glass` menjadi sangat transparan (`rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.05) 100%`).
+  3. Selector spesifik `.light-mode #searchResultPanel` yang sudah ada sebelumnya tidak aktif karena elemen di HTML belum dipasangi ID `#searchResultPanel`.
+
+#### 2. Rencana Implementasi & Rekayasa UI/UX
+1. **Pelepasan Class Glass & Pemasangan ID Spesifik:**
+   - Di [`modules/dashboard/view_dashboard.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/dashboard/view_dashboard.html) dan [`dashboard/view_dashboard.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/dashboard/view_dashboard.html):
+     * Melepaskan class `.glass` dari kontainer hasil pencarian.
+     * Memasang `id="searchResultPanel"` dan class `dashboard-search-dropdown`.
+     * Memasang `id="searchResultContent"` pada wadah daftar.
+     * Memberi tanda class `.search-item-row`, `.search-item-nama`, `.search-item-meta`, dan `.search-empty-state`.
+2. **Penerapan Heavy Frosted Blur & High Opacity (Anti-Tembus Pandang):**
+   - Di [`stylesheet.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/stylesheet.html) dan [`css/stylesheet.css`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/css/stylesheet.css):
+     * Mengatur latar belakang panel pencarian menjadi putih frosted 98% (`rgba(255, 255, 255, 0.98)`).
+     * Menerapkan filter blur ekstrim `backdrop-filter: blur(36px) saturate(200%)` sehingga elemen di belakangnya lebur total dan 100% tidak tampak.
+     * Menambahkan border presisi `rgba(203, 213, 225, 0.95)` dan elevated drop shadow `box-shadow: 0 25px 60px -15px rgba(15, 23, 42, 0.25)`.
+     * Menyesuaikan baris hasil pencarian dengan teks gelap kontras `#0f172a` (nama), `#475569` (jabatan/NIP), dan hover state halus `#f1f5f9`.
+3. **Proteksi Menyeluruh Searchable Dropdowns Lintas Modul:**
+   - Menambahkan aturan styling global pada mode terang untuk dropdown pemilih atasan di Jobdes, pejabat penilai di Kinerja, filter saring pegawai di E-Office & Permohonan, serta mode bypass cuti.
+4. **PWA Versioning & Deployment:**
+   - Menaikkan versi Service Worker [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) dan `APP_BUILD_VER` di [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) ke **`transkep-v3.8.8`** / **`3.8.8`**.
+   - Deploy build Google Apps Script Clasp ke versi **`@334`**.
+   - Git commit dan push **HANYA ke `origin/main`** ([`sopiyandedi/TRANSKEP`](https://github.com/sopiyandedi/TRANSKEP)), **TIDAK ke `prod`**.
+
+#### 3. Estimasi Dampak & File yang Dimodifikasi
+- **File Dimodifikasi:**
+  1. [`modules/dashboard/view_dashboard.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/dashboard/view_dashboard.html) (Pelepasan `.glass`, penambahan `#searchResultPanel`, `#searchResultContent`, `.dashboard-search-dropdown`, dan struktur baris)
+  2. [`dashboard/view_dashboard.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/dashboard/view_dashboard.html) (Penyelarasan cermin GAS dashboard)
+  3. [`stylesheet.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/stylesheet.html) (Heavy frosted blur 36px, 98% opacity, border & shadow anti-tembus pandang, dan proteksi global searchable dropdown)
+  4. [`css/stylesheet.css`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/css/stylesheet.css) (Penyelarasan stylesheet CSS PWA)
+  5. [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) (Cache PWA v3.8.8)
+  6. [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) (App build 3.8.8)
+  7. [`prd.md`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/prd.md) (Pembaruan Living Context Poin 66)
+- **Status:** `[SELESAI & AKTIF]` ✅
+
 
 ---
 
@@ -4305,6 +4893,48 @@ Pengguna melaporkan bahwa pratinjau (*preview*) dokumen PDF di modal SK dan SOP 
   6. [`prd.md`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/prd.md) (Pembaruan Living Context Poin 63)
 - **Status:** `[SELESAI & AKTIF]` ✅
 
+---
+
+### TAHAP 85: Peningkatan Blur & Opasitas Searchable Dropdown di Mode Light (Anti-Transparan / Heavy Frosted Glass & Solid Contrast v3.8.8)
+
+#### 1. Latar Belakang & Akar Masalah
+- **Latar Belakang:** Pada mode tampilan terang (Light Mode), dropdown hasil pencarian pegawai di dashboard (`searchKeyword`) serta dropdown saring/filter pegawai di berbagai modul terlihat terlalu transparan/tembus pandang (5% - 15% opacity), sehingga kartu dan teks di belakangnya ("Ketidakhadiran", "Peringatan Dini", nama pegawai lain) tembus terlihat dan bertabrakan dengan teks hasil pencarian.
+- **Akar Masalah:**
+  1. Kontainer hasil pencarian di dashboard menggunakan class `.glass`.
+  2. Aturan CSS `.light-mode #app-container .glass` memaksa seluruh elemen `.glass` menjadi sangat transparan (`rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.05) 100%`).
+  3. Selector spesifik `.light-mode #searchResultPanel` yang sudah ada sebelumnya tidak aktif karena elemen di HTML belum dipasangi ID `#searchResultPanel`.
+
+#### 2. Rencana Implementasi & Rekayasa UI/UX
+1. **Pelepasan Class Glass & Pemasangan ID Spesifik:**
+   - Di [`modules/dashboard/view_dashboard.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/dashboard/view_dashboard.html) dan [`dashboard/view_dashboard.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/dashboard/view_dashboard.html):
+     * Melepaskan class `.glass` dari kontainer hasil pencarian.
+     * Memasang `id="searchResultPanel"` dan class `dashboard-search-dropdown`.
+     * Memasang `id="searchResultContent"` pada wadah daftar.
+     * Memberi tanda class `.search-item-row`, `.search-item-nama`, `.search-item-meta`, dan `.search-empty-state`.
+2. **Penerapan Heavy Frosted Blur & High Opacity (Anti-Tembus Pandang):**
+   - Di [`stylesheet.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/stylesheet.html) dan [`css/stylesheet.css`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/css/stylesheet.css):
+     * Mengatur latar belakang panel pencarian menjadi putih frosted 98% (`rgba(255, 255, 255, 0.98)`).
+     * Menerapkan filter blur ekstrim `backdrop-filter: blur(36px) saturate(200%)` sehingga elemen di belakangnya lebur total dan 100% tidak tampak.
+     * Menambahkan border presisi `rgba(203, 213, 225, 0.95)` dan elevated drop shadow `box-shadow: 0 25px 60px -15px rgba(15, 23, 42, 0.25)`.
+     * Menyesuaikan baris hasil pencarian dengan teks gelap kontras `#0f172a` (nama), `#475569` (jabatan/NIP), dan hover state halus `#f1f5f9`.
+3. **Proteksi Menyeluruh Searchable Dropdowns Lintas Modul:**
+   - Menambahkan aturan styling global pada mode terang untuk dropdown pemilih atasan di Jobdes, pejabat penilai di Kinerja, filter saring pegawai di E-Office & Permohonan, serta mode bypass cuti.
+4. **PWA Versioning & Deployment:**
+   - Menaikkan versi Service Worker [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) dan `APP_BUILD_VER` di [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) ke **`transkep-v3.8.8`** / **`3.8.8`**.
+   - Deploy build Google Apps Script Clasp ke versi **`@334`**.
+   - Git commit dan push **HANYA ke `origin/main`** ([`sopiyandedi/TRANSKEP`](https://github.com/sopiyandedi/TRANSKEP)), **TIDAK ke `prod`**.
+
+#### 3. Estimasi Dampak & File yang Dimodifikasi
+- **File Dimodifikasi:**
+  1. [`modules/dashboard/view_dashboard.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/dashboard/view_dashboard.html) (Pelepasan `.glass`, penambahan `#searchResultPanel`, `#searchResultContent`, `.dashboard-search-dropdown`, dan struktur baris)
+  2. [`dashboard/view_dashboard.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/dashboard/view_dashboard.html) (Penyelarasan cermin GAS dashboard)
+  3. [`stylesheet.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/stylesheet.html) (Heavy frosted blur 36px, 98% opacity, border & shadow anti-tembus pandang, dan proteksi global searchable dropdown)
+  4. [`css/stylesheet.css`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/css/stylesheet.css) (Penyelarasan stylesheet CSS PWA)
+  5. [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) (Cache PWA v3.8.8)
+  6. [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) (App build 3.8.8)
+  7. [`prd.md`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/prd.md) (Pembaruan Living Context Poin 66)
+- **Status:** `[SELESAI & AKTIF]` ✅
+
 
 ---
 
@@ -4328,127 +4958,8 @@ Pengguna melaporkan bahwa pratinjau (*preview*) dokumen PDF di modal SK dan SOP 
    - **Pemutusan Penulisan Baris Sheets (`pkp_dokumen`, `pkp_rencana`, `pck_dokumen`, `pck_realisasi`)**: Pendaftaran sasaran PK baru, pengajuan laporan bulanan PCK, pengesahan nilai, revisi target, dan penghapusan dokumen 100% murni dikelola di Cloud Firestore.
    - **Preservasi Generator Dokumen PDF Resmi**: Google Apps Script tetap melayani tugas penerbitan file PDF cetak resmi (`generatePdfPK` dan `generatePdfPCK`) menggunakan template Google Docs dan Google Drive dinas, namun dibebaskan dari manipulasi baris spreadsheet database.
    - **Penyelarasan Aksi Status ke Firestore**: Seluruh aksi `Hapus`, `Kirim`, `Setujui`, dan `Tolak` pada PKP dan PCK di [`pkp/js_pkp_core.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/pkp/js_pkp_core.html) diarahkan murni melalui service layer `PkpDataService` yang mengupdate dokumen Cloud Firestore secara instan (0ms).
-   - **Inisialisasi Realtime Sync Otomatis**: Menambahkan `initRealtimeSync()` pada `PkpDataService` sehingga daftar dokumen PK, PCK, dan Rekapitulasi langsung tersinkronisasi di latar belakang sejak startup aplikasi (Zero UI).
-   - **Proteksi Anti-Overwrite Delta Sync**: Mengunci `state.masterKinerjaList` pada `syncBackgroundData()` agar tidak tertimpa oleh respon Sheets statis `d.masterKinerjaList`.
-
----
-
-#### 2. Rencana Implementasi Teknis (Implementation Plan)
-
-1. **Pembaruan Service Layer Frontend ([`modules/pkp/pkp_data.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/pkp/pkp_data.js)):**
-   - **`submitBulkPKP(payload, nip, token)`**:
-     * Simpan dokumen PK lengkap beserta daftar sasaran dan indikator 100% murni ke Cloud Firestore via `TranskepFirebase.savePkpToFirestore(payload)`.
-     * Hapus background call ke Apps Script `google.script.run.submitBulkPKP`.
-   - **`submitBulkPCK(payload, nip, token)`**:
-     * Simpan dokumen PCK lengkap beserta rincian capaian realisasi 100% murni ke Cloud Firestore via `TranskepFirebase.savePckToFirestore(payload)`.
-     * Hapus background call ke Apps Script `google.script.run.submitBulkPCK`.
-   - **`aksiDokumenPKP(idPKP, aksi, nip, token)`**:
-     * Update status atau hapus dokumen PK murni 100% langsung di Cloud Firestore (`TranskepFirebase.deletePkpFromFirestore` atau update status dokumen).
-     * Hapus background mirror ke Apps Script `google.script.run.aksiDokumenPKP`.
-   - **`aksiDokumenPCK(idPCK, aksi, nip, token)`**:
-     * Update status atau hapus laporan PCK murni 100% langsung di Cloud Firestore (`TranskepFirebase.deletePckFromFirestore` atau update status dokumen).
-     * Hapus background mirror ke Apps Script `google.script.run.aksiDokumenPCK`.
-   - **`initRealtimeSync()`**:
-     * Pasang auto-init listener Firestore realtime untuk PKP, PCK, dan Rekapitulasi saat script dimuat, memperbarui memori runtime `state.pkpDokumen` dan `state.pckDokumen`.
-
-2. **Pembersihan Frontend Render & Core ([`pkp/js_pkp_render.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/pkp/js_pkp_render.html) & [`pkp/js_pkp_core.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/pkp/js_pkp_core.html)):**
-   - Di `pkp/js_pkp_render.html`: Hapus sisa pemanggilan manual `google.script.run.submitBulkPKP` (baris 914–916) dan `submitBulkPCK` (baris 1190–1192).
-   - Di `pkp/js_pkp_core.html`: Ubah pemanggilan `google.script.run.aksiDokumenPKP` dan `aksiDokumenPCK` pada fungsi `hapusDokumenPK`, `hapusDokumenPCK`, `kirimDokumenPK`, `kirimDokumenPCK`, dan `validasiCepatDokumen` agar memanggil `PkpDataService.aksiDokumenPKP` dan `PkpDataService.aksiDokumenPCK`.
-
-3. **Pembersihan Backend Google Apps Script ([`pkp/setup_pkp.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/pkp/setup_pkp.js)):**
-   - Di fungsi `submitBulkPKP`: Hapus manipulasi penulisan baris ke `pkp_dokumen` dan `pkp_rencana`. Cukup kembalikan `{ success: true, id_pkp: payload.id_pkp || ('PKP-' + new Date().getTime()), message: 'Data PK berhasil diproses di Cloud Firestore.' }`.
-   - Di fungsi `submitBulkPCK`: Hapus manipulasi penulisan baris ke `pck_dokumen` dan `pck_realisasi`. Cukup kembalikan `{ success: true, id_pck: payload.id_pck || ('PCK-' + new Date().getTime()), message: 'Laporan PCK berhasil diproses di Cloud Firestore.' }`.
-   - Di fungsi `aksiDokumenPKP`: Hapus manipulasi baris pada `pkp_dokumen`. Cukup kembalikan `{ success: true, message: 'Aksi PK diproses di Cloud Firestore.' }`.
-   - Di fungsi `aksiDokumenPCK`: Hapus manipulasi baris pada `pck_dokumen`. Cukup kembalikan `{ success: true, message: 'Aksi PCK diproses di Cloud Firestore.' }`.
-
-4. **Proteksi Anti-Overwrite Delta Sync di [`core/core.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/core/core.js) & [`javascript.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/javascript.html):**
-   - Pada `syncBackgroundData()`, proteksi `state.masterKinerjaList`: jika sudah terisi data Cloud Firestore (`x.is_firebase`), abaikan penimpaan dari respon Sheets `d.masterKinerjaList`.
-
-5. **PWA Versioning & Deployment:**
-   - Naikkan versi Service Worker di [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) dan `APP_BUILD_VER` di [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) ke **`transkep-v3.8.6`** / **`3.8.6`**.
-   - Deploy build Google Apps Script Clasp ke versi **`@332`**.
-   - Git commit dan push **HANYA ke `origin/main`** ([`sopiyandedi/TRANSKEP`](https://github.com/sopiyandedi/TRANSKEP)), **TIDAK ke `prod`**.
-
----
-
-#### 3. Estimasi Dampak & File yang Dimodifikasi
-- **File Dimodifikasi:**
-  1. [`modules/pkp/pkp_data.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/pkp/pkp_data.js) (Pemutusan simpan/aksi Sheets, integrasi Firestore standalone & initRealtimeSync)
-  2. [`pkp/setup_pkp.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/pkp/setup_pkp.js) (Pembersihan operasi penulisan sheet `pkp_dokumen`, `pkp_rencana`, `pck_dokumen`, `pck_realisasi` pada backend GAS)
-  3. [`pkp/js_pkp_core.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/pkp/js_pkp_core.html) (Pengalihan aksi hapus/kirim/setujui ke PkpDataService)
-  4. [`pkp/js_pkp_render.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/pkp/js_pkp_render.html) (Pembersihan background RPC Sheets saat submit PK/PCK)
-  5. [`core/core.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/core/core.js) & [`javascript.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/javascript.html) (Proteksi anti-overwrite state masterKinerjaList dari Sheets)
-  6. [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) (Cache PWA v3.8.6)
-  7. [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) (App build 3.8.6)
-  8. [`prd.md`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/prd.md) (Pembaruan Living Context Poin 64)
-- **Status:** `[SELESAI & AKTIF]` ✅
-
-
----
-
-### TAHAP 84: Pemutusan Inputan Lanjutan Database E-Office (KGB & Rapat 3-in-1) ke Google Sheets & Standalone Cloud Firestore (v3.8.7)
-
-#### 1. Latar Belakang & Analisis Kebutuhan
-1. **Latar Belakang:**
-   - Setelah Surat Tugas (Tahap 79), Uraian Tugas/Jobdes (Tahap 80), Surat Keputusan/SK (Tahap 81), Standar Operasional Prosedur/SOP (Tahap 82), dan Penilaian Kinerja Pegawai/PKP (Tahap 83) berhasil diputus dari Google Sheets dan 100% mandiri di Cloud Firestore, modul berikutnya dalam roadmap pemutusan adalah **Modul E-Office Kedinasan (Kenaikan Gaji Berkala / KGB & Paket Rapat 3-in-1: Undangan, Absensi, Notulen)**.
-   - Modul ini mengelola 2 entitas inti:
-     * Pilar 1: Kenaikan Gaji Berkala Pegawai (`eoffice_kgb` di Firestore, sebelumnya mereplikasi ke sheet `EofficeKGB`).
-     * Pilar 2: Paket Administrasi Rapat 3-in-1 (`eoffice_rapat` di Firestore, sebelumnya mereplikasi ke sheet `EofficeRapat`).
-   - Saat ini, backend Google Apps Script [`eoffice/kgb.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/kgb.js) dan [`eoffice/rapat.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/rapat.js) masih mereplikasi penulisan baris ganda ke Google Sheets:
-     * Saat SK KGB diterbitkan (`saveOrGenerateKgbDoc` mode 'generate'), GAS membuat Google Docs di Google Drive (fungsi esensial cetak/arsip resmi), namun setelah itu masih menulis 29 kolom ke baris sheet `EofficeKGB` dan memperbarui sheet `user_data`.
-     * Saat Paket Rapat diterbitkan (`createPaketRapatDocs`), GAS membuat 3 Google Docs (Undangan, Daftar Hadir, Notulen) di Google Drive, namun setelah itu masih menulis 18 kolom ke baris sheet `EofficeRapat`.
-     * Saat berkas KGB dihapus (`deleteKgbDocRecord`), backend masih mencari dan menghapus baris di sheet `EofficeKGB`.
-     * Di frontend [`eoffice/js_kgb.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/js_kgb.html), [`eoffice/js_rapat.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/js_rapat.html), dan [`eoffice/js_eoffice.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/js_eoffice.html), masih terdapat blok fallback `google.script.run` langsung ke Sheets.
-
-2. **Sasaran Perubahan:**
-   - **Pemutusan Penulisan Baris Sheets (`EofficeKGB` & `EofficeRapat`)**: Penerbitan SK KGB baru, pengajuan draf/TTE KGB, pembuatan paket rapat baru, dan penghapusan berkas 100% murni dikelola di Cloud Firestore.
-   - **Preservasi Generator Dokumen Google Docs Resmi**: Google Apps Script tetap melayani tugas pembuatan dokumen Google Docs resmi di Google Drive dinas (`createKgbGoogleDoc_` dan 3 dokumen rapat `docUndangan`, `docAbsen`, `docNotulen`) dan mengembalikan URL dokumen beserta link ekspor PDF, namun dibebaskan dari manipulasi baris spreadsheet database. Data historis di Google Sheets tetap dipreservasi utuh sebagai arsip statis (*cold archive*).
-   - **Penyelarasan Service Layer Frontend ([`modules/eoffice/eoffice_data.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/eoffice_data.js))**:
-     * Operasi simpan, draf, kirim TTE, dan penerbitan KGB & Rapat berjalan Firestore-first mandiri.
-     * `getEofficeData` membaca murni dari Cloud Firestore (`eoffice_kgb` & `eoffice_rapat`) tanpa fallback call Sheets jika data Firestore sudah aktif.
-   - **Pembersihan Frontend Render & Form ([`eoffice/js_kgb.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/js_kgb.html), [`eoffice/js_rapat.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/js_rapat.html), [`eoffice/js_eoffice.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/js_eoffice.html))**: Menghapus sisa pemanggilan fallback direct RPC Sheets yang usang.
-
----
-
-#### 2. Rencana Implementasi Teknis (Implementation Plan)
-
-1. **Pembaruan Backend Google Apps Script ([`eoffice/kgb.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/kgb.js) & [`eoffice/rapat.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/rapat.js)):**
-   - **`saveOrGenerateKgbDoc` di [`eoffice/kgb.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/kgb.js)**:
-     * Tetap membuat file Google Docs resmi di Google Drive jika `actionType === 'generate'` via `createKgbGoogleDoc_(payload, idKgb)`.
-     * Hapus manipulasi penulisan baris ke sheet `EofficeKGB` (baris 222–279) dan pembaruan cell ke sheet `user_data` (baris 280–310).
-     * Kembalikan URL Google Docs dan URL PDF secara instan ke frontend untuk disimpan langsung ke Cloud Firestore collection `eoffice_kgb`.
-   - **`deleteKgbDocRecord` di [`eoffice/kgb.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/kgb.js)**:
-     * Hapus pencarian dan penghapusan baris pada sheet `EofficeKGB`. Cukup kembalikan `{ status: 'success', message: 'Berkas KGB diproses di Cloud Firestore.' }`.
-   - **`createPaketRapatDocs` di [`eoffice/rapat.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/rapat.js)**:
-     * Tetap membuat 3 dokumen Google Docs resmi (Undangan, Absensi, Notulen) di Google Drive lengkap dengan kop surat dan tabel dinas.
-     * Hapus manipulasi penulisan baris ke sheet `EofficeRapat` (baris 318–367).
-     * Kembalikan ketiga link Google Docs langsung ke frontend untuk disimpan ke Cloud Firestore collection `eoffice_rapat`.
-
-2. **Penyelarasan Service Layer Frontend ([`modules/eoffice/eoffice_data.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/eoffice_data.js)):**
-   - Di `getEofficeData()`: pastikan pembacaan Cloud Firestore (`TranskepFirebase.getFirestoreKgbs()` dan `getFirestoreRapats()`) beroperasi mandiri; jika data Firestore sudah pernah termigrasi (`MIGRATION_FLAG_KEY` aktif atau data sudah ada), jangan lagi memanggil fallback RPC `getEofficeData` ke Sheets.
-   - Di `saveOrGenerateKgb()`: saat `actionType === 'generate'`, setelah GAS merender Google Doc di Drive dan mengembalikan URL, frontend menyimpan dokumen KGB lengkap ke Firestore `eoffice_kgb` dan memperbarui status pegawai di Firestore `users` tanpa menyentuh spreadsheet.
-
-3. **Pembersihan Frontend Templates ([`eoffice/js_kgb.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/js_kgb.html), [`eoffice/js_rapat.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/js_rapat.html), [`eoffice/js_eoffice.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/js_eoffice.html)):**
-   - Hapus fallback usang `google.script.run` langsung ke Sheets, pastikan seluruh interaksi melewati `EofficeDataService`.
-
-4. **PWA Versioning & Deployment:**
-   - Naikkan Service Worker di [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) dan `APP_BUILD_VER` di [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) ke **`transkep-v3.8.7`** / **`3.8.7`**.
-   - Deploy build Google Apps Script Clasp ke versi **`@333`** (setelah menghapus deployment lama jika kuota 20 versi penuh).
-   - Git commit dan push **HANYA ke `origin/main`** ([`sopiyandedi/TRANSKEP`](https://github.com/sopiyandedi/TRANSKEP)), **TIDAK ke `prod`**.
-
----
-
-#### 3. Estimasi Dampak & File yang Dimodifikasi
-- **File Dimodifikasi:**
-  1. [`eoffice/kgb.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/kgb.js) (Pembersihan penulisan baris `EofficeKGB` dan manipulasi sheet `user_data`, preservasi generator Google Docs KGB)
-  2. [`eoffice/rapat.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/rapat.js) (Pembersihan penulisan baris `EofficeRapat`, preservasi pembuat 3 Google Docs rapat)
-  3. [`modules/eoffice/eoffice_data.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/eoffice_data.js) (Optimalisasi pembacaan Firestore mandiri & pemutusan fallback Sheets)
-  4. [`eoffice/js_kgb.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/js_kgb.html) & [`eoffice/js_rapat.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/js_rapat.html) & [`eoffice/js_eoffice.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/js_eoffice.html) (Pembersihan sisa direct RPC Sheets fallback)
-  5. [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) (Cache PWA v3.8.7)
-  6. [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) (App build 3.8.7)
-  7. [`prd.md`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/prd.md) (Pembaruan Living Context Poin 65)
-- **Status:** `[SELESAI & AKTIF]` ✅
-
+   - **Inisialisasi Realtime Sync Otomatis**: Menambahkan `initRealtimeSync()` pada `Pk
+... [truncated for diff preview]
 
 ---
 
@@ -4490,4 +5001,46 @@ Pengguna melaporkan bahwa pratinjau (*preview*) dokumen PDF di modal SK dan SOP 
   5. [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) (Cache PWA v3.8.8)
   6. [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) (App build 3.8.8)
   7. [`prd.md`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/prd.md) (Pembaruan Living Context Poin 66)
+- **Status:** `[SELESAI & AKTIF]` ✅
+
+
+---
+
+### TAHAP 86: Smart Bulk Import Word (.docx) Uraian Tugas ke Cloud Firestore (Client-Side Parsing via Mammoth.js & Instant Batching v3.8.9)
+
+#### 1. Latar Belakang & Analisis Kebutuhan
+- **Latar Belakang:** Pengisian Uraian Tugas pegawai di TRANSKEP sebelumnya dilakukan manual satu per satu. Instansi telah memiliki kumpulan dokumen Microsoft Word (.docx) yang berisi daftar rincian tugas masing-masing pegawai. Diperlukan fitur import massal yang dapat memproses banyak file .docx sekaligus langsung di browser tanpa membebani server/kuota GAS, serta menyimpannya murni ke Cloud Firestore (jobdes_documents).
+- **Keputusan Arsitektur & Rekayasa:**
+  1. **Parsing Client-Side dengan Mammoth.js:** Memproses dokumen .docx 100% di browser via FileReader ArrayBuffer.
+  2. **Smart Parser Poin Kalimat Biasa:** Menyaring baris judul/kop/biodata/tanda tangan, membersihkan bullet Word acak, dan menomori ulang secara teratur (1. ..., 2. ...) dengan pemisah baris (\n) agar selaras dengan fungsi visual dan cetak PDF (pormatTugasRapi).
+  3. **Pencocokan Deterministik Berbasis NIP (18 Digit):** Menggunakan Regex NIP 18 digit (/\b(19\d{16}|20\d{16})\b/) dari teks dokumen maupun nama file untuk mencocokkan identitas pegawai, nama, jabatan, pangkat, dan atasan lama secara otomatis tanpa risiko salah sasaran akibat gelar nama.
+  4. **Custom Modal Preview, Inline Editor & Atasan Selector:** Dropzone drag & drop, tab/accordion per pegawai, inline editor poin tugas (tambah/hapus/edit), opsi Atasan Langsung, dan opsi mode Timpa (Replace) vs Tambah (Append).
+  5. **Atomic Batch Write Firestore (Zero Sheets):** Menggunakan db.batch() murni ke Cloud Firestore koleksi jobdes_documents ({ merge: true }) tanpa memanggil Google Sheets sama sekali.
+
+#### 2. Rencana Implementasi & Eksekusi
+1. **Pemasangan Library Mammoth.js:**
+   - Menambahkan CDN mammoth.browser.min.js pada index.html, modules/jobdes/view_jobdes.html, dan jobdes/view_jobdes.html.
+2. **Penyusunan Service Layer Firestore Batch:**
+   - Menambahkan bulkSaveJobdesBatchToFirestore di core/firebase.js dan javascript_firebase.html.
+   - Menambahkan bulkSaveJobdesBatch di modules/jobdes/jobdes_data.js.
+3. **Pemasangan Tombol & Modal Preview pada Tampilan Uraian Tugas:**
+   - Menempatkan tombol "Import Word (.docx)" di header modul Uraian Tugas tepat di area toolbar admin yang bersebelahan dengan notifikasi usulan reposisi (v-if="hasAdminAccess").
+   - Membangun Modal Bulk Import lengkap dengan dropzone, badge matched/unmatched, inline textarea per butir tugas, dropdown atasan, dan tombol aksi batch save.
+4. **Logika Kontroller Vue.js:**
+   - Menambahkan state importDocx, method processDocxFiles, cleanDocxTextPoints, extractNipFromDoc, dan submitBulkImportJobdes pada modules/jobdes/jobdes.js dan jobdes/js_jobdes.html.
+5. **Versioning & Deployment:**
+   - Menaikkan versi Service Worker sw.js dan APP_BUILD_VER di index.html ke **transkep-v3.8.9** / **3.8.9**.
+   - Deploy build Google Apps Script Clasp ke versi **@335**.
+   - Git commit dan push **HANYA ke origin/main** (sopiyandedi/TRANSKEP), **TIDAK ke prod**.
+
+#### 3. Estimasi Dampak & File yang Dimodifikasi
+- **File Dimodifikasi:**
+  1. index.html (Injeksi CDN Mammoth.js & PWA build 3.8.9)
+  2. modules/jobdes/view_jobdes.html & jobdes/view_jobdes.html (Tombol Import Word, CDN Mammoth, dan Modal Preview)
+  3. modules/jobdes/jobdes.js & jobdes/js_jobdes.html (Controller Vue: state, parser, NIP matcher, dan handler batch import)
+  4. modules/jobdes/jobdes_data.js (Service method bulkSaveJobdesBatch)
+  5. core/firebase.js & javascript_firebase.html (Firestore bulkSaveJobdesBatchToFirestore via db.batch)
+  6. sw.js (Cache PWA v3.8.9)
+  7. prd.md (Pembaruan Living Context Poin 67)
+  8. revisi.md (Dokumentasi Log Revisi Tahap 86)
 - **Status:** `[SELESAI & AKTIF]` ✅
