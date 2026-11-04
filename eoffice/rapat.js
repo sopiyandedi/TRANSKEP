@@ -77,16 +77,10 @@ function createPaketRapatDocs(payload, adminNip, clientToken) {
       return { status: 'error', message: 'Akses Ditolak: Pembuatan paket rapat dinas hanya dapat dilakukan oleh Admin.' };
     }
 
-    const ss = getDB();
-    if (!ss) throw new Error("Koneksi spreadsheet gagal.");
-
-    initEofficeDatabase_();
-    const sheet = ss.getSheetByName('EofficeRapat');
-    if (!sheet) throw new Error("Sheet EofficeRapat tidak ditemukan.");
-
+    const todayStrClean = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'yyyyMMddHHmmss');
     let idRapat = String(payload.id_rapat || '');
     if (!idRapat) {
-      idRapat = generateSeqRapatId_(ss);
+      idRapat = 'RPT-' + todayStrClean;
     }
 
     let pesertaList = [];
@@ -316,55 +310,13 @@ function createPaketRapatDocs(payload, adminNip, clientToken) {
     try { fileNotulen.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW); } catch(e){}
 
     // ==========================================
-    // 4. SIMPAN RIWAYAT KE SHEET EofficeRapat
+    // TAHAP 84: PEMUTUSAN PENULISAN BARIS KE SHEET EofficeRapat
     // ==========================================
-    const todayStr = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'yyyy-MM-dd');
+    // Generator 3 Dokumen Google Docs di Google Drive tetap berjalan utuh.
+    // Seluruh data riwayat paket rapat dikelola 100% murni di Cloud Firestore (eoffice_rapat).
     const docUndanganUrl = fileUndangan.getUrl();
     const docAbsenUrl = fileAbsen.getUrl();
     const docNotulenUrl = fileNotulen.getUrl();
-
-    const rapatRow = [
-      idRapat,
-      todayStr,
-      String(payload.nomor_undangan || ''),
-      String(payload.agenda || ''),
-      String(payload.hari_tanggal || ''),
-      String(payload.waktu_mulai || ''),
-      String(payload.waktu_selesai || ''),
-      String(payload.tempat || ''),
-      String(payload.pemimpin || ''),
-      String(payload.notulis || ''),
-      String(payload.peserta_json || '[]'),
-      String(payload.pembahasan || ''),
-      String(payload.kesimpulan || ''),
-      'Selesai',
-      docUndanganUrl,
-      docAbsenUrl,
-      docNotulenUrl,
-      String(adminNip || '')
-    ];
-
-    const safeRapatRow = sanitizeRowArray ? sanitizeRowArray(rapatRow) : rapatRow;
-
-    // Periksa apakah update baris lama atau insert baru
-    let targetRowIdx = -1;
-    if (sheet.getLastRow() > 1) {
-      const existingIds = sheet.getRange(2, 1, sheet.getLastRow() - 1, 1).getValues();
-      for (let i = 0; i < existingIds.length; i++) {
-        if (String(existingIds[i][0]) === idRapat) {
-          targetRowIdx = i + 2;
-          break;
-        }
-      }
-    }
-
-    if (targetRowIdx > 0) {
-      sheet.getRange(targetRowIdx, 1, 1, safeRapatRow.length).setValues([safeRapatRow]);
-    } else {
-      sheet.appendRow(safeRapatRow);
-    }
-
-    if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush();
 
     return {
       status: 'success',

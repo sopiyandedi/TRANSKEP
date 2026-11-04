@@ -144,7 +144,9 @@ const EofficeDataService = {
     }
 
     // 2. Jika KGB di Firestore masih kosong (belum migrasi), ambil arsip lama dari Google Sheets & otomatis SEED ke Firestore
-    if (!hasLoadedKgbs || !hasLoadedRapats) {
+    // TAHAP 84: Jika flag migrasi sudah aktif, jangan pernah memanggil fallback Sheets lagi
+    const isAlreadyMigrated = (typeof localStorage !== 'undefined' && localStorage.getItem(this.MIGRATION_FLAG_KEY) === 'true');
+    if ((!hasLoadedKgbs || !hasLoadedRapats) && !isAlreadyMigrated) {
       try {
         let sheetRes = null;
         if (typeof window.TranskepAPI !== 'undefined' && typeof window.TranskepAPI.call === 'function') {

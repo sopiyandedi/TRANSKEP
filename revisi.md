@@ -4382,3 +4382,69 @@ Pengguna melaporkan bahwa pratinjau (*preview*) dokumen PDF di modal SK dan SOP 
   7. [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) (App build 3.8.6)
   8. [`prd.md`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/prd.md) (Pembaruan Living Context Poin 64)
 - **Status:** `[SELESAI & AKTIF]` ✅
+
+
+---
+
+### TAHAP 84: Pemutusan Inputan Lanjutan Database E-Office (KGB & Rapat 3-in-1) ke Google Sheets & Standalone Cloud Firestore (v3.8.7)
+
+#### 1. Latar Belakang & Analisis Kebutuhan
+1. **Latar Belakang:**
+   - Setelah Surat Tugas (Tahap 79), Uraian Tugas/Jobdes (Tahap 80), Surat Keputusan/SK (Tahap 81), Standar Operasional Prosedur/SOP (Tahap 82), dan Penilaian Kinerja Pegawai/PKP (Tahap 83) berhasil diputus dari Google Sheets dan 100% mandiri di Cloud Firestore, modul berikutnya dalam roadmap pemutusan adalah **Modul E-Office Kedinasan (Kenaikan Gaji Berkala / KGB & Paket Rapat 3-in-1: Undangan, Absensi, Notulen)**.
+   - Modul ini mengelola 2 entitas inti:
+     * Pilar 1: Kenaikan Gaji Berkala Pegawai (`eoffice_kgb` di Firestore, sebelumnya mereplikasi ke sheet `EofficeKGB`).
+     * Pilar 2: Paket Administrasi Rapat 3-in-1 (`eoffice_rapat` di Firestore, sebelumnya mereplikasi ke sheet `EofficeRapat`).
+   - Saat ini, backend Google Apps Script [`eoffice/kgb.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/kgb.js) dan [`eoffice/rapat.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/rapat.js) masih mereplikasi penulisan baris ganda ke Google Sheets:
+     * Saat SK KGB diterbitkan (`saveOrGenerateKgbDoc` mode 'generate'), GAS membuat Google Docs di Google Drive (fungsi esensial cetak/arsip resmi), namun setelah itu masih menulis 29 kolom ke baris sheet `EofficeKGB` dan memperbarui sheet `user_data`.
+     * Saat Paket Rapat diterbitkan (`createPaketRapatDocs`), GAS membuat 3 Google Docs (Undangan, Daftar Hadir, Notulen) di Google Drive, namun setelah itu masih menulis 18 kolom ke baris sheet `EofficeRapat`.
+     * Saat berkas KGB dihapus (`deleteKgbDocRecord`), backend masih mencari dan menghapus baris di sheet `EofficeKGB`.
+     * Di frontend [`eoffice/js_kgb.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/js_kgb.html), [`eoffice/js_rapat.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/js_rapat.html), dan [`eoffice/js_eoffice.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/js_eoffice.html), masih terdapat blok fallback `google.script.run` langsung ke Sheets.
+
+2. **Sasaran Perubahan:**
+   - **Pemutusan Penulisan Baris Sheets (`EofficeKGB` & `EofficeRapat`)**: Penerbitan SK KGB baru, pengajuan draf/TTE KGB, pembuatan paket rapat baru, dan penghapusan berkas 100% murni dikelola di Cloud Firestore.
+   - **Preservasi Generator Dokumen Google Docs Resmi**: Google Apps Script tetap melayani tugas pembuatan dokumen Google Docs resmi di Google Drive dinas (`createKgbGoogleDoc_` dan 3 dokumen rapat `docUndangan`, `docAbsen`, `docNotulen`) dan mengembalikan URL dokumen beserta link ekspor PDF, namun dibebaskan dari manipulasi baris spreadsheet database. Data historis di Google Sheets tetap dipreservasi utuh sebagai arsip statis (*cold archive*).
+   - **Penyelarasan Service Layer Frontend ([`modules/eoffice/eoffice_data.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/eoffice_data.js))**:
+     * Operasi simpan, draf, kirim TTE, dan penerbitan KGB & Rapat berjalan Firestore-first mandiri.
+     * `getEofficeData` membaca murni dari Cloud Firestore (`eoffice_kgb` & `eoffice_rapat`) tanpa fallback call Sheets jika data Firestore sudah aktif.
+   - **Pembersihan Frontend Render & Form ([`eoffice/js_kgb.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/js_kgb.html), [`eoffice/js_rapat.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/js_rapat.html), [`eoffice/js_eoffice.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/js_eoffice.html))**: Menghapus sisa pemanggilan fallback direct RPC Sheets yang usang.
+
+---
+
+#### 2. Rencana Implementasi Teknis (Implementation Plan)
+
+1. **Pembaruan Backend Google Apps Script ([`eoffice/kgb.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/kgb.js) & [`eoffice/rapat.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/rapat.js)):**
+   - **`saveOrGenerateKgbDoc` di [`eoffice/kgb.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/kgb.js)**:
+     * Tetap membuat file Google Docs resmi di Google Drive jika `actionType === 'generate'` via `createKgbGoogleDoc_(payload, idKgb)`.
+     * Hapus manipulasi penulisan baris ke sheet `EofficeKGB` (baris 222–279) dan pembaruan cell ke sheet `user_data` (baris 280–310).
+     * Kembalikan URL Google Docs dan URL PDF secara instan ke frontend untuk disimpan langsung ke Cloud Firestore collection `eoffice_kgb`.
+   - **`deleteKgbDocRecord` di [`eoffice/kgb.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/kgb.js)**:
+     * Hapus pencarian dan penghapusan baris pada sheet `EofficeKGB`. Cukup kembalikan `{ status: 'success', message: 'Berkas KGB diproses di Cloud Firestore.' }`.
+   - **`createPaketRapatDocs` di [`eoffice/rapat.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/rapat.js)**:
+     * Tetap membuat 3 dokumen Google Docs resmi (Undangan, Absensi, Notulen) di Google Drive lengkap dengan kop surat dan tabel dinas.
+     * Hapus manipulasi penulisan baris ke sheet `EofficeRapat` (baris 318–367).
+     * Kembalikan ketiga link Google Docs langsung ke frontend untuk disimpan ke Cloud Firestore collection `eoffice_rapat`.
+
+2. **Penyelarasan Service Layer Frontend ([`modules/eoffice/eoffice_data.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/eoffice_data.js)):**
+   - Di `getEofficeData()`: pastikan pembacaan Cloud Firestore (`TranskepFirebase.getFirestoreKgbs()` dan `getFirestoreRapats()`) beroperasi mandiri; jika data Firestore sudah pernah termigrasi (`MIGRATION_FLAG_KEY` aktif atau data sudah ada), jangan lagi memanggil fallback RPC `getEofficeData` ke Sheets.
+   - Di `saveOrGenerateKgb()`: saat `actionType === 'generate'`, setelah GAS merender Google Doc di Drive dan mengembalikan URL, frontend menyimpan dokumen KGB lengkap ke Firestore `eoffice_kgb` dan memperbarui status pegawai di Firestore `users` tanpa menyentuh spreadsheet.
+
+3. **Pembersihan Frontend Templates ([`eoffice/js_kgb.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/js_kgb.html), [`eoffice/js_rapat.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/js_rapat.html), [`eoffice/js_eoffice.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/js_eoffice.html)):**
+   - Hapus fallback usang `google.script.run` langsung ke Sheets, pastikan seluruh interaksi melewati `EofficeDataService`.
+
+4. **PWA Versioning & Deployment:**
+   - Naikkan Service Worker di [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) dan `APP_BUILD_VER` di [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) ke **`transkep-v3.8.7`** / **`3.8.7`**.
+   - Deploy build Google Apps Script Clasp ke versi **`@333`** (setelah menghapus deployment lama jika kuota 20 versi penuh).
+   - Git commit dan push **HANYA ke `origin/main`** ([`sopiyandedi/TRANSKEP`](https://github.com/sopiyandedi/TRANSKEP)), **TIDAK ke `prod`**.
+
+---
+
+#### 3. Estimasi Dampak & File yang Dimodifikasi
+- **File Dimodifikasi:**
+  1. [`eoffice/kgb.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/kgb.js) (Pembersihan penulisan baris `EofficeKGB` dan manipulasi sheet `user_data`, preservasi generator Google Docs KGB)
+  2. [`eoffice/rapat.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/rapat.js) (Pembersihan penulisan baris `EofficeRapat`, preservasi pembuat 3 Google Docs rapat)
+  3. [`modules/eoffice/eoffice_data.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/eoffice_data.js) (Optimalisasi pembacaan Firestore mandiri & pemutusan fallback Sheets)
+  4. [`eoffice/js_kgb.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/js_kgb.html) & [`eoffice/js_rapat.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/js_rapat.html) & [`eoffice/js_eoffice.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/js_eoffice.html) (Pembersihan sisa direct RPC Sheets fallback)
+  5. [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) (Cache PWA v3.8.7)
+  6. [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) (App build 3.8.7)
+  7. [`prd.md`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/prd.md) (Pembaruan Living Context Poin 65)
+- **Status:** `[SELESAI & AKTIF]` ✅

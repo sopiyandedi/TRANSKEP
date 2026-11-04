@@ -527,38 +527,10 @@
       return;
     }
 
-    google.script.run
-      .withSuccessHandler(function(res) {
-        if (typeof hideLoading === 'function') hideLoading();
-        if (btnDoc) btnDoc.disabled = false;
-        if (btnDraft) btnDraft.disabled = false;
-
-        if (res && res.status === 'success') {
-          closeKgbModalForm();
-          if (typeof showNotify === 'function') {
-            showNotify(
-              "Sukses",
-              actionType === 'generate' ? "SK KGB berhasil diterbitkan ke Folder Google Drive!" : "Data KGB berhasil disimpan.",
-              "success"
-            );
-          }
-          if (typeof window.refreshEofficeData === 'function') {
-            window.refreshEofficeData();
-          }
-        } else if (typeof showNotify === 'function') {
-          showNotify("Gagal", (res ? res.message : "Terjadi kendala saat menyimpan berkas KGB."), "error");
-        }
-      })
-      .withFailureHandler(function(err) {
-        if (typeof hideLoading === 'function') hideLoading();
-        if (btnDoc) btnDoc.disabled = false;
-        if (btnDraft) btnDraft.disabled = false;
-        console.error("Error save KGB: ", err);
-        if (typeof showNotify === 'function') {
-          showNotify("Error Sistem", err.toString(), "error");
-        }
-      })
-      .saveOrGenerateKgbDoc(payload, actionType, adminNip, token);
+    // TAHAP 84: Seluruh penyimpanan data KGB diarahkan melalui EofficeDataService (Firestore Standalone)
+    if (typeof hideLoading === 'function') hideLoading();
+    if (btnDoc) btnDoc.disabled = false;
+    if (btnDraft) btnDraft.disabled = false;
   }
 
   window.terbilangRupiah = terbilangRupiah;

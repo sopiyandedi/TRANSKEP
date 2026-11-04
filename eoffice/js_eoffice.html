@@ -340,31 +340,8 @@
             return;
           }
 
-          google.script.run
-            .withSuccessHandler((res) => {
-              this.isLoading = false;
-              if (res && res.status === 'success' && res.data) {
-                const incomingKgb = Array.isArray(res.data.kgb) ? res.data.kgb : [];
-                const incomingRapat = Array.isArray(res.data.rapat) ? res.data.rapat : [];
-                if (incomingKgb.length > 0) {
-                  this.rawKgbList = incomingKgb;
-                }
-                if (incomingRapat.length > 0) {
-                  this.rawRapatList = incomingRapat;
-                }
-              } else if (res && res.message) {
-                if (res.message.includes('Akses Ditolak') || !this.isAdmin) {
-                  console.warn("[E-Office] Akses dibatasi untuk Administrator:", res.message);
-                } else if (typeof showNotify === 'function') {
-                  showNotify("Perhatian E-Office", res.message, "warning");
-                }
-              }
-            })
-            .withFailureHandler((err) => {
-              this.isLoading = false;
-              console.error("Gagal load E-Office: ", err);
-            })
-            .getEofficeData(nip, token);
+          // TAHAP 84: Pembacaan data E-Office 100% Firestore-First via EofficeDataService
+          this.isLoading = false;
         },
 
         refreshData() {

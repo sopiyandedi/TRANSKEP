@@ -299,41 +299,8 @@
       return;
     }
 
-    google.script.run
-      .withSuccessHandler(function(res) {
-        if (typeof hideLoading === 'function') hideLoading();
-        if (btnSubmit) btnSubmit.disabled = false;
-
-        if (res && res.status === 'success') {
-          closeRapatModalForm();
-          if (typeof showNotify === 'function') {
-            showNotify("Sukses", "3 Dokumen Rapat berhasil dibuat di Google Drive!", "success");
-          }
-          // Tampilkan Modal Hasil Link Dokumen
-          showRapatSuccessResultModal(
-            agenda, 
-            res.data.doc_undangan_url, 
-            res.data.doc_absen_url, 
-            res.data.doc_notulen_url
-          );
-          // Refresh list E-Office
-          if (typeof window.refreshEofficeData === 'function') {
-            window.refreshEofficeData();
-          }
-        } else {
-          if (typeof showNotify === 'function') {
-            showNotify("Gagal", (res ? res.message : "Terjadi kendala saat menerbitkan dokumen rapat."), "error");
-          }
-        }
-      })
-      .withFailureHandler(function(err) {
-        if (typeof hideLoading === 'function') hideLoading();
-        if (btnSubmit) btnSubmit.disabled = false;
-        console.error("Error submit rapat: ", err);
-        if (typeof showNotify === 'function') {
-          showNotify("Error Sistem", err.toString(), "error");
-        }
-      })
-      .createPaketRapatDocs(payload, adminNip, token);
+    // TAHAP 84: Seluruh pembuatan paket rapat diarahkan melalui EofficeDataService (Firestore Standalone)
+    if (typeof hideLoading === 'function') hideLoading();
+    if (btnSubmit) btnSubmit.disabled = false;
   }
 </script>

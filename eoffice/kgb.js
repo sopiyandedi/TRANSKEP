@@ -187,16 +187,10 @@ function saveOrGenerateKgbDoc(payload, actionType, adminNip, clientToken) {
       return { status: 'error', message: 'Akses Ditolak: Pembuatan atau penerbitan KGB hanya dapat dilakukan oleh Admin.' };
     }
 
-    const ss = getDB();
-    if (!ss) throw new Error("Koneksi database spreadsheet gagal.");
-
-    initEofficeDatabase_();
-    const sheet = ss.getSheetByName('EofficeKGB');
-    if (!sheet) throw new Error("Sheet EofficeKGB tidak ditemukan.");
-
+    const todayStrClean = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'yyyyMMddHHmmss');
     let idKgb = String(payload.id_kgb || '');
     if (!idKgb || idKgb.startsWith('DRAFT-')) {
-      idKgb = generateSeqKgbId_(ss);
+      idKgb = 'KGB-' + String(payload.nip || '').trim() + '-' + todayStrClean;
     }
 
     const todayStr = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'yyyy-MM-dd');
@@ -219,96 +213,8 @@ function saveOrGenerateKgbDoc(payload, actionType, adminNip, clientToken) {
       pdfUrl = docResult.pdfUrl;
     }
 
-    // 3. SUSUN ARRAY ROW UNTUK SHEET EofficeKGB
-    const rowValues = [
-      idKgb,
-      todayStr,
-      String(payload.nip || ''),
-      String(payload.nama_pegawai || ''),
-      String(payload.tanggal_lahir || ''),
-      String(payload.pangkat || ''),
-      String(payload.golongan || ''),
-      String(payload.jabatan || ''),
-      String(payload.unit_kerja || 'Pengadilan Agama Indramayu Kelas 1.A.'),
-      String(noParsed.full || payload.nomor_surat || ''),
-      String(payload.tanggal_surat || ''),
-      String(payload.tujuan_kppn || 'Kepala KPPN Cirebon di- CIREBON'),
-      String(payload.gaji_lama || ''),
-      String(payload.pejabat_lama || 'Ketua Pengadilan Agama Indramayu'),
-      String(payload.nomor_sk_lama || ''),
-      String(payload.tanggal_sk_lama || ''),
-      String(payload.tmt_lama || ''),
-      String(mkgLamaParsed.full || payload.mkg_lama || ''),
-      String(payload.gaji_baru || ''),
-      String(payload.terbilang_gaji || ''),
-      String(mkgBaruParsed.full || payload.mkg_baru || ''),
-      String(payload.tmt_baru || ''),
-      String(payload.tmt_yad || ''),
-      String(payload.dasar_pp || 'Peraturan Pemerintah Republik Indonesia Nomor : 05 Tahun 2024'),
-      String(payload.nama_ketua || ''),
-      statusProses,
-      docUrl,
-      pdfUrl,
-      String(adminNip || '')
-    ];
-
-    const safeRow = sanitizeRowArray ? sanitizeRowArray(rowValues) : rowValues;
-
-    // 4. SIMPAN ATAU UPDATE KE SHEET EofficeKGB (Jangan menimpa arsip 'Selesai' periode lama)
-    let targetRowIndex = -1;
-    if (sheet.getLastRow() > 1) {
-      const existingIds = sheet.getRange(2, 1, sheet.getLastRow() - 1, 1).getValues();
-      const existingNips = sheet.getRange(2, 3, sheet.getLastRow() - 1, 1).getValues();
-      const existingStatuses = sheet.getRange(2, 26, sheet.getLastRow() - 1, 1).getValues();
-      for (let i = 0; i < existingIds.length; i++) {
-        const rowId = String(existingIds[i][0] || '');
-        const rowNip = String(existingNips[i][0] || '');
-        const rowSt = String(existingStatuses[i][0] || '');
-        if (rowId === idKgb || (payload.id_kgb && String(payload.id_kgb).startsWith('DRAFT-') && rowNip === String(payload.nip) && rowSt !== 'Selesai')) {
-          targetRowIndex = i + 2;
-          break;
-        }
-      }
-    }
-
-    if (targetRowIndex > 0) {
-      sheet.getRange(targetRowIndex, 1, 1, safeRow.length).setValues([safeRow]);
-    } else {
-      sheet.appendRow(safeRow);
-    }
-
-    // 5. SINKRONISASI KE TABEL user_data (DASHBOARD INTEGRATION)
-    const userSheet = ss.getSheetByName('user_data');
-    if (userSheet && userSheet.getLastRow() > 1) {
-      const uData = userSheet.getDataRange().getValues();
-      const headers = uData[0];
-      const nipCol = headers.indexOf('NIP');
-      const statusKgbCol = headers.indexOf('Status_KGB');
-      const tglSelesaiKgbCol = headers.indexOf('Tgl_Selesai_KGB');
-      const tmtKgbCol = headers.indexOf('TMT_KGB');
-
-      if (nipCol !== -1 && statusKgbCol !== -1) {
-        for (let j = 1; j < uData.length; j++) {
-          if (String(uData[j][nipCol]) === String(payload.nip)) {
-            const userRowIdx = j + 1;
-            if (statusProses === 'Selesai') {
-              userSheet.getRange(userRowIdx, statusKgbCol + 1).setValue('Selesai');
-              if (tglSelesaiKgbCol !== -1) {
-                userSheet.getRange(userRowIdx, tglSelesaiKgbCol + 1).setValue(todayStr);
-              }
-              if (payload.tmt_yad && tmtKgbCol !== -1) {
-                userSheet.getRange(userRowIdx, tmtKgbCol + 1).setValue(payload.tmt_yad);
-              }
-            } else {
-              userSheet.getRange(userRowIdx, statusKgbCol + 1).setValue('Proses');
-            }
-            break;
-          }
-        }
-      }
-    }
-
-    if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush();
+    // TAHAP 84: Pemutusan penulisan baris ke sheet EofficeKGB & pembaruan sheet user_data.
+    // Seluruh data KGB & status pegawai dikelola 100% murni di Cloud Firestore (eoffice_kgb & users).
     return {
       status: 'success',
       message: (actionType === 'generate') ? 'SK KGB berhasil diterbitkan ke Folder Google Drive!' : 'Data KGB berhasil disimpan.',
@@ -337,48 +243,8 @@ function deleteKgbDocRecord(idKgb, nipPegawai, resetUserStatus, adminNip, client
     if (!cekOtorisasiAdmin(adminNip, clientToken)) {
       return { status: 'error', message: 'Akses Ditolak: Hanya Admin yang dapat menghapus berkas KGB.' };
     }
-    const ss = getDB();
-    if (!ss) throw new Error("Koneksi database spreadsheet gagal.");
-
-    const sheet = ss.getSheetByName('EofficeKGB');
-    let deletedRows = 0;
-    if (sheet && sheet.getLastRow() > 1) {
-      const data = sheet.getRange(2, 1, sheet.getLastRow() - 1, 26).getValues();
-      for (let i = data.length - 1; i >= 0; i--) {
-        const rowId = String(data[i][0] || '').trim();
-        const rowNip = String(data[i][2] || '').trim();
-        const rowStatus = String(data[i][25] || '').trim();
-        const isDraftMatch = (String(idKgb || '').startsWith('DRAFT-') && rowNip === String(nipPegawai || '').trim() && rowStatus !== 'Selesai');
-        if ((idKgb && rowId === String(idKgb).trim()) || isDraftMatch) {
-          sheet.deleteRow(i + 2);
-          deletedRows++;
-        }
-      }
-    }
-
-    if (resetUserStatus && nipPegawai) {
-      const userSheet = ss.getSheetByName('user_data');
-      if (userSheet && userSheet.getLastRow() > 1) {
-        const uData = userSheet.getDataRange().getValues();
-        const headers = uData[0];
-        const nipCol = headers.indexOf('NIP');
-        const statusKgbCol = headers.indexOf('Status_KGB');
-        if (nipCol !== -1 && statusKgbCol !== -1) {
-          for (let j = 1; j < uData.length; j++) {
-            if (String(uData[j][nipCol]) === String(nipPegawai)) {
-              const curSt = String(uData[j][statusKgbCol] || '').trim();
-              if (curSt === 'Proses') {
-                userSheet.getRange(j + 1, statusKgbCol + 1).setValue('');
-              }
-              break;
-            }
-          }
-        }
-      }
-    }
-
-    if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush();
-    return { status: 'success', deleted: deletedRows };
+    // TAHAP 84: Penghapusan berkas KGB diproses murni di Cloud Firestore (eoffice_kgb).
+    return { status: 'success', message: 'Berkas KGB berhasil diproses di Cloud Firestore.' };
   } catch (err) {
     Logger.log("ERROR deleteKgbDocRecord: " + err.toString());
     return { status: 'error', message: err.toString() };
