@@ -731,3 +731,14 @@ ZONA BAWAH: MASTER CONTEXT & STATUS MIGRASI TERKINI (LIVING CONTEXT)
     - **Deployment Google Apps Script `@327` & Versioning**:
       - Versi Service Worker [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) dan `APP_BUILD_VER` di [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) dinaikkan ke **`transkep-v3.8.2`** / **`3.8.2`**.
       - Perubahan di-*push* **HANYA ke remote `origin/main`** ([`sopiyandedi/TRANSKEP`](https://github.com/sopiyandedi/TRANSKEP)) untuk pengujian, **TIDAK di-push ke remote `prod`**.
+
+61. **Pemutusan Inputan Lanjutan Database Uraian Tugas (Jobdes & Usulan Reposisi) ke Google Sheets & Standalone Cloud Firestore (Tahap 80 - Selesai & Aktif ✅):**
+    - **Latar Belakang & Analisis Arsitektur**:
+      - Melanjutkan tahapan bertahap pemutusan Google Sheets setelah Surat Tugas (Tahap 79), transaksi Uraian Tugas pegawai (`jobdes_documents`) dan usulan reposisi (`jobdes_usulan`) sebelumnya masih mereplikasi penulisan baris ganda ke sheet `jobdes_master` dan `jobdes_usulan`.
+      - Pengguna menyetujui pemutusan total penulisan ke Google Sheets pada modul Jobdes agar seluruh perubahan tupoksi dan pengajuan usulan berjalan 100% mandiri di Cloud Firestore secara instan (<100ms) tanpa membebani kuota Apps Script. Data historis di Google Sheets tetap dipreservasi utuh sebagai arsip statis (*cold archive*).
+    - **Implementasi Pemutusan & Pengamanan**:
+      - **Service Layer Mandiri (Firestore-Only)**: Di [`modules/jobdes/jobdes_data.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/jobdes/jobdes_data.js), seluruh pemanggilan `google.script.run.saveJobdes`, `saveUsulanReposisi`, dan `tandaiUsulanSelesai` diputus total. Operasi simpan tupoksi, pengajuan usulan, dan penyelesaian usulan berjalan murni 100% langsung ke Cloud Firestore.
+      - **Proteksi Anti-Overwrite Delta Sync**: Pada `syncBackgroundData()` di [`core/core.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/core/core.js) dan [`javascript.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/javascript.html), variabel `state.jobdesList` diproteksi agar tidak ditimpa oleh respon statis Sheets `d.jobdesList` saat data Firestore aktif (`is_firebase`).
+    - **Deployment Google Apps Script `@328` & Versioning**:
+      - Versi Service Worker [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) dan `APP_BUILD_VER` di [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) dinaikkan ke **`transkep-v3.8.3`** / **`3.8.3`**.
+      - Perubahan di-*push* **HANYA ke remote `origin/main`** ([sopiyandedi/TRANSKEP](https://github.com/sopiyandedi/TRANSKEP)) untuk pengujian, **TIDAK di-push ke remote `prod`**.

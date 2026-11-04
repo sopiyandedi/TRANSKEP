@@ -12,63 +12,40 @@ const JobdesDataService = {
    * Sinkronisasi background ke Google Spreadsheet
    */
   async saveJobdes(payload, userNip, token) {
+    // TAHAP 80: Cloud Firestore Mandiri (Inputan ke Sheets Resmi Diputus)
     if (typeof TranskepFirebase !== 'undefined' && TranskepFirebase.isReady()) {
       try {
         const firestoreRes = await TranskepFirebase.saveJobdesToFirestore({
           ...payload,
-          updated_by: userNip || (typeof state !== 'undefined' && state.user ? state.user.nama : 'Admin')
+          updated_by: userNip || (typeof state !== 'undefined' && state.user ? state.user.nama : 'Admin'),
+          is_firebase: true
         });
-
-        // Mirror ke Google Spreadsheet jika tersedia (tanpa memblokir UI)
-        if (typeof google !== 'undefined' && google.script && google.script.run) {
-          const authToken = token || (typeof localStorage !== 'undefined' ? localStorage.getItem('transkep_session_token') : '') || '';
-          google.script.run.saveJobdes(payload, userNip, authToken);
-        }
+        console.log("⚡ [JobdesDataService] Jobdes tersimpan murni di Cloud Firestore:", payload.nip);
         return firestoreRes;
       } catch (err) {
-        console.warn("⚠️ [JobdesDataService] Gagal simpan ke Firestore, fallback ke Apps Script:", err);
+        console.error("❌ [JobdesDataService] Gagal simpan ke Cloud Firestore:", err);
+        throw err;
       }
     }
-
-    const authToken = token || (typeof localStorage !== 'undefined' ? localStorage.getItem('transkep_session_token') : '') || '';
-    return new Promise((resolve, reject) => {
-      if (typeof google === 'undefined' || !google.script || !google.script.run) {
-        return reject(new Error("Koneksi google.script.run tidak tersedia."));
-      }
-      google.script.run
-        .withSuccessHandler((res) => resolve(res))
-        .withFailureHandler((err) => reject(err))
-        .saveJobdes(payload, userNip, authToken);
-    });
+    return Promise.reject(new Error("Koneksi Cloud Firestore tidak aktif."));
   },
 
   /**
    * Menyimpan usulan reposisi / revisi uraian tugas dari pegawai
    */
   async saveUsulan(payload, userNip, token) {
+    // TAHAP 80: Cloud Firestore Mandiri (Inputan ke Sheets Resmi Diputus)
     if (typeof TranskepFirebase !== 'undefined' && TranskepFirebase.isReady()) {
       try {
         const firestoreRes = await TranskepFirebase.saveUsulanJobdesToFirestore(payload);
-        if (typeof google !== 'undefined' && google.script && google.script.run) {
-          const authToken = token || (typeof localStorage !== 'undefined' ? localStorage.getItem('transkep_session_token') : '') || '';
-          google.script.run.saveUsulanReposisi(payload, userNip, authToken);
-        }
+        console.log("⚡ [JobdesDataService] Usulan reposisi tersimpan murni di Cloud Firestore:", firestoreRes.id);
         return firestoreRes;
       } catch (err) {
-        console.warn("⚠️ [JobdesDataService] Gagal simpan usulan ke Firestore, fallback ke Apps Script:", err);
+        console.error("❌ [JobdesDataService] Gagal simpan usulan ke Cloud Firestore:", err);
+        throw err;
       }
     }
-
-    const authToken = token || (typeof localStorage !== 'undefined' ? localStorage.getItem('transkep_session_token') : '') || '';
-    return new Promise((resolve, reject) => {
-      if (typeof google === 'undefined' || !google.script || !google.script.run) {
-        return reject(new Error("Koneksi google.script.run tidak tersedia."));
-      }
-      google.script.run
-        .withSuccessHandler((res) => resolve(res))
-        .withFailureHandler((err) => reject(err))
-        .saveUsulanReposisi(payload, userNip, authToken);
-    });
+    return Promise.reject(new Error("Koneksi Cloud Firestore tidak aktif."));
   },
 
   /**
@@ -91,24 +68,18 @@ const JobdesDataService = {
    * Menandai usulan reposisi telah diproses / selesai
    */
   async tandaiUsulanSelesai(id, userNip, token) {
+    // TAHAP 80: Cloud Firestore Mandiri (Inputan ke Sheets Resmi Diputus)
     if (typeof TranskepFirebase !== 'undefined' && TranskepFirebase.isReady()) {
       try {
-        await TranskepFirebase.tandaiUsulanSelesaiInFirestore(id);
+        const res = await TranskepFirebase.tandaiUsulanSelesaiInFirestore(id);
+        console.log("⚡ [JobdesDataService] Usulan reposisi ditandai selesai murni di Cloud Firestore:", id);
+        return res;
       } catch (e) {
-        console.warn("⚠️ [JobdesDataService] Firestore usulan update error:", e);
+        console.error("❌ [JobdesDataService] Gagal update status usulan di Firestore:", e);
+        throw e;
       }
     }
-
-    const authToken = token || (typeof localStorage !== 'undefined' ? localStorage.getItem('transkep_session_token') : '') || '';
-    return new Promise((resolve, reject) => {
-      if (typeof google === 'undefined' || !google.script || !google.script.run) {
-        return resolve({ status: 'success', message: 'Usulan ditandai selesai.' });
-      }
-      google.script.run
-        .withSuccessHandler((res) => resolve(res))
-        .withFailureHandler((err) => reject(err))
-        .tandaiUsulanSelesai(id, userNip, authToken);
-    });
+    return Promise.reject(new Error("Koneksi Cloud Firestore tidak aktif."));
   },
 
   /**

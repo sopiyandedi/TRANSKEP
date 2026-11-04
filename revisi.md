@@ -4106,3 +4106,67 @@ Pengguna melaporkan bahwa pratinjau (*preview*) dokumen PDF di modal SK dan SOP 
   7. [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) (App build 3.8.2)
   8. [`prd.md`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/prd.md) (Pembaruan Living Context Poin 60)
 - **Status:** `[SELESAI & AKTIF]` ✅
+
+
+---
+
+### TAHAP 80: Pemutusan Inputan Lanjutan Database Uraian Tugas (Jobdes & Usulan Reposisi) ke Google Sheets & Standalone Cloud Firestore (v3.8.3)
+
+#### 1. Latar Belakang & Analisis Kebutuhan
+1. **Latar Belakang:**
+   - Melanjutkan langkah bertahap dari Tahap 79 (pemutusan database Surat Tugas), modul berikutnya dalam antrean migrasi pemutusan Google Sheets adalah **Modul Uraian Tugas (Job Description & Usulan Reposisi)**.
+   - Modul Jobdes mengelola data tupoksi pegawai per jabatan (`jobdes_documents`) serta usulan reposisi tugas antarpegawai (`jobdes_usulan`).
+   - Sifat data Jobdes adalah murni data terstruktur (teks, array tupoksi, status) tanpa ketergantungan unggah berkas fisik ke Google Drive (pencetakan PDF di-generate secara *on-the-fly* via HTML string).
+   - Saat ini, data service layer [`modules/jobdes/jobdes_data.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/jobdes/jobdes_data.js) masih menjalankan *Dual-Storage*:
+     * `saveJobdes`: Menyimpan ke Firestore, lalu memanggil `google.script.run.saveJobdes` ke sheet `jobdes_master`.
+     * `saveUsulan`: Menyimpan ke Firestore, lalu memanggil `google.script.run.saveUsulanReposisi` ke sheet `jobdes_usulan`.
+     * `tandaiUsulanSelesai`: Menandai selesai di Firestore, lalu memanggil `google.script.run.tandaiUsulanSelesai` ke sheet `jobdes_usulan`.
+
+2. **Sasaran Perubahan:**
+   - Memutus seluruh pemanggilan penulisan baris baru ke Google Sheets pada modul Jobdes (`jobdes_master` dan `jobdes_usulan`).
+   - Seluruh transaksi pembaruan Jobdes dan pengajuan usulan reposisi berjalan 100% instan di Cloud Firestore (`<100ms`).
+   - Data historis lama di Google Sheets tetap aman dipreservasi sebagai arsip statis (*cold archive*).
+   - Memproteksi `state.jobdesList` pada `syncBackgroundData()` di [`core/core.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/core/core.js) agar tidak ditimpa oleh data usang Google Sheets.
+
+---
+
+#### 2. Rencana Implementasi Teknis (Implementation Plan)
+
+1. **Pemutusan Panggilan Google Sheets di Service Layer ([`modules/jobdes/jobdes_data.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/jobdes/jobdes_data.js)):**
+   - **`saveJobdes(payload, userNip, token)`**:
+     * Hapus pemanggilan `google.script.run.saveJobdes(...)`.
+     * Simpan 100% murni ke Cloud Firestore via `TranskepFirebase.saveJobdesToFirestore(...)`.
+     * Kembalikan respons sukses instan `<100ms`.
+   - **`saveUsulan(payload, userNip, token)`**:
+     * Hapus pemanggilan `google.script.run.saveUsulanReposisi(...)`.
+     * Simpan 100% murni ke Cloud Firestore via `TranskepFirebase.saveUsulanJobdesToFirestore(...)`.
+     * Kembalikan respons sukses instan `<100ms`.
+   - **`tandaiUsulanSelesai(id, userNip, token)`**:
+     * Hapus pemanggilan `google.script.run.tandaiUsulanSelesai(...)`.
+     * Perbarui status usulan 100% murni di Cloud Firestore via `TranskepFirebase.tandaiUsulanSelesaiInFirestore(id)`.
+     * Kembalikan respons sukses instan `<100ms`.
+
+2. **Penyelarasan pada Template Klasik ([`jobdes/js_jobdes.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/jobdes/js_jobdes.html)):**
+   - Menyelaraskan seluruh interaksi data Jobdes dan usulan reposisi agar identik dengan service layer modular.
+
+3. **Proteksi Anti-Overwrite Delta Sync di [`core/core.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/core/core.js) & [`javascript.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/javascript.html):**
+   - Pada `syncBackgroundData()`, sebelum mengeksekusi `state.jobdesList = d.jobdesList || [];`:
+     * Pasang proteksi: jika `state.jobdesList` sudah berisi data dari Cloud Firestore (`x.is_firebase`), abaikan penimpaan dari respon Sheets `d.jobdesList`. Pertahankan data mutakhir dari Cloud Firestore.
+
+4. **PWA Versioning & Deployment:**
+   - Naikkan versi Service Worker di [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) dan `APP_BUILD_VER` di [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) ke **`transkep-v3.8.3`** / **`3.8.3`**.
+   - Deploy build Google Apps Script Clasp ke versi **`@328`**.
+   - Git commit dan push **HANYA ke `origin/main`** ([`sopiyandedi/TRANSKEP`](https://github.com/sopiyandedi/TRANSKEP)), **TIDAK ke `prod`**.
+
+---
+
+#### 3. Estimasi Dampak & File yang Dimodifikasi
+- **File Dimodifikasi:**
+  1. [`modules/jobdes/jobdes_data.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/jobdes/jobdes_data.js) (Pemutusan simpan/usulan/selesai Sheets & Firestore standalone)
+  2. [`jobdes/js_jobdes.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/jobdes/js_jobdes.html) (Penyelarasan template GAS)
+  3. [`core/core.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/core/core.js) (Proteksi anti-overwrite state Jobdes dari Sheets)
+  4. [`javascript.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/javascript.html) (Sinkronisasi runtime GAS)
+  5. [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) (Cache PWA v3.8.3)
+  6. [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) (App build 3.8.3)
+  7. [`prd.md`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/prd.md) (Pembaruan Living Context Poin 61)
+- **Status:** `[SELESAI & AKTIF]` ✅

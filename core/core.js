@@ -1811,7 +1811,12 @@ function syncBackgroundData(forceRefresh) {
       state.ikLogs = d.ikLogs || [];
       state.ipLogs = d.ipLogs || [];
       state.wfhLogs = d.wfhLogs || [];
-      state.jobdesList = d.jobdesList || [];
+      // TAHAP 80: Proteksi anti-overwrite state.jobdesList dari Sheets jika data Firestore sudah aktif
+      if (!state.jobdesList || state.jobdesList.length === 0 || !state.jobdesList.some(x => x && x.is_firebase)) {
+        state.jobdesList = d.jobdesList || [];
+      } else {
+        console.log("🔥 [Sync] state.jobdesList dipertahankan dari Cloud Firestore.");
+      }
       state.skList = d.skList || [];
       state.skAckList = d.skAckList || [];
       state.kinerjaList = d.kinerjaList || [];
