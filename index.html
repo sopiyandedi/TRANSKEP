@@ -128,8 +128,9 @@
 
   <!-- TRANSKEP: Auto-Bust PWA Cache & Stale Service Worker Guard -->
   <script>
+    window.APP_BUILD_VER = '3.8.10';
     (async function () {
-      const CURRENT_APP_BUILD = 'transkep-v3.8.0';
+      const CURRENT_APP_BUILD = 'transkep-v' + window.APP_BUILD_VER;
       if (localStorage.getItem('transkep_active_build') !== CURRENT_APP_BUILD) {
         localStorage.setItem('transkep_active_build', CURRENT_APP_BUILD);
         try {
@@ -513,10 +514,10 @@
       ];
 
       try {
-        const APP_BUILD_VER = '3.8.9';
+        const APP_BUILD_VER = window.APP_BUILD_VER || '3.8.10';
         console.log('🔄 [TRANSKEP Loader] Memuat komponen tampilan views/ secara paralel...');
         await Promise.all(VIEW_SLOTS.map(async item => {
-          const res = await fetch(item.file + '?v=' + APP_BUILD_VER);
+          const res = await fetch(item.file + '?v=' + APP_BUILD_VER, { cache: 'no-cache' });
           if (!res.ok) throw new Error(`HTTP ${res.status} saat memuat ${item.file}`);
           const html = await res.text();
           const el = document.getElementById(item.slot);
@@ -527,7 +528,7 @@
         const cetakSlot = document.getElementById('slot-templates-cetak');
         if (cetakSlot) {
           const cetakHtmls = await Promise.all(CETAK_TEMPLATES.map(async file => {
-            const res = await fetch(file + '?v=' + APP_BUILD_VER);
+            const res = await fetch(file + '?v=' + APP_BUILD_VER, { cache: 'no-cache' });
             if (!res.ok) throw new Error(`HTTP ${res.status} saat memuat ${file}`);
             return await res.text();
           }));
