@@ -1843,8 +1843,31 @@ function syncBackgroundData(forceRefresh) {
         }
       }
       state.kinerjaList = d.kinerjaList || [];
-      state.sopList = d.sopList || [];
-      state.sopAckList = d.sopAckList || [];
+      // TAHAP 82: Proteksi anti-overwrite state.sopList dari Sheets jika data Firestore sudah aktif
+      if (!state.sopList || state.sopList.length === 0 || !state.sopList.some(x => x && x.is_firebase)) {
+        state.sopList = d.sopList || [];
+        state.sopAckList = d.sopAckList || [];
+      } else {
+        console.log("🔥 [Sync] state.sopList dipertahankan dari Cloud Firestore.");
+        if (state.sopList && Array.isArray(state.sopList)) {
+          const extractedAck = [];
+          state.sopList.forEach(sop => {
+            if (sop.acknowledgments && Array.isArray(sop.acknowledgments)) {
+              sop.acknowledgments.forEach(ack => {
+                extractedAck.push({
+                  id: 'ACK-' + sop.id + '-' + ack.nip,
+                  sop_id: sop.id,
+                  nip: ack.nip,
+                  tanggal_baca: ack.tanggal_baca || ''
+                });
+              });
+            }
+          });
+          if (extractedAck.length > 0) {
+            state.sopAckList = extractedAck;
+          }
+        }
+      }
       state.masterKinerjaList = d.masterKinerjaList || [];
       state.isBgSyncDone = true;
 

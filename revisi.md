@@ -4238,3 +4238,69 @@ Pengguna melaporkan bahwa pratinjau (*preview*) dokumen PDF di modal SK dan SOP 
   7. [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) (App build 3.8.4)
   8. [`prd.md`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/prd.md) (Pembaruan Living Context Poin 62)
 - **Status:** `[SELESAI & AKTIF]` ✅
+
+
+---
+
+### TAHAP 82: Pemutusan Inputan Lanjutan Database Standar Operasional Prosedur (SOP) ke Google Sheets & Standalone Cloud Firestore (v3.8.5)
+
+#### 1. Latar Belakang & Analisis Kebutuhan
+1. **Latar Belakang:**
+   - Melanjutkan tahapan bertahap pemutusan Google Sheets setelah Surat Tugas (Tahap 79), Uraian Tugas/Jobdes (Tahap 80), dan Surat Keputusan/SK (Tahap 81), modul berikutnya dalam urutan migrasi adalah **Modul Standar Operasional Prosedur (SOP)**.
+   - Modul SOP mengelola arsip prosedur operasional kedinasan (`sop_documents`), pemetaan tim pelaksana per SOP, riwayat tanggal pembuatan/revisi/efektif, serta pencatatan kepatuhan tanda telah membaca (*acknowledgment*) oleh pegawai terkait.
+   - Saat ini, data service layer [`modules/sop/sop_data.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/sop/sop_data.js) dan backend [`sop/sop.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sop/sop.js) masih menjalankan *Dual-Storage*:
+     * Saat SOP disimpan via modal form, sistem memanggil `saveSopData` via Apps Script yang mengunggah PDF ke Google Drive DAN menulis/memperbarui baris ke sheet `sop_data`. Setelah itu, barulah sistem menyimpan ke Cloud Firestore.
+     * Saat SOP dihapus, sistem menghapus dari Firestore, lalu memanggil Apps Script `deleteSopData` yang menghapus baris dari sheet `sop_data` dan `sop_ack`.
+     * Saat pegawai mengonfirmasi tanda baca SOP, sistem mencatat ke Firestore lalu memanggil Apps Script `acknowledgeSop` yang menulis baris ke sheet `sop_ack`.
+
+2. **Sasaran Perubahan:**
+   - **Pemutusan Penulisan Baris Sheets (`sop_data` & `sop_ack`)**: Pendaftaran SOP baru, pembaruan data SOP, penghapusan SOP, dan konfirmasi tanda baca pegawai 100% murni dikelola di Cloud Firestore.
+   - **Preservasi Google Drive Upload**: Google Apps Script tetap melayani tugas unggah berkas fisik PDF ke folder Google Drive (`TRANSKEP SOP/<Tahun>/<PJ>`) dan mengembalikan tautan `link_drive`, namun dibebaskan dari kewajiban manipulasi sheet `sop_data`.
+   - **Pencatatan Acknowledgment Terpadu di Firestore**: Konfirmasi baca pegawai dicatat langsung ke array `acknowledgments` pada dokumen koleksi `sop_documents` via `TranskepFirebase.acknowledgeSopInFirestore`, tanpa RPC ke sheet `sop_ack`.
+   - **Inisialisasi Realtime Sync Otomatis**: Menambahkan `initRealtimeSync()` pada `SopDataService` sehingga daftar SOP dan tanda baca langsung tersinkronisasi di latar belakang sejak startup aplikasi (Zero UI / tanpa tombol manual).
+   - **Proteksi Anti-Overwrite Delta Sync**: Mengunci `state.sopList` dan `state.sopAckList` pada `syncBackgroundData()` agar tidak tertimpa oleh respon Sheets statis `d.sopList` saat data Firestore aktif (`is_firebase: true`).
+
+---
+
+#### 2. Rencana Implementasi Teknis (Implementation Plan)
+
+1. **Pembaruan Service Layer Frontend ([`modules/sop/sop_data.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/sop/sop_data.js)):**
+   - **`saveSop(payload, userNip, token)`**:
+     * Jika ada berkas PDF baru (`payload.fileBase64`), panggil GAS khusus untuk mengunggah ke Google Drive dan mendapatkan `link_drive`.
+     * Simpan dokumen lengkap 100% murni ke Cloud Firestore via `TranskepFirebase.saveSopToFirestore(...)`.
+     * Hapus kewajiban pemanggilan penulisan baris ke sheet `sop_data`.
+   - **`deleteSop(id, userNip, token)`**:
+     * Hapus 100% murni dari Cloud Firestore via `TranskepFirebase.deleteSopFromFirestore(id)`.
+     * Hapus pemanggilan penghapusan baris ke sheet `sop_data` dan `sop_ack`.
+   - **`acknowledgeSop(sopId, nip, token)`**:
+     * Catat tanda baca 100% murni ke Cloud Firestore via `TranskepFirebase.acknowledgeSopInFirestore(sopId, nip)`.
+     * Hapus pemanggilan penulisan baris ke sheet `sop_ack`.
+   - **`initRealtimeSync()`**:
+     * Pasang listener Firestore realtime otomatis yang memetakan dokumen Firestore ke `state.sopList` dan mengekstrak tanda baca ke `state.sopAckList`, serta memperbarui badge notifikasi sidebar.
+
+2. **Pembersihan Backend Google Apps Script ([`sop/sop.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sop/sop.js)):**
+   - Di fungsi `saveSopData`: Pertahankan pembuatan folder dan unggah berkas fisik PDF ke Google Drive (baris 57–101), namun hapus penulisan baris ke sheet `sop_data` (baris 104–145). Cukup kembalikan `{ status: 'success', id: payload.id || ('SOP-' + Date.now()), link_drive: payload.link_drive, message: 'Berkas SOP berhasil diunggah ke Google Drive.' }`.
+   - Di fungsi `deleteSopData`: Cukup kembalikan `{ status: 'success', message: 'Dokumen SOP berhasil dihapus dari Cloud Firestore.' }` tanpa memanipulasi sheet `sop_data` dan `sop_ack`.
+   - Di fungsi `acknowledgeSop`: Cukup kembalikan `{ status: 'success', message: 'Tanda baca SOP dicatat di Cloud Firestore.' }` tanpa memanipulasi sheet `sop_ack`.
+
+3. **Proteksi Anti-Overwrite Delta Sync di [`core/core.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/core/core.js) & [`javascript.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/javascript.html):**
+   - Pada `syncBackgroundData()`, sebelum mengeksekusi `state.sopList = d.sopList || [];`:
+     * Pasang proteksi: jika `state.sopList` sudah terisi data Cloud Firestore (`x.is_firebase`), abaikan penimpaan dari respon Sheets `d.sopList`.
+     * Ekstrak seluruh `acknowledgments` dari dokumen Firestore ke `state.sopAckList` agar status konfirmasi baca pegawai tetap presisi.
+
+4. **PWA Versioning & Deployment:**
+   - Naikkan versi Service Worker di [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) dan `APP_BUILD_VER` di [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) ke **`transkep-v3.8.5`** / **`3.8.5`**.
+   - Deploy build Google Apps Script Clasp ke versi **`@330`**.
+   - Git commit dan push **HANYA ke `origin/main`** ([`sopiyandedi/TRANSKEP`](https://github.com/sopiyandedi/TRANSKEP)), **TIDAK ke `prod`**.
+
+---
+
+#### 3. Estimasi Dampak & File yang Dimodifikasi
+- **File Dimodifikasi:**
+  1. [`modules/sop/sop_data.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/sop/sop_data.js) (Pemutusan simpan/hapus/ack Sheets, integrasi Firestore standalone & initRealtimeSync)
+  2. [`sop/sop.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sop/sop.js) (Pembersihan operasi penulisan sheet `sop_data` & `sop_ack` pada backend GAS)
+  3. [`core/core.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/core/core.js) & [`javascript.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/javascript.html) (Proteksi anti-overwrite state SOP dari Sheets)
+  4. [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) (Cache PWA v3.8.5)
+  5. [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) (App build 3.8.5)
+  6. [`prd.md`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/prd.md) (Pembaruan Living Context Poin 63)
+- **Status:** `[SELESAI & AKTIF]` ✅

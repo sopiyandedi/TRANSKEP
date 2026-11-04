@@ -100,49 +100,14 @@ function saveSopData(payload, userNip, clientToken) {
        }
     }
     // ========================================================
-
-    const ss = getDB();
-    autoInitSopSheets(ss);
-    
-    const sheet = ss.getSheetByName('sop_data');
-    if(!sheet) throw new Error("Gagal menginisialisasi tabel sop_data.");
-
-    const now = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'dd/MM/yyyy HH:mm:ss');
-    
-    const tglPembuatan = payload.tanggal_pembuatan; 
-    const tglRevisi = payload.tanggal_revisi || '-'; 
-    const tglEfektif = payload.tanggal_efektif; 
-    const pelaksanaStr = JSON.stringify(payload.pelaksana || []);
-
-    if (payload.id) {
-      const data = sheet.getDataRange().getValues();
-      let rowIndex = -1;
-      for (let i = 1; i < data.length; i++) {
-        if (String(data[i][0]) === String(payload.id)) {
-          rowIndex = i + 1;
-          break;
-        }
-      }
-      
-      if (rowIndex !== -1) {
-        sheet.getRange(rowIndex, 2, 1, 8).setValues([[
-          payload.judul_sop, payload.kategori_pj, payload.nomor_sop,
-          tglPembuatan, tglRevisi, tglEfektif, payload.link_drive, pelaksanaStr
-        ]]);
-        if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush();
-        return { status: 'success', id: payload.id, link_drive: payload.link_drive, message: 'Dokumen SOP berhasil diperbarui.' };
-      } else {
-        throw new Error("SOP tidak ditemukan di database.");
-      }
-    } else {
-      const newId = 'SOP-' + new Date().getTime();
-      sheet.appendRow([
-        newId, payload.judul_sop, payload.kategori_pj, payload.nomor_sop,
-        tglPembuatan, tglRevisi, tglEfektif, payload.link_drive, pelaksanaStr, now
-      ]);
-      if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush();
-      return { status: 'success', id: newId, link_drive: payload.link_drive, message: 'Dokumen SOP baru berhasil ditambahkan.' };
-    }
+    // TAHAP 82: Pemutusan penulisan baris ke sheet sop_data.
+    // Seluruh data dokumen SOP tersimpan murni di Cloud Firestore (sop_documents).
+    return { 
+      status: 'success', 
+      id: payload.id || ('SOP-' + new Date().getTime()), 
+      link_drive: payload.link_drive || '', 
+      message: 'Berkas SOP berhasil diproses dan diunggah ke Google Drive.' 
+    };
   } catch(e) {
     return { status: 'error', message: e.toString() };
   }
@@ -152,30 +117,8 @@ function deleteSopData(id, userNip, clientToken) {
   try {
     if (!cekOtorisasi(userNip, clientToken)) return { status: 'error', message: 'Akses Ditolak: Sesi tidak valid.' };
 
-    const ss = getDB();
-    const sheet = ss.getSheetByName('sop_data');
-    if(!sheet) throw new Error("Tabel sop_data belum siap.");
-
-    const data = sheet.getDataRange().getValues();
-    for (let i = 1; i < data.length; i++) {
-      if (String(data[i][0]) === String(id)) {
-        sheet.deleteRow(i + 1);
-        
-        const ackSheet = ss.getSheetByName('sop_ack');
-        if(ackSheet) {
-           const ackData = ackSheet.getDataRange().getValues();
-           for (let j = ackData.length - 1; j >= 1; j--) {
-              if (String(ackData[j][1]) === String(id)) {
-                 ackSheet.deleteRow(j + 1);
-              }
-           }
-        }
-        
-        if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush();
-        return { status: 'success', message: 'Dokumen SOP berhasil dihapus.' };
-      }
-    }
-    throw new Error("SOP tidak ditemukan.");
+    // TAHAP 82: Penghapusan SOP murni dikelola di Cloud Firestore (sop_documents).
+    return { status: 'success', message: 'Dokumen SOP berhasil dihapus dari Cloud Firestore.' };
   } catch(e) {
     return { status: 'error', message: e.toString() };
   }
@@ -185,25 +128,8 @@ function acknowledgeSop(sopId, nip, clientToken) {
   try {
     if (!cekOtorisasi(nip, clientToken)) return { status: 'error', message: 'Akses Ditolak: Sesi tidak valid.' };
 
-    const ss = getDB();
-    autoInitSopSheets(ss);
-    
-    const sheet = ss.getSheetByName('sop_ack');
-    if(!sheet) throw new Error("Tabel sop_ack belum siap.");
-
-    const data = sheet.getDataRange().getDisplayValues();
-    for(let i=1; i<data.length; i++) {
-        if(String(data[i][1]) === String(sopId) && String(data[i][2]) === String(nip)) {
-            return { status: 'success', message: 'Sudah ditandai sebelumnya.' };
-        }
-    }
-
-    const newId = 'ACK-' + new Date().getTime();
-    const now = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'dd/MM/yyyy HH:mm:ss');
-
-    sheet.appendRow([newId, sopId, nip, now]);
-    if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush();
-    return { status: 'success', message: 'Dokumen SOP telah ditandai sebagai dibaca.' };
+    // TAHAP 82: Acknowledgment SOP murni dikelola di Cloud Firestore via arrayUnion.
+    return { status: 'success', message: 'Dokumen SOP telah ditandai sebagai dibaca di Cloud Firestore.' };
   } catch(e) {
     return { status: 'error', message: e.toString() };
   }

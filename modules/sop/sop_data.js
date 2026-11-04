@@ -1,11 +1,13 @@
 // ==========================================
 // FILE: sop_data.js (TRANSKEP Modular)
 // DESKRIPSI: Data Service Layer khusus Modul Standar Operasional Prosedur (SOP)
-// FITUR: PDF Validator & Reader, RPC Save/Delete/Acknowledge/Drive URL
-// ENGINE: TRANSKEP Core v1.0.0 
+// FITUR: PDF Validator & Reader, Cloud Firestore Standalone & Drive Auto-Upload
+// ENGINE: TRANSKEP Core v1.0.0 (Tahap 82)
 // ==========================================
 
 const SopDataService = {
+  _hasSubscribed: false,
+
   /**
    * Validasi dan Konversi File PDF lokal ke Base64 murni (Promise)
    * @param {File} file - Berkas file dari input/drop
@@ -55,121 +57,149 @@ const SopDataService = {
   },
 
   /**
-   * Menyimpan data SOP baru atau pembaruan SOP ke spreadsheet & Google Drive
+   * TAHAP 82: Menyimpan data SOP ke Cloud Firestore 100% mandiri
+   * Mengunggah berkas PDF fisik ke Google Drive via GAS hanya jika ada file baru
    * @param {Object} payload - Data form SOP, pelaksana, dan fileBase64
    * @param {string} userNip - NIP pembuat/editor
    * @param {string} token - Token sesi aktif
-   * @returns {Promise<Object>} Respon server
-   */
-  /**
-   * Menyimpan data SOP baru atau pembaruan SOP ke Cloud Firestore & spreadsheet
-   * Prioritas: Simpan instan ke Cloud Firestore (koleksi sop_documents)
-   * Berkas PDF baru diunggah ke Google Drive via Apps Script
+   * @returns {Promise<Object>} Respon status
    */
   async saveSop(payload, userNip, token) {
     const authToken = token || (typeof localStorage !== 'undefined' ? localStorage.getItem('transkep_session_token') : '') || '';
 
-    let gasRes = null;
-    // Jika ada file upload baru atau Apps Script tersedia, proses upload Drive & spreadsheet
-    if (typeof google !== 'undefined' && google.script && google.script.run) {
-      gasRes = await new Promise((resolve, reject) => {
-        google.script.run
-          .withSuccessHandler((res) => resolve(res))
-          .withFailureHandler((err) => reject(err))
-          .saveSopData(payload, userNip, authToken);
-      });
+    let driveUrl = payload.link_drive || '-';
 
-      if (gasRes && gasRes.status !== 'success') {
-        return gasRes;
-      }
-    }
-
-    // Simpan dokumen ke Cloud Firestore
-    if (typeof TranskepFirebase !== 'undefined' && TranskepFirebase.isReady()) {
+    // 1. Jika ada berkas PDF baru, unggah ke Google Drive via GAS
+    if (payload.fileBase64 && typeof google !== 'undefined' && google.script && google.script.run) {
       try {
-        const docId = (gasRes && gasRes.id) ? gasRes.id : (payload.id || ('SOP-' + Date.now()));
-        const driveUrl = (gasRes && gasRes.link_drive) ? gasRes.link_drive : (payload.link_drive || '-');
+        const gasRes = await new Promise((resolve, reject) => {
+          google.script.run
+            .withSuccessHandler((res) => resolve(res))
+            .withFailureHandler((err) => reject(err))
+            .saveSopData({
+              judul_sop: payload.judul_sop,
+              nomor_sop: payload.nomor_sop,
+              kategori_pj: payload.kategori_pj,
+              tanggal_pembuatan: payload.tanggal_pembuatan,
+              tanggal_revisi: payload.tanggal_revisi,
+              tanggal_efektif: payload.tanggal_efektif,
+              fileBase64: payload.fileBase64,
+              link_drive: payload.link_drive || ''
+            }, userNip, authToken);
+        });
 
-        const firestorePayload = {
-          ...payload,
-          id: docId,
-          link_drive: driveUrl
-        };
-        // Hapus base64 dari payload dokumen Firestore agar hemat kuota & ringan
-        delete firestorePayload.fileBase64;
-        delete firestorePayload.fileName;
-
-        const fRes = await TranskepFirebase.saveSopToFirestore(firestorePayload);
-        return gasRes || fRes;
-      } catch (err) {
-        console.warn("⚠️ [SopDataService] Gagal simpan ke Firestore, fallback:", err);
-        if (gasRes) return gasRes;
+        if (gasRes && gasRes.status === 'success' && gasRes.link_drive) {
+          driveUrl = gasRes.link_drive;
+          payload.link_drive = driveUrl;
+        }
+      } catch (uploadErr) {
+        console.warn("⚠️ [SopDataService] Gagal upload Drive via GAS:", uploadErr);
       }
     }
 
-    return gasRes || { status: 'success', message: 'Dokumen SOP berhasil disimpan.' };
+    // 2. Simpan dokumen lengkap 100% murni ke Cloud Firestore (sop_documents)
+    if (typeof TranskepFirebase !== 'undefined' && TranskepFirebase.isReady()) {
+      const docId = payload.id || ('SOP-' + Date.now());
+      const firestorePayload = {
+        ...payload,
+        id: docId,
+        link_drive: driveUrl,
+        is_firebase: true
+      };
+      delete firestorePayload.fileBase64;
+      delete firestorePayload.fileName;
+
+      await TranskepFirebase.saveSopToFirestore(firestorePayload);
+      return { status: 'success', id: docId, link_drive: driveUrl, message: 'Dokumen SOP berhasil disimpan ke Cloud Firestore.' };
+    }
+
+    return { status: 'success', message: 'Dokumen SOP berhasil disimpan.' };
   },
 
   /**
-   * Menghapus arsip SOP dan riwayat tanda baca dari pegawai
-   * Menghapus dari Firestore dan Spreadsheet
+   * TAHAP 82: Menghapus arsip SOP 100% murni dari Cloud Firestore
+   * @param {string} id - ID SOP
+   * @param {string} userNip - NIP admin penghapus
+   * @param {string} token - Token sesi aktif
+   * @returns {Promise<Object>} Respon status
    */
   async deleteSop(id, userNip, token) {
-    // 1. Hapus dari Cloud Firestore
     if (typeof TranskepFirebase !== 'undefined' && TranskepFirebase.isReady()) {
-      try {
-        await TranskepFirebase.deleteSopFromFirestore(id);
-      } catch (e) {
-        console.warn("⚠️ [SopDataService] Gagal hapus dari Firestore:", e);
-      }
+      await TranskepFirebase.deleteSopFromFirestore(id);
+      return { status: 'success', message: 'Dokumen SOP berhasil dihapus dari Cloud Firestore.' };
     }
-
-    // 2. Sinkronkan hapus di Google Spreadsheet via Apps Script
-    const authToken = token || (typeof localStorage !== 'undefined' ? localStorage.getItem('transkep_session_token') : '') || '';
-    if (typeof google !== 'undefined' && google.script && google.script.run) {
-      return new Promise((resolve, reject) => {
-        google.script.run
-          .withSuccessHandler((res) => resolve(res))
-          .withFailureHandler((err) => reject(err))
-          .deleteSopData(id, userNip, authToken);
-      });
-    }
-
-    return { status: 'success', message: 'Dokumen SOP berhasil dihapus dari Cloud Firestore.' };
+    return { status: 'success', message: 'Dokumen SOP dihapus.' };
   },
 
   /**
-   * Konfirmasi / Tanda Telah Membaca SOP oleh Pegawai Terlibat
-   * Menyimpan ke Cloud Firestore secara instan dan mirror ke spreadsheet
+   * TAHAP 82: Konfirmasi / Tanda Telah Membaca SOP oleh Pegawai Terlibat via Cloud Firestore
+   * @param {string} sopId - ID SOP
+   * @param {string} nip - NIP pegawai yang membaca
+   * @param {string} token - Token sesi aktif
+   * @returns {Promise<Object>} Respon status
    */
   async acknowledgeSop(sopId, nip, token) {
-    // 1. Simpan Acknowledgment instan ke Cloud Firestore
     if (typeof TranskepFirebase !== 'undefined' && TranskepFirebase.isReady()) {
-      try {
-        await TranskepFirebase.acknowledgeSopInFirestore(sopId, nip);
-      } catch (e) {
-        console.warn("⚠️ [SopDataService] Gagal catat acknowledgment di Firestore:", e);
-      }
+      return await TranskepFirebase.acknowledgeSopInFirestore(sopId, nip);
     }
+    return { status: 'success', message: 'Tanda telah membaca SOP berhasil dicatat di Cloud Firestore.' };
+  },
 
-    // 2. Mirror ke Google Spreadsheet
-    const authToken = token || (typeof localStorage !== 'undefined' ? localStorage.getItem('transkep_session_token') : '') || '';
-    if (typeof google !== 'undefined' && google.script && google.script.run) {
-      return new Promise((resolve, reject) => {
-        google.script.run
-          .withSuccessHandler((res) => resolve(res))
-          .withFailureHandler((err) => reject(err))
-          .acknowledgeSop(sopId, nip, authToken);
+  /**
+   * TAHAP 82: Inisialisasi Real-time Synchronization Firestore untuk SOP & Acknowledgment
+   */
+  initRealtimeSync() {
+    if (this._hasSubscribed) return;
+    if (typeof TranskepFirebase !== 'undefined' && TranskepFirebase.isReady && TranskepFirebase.isReady()) {
+      this._hasSubscribed = true;
+      console.log("🔥 [TRANSKEP SOP] Menghubungkan listener realtime Firestore SOP...");
+
+      TranskepFirebase.subscribeFirestoreSops((list) => {
+        if (!Array.isArray(list)) return;
+
+        const currentList = (typeof state !== 'undefined' && state.sopList) || (window.vueState && window.vueState.sopList) || [];
+        const fIds = new Set(list.map(x => String(x.id)));
+        const unmigratedLegacy = currentList.filter(item => item && item.id && !item.is_firebase && !fIds.has(String(item.id)));
+        const merged = [...list.map(f => ({ ...f, is_firebase: true })), ...unmigratedLegacy];
+
+        if (typeof state !== 'undefined') state.sopList = merged;
+        if (window.vueState) window.vueState.sopList = merged;
+
+        // Ekstrak acknowledgments terpadu dari dokumen Firestore
+        const currentAckList = [...((typeof state !== 'undefined' && state.sopAckList) || (window.vueState && window.vueState.sopAckList) || [])];
+        merged.forEach(fSop => {
+          if (fSop.acknowledgments && Array.isArray(fSop.acknowledgments)) {
+            fSop.acknowledgments.forEach(ack => {
+              if (!currentAckList.some(a => String(a.sop_id) === String(fSop.id) && String(a.nip) === String(ack.nip))) {
+                currentAckList.push({
+                  id: 'ACK-' + fSop.id + '-' + ack.nip,
+                  sop_id: fSop.id,
+                  nip: ack.nip,
+                  tanggal_baca: ack.tanggal_baca || ''
+                });
+              }
+            });
+          }
+        });
+
+        if (typeof state !== 'undefined') state.sopAckList = currentAckList;
+        if (window.vueState) window.vueState.sopAckList = currentAckList;
+
+        if (typeof updateSidebarBadges === 'function') updateSidebarBadges();
+        console.log(`🔥 [TRANSKEP SOP] Realtime Sync Aktif: ${merged.length} SOP tersinkron.`);
       });
     }
-
-    return { status: 'success', message: 'Tanda telah membaca SOP berhasil dicatat di Cloud Firestore.' };
   }
 };
 
-// Ekspos ke global window
+// Ekspos ke global window & Auto-init Realtime Sync
 if (typeof window !== 'undefined') {
   window.SopDataService = SopDataService;
+  setTimeout(() => {
+    if (typeof SopDataService.initRealtimeSync === 'function') {
+      SopDataService.initRealtimeSync();
+    }
+  }, 1000);
 }
 
 if (typeof module !== 'undefined' && module.exports) {
