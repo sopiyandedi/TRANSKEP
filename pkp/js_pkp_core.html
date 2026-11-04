@@ -238,7 +238,11 @@ function switchTabLapis1PKP(tabName) {
 function hapusDokumenPK(idPKP) {
     const token = localStorage.getItem('transkep_session_token');
     showCustomConfirm("Hapus Dokumen PK", "Anda yakin ingin menghapus Permanen dokumen ini?", function() {
-        if (typeof google !== 'undefined' && google.script) { google.script.run.aksiDokumenPKP(idPKP, "Hapus", state.user.nip, token); }
+        if (typeof PkpDataService !== 'undefined') {
+            PkpDataService.aksiDokumenPKP(idPKP, "Hapus", state.user.nip, token).catch(e => console.warn(e));
+        } else if (typeof TranskepFirebase !== 'undefined' && TranskepFirebase.isReady()) {
+            TranskepFirebase.deletePkpFromFirestore(idPKP).catch(e => console.warn(e));
+        }
         state.pkpDokumen = state.pkpDokumen.filter(function(item) { return String(item.id_pkp) !== String(idPKP); });
         if (window.vueState) window.vueState.pkpDokumen = state.pkpDokumen;
         if (window.vmPkpApp) window.vmPkpApp.syncData(state.pkpDokumen, state.pckDokumen);
@@ -250,7 +254,11 @@ function hapusDokumenPK(idPKP) {
 function hapusDokumenPCK(idPCK) {
     const token = localStorage.getItem('transkep_session_token');
     showCustomConfirm("Hapus Laporan PCK", "Anda yakin ingin menghapus Laporan bulan ini?", function() {
-        if (typeof google !== 'undefined' && google.script) { google.script.run.aksiDokumenPCK(idPCK, "Hapus", state.user.nip, token); }
+        if (typeof PkpDataService !== 'undefined') {
+            PkpDataService.aksiDokumenPCK(idPCK, "Hapus", state.user.nip, token).catch(e => console.warn(e));
+        } else if (typeof TranskepFirebase !== 'undefined' && TranskepFirebase.isReady()) {
+            TranskepFirebase.deletePckFromFirestore(idPCK).catch(e => console.warn(e));
+        }
         state.pckDokumen = state.pckDokumen.filter(function(item) { return String(item.id_pck) !== String(idPCK); });
         if (window.vueState) window.vueState.pckDokumen = state.pckDokumen;
         if (window.vmPkpApp) window.vmPkpApp.syncData(state.pkpDokumen, state.pckDokumen);
@@ -262,7 +270,9 @@ function hapusDokumenPCK(idPCK) {
 function kirimDokumenPK(idPKP) {
     const token = localStorage.getItem('transkep_session_token');
     showCustomConfirm("Kirim Dokumen PK", "Kirim ke Atasan Penilai? Setelah dikirim, Anda tidak bisa mengedit dokumen ini lagi.", function() {
-        if (typeof google !== 'undefined' && google.script) { google.script.run.aksiDokumenPKP(idPKP, "Kirim", state.user.nip, token); }
+        if (typeof PkpDataService !== 'undefined') {
+            PkpDataService.aksiDokumenPKP(idPKP, "Kirim", state.user.nip, token).catch(e => console.warn(e));
+        }
         for(var i=0; i<state.pkpDokumen.length; i++) {
             if(String(state.pkpDokumen[i].id_pkp) === String(idPKP)) state.pkpDokumen[i].status = "Menunggu Penilai";
         }
@@ -276,7 +286,9 @@ function kirimDokumenPK(idPKP) {
 function kirimDokumenPCK(idPCK) {
     const token = localStorage.getItem('transkep_session_token');
     showCustomConfirm("Kirim Laporan PCK", "Kirim laporan ini ke Atasan? Data akan terkunci.", function() {
-        if (typeof google !== 'undefined' && google.script) { google.script.run.aksiDokumenPCK(idPCK, "Kirim", state.user.nip, token); }
+        if (typeof PkpDataService !== 'undefined') {
+            PkpDataService.aksiDokumenPCK(idPCK, "Kirim", state.user.nip, token).catch(e => console.warn(e));
+        }
         for(var i=0; i<state.pckDokumen.length; i++) {
             if(String(state.pckDokumen[i].id_pck) === String(idPCK)) state.pckDokumen[i].status = "Menunggu Penilai";
         }

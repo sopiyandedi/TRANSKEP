@@ -97,15 +97,7 @@ const PkpDataService = {
           }, { merge: true });
         }
 
-        // Mirror ke Google Apps Script (Cold Backup)
-        if (typeof google !== 'undefined' && google.script && google.script.run) {
-          try {
-            google.script.run
-              .withSuccessHandler((r) => console.log(`✅ [PKP] Mirror aksi ${cleanAksi} berhasil:`, r))
-              .withFailureHandler((e) => console.warn(`⚠️ [PKP] Mirror aksi ${cleanAksi} gagal:`, e))
-              .aksiDokumenPKP(cleanId, cleanAksi, userNip, authToken);
-          } catch(e) {}
-        }
+        // TAHAP 83: Penulisan ke Google Sheets diputus total. Data murni tersimpan di Cloud Firestore.
 
         return { success: true, message: `Aksi ${cleanAksi} dokumen PK berhasil diproses di Cloud Firestore.` };
       } catch (err) {
@@ -162,15 +154,7 @@ const PkpDataService = {
           }, { merge: true });
         }
 
-        // Mirror ke Google Apps Script (Cold Backup)
-        if (typeof google !== 'undefined' && google.script && google.script.run) {
-          try {
-            google.script.run
-              .withSuccessHandler((r) => console.log(`✅ [PCK] Mirror aksi ${cleanAksi} berhasil:`, r))
-              .withFailureHandler((e) => console.warn(`⚠️ [PCK] Mirror aksi ${cleanAksi} gagal:`, e))
-              .aksiDokumenPCK(cleanId, cleanAksi, userNip, authToken);
-          } catch(e) {}
-        }
+        // TAHAP 83: Penulisan ke Google Sheets diputus total. Data murni tersimpan di Cloud Firestore.
 
         return { success: true, message: `Aksi ${cleanAksi} laporan PCK berhasil diproses di Cloud Firestore.` };
       } catch (err) {
@@ -261,17 +245,7 @@ const PkpDataService = {
         const firestoreRes = await TranskepFirebase.savePkpToFirestore(payload);
         const docId = firestoreRes.id_pkp || firestoreRes.id;
 
-        // Mirror ke Google Apps Script / Spreadsheet di background (Non-Destructive Cold Backup)
-        if (typeof google !== 'undefined' && google.script && google.script.run) {
-          try {
-            google.script.run
-              .withSuccessHandler((gRes) => console.log("✅ [PKP] Background mirror ke Google Sheets berhasil:", gRes))
-              .withFailureHandler((gErr) => console.warn("⚠️ [PKP] Background mirror ke Google Sheets gagal:", gErr))
-              .submitBulkPKP(payload, userNip, authToken);
-          } catch (e) {
-            console.warn("⚠️ [PKP] Gagal panggil background mirror Sheets:", e);
-          }
-        }
+        // TAHAP 83: Penulisan baris ke sheet pkp_dokumen & pkp_rencana diputus total. 100% mandiri di Cloud Firestore.
 
         return {
           success: true,
@@ -418,17 +392,7 @@ const PkpDataService = {
         const firestoreRes = await TranskepFirebase.savePckToFirestore(payload);
         const docId = firestoreRes.id_pck || firestoreRes.id;
 
-        // Mirror ke Google Apps Script / Spreadsheet di background (Cold Backup)
-        if (typeof google !== 'undefined' && google.script && google.script.run) {
-          try {
-            google.script.run
-              .withSuccessHandler((gRes) => console.log("✅ [PCK] Background mirror ke Google Sheets berhasil:", gRes))
-              .withFailureHandler((gErr) => console.warn("⚠️ [PCK] Background mirror ke Google Sheets gagal:", gErr))
-              .submitBulkPCK(payload, userNip, authToken);
-          } catch (e) {
-            console.warn("⚠️ [PCK] Gagal panggil background mirror Sheets:", e);
-          }
-        }
+        // TAHAP 83: Penulisan baris ke sheet pck_dokumen & pck_realisasi diputus total. 100% mandiri di Cloud Firestore.
 
         return {
           success: true,
@@ -1028,10 +992,104 @@ const PkpDataService = {
       throw new Error("Cloud Firestore belum siap terhubung.");
     }
     return await TranskepFirebase.deleteRekapitulasiFromFirestore(idRekap);
+  },
+
+  // ==========================================
+  // TAHAP 83: INTI REALTIME SYNC OTOMATIS (ZERO UI)
+  // ==========================================
+  _hasSubscribed: false,
+  initRealtimeSync() {
+    if (this._hasSubscribed) return;
+    if (typeof TranskepFirebase !== 'undefined' && TranskepFirebase.isReady && TranskepFirebase.isReady()) {
+      this._hasSubscribed = true;
+      console.log("🔥 [TRANSKEP PKP] Menghubungkan listener realtime Firestore PKP & PCK...");
+
+      // 1. Sinkronisasi Dokumen PK Tahunan
+      TranskepFirebase.subscribeFirestorePkps((list) => {
+        if (!Array.isArray(list)) return;
+        if (typeof state !== 'undefined') {
+          const map = {};
+          (state.pkpDokumen || []).forEach(p => {
+            const id = String(p.id_pkp || '').trim();
+            if (id) map[id] = p;
+          });
+          list.forEach(fp => {
+            const id = String(fp.id_pkp || '').trim();
+            if (id) {
+              map[id] = {
+                id_pkp: id,
+                nip: fp.nip_pegawai || fp.nip,
+                penilai: fp.nip_penilai || fp.penilai,
+                atasan_pejabat: fp.nip_atasan_pejabat || fp.atasan_pejabat,
+                tahun: fp.tahun,
+                status: fp.status,
+                nilai: fp.nilai_akhir || fp.nilai || '0',
+                items: Array.isArray(fp.items) ? fp.items : [],
+                items_count: Array.isArray(fp.items) ? fp.items.length : (fp.items_count || 0),
+                is_firebase: true
+              };
+            }
+          });
+          state.pkpDokumen = Object.values(map);
+          if (window.vueState) window.vueState.pkpDokumen = state.pkpDokumen;
+          if (window.vmPkpApp && typeof window.vmPkpApp.syncData === 'function') {
+            window.vmPkpApp.syncData(state.pkpDokumen, state.pckDokumen);
+          }
+        }
+      });
+
+      // 2. Sinkronisasi Dokumen PCK Bulanan
+      TranskepFirebase.subscribeFirestorePcks((list) => {
+        if (!Array.isArray(list)) return;
+        if (typeof state !== 'undefined') {
+          const map = {};
+          (state.pckDokumen || []).forEach(p => {
+            const id = String(p.id_pck || '').trim();
+            if (id) map[id] = p;
+          });
+          list.forEach(fp => {
+            const id = String(fp.id_pck || '').trim();
+            if (id) {
+              map[id] = {
+                id_pck: id,
+                nip: fp.nip_pegawai || fp.nip,
+                bulan: fp.bulan,
+                tahun: fp.tahun,
+                rencana: parseInt(fp.rencana || fp.total_rencana || (Array.isArray(fp.realisasi) ? fp.realisasi.length : 0)) || 0,
+                progress: fp.progress || '100%',
+                status: fp.status,
+                nilai_akhir: fp.nilai_akhir || '0',
+                realisasi: Array.isArray(fp.realisasi) ? fp.realisasi : [],
+                is_firebase: true
+              };
+            }
+          });
+          state.pckDokumen = Object.values(map);
+          if (window.vueState) window.vueState.pckDokumen = state.pckDokumen;
+          if (window.vmPkpApp && typeof window.vmPkpApp.syncData === 'function') {
+            window.vmPkpApp.syncData(state.pkpDokumen, state.pckDokumen);
+          }
+        }
+      });
+
+      // 3. Sinkronisasi Rekapitulasi Satker
+      TranskepFirebase.subscribeFirestoreRekapitulasi((list) => {
+        if (Array.isArray(list) && window.vmPkpApp) {
+          window.vmPkpApp.rekapSnapshots = list;
+        }
+      });
+
+      console.log("🔥 [TRANSKEP PKP] Realtime Sync Aktif untuk PKP, PCK, & Rekapitulasi.");
+    }
   }
 };
 
-// Ekspos ke global window
+// Ekspos ke global window & Auto-init Realtime Sync
 if (typeof window !== 'undefined') {
   window.PkpDataService = PkpDataService;
+  setTimeout(() => {
+    if (typeof PkpDataService.initRealtimeSync === 'function') {
+      PkpDataService.initRealtimeSync();
+    }
+  }, 1000);
 }

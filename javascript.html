@@ -835,7 +835,12 @@ let gSyncWatchdog = null;
                     }
                   }
                 }
-                state.masterKinerjaList = d.masterKinerjaList || [];
+                // TAHAP 83: Proteksi anti-overwrite state.masterKinerjaList dari Sheets jika data Firestore sudah aktif
+      if (!state.masterKinerjaList || state.masterKinerjaList.length === 0 || !state.masterKinerjaList.some(x => x && x.is_firebase)) {
+        state.masterKinerjaList = d.masterKinerjaList || [];
+      } else {
+        console.log("🔥 [Sync] state.masterKinerjaList dipertahankan dari Cloud Firestore.");
+      }
                 state.isBgSyncDone = true;
                 
                 if (window.vueState) {

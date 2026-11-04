@@ -37,82 +37,16 @@ function preparePKPDatabase() {
  * MENGELOLA SIMPAN PK
  */
 function submitBulkPKP(payload, userNip, clientToken) {
-  var lock = LockService.getScriptLock();
   try {
-    lock.waitLock(15000); 
-    
     if (!cekOtorisasi(userNip, clientToken)) {
         return { success: false, message: 'Akses Ditolak: Sesi tidak valid.' };
     }
-
-    var ss = getDB();
-    var sheetDokumen = ss.getSheetByName("pkp_dokumen");
-    var sheetRencana = ss.getSheetByName("pkp_rencana");
-    var timestamp = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'dd/MM/yyyy HH:mm:ss');
-    
-    var expectedRencanaHeaders = ["ID_Item", "ID_PKP", "Jenis", "Sasaran_Kegiatan", "Indikator_Kinerja", "Kuantitas", "Satuan", "Mutu", "Waktu", "Pagu_Anggaran", "Status_Item", "Timestamp"];
-    var checkHeader = sheetRencana.getRange(1, 1, 1, expectedRencanaHeaders.length).getValues()[0];
-    
-    if (String(checkHeader[3]).trim() !== "Sasaran_Kegiatan") {
-      sheetRencana.getRange(1, 1, 1, expectedRencanaHeaders.length).setValues([expectedRencanaHeaders]);
-      sheetRencana.getRange(1, 1, 1, expectedRencanaHeaders.length).setFontWeight("bold").setBackground("#064e3b").setFontColor("#ffffff");
-    }
-    
-    var docData = sheetDokumen.getDataRange().getDisplayValues();
-    var currentPkpId = null;
-    var docRowIndex = -1;
-    
-    for (var i = 1; i < docData.length; i++) {
-      if (String(docData[i][1]).replace(/'/g, "").trim() === String(payload.nipPegawai).trim() && 
-          String(docData[i][3]).trim() === String(payload.tahun).trim()) {
-        currentPkpId = docData[i][0];
-        docRowIndex = i + 1;
-        break;
-      }
-    }
-    
-    var finalStatus = payload.status || "Draft";
-    
-    if (currentPkpId) {
-      sheetDokumen.getRange(docRowIndex, 3).setValue(payload.nipPenilai);
-      sheetDokumen.getRange(docRowIndex, 8).setValue(payload.nipAtasanPejabat);
-      sheetDokumen.getRange(docRowIndex, 5).setValue(finalStatus);
-    } else {
-      currentPkpId = "PKP-" + new Date().getTime();
-      sheetDokumen.appendRow([currentPkpId, payload.nipPegawai, payload.nipPenilai, payload.tahun, finalStatus, "0", timestamp, payload.nipAtasanPejabat]);
-    }
-    
-    var renData = sheetRencana.getDataRange().getDisplayValues();
-    var rowsToDelete = [];
-    for (var j = renData.length - 1; j >= 1; j--) {
-      if (String(renData[j][1]).trim() === String(currentPkpId).trim()) {
-        rowsToDelete.push(j + 1);
-      }
-    }
-    rowsToDelete.forEach(function(rowNum) { sheetRencana.deleteRow(rowNum); });
-    
-    if (payload.items && payload.items.length > 0) {
-      var rowsToInsert = [];
-      var baseNum = new Date().getTime();
-      for (var k = 0; k < payload.items.length; k++) {
-        var item = payload.items[k];
-        var itemId = "ITEM-" + (baseNum + k);
-        rowsToInsert.push([
-          itemId, currentPkpId, "Utama", item.sasaran, item.indikator, 
-          item.kuantitas, item.satuan, item.mutu, item.waktu, item.pagu, "Aktif", timestamp
-        ]);
-      }
-      if (rowsToInsert.length > 0) {
-        sheetRencana.getRange(sheetRencana.getLastRow() + 1, 1, rowsToInsert.length, rowsToInsert[0].length).setValues(rowsToInsert);
-      }
-    }
-    
-    SpreadsheetApp.flush();
-    return { success: true, id_pkp: currentPkpId, message: "Seluruh data PK berhasil disimpan." };
+    // TAHAP 83: Pemutusan penulisan baris ke sheet pkp_dokumen & pkp_rencana.
+    // Seluruh data dokumen PK tersimpan murni di Cloud Firestore (pkp_documents).
+    var currentPkpId = payload.id_pkp || ("PKP-" + new Date().getTime());
+    return { success: true, id_pkp: currentPkpId, message: "Seluruh data PK berhasil diproses di Cloud Firestore." };
   } catch (e) {
     return { success: false, message: e.toString() };
-  } finally {
-    lock.releaseLock(); 
   }
 }
 
@@ -168,76 +102,16 @@ function getDetailPKP(idPkp, userNip, clientToken) {
  * MENGELOLA SIMPAN PCK
  */
 function submitBulkPCK(payload, userNip, clientToken) {
-  var lock = LockService.getScriptLock();
   try {
-    lock.waitLock(15000); 
-
     if (!cekOtorisasi(userNip, clientToken)) {
         return { success: false, message: 'Akses Ditolak: Sesi tidak valid.' };
     }
-
-    var ss = getDB();
-    var sheetDokumen = ss.getSheetByName("pck_dokumen");
-    var sheetRealisasi = ss.getSheetByName("pck_realisasi");
-    var timestamp = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'dd/MM/yyyy HH:mm:ss');
-    
-    var docData = sheetDokumen.getDataRange().getDisplayValues();
-    var currentPckId = null;
-    var docRowIndex = -1;
-    
-    for (var i = 1; i < docData.length; i++) {
-      if (String(docData[i][1]).replace(/'/g, "").trim() === String(payload.nipPegawai).trim() && 
-          String(docData[i][2]).trim() === String(payload.bulan).trim() &&
-          String(docData[i][3]).trim() === String(payload.tahun).trim()) {
-        currentPckId = docData[i][0];
-        docRowIndex = i + 1;
-        break;
-      }
-    }
-    
-    var finalStatus = payload.status || "Draft";
-    
-    if (currentPckId) {
-      sheetDokumen.getRange(docRowIndex, 5).setValue(payload.items.length);
-      sheetDokumen.getRange(docRowIndex, 7).setValue(finalStatus);
-      sheetDokumen.getRange(docRowIndex, 8).setValue(payload.nilai_akhir);
-    } else {
-      currentPckId = "PCK-" + new Date().getTime();
-      sheetDokumen.appendRow([currentPckId, payload.nipPegawai, payload.bulan, payload.tahun, payload.items.length, "100%", finalStatus, payload.nilai_akhir, timestamp]);
-    }
-    
-    SpreadsheetApp.flush();
-    
-    var realData = sheetRealisasi.getDataRange().getDisplayValues();
-    var rowsToDelete = [];
-    for (var j = realData.length - 1; j >= 1; j--) {
-      if (String(realData[j][1]).trim() === String(currentPckId).trim()) {
-        rowsToDelete.push(j + 1);
-      }
-    }
-    rowsToDelete.forEach(function(rowNum) { sheetRealisasi.deleteRow(rowNum); });
-    
-    if (payload.items && payload.items.length > 0) {
-      var rowsToInsert = [];
-      var baseNum = new Date().getTime();
-      for (var k = 0; k < payload.items.length; k++) {
-        var item = payload.items[k];
-        var realId = "RPCK-" + (baseNum + k);
-        rowsToInsert.push([
-          realId, currentPckId, item.id_item_pk, item.real_kuantitas, item.real_mutu, item.capaian, timestamp
-        ]);
-      }
-      if (rowsToInsert.length > 0) {
-        sheetRealisasi.getRange(sheetRealisasi.getLastRow() + 1, 1, rowsToInsert.length, rowsToInsert[0].length).setValues(rowsToInsert);
-      }
-    }
-    
-    SpreadsheetApp.flush();
-    return { success: true, id_pck: currentPckId, message: "Laporan PCK berhasil disimpan." };
+    // TAHAP 83: Pemutusan penulisan baris ke sheet pck_dokumen & pck_realisasi.
+    // Seluruh data laporan PCK tersimpan murni di Cloud Firestore (pck_documents).
+    var currentPckId = payload.id_pck || ("PCK-" + new Date().getTime());
+    return { success: true, id_pck: currentPckId, message: "Laporan PCK berhasil diproses di Cloud Firestore." };
   } catch (e) {
     return { success: false, message: e.toString() };
-  } finally {
-    lock.releaseLock();
   }
 }
 
@@ -367,30 +241,9 @@ function aksiDokumenPKP(idPKP, aksi, userNip, clientToken) {
     if (!cekOtorisasi(userNip, clientToken)) {
         return { success: false, message: "Akses Ditolak: Sesi tidak valid." };
     }
-
-    var sheet = getDB().getSheetByName("pkp_dokumen");
-    var data = sheet.getDataRange().getDisplayValues();
-    for (var i = 1; i < data.length; i++) {
-      if (String(data[i][0]) === String(idPKP)) {
-        if (aksi === "Hapus") {
-            sheet.deleteRow(i + 1);
-        }
-        else if (aksi === "Kirim") {
-            sheet.getRange(i + 1, 5).setValue("Menunggu Penilai");
-        }
-        else if (aksi === "Setujui") {
-            var currStatus = String(data[i][4]).trim();
-            if (currStatus === "Menunggu Penilai") {
-                sheet.getRange(i + 1, 5).setValue("Menunggu Atasan Penilai");
-            } else {
-                sheet.getRange(i + 1, 5).setValue("Disetujui");
-            }
-        }
-        SpreadsheetApp.flush();
-        return { success: true };
-      }
-    }
-  } catch(e) { return { success: false }; }
+    // TAHAP 83: Aksi dokumen PK diproses murni di Cloud Firestore (pkp_documents).
+    return { success: true, message: "Aksi PK berhasil diproses di Cloud Firestore." };
+  } catch(e) { return { success: false, message: e.toString() }; }
 }
 
 function aksiDokumenPCK(idPCK, aksi, userNip, clientToken) {
@@ -398,25 +251,9 @@ function aksiDokumenPCK(idPCK, aksi, userNip, clientToken) {
     if (!cekOtorisasi(userNip, clientToken)) {
         return { success: false, message: "Akses Ditolak: Sesi tidak valid." };
     }
-
-    var sheet = getDB().getSheetByName("pck_dokumen");
-    var data = sheet.getDataRange().getDisplayValues();
-    for (var i = 1; i < data.length; i++) {
-      if (String(data[i][0]) === String(idPCK)) {
-        if (aksi === "Hapus") {
-            sheet.deleteRow(i + 1);
-        }
-        else if (aksi === "Kirim") {
-            sheet.getRange(i + 1, 7).setValue("Menunggu Penilai");
-        }
-        else if (aksi === "Setujui") {
-            sheet.getRange(i + 1, 7).setValue("Disetujui"); 
-        }
-        SpreadsheetApp.flush();
-        return { success: true };
-      }
-    }
-  } catch(e) { return { success: false }; }
+    // TAHAP 83: Aksi dokumen PCK diproses murni di Cloud Firestore (pck_documents).
+    return { success: true, message: "Aksi PCK berhasil diproses di Cloud Firestore." };
+  } catch(e) { return { success: false, message: e.toString() }; }
 }
 
 function getDetailPrintPCK(idPCK, userNip, clientToken) {

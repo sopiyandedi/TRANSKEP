@@ -4304,3 +4304,81 @@ Pengguna melaporkan bahwa pratinjau (*preview*) dokumen PDF di modal SK dan SOP 
   5. [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) (App build 3.8.5)
   6. [`prd.md`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/prd.md) (Pembaruan Living Context Poin 63)
 - **Status:** `[SELESAI & AKTIF]` ✅
+
+
+---
+
+### TAHAP 83: Pemutusan Inputan Lanjutan Database Penilaian Kinerja (PKP, PCK & Rekapitulasi) ke Google Sheets & Standalone Cloud Firestore (v3.8.6)
+
+#### 1. Latar Belakang & Analisis Kebutuhan
+1. **Latar Belakang:**
+   - Setelah Surat Tugas (Tahap 79), Uraian Tugas/Jobdes (Tahap 80), Surat Keputusan/SK (Tahap 81), dan Standar Operasional Prosedur/SOP (Tahap 82) berhasil diputus dari Google Sheets dan 100% mandiri di Cloud Firestore, modul berikutnya dalam urutan migrasi adalah **Modul Penilaian Kinerja Pegawai (PKP, PCK, & Rekapitulasi)**.
+   - Modul ini mengelola 4 pilar kinerja:
+     * Pilar 0: Kamus Kinerja / Template Sasaran Jabatan (`master_kinerja`).
+     * Pilar 1: Perjanjian Kinerja (PK) Tahunan (`pkp_documents`).
+     * Pilar 2: Penilaian Capaian Kinerja (PCK) Bulanan (`pck_documents`).
+     * Pilar 3: Snapshot Pengesahan Rekapitulasi Bulanan Satker (`pck_rekapitulasi`).
+   - Saat ini, data service layer [`modules/pkp/pkp_data.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/pkp/pkp_data.js) dan frontend [`pkp/js_pkp_render.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/pkp/js_pkp_render.html) & [`pkp/js_pkp_core.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/pkp/js_pkp_core.html) masih mereplikasi penulisan baris ganda ke Google Sheets:
+     * Saat PK tahunan disimpan via form sasaran kerja, `PkpDataService.submitBulkPKP` menyimpan ke Firestore lalu memanggil Apps Script `submitBulkPKP` yang menulis puluhan baris ke sheet `pkp_dokumen` dan `pkp_rencana`.
+     * Saat PCK bulanan disimpan, `PkpDataService.submitBulkPCK` menyimpan ke Firestore lalu memanggil Apps Script `submitBulkPCK` yang menulis baris ke sheet `pck_dokumen` dan `pck_realisasi`.
+     * Saat aksi status dijalankan (Kirim, Setujui, Tolak, Hapus), `PkpDataService.aksiDokumenPKP` dan `aksiDokumenPCK` memanggil Apps Script `aksiDokumenPKP` dan `aksiDokumenPCK` yang memanipulasi baris Google Sheets.
+     * Di [`pkp/js_pkp_core.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/pkp/js_pkp_core.html), fungsi `hapusDokumenPK`, `hapusDokumenPCK`, `kirimDokumenPK`, `kirimDokumenPCK`, dan `validasiCepatDokumen` masih memanggil langsung `google.script.run.aksiDokumenPKP` / `aksiDokumenPCK`.
+
+2. **Sasaran Perubahan:**
+   - **Pemutusan Penulisan Baris Sheets (`pkp_dokumen`, `pkp_rencana`, `pck_dokumen`, `pck_realisasi`)**: Pendaftaran sasaran PK baru, pengajuan laporan bulanan PCK, pengesahan nilai, revisi target, dan penghapusan dokumen 100% murni dikelola di Cloud Firestore.
+   - **Preservasi Generator Dokumen PDF Resmi**: Google Apps Script tetap melayani tugas penerbitan file PDF cetak resmi (`generatePdfPK` dan `generatePdfPCK`) menggunakan template Google Docs dan Google Drive dinas, namun dibebaskan dari manipulasi baris spreadsheet database.
+   - **Penyelarasan Aksi Status ke Firestore**: Seluruh aksi `Hapus`, `Kirim`, `Setujui`, dan `Tolak` pada PKP dan PCK di [`pkp/js_pkp_core.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/pkp/js_pkp_core.html) diarahkan murni melalui service layer `PkpDataService` yang mengupdate dokumen Cloud Firestore secara instan (0ms).
+   - **Inisialisasi Realtime Sync Otomatis**: Menambahkan `initRealtimeSync()` pada `PkpDataService` sehingga daftar dokumen PK, PCK, dan Rekapitulasi langsung tersinkronisasi di latar belakang sejak startup aplikasi (Zero UI).
+   - **Proteksi Anti-Overwrite Delta Sync**: Mengunci `state.masterKinerjaList` pada `syncBackgroundData()` agar tidak tertimpa oleh respon Sheets statis `d.masterKinerjaList`.
+
+---
+
+#### 2. Rencana Implementasi Teknis (Implementation Plan)
+
+1. **Pembaruan Service Layer Frontend ([`modules/pkp/pkp_data.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/pkp/pkp_data.js)):**
+   - **`submitBulkPKP(payload, nip, token)`**:
+     * Simpan dokumen PK lengkap beserta daftar sasaran dan indikator 100% murni ke Cloud Firestore via `TranskepFirebase.savePkpToFirestore(payload)`.
+     * Hapus background call ke Apps Script `google.script.run.submitBulkPKP`.
+   - **`submitBulkPCK(payload, nip, token)`**:
+     * Simpan dokumen PCK lengkap beserta rincian capaian realisasi 100% murni ke Cloud Firestore via `TranskepFirebase.savePckToFirestore(payload)`.
+     * Hapus background call ke Apps Script `google.script.run.submitBulkPCK`.
+   - **`aksiDokumenPKP(idPKP, aksi, nip, token)`**:
+     * Update status atau hapus dokumen PK murni 100% langsung di Cloud Firestore (`TranskepFirebase.deletePkpFromFirestore` atau update status dokumen).
+     * Hapus background mirror ke Apps Script `google.script.run.aksiDokumenPKP`.
+   - **`aksiDokumenPCK(idPCK, aksi, nip, token)`**:
+     * Update status atau hapus laporan PCK murni 100% langsung di Cloud Firestore (`TranskepFirebase.deletePckFromFirestore` atau update status dokumen).
+     * Hapus background mirror ke Apps Script `google.script.run.aksiDokumenPCK`.
+   - **`initRealtimeSync()`**:
+     * Pasang auto-init listener Firestore realtime untuk PKP, PCK, dan Rekapitulasi saat script dimuat, memperbarui memori runtime `state.pkpDokumen` dan `state.pckDokumen`.
+
+2. **Pembersihan Frontend Render & Core ([`pkp/js_pkp_render.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/pkp/js_pkp_render.html) & [`pkp/js_pkp_core.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/pkp/js_pkp_core.html)):**
+   - Di `pkp/js_pkp_render.html`: Hapus sisa pemanggilan manual `google.script.run.submitBulkPKP` (baris 914–916) dan `submitBulkPCK` (baris 1190–1192).
+   - Di `pkp/js_pkp_core.html`: Ubah pemanggilan `google.script.run.aksiDokumenPKP` dan `aksiDokumenPCK` pada fungsi `hapusDokumenPK`, `hapusDokumenPCK`, `kirimDokumenPK`, `kirimDokumenPCK`, dan `validasiCepatDokumen` agar memanggil `PkpDataService.aksiDokumenPKP` dan `PkpDataService.aksiDokumenPCK`.
+
+3. **Pembersihan Backend Google Apps Script ([`pkp/setup_pkp.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/pkp/setup_pkp.js)):**
+   - Di fungsi `submitBulkPKP`: Hapus manipulasi penulisan baris ke `pkp_dokumen` dan `pkp_rencana`. Cukup kembalikan `{ success: true, id_pkp: payload.id_pkp || ('PKP-' + new Date().getTime()), message: 'Data PK berhasil diproses di Cloud Firestore.' }`.
+   - Di fungsi `submitBulkPCK`: Hapus manipulasi penulisan baris ke `pck_dokumen` dan `pck_realisasi`. Cukup kembalikan `{ success: true, id_pck: payload.id_pck || ('PCK-' + new Date().getTime()), message: 'Laporan PCK berhasil diproses di Cloud Firestore.' }`.
+   - Di fungsi `aksiDokumenPKP`: Hapus manipulasi baris pada `pkp_dokumen`. Cukup kembalikan `{ success: true, message: 'Aksi PK diproses di Cloud Firestore.' }`.
+   - Di fungsi `aksiDokumenPCK`: Hapus manipulasi baris pada `pck_dokumen`. Cukup kembalikan `{ success: true, message: 'Aksi PCK diproses di Cloud Firestore.' }`.
+
+4. **Proteksi Anti-Overwrite Delta Sync di [`core/core.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/core/core.js) & [`javascript.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/javascript.html):**
+   - Pada `syncBackgroundData()`, proteksi `state.masterKinerjaList`: jika sudah terisi data Cloud Firestore (`x.is_firebase`), abaikan penimpaan dari respon Sheets `d.masterKinerjaList`.
+
+5. **PWA Versioning & Deployment:**
+   - Naikkan versi Service Worker di [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) dan `APP_BUILD_VER` di [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) ke **`transkep-v3.8.6`** / **`3.8.6`**.
+   - Deploy build Google Apps Script Clasp ke versi **`@332`**.
+   - Git commit dan push **HANYA ke `origin/main`** ([`sopiyandedi/TRANSKEP`](https://github.com/sopiyandedi/TRANSKEP)), **TIDAK ke `prod`**.
+
+---
+
+#### 3. Estimasi Dampak & File yang Dimodifikasi
+- **File Dimodifikasi:**
+  1. [`modules/pkp/pkp_data.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/pkp/pkp_data.js) (Pemutusan simpan/aksi Sheets, integrasi Firestore standalone & initRealtimeSync)
+  2. [`pkp/setup_pkp.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/pkp/setup_pkp.js) (Pembersihan operasi penulisan sheet `pkp_dokumen`, `pkp_rencana`, `pck_dokumen`, `pck_realisasi` pada backend GAS)
+  3. [`pkp/js_pkp_core.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/pkp/js_pkp_core.html) (Pengalihan aksi hapus/kirim/setujui ke PkpDataService)
+  4. [`pkp/js_pkp_render.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/pkp/js_pkp_render.html) (Pembersihan background RPC Sheets saat submit PK/PCK)
+  5. [`core/core.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/core/core.js) & [`javascript.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/javascript.html) (Proteksi anti-overwrite state masterKinerjaList dari Sheets)
+  6. [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) (Cache PWA v3.8.6)
+  7. [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) (App build 3.8.6)
+  8. [`prd.md`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/prd.md) (Pembaruan Living Context Poin 64)
+- **Status:** `[SELESAI & AKTIF]` ✅

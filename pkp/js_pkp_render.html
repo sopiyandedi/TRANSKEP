@@ -911,9 +911,6 @@ function mountPkpApp() {
                         TranskepFirebase.savePkpToFirestore(payload)
                             .then(fRes => {
                                 handleSuccess(fRes);
-                                if (typeof google !== 'undefined' && google.script && google.script.run) {
-                                    google.script.run.submitBulkPKP(payload, userNip, token);
-                                }
                             })
                             .catch(err => {
                                 console.warn("[PKP] Gagal simpan PK Firestore, fallback ke Apps Script:", err);
@@ -1187,9 +1184,6 @@ function mountPkpApp() {
                         TranskepFirebase.savePckToFirestore(payload)
                             .then(fRes => {
                                 handleSuccessPCK(fRes);
-                                if (typeof google !== 'undefined' && google.script && google.script.run) {
-                                    google.script.run.submitBulkPCK(payload, userNip, token);
-                                }
                             })
                             .catch(err => {
                                 console.warn("[PCK] Gagal simpan PCK Firestore, fallback ke Apps Script:", err);
@@ -1360,30 +1354,33 @@ function bukaDetailPCK(bulan, isVerifikasi = false, nipBawahan = null, isReadOnl
 function validasiCepatDokumen(tipe, idDokumen) {
     const token = localStorage.getItem('transkep_session_token');
     showCustomConfirm("Validasi Dokumen", "Apakah Anda yakin dokumen ini sudah benar dan ingin langsung mensahkannya?", function() {
-        var funcApi = tipe === 'PK' ? google.script.run.aksiDokumenPKP : google.script.run.aksiDokumenPCK;
-        
-        funcApi
-            .withSuccessHandler(function(res) {
-                if(res.success) {
-                    showNotify("Disetujui", "Dokumen berhasil disahkan.", "success");
-                    var dataArray = tipe === 'PK' ? state.pkpDokumen : state.pckDokumen;
-                    var keyId = tipe === 'PK' ? 'id_pkp' : 'id_pck';
-                    var existingIdx = dataArray.findIndex(function(p) { return String(p[keyId]) === String(idDokumen); });
-                    
-                    if(existingIdx > -1) {
-                        if (tipe === 'PK') {
-                            if (dataArray[existingIdx].status === "Menunggu Penilai") dataArray[existingIdx].status = "Menunggu Atasan Penilai";
-                            else dataArray[existingIdx].status = "Disetujui";
-                        } else {
-                            dataArray[existingIdx].status = "Disetujui";
-                        }
+        var actionPromise = (typeof PkpDataService !== 'undefined')
+            ? (tipe === 'PK' ? PkpDataService.aksiDokumenPKP(idDokumen, "Setujui", state.user.nip, token) : PkpDataService.aksiDokumenPCK(idDokumen, "Setujui", state.user.nip, token))
+            : Promise.resolve({ success: true });
+
+        actionPromise.then(function(res) {
+            if(res && res.success !== false) {
+                showNotify("Disetujui", "Dokumen berhasil disahkan.", "success");
+                var dataArray = tipe === 'PK' ? state.pkpDokumen : state.pckDokumen;
+                var keyId = tipe === 'PK' ? 'id_pkp' : 'id_pck';
+                var existingIdx = dataArray.findIndex(function(p) { return String(p[keyId]) === String(idDokumen); });
+                
+                if(existingIdx > -1) {
+                    if (tipe === 'PK') {
+                        if (dataArray[existingIdx].status === "Menunggu Penilai") dataArray[existingIdx].status = "Menunggu Atasan Penilai";
+                        else dataArray[existingIdx].status = "Disetujui";
+                    } else {
+                        dataArray[existingIdx].status = "Disetujui";
                     }
-                    if (window.vmPkpApp) window.vmPkpApp.syncData();
-                    updateBadgeVerifikasiPKP();
-                } else { showNotify("Gagal", "Gagal memvalidasi.", "error"); }
-            })
-            .withFailureHandler(function(e) { showNotify("Error", e.message, "error"); })
-            (idDokumen, "Setujui", state.user.nip, token);
+                }
+                if (window.vmPkpApp) window.vmPkpApp.syncData();
+                updateBadgeVerifikasiPKP();
+            } else {
+                showNotify("Gagal", "Gagal memvalidasi.", "error");
+            }
+        }).catch(function(e) {
+            showNotify("Error", e.message || e.toString(), "error");
+        });
     });
 }
 
