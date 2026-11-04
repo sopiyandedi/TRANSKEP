@@ -313,36 +313,146 @@
      background-color: #ffffff !important;
   }
  
-/* =========================================================
-   FIX: PAKSA SEARCH RESULT SOLID DI LIGHT MODE
-   ========================================================= */
+/* =========================================================================
+   FIX: DROPDOWN PENCARIAN & SEARCHABLE DROPDOWNS DI LIGHT MODE
+   Heavy Frosted Blur (blur: 36px), 98% Opacity, Zero Background Bleed
+   ========================================================================= */
 .light-mode #searchResultPanel,
 .light-mode #searchResultPanel.glass,
+.light-mode #app-container #searchResultPanel,
+.light-mode .dashboard-search-dropdown,
+.light-mode #app-container .dashboard-search-dropdown,
 #searchResultPanel.light-mode {
-    background: #f0f9ff !important;
-    background-color: #f0f9ff !important;
+    background: rgba(255, 255, 255, 0.98) !important;
+    background-color: rgba(255, 255, 255, 0.98) !important;
+    backdrop-filter: blur(36px) saturate(200%) !important;
+    -webkit-backdrop-filter: blur(36px) saturate(200%) !important;
+    border: 1px solid rgba(203, 213, 225, 0.95) !important;
+    box-shadow: 0 25px 60px -15px rgba(15, 23, 42, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.9) inset !important;
     opacity: 1 !important;
-    backdrop-filter: none !important;
-    -webkit-backdrop-filter: none !important;
-    border: 1px solid #bae6fd !important;
-    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15) !important;
+    z-index: 100 !important;
 }
 
-/* Pastikan wadah pembungkus isi list di dalamnya juga solid */
-.light-mode #searchResultPanel #searchResultContent {
-    background: #f0f9ff !important;
-    background-color: #f0f9ff !important;
+/* Wadah pembungkus isi list di dalamnya */
+.light-mode #searchResultPanel #searchResultContent,
+.light-mode .dashboard-search-dropdown #searchResultContent {
+    background: transparent !important;
+    background-color: transparent !important;
 }
 
-/* Warna latar belakang per baris data agar tidak transparan */
-.light-mode #searchResultPanel #searchResultContent > div {
-    background-color: #f0f9ff !important;
-    border-bottom: 1px solid #e0f2fe !important;
+/* Status pencarian kosong */
+.light-mode #searchResultPanel .search-empty-state,
+.light-mode .dashboard-search-dropdown .search-empty-state {
+    color: #64748b !important;
+}
+.light-mode #searchResultPanel .search-empty-state span,
+.light-mode .dashboard-search-dropdown .search-empty-state span {
+    color: #0f172a !important;
+}
+
+/* Baris data hasil pencarian */
+.light-mode #searchResultPanel .search-item-row,
+.light-mode .dashboard-search-dropdown .search-item-row,
+.light-mode #searchResultPanel #searchResultContent > div:not([class*="text-center"]) {
+    background-color: rgba(255, 255, 255, 0.85) !important;
+    border-bottom: 1px solid rgba(241, 245, 249, 1) !important;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
 }
 
 /* Saat baris diarahkan kursor (hover) */
-.light-mode #searchResultPanel #searchResultContent > div:hover {
-    background-color: #e0f2fe !important;
+.light-mode #searchResultPanel .search-item-row:hover,
+.light-mode .dashboard-search-dropdown .search-item-row:hover,
+.light-mode #searchResultPanel #searchResultContent > div:not([class*="text-center"]):hover {
+    background-color: #f1f5f9 !important;
+}
+
+/* Nama Pegawai */
+.light-mode #searchResultPanel .search-item-nama,
+.light-mode .dashboard-search-dropdown .search-item-nama,
+.light-mode #searchResultPanel #searchResultContent .search-item-row > div > div:first-child {
+    color: #0f172a !important;
+}
+
+.light-mode #searchResultPanel .search-item-row:hover .search-item-nama,
+.light-mode .dashboard-search-dropdown .search-item-row:hover .search-item-nama,
+.light-mode #searchResultPanel #searchResultContent .search-item-row:hover > div > div:first-child {
+    color: #4f46e5 !important;
+}
+
+/* Meta Data (NIP, Pangkat, Jabatan) */
+.light-mode #searchResultPanel .search-item-meta,
+.light-mode .dashboard-search-dropdown .search-item-meta {
+    color: #64748b !important;
+}
+
+/* Badge Pangkat di Light Mode */
+.light-mode #searchResultPanel [class*="bg-indigo-500/10"],
+.light-mode .dashboard-search-dropdown [class*="bg-indigo-500/10"] {
+    background-color: rgba(238, 242, 255, 0.95) !important;
+    color: #4338ca !important;
+    border-color: rgba(199, 210, 254, 0.9) !important;
+}
+
+/* NIP & Jabatan Hover di Light Mode */
+.light-mode #searchResultPanel span.font-mono,
+.light-mode .dashboard-search-dropdown span.font-mono {
+    color: #4f46e5 !important;
+}
+
+.light-mode #searchResultPanel [class*="hover:bg-slate-800"]:hover,
+.light-mode .dashboard-search-dropdown [class*="hover:bg-slate-800"]:hover {
+    background-color: rgba(226, 232, 240, 0.8) !important;
+    color: #1e293b !important;
+}
+
+/* =========================================================================
+   PROTEKSI GLOBAL SEMUA SEARCHABLE DROPDOWNS DI SELURUH MODUL PADA LIGHT MODE
+   (E-Office, Jobdes, Kinerja, Permohonan Bypass & Saring Pegawai, Rekapitulasi)
+   ========================================================================= */
+.light-mode #jdAtasanContainer [v-show="showDropdownAtasan"],
+.light-mode #knjPejabatContainer [v-show="showDropdownPejabat"],
+.light-mode [v-show="isBypassDropdownOpen"],
+.light-mode [v-show="isDropdownOpen"] {
+    background: rgba(255, 255, 255, 0.98) !important;
+    background-color: rgba(255, 255, 255, 0.98) !important;
+    backdrop-filter: blur(36px) saturate(200%) !important;
+    -webkit-backdrop-filter: blur(36px) saturate(200%) !important;
+    border: 1px solid rgba(203, 213, 225, 0.95) !important;
+    box-shadow: 0 25px 60px -15px rgba(15, 23, 42, 0.25) !important;
+    opacity: 1 !important;
+}
+
+.light-mode #jdAtasanContainer [v-show="showDropdownAtasan"] > div > div,
+.light-mode #knjPejabatContainer [v-show="showDropdownPejabat"] > div > div,
+.light-mode [v-show="isBypassDropdownOpen"] > div,
+.light-mode [v-show="isDropdownOpen"] > div,
+.light-mode [v-show="isDropdownOpen"] > div > div {
+    background-color: rgba(255, 255, 255, 0.85) !important;
+    border-bottom: 1px solid rgba(241, 245, 249, 1) !important;
+    color: #1e293b !important;
+}
+
+.light-mode #jdAtasanContainer [v-show="showDropdownAtasan"] > div > div:hover,
+.light-mode #knjPejabatContainer [v-show="showDropdownPejabat"] > div > div:hover,
+.light-mode [v-show="isBypassDropdownOpen"] > div:hover,
+.light-mode [v-show="isDropdownOpen"] > div:hover,
+.light-mode [v-show="isDropdownOpen"] > div > div:hover {
+    background-color: #f1f5f9 !important;
+    color: #4f46e5 !important;
+}
+
+.light-mode #jdAtasanContainer [v-show="showDropdownAtasan"] .text-slate-200,
+.light-mode #knjPejabatContainer [v-show="showDropdownPejabat"] .text-slate-200,
+.light-mode [v-show="isBypassDropdownOpen"] .text-slate-200,
+.light-mode [v-show="isDropdownOpen"] .text-slate-300 {
+    color: #0f172a !important;
+}
+
+.light-mode #jdAtasanContainer [v-show="showDropdownAtasan"] .text-slate-400,
+.light-mode #knjPejabatContainer [v-show="showDropdownPejabat"] .text-slate-400,
+.light-mode [v-show="isBypassDropdownOpen"] .text-slate-400,
+.light-mode [v-show="isDropdownOpen"] .text-slate-400 {
+    color: #64748b !important;
 }
 
 /* ---------------------------------------------------------

@@ -28,13 +28,13 @@
       </div>
       
       <!-- VUE: PANEL HASIL PENCARIAN -->
-      <div v-if="searchKeyword" class="absolute left-10 right-0 top-full mt-2 glass border border-slate-700/50 rounded-xl shadow-2xl overflow-hidden max-h-[400px] overflow-y-auto custom-scrollbar flex flex-col z-[70] bg-slate-900/95 backdrop-blur-xl">
-          <div class="p-2 space-y-1">
-              <div v-if="searchResults.length === 0" class="p-4 text-center text-slate-500 text-xs">Pencarian untuk <span class="text-white font-bold">"{{ searchKeyword }}"</span> tidak ditemukan.</div>
-              <div v-for="u in searchResults" :key="u.nip" class="p-3 border-b border-slate-800/50 hover:bg-slate-800/80 transition rounded-lg flex items-center justify-between gap-3 group">
+      <div v-if="searchKeyword" id="searchResultPanel" class="dashboard-search-dropdown absolute left-0 right-0 top-full mt-2 border border-slate-700/50 rounded-2xl shadow-2xl overflow-hidden max-h-[420px] overflow-y-auto custom-scrollbar flex flex-col z-[100] bg-slate-900/95 backdrop-blur-2xl">
+          <div id="searchResultContent" class="p-2 space-y-1">
+              <div v-if="searchResults.length === 0" class="search-empty-state p-4 text-center text-slate-500 text-xs">Pencarian untuk <span class="text-white font-bold">"{{ searchKeyword }}"</span> tidak ditemukan.</div>
+              <div v-for="u in searchResults" :key="u.nip" class="search-item-row p-3 border-b border-slate-800/50 hover:bg-slate-800/80 transition rounded-xl flex items-center justify-between gap-3 group">
                  <div class="w-full">
-                     <div @click="copyTeks(u.nama, 'Nama Lengkap')" title="Salin" class="font-bold text-slate-200 text-sm hover:text-indigo-400 transition cursor-pointer inline-block w-fit">{{ u.nama }}</div>
-                     <div class="text-[10px] text-slate-400 mt-1.5 flex flex-wrap items-center gap-1.5 leading-relaxed">
+                     <div @click="copyTeks(u.nama, 'Nama Lengkap')" title="Salin" class="search-item-nama font-bold text-slate-200 text-sm hover:text-indigo-400 transition cursor-pointer inline-block w-fit">{{ u.nama }}</div>
+                     <div class="search-item-meta text-[10px] text-slate-400 mt-1.5 flex flex-wrap items-center gap-1.5 leading-relaxed">
                          <span v-if="u.pangkat" @click="copyTeks(u.pangkat, 'Pangkat')" class="px-1.5 py-0.5 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded mr-1 cursor-pointer">{{ u.pangkat }}</span>
                          <span @click="copyTeks(u.nip, 'NIP')" class="font-mono text-indigo-400 hover:bg-indigo-500/10 px-1 py-0.5 rounded cursor-pointer border border-transparent">{{ u.nip }}</span>
                          <span class="text-slate-600 px-0.5">•</span>
