@@ -105,6 +105,7 @@ const TranskepFirebase = {
       members: Array.isArray(skData.members) ? skData.members : [],
       naskah_utama: skData.naskah_utama || null,
       lampiran: Array.isArray(skData.lampiran) ? skData.lampiran : [],
+      template_gdoc_id: skData.template_gdoc_id || '',
       revisi_history: Array.isArray(skData.revisi_history) ? skData.revisi_history : [{
         versi: 1,
         tgl_revisi: skData.tgl_input || new Date().toISOString().split('T')[0],

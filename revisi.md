@@ -5141,3 +5141,45 @@ Pengguna melaporkan bahwa pratinjau (*preview*) dokumen PDF di modal SK dan SOP 
   4. [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js)
   5. [`revisi.md`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/revisi.md)
 - **Status:** `[SELESAI & AKTIF]` ✅
+
+
+---
+
+### TAHAP 94: Evolusi Smart SK Studio Builder — Auto-Import Word (`.docx` & `.doc`), 3 Lampiran Terpadu, Tabel Adaptif, Penguncian 1 Baris = 1 SK & Kamus Placeholder Google Docs (v3.8.17)
+
+#### 1. Latar Belakang & Analisis Kebutuhan
+- **Kebutuhan Pengguna:**
+  1. Mempercepat pembuatan dan revisi Surat Keputusan (SK) di menu SK dengan fitur **Import Word (`.docx` / `.doc`)** di dalam pop-up **Smart SK Studio Builder** sehingga seluruh kolom terisi otomatis.
+  2. Melengkapi struktur naskah utama SK agar 100% sesuai tata naskah Pengadilan Agama Indramayu: **Pejabat Pembuat SK (Ketua / Sekretaris)**, **Nomor SK**, **Judul (Tentang)**, **Membaca**, **Menimbang (`a, b, c...`)**, **Mengingat (`1, 2, 3...`)**, **Memperhatikan**, **Menetapkan**, **Diktum (`Kesatu, Kedua, Ketiga, Keempat, Kelima, Keenam, Ketujuh, dst.`)**, **Tanggal Titi Mangsa & Penandatangan**, serta **Salinan / Tembusan**.
+  3. Menyediakan **3 Slot Lampiran Terstruktur** (*Lampiran I: Daftar Nama Tim [Tabel Adaptif]*, *Lampiran II: Uraian Tugas Tim [Teks Opsional/Toggle]*, *Lampiran III: Struktur Organisasi Tim [Bagan Double-Border]*) dengan penomoran Romawi dinamis.
+  4. Mengakomodasi format tabel lampiran SK yang kadang berbeda urutan/nama kolom melalui **Editable Column Headers** dan opsi kolom ke-5, serta menyinkronkan otomatis Tabel Lampiran I ke Bagan Struktur Lampiran III.
+  5. Mengunci prinsip **1 Baris = 1 SK Utuh** sehingga saat membuka Smart SK Studio atau melakukan **Revisi SK (`🌿`)** pada suatu baris, seluruh naskah dan personil baris tersebut termuat akurat dan tersimpan kembali ke dokumen Firestore baris yang sama.
+  6. Menyiapkan **Kamus Placeholder Google Docs (`{{...}}`)** dan generator payload untuk integrasi cetak ke template Google Docs.
+
+#### 2. Rencana Implementasi & Solusi Rekayasa
+1. **Dual-Engine Word Importer (`.docx` via Mammoth.js & `.doc` via Native Binary Stream Parser):**
+   - Mendukung ekstraksi instan (<1 detik) baik untuk dokumen Word modern (`.docx` ZIP) maupun Word klasik (`.doc` OLE2 `D0 CF 11 E0` dengan pemisah sel tabel `\x07`).
+   - Memisahkan otomatis blok Naskah Utama (`Membaca`, `Menimbang`, `Mengingat`, `Memperhatikan`, `Menetapkan`, `Diktum Kesatu–Ketujuh+` lengkap dengan sub-poin tugas, `Titi Mangsa`, `Tembusan`) dan blok Lampiran (`Lampiran I`, `Lampiran II`, `Lampiran III`).
+   - Melakukan *fuzzy auto-matching* nama dan jabatan personil terhadap `usersList` untuk mengisi NIP secara otomatis.
+2. **Auto-Expanding Textareas (Zero Inner Scroll):**
+   - Seluruh textarea di Step 1 dan Step 2 dipasangi kelas `.sk-auto-textarea` (`field-sizing: content; resize: none; overflow: hidden;`) dan kalkulator baris dinamis `calcAutoRows()` sehingga kalimat panjang tampil utuh tanpa scrollbar dalam.
+3. **3 Lampiran Terpadu, Tabel Adaptif & Auto-Sync Bagan Double-Border:**
+   - **Lampiran I (Tabel Adaptif):** Urutan baku `No | Nama | Jabatan Dalam Dinas | Jabatan Tim` dengan header kolom yang dapat diedit langsung, toggle tampilkan NIP, dan toggle kolom ekstra ke-5.
+   - **Lampiran II (Uraian Tugas Tim):** Dilengkapi toggle *Tampilkan di Cetak SK / Disembunyikan (Di Dalam Diktum)* dan tombol 1-klik *"Salin dari Diktum Tugas"*. Jika dinonaktifkan, Lampiran III otomatis bergeser menjadi `LAMPIRAN II`.
+   - **Lampiran III (Struktur Organisasi Tim):** Bagan kotak bergaris ganda (*double-border* `3px double #000`) standar SK pengadilan (`KETUA TIM`, cabang `SEKRETARIS`, dan kotak `ANGGOTA` bernomor urut) yang otomatis disinkronkan dari Tabel Lampiran I (`syncBaganFromLampiranTabel`).
+4. **Penguncian 1 Baris = 1 SK & Sinkronisasi Revisi SK (`🌿`):**
+   - `normalizeSkBuilderDoc(doc)` mengunci `doc.id`, membersihkan akhiran `.PDF` pada judul, dan mengonversi `doc.members` menjadi baris Lampiran I & Bagan Lampiran III secara otomatis jika lampiran sebelumnya masih kosong.
+   - `openRevisiModal`, `openBuilderFromRevisi`, dan `submitSkRevisi` menyinkronkan perubahan personil di *Personnel Switcher* langsung ke `members`, `Lampiran I (Tabel)`, dan `Lampiran III (Bagan)` pada baris SK terkait.
+5. **Kamus 19 Placeholder Google Docs & Pratinjau A4 5-Halaman:**
+   - Menyediakan panel interaktif **Kamus Placeholder Google Docs** dengan fitur *1-Click Copy* (`{{PEJABAT_PEMBUAT}}` s.d. `{{BAGAN_LAMPIRAN_3}}`) beserta input `template_gdoc_id`.
+
+#### 3. Estimasi Dampak & File yang Dimodifikasi
+- **File Dimodifikasi:**
+  1. [`modules/sk/sk_builder.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/sk/sk_builder.js) & [`sk/js_sk_builder.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sk/js_sk_builder.html)
+  2. [`modules/sk/view_sk_builder.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/sk/view_sk_builder.html) & [`sk/view_sk_builder.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sk/view_sk_builder.html)
+  3. [`modules/sk/view_sk_revisi.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/sk/view_sk_revisi.html) & [`sk/view_sk_revisi.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sk/view_sk_revisi.html)
+  4. [`modules/sk/sk.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/sk/sk.js) & [`sk/js_sk.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sk/js_sk.html)
+  5. [`css/sk_builder.css`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/css/sk_builder.css) & [`sk/css_sk_builder.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sk/css_sk_builder.html)
+  6. [`core/firebase.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/core/firebase.js) & [`javascript_firebase.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/javascript_firebase.html)
+  7. [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) & [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js)
+- **Status:** `[SELESAI & AKTIF]` ✅

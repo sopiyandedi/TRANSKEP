@@ -1,6 +1,6 @@
 <script>
 // ========================================================
-// FILE: sk/js_sk_builder.html
+// FILE: transkep-web/modules/sk/sk_builder.js
 // CONTROLLER & STATE MIXIN: SMART SK BUILDER & REVISI ENGINE
 // ========================================================
 
@@ -9,45 +9,81 @@ window.SkBuilderMixin = {
     return {
       showModalSkBuilder: false,
       showModalSkRevisi: false,
+      showKamusPlaceholder: false,
       builderStep: 1,
       activeLampiranIndex: 0,
       isSavingBuilder: false,
       isSubmittingRevisi: false,
+      isParsingSkDocx: false,
+      isGeneratingGDoc: false,
       targetRevisiDoc: null,
       revisiMembers: [],
       revisiForm: {
         catatan: '',
         klausul_menimbang: ''
       },
+      skPlaceholderList: [
+        { tag: '{{PEJABAT_PEMBUAT}}', label: 'Pejabat Pembuat SK', desc: 'KETUA / SEKRETARIS PENGADILAN AGAMA INDRAMAYU' },
+        { tag: '{{NOMOR_SK}}', label: 'Nomor Surat Keputusan', desc: 'Nomor lengkap SK (misal: 1056/KPA.W10-A2/SK.PW1.2.1/X/2026)' },
+        { tag: '{{JUDUL_SK}}', label: 'Judul / Tentang SK', desc: 'Judul keputusan di bawah kata TENTANG' },
+        { tag: '{{MEMBACA}}', label: 'Konsiderans Membaca', desc: 'Daftar butir Membaca (otomatis bernomor jika > 1)' },
+        { tag: '{{MENIMBANG}}', label: 'Konsiderans Menimbang', desc: 'Daftar butir Menimbang (a., b., c., dst.)' },
+        { tag: '{{MENGINGAT}}', label: 'Dasar Hukum Mengingat', desc: 'Daftar butir Mengingat (1., 2., 3., dst.)' },
+        { tag: '{{MEMPERHATIKAN}}', label: ' bagian Memperhatikan', desc: 'Daftar butir Memperhatikan (1., 2., dst.)' },
+        { tag: '{{MENETAPKAN}}', label: 'Kalimat Menetapkan', desc: 'KEPUTUSAN KETUA ... TENTANG ...' },
+        { tag: '{{DIKTUM_FULL}}', label: 'Seluruh Diktum (Kesatu–Dst)', desc: 'Gabungan otomatis seluruh diktum Kesatu s.d. selesai' },
+        { tag: '{{DIKTUM_KESATU}}', label: 'Isi Diktum Kesatu', desc: 'Khusus teks isi Diktum Kesatu (tersedia s.d. {{DIKTUM_KETUJUH}})' },
+        { tag: '{{TEMPAT_SK}}', label: 'Tempat Ditetapkan', desc: 'Indramayu' },
+        { tag: '{{TANGGAL_SK}}', label: 'Tanggal Titi Mangsa', desc: 'Tanggal format Indonesia (misal: 26 Oktober 2026)' },
+        { tag: '{{JABATAN_TTD}}', label: 'Jabatan Penandatangan', desc: 'Ketua, / Sekretaris,' },
+        { tag: '{{NAMA_TTD}}', label: 'Nama Pejabat TTD', desc: 'Nama lengkap dan gelar pejabat penandatangan' },
+        { tag: '{{NIP_TTD}}', label: 'NIP Pejabat TTD', desc: 'NIP 18 digit pejabat penandatangan' },
+        { tag: '{{TEMBUSAN}}', label: 'Daftar Salinan / Tembusan', desc: 'Daftar penerima salinan/tembusan SK (1., 2., dst.)' },
+        { tag: '{{TABEL_LAMPIRAN_1}}', label: 'Tabel Lampiran I (Tim)', desc: 'Injeksi otomatis tabel daftar nama & jabatan tim' },
+        { tag: '{{TEKS_LAMPIRAN_2}}', label: 'Teks Lampiran II (Tugas)', desc: 'Injeksi otomatis rincian uraian tugas tim' },
+        { tag: '{{BAGAN_LAMPIRAN_3}}', label: 'Bagan Lampiran III (Struktur)', desc: 'Injeksi otomatis struktur organisasi tim' }
+      ],
       skBuilderDoc: {
         id: '',
         no_sk: '',
         judul_sk: '',
         pj_sk: 'PJ. Kesekretariatan',
         tgl_sk: new Date().toISOString().split('T')[0],
+        link_drive: '',
+        template_gdoc_id: '',
         status: 'Aktif',
         versi_aktif: 1,
         naskah_utama: {
           kop: 'PENGADILAN AGAMA INDRAMAYU KELAS I A',
+          pejabat_pembuat: 'KETUA PENGADILAN AGAMA INDRAMAYU',
+          membaca: ['-'],
           menimbang: [
-            'bahwa dalam rangka memperlancar pelaksanaan tugas pokok dan fungsi, perlu dibentuk tim kerja yang terstruktur;',
-            'bahwa berdasarkan pertimbangan sebagaimana dimaksud, perlu menetapkan Keputusan Ketua Pengadilan Agama Indramayu.'
+            'Bahwa dalam rangka memperlancar pelaksanaan tugas pokok dan fungsi, perlu dibentuk tim kerja yang terstruktur;',
+            'Bahwa berdasarkan pertimbangan sebagaimana dimaksud, perlu menetapkan Keputusan Ketua Pengadilan Agama Indramayu.'
           ],
           mengingat: [
             'Undang-Undang Nomor 7 Tahun 1989 tentang Peradilan Agama sebagaimana telah diubah dengan UU No. 3 Tahun 2006 dan UU No. 50 Tahun 2009;',
             'Undang-Undang Nomor 5 Tahun 2014 tentang Aparatur Sipil Negara;',
             'Keputusan Ketua Mahkamah Agung Republik Indonesia tentang Pedoman Tata Naskah Dinas.'
           ],
+          memperhatikan: ['-'],
+          menetapkan: '',
           diktum: [
-            { label: 'KESATU', isi: 'Membentuk dan menetapkan susunan Tim Kerja sebagaimana tercantum dalam Lampiran yang merupakan bagian tidak terpisahkan dari Keputusan ini.' },
-            { label: 'KEDUA', isi: 'Tim Kerja bertugas dan bertanggung jawab langsung kepada Ketua Pengadilan Agama Indramayu.' },
-            { label: 'KETIGA', isi: 'Keputusan ini berlaku sejak tanggal ditetapkan dengan ketentuan apabila di kemudian hari terdapat kekeliruan akan diperbaiki sebagaimana mestinya.' }
+            { label: 'KESATU', isi: 'Membentuk dan menetapkan susunan Tim Kerja sebagaimana tercantum dalam Lampiran yang merupakan bagian tidak terpisahkan dari Keputusan ini;' },
+            { label: 'KEDUA', isi: 'Tim Kerja bertugas dan bertanggung jawab langsung kepada Ketua Pengadilan Agama Indramayu;' },
+            { label: 'KETIGA', isi: 'Keputusan ini mulai berlaku sejak tanggal ditetapkan dengan ketentuan apabila di kemudian hari terdapat kekeliruan di dalamnya akan diadakan perbaikan sebagaimana mestinya.' }
           ],
+          tempat_sk: 'Indramayu',
+          tgl_sk_teks: '',
           pejabat: {
-            jabatan: 'Ketua Pengadilan Agama Indramayu',
+            jabatan: 'Ketua,',
             nama: 'Drs. H. M. YAHYA, M.H.',
             nip: '196512311994031011'
-          }
+          },
+          tembusan: [
+            'Yth. Ketua Pengadilan Tinggi Agama Bandung;',
+            'Yang bersangkutan untuk dilaksanakan.'
+          ]
         },
         lampiran: [],
         revisi_history: []
@@ -58,19 +94,375 @@ window.SkBuilderMixin = {
     currentLampiran() {
       if (!this.skBuilderDoc || !Array.isArray(this.skBuilderDoc.lampiran)) return null;
       return this.skBuilderDoc.lampiran[this.activeLampiranIndex] || null;
+    },
+    activeLampiranList() {
+      if (!this.skBuilderDoc || !Array.isArray(this.skBuilderDoc.lampiran)) return [];
+      return this.skBuilderDoc.lampiran.filter(l => l && l.aktif !== false);
+    },
+    computedMenetapkanText() {
+      if (!this.skBuilderDoc || !this.skBuilderDoc.naskah_utama) return '';
+      if (this.skBuilderDoc.naskah_utama.menetapkan && this.skBuilderDoc.naskah_utama.menetapkan.trim()) {
+        return this.skBuilderDoc.naskah_utama.menetapkan.trim();
+      }
+      const pjb = this.skBuilderDoc.naskah_utama.pejabat_pembuat || 'KETUA PENGADILAN AGAMA INDRAMAYU';
+      const jdl = (this.skBuilderDoc.judul_sk || '[JUDUL KEPUTUSAN]').replace(/\.(pdf|docx?)$/i, '').trim();
+      return `KEPUTUSAN ${pjb} TENTANG ${jdl}.`.toUpperCase();
+    },
+    computedTglSkIndo() {
+      if (!this.skBuilderDoc) return '....................';
+      if (this.skBuilderDoc.naskah_utama && this.skBuilderDoc.naskah_utama.tgl_sk_teks && this.skBuilderDoc.naskah_utama.tgl_sk_teks.trim()) {
+        return this.skBuilderDoc.naskah_utama.tgl_sk_teks.trim();
+      }
+      return this.formatIsoToIndoDate(this.skBuilderDoc.tgl_sk);
     }
   },
   methods: {
     // ----------------------------------------------------
-    // 1. LIFECYCLE MODAL BUILDER
+    // 0. HELPER TANGGAL, AUTO-ROWS & DEFAULT SCHEMA
+    // ----------------------------------------------------
+    calcAutoRows(text, minRows = 2, charsPerLine = 88) {
+      if (!text) return minRows;
+      const str = String(text);
+      const lines = str.split('\n');
+      let totalRows = 0;
+      lines.forEach(line => {
+        totalRows += Math.max(1, Math.ceil((line.length || 1) / charsPerLine));
+      });
+      return Math.max(minRows, totalRows);
+    },
+
+    formatIsoToIndoDate(isoStr) {
+      if (!isoStr || isoStr === '-') return '....................';
+      const months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+      const mIso = String(isoStr).match(/^(\d{4})-(\d{2})-(\d{2})/);
+      if (mIso) {
+        const day = parseInt(mIso[3], 10);
+        const mon = months[parseInt(mIso[2], 10) - 1] || '';
+        return `${day} ${mon} ${mIso[1]}`;
+      }
+      return String(isoStr);
+    },
+
+    parseIndoDateToIso(dateStr) {
+      if (!dateStr) return '';
+      const clean = String(dateStr).trim();
+      if (/^\d{4}-\d{2}-\d{2}$/.test(clean)) return clean;
+      const monthMap = {
+        januari: '01', jan: '01',
+        februari: '02', pebruari: '02', feb: '02',
+        maret: '03', mar: '03',
+        april: '04', apr: '04',
+        mei: '05', may: '05',
+        juni: '06', jun: '06',
+        juli: '07', jul: '07',
+        agustus: '08', aug: '08', agu: '08',
+        september: '09', sep: '09', sept: '09',
+        oktober: '10', oct: '10', okt: '10',
+        november: '11', nopember: '11', nov: '11',
+        desember: '12', dec: '12', des: '12'
+      };
+      const m = clean.match(/(\d{1,2})\s*[-\/\s]\s*([a-zA-Z]+)\s*[-\/\s]\s*(\d{4})/);
+      if (m) {
+        const dd = String(m[1]).padStart(2, '0');
+        const mm = monthMap[m[2].toLowerCase()];
+        const yyyy = m[3];
+        if (mm) return `${yyyy}-${mm}-${dd}`;
+      }
+      const mSlash = clean.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+      if (mSlash) {
+        return `${mSlash[3]}-${String(mSlash[2]).padStart(2, '0')}-${String(mSlash[1]).padStart(2, '0')}`;
+      }
+      return '';
+    },
+
+    onTglSkDateChange() {
+      if (this.skBuilderDoc && this.skBuilderDoc.tgl_sk && this.skBuilderDoc.naskah_utama) {
+        this.skBuilderDoc.naskah_utama.tgl_sk_teks = this.formatIsoToIndoDate(this.skBuilderDoc.tgl_sk);
+      }
+    },
+
+    getDefaultSignatoryByIssuer(pejabatPembuat) {
+      const isSekretaris = /SEKRETARIS/i.test(pejabatPembuat || '');
+      const uList = (this.globalState && Array.isArray(this.globalState.usersList)) ? this.globalState.usersList : [];
+      if (isSekretaris) {
+        const sekUser = uList.find(u => /\bsekretaris\b/i.test(u.jabatan || '') && !/kasubbag|staf/i.test(u.jabatan || ''));
+        return {
+          jabatan: 'Sekretaris,',
+          nama: sekUser ? sekUser.nama : 'H. AHMAD SYAFI\'I, S.Ag.',
+          nip: sekUser ? sekUser.nip : ''
+        };
+      }
+      const ketuaUser = uList.find(u => /^ketua/i.test((u.jabatan || '').trim()) && !/wakil|panitera|muda/i.test(u.jabatan || ''));
+      return {
+        jabatan: 'Ketua,',
+        nama: ketuaUser ? ketuaUser.nama : 'Drs. H. M. YAHYA, M.H.',
+        nip: ketuaUser ? ketuaUser.nip : '196512311994031011'
+      };
+    },
+
+    onPejabatPembuatChange() {
+      if (!this.skBuilderDoc || !this.skBuilderDoc.naskah_utama) return;
+      const sig = this.getDefaultSignatoryByIssuer(this.skBuilderDoc.naskah_utama.pejabat_pembuat);
+      this.skBuilderDoc.naskah_utama.pejabat.jabatan = sig.jabatan;
+      if (!this.skBuilderDoc.naskah_utama.pejabat.nama || this.skBuilderDoc.naskah_utama.pejabat.nama.toLowerCase() === 'noname') {
+        this.skBuilderDoc.naskah_utama.pejabat.nama = sig.nama;
+        this.skBuilderDoc.naskah_utama.pejabat.nip = sig.nip;
+      }
+    },
+
+    createDefaultThreeLampiran(judulSk = '') {
+      const cleanTitle = (judulSk || 'TIM KERJA PENGADILAN AGAMA INDRAMAYU KELAS I A').replace(/\.(pdf|docx?)$/i, '').trim().toUpperCase();
+      return [
+        {
+          id: 'lamp-1',
+          slot_label: 'Daftar Nama Tim',
+          judul: cleanTitle,
+          tipe: 'tabel',
+          aktif: true,
+          show_extra_col: false,
+          show_nip: false,
+          kolom_headers: {
+            no: 'No',
+            nama: 'Nama',
+            jabatan_dinas: 'Jabatan Dalam Dinas',
+            jabatan_tim: 'Jabatan Tim',
+            extra: 'Keterangan'
+          },
+          data: [
+            { nama: '', nip: '', jabatan_dinas: 'Wakil Ketua', jabatan_tim: 'Ketua Tim', extra: '' },
+            { nama: '', nip: '', jabatan_dinas: 'Sekretaris', jabatan_tim: 'Sekretaris', extra: '' },
+            { nama: '', nip: '', jabatan_dinas: 'Hakim', jabatan_tim: 'Anggota', extra: '' }
+          ]
+        },
+        {
+          id: 'lamp-2',
+          slot_label: 'Uraian Tugas Tim',
+          judul: 'URAIAN TUGAS ' + cleanTitle,
+          tipe: 'teks',
+          aktif: false,
+          data: '1. Merencanakan dan menyusun program kerja kegiatan tahun berjalan.\n2. Melaksanakan koordinasi teknis dan evaluasi pelaksanaan tugas secara berkala.\n3. Menyusun dan menyampaikan laporan hasil pelaksanaan tugas kepada Pimpinan Pengadilan Agama Indramayu.'
+        },
+        {
+          id: 'lamp-3',
+          slot_label: 'Struktur Tim',
+          judul: 'STRUKTUR ' + cleanTitle,
+          tipe: 'bagan_struktur',
+          aktif: true,
+          data: {
+            pengarah_list: [],
+            ketua: { role: 'KETUA TIM', nama: '', nip: '', jabatan_dinas: 'Wakil Ketua' },
+            sekretaris: { role: 'SEKRETARIS', nama: '', nip: '', jabatan_dinas: 'Sekretaris' },
+            anggota_list: [
+              { nama: '', nip: '', jabatan_dinas: 'Hakim' }
+            ],
+            level_1: [{ role: 'Pembina / Pengarah', nama: '', nip: '' }],
+            level_2: [{ role: 'Ketua Tim', nama: '', nip: '' }],
+            level_3: [{ role: 'Sekretaris', nama: '', nip: '' }],
+            level_4: [{ role: 'Anggota', nama: '', nip: '' }]
+          }
+        }
+      ];
+    },
+
+    normalizeSkBuilderDoc(rawDoc) {
+      const d = rawDoc ? JSON.parse(JSON.stringify(rawDoc)) : {};
+      const cleanJudul = String(d.judul_sk || '').replace(/\.(pdf|docx?)$/i, '').trim();
+
+      let defaultPejabatPembuat = 'KETUA PENGADILAN AGAMA INDRAMAYU';
+      if (d.no_sk && /\/SEK\./i.test(d.no_sk) && !/\/KPA\./i.test(d.no_sk)) {
+        defaultPejabatPembuat = 'SEKRETARIS PENGADILAN AGAMA INDRAMAYU';
+      }
+
+      const nu = d.naskah_utama || {};
+      const sigDefault = this.getDefaultSignatoryByIssuer(nu.pejabat_pembuat || defaultPejabatPembuat);
+
+      let isoTgl = d.tgl_sk || new Date().toISOString().split('T')[0];
+      const parsedIso = this.parseIndoDateToIso(isoTgl);
+      if (parsedIso) isoTgl = parsedIso;
+
+      const normalizedNu = {
+        kop: nu.kop || 'PENGADILAN AGAMA INDRAMAYU KELAS I A',
+        pejabat_pembuat: nu.pejabat_pembuat || defaultPejabatPembuat,
+        membaca: Array.isArray(nu.membaca) && nu.membaca.length > 0 ? nu.membaca : ['-'],
+        menimbang: Array.isArray(nu.menimbang) && nu.menimbang.length > 0 ? nu.menimbang : [
+          'Bahwa dalam rangka memperlancar pelaksanaan tugas pokok dan fungsi, perlu dibentuk tim kerja yang terstruktur;',
+          'Bahwa nama-nama yang tercantum dalam Keputusan ini dipandang cakap dan mampu melaksanakan tugas;'
+        ],
+        mengingat: Array.isArray(nu.mengingat) && nu.mengingat.length > 0 ? nu.mengingat : [
+          'Undang-Undang Nomor 7 Tahun 1989 tentang Peradilan Agama sebagaimana telah diubah dengan UU No. 3 Tahun 2006 dan UU No. 50 Tahun 2009;',
+          'Undang-Undang Nomor 5 Tahun 2014 tentang Aparatur Sipil Negara;'
+        ],
+        memperhatikan: Array.isArray(nu.memperhatikan) && nu.memperhatikan.length > 0 ? nu.memperhatikan : ['-'],
+        menetapkan: nu.menetapkan || (cleanJudul ? `KEPUTUSAN ${nu.pejabat_pembuat || defaultPejabatPembuat} TENTANG ${cleanJudul.toUpperCase()}.` : ''),
+        diktum: Array.isArray(nu.diktum) && nu.diktum.length > 0 ? nu.diktum : [
+          { label: 'KESATU', isi: `Menetapkan Keputusan ${nu.pejabat_pembuat === 'SEKRETARIS PENGADILAN AGAMA INDRAMAYU' ? 'Sekretaris' : 'Ketua'} Pengadilan Agama Indramayu tentang ${cleanJudul || 'Tim Kerja Pengadilan Agama Indramayu'};` },
+          { label: 'KEDUA', isi: 'Menetapkan dan menunjuk nama-nama yang tercantum dalam lampiran Keputusan ini sebagai Tim Kerja pada Pengadilan Agama Indramayu Kelas I.A;' },
+          { label: 'KETIGA', isi: 'Keputusan ini mulai berlaku sejak tanggal ditetapkan dengan ketentuan apabila di kemudian hari terdapat kekeliruan di dalamnya akan diadakan perbaikan sebagaimana mestinya.' }
+        ],
+        tempat_sk: nu.tempat_sk || 'Indramayu',
+        tgl_sk_teks: nu.tgl_sk_teks || this.formatIsoToIndoDate(isoTgl),
+        pejabat: {
+          jabatan: (nu.pejabat && nu.pejabat.jabatan) ? nu.pejabat.jabatan : sigDefault.jabatan,
+          nama: (nu.pejabat && nu.pejabat.nama) ? nu.pejabat.nama : sigDefault.nama,
+          nip: (nu.pejabat && nu.pejabat.nip !== undefined) ? nu.pejabat.nip : sigDefault.nip
+        },
+        tembusan: Array.isArray(nu.tembusan) && nu.tembusan.length > 0 ? nu.tembusan : [
+          'Yth. Ketua Pengadilan Tinggi Agama Bandung;',
+          'Yang bersangkutan untuk dilaksanakan.'
+        ]
+      };
+
+      // Normalisasi 3 Lampiran Standar (Tabel, Teks Uraian Tugas, Bagan Struktur)
+      let lampList = Array.isArray(d.lampiran) ? JSON.parse(JSON.stringify(d.lampiran)) : [];
+      const defaults = this.createDefaultThreeLampiran(cleanJudul);
+
+      if (lampList.length === 0) {
+        lampList = defaults;
+        // Jika baris SK memiliki members (dari form tambah SK biasa), konversi otomatis ke Lampiran I & III!
+        if (Array.isArray(d.members) && d.members.length > 0) {
+          lampList[0].data = this.convertMembersArrayToTableRows(d.members);
+        }
+      } else {
+        // Pastikan setiap lampiran yang ada memiliki properti lengkap dan minimal tersedia 3 slot (Tabel, Teks, Bagan)
+        let hasTabel = lampList.find(l => l.tipe === 'tabel');
+        let hasTeks = lampList.find(l => l.tipe === 'teks');
+        let hasBagan = lampList.find(l => l.tipe === 'bagan_struktur');
+
+        if (!hasTabel) {
+          hasTabel = defaults[0];
+          if (Array.isArray(d.members) && d.members.length > 0) {
+            hasTabel.data = this.convertMembersArrayToTableRows(d.members);
+          }
+          lampList.unshift(hasTabel);
+        }
+        if (!hasTeks) {
+          hasTeks = defaults[1];
+          // Sisipkan di urutan ke-2
+          lampList.splice(1, 0, hasTeks);
+        }
+        if (!hasBagan) {
+          hasBagan = defaults[2];
+          lampList.push(hasBagan);
+        }
+
+        lampList.forEach(l => {
+          if (l.aktif === undefined) l.aktif = true;
+          if (l.tipe === 'tabel') {
+            l.slot_label = l.slot_label || 'Daftar Nama Tim';
+            l.show_extra_col = !!l.show_extra_col;
+            l.show_nip = !!l.show_nip;
+            l.kolom_headers = Object.assign({
+              no: 'No',
+              nama: 'Nama',
+              jabatan_dinas: 'Jabatan Dalam Dinas',
+              jabatan_tim: 'Jabatan Tim',
+              extra: 'Keterangan'
+            }, l.kolom_headers || {});
+            if (!Array.isArray(l.data)) l.data = [];
+            l.data = l.data.map(r => ({
+              nama: r.nama || '',
+              nip: r.nip || '',
+              jabatan_dinas: r.jabatan_dinas || '',
+              jabatan_tim: r.jabatan_tim || 'Anggota',
+              extra: r.extra || ''
+            }));
+          } else if (l.tipe === 'teks') {
+            l.slot_label = l.slot_label || 'Uraian Tugas Tim';
+            if (typeof l.data !== 'string') l.data = '';
+          } else if (l.tipe === 'bagan_struktur') {
+            l.slot_label = l.slot_label || 'Struktur Tim';
+            l.data = this.normalizeBaganData(l.data);
+          }
+        });
+      }
+
+      this.skBuilderDoc = {
+        id: d.id || '',
+        no_sk: (d.no_sk && d.no_sk !== '-') ? d.no_sk : '',
+        judul_sk: cleanJudul,
+        pj_sk: d.pj_sk || 'PJ. Kesekretariatan',
+        tgl_sk: isoTgl,
+        tgl_input: d.tgl_input || UtilitiesDateNow(),
+        link_drive: d.link_drive || '',
+        template_gdoc_id: d.template_gdoc_id || '',
+        status: d.status || 'Aktif',
+        versi_aktif: d.versi_aktif || 1,
+        naskah_utama: normalizedNu,
+        lampiran: lampList,
+        members: Array.isArray(d.members) ? d.members : [],
+        revisi_history: Array.isArray(d.revisi_history) ? d.revisi_history : []
+      };
+
+      // Sinkronkan bagan struktur jika masih kosong tapi tabel sudah terisi
+      const baganLamp = this.skBuilderDoc.lampiran.find(l => l.tipe === 'bagan_struktur');
+      if (baganLamp && (!baganLamp.data.ketua || !baganLamp.data.ketua.nama)) {
+        this.syncBaganFromLampiranTabel(true);
+      }
+    },
+
+    normalizeBaganData(rawBagan) {
+      const b = (rawBagan && typeof rawBagan === 'object' && !Array.isArray(rawBagan)) ? rawBagan : {};
+      const pengarahList = Array.isArray(b.pengarah_list) ? b.pengarah_list : [];
+      const ketua = (b.ketua && typeof b.ketua === 'object')
+        ? b.ketua
+        : (Array.isArray(b.level_2) && b.level_2[0] ? { role: b.level_2[0].role || 'KETUA TIM', nama: b.level_2[0].nama || '', nip: b.level_2[0].nip || '', jabatan_dinas: '' } : { role: 'KETUA TIM', nama: '', nip: '', jabatan_dinas: '' });
+      const sekretaris = (b.sekretaris && typeof b.sekretaris === 'object')
+        ? b.sekretaris
+        : (Array.isArray(b.level_3) && b.level_3[0] ? { role: b.level_3[0].role || 'SEKRETARIS', nama: b.level_3[0].nama || '', nip: b.level_3[0].nip || '', jabatan_dinas: '' } : { role: 'SEKRETARIS', nama: '', nip: '', jabatan_dinas: '' });
+      const anggotaList = Array.isArray(b.anggota_list) && b.anggota_list.length > 0
+        ? b.anggota_list
+        : (Array.isArray(b.level_4) ? b.level_4.map(n => ({ nama: n.nama || '', nip: n.nip || '', jabatan_dinas: '' })) : [{ nama: '', nip: '', jabatan_dinas: '' }]);
+
+      return {
+        pengarah_list: pengarahList,
+        ketua,
+        sekretaris,
+        anggota_list: anggotaList,
+        level_1: Array.isArray(b.level_1) && b.level_1.length > 0 ? b.level_1 : [{ role: 'Pembina / Pengarah', nama: '', nip: '' }],
+        level_2: [{ role: ketua.role || 'KETUA TIM', nama: ketua.nama || '', nip: ketua.nip || '' }],
+        level_3: [{ role: sekretaris.role || 'SEKRETARIS', nama: sekretaris.nama || '', nip: sekretaris.nip || '' }],
+        level_4: anggotaList.map(a => ({ role: 'Anggota', nama: a.nama || '', nip: a.nip || '' }))
+      };
+    },
+
+    convertMembersArrayToTableRows(membersArr) {
+      const uList = (this.globalState && Array.isArray(this.globalState.usersList)) ? this.globalState.usersList : [];
+      const rows = [];
+      (membersArr || []).forEach(m => {
+        const nipStr = String(m.nip || '').trim();
+        if (!nipStr) return;
+        if (nipStr.startsWith('[TAG:')) {
+          const tagLabel = (this.groupTagsOptions && this.groupTagsOptions[nipStr]) ? this.groupTagsOptions[nipStr].label : nipStr;
+          rows.push({
+            nama: `[GRUP] ${tagLabel}`,
+            nip: nipStr,
+            jabatan_dinas: 'Seluruh Personil Terkait',
+            jabatan_tim: m.peran || 'Anggota',
+            extra: ''
+          });
+        } else {
+          const userObj = uList.find(u => String(u.nip).trim() === nipStr);
+          rows.push({
+            nama: userObj ? userObj.nama : nipStr,
+            nip: nipStr,
+            jabatan_dinas: userObj ? (userObj.jabatan || '-') : '-',
+            jabatan_tim: m.peran || 'Anggota',
+            extra: userObj ? (userObj.pangkat || '') : ''
+          });
+        }
+      });
+      return rows;
+    },
+
+    // ----------------------------------------------------
+    // 1. LIFECYCLE MODAL BUILDER (1 BARIS = 1 SK)
     // ----------------------------------------------------
     openSkBuilder(doc = null) {
       this.builderStep = 1;
       this.activeLampiranIndex = 0;
+      this.showKamusPlaceholder = false;
       if (doc) {
-        this.skBuilderDoc = JSON.parse(JSON.stringify(doc));
-        if (!this.skBuilderDoc.naskah_utama) this.initDefaultNaskahUtama();
-        if (!Array.isArray(this.skBuilderDoc.lampiran)) this.skBuilderDoc.lampiran = [];
+        this.normalizeSkBuilderDoc(doc);
       } else {
         this.resetSkBuilderDoc();
       }
@@ -78,39 +470,36 @@ window.SkBuilderMixin = {
     },
 
     openSkBuilderFromInput() {
-      // Transfer data pokok dari Form Input SK biasa ke Studio Builder
-      this.resetSkBuilderDoc();
+      let baseDoc = null;
+      if (this.formSk && this.formSk.id) {
+        baseDoc = (this.groupedSkData || []).find(s => s.id === this.formSk.id) || null;
+      }
+      const merged = baseDoc ? JSON.parse(JSON.stringify(baseDoc)) : {};
       if (this.formSk) {
-        if (this.formSk.judul_sk) this.skBuilderDoc.judul_sk = this.formSk.judul_sk;
-        if (this.formSk.no_sk) this.skBuilderDoc.no_sk = this.formSk.no_sk;
-        if (this.formSk.pj_sk) this.skBuilderDoc.pj_sk = this.formSk.pj_sk;
-        if (this.formSk.tgl_sk) this.skBuilderDoc.tgl_sk = this.formSk.tgl_sk;
+        if (this.formSk.id) merged.id = this.formSk.id;
+        if (this.formSk.judul_sk) merged.judul_sk = this.formSk.judul_sk;
+        if (this.formSk.no_sk) merged.no_sk = this.formSk.no_sk;
+        if (this.formSk.pj_sk) merged.pj_sk = this.formSk.pj_sk;
+        if (this.formSk.tgl_sk) merged.tgl_sk = this.formSk.tgl_sk;
+        if (this.formSk.link_drive) merged.link_drive = this.formSk.link_drive;
+      }
+      if (Array.isArray(this.tempMembers) && this.tempMembers.length > 0) {
+        merged.members = JSON.parse(JSON.stringify(this.tempMembers));
       }
 
-      // Jika ada anggota yang sudah dipilih di form biasa, jadikan Lampiran 1 (Tabel)
+      this.normalizeSkBuilderDoc(merged);
       if (Array.isArray(this.tempMembers) && this.tempMembers.length > 0) {
-        const tableData = this.tempMembers.map(m => {
-          const userObj = (this.globalState.usersList || []).find(u => u.nip === m.nip);
-          return {
-            jabatan_tim: m.peran || 'Anggota',
-            nama: userObj ? `${userObj.nama} (${userObj.nip})` : m.nip,
-            nip: m.nip,
-            jabatan_dinas: userObj ? userObj.jabatan : '-'
-          };
-        });
-
-        this.skBuilderDoc.lampiran.push({
-          id: 'lamp-1',
-          judul: 'SUSUNAN PERSONIL TIM KERJA',
-          tipe: 'tabel',
-          data: tableData
-        });
+        const tblLamp = this.skBuilderDoc.lampiran.find(l => l.tipe === 'tabel');
+        if (tblLamp) {
+          tblLamp.data = this.convertMembersArrayToTableRows(this.tempMembers);
+          this.syncBaganFromLampiranTabel(true);
+        }
       }
 
       this.showModalSkForm = false;
       this.showModalSkBuilder = true;
       if (window.showNotify) {
-        window.showNotify("Data Ditransfer", "Data pokok SK berhasil dialirkan ke Smart SK Studio Builder.", "success");
+        window.showNotify("Data Ditransfer", "Data pokok & anggota SK berhasil dialirkan ke Smart SK Studio Builder.", "success");
       }
     },
 
@@ -119,58 +508,646 @@ window.SkBuilderMixin = {
     },
 
     resetSkBuilderDoc() {
-      this.skBuilderDoc = {
+      this.normalizeSkBuilderDoc({
         id: '',
         no_sk: '',
         judul_sk: '',
         pj_sk: 'PJ. Kesekretariatan',
         tgl_sk: new Date().toISOString().split('T')[0],
         status: 'Aktif',
-        versi_aktif: 1,
-        naskah_utama: {
-          kop: 'PENGADILAN AGAMA INDRAMAYU KELAS I A',
-          menimbang: [
-            'bahwa dalam rangka memperlancar pelaksanaan tugas pokok dan fungsi, perlu dibentuk tim kerja yang terstruktur;',
-            'bahwa berdasarkan pertimbangan sebagaimana dimaksud, perlu menetapkan Keputusan Ketua Pengadilan Agama Indramayu.'
-          ],
-          mengingat: [
-            'Undang-Undang Nomor 7 Tahun 1989 tentang Peradilan Agama sebagaimana telah diubah dengan UU No. 3 Tahun 2006 dan UU No. 50 Tahun 2009;',
-            'Undang-Undang Nomor 5 Tahun 2014 tentang Aparatur Sipil Negara;',
-            'Keputusan Ketua Mahkamah Agung Republik Indonesia tentang Pedoman Tata Naskah Dinas.'
-          ],
-          diktum: [
-            { label: 'KESATU', isi: 'Membentuk dan menetapkan susunan Tim Kerja sebagaimana tercantum dalam Lampiran yang merupakan bagian tidak terpisahkan dari Keputusan ini.' },
-            { label: 'KEDUA', isi: 'Tim Kerja bertugas dan bertanggung jawab langsung kepada Ketua Pengadilan Agama Indramayu.' },
-            { label: 'KETIGA', isi: 'Keputusan ini berlaku sejak tanggal ditetapkan dengan ketentuan apabila di kemudian hari terdapat kekeliruan akan diperbaiki sebagaimana mestinya.' }
-          ],
-          pejabat: {
-            jabatan: 'Ketua Pengadilan Agama Indramayu',
-            nama: 'Drs. H. M. YAHYA, M.H.',
-            nip: '196512311994031011'
-          }
-        },
-        lampiran: [],
-        revisi_history: []
-      };
+        versi_aktif: 1
+      });
     },
 
     initDefaultNaskahUtama() {
-      this.skBuilderDoc.naskah_utama = {
-        kop: 'PENGADILAN AGAMA INDRAMAYU KELAS I A',
-        menimbang: ['bahwa dalam rangka kelancaran tugas dinas...'],
-        mengingat: ['Undang-Undang Nomor 7 Tahun 1989 tentang Peradilan Agama...'],
-        diktum: [{ label: 'KESATU', isi: 'Menetapkan susunan tim...' }],
-        pejabat: {
-          jabatan: 'Ketua Pengadilan Agama Indramayu',
-          nama: 'Drs. H. M. YAHYA, M.H.',
-          nip: '196512311994031011'
-        }
-      };
+      this.resetSkBuilderDoc();
     },
 
     // ----------------------------------------------------
-    // 2. MANIPULASI BUTIR NASKAH UTAMA
+    // 2. SMART WORD (.DOCX & .DOC) IMPORTER ENGINE
     // ----------------------------------------------------
+    triggerSkDocxUpload() {
+      if (this.$refs.skDocxInput) {
+        this.$refs.skDocxInput.value = '';
+        this.$refs.skDocxInput.click();
+      }
+    },
+
+    async handleSkDocxUpload(event) {
+      const file = event && event.target && event.target.files ? event.target.files[0] : null;
+      if (!file) return;
+      await this.processSkWordFile(file);
+      if (event && event.target) event.target.value = '';
+    },
+
+    async processSkWordFile(file) {
+      this.isParsingSkDocx = true;
+      try {
+        const arrayBuffer = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = e => resolve(e.target.result);
+          reader.onerror = () => reject(new Error("Gagal membaca berkas dari perangkat."));
+          reader.readAsArrayBuffer(file);
+        });
+
+        const bytes = new Uint8Array(arrayBuffer);
+        const isZipDocx = bytes.length > 4 && bytes[0] === 0x50 && bytes[1] === 0x4B;
+        const isOleDoc = bytes.length > 8 && bytes[0] === 0xD0 && bytes[1] === 0xCF && bytes[2] === 0x11 && bytes[3] === 0xE0;
+
+        let rawText = '';
+        let htmlText = '';
+
+        if (isZipDocx) {
+          if (typeof mammoth === 'undefined') {
+            throw new Error("Pustaka Mammoth.js belum termuat. Silakan muat ulang halaman.");
+          }
+          const [rawRes, htmlRes] = await Promise.all([
+            mammoth.extractRawText({ arrayBuffer }),
+            mammoth.convertToHtml({ arrayBuffer })
+          ]);
+          rawText = (rawRes && rawRes.value) ? rawRes.value : '';
+          htmlText = (htmlRes && htmlRes.value) ? htmlRes.value : '';
+        } else if (isOleDoc) {
+          rawText = this.extractLegacyDocStream(arrayBuffer);
+        } else {
+          // Fallback: coba mammoth terlebih dahulu, jika gagal ekstrak teks stream
+          try {
+            const [rawRes, htmlRes] = await Promise.all([
+              mammoth.extractRawText({ arrayBuffer }),
+              mammoth.convertToHtml({ arrayBuffer })
+            ]);
+            rawText = (rawRes && rawRes.value) ? rawRes.value : '';
+            htmlText = (htmlRes && htmlRes.value) ? htmlRes.value : '';
+          } catch (e) {
+            rawText = this.extractLegacyDocStream(arrayBuffer);
+          }
+        }
+
+        if (!rawText || rawText.trim().length < 20) {
+          throw new Error("Isi naskah tidak dapat terbaca dari berkas Word tersebut. Pastikan berkas berisi teks Keputusan SK.");
+        }
+
+        this.parseAndApplySkWordData(rawText, htmlText, file.name);
+      } catch (err) {
+        console.error("[Smart SK Importer Error]:", err);
+        if (window.showNotify) {
+          window.showNotify("Gagal Membaca Word", err.message || err.toString(), "error");
+        }
+      } finally {
+        this.isParsingSkDocx = false;
+      }
+    },
+
+    extractLegacyDocStream(arrayBuffer) {
+      const bytes = new Uint8Array(arrayBuffer);
+      let raw = '';
+      for (let i = 0; i < bytes.length; i++) {
+        raw += String.fromCharCode(bytes[i]);
+      }
+
+      let startIdx = -1;
+      const bjbjIdx = raw.indexOf('bjbj');
+      if (bjbjIdx !== -1) {
+        const afterFib = raw.slice(bjbjIdx + 100);
+        const matchStart = afterFib.search(/(KETUA|SEKRETARIS|KEPUTUSAN|PENGADILAN\s+AGAMA|MAHKAMAH\s+AGUNG)/i);
+        if (matchStart !== -1) {
+          startIdx = bjbjIdx + 100 + matchStart;
+        }
+      }
+      if (startIdx === -1) {
+        startIdx = raw.search(/(KEPUTUSAN\s+(KETUA|SEKRETARIS)|KETUA\s+PENGADILAN\s+AGAMA)/i);
+      }
+      if (startIdx === -1) return '';
+
+      let slice = raw.slice(startIdx);
+      const nullRun = slice.indexOf('\x00\x00\x00\x00');
+      if (nullRun !== -1) {
+        slice = slice.slice(0, nullRun);
+      }
+
+      return slice.replace(/[\x00-\x06\x08\x0B\x0C\x0E-\x1F]/g, '');
+    },
+
+    formatDiktumSublist(lines) {
+      if (!Array.isArray(lines) || lines.length === 0) return '';
+      if (lines.length === 1) return lines[0];
+
+      const out = [];
+      let mainNum = 1;
+      let subAlphaIdx = -1;
+
+      for (let i = 0; i < lines.length; i++) {
+        const ln = lines[i].trim();
+        if (!ln) continue;
+
+        if (i === 0 && /:\s*$/.test(ln)) {
+          out.push(ln);
+          continue;
+        }
+
+        // Jika sudah memiliki penomoran eksplisit (1., a., -, •), biarkan apa adanya
+        if (/^(?:\d+\.|[a-z]\.|[-•])\s+/i.test(ln)) {
+          out.push(ln);
+          continue;
+        }
+
+        if (subAlphaIdx >= 0) {
+          const alphaChar = String.fromCharCode(97 + subAlphaIdx);
+          out.push(`   ${alphaChar}. ${ln}`);
+          subAlphaIdx++;
+          // Jika baris diakhiri titik (bukan koma/dan/atau), kembali ke penomoran utama
+          if (/\.\s*$/.test(ln) && !/(?:dan|atau)\s*$/i.test(ln)) {
+            subAlphaIdx = -1;
+          }
+          continue;
+        }
+
+        if (/:\s*$/.test(ln)) {
+          out.push(`${mainNum}. ${ln}`);
+          mainNum++;
+          subAlphaIdx = 0;
+        } else {
+          out.push(`${mainNum}. ${ln}`);
+          mainNum++;
+        }
+      }
+      return out.join('\n');
+    },
+
+    autoMatchPegawaiRow(row) {
+      if (!row) return row;
+      const uList = (this.globalState && Array.isArray(this.globalState.usersList)) ? this.globalState.usersList : [];
+      if (uList.length === 0) return row;
+
+      const rawNama = String(row.nama || '').trim();
+      const rawJabDinas = String(row.jabatan_dinas || '').trim();
+
+      // 1. Cek jika ada NIP 18 digit di dalam teks nama
+      const nipMatch = rawNama.match(/\b(19\d{16}|20\d{16})\b/);
+      if (nipMatch) {
+        const byNip = uList.find(u => String(u.nip).trim() === nipMatch[1]);
+        if (byNip) {
+          row.nip = byNip.nip;
+          row.nama = byNip.nama;
+          if (!row.jabatan_dinas || row.jabatan_dinas === '-') row.jabatan_dinas = byNip.jabatan || '-';
+          return row;
+        }
+      }
+
+      // 2. Pencocokan Nama Pegawai (jika bukan 'noname')
+      if (rawNama && rawNama.toLowerCase() !== 'noname' && rawNama !== '-') {
+        const normTarget = rawNama.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+        let matchedUser = uList.find(u => (u.nama || '').toLowerCase().trim() === rawNama.toLowerCase());
+        if (!matchedUser) {
+          // Strip gelar umum dan cocokkan kata inti nama
+          const stripTitles = s => String(s || '')
+            .replace(/\b(drs|dra|dr|ir|h|hj|sh|mh|sag|ssi|sip|se|st|skom|amd|ab|mm|mpd|ma|shi|mhi|ak|ca)\b\.?/gi, ' ')
+            .replace(/[^a-zA-Z\s]/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim()
+            .toLowerCase();
+          const targetCore = stripTitles(rawNama);
+          if (targetCore.length >= 3) {
+            matchedUser = uList.find(u => {
+              const uCore = stripTitles(u.nama);
+              return uCore && (uCore === targetCore || uCore.includes(targetCore) || targetCore.includes(uCore));
+            });
+          }
+        }
+        if (matchedUser) {
+          row.nip = matchedUser.nip;
+          row.nama = matchedUser.nama;
+          if (!row.jabatan_dinas || row.jabatan_dinas === '-') row.jabatan_dinas = matchedUser.jabatan || '-';
+          return row;
+        }
+      }
+
+      // 3. Jika nama masih 'noname' atau kosong, coba cocokkan dari Jabatan Dalam Dinas yang spesifik (misal: Wakil Ketua, Panitera, Sekretaris)
+      if ((!rawNama || rawNama.toLowerCase() === 'noname') && rawJabDinas) {
+        const jabLower = rawJabDinas.toLowerCase().trim();
+        const candidates = uList.filter(u => {
+          const uJab = (u.jabatan || '').toLowerCase().trim();
+          if (!uJab) return false;
+          if (jabLower === 'wakil ketua') return uJab === 'wakil ketua';
+          if (jabLower === 'ketua') return uJab === 'ketua';
+          if (jabLower === 'panitera') return uJab === 'panitera';
+          if (jabLower === 'sekretaris') return uJab === 'sekretaris';
+          return uJab === jabLower;
+        });
+        if (candidates.length === 1) {
+          row.nip = candidates[0].nip;
+          row.nama = candidates[0].nama;
+        }
+      }
+
+      return row;
+    },
+
+    parseHtmlTablesForLampiran(htmlText) {
+      if (!htmlText || typeof DOMParser === 'undefined') return null;
+      try {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(htmlText, 'text/html');
+        const tables = Array.from(doc.querySelectorAll('table'));
+        for (const tbl of tables) {
+          const trs = Array.from(tbl.querySelectorAll('tr'));
+          if (trs.length < 2) continue;
+
+          // Cari baris header yang memiliki kata 'nama' dan ('jabatan' atau 'kedudukan' atau 'tim' atau 'peran')
+          let headerRowIdx = -1;
+          let headerCells = [];
+          for (let r = 0; r < Math.min(3, trs.length); r++) {
+            const cells = Array.from(trs[r].querySelectorAll('th, td')).map(c => (c.textContent || '').replace(/\s+/g, ' ').trim());
+            const joined = cells.join(' ').toLowerCase();
+            if (joined.includes('nama') && (joined.includes('jabatan') || joined.includes('kedudukan') || joined.includes('tim') || joined.includes('peran'))) {
+              headerRowIdx = r;
+              headerCells = cells;
+              break;
+            }
+          }
+          if (headerRowIdx === -1) continue;
+
+          // Petakan indeks kolom secara adaptif
+          let idxNo = -1, idxNama = -1, idxDinas = -1, idxTim = -1, idxExtra = -1;
+          const headersObj = {
+            no: 'No',
+            nama: 'Nama',
+            jabatan_dinas: 'Jabatan Dalam Dinas',
+            jabatan_tim: 'Jabatan Tim',
+            extra: 'Keterangan'
+          };
+
+          headerCells.forEach((hText, cIdx) => {
+            const hLow = hText.toLowerCase();
+            if (idxNo === -1 && /^(no|nomor|urut)\b/.test(hLow)) {
+              idxNo = cIdx;
+              headersObj.no = hText || 'No';
+            } else if (idxNama === -1 && hLow.includes('nama')) {
+              idxNama = cIdx;
+              headersObj.nama = hText || 'Nama';
+            } else if (idxTim === -1 && (hLow.includes('tim') || hLow.includes('kedudukan') || hLow.includes('peran') || hLow.includes('penugasan'))) {
+              idxTim = cIdx;
+              headersObj.jabatan_tim = hText || 'Jabatan Tim';
+            } else if (idxDinas === -1 && (hLow.includes('dinas') || hLow.includes('jabatan') || hLow.includes('pangkat') || hLow.includes('struktural'))) {
+              idxDinas = cIdx;
+              headersObj.jabatan_dinas = hText || 'Jabatan Dalam Dinas';
+            } else if (idxExtra === -1) {
+              idxExtra = cIdx;
+              headersObj.extra = hText || 'Keterangan';
+            }
+          });
+
+          // Fallback jika ada 2 kolom 'jabatan' dan belum terpetakan
+          if (idxNama !== -1 && idxDinas === -1 && idxTim === -1 && headerCells.length >= 4) {
+            idxDinas = 2;
+            idxTim = 3;
+          } else if (idxNama !== -1 && idxTim !== -1 && idxDinas === -1 && headerCells.length >= 3) {
+            idxDinas = headerCells.findIndex((_, i) => i !== idxNo && i !== idxNama && i !== idxTim);
+          }
+
+          const extractedRows = [];
+          let lastJabatanTim = 'Anggota';
+
+          for (let r = headerRowIdx + 1; r < trs.length; r++) {
+            const tdEls = Array.from(trs[r].querySelectorAll('td, th'));
+            if (tdEls.length < 2) continue;
+
+            // Cek apakah di dalam sel terdapat multi-paragraf (beberapa baris pegawai digabung dalam 1 sel Word)
+            const getCellLines = (colIdx) => {
+              if (colIdx < 0 || colIdx >= tdEls.length) return [''];
+              const cell = tdEls[colIdx];
+              const pList = Array.from(cell.querySelectorAll('p, li'));
+              if (pList.length > 1) {
+                return pList.map(p => (p.textContent || '').replace(/\s+/g, ' ').trim()).filter(Boolean);
+              }
+              return [(cell.textContent || '').replace(/\s+/g, ' ').trim()];
+            };
+
+            const namaLines = getCellLines(idxNama !== -1 ? idxNama : 1);
+            const dinasLines = getCellLines(idxDinas !== -1 ? idxDinas : 2);
+            const timLines = getCellLines(idxTim !== -1 ? idxTim : 3);
+            const extraLines = idxExtra !== -1 ? getCellLines(idxExtra) : [''];
+
+            const maxSubRows = Math.max(namaLines.length, dinasLines.length);
+            for (let s = 0; s < maxSubRows; s++) {
+              const nm = namaLines[s] !== undefined ? namaLines[s] : (namaLines[0] || '');
+              const dn = dinasLines[s] !== undefined ? dinasLines[s] : (dinasLines[0] || '');
+              let tm = timLines[s] !== undefined ? timLines[s] : (timLines[0] || '');
+              const ex = extraLines[s] !== undefined ? extraLines[s] : (extraLines[0] || '');
+
+              if (tm) lastJabatanTim = tm;
+              else tm = lastJabatanTim;
+
+              if (nm || dn) {
+                const rowObj = {
+                  nama: nm,
+                  nip: '',
+                  jabatan_dinas: dn,
+                  jabatan_tim: tm || 'Anggota',
+                  extra: ex
+                };
+                this.autoMatchPegawaiRow(rowObj);
+                extractedRows.push(rowObj);
+              }
+            }
+          }
+
+          if (extractedRows.length > 0) {
+            return {
+              headers: headersObj,
+              show_extra: idxExtra !== -1,
+              rows: extractedRows
+            };
+          }
+        }
+      } catch (e) {
+        console.warn("[Smart SK] HTML Table parse warning:", e);
+      }
+      return null;
+    },
+
+    parseAndApplySkWordData(rawText, htmlText = '', fileName = '') {
+      const hasCellMarkers = rawText.includes('\x07');
+      const normWithBell = rawText.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+      const normPlain = normWithBell.replace(/\x07+/g, '\t');
+
+      let mainPart = normPlain;
+      let lampiranPartBell = '';
+      let lampiranPartPlain = '';
+
+      const lampIdx = normPlain.search(/(?:^|\n)\s*Lampiran\s+(?:I|1)\b/i);
+      if (lampIdx !== -1) {
+        mainPart = normPlain.slice(0, lampIdx);
+        lampiranPartPlain = normPlain.slice(lampIdx);
+      }
+      const lampBellIdx = normWithBell.search(/(?:^|\n)\s*Lampiran\s+(?:I|1)\b/i);
+      if (lampBellIdx !== -1) {
+        lampiranPartBell = normWithBell.slice(lampBellIdx);
+      }
+
+      const nu = this.skBuilderDoc.naskah_utama;
+
+      // 1. Pejabat Pembuat SK & Nomor SK
+      if (/KEPUTUSAN\s+SEKRETARIS\s+PENGADILAN\s+AGAMA\s+INDRAMAYU/i.test(mainPart)) {
+        nu.pejabat_pembuat = 'SEKRETARIS PENGADILAN AGAMA INDRAMAYU';
+      } else if (/KEPUTUSAN\s+KETUA\s+PENGADILAN\s+AGAMA\s+INDRAMAYU/i.test(mainPart)) {
+        nu.pejabat_pembuat = 'KETUA PENGADILAN AGAMA INDRAMAYU';
+      }
+
+      const noMatch = mainPart.match(/Nomor\s*:\s*([^\n\t]+)/i);
+      if (noMatch && noMatch[1].trim()) {
+        this.skBuilderDoc.no_sk = noMatch[1].trim();
+        if (/\/SEK\./i.test(this.skBuilderDoc.no_sk) && !/\/KPA\./i.test(this.skBuilderDoc.no_sk)) {
+          nu.pejabat_pembuat = 'SEKRETARIS PENGADILAN AGAMA INDRAMAYU';
+        }
+      }
+
+      // 2. Judul SK (Tentang)
+      const tentangMatch = mainPart.match(/TENTANG\s*\n+([\s\S]*?)(?=\n\s*(?:KETUA|SEKRETARIS)\s+PENGADILAN\s+AGAMA|\n\s*Membaca|\n\s*Menimbang)/i);
+      if (tentangMatch && tentangMatch[1].trim()) {
+        this.skBuilderDoc.judul_sk = tentangMatch[1]
+          .split(/\n+/)
+          .map(s => s.trim())
+          .filter(Boolean)
+          .join(' ')
+          .replace(/\s+/g, ' ')
+          .replace(/\.(pdf|docx?)$/i, '')
+          .trim()
+          .toUpperCase();
+      }
+
+      const splitItems = (blockText, stripPrefixRegex) => {
+        if (!blockText) return [];
+        return blockText
+          .split(/\n+/)
+          .map(l => l.replace(/^[:\s\t]+/, '').trim())
+          .filter(l => l.length > 0 && l !== ':')
+          .map(l => stripPrefixRegex ? l.replace(stripPrefixRegex, '').trim() : l)
+          .filter(l => l.length > 0);
+      };
+
+      // 3. Membaca, Menimbang, Mengingat, Memperhatikan
+      const membacaMatch = mainPart.match(/(?:^|\n)\s*Membaca\s*[:\t]*([\s\S]*?)(?=\n\s*Menimbang\b)/i);
+      if (membacaMatch) {
+        const items = splitItems(membacaMatch[1], /^(?:[a-z0-9]+\.|[-•])\s*/i);
+        nu.membaca = items.length > 0 ? items : ['-'];
+      }
+
+      const menimbangMatch = mainPart.match(/(?:^|\n)\s*Menimbang\s*[:\t]*([\s\S]*?)(?=\n\s*Mengingat\b)/i);
+      if (menimbangMatch) {
+        const items = splitItems(menimbangMatch[1], /^[a-z]\.\s*/i);
+        if (items.length > 0) nu.menimbang = items;
+      }
+
+      const mengingatMatch = mainPart.match(/(?:^|\n)\s*Mengingat\s*[:\t]*([\s\S]*?)(?=\n\s*(?:Memperhatikan|MEMUTUSKAN)\b)/i);
+      if (mengingatMatch) {
+        const items = splitItems(mengingatMatch[1], /^\d+\.\s*/);
+        if (items.length > 0) nu.mengingat = items;
+      }
+
+      const memperhatikanMatch = mainPart.match(/(?:^|\n)\s*Memperhatikan\s*[:\t]*([\s\S]*?)(?=\n\s*MEMUTUSKAN\b)/i);
+      if (memperhatikanMatch) {
+        const items = splitItems(memperhatikanMatch[1], /^\d+\.\s*/);
+        nu.memperhatikan = items.length > 0 ? items : ['-'];
+      }
+
+      // 4. Menetapkan & Diktum (Kesatu s.d. Selesai)
+      const menetapkanMatch = mainPart.match(/(?:^|\n)\s*Menetapkan\s*[:\t]*([\s\S]*?)(?=\n\s*(?:KESATU|PERTAMA)\b)/i);
+      if (menetapkanMatch && menetapkanMatch[1].trim()) {
+        nu.menetapkan = menetapkanMatch[1]
+          .split(/\n+/)
+          .map(l => l.replace(/^[:\s\t]+/, '').trim())
+          .filter(Boolean)
+          .join(' ')
+          .replace(/\s+/g, ' ');
+      } else if (this.skBuilderDoc.judul_sk) {
+        nu.menetapkan = `KEPUTUSAN ${nu.pejabat_pembuat} TENTANG ${this.skBuilderDoc.judul_sk}.`;
+      }
+
+      const diktumBlockMatch = mainPart.match(/\n\s*((?:KESATU|PERTAMA)\b[\s\S]*?)(?=\n\s*Ditetapkan\s+di\b|\n\s*Salinan\b|\n\s*Tembusan\b|$)/i);
+      if (diktumBlockMatch) {
+        const diktumRaw = diktumBlockMatch[1];
+        const diktumRegex = /(?:^|\n)\s*(KESATU|PERTAMA|KEDUA|KETIGA|KEEMPAT|KELIMA|KEENAM|KETUJUH|KEDELAPAN|KESEMBILAN|KESEPULUH)\s*[:\t]*([\s\S]*?)(?=(?:\n\s*(?:KEDUA|KETIGA|KEEMPAT|KELIMA|KEENAM|KETUJUH|KEDELAPAN|KESEMBILAN|KESEPULUH)\b)|$)/gi;
+        const extractedDiktum = [];
+        let m;
+        while ((m = diktumRegex.exec(diktumRaw)) !== null) {
+          const label = m[1].trim().toUpperCase();
+          const lines = m[2]
+            .split(/\n+/)
+            .map(l => l.replace(/^[:\s\t]+/, '').trim())
+            .filter(Boolean);
+          extractedDiktum.push({
+            label,
+            isi: this.formatDiktumSublist(lines)
+          });
+        }
+        if (extractedDiktum.length > 0) {
+          nu.diktum = extractedDiktum;
+        }
+      }
+
+      // 5. Titi Mangsa, Pejabat Penandatangan & Tembusan
+      const tempatMatch = mainPart.match(/Ditetapkan\s+di\s*[:\t]*([^\n\r]+)/i);
+      if (tempatMatch && tempatMatch[1].trim()) {
+        nu.tempat_sk = tempatMatch[1].trim();
+      }
+      const tglMatch = mainPart.match(/Pada\s+tanggal\s*[:\t]*([^\n\r]+)/i);
+      if (tglMatch && tglMatch[1].trim()) {
+        nu.tgl_sk_teks = tglMatch[1].trim();
+        const isoFromDoc = this.parseIndoDateToIso(nu.tgl_sk_teks);
+        if (isoFromDoc) this.skBuilderDoc.tgl_sk = isoFromDoc;
+      }
+
+      const sigDefault = this.getDefaultSignatoryByIssuer(nu.pejabat_pembuat);
+      const ttdBlockMatch = mainPart.match(/Pada\s+tanggal\s*[:\t]*[^\n]+\n+([\s\S]*?)(?=\n\s*(?:Salinan|Tembusan)\b|$)/i);
+      if (ttdBlockMatch) {
+        const ttdLines = ttdBlockMatch[1].split(/\n+/).map(l => l.trim()).filter(Boolean);
+        if (ttdLines.length >= 1) {
+          nu.pejabat.jabatan = ttdLines[0];
+        }
+        if (ttdLines.length >= 2) {
+          const rawPejabatNama = ttdLines[ttdLines.length - 1];
+          if (rawPejabatNama && rawPejabatNama.toLowerCase() !== 'noname' && !/^…|\.{3,}/.test(rawPejabatNama)) {
+            nu.pejabat.nama = rawPejabatNama;
+            const tempRow = { nama: rawPejabatNama, nip: '', jabatan_dinas: '' };
+            this.autoMatchPegawaiRow(tempRow);
+            if (tempRow.nip) nu.pejabat.nip = tempRow.nip;
+          } else {
+            nu.pejabat.nama = sigDefault.nama;
+            nu.pejabat.nip = sigDefault.nip;
+          }
+        }
+      }
+
+      const tembusanMatch = mainPart.match(/(?:Salinan\s+Keputusan\s+ini\s+disampaikan\s+kepada|Tembusan)\s*[:\t]*([\s\S]*?)$/i);
+      if (tembusanMatch) {
+        const tItems = splitItems(tembusanMatch[1], /^\d+\.\s*/);
+        if (tItems.length > 0) nu.tembusan = tItems;
+      }
+
+      // 6. Pastikan 3 Slot Lampiran Tersedia (Lampiran I: Tabel, Lampiran II: Teks Tugas, Lampiran III: Bagan Struktur)
+      if (!Array.isArray(this.skBuilderDoc.lampiran) || this.skBuilderDoc.lampiran.length < 3) {
+        this.skBuilderDoc.lampiran = this.createDefaultThreeLampiran(this.skBuilderDoc.judul_sk);
+      }
+      const lampTabel = this.skBuilderDoc.lampiran.find(l => l.tipe === 'tabel') || this.skBuilderDoc.lampiran[0];
+      const lampTeks = this.skBuilderDoc.lampiran.find(l => l.tipe === 'teks') || this.skBuilderDoc.lampiran[1];
+      const lampBagan = this.skBuilderDoc.lampiran.find(l => l.tipe === 'bagan_struktur') || this.skBuilderDoc.lampiran[2];
+
+      // 6A. Ekstrak Tabel Lampiran I (dari HTML .docx atau dari Bell Stream .doc)
+      let parsedTable = this.parseHtmlTablesForLampiran(htmlText);
+      if (!parsedTable && hasCellMarkers && lampiranPartBell) {
+        const lamp2BellIdx = lampiranPartBell.search(/\n\s*Lampiran\s+(?:II|2)\b/i);
+        const lamp1Bell = lamp2BellIdx !== -1 ? lampiranPartBell.slice(0, lamp2BellIdx) : lampiranPartBell;
+        const lamp2Bell = lamp2BellIdx !== -1 ? lampiranPartBell.slice(lamp2BellIdx) : '';
+
+        const l1TitleMatch = lamp1Bell.match(/Tanggal\s*[:\t]*[^\n]+\n+([\s\S]*?)(?=\n\s*No\x07)/i);
+        if (l1TitleMatch && l1TitleMatch[1].trim()) {
+          lampTabel.judul = l1TitleMatch[1].split(/\n+/).map(s => s.trim()).filter(Boolean).join(' ').toUpperCase();
+        }
+
+        const tableStartIdx = lamp1Bell.search(/No\x07/i);
+        if (tableStartIdx !== -1) {
+          const tableStr = lamp1Bell.slice(tableStartIdx);
+          const rawRows = tableStr.split(/\x07\x07/);
+          const rows = [];
+          let lastRole = 'Anggota';
+          rawRows.forEach((rStr, idx) => {
+            if (!rStr.includes('\x07')) return;
+            const cells = rStr.split('\x07').map(c => c.replace(/^\s+|\s+$/g, ''));
+            if (idx === 0) return;
+            if (cells.length >= 3) {
+              const isNumCol = /^\d+$/.test(cells[0]);
+              const nama = isNumCol ? (cells[1] || '') : (cells[0] || '');
+              const jabDinas = isNumCol ? (cells[2] || '') : (cells[1] || '');
+              let jabTim = isNumCol ? (cells[3] || '') : (cells[2] || '');
+              if (jabTim) lastRole = jabTim;
+              else jabTim = lastRole;
+
+              if (nama || jabDinas) {
+                const rObj = {
+                  nama: nama,
+                  nip: '',
+                  jabatan_dinas: jabDinas,
+                  jabatan_tim: jabTim || 'Anggota',
+                  extra: ''
+                };
+                this.autoMatchPegawaiRow(rObj);
+                rows.push(rObj);
+              }
+            }
+          });
+          if (rows.length > 0) {
+            lampTabel.data = rows;
+          }
+        }
+
+        if (lamp2Bell) {
+          const linesAfterTgl = lamp2Bell.split(/Tanggal\s*[:\t]*[^\n]+\n+/i)[1] || '';
+          const cleanLines = linesAfterTgl.split(/\n+/).map(s => s.replace(/[\x00-\x1F]+/g, '').trim()).filter(Boolean);
+          const titleLines = [];
+          for (const ln of cleanLines) {
+            if (/^(Ketua|Pengarah|Sekretaris|Anggota)/i.test(ln)) break;
+            titleLines.push(ln);
+          }
+          if (titleLines.length > 0) {
+            lampBagan.judul = titleLines.join(' ').toUpperCase();
+          }
+        }
+      } else if (parsedTable) {
+        lampTabel.kolom_headers = parsedTable.headers;
+        lampTabel.show_extra_col = parsedTable.show_extra;
+        lampTabel.data = parsedTable.rows;
+
+        if (lampiranPartPlain) {
+          const l1TitleMatch = lampiranPartPlain.match(/Tanggal\s*[:\t]*[^\n]+\n+([\s\S]*?)(?=\n\s*No\b)/i);
+          if (l1TitleMatch && l1TitleMatch[1].trim()) {
+            lampTabel.judul = l1TitleMatch[1].split(/\n+/).map(s => s.trim()).filter(Boolean).join(' ').toUpperCase();
+          }
+        }
+      }
+
+      // 6B. Siapkan Lampiran II (Uraian Tugas Tim) dari Diktum Tugas sebagai draft siap pakai
+      const diktumTugas = nu.diktum.find(d => /mempunyai\s+tugas|bertugas|uraian\s+tugas/i.test(d.isi || ''));
+      if (diktumTugas && lampTeks) {
+        lampTeks.data = diktumTugas.isi;
+        lampTeks.judul = 'URAIAN TUGAS ' + (this.skBuilderDoc.judul_sk || 'TIM KERJA');
+        // Jika di dokumen Word hanya ada 2 Lampiran (karena tugas sudah di dalam Diktum), biarkan aktif=false secara default agar penomoran sama persis dengan Word (Lampiran I & Lampiran II)
+        const hasLampiran3InWord = /Lampiran\s+(?:III|3)\b/i.test(lampiranPartPlain);
+        lampTeks.aktif = hasLampiran3InWord;
+      }
+
+      // 6C. Sinkronkan Otomatis Lampiran III (Bagan Struktur Tim) dari Tabel Lampiran I
+      if (lampBagan) {
+        if (!lampBagan.judul || lampBagan.judul.startsWith('STRUKTUR TIM KERJA')) {
+          lampBagan.judul = 'STRUKTUR ' + (lampTabel.judul || this.skBuilderDoc.judul_sk || 'TIM KERJA');
+        }
+        lampBagan.aktif = true;
+        this.syncBaganFromLampiranTabel(true);
+      }
+
+      if (window.showNotify) {
+        window.showNotify(
+          "Smart Import SK Berhasil! 🚀",
+          `Berhasil memuat "${this.skBuilderDoc.no_sk || fileName}" (${nu.menimbang.length} Menimbang, ${nu.mengingat.length} Mengingat, ${nu.diktum.length} Diktum, & ${(lampTabel.data || []).length} Personil Tim).`,
+          "success"
+        );
+      }
+    },
+
+    // ----------------------------------------------------
+    // 3. MANIPULASI BUTIR NASKAH UTAMA (STEP 1)
+    // ----------------------------------------------------
+    addMembacaItem() {
+      if (!Array.isArray(this.skBuilderDoc.naskah_utama.membaca)) this.skBuilderDoc.naskah_utama.membaca = [];
+      this.skBuilderDoc.naskah_utama.membaca.push('');
+    },
+    removeMembacaItem(idx) {
+      if (this.skBuilderDoc.naskah_utama.membaca.length > 1) {
+        this.skBuilderDoc.naskah_utama.membaca.splice(idx, 1);
+      } else {
+        this.skBuilderDoc.naskah_utama.membaca = ['-'];
+      }
+    },
     addMenimbangItem() {
       this.skBuilderDoc.naskah_utama.menimbang.push('');
     },
@@ -187,8 +1164,19 @@ window.SkBuilderMixin = {
         this.skBuilderDoc.naskah_utama.mengingat.splice(idx, 1);
       }
     },
+    addMemperhatikanItem() {
+      if (!Array.isArray(this.skBuilderDoc.naskah_utama.memperhatikan)) this.skBuilderDoc.naskah_utama.memperhatikan = [];
+      this.skBuilderDoc.naskah_utama.memperhatikan.push('');
+    },
+    removeMemperhatikanItem(idx) {
+      if (this.skBuilderDoc.naskah_utama.memperhatikan.length > 1) {
+        this.skBuilderDoc.naskah_utama.memperhatikan.splice(idx, 1);
+      } else {
+        this.skBuilderDoc.naskah_utama.memperhatikan = ['-'];
+      }
+    },
     addDiktumItem() {
-      const labels = ['KESATU', 'KEDUA', 'KETIGA', 'KEEMPAT', 'KELIMA', 'KEENAM', 'KETUJUH', 'KEDELAPAN'];
+      const labels = ['KESATU', 'KEDUA', 'KETIGA', 'KEEMPAT', 'KELIMA', 'KEENAM', 'KETUJUH', 'KEDELAPAN', 'KESEMBILAN', 'KESEPULUH'];
       const nextIdx = this.skBuilderDoc.naskah_utama.diktum.length;
       const nextLabel = labels[nextIdx] || `KE-${nextIdx + 1}`;
       this.skBuilderDoc.naskah_utama.diktum.push({ label: nextLabel, isi: '' });
@@ -198,19 +1186,156 @@ window.SkBuilderMixin = {
         this.skBuilderDoc.naskah_utama.diktum.splice(idx, 1);
       }
     },
+    addTembusanItem() {
+      if (!Array.isArray(this.skBuilderDoc.naskah_utama.tembusan)) this.skBuilderDoc.naskah_utama.tembusan = [];
+      this.skBuilderDoc.naskah_utama.tembusan.push('');
+    },
+    removeTembusanItem(idx) {
+      if (this.skBuilderDoc.naskah_utama.tembusan.length > 1) {
+        this.skBuilderDoc.naskah_utama.tembusan.splice(idx, 1);
+      }
+    },
+    onPejabatTtdSelected() {
+      const pjb = this.skBuilderDoc.naskah_utama.pejabat;
+      if (!pjb || !pjb.nama) return;
+      const raw = pjb.nama;
+      const match = raw.match(/\(([^)]+)\)$/);
+      const nip = match ? match[1].trim() : '';
+      const user = (this.globalState.usersList || []).find(u => u.nip === nip || raw.includes(u.nama));
+      if (user) {
+        pjb.nama = user.nama;
+        pjb.nip = user.nip;
+      }
+    },
 
     // ----------------------------------------------------
-    // 3. MANIPULASI LAMPIRAN DINAMIS (TOOLS)
+    // 4. MANIPULASI LAMPIRAN I, II, III (STEP 2)
     // ----------------------------------------------------
+    getActiveLampiranRoman(lampIdx) {
+      const list = this.skBuilderDoc.lampiran || [];
+      const target = list[lampIdx];
+      if (!target || target.aktif === false) return '-';
+      let activeCount = 0;
+      for (let i = 0; i <= lampIdx; i++) {
+        if (list[i] && list[i].aktif !== false) activeCount++;
+      }
+      return this.toRoman(activeCount);
+    },
+
+    toggleLampiranAktif(lamp) {
+      if (!lamp) return;
+      lamp.aktif = lamp.aktif === false ? true : false;
+    },
+
+    copyTasksFromDiktumToLampiran2() {
+      const diktums = (this.skBuilderDoc.naskah_utama && this.skBuilderDoc.naskah_utama.diktum) || [];
+      const found = diktums.find(d => /tugas|wewenang|tanggung\s+jawab/i.test(d.isi || '')) || diktums[3] || diktums[1];
+      if (!found || !found.isi) {
+        if (window.showNotify) window.showNotify("Info Diktum", "Tidak ditemukan rincian tugas di dalam Diktum.", "warning");
+        return;
+      }
+      const lampTeks = this.skBuilderDoc.lampiran.find(l => l.tipe === 'teks') || this.currentLampiran;
+      if (lampTeks) {
+        lampTeks.data = found.isi;
+        lampTeks.aktif = true;
+        if (window.showNotify) {
+          window.showNotify("Tersalin ke Lampiran II", `Rincian tugas dari Diktum ${found.label} berhasil disalin & Lampiran II diaktifkan.`, "success");
+        }
+      }
+    },
+
+    syncBaganFromLampiranTabel(silent = false) {
+      const lampTabel = (this.skBuilderDoc.lampiran || []).find(l => l.tipe === 'tabel');
+      const lampBagan = (this.skBuilderDoc.lampiran || []).find(l => l.tipe === 'bagan_struktur');
+      if (!lampTabel || !lampBagan || !Array.isArray(lampTabel.data)) return;
+
+      const pengarahList = [];
+      let ketuaObj = null;
+      let sekretarisObj = null;
+      const anggotaList = [];
+
+      lampTabel.data.forEach(row => {
+        const roleLow = String(row.jabatan_tim || '').toLowerCase().trim();
+        const dispNama = (row.nama && row.nama.toLowerCase() !== 'noname') ? row.nama : (row.jabatan_dinas || row.nama || '');
+        const entry = {
+          role: (row.jabatan_tim || 'ANGGOTA').toUpperCase(),
+          nama: dispNama,
+          nip: row.nip || '',
+          jabatan_dinas: row.jabatan_dinas || ''
+        };
+
+        if (/pengarah|pembina|pelindung|penanggung\s*jawab/.test(roleLow)) {
+          pengarahList.push(entry);
+        } else if (!ketuaObj && /\bketua\b/.test(roleLow)) {
+          ketuaObj = {
+            role: (row.jabatan_tim || 'KETUA TIM').toUpperCase(),
+            nama: dispNama,
+            nip: row.nip || '',
+            jabatan_dinas: row.jabatan_dinas || ''
+          };
+        } else if (!sekretarisObj && /sekretaris|koordinator/.test(roleLow)) {
+          sekretarisObj = {
+            role: (row.jabatan_tim || 'SEKRETARIS').toUpperCase(),
+            nama: dispNama,
+            nip: row.nip || '',
+            jabatan_dinas: row.jabatan_dinas || ''
+          };
+        } else {
+          anggotaList.push({
+            nama: dispNama,
+            nip: row.nip || '',
+            jabatan_dinas: row.jabatan_dinas || '',
+            role: row.jabatan_tim || 'Anggota'
+          });
+        }
+      });
+
+      if (!ketuaObj) {
+        ketuaObj = { role: 'KETUA TIM', nama: '', nip: '', jabatan_dinas: '' };
+      }
+      if (!sekretarisObj) {
+        sekretarisObj = { role: 'SEKRETARIS', nama: '', nip: '', jabatan_dinas: '' };
+      }
+      if (anggotaList.length === 0) {
+        anggotaList.push({ nama: '', nip: '', jabatan_dinas: '' });
+      }
+
+      lampBagan.data = {
+        pengarah_list: pengarahList,
+        ketua: ketuaObj,
+        sekretaris: sekretarisObj,
+        anggota_list: anggotaList,
+        level_1: pengarahList.length > 0 ? pengarahList : [{ role: 'Pembina / Pengarah', nama: '', nip: '' }],
+        level_2: [ketuaObj],
+        level_3: [sekretarisObj],
+        level_4: anggotaList.map(a => ({ role: 'Anggota', nama: a.nama, nip: a.nip }))
+      };
+
+      if (!silent && window.showNotify) {
+        window.showNotify("Bagan Tersinkronisasi! 🔄", "Struktur Organisasi (Lampiran III) berhasil diperbarui otomatis dari Tabel Tim (Lampiran I).", "success");
+      }
+    },
+
     addLampiran() {
       const count = this.skBuilderDoc.lampiran.length + 1;
       this.skBuilderDoc.lampiran.push({
-        id: 'lamp-' + count,
-        judul: `LAMPIRAN ${count} : SUSUNAN TIM KERJA`,
+        id: 'lamp-' + Date.now(),
+        slot_label: `Lampiran Tambahan ${count}`,
+        judul: `LAMPIRAN ${this.toRoman(count)} : SUSUNAN TIM KERJA`,
         tipe: 'tabel',
+        aktif: true,
+        show_extra_col: false,
+        show_nip: false,
+        kolom_headers: {
+          no: 'No',
+          nama: 'Nama',
+          jabatan_dinas: 'Jabatan Dalam Dinas',
+          jabatan_tim: 'Jabatan Tim',
+          extra: 'Keterangan'
+        },
         data: [
-          { jabatan_tim: 'Pengarah', nama: '', nip: '', jabatan_dinas: '' },
-          { jabatan_tim: 'Ketua Tim', nama: '', nip: '', jabatan_dinas: '' }
+          { nama: '', nip: '', jabatan_dinas: '', jabatan_tim: 'Ketua Tim', extra: '' },
+          { nama: '', nip: '', jabatan_dinas: '', jabatan_tim: 'Anggota', extra: '' }
         ]
       });
       this.activeLampiranIndex = this.skBuilderDoc.lampiran.length - 1;
@@ -220,25 +1345,13 @@ window.SkBuilderMixin = {
       if (!this.currentLampiran) return;
       this.currentLampiran.tipe = tipe;
       if (tipe === 'bagan_struktur') {
-        if (!this.currentLampiran.data || typeof this.currentLampiran.data !== 'object' || Array.isArray(this.currentLampiran.data)) {
-          this.currentLampiran.data = {
-            level_1: [{ role: 'Pembina / Pengarah', nama: 'Ketua Pengadilan Agama Indramayu', nip: '' }],
-            level_2: [{ role: 'Ketua Tim', nama: 'Sekretaris Pengadilan Agama Indramayu', nip: '' }],
-            level_3: [
-              { role: 'Sekretaris Tim', nama: '', nip: '' },
-              { role: 'Koordinator Pelaksana', nama: '', nip: '' }
-            ],
-            level_4: [
-              { role: 'Anggota Tim', nama: '', nip: '' },
-              { role: 'Anggota Tim', nama: '', nip: '' }
-            ]
-          };
-        }
+        this.currentLampiran.data = this.normalizeBaganData(this.currentLampiran.data);
+        this.syncBaganFromLampiranTabel(true);
       } else if (tipe === 'tabel') {
         if (!Array.isArray(this.currentLampiran.data)) {
           this.currentLampiran.data = [
-            { jabatan_tim: 'Pengarah', nama: '', nip: '', jabatan_dinas: '' },
-            { jabatan_tim: 'Ketua Tim', nama: '', nip: '', jabatan_dinas: '' }
+            { nama: '', nip: '', jabatan_dinas: '', jabatan_tim: 'Ketua Tim', extra: '' },
+            { nama: '', nip: '', jabatan_dinas: '', jabatan_tim: 'Anggota', extra: '' }
           ];
         }
       } else if (tipe === 'teks') {
@@ -249,7 +1362,7 @@ window.SkBuilderMixin = {
     },
 
     removeCurrentLampiran() {
-      if (this.skBuilderDoc.lampiran.length > 0) {
+      if (this.skBuilderDoc.lampiran.length > 1) {
         this.skBuilderDoc.lampiran.splice(this.activeLampiranIndex, 1);
         if (this.activeLampiranIndex >= this.skBuilderDoc.lampiran.length) {
           this.activeLampiranIndex = Math.max(0, this.skBuilderDoc.lampiran.length - 1);
@@ -260,7 +1373,7 @@ window.SkBuilderMixin = {
     addLampiranTableRow() {
       if (!this.currentLampiran || this.currentLampiran.tipe !== 'tabel') return;
       if (!Array.isArray(this.currentLampiran.data)) this.currentLampiran.data = [];
-      this.currentLampiran.data.push({ jabatan_tim: 'Anggota', nama: '', nip: '', jabatan_dinas: '' });
+      this.currentLampiran.data.push({ nama: '', nip: '', jabatan_dinas: '', jabatan_tim: 'Anggota', extra: '' });
     },
 
     moveLampiranRow(rIdx, direction) {
@@ -269,10 +1382,14 @@ window.SkBuilderMixin = {
       if (targetIdx < 0 || targetIdx >= this.currentLampiran.data.length) return;
       const item = this.currentLampiran.data.splice(rIdx, 1)[0];
       this.currentLampiran.data.splice(targetIdx, 0, item);
+      this.syncBaganFromLampiranTabel(true);
     },
 
     setRowRole(row, role) {
-      if (row) row.jabatan_tim = role;
+      if (row) {
+        row.jabatan_tim = role;
+        this.syncBaganFromLampiranTabel(true);
+      }
     },
 
     onPegawaiSelected(row) {
@@ -280,31 +1397,44 @@ window.SkBuilderMixin = {
       const raw = row.nama;
       const match = raw.match(/\(([^)]+)\)$/);
       const nip = match ? match[1].trim() : '';
-      
+
       const user = (this.globalState.usersList || []).find(u => u.nip === nip || raw.includes(u.nama));
       if (user) {
         row.nip = user.nip;
         row.nama = user.nama;
-        if (!row.jabatan_dinas || row.jabatan_dinas === '-') {
+        if (!row.jabatan_dinas || row.jabatan_dinas === '-' || row.jabatan_dinas.toLowerCase() === 'noname') {
           row.jabatan_dinas = user.jabatan;
         }
+        if (!row.extra && user.pangkat) {
+          row.extra = user.pangkat;
+        }
+      }
+      this.syncBaganFromLampiranTabel(true);
+    },
+
+    // Manipulasi Node Bagan Struktur (Double-Border Judicial Chart)
+    addBaganPengarah() {
+      if (!this.currentLampiran || this.currentLampiran.tipe !== 'bagan_struktur') return;
+      if (!Array.isArray(this.currentLampiran.data.pengarah_list)) this.currentLampiran.data.pengarah_list = [];
+      this.currentLampiran.data.pengarah_list.push({ role: 'PENGARAH / PEMBINA', nama: '', nip: '' });
+    },
+    removeBaganPengarah(idx) {
+      if (!this.currentLampiran || this.currentLampiran.tipe !== 'bagan_struktur') return;
+      if (Array.isArray(this.currentLampiran.data.pengarah_list)) {
+        this.currentLampiran.data.pengarah_list.splice(idx, 1);
       }
     },
-
-    // Manipulasi Node Bagan Struktur Box Tree
-    addTreeNode(levelKey, defaultRole = 'Anggota Tim') {
+    addBaganAnggota() {
       if (!this.currentLampiran || this.currentLampiran.tipe !== 'bagan_struktur') return;
-      if (!this.currentLampiran.data[levelKey]) this.currentLampiran.data[levelKey] = [];
-      this.currentLampiran.data[levelKey].push({ role: defaultRole, nama: '', nip: '' });
+      if (!Array.isArray(this.currentLampiran.data.anggota_list)) this.currentLampiran.data.anggota_list = [];
+      this.currentLampiran.data.anggota_list.push({ nama: '', nip: '', jabatan_dinas: '' });
     },
-
-    removeTreeNode(levelKey, idx) {
+    removeBaganAnggota(idx) {
       if (!this.currentLampiran || this.currentLampiran.tipe !== 'bagan_struktur') return;
-      if (this.currentLampiran.data[levelKey] && this.currentLampiran.data[levelKey].length > 1) {
-        this.currentLampiran.data[levelKey].splice(idx, 1);
+      if (Array.isArray(this.currentLampiran.data.anggota_list) && this.currentLampiran.data.anggota_list.length > 1) {
+        this.currentLampiran.data.anggota_list.splice(idx, 1);
       }
     },
-
     onTreeNodeSelected(node) {
       if (!node || !node.nama) return;
       const raw = node.nama;
@@ -314,10 +1444,11 @@ window.SkBuilderMixin = {
       if (user) {
         node.nip = user.nip;
         node.nama = user.nama;
+        if (!node.jabatan_dinas) node.jabatan_dinas = user.jabatan || '';
       }
     },
 
-    // Format Cepat Editor Teks
+    // Format Cepat Editor Teks (Lampiran II)
     insertJobdescTemplate() {
       if (!this.currentLampiran || this.currentLampiran.tipe !== 'teks') return;
       const template = "1. Merencanakan dan menyusun program kerja kegiatan tahun berjalan.\n2. Melaksanakan koordinasi teknis dengan unit kerja terkait secara berkala.\n3. Menyusun evaluasi dan tindak lanjut atas kendala operasional yang ditemukan.\n4. Melaporkan hasil pelaksanaan tugas secara tertulis kepada Ketua Pengadilan Agama Indramayu.";
@@ -342,7 +1473,81 @@ window.SkBuilderMixin = {
     },
 
     // ----------------------------------------------------
-    // 4. SIMPAN DOKUMEN BUILDER KE CLOUD FIRESTORE
+    // 5. PLACEHOLDER GOOGLE DOCS & GENERATOR HOOK
+    // ----------------------------------------------------
+    copyPlaceholderTag(tag) {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(tag);
+      }
+      if (window.showNotify) {
+        window.showNotify("Placeholder Disalin! 📋", `Tag ${tag} siap ditempel (Ctrl+V) ke template Google Docs Anda.`, "success");
+      }
+    },
+
+    buildGoogleDocPlaceholderPayload() {
+      const doc = this.skBuilderDoc;
+      const nu = doc.naskah_utama || {};
+      const diktumArr = Array.isArray(nu.diktum) ? nu.diktum : [];
+
+      const mapDiktumByLabel = (lbl) => {
+        const f = diktumArr.find(d => (d.label || '').toUpperCase() === lbl);
+        return f ? f.isi : '';
+      };
+
+      const lampTabel = (doc.lampiran || []).find(l => l.tipe === 'tabel');
+      const lampTeks = (doc.lampiran || []).find(l => l.tipe === 'teks' && l.aktif !== false);
+      const lampBagan = (doc.lampiran || []).find(l => l.tipe === 'bagan_struktur' && l.aktif !== false);
+
+      return {
+        '{{PEJABAT_PEMBUAT}}': nu.pejabat_pembuat || 'KETUA PENGADILAN AGAMA INDRAMAYU',
+        '{{NOMOR_SK}}': doc.no_sk || '',
+        '{{JUDUL_SK}}': doc.judul_sk || '',
+        '{{MEMBACA}}': (nu.membaca || []).join('\n'),
+        '{{MENIMBANG}}': (nu.menimbang || []).map((m, i) => `${String.fromCharCode(97 + i)}. ${m}`).join('\n'),
+        '{{MENGINGAT}}': (nu.mengingat || []).map((m, i) => `${i + 1}. ${m}`).join('\n'),
+        '{{MEMPERHATIKAN}}': (nu.memperhatikan || []).map((m, i) => (nu.memperhatikan.length > 1 ? `${i + 1}. ${m}` : m)).join('\n'),
+        '{{MENETAPKAN}}': this.computedMenetapkanText,
+        '{{DIKTUM_FULL}}': diktumArr.map(d => `${d.label} : ${d.isi}`).join('\n\n'),
+        '{{DIKTUM_KESATU}}': mapDiktumByLabel('KESATU'),
+        '{{DIKTUM_KEDUA}}': mapDiktumByLabel('KEDUA'),
+        '{{DIKTUM_KETIGA}}': mapDiktumByLabel('KETIGA'),
+        '{{DIKTUM_KEEMPAT}}': mapDiktumByLabel('KEEMPAT'),
+        '{{DIKTUM_KELIMA}}': mapDiktumByLabel('KELIMA'),
+        '{{DIKTUM_KEENAM}}': mapDiktumByLabel('KEENAM'),
+        '{{DIKTUM_KETUJUH}}': mapDiktumByLabel('KETUJUH'),
+        '{{TEMPAT_SK}}': nu.tempat_sk || 'Indramayu',
+        '{{TANGGAL_SK}}': this.computedTglSkIndo,
+        '{{JABATAN_TTD}}': (nu.pejabat && nu.pejabat.jabatan) || 'Ketua,',
+        '{{NAMA_TTD}}': (nu.pejabat && nu.pejabat.nama) || '',
+        '{{NIP_TTD}}': (nu.pejabat && nu.pejabat.nip) || '',
+        '{{TEMBUSAN}}': (nu.tembusan || []).map((t, i) => `${i + 1}. ${t}`).join('\n'),
+        '{{TABEL_LAMPIRAN_1}}': lampTabel ? lampTabel.data : [],
+        '{{TEKS_LAMPIRAN_2}}': lampTeks ? lampTeks.data : '',
+        '{{BAGAN_LAMPIRAN_3}}': lampBagan ? lampBagan.data : null
+      };
+    },
+
+    triggerGenerateSkGoogleDoc() {
+      const payload = this.buildGoogleDocPlaceholderPayload();
+      console.log("[Smart SK Google Docs Payload]:", payload);
+      if (!this.skBuilderDoc.template_gdoc_id || !this.skBuilderDoc.template_gdoc_id.trim()) {
+        this.showKamusPlaceholder = true;
+        if (window.showNotify) {
+          window.showNotify(
+            "Kamus Placeholder Siap! 📄",
+            "Silakan salin daftar tag {{PLACEHOLDER}} di bawah untuk menyusun Template Google Docs Anda, atau gunakan tombol Cetak / Unduh PDF A4 langsung.",
+            "info"
+          );
+        }
+        return;
+      }
+      if (window.showNotify) {
+        window.showNotify("Siap Terhubung", `Payload 19 placeholder untuk Template ID "${this.skBuilderDoc.template_gdoc_id}" telah disiapkan.`, "success");
+      }
+    },
+
+    // ----------------------------------------------------
+    // 6. SIMPAN DOKUMEN BUILDER KE CLOUD FIRESTORE (1 ROW = 1 SK)
     // ----------------------------------------------------
     async saveSkFromBuilder() {
       if (!this.skBuilderDoc.no_sk || !this.skBuilderDoc.judul_sk) {
@@ -357,28 +1562,37 @@ window.SkBuilderMixin = {
         }
 
         const isNew = !this.skBuilderDoc.id;
-        const finalId = isNew ? ('SK-' + new Date().getFullYear() + '-' + Date.now().toString().slice(-4)) : this.skBuilderDoc.id;
-        
-        // Ekstrak seluruh personil dari lampiran tabel agar sinkron dengan daftar members pencarian
-        let extractedMembers = [];
+        const finalId = isNew ? ('SK-' + new Date().getFullYear() + '-' + Date.now().toString().slice(-4)) : String(this.skBuilderDoc.id).trim();
+
+        // Pastikan seluruh baris tabel lampiran I sudah melalui auto-matching NIP & sinkronisasi ke bagan
+        const extractedMembers = [];
+        const seenNip = new Set();
+
         (this.skBuilderDoc.lampiran || []).forEach(lamp => {
           if (lamp.tipe === 'tabel' && Array.isArray(lamp.data)) {
             lamp.data.forEach(item => {
-              if (item.nip) {
+              this.autoMatchPegawaiRow(item);
+              if (item.nip && !seenNip.has(item.nip)) {
+                seenNip.add(item.nip);
                 extractedMembers.push({ nip: item.nip, peran: item.jabatan_tim || 'Anggota' });
               }
             });
           }
         });
 
+        this.syncBaganFromLampiranTabel(true);
+
+        const cleanTitle = this.skBuilderDoc.judul_sk.replace(/\.(pdf|docx?)$/i, '').trim().toUpperCase();
+
         const payload = {
           id: finalId,
-          no_sk: this.skBuilderDoc.no_sk,
-          judul_sk: this.skBuilderDoc.judul_sk.toUpperCase(),
+          no_sk: this.skBuilderDoc.no_sk.trim(),
+          judul_sk: cleanTitle,
           pj_sk: this.skBuilderDoc.pj_sk || 'PJ. Kesekretariatan',
           tgl_sk: this.skBuilderDoc.tgl_sk || new Date().toISOString().split('T')[0],
           tgl_input: this.skBuilderDoc.tgl_input || UtilitiesDateNow(),
-          link_drive: this.skBuilderDoc.link_drive || '',
+          link_drive: this.skBuilderDoc.link_drive || '-',
+          template_gdoc_id: this.skBuilderDoc.template_gdoc_id || '',
           status: 'Aktif',
           versi_aktif: this.skBuilderDoc.versi_aktif || 1,
           naskah_utama: this.skBuilderDoc.naskah_utama,
@@ -392,7 +1606,11 @@ window.SkBuilderMixin = {
         this.showModalSkBuilder = false;
 
         if (window.showNotify) {
-          window.showNotify("Berhasil Terbit! 🔥", `Dokumen "${payload.judul_sk}" resmi tersimpan di Cloud Firestore.`, "success");
+          window.showNotify(
+            isNew ? "SK Baru Terbit! 🔥" : "Baris SK Diperbarui! ✅",
+            `Dokumen "${payload.judul_sk}" (${payload.no_sk}) resmi tersimpan di Cloud Firestore.`,
+            "success"
+          );
         }
       } catch (err) {
         this.isSavingBuilder = false;
@@ -403,15 +1621,30 @@ window.SkBuilderMixin = {
     },
 
     // ----------------------------------------------------
-    // 5. LOGIKA FORM KHUSUS REVISI SK (AMANDEMEN)
+    // 7. LOGIKA FORM KHUSUS REVISI SK (AMANDEMEN BARIS SK)
     // ----------------------------------------------------
     openRevisiModal(sk) {
       if (!sk) return;
-      this.targetRevisiDoc = sk;
-      this.revisiMembers = JSON.parse(JSON.stringify(sk.members || []));
+      this.targetRevisiDoc = JSON.parse(JSON.stringify(sk));
+
+      // Jika sk.members kosong tapi lampiran tabel ada isinya, tarik dari lampiran tabel
+      let initialMembers = Array.isArray(sk.members) ? JSON.parse(JSON.stringify(sk.members)) : [];
+      if (initialMembers.length === 0 && Array.isArray(sk.lampiran)) {
+        const tbl = sk.lampiran.find(l => l.tipe === 'tabel');
+        if (tbl && Array.isArray(tbl.data)) {
+          tbl.data.forEach(r => {
+            this.autoMatchPegawaiRow(r);
+            if (r.nip) {
+              initialMembers.push({ nip: r.nip, peran: r.jabatan_tim || 'Anggota' });
+            }
+          });
+        }
+      }
+
+      this.revisiMembers = initialMembers;
       this.revisiForm = {
         catatan: 'Penyesuaian susunan anggota tim sehubungan dengan alih tugas / mutasi pegawai.',
-        klausul_menimbang: 'bahwa sehubungan dengan adanya alih tugas dan mutasi pegawai di lingkungan Pengadilan Agama Indramayu, dipandang perlu melakukan penyesuaian susunan tim kerja;'
+        klausul_menimbang: 'Bahwa sehubungan dengan adanya alih tugas dan mutasi pegawai di lingkungan Pengadilan Agama Indramayu, dipandang perlu melakukan penyesuaian susunan tim kerja;'
       };
       this.showModalSkRevisi = true;
     },
@@ -425,35 +1658,37 @@ window.SkBuilderMixin = {
       const targetVersion = (this.targetRevisiDoc.versi_aktif || 1) + 1;
       let cloned = JSON.parse(JSON.stringify(this.targetRevisiDoc));
       cloned.versi_aktif = targetVersion;
-      
-      if (!cloned.naskah_utama) cloned.naskah_utama = { kop: 'PENGADILAN AGAMA INDRAMAYU KELAS I A', menimbang: [], mengingat: [], diktum: [], pejabat: {} };
-      if (!Array.isArray(cloned.naskah_utama.menimbang)) cloned.naskah_utama.menimbang = [];
-      
-      // Sisipkan klausul amandemen di awal menimbang
+      cloned.members = JSON.parse(JSON.stringify(this.revisiMembers));
+
+      this.normalizeSkBuilderDoc(cloned);
+
+      // Sisipkan klausul amandemen di awal menimbang jika belum ada
       if (this.revisiForm.klausul_menimbang) {
-        cloned.naskah_utama.menimbang.unshift(this.revisiForm.klausul_menimbang);
-      }
-
-      cloned.members = this.revisiMembers;
-
-      // Sinkronkan ke lampiran tabel jika ada
-      if (Array.isArray(cloned.lampiran)) {
-        const tableLamp = cloned.lampiran.find(l => l.tipe === 'tabel');
-        if (tableLamp && Array.isArray(tableLamp.data)) {
-          tableLamp.data = this.revisiMembers.map(m => {
-            const userObj = (this.globalState.usersList || []).find(u => u.nip === m.nip);
-            return {
-              jabatan_tim: m.peran || 'Anggota',
-              nama: userObj ? `${userObj.nama} (${userObj.nip})` : m.nip,
-              nip: m.nip,
-              jabatan_dinas: userObj ? userObj.jabatan : '-'
-            };
-          });
+        const klausul = this.revisiForm.klausul_menimbang.trim();
+        if (klausul && !this.skBuilderDoc.naskah_utama.menimbang.includes(klausul)) {
+          this.skBuilderDoc.naskah_utama.menimbang.unshift(klausul);
         }
       }
 
+      // Sinkronkan personil hasil revisi ke Lampiran I (Tabel) dan Lampiran III (Bagan)
+      const tableLamp = this.skBuilderDoc.lampiran.find(l => l.tipe === 'tabel');
+      if (tableLamp) {
+        tableLamp.data = this.convertMembersArrayToTableRows(this.revisiMembers);
+      }
+      this.syncBaganFromLampiranTabel(true);
+
+      // Catat ke revisi_history
+      const tglHariIni = new Date().toISOString().split('T')[0];
+      if (!Array.isArray(this.skBuilderDoc.revisi_history)) this.skBuilderDoc.revisi_history = [];
+      this.skBuilderDoc.revisi_history.push({
+        versi: targetVersion,
+        tgl_revisi: tglHariIni,
+        catatan: this.revisiForm.catatan || 'Amandemen susunan tim',
+        oleh: (this.globalState.user ? this.globalState.user.nama : 'Admin')
+      });
+
       this.showModalSkRevisi = false;
-      this.openSkBuilder(cloned);
+      this.showModalSkBuilder = true;
     },
 
     async submitSkRevisi() {
@@ -476,41 +1711,37 @@ window.SkBuilderMixin = {
           oleh: (this.globalState.user ? this.globalState.user.nama : 'Admin')
         });
 
-        // Duplikasi payload dengan versi baru
-        let updatedPayload = JSON.parse(JSON.stringify(this.targetRevisiDoc));
-        updatedPayload.versi_aktif = nextVer;
-        updatedPayload.members = this.revisiMembers;
-        updatedPayload.revisi_history = history;
+        let cloned = JSON.parse(JSON.stringify(this.targetRevisiDoc));
+        cloned.versi_aktif = nextVer;
+        cloned.members = JSON.parse(JSON.stringify(this.revisiMembers));
+        cloned.revisi_history = history;
 
-        // Sinkronkan ke lampiran tabel jika ada
-        if (Array.isArray(updatedPayload.lampiran)) {
-          const tableLamp = updatedPayload.lampiran.find(l => l.tipe === 'tabel');
-          if (tableLamp && Array.isArray(tableLamp.data)) {
-            tableLamp.data = this.revisiMembers.map(m => {
-              const userObj = (this.globalState.usersList || []).find(u => u.nip === m.nip);
-              return {
-                jabatan_tim: m.peran || 'Anggota',
-                nama: userObj ? `${userObj.nama} (${userObj.nip})` : m.nip,
-                nip: m.nip,
-                jabatan_dinas: userObj ? userObj.jabatan : '-'
-              };
-            });
+        // Gunakan normalizeSkBuilderDoc pada objek sementara agar Lampiran I & III ikut ter-update rapi
+        const backupBuilder = JSON.parse(JSON.stringify(this.skBuilderDoc));
+        this.normalizeSkBuilderDoc(cloned);
+
+        if (this.revisiForm.klausul_menimbang) {
+          const klausul = this.revisiForm.klausul_menimbang.trim();
+          if (klausul && !this.skBuilderDoc.naskah_utama.menimbang.includes(klausul)) {
+            this.skBuilderDoc.naskah_utama.menimbang.unshift(klausul);
           }
         }
 
-        // Sisipkan klausul amandemen jika naskah_utama tersedia
-        if (updatedPayload.naskah_utama && Array.isArray(updatedPayload.naskah_utama.menimbang)) {
-          if (this.revisiForm.klausul_menimbang) {
-            updatedPayload.naskah_utama.menimbang.unshift(this.revisiForm.klausul_menimbang);
-          }
+        const tableLamp = this.skBuilderDoc.lampiran.find(l => l.tipe === 'tabel');
+        if (tableLamp) {
+          tableLamp.data = this.convertMembersArrayToTableRows(this.revisiMembers);
         }
+        this.syncBaganFromLampiranTabel(true);
+
+        const updatedPayload = JSON.parse(JSON.stringify(this.skBuilderDoc));
+        this.skBuilderDoc = backupBuilder;
 
         await TranskepFirebase.saveSkToFirestore(updatedPayload);
         this.isSubmittingRevisi = false;
         this.showModalSkRevisi = false;
 
         if (window.showNotify) {
-          window.showNotify("Revisi Diterbitkan! 🎉", `SK "${updatedPayload.no_sk}" berhasil diperbarui ke Versi ${nextVer}.`, "success");
+          window.showNotify("Revisi Diterbitkan! 🎉", `SK "${updatedPayload.judul_sk}" (${updatedPayload.no_sk}) berhasil diperbarui ke Versi ${nextVer}.`, "success");
         }
       } catch (err) {
         this.isSubmittingRevisi = false;
@@ -527,4 +1758,5 @@ function UtilitiesDateNow() {
   const pad = n => n < 10 ? '0' + n : n;
   return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
 }
+
 </script>

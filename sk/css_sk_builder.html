@@ -10,7 +10,7 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.5rem 1rem;
+  padding: 0.5rem 0.85rem;
   border-radius: 0.75rem;
   font-size: 0.75rem;
   font-weight: 700;
@@ -29,8 +29,8 @@
 }
 
 .sk-stepper-badge {
-  width: 1.5rem;
-  height: 1.5rem;
+  width: 1.4rem;
+  height: 1.4rem;
   border-radius: 9999px;
   display: flex;
   align-items: center;
@@ -49,46 +49,81 @@
   color: #ffffff;
 }
 
-/* Naskah Dinas Yuridis Preview Paper */
-.sk-legal-naskah {
-  font-family: 'Times New Roman', Times, serif;
-  color: #0f172a;
-  background: #ffffff;
-  padding: 3rem 2.5rem;
-  border-radius: 0.5rem;
-  line-height: 1.6;
+/* Auto-Expanding Textarea (Zero Inner Scrollbar) */
+.sk-auto-textarea {
+  field-sizing: content;
+  resize: none;
+  overflow: hidden;
+  line-height: 1.55;
 }
 
-/* Printable Legal Table */
+/* Naskah Dinas Yuridis Preview Paper (Standar A4 Pengadilan) */
+.sk-legal-naskah {
+  font-family: 'Bookman Old Style', 'Times New Roman', Times, serif;
+  color: #000000;
+  background: #ffffff;
+  padding: 2.5rem 2.75rem;
+  border-radius: 0.5rem;
+  line-height: 1.5;
+  font-size: 11pt;
+}
+
+/* Tabel Yudisial Tanpa Garis untuk Konsiderans & Diktum */
+.sk-legal-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
+  text-align: justify;
+}
+
+.sk-legal-label {
+  width: 115px;
+  flex-shrink: 0;
+  font-weight: normal;
+}
+
+.sk-legal-colon {
+  width: 14px;
+  flex-shrink: 0;
+  text-align: center;
+}
+
+.sk-legal-content {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Printable Legal Table (Lampiran I) */
 .sk-legal-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 11px;
+  font-size: 10.5pt;
   color: #000000;
-  margin-top: 1rem;
+  margin-top: 0.75rem;
 }
 
 .sk-legal-table th, 
 .sk-legal-table td {
-  border: 1px solid #334155;
+  border: 1px solid #000000;
   padding: 6px 10px;
+  vertical-align: top;
 }
 
 .sk-legal-table th {
-  background-color: #f1f5f9;
+  background-color: #f8fafc;
   font-weight: bold;
   text-align: center;
-  text-transform: uppercase;
 }
 
-/* Smart Box Tree (Bagan Struktur Organisasi) */
+/* Smart Box Tree (Bagan Struktur Organisasi di Editor Step 2) */
 .sk-tree-container {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1.5rem;
+  gap: 1.25rem;
   width: 100%;
-  padding: 1.5rem 0.5rem;
+  padding: 1.25rem 0.5rem;
   overflow-x: auto;
 }
 
@@ -104,11 +139,11 @@
 
 .sk-tree-node {
   background: #0f172a;
-  border: 1.5px solid #334155;
-  border-radius: 0.75rem;
+  border: 3px double #475569;
+  border-radius: 0.5rem;
   padding: 0.75rem 1rem;
-  min-width: 190px;
-  max-width: 260px;
+  min-width: 210px;
+  max-width: 320px;
   text-align: center;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
   transition: all 0.2s ease;
@@ -116,18 +151,19 @@
 }
 
 .sk-tree-node:hover {
-  border-color: #6366f1;
-  transform: translateY(-2px);
+  border-color: #818cf8;
   box-shadow: 0 6px 16px rgba(99, 102, 241, 0.25);
 }
 
 .sk-tree-role {
-  font-size: 0.65rem;
+  font-size: 0.7rem;
   font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.04em;
   color: #818cf8;
-  margin-bottom: 0.25rem;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.25);
+  padding-bottom: 0.25rem;
+  margin-bottom: 0.35rem;
 }
 
 .sk-tree-name {
@@ -143,7 +179,6 @@
   margin-top: 0.15rem;
 }
 
-/* Connector Line Between Levels */
 .sk-tree-connector {
   width: 2px;
   height: 1.25rem;
@@ -151,39 +186,48 @@
   margin: 0 auto;
 }
 
-/* Printable Legal Tree in Preview Paper */
-.sk-legal-tree {
+/* ========================================== */
+/* BAGAN STRUKTUR DOUBLE-BORDER STANDAR SK PA */
+/* ========================================== */
+.sk-judicial-chart {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1rem;
-  margin-top: 1.5rem;
-  font-family: 'Times New Roman', Times, serif;
+  width: 100%;
+  margin-top: 1.25rem;
+  font-family: 'Bookman Old Style', 'Times New Roman', Times, serif;
+  color: #000000;
 }
 
-.sk-legal-tree-node {
-  border: 1.5px solid #000000;
-  padding: 6px 14px;
-  text-align: center;
-  min-width: 180px;
+.sk-judicial-box {
+  border: 3px double #000000;
   background: #ffffff;
+  color: #000000;
+  padding: 8px 18px;
+  min-width: 230px;
+  max-width: 380px;
+  text-align: center;
 }
 
-.sk-legal-tree-role {
-  font-size: 10px;
+.sk-judicial-box-title {
   font-weight: bold;
   text-transform: uppercase;
+  font-size: 10.5pt;
+  border-bottom: 1px solid #000000;
+  padding-bottom: 3px;
+  margin-bottom: 5px;
 }
 
-.sk-legal-tree-name {
-  font-size: 11px;
-  font-weight: bold;
+.sk-judicial-box-body {
+  font-size: 10.5pt;
+  line-height: 1.45;
 }
 
-.sk-legal-tree-connector {
-  width: 1.5px;
-  height: 14px;
+.sk-judicial-vline {
+  width: 2px;
+  height: 22px;
   background: #000000;
+  margin: 0 auto;
 }
 
 /* ========================================== */
@@ -192,7 +236,7 @@
 @media print {
   @page {
     size: A4 portrait;
-    margin: 20mm 20mm 20mm 25mm;
+    margin: 18mm 18mm 18mm 22mm;
   }
 
   body {

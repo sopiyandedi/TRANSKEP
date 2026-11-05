@@ -79,23 +79,25 @@ document.addEventListener("DOMContentLoaded", () => {
                    mapGroup[baseId].members.push({ nip: sk.nip, peran: peran });
                 });
 
-                // TAHAP 44: Integrasi & Realtime Sync dari Cloud Firestore
+                // TAHAP 44 & 94: Integrasi & Realtime Sync dari Cloud Firestore (Penguncian 1 Baris = 1 SK)
                 (this.firestoreSks || []).forEach(fSk => {
                     const docId = String(fSk.id).trim();
+                    const prev = mapGroup[docId] || {};
                     mapGroup[docId] = {
                         id: docId,
-                        judul_sk: fSk.judul_sk || '-',
-                        link_drive: fSk.link_drive || '-',
-                        tgl_input: fSk.tgl_input || '-',
-                        no_sk: fSk.no_sk || '-',
-                        tgl_sk: fSk.tgl_sk || '-',
-                        pj_sk: fSk.pj_sk || 'PJ. Kesekretariatan',
+                        judul_sk: fSk.judul_sk || prev.judul_sk || '-',
+                        link_drive: (fSk.link_drive && fSk.link_drive !== '-') ? fSk.link_drive : (prev.link_drive || '-'),
+                        tgl_input: fSk.tgl_input || prev.tgl_input || '-',
+                        no_sk: fSk.no_sk || prev.no_sk || '-',
+                        tgl_sk: fSk.tgl_sk || prev.tgl_sk || '-',
+                        pj_sk: fSk.pj_sk || prev.pj_sk || 'PJ. Kesekretariatan',
                         status: fSk.status || 'Aktif',
                         versi_aktif: fSk.versi_aktif || 1,
-                        members: Array.isArray(fSk.members) ? fSk.members : [],
+                        members: (Array.isArray(fSk.members) && fSk.members.length > 0) ? fSk.members : (prev.members || []),
                         revisi_history: Array.isArray(fSk.revisi_history) ? fSk.revisi_history : [],
                         naskah_utama: fSk.naskah_utama || null,
                         lampiran: Array.isArray(fSk.lampiran) ? fSk.lampiran : [],
+                        template_gdoc_id: fSk.template_gdoc_id || '',
                         is_firebase: true
                     };
                 });
