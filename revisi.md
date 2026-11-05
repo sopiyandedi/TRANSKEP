@@ -5100,3 +5100,44 @@ Pengguna melaporkan bahwa pratinjau (*preview*) dokumen PDF di modal SK dan SOP 
   6. [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js)
   7. [`revisi.md`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/revisi.md)
 - **Status:** `[SELESAI & AKTIF]` ✅
+
+
+---
+
+### TAHAP 93: Proteksi Berlapis Anti-Bocor Nama & NIP ke Tab Ikhtisar Jabatan (Dual-Pass Sanitizer & NIP-Aware Parser v3.8.16)
+
+#### 1. Latar Belakang & Analisis Mendalam
+- **Gejala Masalah:** Meskipun kata "Uraian Tugas" sudah berhasil hilang dari tab Ikhtisar pada Tahap 92, baris **Nama** dan **NIP** pegawai masih sempat lolos masuk ke tab Ikhtisar pada beberapa format dokumen Word.
+- **Akar Masalah Teknis:**
+  1. **Tabel & Variasi Format Word:** Dalam dokumen Word resmi, biodata sering berbentuk tabel (nama pegawai dan angka NIP terpisah di baris/sel sendiri tanpa awalan kata `NAMA :` atau `NIP :`, atau bertuliskan `N.I.P.`, `N I P`, atau angka NIP 18 digit murni `199312242025211033`).
+  2. **Kebocoran Fase Header:** Pada parser sebelumnya, blok `currentSection === 'header'` masih mendorong baris apapun dengan panjang `>= 10` karakter ke dalam `sections.ikhtisar` jika lolos filter noise sederhana. Akibatnya, baris berisi nama pegawai atau nomor NIP yang tidak berawalan `nama:` tetap terdorong ke Ikhtisar.
+  3. **Ketiadaan Konteks Identitas Terdeteksi:** Fungsi `parseDocxSections` sebelumnya tidak mengetahui siapa nama dan NIP pegawai yang sedang diproses, sehingga tidak dapat membuang baris yang memuat nama atau NIP pegawai tersebut.
+
+#### 2. Rencana Implementasi & Solusi Rekayasa
+1. **Injeksi Parameter Identitas Pegawai (`detectedNip` & `matchedNama`):**
+   - Di [`modules/jobdes/jobdes.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/jobdes/jobdes.js) & [`jobdes/js_jobdes.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/jobdes/js_jobdes.html):
+     * Fungsi `extractNipFromDoc` tetap beroperasi 100% normal untuk kebutuhan Auto-Match ke database pegawai.
+     * `processDocxFiles` kini meneruskan `detectedNip` dan nama pegawai (`matchedUser?.nama`) ke dalam fungsi `parseDocxSections(fullText, detectedNip, matchedNama)`.
+2. **Eliminasi Kebocoran Blok Header (`hasExplicitIkhtisar`):**
+   - Memeriksa apakah dokumen memiliki heading resmi `IKHTISAR JABATAN`. Jika ada, seluruh teks di blok `header` (sebelum heading) dijamin 100% dibuang dan DILARANG masuk ke `sections.ikhtisar`.
+3. **Penyaring Noise Agresif & Universal (`isNoiseOrBiodata`):**
+   - Mendeteksi dan membuang baris jika mengandung:
+     * Kata `\bnip\b`, `n\.?i\.?p`, deretan angka 8+ digit `\d{8,}`, atau string `detectedNip`.
+     * Kata `\bnama\b`, nama pegawai `matchedNama`, atau string gelar akademik pendek (`, S.H.`, `, S.Ag.`, `, M.H.`, dsb).
+     * `pangkat`, `golongan`, `jabatan`, `satker`, `instansi`, `nomor`, `tanggal`, `sk`, `atasan`.
+4. **Dual-Pass Post-Sanitizer Khusus Tab Ikhtisar:**
+   - Sebelum mengembalikan objek `sections`, lakukan penyaringan akhir (*hard guarantee*) pada array `sections.ikhtisar`:
+     * Membuang baris apapun yang mengandung angka NIP (`\d{6,}`), kata `nip`, kata `nama`, nama pegawai, atau gelar.
+     * Menjamin bahwa yang tersisa di `sections.ikhtisar` **HANYA** kalimat uraian tugas substantif.
+5. **Versioning & Deployment:**
+   - Bump versi cache PWA ke `v3.8.16` di [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) dan [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js).
+   - Push commit ke `origin/main` (sopiyandedi/TRANSKEP).
+
+#### 3. Estimasi Dampak & File yang Dimodifikasi
+- **File Dimodifikasi:**
+  1. [`modules/jobdes/jobdes.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/jobdes/jobdes.js)
+  2. [`jobdes/js_jobdes.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/jobdes/js_jobdes.html)
+  3. [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html)
+  4. [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js)
+  5. [`revisi.md`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/revisi.md)
+- **Status:** `[SELESAI & AKTIF]` ✅

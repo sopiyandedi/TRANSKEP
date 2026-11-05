@@ -516,7 +516,7 @@ function escapeHtml(str) {
 
           return null;
         },
-                parseDocxSections(rawText) {
+                parseDocxSections(rawText, matchedNip = '', matchedNama = '') {
           if (!rawText) return { ikhtisar: [], pokok: [], tambahan: [], wewenang: [], tanggung: [], hasil: [], bawahan: [] };
           const lines = rawText.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
 
@@ -531,7 +531,7 @@ function escapeHtml(str) {
           };
 
           let currentSection = 'header';
-
+          const hasExplicitIkhtisar = /(?:(?:I|A|1)[\.\)]\s*)?(?:ikhtisar\s+jabatan|ikhtisar)\b/i.test(rawText);
           const isStopFooter = /^(?:mengetahui|ketua\s+|sekretaris\s+|panitera\s+|pejabat\s+penilai|ditetapkan\s+di|indramayu,\s*\d+)/i;
 
           // Helper: Deteksi menyeluruh apakah baris ini adalah metadata/biodata/kop/judul yang harus disaring
@@ -541,13 +541,14 @@ function escapeHtml(str) {
             const text = str.replace(/^(\d+[\.\)]|[a-zA-Z][\.\)]|[-–—•*▪▫◦●])\s*/, '').trim().toLowerCase();
             if (text.length < 3) return true;
 
-            // 1. Nama Pegawai
-            if (/^nama(?:\s+pns|\s+pegawai)?\s*[:.\s-]/i.test(text)) return true;
-            if (/^nama\s*$/i.test(text)) return true;
+            // 1. NIP Pegawai (Pola NIP kata kunci, deretan angka 8+ digit, atau kecocokan NIP terdeteksi)
+            if (/\bnip\b/i.test(text) || /n\.?i\.?p/i.test(text) || /\d{8,}/.test(text)) return true;
+            if (matchedNip && text.includes(matchedNip)) return true;
 
-            // 2. NIP Pegawai
-            if (/^nip(?:\s+pns|\s+pegawai)?\s*[:.\s-]/i.test(text)) return true;
-            if (/^nip\b/i.test(text) && /\d{6,}/.test(text)) return true;
+            // 2. Nama Pegawai (Kata kunci nama, nama matched pegawai, atau gelar akademik pendek)
+            if (/\bnama\b/i.test(text)) return true;
+            if (matchedNama && text.includes(matchedNama.toLowerCase().split(',')[0].trim())) return true;
+            if (text.length < 60 && /(?:,\s*(?:s\.h|s\.ag|m\.h|s\.kom|s\.e|a\.md|s\.sos|m\.m|m\.si|s\.h\.i|lc|s\.pd|m\.a)\b|^(?:drs|dr|h\.|hj\.|ir)\b)/i.test(text)) return true;
 
             // 3. Judul / Dokumen / Tupoksi
             if (/^(?:uraian\s+tugas(?:\s+jabatan)?|job\s+description|daftar\s+rincian\s+tugas(?:\s+jabatan)?|rincian\s+tugas(?:\s+jabatan)?|tupoksi)/i.test(text)) return true;
@@ -557,19 +558,16 @@ function escapeHtml(str) {
             if (/^(?:pangkat(?:\s*\/\s*golongan|\s*\/\s*gol)?|golongan|gol(?:\.|\/)|ruang)\b/i.test(text)) return true;
 
             // 5. Jabatan / Nama Jabatan
-            if (/^(?:nama\s+jabatan|jabatan)\s*[:.\s-]/i.test(text)) return true;
+            if (/^(?:nama\s+jabatan|jabatan)\b/i.test(text)) return true;
 
             // 6. Unit Kerja / Satker / Instansi
-            if (/^(?:unit\s+kerja|satuan\s+kerja|instansi|satker)\s*[:.\s-]/i.test(text)) return true;
-            if (/^(?:pegawai\s+pengadilan|pengadilan\s+agama|mahkamah\s+agung)/i.test(text)) return true;
+            if (/^(?:unit\s+kerja|satuan\s+kerja|instansi|satker|pegawai\s+pengadilan|pengadilan\s+agama|mahkamah\s+agung)/i.test(text)) return true;
 
             // 7. Atasan Langsung
-            if (/^atasan(?:\s+langsung)?\s*[:.\s-]/i.test(text)) return true;
+            if (/^atasan(?:\s+langsung)?\b/i.test(text)) return true;
 
             // 8. SK / Lampiran / Nomor / Tanggal
-            if (/^(?:lampiran|surat\s+keputusan|keputusan\s+ketua|keputusan\s+sekretaris)\b/i.test(text)) return true;
-            if (/^(?:nomor|no)\s*[:.\s-]/i.test(text)) return true;
-            if (/^(?:tanggal|tgl)\s*[:.\s-]/i.test(text)) return true;
+            if (/^(?:lampiran|surat\s+keputusan|keputusan|nomor|no|tanggal|tgl)\b/i.test(text)) return true;
 
             return false;
           };
@@ -667,9 +665,9 @@ function escapeHtml(str) {
               continue;
             }
 
-            // Jika masih di header dan lolos filter noise, periksa apakah ini kalimat ikhtisar awal
+            // Jika masih di header, hanya ambil jika tidak ada heading Ikhtisar resmi dan teks adalah kalimat substantif
             if (currentSection === 'header') {
-              if (cleanLine.length >= 10) {
+              if (!hasExplicitIkhtisar && cleanLine.length >= 15) {
                 sections.ikhtisar.push(cleanLine);
               }
               continue;
@@ -680,6 +678,18 @@ function escapeHtml(str) {
               sections[currentSection].push(cleanLine);
             }
           }
+
+          // DUAL-PASS FINAL SANITIZER KHUSUS IKHTISAR
+          sections.ikhtisar = (sections.ikhtisar || []).filter(line => {
+            if (!line || line.length < 5) return false;
+            if (/\bnip\b/i.test(line) || /n\.?i\.?p/i.test(line) || /\d{6,}/.test(line)) return false;
+            if (/\bnama\b/i.test(line)) return false;
+            if (matchedNip && line.includes(matchedNip)) return false;
+            if (matchedNama && line.toLowerCase().includes(matchedNama.toLowerCase().split(',')[0].trim())) return false;
+            if (line.length < 60 && /(?:,\s*(?:s\.h|s\.ag|m\.h|s\.kom|s\.e|a\.md|s\.sos|m\.m|m\.si|s\.h\.i|lc|s\.pd|m\.a)\b|^(?:drs|dr|h\.|hj\.|ir)\b)/i.test(line)) return false;
+            if (isNoiseOrBiodata(line)) return false;
+            return true;
+          });
 
           return sections;
         },
@@ -756,7 +766,14 @@ function escapeHtml(str) {
               const fullText = result.value || '';
 
               const detectedNip = this.extractNipFromDoc(fullText, file.name);
-              const sections = this.parseDocxSections(fullText);
+
+              let matchedUser = null;
+              if (detectedNip) {
+                matchedUser = usersList.find(u => String(u.nip) === String(detectedNip));
+              }
+
+              const matchedNama = matchedUser ? matchedUser.nama : '';
+              const sections = this.parseDocxSections(fullText, detectedNip, matchedNama);
 
               // Ekstrak Nomor & Tanggal SK jika ada di teks
               let dasarSk = '-';
@@ -764,11 +781,6 @@ function escapeHtml(str) {
               const mTanggal = fullText.match(/tanggal\s*:\s*([^\r\n]+)/i);
               if (mNomor && mTanggal) {
                 dasarSk = "Nomor: " + mNomor[1].trim() + "\nTanggal: " + mTanggal[1].trim();
-              }
-
-              let matchedUser = null;
-              if (detectedNip) {
-                matchedUser = usersList.find(u => String(u.nip) === String(detectedNip));
               }
 
               let existingPokok = '';
