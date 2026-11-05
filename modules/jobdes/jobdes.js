@@ -517,7 +517,7 @@ function escapeHtml(str) {
           return null;
         },
                 parseDocxSections(rawText) {
-          if (!rawText) return { ikhtisar: [], pokok: [], tambahan: [], tanggung: [], hasil: [], bawahan: [] };
+          if (!rawText) return { ikhtisar: [], pokok: [], tambahan: [], wewenang: [], tanggung: [], hasil: [], bawahan: [] };
           const lines = rawText.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
 
           const sections = {
@@ -532,8 +532,47 @@ function escapeHtml(str) {
 
           let currentSection = 'header';
 
-          const noiseHeader = /^(?:uraian\s+tugas|job\s+description|daftar\s+rincian\s+tugas|lampiran|surat\s+keputusan|nomor\s*:|tanggal\s*:|pegawai\s+pengadilan|nama\s+jabatan\s*:|nama\s*:|nip\s*:|pangkat|golongan|unit\s+kerja|atasan\s+langsung\s*:)/i;
           const isStopFooter = /^(?:mengetahui|ketua\s+|sekretaris\s+|panitera\s+|pejabat\s+penilai|ditetapkan\s+di|indramayu,\s*\d+)/i;
+
+          // Helper: Deteksi menyeluruh apakah baris ini adalah metadata/biodata/kop/judul yang harus disaring
+          const isNoiseOrBiodata = (str) => {
+            if (!str) return true;
+            // Bersihkan bullet atau penomoran di depan terlebih dahulu
+            const text = str.replace(/^(\d+[\.\)]|[a-zA-Z][\.\)]|[-–—•*▪▫◦●])\s*/, '').trim().toLowerCase();
+            if (text.length < 3) return true;
+
+            // 1. Nama Pegawai
+            if (/^nama(?:\s+pns|\s+pegawai)?\s*[:.\s-]/i.test(text)) return true;
+            if (/^nama\s*$/i.test(text)) return true;
+
+            // 2. NIP Pegawai
+            if (/^nip(?:\s+pns|\s+pegawai)?\s*[:.\s-]/i.test(text)) return true;
+            if (/^nip\b/i.test(text) && /\d{6,}/.test(text)) return true;
+
+            // 3. Judul / Dokumen / Tupoksi
+            if (/^(?:uraian\s+tugas(?:\s+jabatan)?|job\s+description|daftar\s+rincian\s+tugas(?:\s+jabatan)?|rincian\s+tugas(?:\s+jabatan)?|tupoksi)/i.test(text)) return true;
+            if (/^uraian\s+tugas\s*$/i.test(text)) return true;
+
+            // 4. Pangkat / Golongan / Ruang
+            if (/^(?:pangkat(?:\s*\/\s*golongan|\s*\/\s*gol)?|golongan|gol(?:\.|\/)|ruang)\b/i.test(text)) return true;
+
+            // 5. Jabatan / Nama Jabatan
+            if (/^(?:nama\s+jabatan|jabatan)\s*[:.\s-]/i.test(text)) return true;
+
+            // 6. Unit Kerja / Satker / Instansi
+            if (/^(?:unit\s+kerja|satuan\s+kerja|instansi|satker)\s*[:.\s-]/i.test(text)) return true;
+            if (/^(?:pegawai\s+pengadilan|pengadilan\s+agama|mahkamah\s+agung)/i.test(text)) return true;
+
+            // 7. Atasan Langsung
+            if (/^atasan(?:\s+langsung)?\s*[:.\s-]/i.test(text)) return true;
+
+            // 8. SK / Lampiran / Nomor / Tanggal
+            if (/^(?:lampiran|surat\s+keputusan|keputusan\s+ketua|keputusan\s+sekretaris)\b/i.test(text)) return true;
+            if (/^(?:nomor|no)\s*[:.\s-]/i.test(text)) return true;
+            if (/^(?:tanggal|tgl)\s*[:.\s-]/i.test(text)) return true;
+
+            return false;
+          };
 
           for (let i = 0; i < lines.length; i++) {
             const line = lines[i];
@@ -543,62 +582,100 @@ function escapeHtml(str) {
               break;
             }
 
+            // Bersihkan bullet di awal baris
+            const cleanLine = line.replace(/^(\d+[\.\)]|[a-zA-Z][\.\)]|[-–—•*▪▫◦●])\s*/, '').trim();
+
             // 1. Cek Heading I: IKHTISAR JABATAN
-            if (/^(?:(?:I|A|1)[\.\)]\s*)?(?:ikhtisar\s+jabatan|ikhtisar)(?:\s*[:])?$/i.test(line)) {
+            const mIkhtisar = line.match(/^(?:(?:I|A|1)[\.\)]\s*)?(?:ikhtisar\s+jabatan|ikhtisar)(?:\s*[:.\s-]\s*(.*))?$/i);
+            if (mIkhtisar) {
               currentSection = 'ikhtisar';
+              const remainder = (mIkhtisar[1] || '').trim();
+              if (remainder.length >= 5 && !isNoiseOrBiodata(remainder)) {
+                sections.ikhtisar.push(remainder);
+              }
               continue;
             }
 
             // 2. Cek Heading II: URAIAN TUGAS POKOK
-            if (/^(?:(?:II|B|2)[\.\)]\s*)?(?:uraian\s+tugas\s+pokok|tugas\s+pokok)(?:\s*[:])?$/i.test(line)) {
+            const mPokok = line.match(/^(?:(?:II|B|2)[\.\)]\s*)?(?:uraian\s+tugas\s+pokok|tugas\s+pokok)(?:\s*[:.\s-]\s*(.*))?$/i);
+            if (mPokok) {
               currentSection = 'pokok';
+              const remainder = (mPokok[1] || '').trim();
+              if (remainder.length >= 3 && !isNoiseOrBiodata(remainder)) {
+                sections.pokok.push(remainder);
+              }
               continue;
             }
 
             // 3. Cek Heading III: TUGAS TAMBAHAN
-            if (/^(?:(?:III|C|3)[\.\)]\s*)?(?:uraian\s+tugas\s+tambahan|tugas\s+tambahan)(?:\s*[:])?$/i.test(line)) {
+            const mTambahan = line.match(/^(?:(?:III|C|3)[\.\)]\s*)?(?:uraian\s+tugas\s+tambahan|tugas\s+tambahan)(?:\s*[:.\s-]\s*(.*))?$/i);
+            if (mTambahan) {
               currentSection = 'tambahan';
+              const remainder = (mTambahan[1] || '').trim();
+              if (remainder.length >= 3 && !isNoiseOrBiodata(remainder)) {
+                sections.tambahan.push(remainder);
+              }
               continue;
             }
 
             // 4. Cek Heading IV: WEWENANG
-            if (/^(?:(?:IV|D|4)[\.\)]\s*)?(?:wewenang)(?:\s*[:])?$/i.test(line)) {
+            const mWewenang = line.match(/^(?:(?:IV|D|4)[\.\)]\s*)?(?:wewenang|kewenangan)(?:\s*[:.\s-]\s*(.*))?$/i);
+            if (mWewenang) {
               currentSection = 'wewenang';
+              const remainder = (mWewenang[1] || '').trim();
+              if (remainder.length >= 3 && !isNoiseOrBiodata(remainder)) {
+                sections.wewenang.push(remainder);
+              }
               continue;
             }
 
             // 5. Cek Heading V / IV: TANGGUNG JAWAB
-            if (/^(?:(?:V|E|5|IV|D|4)[\.\)]\s*)?(?:tanggung\s*jawab)(?:\s*[:])?$/i.test(line)) {
+            const mTanggung = line.match(/^(?:(?:V|E|5|IV|D|4)[\.\)]\s*)?(?:tanggung\s*jawab)(?:\s*[:.\s-]\s*(.*))?$/i);
+            if (mTanggung) {
               currentSection = 'tanggung';
+              const remainder = (mTanggung[1] || '').trim();
+              if (remainder.length >= 3 && !isNoiseOrBiodata(remainder)) {
+                sections.tanggung.push(remainder);
+              }
               continue;
             }
 
             // 6. Cek Heading VI / V: HASIL KERJA
-            if (/^(?:(?:VI|F|6|V|E|5)[\.\)]\s*)?(?:hasil\s+kerja)(?:\s*[:])?$/i.test(line)) {
+            const mHasil = line.match(/^(?:(?:VI|F|6|V|E|5)[\.\)]\s*)?(?:hasil\s+kerja)(?:\s*[:.\s-]\s*(.*))?$/i);
+            if (mHasil) {
               currentSection = 'hasil';
+              const remainder = (mHasil[1] || '').trim();
+              if (remainder.length >= 3 && !isNoiseOrBiodata(remainder)) {
+                sections.hasil.push(remainder);
+              }
               continue;
             }
 
             // 7. Cek Heading VII / VI: BAWAHAN LANGSUNG
-            if (/^(?:(?:VII|G|7|VI|F|6)[\.\)]\s*)?(?:nama\s+jabatan\s+bawahan\s+langsung|jabatan\s+bawahan\s+langsung|bawahan\s+langsung)(?:\s*[:])?$/i.test(line)) {
+            const mBawahan = line.match(/^(?:(?:VII|G|7|VI|F|6)[\.\)]\s*)?(?:nama\s+jabatan\s+bawahan\s+langsung|jabatan\s+bawahan\s+langsung|bawahan\s+langsung)(?:\s*[:.\s-]\s*(.*))?$/i);
+            if (mBawahan) {
               currentSection = 'bawahan';
+              const remainder = (mBawahan[1] || '').trim();
+              if (remainder.length >= 2 && !isNoiseOrBiodata(remainder)) {
+                sections.bawahan.push(remainder);
+              }
               continue;
             }
 
-            // Jika masih di header tapi bukan metadata noise, anggap sebagai Ikhtisar Jabatan awal
+            // Cek apakah baris ini adalah biodata/noise. Jika ya, abaikan mutlak!
+            if (isNoiseOrBiodata(line) || isNoiseOrBiodata(cleanLine)) {
+              continue;
+            }
+
+            // Jika masih di header dan lolos filter noise, periksa apakah ini kalimat ikhtisar awal
             if (currentSection === 'header') {
-              if (noiseHeader.test(line)) {
-                continue;
-              }
-              const cleanLine = line.replace(/^(\d+[\.\)]|[a-zA-Z][\.\)]|[-–—•*▪▫◦●])\s*/, '').trim();
-              if (cleanLine.length >= 5) {
+              if (cleanLine.length >= 10) {
                 sections.ikhtisar.push(cleanLine);
               }
               continue;
             }
 
             // Di dalam section aktif
-            const cleanLine = line.replace(/^(\d+[\.\)]|[a-zA-Z][\.\)]|[-–—•*▪▫◦●])\s*/, '').trim();
             if (cleanLine.length > 0 && sections[currentSection]) {
               sections[currentSection].push(cleanLine);
             }

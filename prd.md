@@ -825,3 +825,21 @@ ZONA BAWAH: MASTER CONTEXT & STATUS MIGRASI TERKINI (LIVING CONTEXT)
     - **Deployment Google Apps Script @335 & Versioning**:
       - Versi Service Worker sw.js dan APP_BUILD_VER di index.html dinaikkan ke **transkep-v3.8.9** / **3.8.9**.
       - Perubahan di-push **HANYA ke remote origin/main** (sopiyandedi/TRANSKEP) untuk pengujian, **TIDAK di-push ke remote prod**.
+
+
+68. **Evolusi Desain Tombol Header Jobdes Menjadi Ikon Elegan & Penataan 7 Seksi Uraian Tugas (Tahap 88 - 91 - Selesai & Aktif ✅):**
+    - **Header Squircle Icon Buttons**: Mengubah seluruh tombol aksi teks panjang di header modul Uraian Tugas menjadi tombol ikon squircle 40x40 (`w-10 h-10 rounded-xl`) yang elegan dengan tooltip informatif dan nuansa warna tematik.
+    - **Struktur 7 Seksi Uraian Tugas Resmi**:
+      1. I. IKHTISAR JABATAN
+      2. II. URAIAN TUGAS POKOK
+      3. III. TUGAS TAMBAHAN
+      4. IV. WEWENANG (Baru)
+      5. V. TANGGUNG JAWAB
+      6. VI. HASIL KERJA
+      7. VII. NAMA JABATAN BAWAHAN LANGSUNG
+    - Penyelarasan skema Firestore, template cetak PDF, preview card, dan form edit untuk mendukung ke-7 seksi tersebut.
+
+69. **Eliminasi Total Biodata dari Tab Ikhtisar & Auto-Expand Penuh Form Edit Uraian Tugas (Tahap 92 - v3.8.15 - Selesai & Aktif ✅):**
+    - **Clean-First Filtering & Comprehensive Noise Elimination**: Parser cerdas `parseDocxSections` kini membersihkan bullet dan penomoran terlebih dahulu (`cleanLine`), lalu memvalidasi baris terhadap fungsi `isNoiseOrBiodata`. Seluruh baris identitas (`NAMA`, `NIP`, `URAIAN TUGAS`, `PANGKAT/GOL`, `JABATAN`, `UNIT KERJA`, `NOMOR`, `TANGGAL SK`, `ATASAN`) dibuang 100% dan tidak pernah masuk ke tab Ikhtisar maupun tab lainnya. Hanya kalimat ringkasan tugas murni yang masuk ke `sections.ikhtisar`.
+    - **Auto-Expand Penuh Form Edit Uraian Tugas (Zero Inner Scroll)**: Pada modal edit `modals.editJobdes`, seluruh textarea (Ikhtisar, Tugas Pokok, Tugas Tambahan, IV. Wewenang, V. Tanggung Jawab, VI. Hasil Kerja, VII. Bawahan Langsung) dipasangkan formula baris reaktif otomatis `:rows="Math.max(3, (formEdit.field || '').split('\n').length + 1)"` dan CSS `field-sizing: content;`. Seluruh kotak isian memanjang penuh ke bawah mengikuti banyaknya uraian tugas tanpa scrollbar terpotong di dalam kotak. Pengguna dapat membaca dan mengedit puluhan butir uraian secara utuh dan nyaman dengan scrolling di tingkat modal.
+    - **Version Bump**: Versi cache PWA dinaikkan ke **`v3.8.15`** di [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) dan [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js). Commit dan push ke `origin/main`.

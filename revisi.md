@@ -5044,3 +5044,59 @@ Pengguna melaporkan bahwa pratinjau (*preview*) dokumen PDF di modal SK dan SOP 
   7. prd.md (Pembaruan Living Context Poin 67)
   8. revisi.md (Dokumentasi Log Revisi Tahap 86)
 - **Status:** `[SELESAI & AKTIF]` ✅
+
+
+---
+
+### TAHAP 92: Eliminasi Total Biodata & Judul Dokumen dari Slide Ikhtisar Jabatan (Smart Noise Filtering Docx v3.8.15)
+
+#### 1. Latar Belakang & Analisis Masalah
+- **Masalah:** Pada saat ekstraksi file Word (.docx) Uraian Tugas melalui Smart Bulk Import, butir-butir teks biodata seperti:
+  - `NOMOR : ...`
+  - `TANGGAL : ...`
+  - `PEGAWAI PENGADILAN AGAMA ...`
+  - `NAMA JABATAN : ...`
+  - `NAMA : ...`
+  - `NIP : ...`
+  - `PANGKAT/GOL./RUANG : ...`
+  - `URAIAN TUGAS JABATAN`
+  masih ikut terbawa masuk ke dalam tab/slide **"I. Ikhtisar"**.
+- **Akar Penyebab Teknis:**
+  1. Regex `noiseHeader` sebelumnya menggunakan format `^nama\s*:` yang mengasumsikan teks dimulai di awal baris murni, sedangkan di Word teks biodata sering kali berformat poin/bullet bernomor (contoh: `1. NAMA : ...`, `2. NIP : ...`). Pengecekan noise dilakukan *sebelum* pembersihan bullet penomoran sehingga filter gagal mendeteksi baris tersebut sebagai noise.
+  2. Logika fallback pada `currentSection === 'header'` menganggap baris non-noise apa pun sebagai Ikhtisar. Karena baris biodata lolos dari filter noise, seluruh baris identitas pegawai terdorong masuk ke array `sections.ikhtisar`.
+  3. Di dalam `currentSection === 'ikhtisar'`, belum dipasang filter pencegah kebocoran biodata jika dalam dokumen terdapat teks identitas yang berada di bawah heading Ikhtisar.
+
+#### 2. Rencana Implementasi & Solusi Rekayasa
+1. **Refactoring Logika Parser `parseDocxSections` ([`modules/jobdes/jobdes.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/jobdes/jobdes.js) & [`jobdes/js_jobdes.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/jobdes/js_jobdes.html)):**
+   - Membersihkan nomor/simbol bullet (`1.`, `a)`, `-`, `•`, dsb) di awal baris **terlebih dahulu** sebelum melakukan evaluasi teks.
+   - Menyusun fungsi pemeriksa noise komprehensif `isNoiseOrBiodata(text)`:
+     * Menyaring variasi nama: `NAMA :`, `NAMA PEGAWAI :`, `NAMA PNS :`
+     * Menyaring variasi NIP: `NIP :`, `NIP PEGAWAI :`, atau pola angka NIP panjang
+     * Menyaring judul/kop: `URAIAN TUGAS`, `JOB DESCRIPTION`, `DAFTAR RINCIAN TUGAS`, `TUPOKSI`
+     * Menyaring pangkat/golongan: `PANGKAT`, `GOLONGAN`, `GOL.`, `RUANG`
+     * Menyaring jabatan: `JABATAN :`, `NAMA JABATAN :`
+     * Menyaring instansi: `UNIT KERJA`, `SATUAN KERJA`, `PEGAWAI PENGADILAN AGAMA...`
+     * Menyaring metadata SK: `NOMOR :`, `TANGGAL :`, `LAMPIRAN`, `KEPUTUSAN KETUA`
+     * Menyaring atasan: `ATASAN LANGSUNG :`
+   - Memastikan baris yang cocok dengan `isNoiseOrBiodata` **100% dibuang/diabaikan** dan DILARANG masuk ke seksi manapun, terutama `sections.ikhtisar`.
+   - Mendukung penangkapan teks langsung pada baris heading (contoh: `I. IKHTISAR JABATAN : Merencanakan dan melaksanakan...`).
+   - Hanya memasukkan kalimat murni ringkasan tugas (paragraf substantif) ke dalam `sections.ikhtisar`.
+
+2. **Penyempurnaan Tampilan Editor Tab Ikhtisar & Auto-Expand Modal Edit ([`modules/jobdes/view_jobdes.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/jobdes/view_jobdes.html) & [`jobdes/view_jobdes.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/jobdes/view_jobdes.html)):**
+   - Menyesuaikan ukuran input textarea pada modal import: `:rows="item.activeTab === 'ikhtisar' ? 3 : 1"` agar paragraf ikhtisar jabatan tampil lapang, mudah dibaca, dan nyaman disunting.
+   - **Auto-Expand Penuh Form Edit Uraian Tugas (Anti-Inner Scroll):** Pada modal edit `modals.editJobdes`, seluruh textarea (Ikhtisar, Tugas Pokok, Tugas Tambahan, IV. Wewenang, V. Tanggung Jawab, VI. Hasil Kerja, VII. Bawahan Langsung) dipasangkan tinggi reaktif otomatis `:rows="Math.max(3, (formEdit.field || '').split('\n').length + 1)"` dan `field-sizing: content;`. Teks memanjang penuh ke bawah tanpa scrollbar internal terpotong di dalam kotak. Pengguna dapat membaca dan mengedit seluruh uraian tugas secara leluasa dengan scroll lancar di tingkat jendela modal.
+
+3. **Versioning & Deployment:**
+   - Bump versi cache PWA ke `v3.8.15` di [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) dan [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js).
+   - Push commit ke `origin/main` (sopiyandedi/TRANSKEP).
+
+#### 3. Estimasi Dampak & File yang Dimodifikasi
+- **File Dimodifikasi:**
+  1. [`modules/jobdes/jobdes.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/jobdes/jobdes.js)
+  2. [`jobdes/js_jobdes.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/jobdes/js_jobdes.html)
+  3. [`modules/jobdes/view_jobdes.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/jobdes/view_jobdes.html)
+  4. [`jobdes/view_jobdes.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/jobdes/view_jobdes.html)
+  5. [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html)
+  6. [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js)
+  7. [`revisi.md`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/revisi.md)
+- **Status:** `[SELESAI & AKTIF]` ✅
