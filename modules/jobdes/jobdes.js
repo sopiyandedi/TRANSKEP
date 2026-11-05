@@ -510,6 +510,89 @@ function escapeHtml(str) {
 
           return null;
         },
+                parseDocxSections(rawText) {
+          if (!rawText) return { ikhtisar: [], pokok: [], tambahan: [], tanggung: [], hasil: [], bawahan: [] };
+          const lines = rawText.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
+
+          const sections = {
+            ikhtisar: [],
+            pokok: [],
+            tambahan: [],
+            tanggung: [],
+            hasil: [],
+            bawahan: []
+          };
+
+          let currentSection = 'header';
+
+          const noiseHeader = /^(?:uraian\s+tugas|job\s+description|daftar\s+rincian\s+tugas|lampiran|surat\s+keputusan|nomor\s*:|tanggal\s*:|pegawai\s+pengadilan|nama\s+jabatan\s*:|nama\s*:|nip\s*:|pangkat|golongan|unit\s+kerja|atasan\s+langsung\s*:)/i;
+          const isStopFooter = /^(?:mengetahui|ketua\s+|sekretaris\s+|panitera\s+|pejabat\s+penilai|ditetapkan\s+di|indramayu,\s*\d+)/i;
+
+          for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+
+            // Cek jika sudah masuk area footer / tanda tangan
+            if (currentSection !== 'header' && isStopFooter.test(line)) {
+              break;
+            }
+
+            // 1. Cek Heading I: IKHTISAR JABATAN
+            if (/^(?:(?:I|A|1)[\.\)]\s*)?(?:ikhtisar\s+jabatan|ikhtisar)(?:\s*[:])?$/i.test(line)) {
+              currentSection = 'ikhtisar';
+              continue;
+            }
+
+            // 2. Cek Heading II: URAIAN TUGAS POKOK
+            if (/^(?:(?:II|B|2)[\.\)]\s*)?(?:uraian\s+tugas\s+pokok|tugas\s+pokok)(?:\s*[:])?$/i.test(line)) {
+              currentSection = 'pokok';
+              continue;
+            }
+
+            // 3. Cek Heading III: TUGAS TAMBAHAN
+            if (/^(?:(?:III|C|3)[\.\)]\s*)?(?:uraian\s+tugas\s+tambahan|tugas\s+tambahan)(?:\s*[:])?$/i.test(line)) {
+              currentSection = 'tambahan';
+              continue;
+            }
+
+            // 4. Cek Heading IV: TANGGUNG JAWAB
+            if (/^(?:(?:IV|D|4)[\.\)]\s*)?(?:tanggung\s*jawab)(?:\s*[:])?$/i.test(line)) {
+              currentSection = 'tanggung';
+              continue;
+            }
+
+            // 5. Cek Heading V: HASIL KERJA
+            if (/^(?:(?:V|E|5)[\.\)]\s*)?(?:hasil\s+kerja)(?:\s*[:])?$/i.test(line)) {
+              currentSection = 'hasil';
+              continue;
+            }
+
+            // 6. Cek Heading VI: BAWAHAN LANGSUNG
+            if (/^(?:(?:VI|F|6)[\.\)]\s*)?(?:nama\s+jabatan\s+bawahan\s+langsung|jabatan\s+bawahan\s+langsung|bawahan\s+langsung)(?:\s*[:])?$/i.test(line)) {
+              currentSection = 'bawahan';
+              continue;
+            }
+
+            // Jika masih di header tapi bukan metadata noise, anggap sebagai Ikhtisar Jabatan awal
+            if (currentSection === 'header') {
+              if (noiseHeader.test(line)) {
+                continue;
+              }
+              const cleanLine = line.replace(/^(\d+[\.\)]|[a-zA-Z][\.\)]|[-–—•*▪▫◦●])\s*/, '').trim();
+              if (cleanLine.length >= 5) {
+                sections.ikhtisar.push(cleanLine);
+              }
+              continue;
+            }
+
+            // Di dalam section aktif
+            const cleanLine = line.replace(/^(\d+[\.\)]|[a-zA-Z][\.\)]|[-–—•*▪▫◦●])\s*/, '').trim();
+            if (cleanLine.length > 0 && sections[currentSection]) {
+              sections[currentSection].push(cleanLine);
+            }
+          }
+
+          return sections;
+        },
         cleanDocxTextPoints(rawText) {
           if (!rawText) return [];
           const lines = rawText.split(/\r?\n/);
@@ -583,7 +666,15 @@ function escapeHtml(str) {
               const fullText = result.value || '';
 
               const detectedNip = this.extractNipFromDoc(fullText, file.name);
-              const points = this.cleanDocxTextPoints(fullText);
+              const sections = this.parseDocxSections(fullText);
+
+              // Ekstrak Nomor & Tanggal SK jika ada di teks
+              let dasarSk = '-';
+              const mNomor = fullText.match(/nomor\s*:\s*([^\r\n]+)/i);
+              const mTanggal = fullText.match(/tanggal\s*:\s*([^\r\n]+)/i);
+              if (mNomor && mTanggal) {
+                dasarSk = "Nomor: " + mNomor[1].trim() + "\nTanggal: " + mTanggal[1].trim();
+              }
 
               let matchedUser = null;
               if (detectedNip) {
@@ -592,6 +683,7 @@ function escapeHtml(str) {
 
               let existingPokok = '';
               let existingAtasan = '';
+              let existingIkhtisar = '';
               const targetNip = matchedUser ? matchedUser.nip : (detectedNip || '');
               if (targetNip) {
                 const existingJd = (this.firestoreJobdes || []).find(j => String(j.nip) === String(targetNip)) ||
@@ -599,8 +691,13 @@ function escapeHtml(str) {
                 if (existingJd) {
                   existingPokok = existingJd.tugas_pokok || '';
                   existingAtasan = existingJd.atasan_nip || '';
+                  existingIkhtisar = existingJd.ikhtisar_jabatan || '';
                 }
               }
+
+              // Tentukan tab awal yang ada isinya (prioritas pokok)
+              let initialTab = 'pokok';
+              if (sections.pokok.length === 0 && sections.ikhtisar.length > 0) initialTab = 'ikhtisar';
 
               this.importDocx.filesQueue.push({
                 id: 'doc_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
@@ -610,8 +707,11 @@ function escapeHtml(str) {
                 jabatan: matchedUser ? matchedUser.jabatan : '',
                 matched: !!matchedUser,
                 atasanNip: existingAtasan || '',
-                points: points,
-                existingPokok: existingPokok
+                sections: sections,
+                activeTab: initialTab,
+                dasarSk: dasarSk,
+                existingPokok: existingPokok,
+                existingIkhtisar: existingIkhtisar
               });
             } catch (err) {
               console.error('Gagal mengekstrak docx:', file.name, err);
@@ -641,6 +741,16 @@ function escapeHtml(str) {
             item.matched = false;
           }
         },
+                addPointToSection(item, sectionKey) {
+          if (!item.sections) item.sections = { ikhtisar: [], pokok: [], tambahan: [], tanggung: [], hasil: [], bawahan: [] };
+          if (!item.sections[sectionKey]) item.sections[sectionKey] = [];
+          item.sections[sectionKey].push('Tuliskan butir tugas baru di sini...');
+        },
+        removePointFromSection(item, sectionKey, pIdx) {
+          if (item.sections && item.sections[sectionKey]) {
+            item.sections[sectionKey].splice(pIdx, 1);
+          }
+        },
         addPointToItem(item) {
           item.points.push('Melaksanakan tugas kedinasan lainnya yang diberikan atasan...');
         },
@@ -651,7 +761,13 @@ function escapeHtml(str) {
           this.importDocx.filesQueue.splice(idx, 1);
         },
         async submitBulkImportJobdes() {
-          const validItems = this.importDocx.filesQueue.filter(f => f.matched && f.nip && f.points.length > 0);
+          const validItems = this.importDocx.filesQueue.filter(f => {
+            if (!f.matched || !f.nip) return false;
+            const sec = f.sections || {};
+            const total = (sec.ikhtisar || []).length + (sec.pokok || []).length + (sec.tambahan || []).length + (sec.tanggung || []).length + (sec.hasil || []).length + (sec.bawahan || []).length;
+            return total > 0;
+          });
+
           if (validItems.length === 0) {
             if (typeof showNotify === 'function') {
               showNotify('Peringatan', 'Tidak ada data pegawai dan butir tugas valid untuk disimpan.', 'error');
@@ -663,28 +779,69 @@ function escapeHtml(str) {
           const adminNip = this.globalState.user ? this.globalState.user.nip : 'Admin';
 
           try {
-            const payloads = validItems.map(item => {
-              let finalTugasPokok = '';
+            const formatSectionPoints = (arr, isNumbered = true) => {
+              const list = (arr || []).map(p => p.trim()).filter(p => p.length > 0);
+              if (list.length === 0) return '-';
+              if (isNumbered) {
+                return list.map((p, i) => `${i + 1}. ${p}`).join('\n');
+              }
+              return list.join('\n');
+            };
 
+            const payloads = validItems.map(item => {
+              const sec = item.sections || {};
+
+              let finalPokok = '';
               if (this.importDocx.mode === 'append' && item.existingPokok && item.existingPokok.trim() !== '' && item.existingPokok !== '- Belum diisi.') {
                 const existingLines = item.existingPokok.split('\n').filter(l => l.trim().length > 0);
                 const existingClean = existingLines.map(l => l.replace(/^(\d+[\.\)]|[a-zA-Z][\.\)]|[-–—•*▪▫◦●])\s*/, '').trim()).filter(l => l.length > 0);
-                const combined = [...existingClean, ...item.points];
-                finalTugasPokok = combined.map((p, i) => `${i + 1}. ${p.trim()}`).join('\n');
+                const combined = [...existingClean, ...(sec.pokok || [])];
+                finalPokok = combined.map((p, i) => `${i + 1}. ${p.trim()}`).join('\n');
               } else {
-                finalTugasPokok = item.points.map((p, i) => `${i + 1}. ${p.trim()}`).join('\n');
+                finalPokok = formatSectionPoints(sec.pokok, true);
               }
+
+              const finalTambahan = formatSectionPoints(sec.tambahan, true);
+              const finalTanggung = formatSectionPoints(sec.tanggung, true);
+              const finalHasil = formatSectionPoints(sec.hasil, true);
+              const finalBawahan = formatSectionPoints(sec.bawahan, false);
+              const finalIkhtisar = (sec.ikhtisar || []).join(' ').trim() || (item.existingIkhtisar || '-');
 
               return {
                 nip: item.nip,
                 atasan_nip: item.atasanNip || '',
-                dasar_lampiran: '-',
-                tugas_pokok: finalTugasPokok,
-                updated_by: adminNip
+                dasar_lampiran: item.dasarSk || '-',
+                ikhtisar_jabatan: finalIkhtisar,
+                tugas_pokok: finalPokok,
+                tugas_tambahan: finalTambahan,
+                tanggung_jawab: finalTanggung,
+                hasil_kerja: finalHasil,
+                bawahan_langsung: finalBawahan,
+                updated_by: adminNip,
+                is_firebase: true
               };
             });
 
             const res = await window.JobdesDataService.bulkSaveJobdesBatch(payloads, adminNip);
+
+            // Update memori lokal Vue agar tampilan langsung tersegarkan
+            payloads.forEach(p => {
+              let existingIdx = this.globalState.jobdesList.findIndex(j => String(j.nip) === String(p.nip));
+              if (existingIdx > -1) {
+                this.globalState.jobdesList[existingIdx] = { ...this.globalState.jobdesList[existingIdx], ...p };
+              } else {
+                this.globalState.jobdesList.push(p);
+              }
+
+              if (this.firestoreJobdes) {
+                let fIdx = this.firestoreJobdes.findIndex(j => String(j.nip) === String(p.nip));
+                if (fIdx > -1) {
+                  this.firestoreJobdes[fIdx] = { ...this.firestoreJobdes[fIdx], ...p };
+                } else {
+                  this.firestoreJobdes.push(p);
+                }
+              }
+            });
 
             // Optimistic Local State Update
             payloads.forEach(p => {
