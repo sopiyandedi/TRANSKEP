@@ -55,6 +55,8 @@
     tempNode.querySelector('#prtIkhtisar').innerHTML = vm.fmtIkhtisar;
     tempNode.querySelector('#prtPokok').innerHTML = vm.fmtPokok;
     tempNode.querySelector('#prtTambahan').innerHTML = vm.fmtTambahan;
+    var elWew = tempNode.querySelector('#prtWewenang');
+    if (elWew) elWew.innerHTML = vm.fmtWewenang;
     tempNode.querySelector('#prtTanggung').innerHTML = vm.fmtTanggung;
     tempNode.querySelector('#prtHasil').innerHTML = vm.fmtHasil;
     var elBawahan = tempNode.querySelector('#prtBawahan');

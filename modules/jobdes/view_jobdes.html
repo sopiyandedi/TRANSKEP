@@ -138,15 +138,19 @@
             <p id="jdPrevTambahan" class="text-slate-400 leading-relaxed pl-3.5" v-html="fmtTambahan"></p>
           </div>
           <div class="bg-slate-900/20 p-4 rounded-xl border border-slate-800/50">
-            <h4 class="font-bold text-slate-300 border-l-2 border-indigo-500 pl-3 mb-2 uppercase tracking-wide text-xs">IV. Tanggung Jawab</h4>
+            <h4 class="font-bold text-slate-300 border-l-2 border-indigo-500 pl-3 mb-2 uppercase tracking-wide text-xs">IV. Wewenang</h4>
+            <p id="jdPrevWewenang" class="text-slate-400 leading-relaxed pl-3.5" v-html="fmtWewenang"></p>
+          </div>
+          <div class="bg-slate-900/20 p-4 rounded-xl border border-slate-800/50">
+            <h4 class="font-bold text-slate-300 border-l-2 border-indigo-500 pl-3 mb-2 uppercase tracking-wide text-xs">V. Tanggung Jawab</h4>
             <p id="jdPrevTanggung" class="text-slate-400 leading-relaxed pl-3.5" v-html="fmtTanggung"></p>
           </div>
           <div class="bg-slate-900/20 p-4 rounded-xl border border-slate-800/50">
-            <h4 class="font-bold text-slate-300 border-l-2 border-indigo-500 pl-3 mb-2 uppercase tracking-wide text-xs">V. Hasil Kerja</h4>
+            <h4 class="font-bold text-slate-300 border-l-2 border-indigo-500 pl-3 mb-2 uppercase tracking-wide text-xs">VI. Hasil Kerja</h4>
             <p id="jdPrevHasil" class="text-slate-400 leading-relaxed pl-3.5" v-html="fmtHasil"></p>
           </div>
           <div class="bg-slate-900/20 p-4 rounded-xl border border-slate-800/50">
-            <h4 class="font-bold text-slate-300 border-l-2 border-indigo-500 pl-3 mb-2 uppercase tracking-wide text-xs">VI. Nama Jabatan Bawahan Langsung</h4>
+            <h4 class="font-bold text-slate-300 border-l-2 border-indigo-500 pl-3 mb-2 uppercase tracking-wide text-xs">VII. Nama Jabatan Bawahan Langsung</h4>
             <p id="jdPrevBawahan" class="text-slate-400 leading-relaxed pl-3.5" v-html="fmtBawahan"></p>
           </div>
         </div>
@@ -247,15 +251,19 @@
               <textarea v-model="formEdit.tambahan" rows="2" class="w-full px-4 py-3 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-y"></textarea>
             </div>
             <div>
-              <label class="block font-semibold text-slate-400 uppercase mb-2">IV. Tanggung Jawab</label>
+              <label class="block font-semibold text-slate-400 uppercase mb-2">IV. Wewenang</label>
+              <textarea v-model="formEdit.wewenang" rows="2" placeholder="Tuliskan wewenang jabatan..." class="w-full px-4 py-3 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-y"></textarea>
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-400 uppercase mb-2">V. Tanggung Jawab</label>
               <textarea v-model="formEdit.tanggung" rows="2" class="w-full px-4 py-3 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-y"></textarea>
             </div>
             <div>
-              <label class="block font-semibold text-slate-400 uppercase mb-2">V. Hasil Kerja</label>
+              <label class="block font-semibold text-slate-400 uppercase mb-2">VI. Hasil Kerja</label>
               <textarea v-model="formEdit.hasil" rows="2" class="w-full px-4 py-3 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-y"></textarea>
             </div>
             <div>
-              <label class="block font-semibold text-slate-400 uppercase mb-2">VI. Nama Jabatan Bawahan Langsung</label>
+              <label class="block font-semibold text-slate-400 uppercase mb-2">VII. Nama Jabatan Bawahan Langsung</label>
               <textarea v-model="formEdit.bawahan" rows="2" placeholder="Tuliskan nama jabatan bawahan langsung jika ada (pisahkan dengan baris baru), atau '-' jika tidak ada." class="w-full px-4 py-3 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-y"></textarea>
             </div>
             <div class="pt-4 pb-2">
@@ -476,21 +484,27 @@
                       <span :class="['text-[10px] px-1.5 py-0.2 rounded-full font-mono', item.activeTab === 'tambahan' ? 'bg-indigo-800 text-white' : 'bg-slate-700 text-slate-300']">{{ (item.sections?.tambahan || []).length }}</span>
                     </button>
 
+                    <button type="button" @click="item.activeTab = 'wewenang'" 
+                            :class="['px-2.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5', item.activeTab === 'wewenang' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30' : 'bg-slate-800/80 text-slate-400 hover:text-slate-200 hover:bg-slate-800']">
+                      <span>IV. Wewenang</span>
+                      <span :class="['text-[10px] px-1.5 py-0.2 rounded-full font-mono', item.activeTab === 'wewenang' ? 'bg-indigo-800 text-white' : 'bg-slate-700 text-slate-300']">{{ (item.sections?.wewenang || []).length }}</span>
+                    </button>
+
                     <button type="button" @click="item.activeTab = 'tanggung'" 
                             :class="['px-2.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5', item.activeTab === 'tanggung' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30' : 'bg-slate-800/80 text-slate-400 hover:text-slate-200 hover:bg-slate-800']">
-                      <span>IV. Tanggung Jawab</span>
+                      <span>V. Tanggung Jawab</span>
                       <span :class="['text-[10px] px-1.5 py-0.2 rounded-full font-mono', item.activeTab === 'tanggung' ? 'bg-indigo-800 text-white' : 'bg-slate-700 text-slate-300']">{{ (item.sections?.tanggung || []).length }}</span>
                     </button>
 
                     <button type="button" @click="item.activeTab = 'hasil'" 
                             :class="['px-2.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5', item.activeTab === 'hasil' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30' : 'bg-slate-800/80 text-slate-400 hover:text-slate-200 hover:bg-slate-800']">
-                      <span>V. Hasil Kerja</span>
+                      <span>VI. Hasil Kerja</span>
                       <span :class="['text-[10px] px-1.5 py-0.2 rounded-full font-mono', item.activeTab === 'hasil' ? 'bg-indigo-800 text-white' : 'bg-slate-700 text-slate-300']">{{ (item.sections?.hasil || []).length }}</span>
                     </button>
 
                     <button type="button" @click="item.activeTab = 'bawahan'" 
                             :class="['px-2.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5', item.activeTab === 'bawahan' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30' : 'bg-slate-800/80 text-slate-400 hover:text-slate-200 hover:bg-slate-800']">
-                      <span>VI. Bawahan Langsung</span>
+                      <span>VII. Bawahan Langsung</span>
                       <span :class="['text-[10px] px-1.5 py-0.2 rounded-full font-mono', item.activeTab === 'bawahan' ? 'bg-indigo-800 text-white' : 'bg-slate-700 text-slate-300']">{{ (item.sections?.bawahan || []).length }}</span>
                     </button>
                   </div>
@@ -499,7 +513,7 @@
                   <div class="pt-3 space-y-2">
                     <div class="flex items-center justify-between text-xs text-slate-400 mb-1">
                       <span class="font-semibold text-slate-300">
-                        Rincian {{ item.activeTab === 'ikhtisar' ? 'I. Ikhtisar Jabatan' : (item.activeTab === 'pokok' ? 'II. Tugas Pokok' : (item.activeTab === 'tambahan' ? 'III. Tugas Tambahan' : (item.activeTab === 'tanggung' ? 'IV. Tanggung Jawab' : (item.activeTab === 'hasil' ? 'V. Hasil Kerja' : 'VI. Nama Jabatan Bawahan Langsung')))) }} ({{ (item.sections?.[item.activeTab] || []).length }} butir):
+                        Rincian {{ item.activeTab === 'ikhtisar' ? 'I. Ikhtisar Jabatan' : (item.activeTab === 'pokok' ? 'II. Tugas Pokok' : (item.activeTab === 'tambahan' ? 'III. Tugas Tambahan' : (item.activeTab === 'wewenang' ? 'IV. Wewenang' : (item.activeTab === 'tanggung' ? 'V. Tanggung Jawab' : (item.activeTab === 'hasil' ? 'VI. Hasil Kerja' : 'VII. Nama Jabatan Bawahan Langsung'))))) }} ({{ (item.sections?.[item.activeTab] || []).length }} butir):
                       </span>
                       <button @click="addPointToSection(item, item.activeTab)" type="button" class="text-sky-400 hover:text-sky-300 text-xs font-bold flex items-center gap-1 hover:underline">
                         <i class="fa-solid fa-plus text-[10px]"></i> Tambah Baris Poin

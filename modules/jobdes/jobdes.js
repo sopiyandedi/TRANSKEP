@@ -139,7 +139,7 @@ function escapeHtml(str) {
           return jd || { 
             ikhtisar_jabatan: 'Deskripsi ikhtisar tugas belum diatur.', 
             tugas_pokok: '- Belum diisi.', 
-            tugas_tambahan: '-', tanggung_jawab: '-', hasil_kerja: '-', bawahan_langsung: '-', atasan_nip: '' 
+            tugas_tambahan: '-', wewenang: '-', tanggung_jawab: '-', hasil_kerja: '-', bawahan_langsung: '-', atasan_nip: '' 
           };
         },
         atasanUser() {
@@ -149,6 +149,7 @@ function escapeHtml(str) {
         fmtIkhtisar() { return pormatTugasRapi(this.selectedJobdes.ikhtisar_jabatan); },
         fmtPokok() { return pormatTugasRapi(this.selectedJobdes.tugas_pokok); },
         fmtTambahan() { return pormatTugasRapi(this.selectedJobdes.tugas_tambahan); },
+        fmtWewenang() { return pormatTugasRapi(this.selectedJobdes.wewenang); },
         fmtTanggung() { return pormatTugasRapi(this.selectedJobdes.tanggung_jawab); },
         fmtHasil() { return pormatTugasRapi(this.selectedJobdes.hasil_kerja); },
         fmtBawahan() { return pormatTugasRapi(this.selectedJobdes.bawahan_langsung); }
@@ -226,6 +227,7 @@ function escapeHtml(str) {
                ikhtisar: this.selectedJobdes.ikhtisar_jabatan,
                pokok: this.selectedJobdes.tugas_pokok,
                tambahan: this.selectedJobdes.tugas_tambahan,
+               wewenang: this.selectedJobdes.wewenang || "-", 
                tanggung: this.selectedJobdes.tanggung_jawab,
                hasil: this.selectedJobdes.hasil_kerja,
                bawahan: this.selectedJobdes.bawahan_langsung || '-'
@@ -250,6 +252,7 @@ function escapeHtml(str) {
               ikhtisar_jabatan: this.formEdit.ikhtisar,
               tugas_pokok: this.formEdit.pokok,
               tugas_tambahan: this.formEdit.tambahan,
+              wewenang: this.formEdit.wewenang || "-", 
               tanggung_jawab: this.formEdit.tanggung,
               hasil_kerja: this.formEdit.hasil,
               bawahan_langsung: this.formEdit.bawahan || '-'
@@ -359,6 +362,9 @@ function escapeHtml(str) {
            tempNode.querySelector('#prtIkhtisar').innerHTML = document.getElementById('jdPrevIkhtisar').innerHTML;
            tempNode.querySelector('#prtPokok').innerHTML = document.getElementById('jdPrevPokok').innerHTML;
            tempNode.querySelector('#prtTambahan').innerHTML = document.getElementById('jdPrevTambahan').innerHTML;
+            const elWew = tempNode.querySelector('#prtWewenang');
+            const elPrevWew = document.getElementById('jdPrevWewenang');
+            if (elWew && elPrevWew) elWew.innerHTML = elPrevWew.innerHTML;
            tempNode.querySelector('#prtTanggung').innerHTML = document.getElementById('jdPrevTanggung').innerHTML;
            tempNode.querySelector('#prtHasil').innerHTML = document.getElementById('jdPrevHasil').innerHTML;
             const elBwh = tempNode.querySelector('#prtBawahan');
@@ -518,6 +524,7 @@ function escapeHtml(str) {
             ikhtisar: [],
             pokok: [],
             tambahan: [],
+            wewenang: [],
             tanggung: [],
             hasil: [],
             bawahan: []
@@ -554,20 +561,26 @@ function escapeHtml(str) {
               continue;
             }
 
-            // 4. Cek Heading IV: TANGGUNG JAWAB
-            if (/^(?:(?:IV|D|4)[\.\)]\s*)?(?:tanggung\s*jawab)(?:\s*[:])?$/i.test(line)) {
+            // 4. Cek Heading IV: WEWENANG
+            if (/^(?:(?:IV|D|4)[\.\)]\s*)?(?:wewenang)(?:\s*[:])?$/i.test(line)) {
+              currentSection = 'wewenang';
+              continue;
+            }
+
+            // 5. Cek Heading V / IV: TANGGUNG JAWAB
+            if (/^(?:(?:V|E|5|IV|D|4)[\.\)]\s*)?(?:tanggung\s*jawab)(?:\s*[:])?$/i.test(line)) {
               currentSection = 'tanggung';
               continue;
             }
 
-            // 5. Cek Heading V: HASIL KERJA
-            if (/^(?:(?:V|E|5)[\.\)]\s*)?(?:hasil\s+kerja)(?:\s*[:])?$/i.test(line)) {
+            // 6. Cek Heading VI / V: HASIL KERJA
+            if (/^(?:(?:VI|F|6|V|E|5)[\.\)]\s*)?(?:hasil\s+kerja)(?:\s*[:])?$/i.test(line)) {
               currentSection = 'hasil';
               continue;
             }
 
-            // 6. Cek Heading VI: BAWAHAN LANGSUNG
-            if (/^(?:(?:VI|F|6)[\.\)]\s*)?(?:nama\s+jabatan\s+bawahan\s+langsung|jabatan\s+bawahan\s+langsung|bawahan\s+langsung)(?:\s*[:])?$/i.test(line)) {
+            // 7. Cek Heading VII / VI: BAWAHAN LANGSUNG
+            if (/^(?:(?:VII|G|7|VI|F|6)[\.\)]\s*)?(?:nama\s+jabatan\s+bawahan\s+langsung|jabatan\s+bawahan\s+langsung|bawahan\s+langsung)(?:\s*[:])?$/i.test(line)) {
               currentSection = 'bawahan';
               continue;
             }
@@ -742,7 +755,7 @@ function escapeHtml(str) {
           }
         },
                 addPointToSection(item, sectionKey) {
-          if (!item.sections) item.sections = { ikhtisar: [], pokok: [], tambahan: [], tanggung: [], hasil: [], bawahan: [] };
+          if (!item.sections) item.sections = { ikhtisar: [], pokok: [], tambahan: [], wewenang: [], tanggung: [], hasil: [], bawahan: [] };
           if (!item.sections[sectionKey]) item.sections[sectionKey] = [];
           item.sections[sectionKey].push('Tuliskan butir tugas baru di sini...');
         },
@@ -764,7 +777,7 @@ function escapeHtml(str) {
           const validItems = this.importDocx.filesQueue.filter(f => {
             if (!f.matched || !f.nip) return false;
             const sec = f.sections || {};
-            const total = (sec.ikhtisar || []).length + (sec.pokok || []).length + (sec.tambahan || []).length + (sec.tanggung || []).length + (sec.hasil || []).length + (sec.bawahan || []).length;
+            const total = (sec.ikhtisar || []).length + (sec.pokok || []).length + (sec.tambahan || []).length + (sec.wewenang || []).length + (sec.tanggung || []).length + (sec.hasil || []).length + (sec.bawahan || []).length;
             return total > 0;
           });
 
@@ -802,6 +815,7 @@ function escapeHtml(str) {
               }
 
               const finalTambahan = formatSectionPoints(sec.tambahan, true);
+              const finalWewenang = formatSectionPoints(sec.wewenang, true);
               const finalTanggung = formatSectionPoints(sec.tanggung, true);
               const finalHasil = formatSectionPoints(sec.hasil, true);
               const finalBawahan = formatSectionPoints(sec.bawahan, false);
@@ -814,6 +828,7 @@ function escapeHtml(str) {
                 ikhtisar_jabatan: finalIkhtisar,
                 tugas_pokok: finalPokok,
                 tugas_tambahan: finalTambahan,
+                wewenang: finalWewenang,
                 tanggung_jawab: finalTanggung,
                 hasil_kerja: finalHasil,
                 bawahan_langsung: finalBawahan,

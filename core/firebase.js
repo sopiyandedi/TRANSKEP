@@ -216,6 +216,7 @@ const TranskepFirebase = {
       ikhtisar_jabatan: jobdesData.ikhtisar_jabatan || '',
       tugas_pokok: jobdesData.tugas_pokok || '',
       tugas_tambahan: jobdesData.tugas_tambahan || '',
+      wewenang: jobdesData.wewenang !== undefined ? jobdesData.wewenang : '-',
       tanggung_jawab: jobdesData.tanggung_jawab || '',
       hasil_kerja: jobdesData.hasil_kerja || '',
       bawahan_langsung: jobdesData.bawahan_langsung !== undefined ? jobdesData.bawahan_langsung : '-',
@@ -270,6 +271,9 @@ const TranskepFirebase = {
         }
         if (item.tugas_tambahan !== undefined) {
           payload.tugas_tambahan = item.tugas_tambahan;
+        }
+        if (item.wewenang !== undefined) {
+          payload.wewenang = item.wewenang;
         }
         if (item.tanggung_jawab !== undefined) {
           payload.tanggung_jawab = item.tanggung_jawab;
