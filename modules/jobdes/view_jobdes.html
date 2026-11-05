@@ -137,15 +137,17 @@
             <h4 class="font-bold text-slate-300 border-l-2 border-indigo-500 pl-3 mb-2 uppercase tracking-wide text-xs">III. Tugas Tambahan</h4>
             <p id="jdPrevTambahan" class="text-slate-400 leading-relaxed pl-3.5" v-html="fmtTambahan"></p>
           </div>
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div class="bg-slate-900/20 p-4 rounded-xl border border-slate-800/50">
-              <h4 class="font-bold text-slate-300 border-l-2 border-indigo-500 pl-3 mb-2 uppercase tracking-wide text-xs">IV. Tanggung Jawab</h4>
-              <p id="jdPrevTanggung" class="text-slate-400 leading-relaxed pl-3.5" v-html="fmtTanggung"></p>
-            </div>
-            <div class="bg-slate-900/20 p-4 rounded-xl border border-slate-800/50">
-              <h4 class="font-bold text-slate-300 border-l-2 border-indigo-500 pl-3 mb-2 uppercase tracking-wide text-xs">V. Hasil Kerja</h4>
-              <p id="jdPrevHasil" class="text-slate-400 leading-relaxed pl-3.5" v-html="fmtHasil"></p>
-            </div>
+          <div class="bg-slate-900/20 p-4 rounded-xl border border-slate-800/50">
+            <h4 class="font-bold text-slate-300 border-l-2 border-indigo-500 pl-3 mb-2 uppercase tracking-wide text-xs">IV. Tanggung Jawab</h4>
+            <p id="jdPrevTanggung" class="text-slate-400 leading-relaxed pl-3.5" v-html="fmtTanggung"></p>
+          </div>
+          <div class="bg-slate-900/20 p-4 rounded-xl border border-slate-800/50">
+            <h4 class="font-bold text-slate-300 border-l-2 border-indigo-500 pl-3 mb-2 uppercase tracking-wide text-xs">V. Hasil Kerja</h4>
+            <p id="jdPrevHasil" class="text-slate-400 leading-relaxed pl-3.5" v-html="fmtHasil"></p>
+          </div>
+          <div class="bg-slate-900/20 p-4 rounded-xl border border-slate-800/50">
+            <h4 class="font-bold text-slate-300 border-l-2 border-indigo-500 pl-3 mb-2 uppercase tracking-wide text-xs">VI. Nama Jabatan Bawahan Langsung</h4>
+            <p id="jdPrevBawahan" class="text-slate-400 leading-relaxed pl-3.5" v-html="fmtBawahan"></p>
           </div>
         </div>
       </div>
@@ -244,15 +246,17 @@
               <label class="block font-semibold text-slate-400 uppercase mb-2">Tugas Tambahan</label>
               <textarea v-model="formEdit.tambahan" rows="2" class="w-full px-4 py-3 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-y"></textarea>
             </div>
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div>
-                <label class="block font-semibold text-slate-400 uppercase mb-2">Tanggung Jawab</label>
-                <textarea v-model="formEdit.tanggung" rows="2" class="w-full px-4 py-3 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-y"></textarea>
-              </div>
-              <div>
-                <label class="block font-semibold text-slate-400 uppercase mb-2">Hasil Kerja</label>
-                <textarea v-model="formEdit.hasil" rows="2" class="w-full px-4 py-3 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-y"></textarea>
-              </div>
+            <div>
+              <label class="block font-semibold text-slate-400 uppercase mb-2">IV. Tanggung Jawab</label>
+              <textarea v-model="formEdit.tanggung" rows="2" class="w-full px-4 py-3 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-y"></textarea>
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-400 uppercase mb-2">V. Hasil Kerja</label>
+              <textarea v-model="formEdit.hasil" rows="2" class="w-full px-4 py-3 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-y"></textarea>
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-400 uppercase mb-2">VI. Nama Jabatan Bawahan Langsung</label>
+              <textarea v-model="formEdit.bawahan" rows="2" placeholder="Tuliskan nama jabatan bawahan langsung jika ada (pisahkan dengan baris baru), atau '-' jika tidak ada." class="w-full px-4 py-3 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-y"></textarea>
             </div>
             <div class="pt-4 pb-2">
                 <button type="submit" :disabled="isLoadingForm" class="w-full py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl shadow-lg transition tracking-wider uppercase text-sm">

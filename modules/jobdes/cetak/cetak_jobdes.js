@@ -57,6 +57,8 @@
     tempNode.querySelector('#prtTambahan').innerHTML = vm.fmtTambahan;
     tempNode.querySelector('#prtTanggung').innerHTML = vm.fmtTanggung;
     tempNode.querySelector('#prtHasil').innerHTML = vm.fmtHasil;
+    var elBawahan = tempNode.querySelector('#prtBawahan');
+    if (elBawahan) elBawahan.innerHTML = vm.fmtBawahan;
 
     var styleContent = document.getElementById('styleCetakJobdes').outerHTML;
     var innerContent = tempNode.querySelector('#contentCetakJobdes').innerHTML;

@@ -140,7 +140,7 @@ function escapeHtml(str) {
           return jd || { 
             ikhtisar_jabatan: 'Deskripsi ikhtisar tugas belum diatur.', 
             tugas_pokok: '- Belum diisi.', 
-            tugas_tambahan: '-', tanggung_jawab: '-', hasil_kerja: '-', atasan_nip: '' 
+            tugas_tambahan: '-', tanggung_jawab: '-', hasil_kerja: '-', bawahan_langsung: '-', atasan_nip: '' 
           };
         },
         atasanUser() {
@@ -151,7 +151,8 @@ function escapeHtml(str) {
         fmtPokok() { return pormatTugasRapi(this.selectedJobdes.tugas_pokok); },
         fmtTambahan() { return pormatTugasRapi(this.selectedJobdes.tugas_tambahan); },
         fmtTanggung() { return pormatTugasRapi(this.selectedJobdes.tanggung_jawab); },
-        fmtHasil() { return pormatTugasRapi(this.selectedJobdes.hasil_kerja); }
+        fmtHasil() { return pormatTugasRapi(this.selectedJobdes.hasil_kerja); },
+        fmtBawahan() { return pormatTugasRapi(this.selectedJobdes.bawahan_langsung); }
       },
       watch: {
          searchQuery(val) {
@@ -227,7 +228,8 @@ function escapeHtml(str) {
                pokok: this.selectedJobdes.tugas_pokok,
                tambahan: this.selectedJobdes.tugas_tambahan,
                tanggung: this.selectedJobdes.tanggung_jawab,
-               hasil: this.selectedJobdes.hasil_kerja
+               hasil: this.selectedJobdes.hasil_kerja,
+               bawahan: this.selectedJobdes.bawahan_langsung || '-'
            };
            
            const atasanObj = this.listAtasan.find(a => a.nip === this.selectedJobdes.atasan_nip);
@@ -250,7 +252,8 @@ function escapeHtml(str) {
               tugas_pokok: this.formEdit.pokok,
               tugas_tambahan: this.formEdit.tambahan,
               tanggung_jawab: this.formEdit.tanggung,
-              hasil_kerja: this.formEdit.hasil
+              hasil_kerja: this.formEdit.hasil,
+              bawahan_langsung: this.formEdit.bawahan || '-'
            };
 
            const token = localStorage.getItem('transkep_session_token');
@@ -359,6 +362,9 @@ function escapeHtml(str) {
            tempNode.querySelector('#prtTambahan').innerHTML = document.getElementById('jdPrevTambahan').innerHTML;
            tempNode.querySelector('#prtTanggung').innerHTML = document.getElementById('jdPrevTanggung').innerHTML;
            tempNode.querySelector('#prtHasil').innerHTML = document.getElementById('jdPrevHasil').innerHTML;
+            const elBwh = tempNode.querySelector('#prtBawahan');
+            const elPrevBwh = document.getElementById('jdPrevBawahan');
+            if (elBwh && elPrevBwh) elBwh.innerHTML = elPrevBwh.innerHTML;
 
            const printHTML = '<!DOCTYPE html><html lang="id"><head><meta charset="UTF-8">' + document.getElementById('styleCetakJobdes').outerHTML + '</head><body>' + tempNode.querySelector('#contentCetakJobdes').outerHTML + '</body></html>';
            const fileName = "Uraian_Tugas_" + this.selectedUser.nama.replace(/[^a-zA-Z0-9]/g, "_");

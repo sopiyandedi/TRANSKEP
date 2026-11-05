@@ -160,6 +160,7 @@
         tugas_tambahan: jobdesData.tugas_tambahan || '',
         tanggung_jawab: jobdesData.tanggung_jawab || '',
         hasil_kerja: jobdesData.hasil_kerja || '',
+      bawahan_langsung: jobdesData.bawahan_langsung !== undefined ? jobdesData.bawahan_langsung : '-',
         is_firebase: true,
         updated_at: firebase.firestore.FieldValue.serverTimestamp()
       };

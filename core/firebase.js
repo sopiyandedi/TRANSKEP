@@ -218,6 +218,7 @@ const TranskepFirebase = {
       tugas_tambahan: jobdesData.tugas_tambahan || '',
       tanggung_jawab: jobdesData.tanggung_jawab || '',
       hasil_kerja: jobdesData.hasil_kerja || '',
+      bawahan_langsung: jobdesData.bawahan_langsung !== undefined ? jobdesData.bawahan_langsung : '-',
       is_firebase: true,
       updated_at: firebase.firestore.FieldValue.serverTimestamp()
     };
@@ -275,6 +276,9 @@ const TranskepFirebase = {
         }
         if (item.hasil_kerja !== undefined) {
           payload.hasil_kerja = item.hasil_kerja;
+        }
+        if (item.bawahan_langsung !== undefined) {
+          payload.bawahan_langsung = item.bawahan_langsung;
         }
         if (updatedByNip) {
           payload.updated_by = updatedByNip;
