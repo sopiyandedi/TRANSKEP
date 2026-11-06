@@ -404,6 +404,9 @@ function readUserSheetDecrypted_(sheetUser) {
     if (dirtyHp) sheetUser.getRange(2, colHp + 1, numRows, 1).setNumberFormat('@').setValues(encHpCol);
     if (dirtyPass) sheetUser.getRange(2, colPass + 1, numRows, 1).setNumberFormat('@').setValues(encPassCol);
     if (dirtyAlamat) sheetUser.getRange(2, colAlamat + 1, numRows, 1).setNumberFormat('@').setValues(encAlamatCol);
+    if (dirtyNip || dirtyHp || dirtyPass || dirtyAlamat) {
+      bumpDataVersion();
+    }
   } catch (errHeal) {
     Logger.log("Auto-Encrypt user_data warning: " + errHeal.toString());
   }
@@ -481,11 +484,80 @@ function readCutiSheetDecrypted_(sheetCuti) {
     if (dirtyAtasan) sheetCuti.getRange(2, colAtasan + 1, numRows, 1).setNumberFormat('@').setValues(encAtasanCol);
     if (dirtyPejabat) sheetCuti.getRange(2, colPejabat + 1, numRows, 1).setNumberFormat('@').setValues(encPejabatCol);
     if (dirtyAlamat) sheetCuti.getRange(2, colAlamat + 1, numRows, 1).setNumberFormat('@').setValues(encAlamatCol);
+    if (dirtyNip || dirtyAtasan || dirtyPejabat || dirtyAlamat) {
+      bumpDataVersion();
+    }
   } catch (errHeal) {
     Logger.log("Auto-Encrypt cuti_log warning: " + errHeal.toString());
   }
 
   return data;
+}
+
+/**
+ * Trigger & Migrasi Otomatis Enkripsi Seluruh Sheet PII (`user_data`, `cuti_log`, `log_reset_pass`)
+ * Dapat dipanggil via API, saat pembukaan aplikasi, atau melalui Simple Trigger `onOpen`/`onEdit` di Google Sheets.
+ */
+function ensureAllPiiSheetsEncrypted_() {
+  try {
+    const ss = getDB();
+    const sheetUser = ss.getSheetByName('user_data');
+    const sheetCuti = ss.getSheetByName('cuti_log');
+    const sheetReset = ss.getSheetByName('log_reset_pass');
+
+    const uRows = sheetUser ? readUserSheetDecrypted_(sheetUser).length - 1 : 0;
+    const cRows = sheetCuti ? readCutiSheetDecrypted_(sheetCuti).length - 1 : 0;
+
+    if (sheetReset) {
+      const rData = sheetReset.getDataRange().getDisplayValues();
+      if (rData && rData.length > 1) {
+        let dirtyR = false;
+        for (let i = 1; i < rData.length; i++) {
+          const rNip = String(rData[i][2] || '').replace(/^'+/, '').trim();
+          const rWa = String(rData[i][4] || '').replace(/^'+/, '').trim();
+          const rPass = String(rData[i][5] || '').replace(/^'+/, '').trim();
+          if (rNip && !isEncryptedField_(rNip)) {
+            sheetReset.getRange(i + 1, 3).setNumberFormat('@').setValue(encryptField_(rNip));
+            dirtyR = true;
+          }
+          if (rWa && !isEncryptedField_(rWa)) {
+            sheetReset.getRange(i + 1, 5).setNumberFormat('@').setValue(encryptField_(rWa));
+            dirtyR = true;
+          }
+          if (rPass && !isEncryptedField_(rPass) && !rPass.startsWith('SHA256$')) {
+            sheetReset.getRange(i + 1, 6).setNumberFormat('@').setValue(encryptField_(rPass));
+            dirtyR = true;
+          }
+        }
+        if (dirtyR) bumpDataVersion();
+      }
+    }
+
+    SpreadsheetApp.flush();
+    return { status: 'encrypted', userRows: Math.max(0, uRows), cutiRows: Math.max(0, cRows) };
+  } catch (err) {
+    return { status: 'error', message: err.toString() };
+  }
+}
+
+function onOpen(e) {
+  try {
+    ensureAllPiiSheetsEncrypted_();
+  } catch (err) {}
+}
+
+function onEdit(e) {
+  try {
+    if (!e || !e.range) return;
+    const sheet = e.range.getSheet();
+    if (!sheet) return;
+    const name = sheet.getName();
+    if (name === 'user_data') {
+      readUserSheetDecrypted_(sheet);
+    } else if (name === 'cuti_log') {
+      readCutiSheetDecrypted_(sheet);
+    }
+  } catch (err) {}
 }
 
 // 6. Revokasi Sesi Server-Side (CWE-613)
@@ -741,15 +813,17 @@ function getBulkData(nip, clientToken, clientVersion) {
         return { status: 'error', message: 'Akses Ditolak: Sesi kedaluwarsa atau manipulasi terdeteksi. Silakan login ulang.' };
     }
 
+    // Memanggil koneksi database terpusat & cek self-healing enkripsi sebelum short-circuit versi
+    const ss = getDB();
+    const sheetUser = ss.getSheetByName('user_data');
+    const uData = sheetUser ? readUserSheetDecrypted_(sheetUser) : [];
+
     const serverVersion = getServerDataVersion_();
 
     // DELTA SYNC SHORT-CIRCUIT (TAHAP 2):
     if (clientVersion && String(clientVersion) === String(serverVersion)) {
       return { status: 'NOT_MODIFIED', version: serverVersion };
     }
-    
-    // Memanggil koneksi database terpusat
-    const ss = getDB();
 
     let cachedTempPass = null;
     try {
@@ -764,9 +838,7 @@ function getBulkData(nip, clientToken, clientVersion) {
       temp_pass: cachedTempPass || ''
     };
 
-    const sheetUser = ss.getSheetByName('user_data');
-    if(sheetUser) {
-       const uData = readUserSheetDecrypted_(sheetUser);
+    if(sheetUser && uData.length > 0) {
 
        let isRequesterAdmin = false;
        for (let i = 1; i < uData.length; i++) {

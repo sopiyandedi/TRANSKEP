@@ -22,11 +22,13 @@ function handleApiGet_(e) {
     const params = (e && e.parameter) ? e.parameter : {};
     const action = params.action || 'ping';
 
-    // 1. Healthcheck / Ping
+    // 1. Healthcheck / Ping (+ Auto-Heal PII Vault Encryption)
     if (action === 'ping') {
+      const vaultStatus = (typeof ensureAllPiiSheetsEncrypted_ === 'function') ? ensureAllPiiSheetsEncrypted_() : null;
       return jsonResponse_({
         status: 'success',
         message: 'TRANSKEP Headless API Gateway v3.0 Aktif!',
+        piiVault: vaultStatus,
         timestamp: new Date().toISOString()
       });
     }
