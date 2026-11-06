@@ -236,7 +236,7 @@ function generatePdfLaporanWFH(id, userNip, clientToken) {
     }
     if (!logWfh) throw new Error("Data Transaksi WFH tidak ditemukan.");
 
-    const dataUser = sheetUser.getDataRange().getDisplayValues();
+    const dataUser = readUserSheetDecrypted_(sheetUser);
     let pemohon = { nama: '-', nip: '-', jabatan: '-', unit: 'Pengadilan Agama Indramayu', alamat: 'Tempat Tinggal Pegawai (Domisili)' };
     let atasan = { nama: '-', nip: '-' };
     
@@ -413,7 +413,7 @@ function generatePdfRencanaWFH(id, userNip, clientToken) {
     }
     if (!logWfh) throw new Error("Data Transaksi WFH tidak ditemukan.");
 
-    const dataUser = sheetUser.getDataRange().getDisplayValues();
+    const dataUser = readUserSheetDecrypted_(sheetUser);
     let pemohon = { nama: '-', nip: '-', jabatan: '-', unit: 'Pengadilan Agama Indramayu', alamat: 'Tempat Tinggal Pegawai (Domisili)' };
     let atasan = { nama: '-', nip: '-' };
     

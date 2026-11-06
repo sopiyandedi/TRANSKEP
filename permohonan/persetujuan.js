@@ -11,8 +11,8 @@ function updateCutiStatus(id, decision, notes, userNip, bypassMode, clientToken)
     const sheetCuti = ss.getSheetByName('cuti_log');
     const sheetUser = ss.getSheetByName('user_data');
     
-    const cutiData = sheetCuti.getDataRange().getValues(); 
-    const userData = sheetUser.getDataRange().getDisplayValues(); 
+    const cutiData = readCutiSheetDecrypted_(sheetCuti); 
+    const userData = readUserSheetDecrypted_(sheetUser); 
     
     let rowIndex = -1; let logRecord = null;
     for (let i = 1; i < cutiData.length; i++) {
@@ -192,8 +192,8 @@ function getCutiByToken(token) {
     const sheetUser = ss.getSheetByName('user_data');
     if (!sheetCuti || !sheetUser) throw new Error("Basis data belum siap.");
     
-    const cutiData = sheetCuti.getDataRange().getDisplayValues();
-    const userData = sheetUser.getDataRange().getDisplayValues();
+    const cutiData = readCutiSheetDecrypted_(sheetCuti);
+    const userData = readUserSheetDecrypted_(sheetUser);
     
     // Pemetaan user untuk pencarian cepat nama & jabatan
     const userMap = {};
@@ -287,8 +287,8 @@ function processMagicLinkApproval(token, decision, notes) {
     const sheetUser = ss.getSheetByName('user_data');
     if (!sheetCuti || !sheetUser) throw new Error("Basis data belum siap.");
     
-    const cutiData = sheetCuti.getDataRange().getDisplayValues();
-    const userData = sheetUser.getDataRange().getDisplayValues();
+    const cutiData = readCutiSheetDecrypted_(sheetCuti);
+    const userData = readUserSheetDecrypted_(sheetUser);
     
     const userMap = {};
     for (let u = 1; u < userData.length; u++) {
@@ -483,7 +483,7 @@ function processMagicLinkApproval(token, decision, notes) {
 // Fungsi Internal Pengembalian Saldo Cuti (DRY)
 function refundCutiSaldo_(sheetUser, nip, jenis, historyStr) {
   try {
-    const userData = sheetUser.getDataRange().getDisplayValues();
+    const userData = readUserSheetDecrypted_(sheetUser);
     let userRowIndex = -1;
     for (let i = 1; i < userData.length; i++) {
       if (String(userData[i][0]).trim() === String(nip).trim()) {
@@ -537,7 +537,7 @@ function resendCutiWhatsApp(cutiId, adminNip, clientToken) {
     if (!sheetCuti || !sheetUser) throw new Error("Basis data belum siap.");
     
     // Validasi Hak Akses Admin atau Operator
-    const userData = sheetUser.getDataRange().getDisplayValues();
+    const userData = readUserSheetDecrypted_(sheetUser);
     let isAuthorized = false;
     for (let u = 1; u < userData.length; u++) {
       if (String(userData[u][0]).trim() === String(adminNip).trim()) {
@@ -550,7 +550,7 @@ function resendCutiWhatsApp(cutiId, adminNip, clientToken) {
       return { status: 'error', message: 'Akses Ditolak: Fitur kirim ulang WA hanya untuk Admin dan Operator.' };
     }
     
-    const cutiData = sheetCuti.getDataRange().getDisplayValues();
+    const cutiData = readCutiSheetDecrypted_(sheetCuti);
     let rowIndex = -1;
     let targetRow = null;
     for (let i = 1; i < cutiData.length; i++) {

@@ -145,6 +145,9 @@
           this.modalPegMode = mode;
           if (mode === 'edit' && user) {
             this.formPegawai = { ...user, originalNip: user.nip };
+            if (this.formPegawai.pass && String(this.formPegawai.pass).startsWith('SHA256$')) {
+              this.formPegawai.pass = '[Telah Dienkripsi]';
+            }
             this.formPegawai.pangkat = this.normalizePangkat(user.pangkat);
             this.formPegawai.tmt_kgb = this.parseDateToHTML5(user.tmt_kgb);
             this.formPegawai.tmt_knp = this.parseDateToHTML5(user.tmt_knp);

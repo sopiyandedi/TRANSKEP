@@ -36,7 +36,7 @@ function addCutiLog(payload, aktorNip, clientToken) {
         if (d.getDay() !== 0 && d.getDay() !== 6) durasi++;
     }
 
-    const uData = sheetUser.getDataRange().getDisplayValues(); 
+    const uData = readUserSheetDecrypted_(sheetUser); 
     let rowIndex = -1; let namaPegawaiPemohon = "";
     
     for (let i = 1; i < uData.length; i++) {
@@ -82,8 +82,8 @@ function addCutiLog(payload, aktorNip, clientToken) {
     
     const magicToken = Utilities.getUuid();
     sheetCuti.appendRow(sanitizeRowArray([
-      newId, tglForm, payload.nip, payload.jenis, payload.tgl_mulai, payload.tgl_selesai, payload.alasan,
-      statusAwal, '', payload.atasan_nip || '-', payload.pejabat_nip || '-', durasi, payload.plh_nip || '', statusAwal, statusAwal, payload.alamat || '-', JSON.stringify(historyJson), fileUrl, magicToken
+      newId, tglForm, encryptField_(payload.nip), payload.jenis, payload.tgl_mulai, payload.tgl_selesai, payload.alasan,
+      statusAwal, '', encryptField_(payload.atasan_nip || '-'), encryptField_(payload.pejabat_nip || '-'), durasi, payload.plh_nip || '', statusAwal, statusAwal, encryptField_(payload.alamat || '-'), JSON.stringify(historyJson), fileUrl, magicToken
     ]));
     
     if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush(); 
@@ -146,7 +146,7 @@ function updateCutiLog(payload, aktorNip, clientToken) {
     const sheetUser = ss.getSheetByName('user_data');
     if (!sheetCuti || !sheetUser) throw new Error("Database belum siap.");
 
-    const cutiData = sheetCuti.getDataRange().getValues();
+    const cutiData = readCutiSheetDecrypted_(sheetCuti);
     let rowIndexCuti = -1; let logLama = null;
     for (let i = 1; i < cutiData.length; i++) {
         if (String(cutiData[i][0]) === String(payload.id)) { rowIndexCuti = i + 1; logLama = cutiData[i]; break; }
@@ -156,7 +156,7 @@ function updateCutiLog(payload, aktorNip, clientToken) {
     if (logLama[7] !== 'Menunggu') throw new Error("Anda tidak dapat mengubah cuti yang sudah di-proses Atasan.");
 
     // Tarik Identitas Pegawai
-    const uData = sheetUser.getDataRange().getValues(); 
+    const uData = readUserSheetDecrypted_(sheetUser); 
     let rowIndexUser = -1;
     for (let i = 1; i < uData.length; i++) {
         if (String(uData[i][0]) === String(payload.nip)) { rowIndexUser = i + 1; break; }
@@ -242,16 +242,16 @@ function updateCutiLog(payload, aktorNip, clientToken) {
         } catch(e) {}
     }
 
-    // Update Baris Excel
+    // Update Baris Excel (Enkripsi Kolom Rahasia NIP & Alamat Cuti)
     sheetCuti.getRange(rowIndexCuti, 4).setValue(payload.jenis);
     sheetCuti.getRange(rowIndexCuti, 5).setValue(payload.tgl_mulai);
     sheetCuti.getRange(rowIndexCuti, 6).setValue(payload.tgl_selesai);
     sheetCuti.getRange(rowIndexCuti, 7).setValue(payload.alasan);
-    sheetCuti.getRange(rowIndexCuti, 10).setValue(payload.atasan_nip || '-');
-    sheetCuti.getRange(rowIndexCuti, 11).setValue(payload.pejabat_nip || '-');
+    sheetCuti.getRange(rowIndexCuti, 10).setNumberFormat('@').setValue(encryptField_(payload.atasan_nip || '-'));
+    sheetCuti.getRange(rowIndexCuti, 11).setNumberFormat('@').setValue(encryptField_(payload.pejabat_nip || '-'));
     sheetCuti.getRange(rowIndexCuti, 12).setValue(durasiBaru);
     sheetCuti.getRange(rowIndexCuti, 13).setValue(payload.plh_nip || '');
-    sheetCuti.getRange(rowIndexCuti, 16).setValue(payload.alamat || '-');
+    sheetCuti.getRange(rowIndexCuti, 16).setNumberFormat('@').setValue(encryptField_(payload.alamat || '-'));
     sheetCuti.getRange(rowIndexCuti, 17).setValue(JSON.stringify(historyJson));
     sheetCuti.getRange(rowIndexCuti, 18).setValue(fileUrlUpdate);
 
@@ -268,7 +268,7 @@ function deleteCutiLog(id, forceDelete, userNip, clientToken) {
     const sheetCuti = ss.getSheetByName('cuti_log');
     const sheetUser = ss.getSheetByName('user_data');
     
-    const cutiData = sheetCuti.getDataRange().getValues();
+    const cutiData = readCutiSheetDecrypted_(sheetCuti);
     let rowIndex = -1; let logRecord = null;
     const targetId = String(id || '').trim();
 
@@ -319,7 +319,7 @@ function deleteCutiLog(id, forceDelete, userNip, clientToken) {
           } catch(e) {} 
         }
         
-        const userData = sheetUser.getDataRange().getValues();
+        const userData = readUserSheetDecrypted_(sheetUser);
         let userRowIndex = -1;
         for (let i = 1; i < userData.length; i++) { 
           if (String(userData[i][0]).trim() === nip) { 
@@ -372,7 +372,7 @@ function requestCancelCuti(id, alasanBatal, userNip, clientToken) {
     const ss = getDB();
     const sheetCuti = ss.getSheetByName('cuti_log');
     
-    const cutiData = sheetCuti.getDataRange().getValues();
+    const cutiData = readCutiSheetDecrypted_(sheetCuti);
     let rowIndex = -1; let logRecord = null;
     for (let i = 1; i < cutiData.length; i++) {
       if (String(cutiData[i][0]) === String(id)) { rowIndex = i + 1; logRecord = cutiData[i]; break; }

@@ -210,7 +210,7 @@ function generatePdfPK(idPkp, userNip, clientToken) {
     if (!header) throw new Error("Data PKP tidak ditemukan.");
 
     // 3. Tarik Data User (Bawahan, Penilai, Atasan Penilai)
-    const dataUser = sheetUser.getDataRange().getDisplayValues();
+    const dataUser = readUserSheetDecrypted_(sheetUser);
     let penilai = { nama: '-', nip: header.penilai };
     let atasan = { nama: '-', nip: header.atasan_pejabat };
     let pegawai = { nama: '-', nip: header.nip };
@@ -382,7 +382,7 @@ function generatePdfPCK(idPck, userNip, clientToken) {
     }
 
     // 4. Ambil Identitas Lengkap (Pencarian Kolom Dinamis)
-    const dataUser = sheetUser.getDataRange().getDisplayValues();
+    const dataUser = readUserSheetDecrypted_(sheetUser);
     let pegawai = { nama: '-', nip: pckHeader.nip, pangkat: '-', jabatan: '-' };
     let penilai = { nama: '-', nip: nipPenilai };
 

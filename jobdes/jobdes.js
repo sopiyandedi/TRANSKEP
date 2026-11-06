@@ -21,7 +21,7 @@ function searchJobdesBackend(keyword, userNip, clientToken) {
       let sheet = ss.getSheetByName('user_data') || ss.getSheetByName('Master_Pegawai');
       if(!sheet) return []; 
       
-      const data = sheet.getDataRange().getDisplayValues();
+      const data = readUserSheetDecrypted_(sheet);
       if(data.length < 2) return [];
 
       const headers = data[0].map(h => h.toString().toLowerCase().trim());

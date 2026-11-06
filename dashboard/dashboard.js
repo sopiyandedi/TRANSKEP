@@ -43,7 +43,7 @@ function updateTmtStatus(actorNip, targetNip, type, newStatus, clientToken) {
 
     const ss = getDB();
     const sheet = ss.getSheetByName('user_data');
-    const data = sheet.getDataRange().getValues();
+    const data = readUserSheetDecrypted_(sheet);
     const headers = data[0];
 
     let rowIndex = -1;
@@ -98,7 +98,7 @@ function forwardTmtDateByFrontend(actorNip, targetNip, type, newDateStr, clientT
 
     const ss = getDB(); // TRANSKEP: Menggunakan konektor terpusat
     const sheet = ss.getSheetByName('user_data');
-    const data = sheet.getDataRange().getValues();
+    const data = readUserSheetDecrypted_(sheet);
     const headers = data[0];
 
     let rowIndex = -1;

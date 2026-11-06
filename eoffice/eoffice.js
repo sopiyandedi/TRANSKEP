@@ -145,7 +145,7 @@ function getEofficeData(nip, clientToken) {
     // 2. REAKTIF DARI DASHBOARD: Pegawai yang berstatus 'Proses' di user_data tapi belum ada di EofficeKGB
     const userSheet = ss.getSheetByName('user_data');
     if (userSheet && userSheet.getLastRow() > 1) {
-      const uData = userSheet.getDataRange().getValues();
+      const uData = readUserSheetDecrypted_(userSheet);
       const headers = uData[0];
       const uHeaders = headers.map(h => String(h || '').trim().toLowerCase().replace(/[^a-z0-9]/g, ''));
       const findCol = (name, fallback) => {

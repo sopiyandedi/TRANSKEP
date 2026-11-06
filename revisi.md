@@ -5183,3 +5183,50 @@ Pengguna melaporkan bahwa pratinjau (*preview*) dokumen PDF di modal SK dan SOP 
   6. [`core/firebase.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/core/firebase.js) & [`javascript_firebase.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/javascript_firebase.html)
   7. [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) & [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js)
 - **Status:** `[SELESAI & AKTIF]` ✅
+
+
+---
+
+### TAHAP 95: Implementasi Enkripsi Kolom Data Pribadi Rahasia (PII Field-Level Encryption `ENC$` & Smart Auto-Encrypt Self-Healing) di Google Sheets (v3.8.18)
+
+#### 1. Latar Belakang & Analisis Kebutuhan
+- **Kebutuhan Pengguna:**
+  1. Mengamankan **5 Data Pribadi Rahasia (PII)** di dalam database Google Sheets agar berubah menjadi kode enkripsi acak (`ENC$...`) yang tidak dapat dibaca oleh pihak luar meskipun file tabel bocor atau diintip secara langsung:
+     * **Password** (`user_data` kolom F & `log_reset_pass` kolom F)
+     * **Nomor WA / `No_HP`** (`user_data` kolom E & `log_reset_pass` kolom E)
+     * **NIP** (`user_data` kolom A, `cuti_log` kolom C/J/K, & `log_reset_pass` kolom C)
+     * **Alamat Pegawai** (`user_data` kolom P)
+     * **Alamat Cuti** (`cuti_log` kolom P)
+  2. Membiarkan data umum (`Nama`, `Jabatan`, `Pangkat`, `Sisa Cuti`, dsb.) tetap terbaca normal untuk kemudahan identifikasi tabel.
+  3. Memastikan data yang terenkripsi hanya dapat dilihat dalam wujud asli dan diedit melalui aplikasi **TRANSKEP** (Menu Kelola Pegawai & Menu Cuti).
+  4. Menyediakan fitur **Smart Auto-Encrypt (*Self-Healing*)**: Jika Admin dalam keadaan darurat mengetikkan `Password`, `Nomor HP`, `NIP`, atau `Alamat` secara manual (teks biasa) langsung di sel Google Sheet, sistem otomatis mendeteksi dan langsung mengubahnya menjadi kode enkripsi `ENC$...` tanpa menimbulkan error.
+
+#### 2. Rencana Implementasi & Solusi Rekayasa
+1. **Brankas Kunci Master Server (`getEncryptionSecret_` di [`code.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/code.js)):**
+   - Kunci kriptografi utama 256-bit (`TRANSKEP_ENC_SECRET`) dibangkitkan secara otomatis dan disimpan di dalam `PropertiesService.getScriptProperties()` di sisi server Google Apps Script (tidak pernah dikirim ke browser dan tidak pernah terekspos di GitHub).
+2. **Mesin Enkripsi & Dekripsi Dua Arah Deterministik (`encryptField_` & `decryptField_`):**
+   - Menggunakan autentikasi `HMAC-SHA256` (4-byte tag deterministik) yang dikombinasikan dengan *keystream cipher* berbasis `SHA-256` (`ENC$<tagHex>$<cipherHex>`), dilengkapi *In-Memory Execution Cache* (`_encMemoryCache_` & `_decMemoryCache_`) untuk performa pembacaan massal 0ms.
+   - Mendukung penuh pencocokan `verifyPasswordHash_` baik untuk format `ENC$...`, format legacy `SHA256$...` (otomatis di-upgrade ke `ENC$...` saat login), maupun input darurat plaintext.
+3. **Middleware Pembaca Terpusat & Smart Self-Healing (`readUserSheetDecrypted_` & `readCutiSheetDecrypted_`):**
+   - Setiap kali `user_data` atau `cuti_log` dibaca oleh server, fungsi ini otomatis memeriksa apakah ada sel pada kolom `NIP`, `No_HP`, `Password`, atau `Alamat` yang belum berformat `ENC$`.
+   - Jika ditemukan teks biasa (baik data lama maupun ketikan manual darurat di Google Sheet), fungsi otomatis melakukan **Batch Column Auto-Encrypt** langsung ke Google Sheet sekaligus mengembalikan teks asli yang telah didekripsi ke memori aplikasi.
+4. **Enkripsi Penulisan di Modul Kelola Pegawai & Modul Cuti:**
+   - Memperbarui [`pegawai/manajemen_pegawai.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/pegawai/manajemen_pegawai.js) (`addUser`, `updateUser`, `deleteUser`, `importBulkUsers`) dan [`permohonan/permohonan.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/permohonan.js) (`addCutiLog`, `updateCutiLog`, `deleteCutiLog`, `requestCancelCuti`) serta seluruh modul pembaca `user_data` / `cuti_log` agar terintegrasi penuh dengan `encryptField_`, `readUserSheetDecrypted_`, dan `readCutiSheetDecrypted_`.
+
+#### 3. Estimasi Dampak & File yang Dimodifikasi
+- **File Dimodifikasi:**
+  1. [`code.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/code.js)
+  2. [`pegawai/manajemen_pegawai.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/pegawai/manajemen_pegawai.js)
+  3. [`permohonan/permohonan.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/permohonan.js)
+  4. [`permohonan/persetujuan.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/persetujuan.js)
+  5. [`permohonan/rekapitulasi.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/rekapitulasi.js)
+  6. [`dashboard/dashboard.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/dashboard/dashboard.js)
+  7. [`eoffice/eoffice.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/eoffice.js)
+  8. [`jobdes/jobdes.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/jobdes/jobdes.js)
+  9. [`kinerja/kinerja.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/kinerja/kinerja.js)
+  10. [`permohonan/wfh/wfh.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/wfh/wfh.js)
+  11. [`pkp/pkp.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/pkp/pkp.js)
+  12. [`modules/pegawai/pegawai.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/pegawai/pegawai.js) & [`pegawai/js_manajemen_pegawai.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/pegawai/js_manajemen_pegawai.html)
+  13. [`modules/pegawai/view_pegawai.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/pegawai/view_pegawai.html) & [`pegawai/view_manajemen_pegawai.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/pegawai/view_manajemen_pegawai.html)
+  14. [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) & [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js)
+- **Status:** `[SELESAI & AKTIF]` ✅

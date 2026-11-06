@@ -46,7 +46,7 @@ function cekOtorisasi(nip, clientToken) {
     const ss = getDB();
     const sheet = ss.getSheetByName('user_data');
     if (!sheet) return false;
-    const data = sheet.getDataRange().getDisplayValues();
+    const data = readUserSheetDecrypted_(sheet);
     const cleanNip = String(nip).replace(/['"\s]/g, '');
     for (let i = 1; i < data.length; i++) {
       const rowNip = String(data[i][0] || '').replace(/['"\s]/g, '');
@@ -80,7 +80,7 @@ function cekOtorisasiAdmin(nip, clientToken) {
     const ss = getDB();
     const sheet = ss.getSheetByName('user_data');
     if (!sheet) return false;
-    const data = sheet.getDataRange().getDisplayValues();
+    const data = readUserSheetDecrypted_(sheet);
     const cleanNip = String(nip).replace(/['"\s]/g, '');
     for (let i = 1; i < data.length; i++) {
       const rowNip = String(data[i][0] || '').replace(/['"\s]/g, '');
@@ -112,7 +112,7 @@ function cekOtorisasiAdminOrOperator(nip, clientToken) {
   const ss = getDB();
   const sheet = ss.getSheetByName('user_data');
   if (!sheet) return false;
-  const data = sheet.getDataRange().getDisplayValues();
+  const data = readUserSheetDecrypted_(sheet);
   for (let i = 1; i < data.length; i++) {
     if (String(data[i][0]) === String(nip)) {
       const roleStr = String(data[i][3] || '').toLowerCase().trim();
@@ -140,7 +140,7 @@ function sanitizeRowArray(row) {
   return row.map(cell => sanitizeFormulaInput(cell));
 }
 
-// 5. Sentralisasi Hashing Kriptografis Salted SHA-256 (Anti-Rainbow Table & Plaintext Leak)
+// 5. Sentralisasi Hashing Kriptografis Salted SHA-256 & Enkripsi Dua Arah Kolom Rahasia (PII Vault)
 function hashPassword_(plainPassword, salt) {
   if (!salt) salt = Utilities.getUuid().substring(0, 8);
   const rawBytes = Utilities.computeDigest(
@@ -161,8 +161,12 @@ function hashPassword_(plainPassword, salt) {
 
 function verifyPasswordHash_(storedValue, inputPassword) {
   if (!storedValue || !inputPassword) return false;
-  const storedStr = String(storedValue);
-  // Format hash Salted SHA-256
+  const storedStr = String(storedValue).replace(/^'+/, '').trim();
+  // 1. Format Enkripsi Dua Arah Kolom (ENC$<tag>$<hex>)
+  if (isEncryptedField_(storedStr)) {
+    return decryptField_(storedStr) === String(inputPassword);
+  }
+  // 2. Format Hash Salted SHA-256 Legacy (SHA256$<salt>$<hex>)
   if (storedStr.startsWith("SHA256$")) {
     const parts = storedStr.split("$");
     if (parts.length === 3) {
@@ -171,8 +175,317 @@ function verifyPasswordHash_(storedValue, inputPassword) {
       return storedStr === expectedHash;
     }
   }
-  // Mode transisi legacy plaintext
+  // 3. Mode Transisi / Input Darurat Plaintext di Sheet
   return storedStr === String(inputPassword);
+}
+
+// 5B. Mesin Enkripsi Dua Arah Kolom Rahasia (NIP, Nomor WA, Password, Alamat Pegawai & Alamat Cuti)
+var _cachedEncSecret_ = null;
+var _encMemoryCache_ = {};
+var _decMemoryCache_ = {};
+
+function getEncryptionSecret_() {
+  if (_cachedEncSecret_) return _cachedEncSecret_;
+  try {
+    const props = PropertiesService.getScriptProperties();
+    let secret = props.getProperty('TRANSKEP_ENC_SECRET');
+    if (!secret) {
+      const rawSeed = Utilities.getUuid() + ":" + Utilities.getUuid() + ":TRANSKEP_PII_VAULT_2026";
+      const seedBytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, rawSeed, Utilities.Charset.UTF_8);
+      secret = bytesToHex_(seedBytes);
+      props.setProperty('TRANSKEP_ENC_SECRET', secret);
+    }
+    _cachedEncSecret_ = secret;
+    return secret;
+  } catch (e) {
+    _cachedEncSecret_ = "TRANSKEP_FALLBACK_MASTER_VAULT_KEY_2026_SECURE";
+    return _cachedEncSecret_;
+  }
+}
+
+function bytesToHex_(bytes) {
+  let hex = '';
+  for (let i = 0; i < bytes.length; i++) {
+    let b = bytes[i];
+    if (b < 0) b += 256;
+    let h = b.toString(16);
+    if (h.length === 1) h = '0' + h;
+    hex += h;
+  }
+  return hex;
+}
+
+function hexToBytes_(hex) {
+  const bytes = [];
+  for (let i = 0; i < hex.length; i += 2) {
+    let b = parseInt(hex.substring(i, i + 2), 16);
+    if (b > 127) b -= 256;
+    bytes.push(b);
+  }
+  return bytes;
+}
+
+function isEncryptedField_(val) {
+  if (val === null || val === undefined) return false;
+  const s = String(val).replace(/^'+/, '').trim();
+  if (!s.startsWith('ENC$')) return false;
+  const parts = s.split('$');
+  return parts.length === 3 && parts[1].length > 0 && parts[2].length > 0 && (parts[2].length % 2 === 0);
+}
+
+function encryptField_(plainVal) {
+  if (plainVal === null || plainVal === undefined) return '';
+  const rawStr = String(plainVal);
+  const str = rawStr.replace(/^'+/, '').trim();
+  if (str === '' || str === '-') return rawStr;
+  if (isEncryptedField_(str)) return str;
+  if (_encMemoryCache_[str]) return _encMemoryCache_[str];
+
+  const secret = getEncryptionSecret_();
+  const macBytes = Utilities.computeHmacSha256Signature(str, secret, Utilities.Charset.UTF_8);
+  const tagHex = bytesToHex_(macBytes.slice(0, 4));
+
+  const plainBytes = Utilities.newBlob(str, 'text/plain').getBytes();
+  const cipherBytes = [];
+  let blockIdx = 0;
+  let keystream = [];
+
+  for (let i = 0; i < plainBytes.length; i++) {
+    if (i % 32 === 0) {
+      keystream = Utilities.computeDigest(
+        Utilities.DigestAlgorithm.SHA_256,
+        secret + ":" + tagHex + ":" + blockIdx,
+        Utilities.Charset.UTF_8
+      );
+      blockIdx++;
+    }
+    let pByte = plainBytes[i] < 0 ? plainBytes[i] + 256 : plainBytes[i];
+    let kByte = keystream[i % 32] < 0 ? keystream[i % 32] + 256 : keystream[i % 32];
+    let cByte = (pByte ^ kByte) & 0xFF;
+    if (cByte > 127) cByte -= 256;
+    cipherBytes.push(cByte);
+  }
+
+  const result = "ENC$" + tagHex + "$" + bytesToHex_(cipherBytes);
+  _encMemoryCache_[str] = result;
+  _decMemoryCache_[result] = str;
+  return result;
+}
+
+function decryptField_(cipherVal) {
+  if (cipherVal === null || cipherVal === undefined) return '';
+  const rawStr = String(cipherVal);
+  const clean = rawStr.replace(/^'+/, '').trim();
+  if (!clean.startsWith('ENC$')) return rawStr.replace(/^'+/, '');
+  if (_decMemoryCache_[clean]) return _decMemoryCache_[clean];
+
+  const parts = clean.split('$');
+  if (parts.length !== 3) return rawStr;
+
+  const tagHex = parts[1];
+  const cipherHex = parts[2];
+  if (!tagHex || !cipherHex || cipherHex.length % 2 !== 0) return rawStr;
+
+  try {
+    const secret = getEncryptionSecret_();
+    const cipherBytes = hexToBytes_(cipherHex);
+    const plainBytes = [];
+    let blockIdx = 0;
+    let keystream = [];
+
+    for (let i = 0; i < cipherBytes.length; i++) {
+      if (i % 32 === 0) {
+        keystream = Utilities.computeDigest(
+          Utilities.DigestAlgorithm.SHA_256,
+          secret + ":" + tagHex + ":" + blockIdx,
+          Utilities.Charset.UTF_8
+        );
+        blockIdx++;
+      }
+      let cByte = cipherBytes[i] < 0 ? cipherBytes[i] + 256 : cipherBytes[i];
+      let kByte = keystream[i % 32] < 0 ? keystream[i % 32] + 256 : keystream[i % 32];
+      let pByte = (cByte ^ kByte) & 0xFF;
+      if (pByte > 127) pByte -= 256;
+      plainBytes.push(pByte);
+    }
+
+    const plainText = Utilities.newBlob(plainBytes).getDataAsString('UTF-8');
+    _decMemoryCache_[clean] = plainText;
+    _encMemoryCache_[plainText] = clean;
+    return plainText;
+  } catch (e) {
+    return rawStr;
+  }
+}
+
+function encryptPasswordField_(passVal) {
+  if (passVal === null || passVal === undefined) return '';
+  const clean = String(passVal).replace(/^'+/, '').trim();
+  if (clean === '' || clean === '-') return '';
+  if (isEncryptedField_(clean) || clean.startsWith('SHA256$')) return clean;
+  return encryptField_(clean);
+}
+
+/**
+ * Pembaca Terpusat Sheet `user_data` (Dekripsi Transparan + Smart Auto-Encrypt Self-Healing)
+ * Jika ditemukan data lama atau ketikan darurat manual di Sheet yang belum berformat ENC$,
+ * fungsi ini otomatis mengenkripsinya di Google Sheet sekaligus mengembalikan teks asli ke memori aplikasi.
+ */
+function readUserSheetDecrypted_(sheetUser) {
+  if (!sheetUser) return [];
+  const data = sheetUser.getDataRange().getDisplayValues();
+  if (!data || data.length <= 1) return data || [];
+
+  const uHeaders = data[0].map(h => String(h || '').trim().toLowerCase().replace(/[^a-z0-9]/g, ''));
+  const findColIdx = (name, fallback) => {
+    const clean = name.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const idx = uHeaders.indexOf(clean);
+    return idx !== -1 ? idx : fallback;
+  };
+
+  const colNip = findColIdx('NIP', 0);
+  const colHp = findColIdx('No_HP', 4);
+  const colPass = findColIdx('Password', 5);
+  const colAlamat = findColIdx('Alamat', 15);
+
+  let dirtyNip = false, dirtyHp = false, dirtyPass = false, dirtyAlamat = false;
+  const encNipCol = [], encHpCol = [], encPassCol = [], encAlamatCol = [];
+  const numRows = data.length - 1;
+
+  for (let i = 1; i < data.length; i++) {
+    // 1. Kolom NIP
+    const rawNip = String(data[i][colNip] || '').replace(/^'+/, '').trim();
+    if (rawNip !== '' && rawNip !== '-' && !isEncryptedField_(rawNip)) {
+      dirtyNip = true;
+      encNipCol.push([encryptField_(rawNip)]);
+      data[i][colNip] = rawNip;
+    } else {
+      encNipCol.push([rawNip]);
+      data[i][colNip] = decryptField_(rawNip);
+    }
+
+    // 2. Kolom Nomor WA (No_HP)
+    const rawHp = String(data[i][colHp] || '').replace(/^'+/, '').trim();
+    if (rawHp !== '' && rawHp !== '-' && !isEncryptedField_(rawHp)) {
+      dirtyHp = true;
+      encHpCol.push([encryptField_(rawHp)]);
+      data[i][colHp] = rawHp;
+    } else {
+      encHpCol.push([rawHp]);
+      data[i][colHp] = decryptField_(rawHp);
+    }
+
+    // 3. Kolom Password (mendukung ketik manual darurat -> langsung berubah jadi ENC$)
+    const rawPass = String(data[i][colPass] || '').replace(/^'+/, '').trim();
+    if (rawPass !== '' && rawPass !== '-' && !isEncryptedField_(rawPass) && !rawPass.startsWith('SHA256$')) {
+      dirtyPass = true;
+      encPassCol.push([encryptField_(rawPass)]);
+      data[i][colPass] = rawPass;
+    } else {
+      encPassCol.push([rawPass]);
+      data[i][colPass] = isEncryptedField_(rawPass) ? decryptField_(rawPass) : rawPass;
+    }
+
+    // 4. Kolom Alamat Pegawai
+    const rawAlamat = String(data[i][colAlamat] || '').replace(/^'+/, '').trim();
+    if (rawAlamat !== '' && rawAlamat !== '-' && !isEncryptedField_(rawAlamat)) {
+      dirtyAlamat = true;
+      encAlamatCol.push([encryptField_(rawAlamat)]);
+      data[i][colAlamat] = rawAlamat;
+    } else {
+      encAlamatCol.push([rawAlamat]);
+      data[i][colAlamat] = decryptField_(rawAlamat);
+    }
+  }
+
+  // Self-Healing Batch Write ke Google Sheets jika ada sel yang belum terenkripsi
+  try {
+    if (dirtyNip) sheetUser.getRange(2, colNip + 1, numRows, 1).setNumberFormat('@').setValues(encNipCol);
+    if (dirtyHp) sheetUser.getRange(2, colHp + 1, numRows, 1).setNumberFormat('@').setValues(encHpCol);
+    if (dirtyPass) sheetUser.getRange(2, colPass + 1, numRows, 1).setNumberFormat('@').setValues(encPassCol);
+    if (dirtyAlamat) sheetUser.getRange(2, colAlamat + 1, numRows, 1).setNumberFormat('@').setValues(encAlamatCol);
+  } catch (errHeal) {
+    Logger.log("Auto-Encrypt user_data warning: " + errHeal.toString());
+  }
+
+  return data;
+}
+
+/**
+ * Pembaca Terpusat Sheet `cuti_log` (Dekripsi Transparan + Smart Auto-Encrypt Self-Healing)
+ * Mengenkripsi NIP Pemohon (Kolom C), Atasan_NIP (Kolom J), Pejabat_NIP (Kolom K), dan Alamat Cuti (Kolom P).
+ */
+function readCutiSheetDecrypted_(sheetCuti) {
+  if (!sheetCuti) return [];
+  const data = sheetCuti.getDataRange().getDisplayValues();
+  if (!data || data.length <= 1) return data || [];
+
+  const colNip = 2;
+  const colAtasan = 9;
+  const colPejabat = 10;
+  const colAlamat = 15;
+
+  let dirtyNip = false, dirtyAtasan = false, dirtyPejabat = false, dirtyAlamat = false;
+  const encNipCol = [], encAtasanCol = [], encPejabatCol = [], encAlamatCol = [];
+  const numRows = data.length - 1;
+
+  for (let i = 1; i < data.length; i++) {
+    // 1. NIP Pemohon Cuti
+    const rawNip = String(data[i][colNip] || '').replace(/^'+/, '').trim();
+    if (rawNip !== '' && rawNip !== '-' && !isEncryptedField_(rawNip)) {
+      dirtyNip = true;
+      encNipCol.push([encryptField_(rawNip)]);
+      data[i][colNip] = rawNip;
+    } else {
+      encNipCol.push([rawNip]);
+      data[i][colNip] = decryptField_(rawNip);
+    }
+
+    // 2. NIP Atasan Langsung
+    const rawAtasan = String(data[i][colAtasan] || '').replace(/^'+/, '').trim();
+    if (rawAtasan !== '' && rawAtasan !== '-' && !isEncryptedField_(rawAtasan)) {
+      dirtyAtasan = true;
+      encAtasanCol.push([encryptField_(rawAtasan)]);
+      data[i][colAtasan] = rawAtasan;
+    } else {
+      encAtasanCol.push([rawAtasan]);
+      data[i][colAtasan] = decryptField_(rawAtasan);
+    }
+
+    // 3. NIP Pejabat Berwenang
+    const rawPejabat = String(data[i][colPejabat] || '').replace(/^'+/, '').trim();
+    if (rawPejabat !== '' && rawPejabat !== '-' && !isEncryptedField_(rawPejabat)) {
+      dirtyPejabat = true;
+      encPejabatCol.push([encryptField_(rawPejabat)]);
+      data[i][colPejabat] = rawPejabat;
+    } else {
+      encPejabatCol.push([rawPejabat]);
+      data[i][colPejabat] = decryptField_(rawPejabat);
+    }
+
+    // 4. Alamat Selama Cuti
+    const rawAlamat = String(data[i][colAlamat] || '').replace(/^'+/, '').trim();
+    if (rawAlamat !== '' && rawAlamat !== '-' && !isEncryptedField_(rawAlamat)) {
+      dirtyAlamat = true;
+      encAlamatCol.push([encryptField_(rawAlamat)]);
+      data[i][colAlamat] = rawAlamat;
+    } else {
+      encAlamatCol.push([rawAlamat]);
+      data[i][colAlamat] = decryptField_(rawAlamat);
+    }
+  }
+
+  // Self-Healing Batch Write ke Google Sheets jika ada sel yang belum terenkripsi
+  try {
+    if (dirtyNip) sheetCuti.getRange(2, colNip + 1, numRows, 1).setNumberFormat('@').setValues(encNipCol);
+    if (dirtyAtasan) sheetCuti.getRange(2, colAtasan + 1, numRows, 1).setNumberFormat('@').setValues(encAtasanCol);
+    if (dirtyPejabat) sheetCuti.getRange(2, colPejabat + 1, numRows, 1).setNumberFormat('@').setValues(encPejabatCol);
+    if (dirtyAlamat) sheetCuti.getRange(2, colAlamat + 1, numRows, 1).setNumberFormat('@').setValues(encAlamatCol);
+  } catch (errHeal) {
+    Logger.log("Auto-Encrypt cuti_log warning: " + errHeal.toString());
+  }
+
+  return data;
 }
 
 // 6. Revokasi Sesi Server-Side (CWE-613)
@@ -283,11 +596,18 @@ function verifyLogin(nip, pass) {
     const ss = getDB();
     
     const sheet = ss.getSheetByName('user_data');
-    const data = sheet.getDataRange().getDisplayValues();
+    const data = readUserSheetDecrypted_(sheet);
     for (let i = 1; i < data.length; i++) {
       if (String(data[i][0]) === String(nip)) {
         const storedPass = String(data[i][5]);
         if (verifyPasswordHash_(storedPass, pass)) {
+          // Auto-Upgrade jika sandi lama masih berformat SHA256$ menjadi format terpadu ENC$
+          if (storedPass.startsWith("SHA256$")) {
+            try {
+              sheet.getRange(i + 1, 6).setNumberFormat('@').setValue(encryptField_(pass));
+            } catch (eUp) {}
+          }
+
           const user = {
             nip: data[i][0], nama: data[i][1], jabatan: data[i][2], role: data[i][3],
             no_hp: data[i][4], s_tahunan_2024: data[i][6], s_tahunan_2025: data[i][7],
@@ -446,7 +766,7 @@ function getBulkData(nip, clientToken, clientVersion) {
 
     const sheetUser = ss.getSheetByName('user_data');
     if(sheetUser) {
-       const uData = sheetUser.getDataRange().getDisplayValues();
+       const uData = readUserSheetDecrypted_(sheetUser);
 
        let isRequesterAdmin = false;
        for (let i = 1; i < uData.length; i++) {
@@ -583,7 +903,7 @@ function getBackgroundData(nip, clientToken, clientVersion) {
 
     const sheetCuti = ss.getSheetByName('cuti_log');
     if(sheetCuti) {
-       const cData = sheetCuti.getDataRange().getDisplayValues();
+       const cData = readCutiSheetDecrypted_(sheetCuti);
        for(let i=1; i<cData.length; i++) {
           if (!cData[i][0]) continue;
           data.cutiLogs.push({
@@ -710,7 +1030,7 @@ function requestPasswordReset(no_wa) {
     const userSheet = ss.getSheetByName('user_data');
     if(!userSheet) throw new Error("Database user tidak ditemukan");
     
-    const userData = userSheet.getDataRange().getDisplayValues(); 
+    const userData = readUserSheetDecrypted_(userSheet); 
 
     let userFound = null;
     let userRowIndex = -1;
@@ -738,10 +1058,10 @@ function requestPasswordReset(no_wa) {
 
     if (!userFound || userRowIndex === -1) return { status: 'error', message: 'Nomor WhatsApp ini tidak terdaftar di dalam sistem pegawai. Silakan periksa kembali atau hubungi Admin.' };
 
-    // 1. Generate Kata Sandi Sementara (6 Digit OTP)
+    // 1. Generate Kata Sandi Sementara (6 Digit OTP) & Enkripsi Kolom (ENC$)
     const tempPass = "TR-" + Math.floor(100000 + Math.random() * 900000);
-    const newHashedPass = hashPassword_(tempPass);
-    userSheet.getRange(userRowIndex, 6).setValue(newHashedPass);
+    const newEncryptedPass = encryptField_(tempPass);
+    userSheet.getRange(userRowIndex, 6).setNumberFormat('@').setValue(newEncryptedPass);
 
     try {
       CacheService.getScriptCache().put("force_reset_" + userFound.nip, tempPass, 86400);
@@ -773,7 +1093,7 @@ function requestPasswordReset(no_wa) {
         if (logSheet) {
           const lData = logSheet.getDataRange().getDisplayValues();
           for (let r = lData.length - 1; r >= 1; r--) {
-            if (String(lData[r][2]).trim() === String(userFound.nip).trim()) {
+            if (String(decryptField_(lData[r][2])).trim() === String(userFound.nip).trim()) {
               logSheet.deleteRow(r + 1);
             }
           }
@@ -795,7 +1115,7 @@ function requestPasswordReset(no_wa) {
       
       const uniqueId = 'REQ-' + new Date().getTime();
       const timestamp = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'dd/MM/yyyy HH:mm:ss');
-      logSheet.appendRow([uniqueId, timestamp, userFound.nip, userFound.nama, userFound.no_wa, tempPass]);
+      logSheet.appendRow([uniqueId, timestamp, encryptField_(userFound.nip), userFound.nama, encryptField_(userFound.no_wa), encryptField_(tempPass)]);
       bumpDataVersion();
 
       return { 
@@ -822,7 +1142,7 @@ function getResetPasswordQueue(adminNip, clientToken) {
     const userSheet = ss.getSheetByName('user_data');
     const userMap = {};
     if (userSheet) {
-      const uData = userSheet.getDataRange().getDisplayValues();
+      const uData = readUserSheetDecrypted_(userSheet);
       for (let u = 1; u < uData.length; u++) {
         userMap[String(uData[u][0])] = uData[u][5];
       }
@@ -832,15 +1152,16 @@ function getResetPasswordQueue(adminNip, clientToken) {
     const queue = [];
     for(let i = 1; i < data.length; i++) {
       if(data[i][0] && String(data[i][0]).trim() !== '') { 
-        const uNip = String(data[i][2]);
+        const uNip = String(decryptField_(data[i][2]));
+        const uNoWa = String(decryptField_(data[i][4]));
         // Prioritaskan password sementara (TR-XXXXXX) yang tercatat di antrean log_reset_pass
-        let currentPass = data[i][5] || userMap[uNip] || '-';
+        let currentPass = decryptField_(data[i][5] || userMap[uNip] || '-');
         if (currentPass && String(currentPass).startsWith("SHA256$")) {
           currentPass = "[Telah Dienkripsi - Reset di Edit Pegawai]";
         }
         queue.push({
           id: data[i][0], waktu: data[i][1], nip: uNip,
-          nama: data[i][3], no_wa: data[i][4], pass: currentPass
+          nama: data[i][3], no_wa: uNoWa, pass: currentPass
         });
       }
     }
@@ -911,7 +1232,7 @@ function changeMyPassword(nip, oldPass, newPass, clientToken) {
     // 2. Gunakan koneksi database terpusat
     const ss = getDB();
     const sheet = ss.getSheetByName('user_data');
-    const data = sheet.getDataRange().getDisplayValues();
+    const data = readUserSheetDecrypted_(sheet);
 
     // 3. Cari pegawai dan verifikasi sandi lama
     for (let i = 1; i < data.length; i++) {
@@ -920,12 +1241,13 @@ function changeMyPassword(nip, oldPass, newPass, clientToken) {
           return { status: 'error', message: 'Kata sandi lama yang Anda masukkan salah.' };
         }
         
-        // 4. Timpa dengan sandi baru berformat Salted SHA-256
-        const hashedNewPass = hashPassword_(newPass);
-        sheet.getRange(i + 1, 6).setValue(hashedNewPass);
+        // 4. Timpa dengan sandi baru berformat Enkripsi Kolom (ENC$)
+        const encryptedNewPass = encryptField_(newPass);
+        sheet.getRange(i + 1, 6).setNumberFormat('@').setValue(encryptedNewPass);
         try {
           CacheService.getScriptCache().remove("force_reset_" + nip);
         } catch(e) {}
+        bumpDataVersion();
         return { status: 'success' };
       }
     }

@@ -72,7 +72,7 @@ function approveKinerja(id, userNip, clientToken) {
     if(String(record[8]) !== 'Menunggu TTE') throw new Error("Dokumen ini sudah disahkan sebelumnya.");
     
     // TRANSKEP OPTIMIZATION 1: Menggunakan find untuk menarik data Pegawai & Pejabat
-    const uData = sheetUser.getDataRange().getValues();
+    const uData = readUserSheetDecrypted_(sheetUser);
     
     const rowPegawai = uData.find((row, idx) => idx > 0 && String(row[0]) === String(record[1]));
     const pegawai = rowPegawai ? { nama: rowPegawai[1], nip: rowPegawai[0], jabatan: rowPegawai[2] } : { nama: 'Unknown', nip: record[1], jabatan: '-' };

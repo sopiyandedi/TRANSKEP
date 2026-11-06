@@ -12,8 +12,8 @@ function getSmartRouting(atasanNip, pejabatNip, tglMulai, tglSelesai, userNip, c
     const cutiSheet = ss.getSheetByName('cuti_log');
     const stSheet = ss.getSheetByName('st_log');
 
-    const users = userSheet.getDataRange().getDisplayValues();
-    const cutis = cutiSheet ? cutiSheet.getDataRange().getDisplayValues() : [];
+    const users = readUserSheetDecrypted_(userSheet);
+    const cutis = cutiSheet ? readCutiSheetDecrypted_(cutiSheet) : [];
     const sts = stSheet ? stSheet.getDataRange().getDisplayValues() : [];
 
     let userList = [];
