@@ -898,7 +898,7 @@ ${absXrefOffset}
       const alamatLines = wrapText(alamatRaw, fontRegular, 9.5, alamatColW - 14);
 
       // Tinggi tabel alamat kiri proporsional (mengikuti baris teks seperti HTML)
-      const viContentH = Math.max(38, (alamatLines.length * 13) + 12);
+      const viContentH = Math.max(32, (alamatLines.length * 12.5) + 8);
       const viTableTotalH = secTitleH + viContentH;
 
       // 1. Header Tabel Alamat & Telepon (Kiri)
@@ -946,10 +946,10 @@ ${absXrefOffset}
       });
 
       // 3. Teks Isi Alamat (Bungkus Baris Rapi dengan Padding Seimbang Atas & Bawah)
-      let alY = currentY - secTitleH - 14;
+      let alY = currentY - secTitleH - 12;
       for (const aLine of alamatLines) {
         page.drawText(safeWinAnsi(aLine), { x: marginX + 6, y: alY, size: 9.5, font: fontRegular, color: black });
-        alY -= 13;
+        alY -= 12.5;
       }
 
       // 4. Teks No HP (Tengah Vertikal & Horizontal Presisi)
@@ -1260,33 +1260,33 @@ ${absXrefOffset}
         let qrPejabatDataUrl = '';
         let qrParafDataUrl = '';
 
-        const isGhPages = (global.window && global.window.location && global.window.location.origin.includes('github.io'));
-        const logoEmblemUrl = isGhPages
-          ? 'img/Logo_PA_Imy.png'
-          : 'https://sopiyandedi.github.io/TRANSKEP/img/Logo_PA_Imy.png';
+        const qrWithLogo = (typeof window !== 'undefined' && window.generateQRCodeWithLogo) || global.generateQRCodeWithLogo;
+        const qrEngine = (typeof window !== 'undefined' && window.TranskepQrEngine) || global.TranskepQrEngine;
+        const logoEmblemUrl = 'img/Logo_PA_Imy.png';
 
-        if (global.generateQRCodeWithLogo) {
-          qrPemohonDataUrl = await global.generateQRCodeWithLogo(verifyUrlPemohon, { size: 300, logoSrc: logoEmblemUrl });
+        if (qrWithLogo) {
+          qrPemohonDataUrl = await qrWithLogo(verifyUrlPemohon, { size: 300, logoSrc: logoEmblemUrl });
           if (isSetujuAtasan) {
-            qrAtasanDataUrl = await global.generateQRCodeWithLogo(verifyUrlAtasan, { size: 300, logoSrc: logoEmblemUrl });
+            qrAtasanDataUrl = await qrWithLogo(verifyUrlAtasan, { size: 300, logoSrc: logoEmblemUrl });
           }
           if (isSetujuPejabat) {
-            qrPejabatDataUrl = await global.generateQRCodeWithLogo(verifyUrlPejabat, { size: 300, logoSrc: logoEmblemUrl });
+            qrPejabatDataUrl = await qrWithLogo(verifyUrlPejabat, { size: 300, logoSrc: logoEmblemUrl });
           }
-        } else if (global.TranskepQrEngine) {
-          qrPemohonDataUrl = await global.TranskepQrEngine.generateQrDataUrl(verifyUrlPemohon, { size: 300, logoRatio: 0.28, logoSrc: logoEmblemUrl });
+        } else if (qrEngine) {
+          qrPemohonDataUrl = await qrEngine.generateQrDataUrl(verifyUrlPemohon, { size: 300, logoRatio: 0.28, logoSrc: logoEmblemUrl });
           if (isSetujuAtasan) {
-            qrAtasanDataUrl = await global.TranskepQrEngine.generateQrDataUrl(verifyUrlAtasan, { size: 300, logoRatio: 0.28, logoSrc: logoEmblemUrl });
+            qrAtasanDataUrl = await qrEngine.generateQrDataUrl(verifyUrlAtasan, { size: 300, logoRatio: 0.28, logoSrc: logoEmblemUrl });
           }
           if (isSetujuPejabat) {
-            qrPejabatDataUrl = await global.TranskepQrEngine.generateQrDataUrl(verifyUrlPejabat, { size: 300, logoRatio: 0.28, logoSrc: logoEmblemUrl });
+            qrPejabatDataUrl = await qrEngine.generateQrDataUrl(verifyUrlPejabat, { size: 300, logoRatio: 0.28, logoSrc: logoEmblemUrl });
           }
         }
 
-        if (global.generateQRCodeDataURL) {
-          qrParafDataUrl = global.generateQRCodeDataURL('Sudah diparaf oleh Petugas Cuti PA Indramayu', { size: 100 });
-        } else if (global.TranskepQrEngine) {
-          qrParafDataUrl = await global.TranskepQrEngine.generateQrDataUrl('Sudah diparaf oleh Petugas Cuti PA Indramayu', { size: 100 });
+        const qrSimple = (typeof window !== 'undefined' && window.generateQRCodeDataURL) || global.generateQRCodeDataURL;
+        if (qrSimple) {
+          qrParafDataUrl = qrSimple('Sudah diparaf oleh Petugas Cuti PA Indramayu', { size: 100 });
+        } else if (qrEngine) {
+          qrParafDataUrl = await qrEngine.generateQrDataUrl('Sudah diparaf oleh Petugas Cuti PA Indramayu', { size: 100 });
         }
 
         const signedBytes = await this.buildSignedCutiPdf(log, pns, atasan, pejabat, {

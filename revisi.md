@@ -5268,3 +5268,34 @@ Pengguna melaporkan bahwa pratinjau (*preview*) dokumen PDF di modal SK dan SOP 
 
 #### 3. Estimasi Dampak & File yang Dimodifikasi
 - **Status:** `[SELESAI & AKTIF]` ✅
+
+---
+
+### TAHAP 98: Kalibrasi Layout Rapat Proporsional Kolom VI & Barcode Logo Berwarna Resmi pada Form Cetak dan PDF Signer TTE (v3.8.23)
+
+#### 1. Latar Belakang & Analisis Masalah
+- **Masalah 1 (Section VI Terentang / Stretch Berlebihan):** Pada tampilan cetak HTML (`template_cetak_cuti.html` & `modules/permohonan/cetak/cetak_cuti.html`), pembungkus flexbox menggunakan `align-items: stretch` dan elemen `<td>` alamat memiliki `height: 35px`. Hal ini memaksa tinggi tabel alamat di sebelah kiri meregang setara dengan tinggi blok tanda tangan di sebelah kanan (~140px), sehingga menghasilkan ruang kosong vertikal yang sangat besar di bawah teks alamat.
+- **Masalah 2 (Barcode Tanpa Logo pada PDF Biner):** Pada unduhan berkas PDF biner resmi (`Download Persetujuan`), pemanggilan URL logo sebelumnya merujuk ke path yang tidak konsisten atau fallback terhambat, sehingga barcode pada PDF unduhan tidak memuat emblem logo berwarna Pengadilan Agama di pusatnya.
+- **Masalah 3 (PWA Cache Persistence):** Browser klien masih menyimpan cache versi lama (`transkep-v3.8.20`) sehingga perbaikan visual tidak langsung tampak di layar pengguna tanpa cache busting.
+
+#### 2. Rencana Implementasi & Solusi Rekayasa
+1. **Perbaikan Layout Section VI Form Cetak HTML:**
+   - Mengubah `align-items: stretch` menjadi `align-items: flex-start` pada container flexbox Section VI di [`permohonan/template_cetak_cuti.html`](file:///c:/Users/user/.gemini/antigravity-ide\projek\TRANSKEP\permohonan\template_cetak_cuti.html) dan [`modules/permohonan/cetak/cetak_cuti.html`](file:///c:/Users/user/.gemini/antigravity-ide\projek\TRANSKEP\modules\permohonan\cetak\cetak_cuti.html).
+   - Menghapus `height: 35px` pada `<td>` alamat dan menerapkan padding proporsional (`padding: 4px 6px !important; line-height: 1.3; font-size: 10pt !important;`) sehingga garis bawah tabel alamat rapat merangkul teks persis sesuai referensi ideal.
+2. **Penyempurnaan Mesin PDF Signer & Barcode Logo Emblem:**
+   - Mengalibrasi tinggi kotak Section VI pada [`core/pdf_signer.js`](file:///c:/Users/user/.gemini/antigravity-ide\projek\TRANSKEP\core\pdf_signer.js) dan [`permohonan/js_pdf_signer.html`](file:///c:/Users/user/.gemini/antigravity-ide\projek\TRANSKEP\permohonan\js_pdf_signer.html) menjadi rapat proporsional (`viContentH = Math.max(32, (alamatLines.length * 12.5) + 8)`).
+   - Memastikan generator QR (`generateQRCodeWithLogo` / `TranskepQrEngine`) secara konsisten menggunakan aset logo resmi `img/Logo_PA_Imy.png` dengan fallback multi-tier.
+3. **Invalidasi Cache & Versioning:**
+   - Menaikkan versi Service Worker di [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide\projek\TRANSKEP\sw.js) ke `transkep-v3.8.23`.
+   - Menaikkan `APP_BUILD_VER` di [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide\projek\TRANSKEP\index.html) ke `3.8.23`.
+   - Deploy build Apps Script dan commit Git ke branch `origin/main`.
+
+#### 3. Estimasi Dampak & File yang Dimodifikasi
+- **File Dimodifikasi:**
+  1. `permohonan/template_cetak_cuti.html` & `modules/permohonan/cetak/cetak_cuti.html` (Flex-start & eliminasi height fixed kolom VI)
+  2. `core/pdf_signer.js` & `permohonan/js_pdf_signer.html` (Kalibrasi rapat Section VI & integrasi barcode berlogo resmi)
+  3. `core/qr_engine.js` & `permohonan/js_qr_engine.html` (Sinkronisasi generator QR)
+  4. `index.html` (Bump APP_BUILD_VER ke 3.8.23)
+  5. `sw.js` (Bump CACHE_NAME ke transkep-v3.8.23)
+  6. `revisi.md` (Dokumentasi Tahap 98)
+- **Status:** `[SELESAI & AKTIF]` ✅
