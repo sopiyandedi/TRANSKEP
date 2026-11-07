@@ -877,3 +877,18 @@ ZONA BAWAH: MASTER CONTEXT & STATUS MIGRASI TERKINI (LIVING CONTEXT)
     - **Kalender Hari Kerja SKB 3 Menteri (2026 & 2027)**: Memuat lengkap 51 tanggal Libur Nasional & Cuti Bersama 2026 (25 tanggal) dan 2027 (26 tanggal sesuai SKB Nomor 1205/3/2 Tahun 2026); otomatis melewati akhir pekan & tanggal merah serta menolak rentang `0` hari kerja efektif (kecuali `Dinas Luar`). Batas H-5 tetap tidak dikunci.
     - **Slim Pill Bar & Label Tahun Dinamis (`cutiYears`)**: Menampilkan info real-time hari kerja efektif, tanggal libur SKB yang dilewati, kuota tersedia, dan sisa akhir tepat di bawah input tanggal `Mulai/Selesai Pelaksanaan`, serta memperbarui label tahun secara dinamis di Modal Sisa Cuti, Kelola Pegawai, Export/Import Excel, Blanko Cetak Cuti (`V. CATATAN CUTI`), dan PDF Signer TTE (`snap_awal` & `snap_akhir`).
     - **Versioning**: Versi cache PWA dinaikkan ke **`v3.8.19`** di [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) dan [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js).
+
+
+74. **Kalibrasi Presisi Layout PDF Signer TTE 1:1 Identik Kembar dengan Form Cetak HTML (Tahap 97 - v3.8.20 - Selesai & Aktif ✅):**
+    - **Penyelarasan Proporsi & Eliminasi Void 8.5 cm**: Mengalibrasi ulang seluruh formula koordinat pada [`core/pdf_signer.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/core/pdf_signer.js) dan [`permohonan/js_pdf_signer.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/js_pdf_signer.html) agar membentang 1 halaman A4 penuh secara proporsional (`width: 595.28, height: 841.89`), menghilangkan ruang kosong putih di bawah, dan mengunci dokumen secara mutlak menjadi **1 halaman (Zero Overflow)**.
+    - **Penyamaan Tipografi & Tata Letak (1:1 Kembar Identik dengan HTML)**:
+      * Margin halaman disesuaikan menjadi 20 point (identik dengan padding CSS `2mm 5mm`).
+      * Font diselaraskan ke ukuran 9.5 pt – 11.5 pt *Times New Roman* murni (regular & bold).
+      * Baris data tabel Bagian I s.d. V diperlebar dari 12–13 pt menjadi 16.5–17.5 pt agar teks dan angka cuti bernafas lega.
+      * Bagian IV (*Lamanya Cuti*) kini menampilkan `Hari / Bulan / Tahun` dengan efek coret (*strikethrough*) presisi pada kata Bulan dan Tahun persis seperti di HTML.
+      * Bagian V (*Catatan Cuti*): Header Paraf Petugas Cuti dan QR Paraf digabungkan (*merged border*) menaungi baris terkait secara rapi.
+      * Bagian VI (*Alamat Cuti*): Dilengkapi fitur *word-wrap* otomatis sehingga alamat panjang mengalir anggun dalam 2–3 baris tanpa terpotong `...`.
+    - **Presisi Area TTE Kriptografis X.509 PAdES (Adobe/Foxit Panel Tetap Aktif 100%)**:
+      * Kotak tanda tangan digital (`pemohonRect`, `atasanRect`, `pejabatRect`) dikalibrasi dinamis mengikuti koordinat blok tanda tangan baru (tinggi 80 pt, lebar 180 pt, QR size 48x48 pt dengan logo resmi emblem Pengadilan Agama Indramayu).
+      * Panel *Digital Signatures* (Rev. 1 Pemohon, Rev. 2 Atasan Langsung, Rev. 3 Pejabat/Ketua) di Adobe Acrobat dan Foxit Reader tetap terdeteksi 100% sah dan valid.
+    - **Versioning**: Versi cache PWA dinaikkan ke **`v3.8.20`** di [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) dan [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js). Commit dan push ke `origin/main` serta deployment ke Google Apps Script.

@@ -383,12 +383,12 @@ ${absXrefOffset}
         console.warn('⚠️ Gagal embed barcode PNG:', err);
       }
 
-      const marginX = 32;
-      const contentWidth = width - (marginX * 2); // 531.28 points
-      let currentY = height - 28;
+      const marginX = 20;
+      const contentWidth = width - (marginX * 2); // 555.28 points (identik margin CSS HTML)
+      let currentY = height - 24; // 817.89 points
 
       // Helper Menggambar Tanda Centang Vektor Presisi (Anti-Error WinAnsi Encoding)
-      function drawCheckmark(cx, cy, size = 7.5) {
+      function drawCheckmark(cx, cy, size = 8.5) {
         const x1 = cx - size * 0.35;
         const y1 = cy + size * 0.05;
         const x2 = cx - size * 0.05;
@@ -399,13 +399,13 @@ ${absXrefOffset}
         page.drawLine({
           start: { x: x1, y: y1 },
           end: { x: x2, y: y2 },
-          thickness: 1.3,
+          thickness: 1.4,
           color: black
         });
         page.drawLine({
           start: { x: x2, y: y2 },
           end: { x: x3, y: y3 },
-          thickness: 1.3,
+          thickness: 1.4,
           color: black
         });
       }
@@ -422,48 +422,105 @@ ${absXrefOffset}
           .replace(/[^\x00-\xFF]/g, '');
       }
 
+      // Helper Pemecah Baris Teks Otomatis (Mencegah Teks Terpotong)
+      function wrapText(text, font, size, maxWidth) {
+        const words = String(text || '').split(' ');
+        const lines = [];
+        let curLine = '';
+        for (let i = 0; i < words.length; i++) {
+          const w = words[i];
+          const testLine = curLine ? `${curLine} ${w}` : w;
+          if (font.widthOfTextAtSize(testLine, size) <= maxWidth) {
+            curLine = testLine;
+          } else {
+            if (curLine) lines.push(curLine);
+            curLine = w;
+          }
+        }
+        if (curLine) lines.push(curLine);
+        return lines;
+      }
+
       // Helper Menggambar Kotak Tabel Presisi
       function drawTableRow(x, y, w, h, cols, bg = null) {
         if (bg) {
           page.drawRectangle({
             x: x, y: y, width: w, height: h,
             color: bg,
-            borderColor: black, borderWidth: 0.5
+            borderColor: black, borderWidth: 0.6
           });
         } else {
           page.drawRectangle({
             x: x, y: y, width: w, height: h,
-            borderColor: black, borderWidth: 0.5
+            borderColor: black, borderWidth: 0.6
           });
         }
         let curX = x;
         for (let i = 0; i < cols.length; i++) {
           const col = cols[i];
-          if (i > 0) {
+          if (i > 0 && !col.skipLeftBorder) {
             page.drawLine({
               start: { x: curX, y: y },
               end: { x: curX, y: y + h },
-              color: black, thickness: 0.5
+              color: black, thickness: 0.6
             });
           }
           if (col.check) {
-            drawCheckmark(curX + col.w / 2, y + h / 2, col.checkSize || 7.5);
+            drawCheckmark(curX + col.w / 2, y + h / 2, col.checkSize || 8.5);
+          } else if (col.richType === 'hari_bulan_tahun') {
+            // Render Hari / Bulan (strikethrough) / Tahun (strikethrough) identik 1:1 dengan HTML
+            const fSize = col.size || 9.5;
+            const sHari = 'Hari / ';
+            const sBulan = 'Bulan';
+            const sSlash = ' / ';
+            const sTahun = 'Tahun';
+            const wHari = fontRegular.widthOfTextAtSize(sHari, fSize);
+            const wBulan = fontRegular.widthOfTextAtSize(sBulan, fSize);
+            const wSlash = fontRegular.widthOfTextAtSize(sSlash, fSize);
+            const wTahun = fontRegular.widthOfTextAtSize(sTahun, fSize);
+            const totalW = wHari + wBulan + wSlash + wTahun;
+            let rx = curX + (col.w - totalW) / 2;
+            const ry = y + (h / 2 - fSize / 2.5);
+
+            page.drawText(sHari, { x: rx, y: ry, size: fSize, font: fontRegular, color: black });
+            rx += wHari;
+            page.drawText(sBulan, { x: rx, y: ry, size: fSize, font: fontRegular, color: black });
+            page.drawLine({ start: { x: rx - 1, y: ry + fSize * 0.35 }, end: { x: rx + wBulan + 1, y: ry + fSize * 0.35 }, thickness: 0.7, color: black });
+            rx += wBulan;
+            page.drawText(sSlash, { x: rx, y: ry, size: fSize, font: fontRegular, color: black });
+            rx += wSlash;
+            page.drawText(sTahun, { x: rx, y: ry, size: fSize, font: fontRegular, color: black });
+            page.drawLine({ start: { x: rx - 1, y: ry + fSize * 0.35 }, end: { x: rx + wTahun + 1, y: ry + fSize * 0.35 }, thickness: 0.7, color: black });
+          } else if (col.lines && Array.isArray(col.lines)) {
+            const fSize = col.size || 9.5;
+            const font = col.bold ? fontBold : fontRegular;
+            const lineH = col.lineHeight || 12;
+            let startLineY = y + h - (col.padTop || 12);
+            for (const lineStr of col.lines) {
+              const t = safeWinAnsi(lineStr);
+              let tx = curX + (col.padX || 5);
+              if (col.align === 'center') {
+                tx = curX + (col.w - font.widthOfTextAtSize(t, fSize)) / 2;
+              }
+              page.drawText(t, { x: tx, y: startLineY, size: fSize, font, color: black });
+              startLineY -= lineH;
+            }
           } else if (col.text !== undefined && col.text !== null && col.text !== '') {
             const rawText = String(col.text);
             if (rawText.includes('✓') || rawText.includes('\u2713')) {
-              drawCheckmark(curX + col.w / 2, y + h / 2, 7.5);
+              drawCheckmark(curX + col.w / 2, y + h / 2, 8.5);
             } else {
-              const fontSize = col.size || 8.5;
+              const fontSize = col.size || 9.5;
               const font = col.bold ? fontBold : fontRegular;
               const text = safeWinAnsi(rawText);
-              let textX = curX + (col.padX !== undefined ? col.padX : 4);
+              let textX = curX + (col.padX !== undefined ? col.padX : 5);
               let textY = y + (col.padY !== undefined ? col.padY : (h / 2 - fontSize / 2.5));
               if (col.align === 'center') {
                 const tw = font.widthOfTextAtSize(text, fontSize);
                 textX = curX + (col.w - tw) / 2;
               } else if (col.align === 'right') {
                 const tw = font.widthOfTextAtSize(text, fontSize);
-                textX = curX + col.w - tw - 4;
+                textX = curX + col.w - tw - 5;
               }
               page.drawText(text, {
                 x: textX,
@@ -481,89 +538,88 @@ ${absXrefOffset}
       // =============================================================
       // HEADER KIRI & KANAN (TUJUAN & TANGGAL DINAS)
       // =============================================================
-      page.drawText('Kepada Yth.', { x: marginX, y: currentY, size: 9, font: fontRegular, color: black });
-      currentY -= 11;
-      page.drawText('Ketua Pengadilan Agama Indramayu', { x: marginX, y: currentY, size: 9, font: fontBold, color: black });
-      currentY -= 11;
-      page.drawText('Di-', { x: marginX, y: currentY, size: 9, font: fontRegular, color: black });
-      currentY -= 11;
-      page.drawText('    Indramayu', { x: marginX, y: currentY, size: 9, font: fontRegular, color: black });
+      page.drawText('Kepada Yth.', { x: marginX, y: currentY - 10, size: 9.5, font: fontRegular, color: black });
+      page.drawText('Ketua Pengadilan Agama Indramayu', { x: marginX, y: currentY - 22, size: 9.5, font: fontBold, color: black });
+      page.drawText('Di-', { x: marginX, y: currentY - 34, size: 9.5, font: fontRegular, color: black });
+      page.drawText('    Indramayu', { x: marginX, y: currentY - 46, size: 9.5, font: fontRegular, color: black });
 
       // Header Kanan (Tanggal)
       const tglLengkapStr = this.formatDateIndoCetak(log.tgl_pengajuan || '');
       const tglText = `Indramayu, ${tglLengkapStr}`;
-      const tglWidth = fontRegular.widthOfTextAtSize(tglText, 9);
-      page.drawText(tglText, { x: width - marginX - tglWidth, y: height - 28, size: 9, font: fontRegular, color: black });
+      const tglWidth = fontRegular.widthOfTextAtSize(tglText, 9.5);
+      page.drawText(tglText, { x: width - marginX - tglWidth, y: currentY - 10, size: 9.5, font: fontRegular, color: black });
 
-      currentY -= 14;
+      currentY -= 54;
 
       // =============================================================
       // JUDUL RESMI BLANKO
       // =============================================================
       const titleText = 'PERMINTAAN DAN PEMBERIAN CUTI';
-      const titleW = fontBold.widthOfTextAtSize(titleText, 11);
+      const titleW = fontBold.widthOfTextAtSize(titleText, 11.5);
       const titleX = (width - titleW) / 2;
-      page.drawText(titleText, { x: titleX, y: currentY, size: 11, font: fontBold, color: black });
-      page.drawLine({ start: { x: titleX, y: currentY - 1.5 }, end: { x: titleX + titleW, y: currentY - 1.5 }, color: black, thickness: 0.8 });
+      page.drawText(titleText, { x: titleX, y: currentY - 10, size: 11.5, font: fontBold, color: black });
+      page.drawLine({ start: { x: titleX, y: currentY - 11.5 }, end: { x: titleX + titleW, y: currentY - 11.5 }, color: black, thickness: 0.8 });
 
-      currentY -= 12;
       const partsTgl = String(log.tgl_pengajuan || '').split('/');
       const romawiArr = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
       const romawiCetak = (partsTgl[1] ? romawiArr[parseInt(partsTgl[1], 10) - 1] : 'X') || 'X';
       const tahunCetak = partsTgl[2] || new Date().getFullYear();
       const noSurat = `Nomor :          /KPA.W10-A/KP5.3/${romawiCetak}/${tahunCetak}`;
-      const noW = fontRegular.widthOfTextAtSize(noSurat, 9);
-      page.drawText(noSurat, { x: (width - noW) / 2, y: currentY, size: 9, font: fontRegular, color: black });
+      const noW = fontRegular.widthOfTextAtSize(noSurat, 9.5);
+      page.drawText(noSurat, { x: (width - noW) / 2, y: currentY - 24, size: 9.5, font: fontRegular, color: black });
 
-      currentY -= 12;
+      currentY -= 32;
 
       // =============================================================
       // I. DATA PEGAWAI
       // =============================================================
-      drawTableRow(marginX, currentY - 13, contentWidth, 13, [
-        { text: 'I. DATA PEGAWAI', w: contentWidth, bold: true, size: 8.5 }
+      const secTitleH = 15;
+      drawTableRow(marginX, currentY - secTitleH, contentWidth, secTitleH, [
+        { text: 'I. DATA PEGAWAI', w: contentWidth, bold: true, size: 9.5 }
       ], headerBg);
-      currentY -= 13;
+      currentY -= secTitleH;
 
       const c1 = 80;
-      const c2 = 239;
-      const c3 = 96;
+      const c2 = 250;
+      const c3 = 100;
       const c4 = contentWidth - c1 - c2 - c3;
+      const rowH1 = 17;
 
-      drawTableRow(marginX, currentY - 13, contentWidth, 13, [
-        { text: 'Nama', w: c1 },
-        { text: pns.nama || '-', w: c2, bold: true, size: 9 },
-        { text: 'NIP', w: c3 },
-        { text: pns.nip || '-', w: c4, bold: true, size: 9 }
+      drawTableRow(marginX, currentY - rowH1, contentWidth, rowH1, [
+        { text: 'Nama', w: c1, size: 9.5 },
+        { text: pns.nama || '-', w: c2, bold: true, size: 10 },
+        { text: 'NIP', w: c3, size: 9.5 },
+        { text: pns.nip || '-', w: c4, bold: true, size: 10 }
       ]);
-      currentY -= 13;
+      currentY -= rowH1;
 
-      drawTableRow(marginX, currentY - 13, contentWidth, 13, [
-        { text: 'Jabatan', w: c1 },
-        { text: this.formatJabatanSingkat(pns.jabatan) || '-', w: c2, size: 8.5 },
-        { text: 'Masa Kerja', w: c3 },
-        { text: '-', w: c4, align: 'center' }
+      drawTableRow(marginX, currentY - rowH1, contentWidth, rowH1, [
+        { text: 'Jabatan', w: c1, size: 9.5 },
+        { text: this.formatJabatanSingkat(pns.jabatan) || '-', w: c2, size: 9.5 },
+        { text: 'Masa Kerja', w: c3, size: 9.5 },
+        { text: '-', w: c4, align: 'center', size: 9.5 }
       ]);
-      currentY -= 13;
+      currentY -= rowH1;
 
-      drawTableRow(marginX, currentY - 13, contentWidth, 13, [
-        { text: 'Unit Kerja', w: c1 },
-        { text: 'Pengadilan Agama Indramayu', w: contentWidth - c1 }
+      drawTableRow(marginX, currentY - rowH1, contentWidth, rowH1, [
+        { text: 'Unit Kerja', w: c1, size: 9.5 },
+        { text: 'Pengadilan Agama Indramayu', w: contentWidth - c1, size: 9.5 }
       ]);
-      currentY -= 13 + 3;
+      currentY -= rowH1 + 6;
 
       // =============================================================
       // II. JENIS CUTI YANG DIAMBIL
       // =============================================================
-      drawTableRow(marginX, currentY - 13, contentWidth, 13, [
-        { text: 'II. JENIS CUTI YANG DIAMBIL', w: contentWidth, bold: true, size: 8.5 }
+      drawTableRow(marginX, currentY - secTitleH, contentWidth, secTitleH, [
+        { text: 'II. JENIS CUTI YANG DIAMBIL', w: contentWidth, bold: true, size: 9.5 }
       ], headerBg);
-      currentY -= 13;
+      currentY -= secTitleH;
 
-      const jColW1 = 212;
-      const jColW2 = 53.64;
-      const jColW3 = 212;
-      const jColW4 = contentWidth - jColW1 - jColW2 - jColW3;
+      const jW1 = 222;
+      const jW2 = 55.64;
+      const jW3 = 222;
+      const jW4 = contentWidth - jW1 - jW2 - jW3;
+      const rowH2 = 16.5;
 
       const chkTahunan = (log.jenis === 'Tahunan');
       const chkBesar = (log.jenis === 'Besar');
@@ -572,78 +628,80 @@ ${absXrefOffset}
       const chkPenting = (log.jenis === 'Alasan Penting' || log.jenis === 'Penting');
       const chkCltn = (log.jenis === 'CLTN');
 
-      drawTableRow(marginX, currentY - 13, contentWidth, 13, [
-        { text: '1. Cuti Tahunan', w: jColW1 },
-        { check: chkTahunan, w: jColW2 },
-        { text: '4. Cuti Melahirkan', w: jColW3 },
-        { check: chkMelahirkan, w: jColW4 }
+      drawTableRow(marginX, currentY - rowH2, contentWidth, rowH2, [
+        { text: '1. Cuti Tahunan', w: jW1, size: 9.5 },
+        { check: chkTahunan, w: jW2 },
+        { text: '4. Cuti Melahirkan', w: jW3, size: 9.5 },
+        { check: chkMelahirkan, w: jW4 }
       ]);
-      currentY -= 13;
+      currentY -= rowH2;
 
-      drawTableRow(marginX, currentY - 13, contentWidth, 13, [
-        { text: '2. Cuti Besar', w: jColW1 },
-        { check: chkBesar, w: jColW2 },
-        { text: '5. Cuti Karena Alasan Penting', w: jColW3 },
-        { check: chkPenting, w: jColW4 }
+      drawTableRow(marginX, currentY - rowH2, contentWidth, rowH2, [
+        { text: '2. Cuti Besar', w: jW1, size: 9.5 },
+        { check: chkBesar, w: jW2 },
+        { text: '5. Cuti Karena Alasan Penting', w: jW3, size: 9.5 },
+        { check: chkPenting, w: jW4 }
       ]);
-      currentY -= 13;
+      currentY -= rowH2;
 
-      drawTableRow(marginX, currentY - 13, contentWidth, 13, [
-        { text: '3. Cuti Sakit', w: jColW1 },
-        { check: chkSakit, w: jColW2 },
-        { text: '6. Cuti di Luar Tanggungan Negara', w: jColW3 },
-        { check: chkCltn, w: jColW4 }
+      drawTableRow(marginX, currentY - rowH2, contentWidth, rowH2, [
+        { text: '3. Cuti Sakit', w: jW1, size: 9.5 },
+        { check: chkSakit, w: jW2 },
+        { text: '6. Cuti di Luar Tanggungan Negara', w: jW3, size: 9.5 },
+        { check: chkCltn, w: jW4 }
       ]);
-      currentY -= 13 + 3;
+      currentY -= rowH2 + 6;
 
       // =============================================================
       // III. ALASAN CUTI
       // =============================================================
-      drawTableRow(marginX, currentY - 13, contentWidth, 13, [
-        { text: 'III. ALASAN CUTI', w: contentWidth, bold: true, size: 8.5 }
+      drawTableRow(marginX, currentY - secTitleH, contentWidth, secTitleH, [
+        { text: 'III. ALASAN CUTI', w: contentWidth, bold: true, size: 9.5 }
       ], headerBg);
-      currentY -= 13;
+      currentY -= secTitleH;
 
       let alasanText = log.alasan || '-';
       if (alasanText.includes('[USULAN PEMBATALAN]:')) {
         const p = alasanText.split('[USULAN PEMBATALAN]:');
         alasanText = p[0].trim() + ' [USULAN PEMBATALAN]: ' + p[1].trim();
       }
-      drawTableRow(marginX, currentY - 16, contentWidth, 16, [
-        { text: alasanText, w: contentWidth, size: 8.5, padY: 4 }
+      const rowH3 = 24;
+      drawTableRow(marginX, currentY - rowH3, contentWidth, rowH3, [
+        { text: alasanText, w: contentWidth, size: 9.5, padY: 7 }
       ]);
-      currentY -= 16 + 3;
+      currentY -= rowH3 + 6;
 
       // =============================================================
       // IV. LAMANYA CUTI
       // =============================================================
-      drawTableRow(marginX, currentY - 13, contentWidth, 13, [
-        { text: 'IV. LAMANYA CUTI', w: contentWidth, bold: true, size: 8.5 }
+      drawTableRow(marginX, currentY - secTitleH, contentWidth, secTitleH, [
+        { text: 'IV. LAMANYA CUTI', w: contentWidth, bold: true, size: 9.5 }
       ], headerBg);
-      currentY -= 13;
+      currentY -= secTitleH;
 
       const durasiStr = String(log.sisa_cuti || log.durasi || '1');
       const tglMulaiStr = this.formatDateIndoCetak(log.tgl_mulai);
       const tglSelesaiStr = this.formatDateIndoCetak(log.tgl_selesai);
+      const rowH4 = 17.5;
 
-      drawTableRow(marginX, currentY - 13, contentWidth, 13, [
-        { text: 'Selama', w: 53 },
-        { text: durasiStr, w: 42, align: 'center', bold: true },
-        { text: 'Hari', w: 106, align: 'center' },
-        { text: 'mulai tanggal', w: 90 },
-        { text: tglMulaiStr, w: 106, align: 'center' },
-        { text: 's.d', w: 27, align: 'center' },
-        { text: tglSelesaiStr, w: contentWidth - 53 - 42 - 106 - 90 - 106 - 27, align: 'center' }
+      drawTableRow(marginX, currentY - rowH4, contentWidth, rowH4, [
+        { text: 'Selama', w: 56, size: 9.5 },
+        { text: durasiStr, w: 45, align: 'center', bold: true, size: 10 },
+        { richType: 'hari_bulan_tahun', w: 115 },
+        { text: 'mulai tanggal', w: 85, size: 9.5 },
+        { text: tglMulaiStr, w: 110, align: 'center', size: 9.5 },
+        { text: 's.d', w: 28, align: 'center', size: 9.5 },
+        { text: tglSelesaiStr, w: contentWidth - 56 - 45 - 115 - 85 - 110 - 28, align: 'center', size: 9.5 }
       ]);
-      currentY -= 13 + 3;
+      currentY -= rowH4 + 6;
 
       // =============================================================
       // V. CATATAN CUTI
       // =============================================================
-      drawTableRow(marginX, currentY - 13, contentWidth, 13, [
-        { text: 'V. CATATAN CUTI', w: contentWidth, bold: true, size: 8.5 }
+      drawTableRow(marginX, currentY - secTitleH, contentWidth, secTitleH, [
+        { text: 'V. CATATAN CUTI', w: contentWidth, bold: true, size: 9.5 }
       ], headerBg);
-      currentY -= 13;
+      currentY -= secTitleH;
 
       let hist = {};
       if (log.history) {
@@ -692,222 +750,252 @@ ${absXrefOffset}
         sAk26 = Math.max(0, sAw26 - hY26 - hHangusBesar);
       }
 
-      const vW1 = 42;
-      const vW2 = 68;
-      const vW3 = 100;
-      const vW4 = 95;
-      const vW5 = 184;
+      const vW1 = 40;
+      const vW2 = 74;
+      const vW3 = 106;
+      const vW4 = 100;
+      const vW5 = 190;
       const vW6 = contentWidth - vW1 - vW2 - vW3 - vW4 - vW5;
+      const rowH5 = 16.5;
 
       // Baris Sub-Header 1
-      drawTableRow(marginX, currentY - 12, contentWidth, 12, [
-        { text: '1. Cuti Tahunan', w: vW1 + vW2 + vW3, bold: true },
-        { text: 'Paraf Petugas Cuti', w: vW4, align: 'center', bold: true },
-        { text: '2. Cuti Besar', w: vW5 },
-        { text: String(pns.s_besar || '0'), w: vW6, align: 'center', bold: true }
+      drawTableRow(marginX, currentY - rowH5, contentWidth, rowH5, [
+        { text: '1. Cuti Tahunan', w: vW1 + vW2 + vW3, bold: true, size: 9.5 },
+        { text: 'Paraf Petugas Cuti', w: vW4, align: 'center', bold: true, size: 9.5 },
+        { text: '2. Cuti Besar', w: vW5, size: 9.5 },
+        { text: String(pns.s_besar || '0'), w: vW6, align: 'center', bold: true, size: 10 }
       ]);
-      currentY -= 12;
+      currentY -= rowH5;
 
       // Baris Sub-Header 2
-      drawTableRow(marginX, currentY - 12, contentWidth, 12, [
-        { text: 'Tahun', w: vW1, align: 'center', bold: true },
-        { text: 'Sisa (Awal)', w: vW2, align: 'center', bold: true },
-        { text: 'Keterangan (Sisa)', w: vW3, align: 'center', bold: true },
+      drawTableRow(marginX, currentY - rowH5, contentWidth, rowH5, [
+        { text: 'Tahun', w: vW1, align: 'center', bold: true, size: 9.5 },
+        { text: 'Sisa (Awal)', w: vW2, align: 'center', bold: true, size: 9.5 },
+        { text: 'Keterangan (Sisa)', w: vW3, align: 'center', bold: true, size: 9.5 },
         { text: '', w: vW4 },
-        { text: '3. Cuti Sakit', w: vW5 },
-        { text: String(pns.s_sakit || '0'), w: vW6, align: 'center', bold: true }
+        { text: '3. Cuti Sakit', w: vW5, size: 9.5 },
+        { text: String(pns.s_sakit || '0'), w: vW6, align: 'center', bold: true, size: 10 }
       ]);
-      currentY -= 12;
+      currentY -= rowH5;
 
-      // Baris Data N-2
-      drawTableRow(marginX, currentY - 12, contentWidth, 12, [
-        { text: String(leaveYear - 2), w: vW1, align: 'center' },
-        { text: String(sAw24), w: vW2, align: 'center' },
-        { text: String(sAk24), w: vW3, align: 'center' },
+      // Baris N-2
+      drawTableRow(marginX, currentY - rowH5, contentWidth, rowH5, [
+        { text: String(leaveYear - 2), w: vW1, align: 'center', size: 9.5 },
+        { text: String(sAw24), w: vW2, align: 'center', size: 9.5 },
+        { text: String(sAk24), w: vW3, align: 'center', size: 9.5 },
         { text: '', w: vW4 },
-        { text: '4. Cuti Melahirkan', w: vW5 },
-        { text: String(pns.s_melahirkan || '0'), w: vW6, align: 'center', bold: true }
+        { text: '4. Cuti Melahirkan', w: vW5, size: 9.5 },
+        { text: String(pns.s_melahirkan || '0'), w: vW6, align: 'center', bold: true, size: 10 }
       ]);
-      currentY -= 12;
+      currentY -= rowH5;
 
-      // Baris Data N-1
-      drawTableRow(marginX, currentY - 12, contentWidth, 12, [
-        { text: String(leaveYear - 1), w: vW1, align: 'center' },
-        { text: String(sAw25), w: vW2, align: 'center' },
-        { text: String(sAk25), w: vW3, align: 'center' },
+      // Baris N-1
+      drawTableRow(marginX, currentY - rowH5, contentWidth, rowH5, [
+        { text: String(leaveYear - 1), w: vW1, align: 'center', size: 9.5 },
+        { text: String(sAw25), w: vW2, align: 'center', size: 9.5 },
+        { text: String(sAk25), w: vW3, align: 'center', size: 9.5 },
         { text: '', w: vW4 },
-        { text: '5. Cuti Karena Alasan Penting', w: vW5 },
-        { text: String(pns.s_penting || '0'), w: vW6, align: 'center', bold: true }
+        { text: '5. Cuti Karena Alasan Penting', w: vW5, size: 9.5 },
+        { text: String(pns.s_penting || '0'), w: vW6, align: 'center', bold: true, size: 10 }
       ]);
-      currentY -= 12;
+      currentY -= rowH5;
 
-      // Baris Data N
-      drawTableRow(marginX, currentY - 12, contentWidth, 12, [
-        { text: String(leaveYear), w: vW1, align: 'center' },
-        { text: String(sAw26), w: vW2, align: 'center' },
-        { text: String(sAk26), w: vW3, align: 'center' },
+      // Baris N
+      drawTableRow(marginX, currentY - rowH5, contentWidth, rowH5, [
+        { text: String(leaveYear), w: vW1, align: 'center', size: 9.5 },
+        { text: String(sAw26), w: vW2, align: 'center', size: 9.5 },
+        { text: String(sAk26), w: vW3, align: 'center', size: 9.5 },
         { text: '', w: vW4 },
-        { text: '6. Cuti di Luar Tanggungan Negara', w: vW5 },
-        { text: String(pns.s_cltn || '0'), w: vW6, align: 'center', bold: true }
+        { text: '6. Cuti di Luar Tanggungan Negara', w: vW5, size: 9.5 },
+        { text: String(pns.s_cltn || '0'), w: vW6, align: 'center', bold: true, size: 10 }
       ]);
 
-      // Gambar QR Paraf Petugas Cuti (Menempati Col 4 vertikal)
+      // Kotak Penyatuan Border Paraf Petugas Cuti (Rows 1 & 2)
+      const parafHeaderTop = currentY + (rowH5 * 4);
+      page.drawRectangle({
+        x: marginX + vW1 + vW2 + vW3,
+        y: parafHeaderTop,
+        width: vW4,
+        height: rowH5 * 2,
+        borderColor: black,
+        borderWidth: 0.6
+      });
+
+      // Kotak Penyatuan Border QR Paraf (Rows 3, 4, 5)
+      page.drawRectangle({
+        x: marginX + vW1 + vW2 + vW3,
+        y: currentY - rowH5,
+        width: vW4,
+        height: rowH5 * 3,
+        borderColor: black,
+        borderWidth: 0.6
+      });
+
+      // Gambar QR Paraf Petugas Cuti di tengah kotak Rows 3-5
       if (qrParafImg) {
+        const pQrSize = 36;
         page.drawImage(qrParafImg, {
-          x: marginX + vW1 + vW2 + vW3 + (vW4 - 32) / 2,
-          y: currentY + 3,
-          width: 32,
-          height: 32
+          x: marginX + vW1 + vW2 + vW3 + (vW4 - pQrSize) / 2,
+          y: (currentY - rowH5) + ((rowH5 * 3) - pQrSize) / 2,
+          width: pQrSize,
+          height: pQrSize
         });
       }
-      currentY -= 12 + 3;
+
+      currentY -= rowH5 + 7;
 
       // =============================================================
       // VI. ALAMAT SELAMA MENJALANKAN CUTI & SIGNATURE PEMOHON
       // =============================================================
-      const viLeftW = 328;
-      const viBlockH = 70;
+      const viLeftW = 345;
+      const viBlockH = 80;
 
-      // Kotak Kiri: Alamat & Telp
-      page.drawRectangle({
-        x: marginX, y: currentY - viBlockH, width: viLeftW, height: viBlockH,
-        borderColor: black, borderWidth: 0.5
-      });
-      // Header Sub-Tabel Alamat
-      page.drawRectangle({
-        x: marginX, y: currentY - 13, width: viLeftW, height: 13,
-        color: headerBg, borderColor: black, borderWidth: 0.5
-      });
-      page.drawText('VI. ALAMAT SELAMA MENJALANKAN CUTI', { x: marginX + 4, y: currentY - 10, size: 8.5, font: fontBold, color: black });
-      page.drawLine({ start: { x: marginX + 246, y: currentY - 13 }, end: { x: marginX + 246, y: currentY - viBlockH }, color: black, thickness: 0.5 });
-      page.drawText('TELPON / HP', { x: marginX + 252, y: currentY - 10, size: 8.5, font: fontBold, color: black });
+      // Tabel Alamat (Kiri)
+      page.drawRectangle({ x: marginX, y: currentY - viBlockH, width: viLeftW, height: viBlockH, borderColor: black, borderWidth: 0.6 });
+      page.drawRectangle({ x: marginX, y: currentY - secTitleH, width: viLeftW, height: secTitleH, color: headerBg, borderColor: black, borderWidth: 0.6 });
+      page.drawText('VI. ALAMAT SELAMA MENJALANKAN CUTI', { x: marginX + 5, y: currentY - 11, size: 9.5, font: fontBold, color: black });
 
-      // Isi Alamat & No HP
-      const alamatVal = log.alamat || '-';
-      page.drawText(alamatVal.length > 50 ? alamatVal.substring(0, 48) + '...' : alamatVal, { x: marginX + 4, y: currentY - 26, size: 8.5, font: fontRegular, color: black });
-      page.drawText(pns.no_hp || log.no_hp || '-', { x: marginX + 250, y: currentY - 38, size: 8.5, font: fontBold, color: black });
+      const telpColW = 90;
+      page.drawLine({ start: { x: marginX + viLeftW - telpColW, y: currentY }, end: { x: marginX + viLeftW - telpColW, y: currentY - viBlockH }, color: black, thickness: 0.6 });
+      page.drawText('TELPON / HP', { x: marginX + viLeftW - telpColW + 12, y: currentY - 11, size: 9.5, font: fontBold, color: black });
 
-      // Area Kanan: TTD Pemohon
-      const pemohonX = marginX + viLeftW + 20;
+      // Isi Alamat (Bungkus baris otomatis)
+      const alamatRaw = log.alamat || '-';
+      const alamatLines = wrapText(alamatRaw, fontRegular, 9.5, viLeftW - telpColW - 12);
+      let alY = currentY - secTitleH - 13;
+      for (const aLine of alamatLines) {
+        page.drawText(safeWinAnsi(aLine), { x: marginX + 6, y: alY, size: 9.5, font: fontRegular, color: black });
+        alY -= 13;
+      }
+
+      // Isi No HP
+      const hpText = safeWinAnsi(pns.no_hp || log.no_hp || '-');
+      page.drawText(hpText, { x: marginX + viLeftW - telpColW + (telpColW - fontBold.widthOfTextAtSize(hpText, 9.5)) / 2, y: currentY - secTitleH - 28, size: 9.5, font: fontBold, color: black });
+
+      // Area TTD Pemohon (Kanan, rata kanan)
+      const pemohonX = marginX + viLeftW + 25;
       const pemohonY = currentY;
-      page.drawText('Hormat Saya,', { x: pemohonX, y: currentY - 10, size: 9, font: fontRegular, color: black });
+      page.drawText('Hormat Saya,', { x: pemohonX, y: currentY - 10, size: 9.5, font: fontRegular, color: black });
 
+      const qrSize = 48;
       if (qrPemohonImg) {
         page.drawImage(qrPemohonImg, {
           x: pemohonX,
-          y: currentY - 48,
-          width: 36,
-          height: 36
+          y: currentY - 14 - qrSize,
+          width: qrSize,
+          height: qrSize
         });
       }
 
-      const pnsNama = pns.nama || '-';
-      const pnsNamaW = fontBold.widthOfTextAtSize(pnsNama, 9);
-      page.drawText(pnsNama, { x: pemohonX, y: currentY - 57, size: 9, font: fontBold, color: black });
-      page.drawLine({ start: { x: pemohonX, y: currentY - 58 }, end: { x: pemohonX + pnsNamaW, y: currentY - 58 }, color: black, thickness: 0.5 });
-      page.drawText(`NIP. ${pns.nip || '-'}`, { x: pemohonX, y: currentY - 66, size: 8.5, font: fontRegular, color: black });
+      const pnsNama = safeWinAnsi(pns.nama || '-');
+      const pnsNamaW = fontBold.widthOfTextAtSize(pnsNama, 9.5);
+      page.drawText(pnsNama, { x: pemohonX, y: currentY - 69, size: 9.5, font: fontBold, color: black });
+      page.drawLine({ start: { x: pemohonX, y: currentY - 70.5 }, end: { x: pemohonX + pnsNamaW, y: currentY - 70.5 }, color: black, thickness: 0.6 });
+      page.drawText(safeWinAnsi(`NIP. ${pns.nip || '-'}`), { x: pemohonX, y: currentY - 80, size: 9, font: fontRegular, color: black });
 
-      currentY -= viBlockH + 3;
+      currentY -= viBlockH + 7;
 
       // =============================================================
       // VII. PERTIMBANGAN ATASAN LANGSUNG
       // =============================================================
-      drawTableRow(marginX, currentY - 13, contentWidth, 13, [
-        { text: 'VII. PERTIMBANGAN ATASAN LANGSUNG', w: contentWidth, bold: true, size: 8.5 }
+      drawTableRow(marginX, currentY - secTitleH, contentWidth, secTitleH, [
+        { text: 'VII. PERTIMBANGAN ATASAN LANGSUNG', w: contentWidth, bold: true, size: 9.5 }
       ], headerBg);
-      currentY -= 13;
+      currentY -= secTitleH;
 
       const col4W = contentWidth / 4;
       const statusAtasan = (log.status_atasan || log.status || '').toUpperCase();
       const isSetujuAtasan = statusAtasan.includes('SETUJU') || statusAtasan.includes('ACC') || statusAtasan.includes('SELESAI');
 
-      drawTableRow(marginX, currentY - 12, contentWidth, 12, [
-        { text: 'DISETUJUI', w: col4W, align: 'center', bold: true },
-        { text: 'PERUBAHAN', w: col4W, align: 'center', bold: true },
-        { text: 'DITANGGUHKAN', w: col4W, align: 'center', bold: true },
-        { text: 'TIDAK DISETUJUI', w: col4W, align: 'center', bold: true }
+      const atasanRowH1 = 15.5;
+      drawTableRow(marginX, currentY - atasanRowH1, contentWidth, atasanRowH1, [
+        { text: 'DISETUJUI', w: col4W, align: 'center', bold: true, size: 9.5 },
+        { text: 'PERUBAHAN', w: col4W, align: 'center', bold: true, size: 9.5 },
+        { text: 'DITANGGUHKAN', w: col4W, align: 'center', bold: true, size: 9.5 },
+        { text: 'TIDAK DISETUJUI', w: col4W, align: 'center', bold: true, size: 9.5 }
       ]);
-      currentY -= 12;
+      currentY -= atasanRowH1;
 
-      drawTableRow(marginX, currentY - 12, contentWidth, 12, [
+      const atasanRowH2 = 16.5;
+      drawTableRow(marginX, currentY - atasanRowH2, contentWidth, atasanRowH2, [
         { check: isSetujuAtasan, w: col4W },
-        { text: '', w: col4W, align: 'center' },
-        { text: '', w: col4W, align: 'center' },
-        { text: '', w: col4W, align: 'center' }
+        { text: '', w: col4W },
+        { text: '', w: col4W },
+        { text: '', w: col4W }
       ]);
-      currentY -= 12;
+      currentY -= atasanRowH2;
 
-      // Area TTD Atasan di Kanan
-      const atasanBlockH = 54;
-      const atasanX = marginX + contentWidth - 200;
+      // Blok TTD Atasan
+      const atasanBlockH = 80;
+      const atasanX = marginX + contentWidth - 210;
       const atasanY = currentY;
       const atasanJabatan = safeWinAnsi(this.formatJabatanSingkat(atasan.jabatan) || 'Atasan Langsung');
-      page.drawText(atasanJabatan, { x: atasanX, y: currentY - 10, size: 9, font: fontBold, color: black });
+      page.drawText(atasanJabatan, { x: atasanX, y: currentY - 10, size: 9.5, font: fontBold, color: black });
 
       if (isSetujuAtasan && qrAtasanImg) {
         page.drawImage(qrAtasanImg, {
           x: atasanX,
-          y: currentY - 44,
-          width: 32,
-          height: 32
+          y: currentY - 14 - qrSize,
+          width: qrSize,
+          height: qrSize
         });
       }
 
       const atasanNama = safeWinAnsi(atasan.nama || '-');
-      const atasanNamaW = fontBold.widthOfTextAtSize(atasanNama, 9);
-      page.drawText(atasanNama, { x: atasanX, y: currentY - 50, size: 9, font: fontBold, color: black });
-      page.drawLine({ start: { x: atasanX, y: currentY - 51 }, end: { x: atasanX + atasanNamaW, y: currentY - 51 }, color: black, thickness: 0.5 });
-      page.drawText(safeWinAnsi(`NIP. ${atasan.nip || '-'}`), { x: atasanX, y: currentY - 59, size: 8.5, font: fontRegular, color: black });
+      const atasanNamaW = fontBold.widthOfTextAtSize(atasanNama, 9.5);
+      page.drawText(atasanNama, { x: atasanX, y: currentY - 69, size: 9.5, font: fontBold, color: black });
+      page.drawLine({ start: { x: atasanX, y: currentY - 70.5 }, end: { x: atasanX + atasanNamaW, y: currentY - 70.5 }, color: black, thickness: 0.6 });
+      page.drawText(safeWinAnsi(`NIP. ${atasan.nip || '-'}`), { x: atasanX, y: currentY - 80, size: 9, font: fontRegular, color: black });
 
-      currentY -= atasanBlockH + 3;
+      currentY -= atasanBlockH + 7;
 
       // =============================================================
-      // VIII. KEPUTUSAN PEJABAT YANG BERWENANG MEMBERIKAN CUTI
+      // VIII. KEPUTUSAN PEJABAT YANG BERWENANG
       // =============================================================
-      drawTableRow(marginX, currentY - 13, contentWidth, 13, [
-        { text: 'VIII. KEPUTUSAN PEJABAT YANG BERWENANG MEMBERIKAN CUTI', w: contentWidth, bold: true, size: 8.5 }
+      drawTableRow(marginX, currentY - secTitleH, contentWidth, secTitleH, [
+        { text: 'VIII. KEPUTUSAN PEJABAT YANG BERWENANG MEMBERIKAN CUTI', w: contentWidth, bold: true, size: 9.5 }
       ], headerBg);
-      currentY -= 13;
+      currentY -= secTitleH;
 
       const statusPejabat = (log.status_pejabat || log.status || '').toUpperCase();
       const isSetujuPejabat = statusPejabat.includes('SETUJU') || statusPejabat.includes('ACC') || statusPejabat.includes('SELESAI');
 
-      drawTableRow(marginX, currentY - 12, contentWidth, 12, [
-        { text: 'DISETUJUI', w: col4W, align: 'center', bold: true },
-        { text: 'PERUBAHAN', w: col4W, align: 'center', bold: true },
-        { text: 'DITANGGUHKAN', w: col4W, align: 'center', bold: true },
-        { text: 'TIDAK DISETUJUI', w: col4W, align: 'center', bold: true }
+      drawTableRow(marginX, currentY - atasanRowH1, contentWidth, atasanRowH1, [
+        { text: 'DISETUJUI', w: col4W, align: 'center', bold: true, size: 9.5 },
+        { text: 'PERUBAHAN', w: col4W, align: 'center', bold: true, size: 9.5 },
+        { text: 'DITANGGUHKAN', w: col4W, align: 'center', bold: true, size: 9.5 },
+        { text: 'TIDAK DISETUJUI', w: col4W, align: 'center', bold: true, size: 9.5 }
       ]);
-      currentY -= 12;
+      currentY -= atasanRowH1;
 
-      drawTableRow(marginX, currentY - 12, contentWidth, 12, [
+      drawTableRow(marginX, currentY - atasanRowH2, contentWidth, atasanRowH2, [
         { check: isSetujuPejabat, w: col4W },
-        { text: '', w: col4W, align: 'center' },
-        { text: '', w: col4W, align: 'center' },
-        { text: '', w: col4W, align: 'center' }
+        { text: '', w: col4W },
+        { text: '', w: col4W },
+        { text: '', w: col4W }
       ]);
-      currentY -= 12;
+      currentY -= atasanRowH2;
 
-      // Area TTD Pejabat di Kanan
-      const pejabatBlockH = 54;
-      const pejabatX = marginX + contentWidth - 200;
+      // Blok TTD Pejabat
+      const pejabatBlockH = 80;
+      const pejabatX = marginX + contentWidth - 210;
       const pejabatY = currentY;
-      page.drawText(safeWinAnsi(pejabat.jabatan || 'Ketua'), { x: pejabatX, y: currentY - 10, size: 9, font: fontBold, color: black });
+      page.drawText(safeWinAnsi(pejabat.jabatan || 'Ketua'), { x: pejabatX, y: currentY - 10, size: 9.5, font: fontBold, color: black });
 
       if (isSetujuPejabat && qrPejabatImg) {
         page.drawImage(qrPejabatImg, {
           x: pejabatX,
-          y: currentY - 44,
-          width: 32,
-          height: 32
+          y: currentY - 14 - qrSize,
+          width: qrSize,
+          height: qrSize
         });
       }
 
       const pejabatNama = safeWinAnsi(pejabat.nama || '-');
-      const pejabatNamaW = fontBold.widthOfTextAtSize(pejabatNama, 9);
-      page.drawText(pejabatNama, { x: pejabatX, y: currentY - 50, size: 9, font: fontBold, color: black });
-      page.drawLine({ start: { x: pejabatX, y: currentY - 51 }, end: { x: pejabatX + pejabatNamaW, y: currentY - 51 }, color: black, thickness: 0.5 });
-      page.drawText(safeWinAnsi(`NIP. ${pejabat.nip || '-'}`), { x: pejabatX, y: currentY - 59, size: 8.5, font: fontRegular, color: black });
+      const pejabatNamaW = fontBold.widthOfTextAtSize(pejabatNama, 9.5);
+      page.drawText(pejabatNama, { x: pejabatX, y: currentY - 69, size: 9.5, font: fontBold, color: black });
+      page.drawLine({ start: { x: pejabatX, y: currentY - 70.5 }, end: { x: pejabatX + pejabatNamaW, y: currentY - 70.5 }, color: black, thickness: 0.6 });
+      page.drawText(safeWinAnsi(`NIP. ${pejabat.nip || '-'}`), { x: pejabatX, y: currentY - 80, size: 9, font: fontRegular, color: black });
 
       // =============================================================
       // PEMBUATAN KAMUS TANDA TANGAN DIGITAL MULTI-TIER X.509 PAdES
@@ -922,9 +1010,9 @@ ${absXrefOffset}
       const dummyContents = PDFHexString.of('0'.repeat(this.SIGNATURE_SLOT_SIZE));
 
       // Koordinat Area Tanda Tangan Fisik Presisi
-      const pemohonRect = [Math.round(pemohonX), Math.round(pemohonY - 68), Math.round(pemohonX + 130), Math.round(pemohonY)];
-      const atasanRect = [Math.round(atasanX), Math.round(atasanY - 60), Math.round(atasanX + 160), Math.round(atasanY)];
-      const pejabatRect = [Math.round(pejabatX), Math.round(pejabatY - 60), Math.round(pejabatX + 160), Math.round(pejabatY)];
+      const pemohonRect = [Math.round(pemohonX), Math.round(pemohonY - 82), Math.round(pemohonX + 180), Math.round(pemohonY)];
+      const atasanRect = [Math.round(atasanX), Math.round(atasanY - 82), Math.round(atasanX + 180), Math.round(atasanY)];
+      const pejabatRect = [Math.round(pejabatX), Math.round(pejabatY - 82), Math.round(pejabatX + 180), Math.round(pejabatY)];
 
       // 1. Signature Field 1: Pemohon (Pegawai yang mengajukan cuti)
       const sig1Reason = 'Pengajuan Permohonan Cuti Pegawai Pengadilan Agama Indramayu';
@@ -1067,13 +1155,15 @@ ${absXrefOffset}
         let qrPejabatDataUrl = '';
         let qrParafDataUrl = '';
 
+        const logoEmblemUrl = 'https://sopiyandedi.github.io/TRANSKEP/transkep-web/img/Logo_PA_Imy.png';
+
         if (global.generateQRCodeWithLogo) {
-          qrPemohonDataUrl = await global.generateQRCodeWithLogo(verifyUrlPemohon, { size: 300, logoSrc: 'img/Logo_PA_Imy.png' });
+          qrPemohonDataUrl = await global.generateQRCodeWithLogo(verifyUrlPemohon, { size: 300, logoSrc: logoEmblemUrl });
           if (isSetujuAtasan) {
-            qrAtasanDataUrl = await global.generateQRCodeWithLogo(verifyUrlAtasan, { size: 300, logoSrc: 'img/Logo_PA_Imy.png' });
+            qrAtasanDataUrl = await global.generateQRCodeWithLogo(verifyUrlAtasan, { size: 300, logoSrc: logoEmblemUrl });
           }
           if (isSetujuPejabat) {
-            qrPejabatDataUrl = await global.generateQRCodeWithLogo(verifyUrlPejabat, { size: 300, logoSrc: 'img/Logo_PA_Imy.png' });
+            qrPejabatDataUrl = await global.generateQRCodeWithLogo(verifyUrlPejabat, { size: 300, logoSrc: logoEmblemUrl });
           }
         } else if (global.TranskepQrEngine) {
           qrPemohonDataUrl = await global.TranskepQrEngine.generateQrDataUrl(verifyUrlPemohon, { size: 300, logoRatio: 0.28 });
