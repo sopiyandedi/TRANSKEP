@@ -1,7 +1,7 @@
 <script>
 // =========================================================================
-// FILE: permohonan/js_qr_engine.html
-// DESKRIPSI: Standalone In-House QR Code & Visual Signature Engine (GAS)
+// FILE: qr_engine.js
+// DESKRIPSI: Standalone In-House QR Code & Visual Signature Canvas Engine
 // FITUR: ISO/IEC 18004 Compliant, Error Correction Level H (30% Recovery),
 //        White Buffer Mask & Emblem Overlay, Zero External Dependency.
 // AUTHOR: TRANSKEP  (Clean Architecture)
@@ -10,6 +10,9 @@
 (function(global) {
   'use strict';
 
+  // -------------------------------------------------------------------------
+  // 1. CONSTANTS & SPECIFICATION TABLES (ISO/IEC 18004)
+  // -------------------------------------------------------------------------
   const QRMode = {
     MODE_NUMBER: 1 << 0,
     MODE_ALPHA_NUM: 1 << 1,
@@ -18,22 +21,65 @@
   };
 
   const QRErrorCorrectLevel = {
-    L: 1, M: 0, Q: 3, H: 2
+    L: 1, // 7% recovery
+    M: 0, // 15% recovery
+    Q: 3, // 25% recovery
+    H: 2  // 30% recovery (Mandatory for center logo overlay)
   };
 
   const QRMaskPattern = {
-    PATTERN000: 0, PATTERN001: 1, PATTERN010: 2, PATTERN011: 3,
-    PATTERN100: 4, PATTERN101: 5, PATTERN110: 6, PATTERN111: 7
+    PATTERN000: 0,
+    PATTERN001: 1,
+    PATTERN010: 2,
+    PATTERN011: 3,
+    PATTERN100: 4,
+    PATTERN101: 5,
+    PATTERN110: 6,
+    PATTERN111: 7
   };
 
   const QRUtil = {
     PATTERN_POSITION_TABLE: [
       [],
-      [6, 18], [6, 22], [6, 26], [6, 30], [6, 34],
-      [6, 22, 38], [6, 24, 42], [6, 26, 46], [6, 28, 50],
-      [6, 30, 54], [6, 32, 58], [6, 34, 62], [6, 26, 46, 66],
-      [6, 26, 48, 70], [6, 26, 50, 74], [6, 30, 54, 78],
-      [6, 30, 56, 82], [6, 30, 58, 86], [6, 34, 62, 90]
+      [6, 18],
+      [6, 22],
+      [6, 26],
+      [6, 30],
+      [6, 34],
+      [6, 22, 38],
+      [6, 24, 42],
+      [6, 26, 46],
+      [6, 28, 50],
+      [6, 30, 54],
+      [6, 32, 58],
+      [6, 34, 62],
+      [6, 26, 46, 66],
+      [6, 26, 48, 70],
+      [6, 26, 50, 74],
+      [6, 30, 54, 78],
+      [6, 30, 56, 82],
+      [6, 30, 58, 86],
+      [6, 34, 62, 90],
+      [6, 28, 50, 72, 94],
+      [6, 26, 50, 74, 98],
+      [6, 30, 54, 78, 102],
+      [6, 28, 54, 80, 106],
+      [6, 32, 58, 84, 110],
+      [6, 30, 58, 86, 114],
+      [6, 34, 62, 90, 118],
+      [6, 26, 50, 74, 98, 122],
+      [6, 30, 54, 78, 102, 126],
+      [6, 26, 52, 78, 104, 130],
+      [6, 30, 56, 82, 108, 134],
+      [6, 34, 60, 86, 112, 138],
+      [6, 30, 58, 86, 114, 142],
+      [6, 34, 62, 90, 118, 146],
+      [6, 30, 54, 78, 102, 126, 150],
+      [6, 24, 50, 76, 102, 128, 154],
+      [6, 28, 54, 80, 106, 132, 158],
+      [6, 32, 58, 84, 110, 136, 162],
+      [6, 26, 54, 82, 110, 138, 166],
+      [6, 30, 58, 86, 114, 142, 170]
     ],
     G15: (1 << 10) | (1 << 8) | (1 << 5) | (1 << 4) | (1 << 2) | (1 << 1) | (1 << 0),
     G18: (1 << 12) | (1 << 11) | (1 << 10) | (1 << 9) | (1 << 8) | (1 << 5) | (1 << 2) | (1 << 0),
@@ -104,8 +150,16 @@
           case QRMode.MODE_KANJI: return 10;
           default: throw new Error("mode:" + mode);
         }
+      } else if (type < 41) {
+        switch (mode) {
+          case QRMode.MODE_NUMBER: return 14;
+          case QRMode.MODE_ALPHA_NUM: return 13;
+          case QRMode.MODE_8BIT_BYTE: return 16;
+          case QRMode.MODE_KANJI: return 12;
+          default: throw new Error("mode:" + mode);
+        }
       } else {
-        return 16;
+        throw new Error("type:" + type);
       }
     },
     getLostPoint: function(qrCode) {
@@ -220,21 +274,46 @@
 
   const QRRSBlock = {
     RS_BLOCK_TABLE: [
+      // 1
       [1, 26, 19], [1, 26, 16], [1, 26, 13], [1, 26, 9],
+      // 2
       [1, 44, 34], [1, 44, 28], [1, 44, 22], [1, 44, 16],
+      // 3
       [1, 70, 55], [1, 70, 44], [2, 35, 17], [2, 35, 13],
+      // 4
       [1, 100, 80], [2, 50, 32], [2, 50, 24], [4, 25, 9],
+      // 5
       [1, 134, 108], [2, 67, 43], [2, 33, 15, 2, 34, 16], [2, 33, 11, 2, 34, 12],
+      // 6
       [2, 86, 68], [4, 43, 27], [4, 43, 19], [4, 43, 15],
+      // 7
       [2, 98, 78], [4, 49, 31], [2, 32, 14, 4, 33, 15], [4, 39, 13, 1, 40, 14],
+      // 8
       [2, 121, 97], [2, 60, 38, 2, 61, 39], [4, 40, 18, 2, 41, 19], [4, 40, 14, 2, 41, 15],
+      // 9
       [2, 146, 116], [3, 58, 36, 2, 59, 37], [4, 36, 16, 4, 37, 17], [4, 36, 12, 4, 37, 13],
+      // 10
       [2, 86, 68, 2, 87, 69], [4, 69, 43, 1, 70, 44], [6, 43, 19, 2, 44, 20], [6, 43, 15, 2, 44, 16],
+      // 11
       [4, 101, 81], [1, 80, 50, 4, 81, 51], [4, 50, 22, 4, 51, 23], [3, 36, 12, 8, 37, 13],
+      // 12
       [2, 116, 92, 2, 117, 93], [6, 58, 36, 2, 59, 37], [4, 46, 20, 6, 47, 21], [7, 42, 14, 4, 43, 15],
+      // 13
       [4, 133, 107], [8, 59, 37, 1, 60, 38], [8, 44, 20, 4, 45, 21], [12, 33, 11, 4, 34, 12],
+      // 14
       [3, 145, 115, 1, 146, 116], [4, 64, 40, 5, 65, 41], [11, 36, 16, 5, 37, 17], [11, 36, 12, 5, 37, 13],
-      [5, 109, 87, 1, 110, 88], [5, 65, 41, 5, 66, 42], [5, 54, 24, 7, 55, 25], [11, 36, 12, 7, 37, 13]
+      // 15
+      [5, 109, 87, 1, 110, 88], [5, 65, 41, 5, 66, 42], [5, 54, 24, 7, 55, 25], [11, 36, 12, 7, 37, 13],
+      // 16
+      [5, 122, 98, 1, 123, 99], [7, 73, 45, 3, 74, 46], [15, 43, 19, 2, 44, 20], [3, 45, 15, 13, 46, 16],
+      // 17
+      [1, 135, 107, 5, 136, 108], [10, 74, 46, 1, 75, 47], [1, 50, 22, 15, 51, 23], [2, 42, 14, 17, 43, 15],
+      // 18
+      [5, 150, 120, 1, 151, 121], [9, 69, 43, 4, 70, 44], [17, 50, 22, 1, 51, 23], [2, 42, 14, 19, 43, 15],
+      // 19
+      [3, 141, 113, 4, 142, 114], [3, 70, 44, 11, 71, 45], [17, 47, 21, 4, 48, 22], [9, 39, 13, 16, 40, 14],
+      // 20
+      [3, 135, 107, 5, 136, 108], [3, 67, 41, 13, 68, 42], [15, 54, 24, 5, 55, 25], [15, 43, 15, 10, 44, 16]
     ],
     getRSBlocks: function(typeNumber, errorCorrectLevel) {
       const rsBlock = QRRSBlock.getRsBlockTable(typeNumber, errorCorrectLevel);
@@ -563,34 +642,79 @@
     return data;
   };
 
+  // -------------------------------------------------------------------------
+  // 2. LOGO IMAGE CACHE (IN-MEMORY FOR LIGHTNING-FAST RENDERING)
+  // -------------------------------------------------------------------------
   const logoImageCache = {};
 
   function loadLogoImage(src) {
     if (!src) return Promise.resolve(null);
-    if (logoImageCache[src]) return Promise.resolve(logoImageCache[src]);
-    return new Promise(function(resolve) {
-      const img = new Image();
-      img.crossOrigin = 'Anonymous';
-      img.onload = function() {
-        logoImageCache[src] = img;
-        resolve(img);
-      };
-      img.onerror = function() {
-        resolve(null);
-      };
-      img.src = src;
-    });
+    if (logoImageCache[src]) {
+      return Promise.resolve(logoImageCache[src]);
+    }
+
+    const candidateUrls = [
+      src,
+      'img/Logo_PA_Imy.png',
+      'https://sopiyandedi.github.io/TRANSKEP/img/Logo_PA_Imy.png'
+    ].filter((v, i, a) => v && a.indexOf(v) === i);
+
+    function tryCandidate(index) {
+      if (index >= candidateUrls.length) {
+        console.warn('⚠️ [QR Engine] Seluruh kandidat URL logo gagal dimuat.');
+        return Promise.resolve(null);
+      }
+      const currentUrl = candidateUrls[index];
+
+      return new Promise(function(resolve) {
+        const img = new Image();
+        img.crossOrigin = 'Anonymous';
+        img.onload = function() {
+          logoImageCache[src] = img;
+          logoImageCache[currentUrl] = img;
+          resolve(img);
+        };
+        img.onerror = function() {
+          // Retry tanpa crossOrigin untuk proteksi pembatasan CORS browser
+          const retryImg = new Image();
+          retryImg.onload = function() {
+            logoImageCache[src] = retryImg;
+            logoImageCache[currentUrl] = retryImg;
+            resolve(retryImg);
+          };
+          retryImg.onerror = function() {
+            tryCandidate(index + 1).then(resolve);
+          };
+          retryImg.src = currentUrl;
+        };
+        img.src = currentUrl;
+      });
+    }
+
+    return tryCandidate(0);
   }
 
+  // -------------------------------------------------------------------------
+  // 3. CANVAS RENDERING ENGINE (WITH WHITE CIRCULAR BUFFER & CENTER LOGO)
+  // -------------------------------------------------------------------------
+  /**
+   * Menggambar QR Code mandiri berlogo di atas HTML5 Canvas
+   * @param {string} textOrUrl - Tautan atau string data
+   * @param {object} options - Konfigurasi render
+   * @returns {Promise<string>} Base64 Data URI ('data:image/png;base64,...')
+   */
   async function generateQRCodeWithLogo(textOrUrl, options) {
     options = options || {};
     const size = options.size || 300;
     const margin = options.margin !== undefined ? options.margin : 2;
-    const logoSrc = options.logoSrc || 'https://sopiyandedi.github.io/TRANSKEP/transkep-web/img/Logo_PA_Imy.png';
-    const logoRatio = options.logoRatio || 0.28;
+    const isGhPages = (typeof window !== 'undefined' && window.location && window.location.origin.includes('github.io'));
+    const defaultLogo = isGhPages ? 'img/Logo_PA_Imy.png' : 'https://sopiyandedi.github.io/TRANSKEP/img/Logo_PA_Imy.png';
+    const logoSrc = options.logoSrc || defaultLogo;
+    const logoRatio = options.logoRatio || 0.28; // Ukuran logo proporsional (~28% tinggi QR)
     const colorDark = options.colorDark || '#000000';
     const colorLight = options.colorLight || '#ffffff';
 
+    // 1. Generate Model QR dengan Error Correction Level H (Wajib untuk Logo Tengah)
     const qr = new QRCodeModel(0, QRErrorCorrectLevel.H);
     qr.addData(textOrUrl || '');
     qr.make();
@@ -601,12 +725,15 @@
     canvas.height = size;
     const ctx = canvas.getContext('2d');
 
+    // 2. Gambar Latar Belakang Putih
     ctx.fillStyle = colorLight;
     ctx.fillRect(0, 0, size, size);
 
+    // 3. Hitung Ukuran Tiap Modul Matriks
     const rawTileW = (size - 2 * margin) / moduleCount;
     const rawTileH = (size - 2 * margin) / moduleCount;
 
+    // 4. Render Modul Hitam
     ctx.fillStyle = colorDark;
     for (let r = 0; r < moduleCount; r++) {
       for (let c = 0; c < moduleCount; c++) {
@@ -618,18 +745,21 @@
       }
     }
 
+    // 5. Render Buffer Putih & Logo Pengadilan Agama di Titik Tengah (Mempertahankan Aspek Rasio Asli Oval)
     const cx = size / 2;
     const cy = size / 2;
 
+    // Gambar Logo (Jika logoSrc tersedia)
     if (logoSrc) {
       try {
         const img = await loadLogoImage(logoSrc);
         if (img) {
+          // Hitung proporsi asli logo agar tidak pipih/terdistorsi bulat
           let targetW = size * logoRatio;
           let targetH = size * logoRatio;
           if (img.width && img.height) {
             const aspect = img.width / img.height;
-            if (aspect < 1) {
+            if (aspect < 1) { // Portrait / Oval (seperti emblem PA Indramayu 752x1024)
               targetH = size * logoRatio;
               targetW = targetH * aspect;
             } else {
@@ -638,6 +768,7 @@
             }
           }
 
+          // Buffer Putih pelindung sekeliling logo (Rounded Card Badge)
           const padX = Math.max(4, Math.round(size * 0.02));
           const padY = Math.max(4, Math.round(size * 0.02));
           const badgeW = targetW + (padX * 2);
@@ -662,16 +793,23 @@
           ctx.fill();
           ctx.restore();
 
+          // Gambar Logo Pengadilan Agama dengan bentuk perisai/oval aslinya tanpa dipotong bulat
           ctx.save();
           ctx.drawImage(img, cx - (targetW / 2), cy - (targetH / 2), targetW, targetH);
           ctx.restore();
         }
-      } catch (e) {}
+      } catch (err) {
+        console.warn('⚠️ [QR Engine] Peringatan saat menggambar logo:', err);
+      }
     }
 
+    // 6. Ekspor ke Data URI Base64 PNG
     return canvas.toDataURL('image/png');
   }
 
+  /**
+   * Pembangkit QR Code sinkron sederhana tanpa logo (jika sewaktu-waktu dibutuhkan)
+   */
   function generateQRCodeDataURL(textOrUrl, options) {
     options = options || {};
     const size = options.size || 200;
@@ -708,6 +846,9 @@
     return canvas.toDataURL('image/png');
   }
 
+  // -------------------------------------------------------------------------
+  // 4. GLOBAL EXPORTS
+  // -------------------------------------------------------------------------
   global.QRCodeEngine = {
     generateQRCodeWithLogo: generateQRCodeWithLogo,
     generateQRCodeDataURL: generateQRCodeDataURL,
@@ -715,8 +856,12 @@
     QRErrorCorrectLevel: QRErrorCorrectLevel
   };
 
+  // Shortcut langsung di window
   global.generateQRCodeWithLogo = generateQRCodeWithLogo;
   global.generateQRCodeDataURL = generateQRCodeDataURL;
 
+  console.log('🛡️ [TRANSKEP] In-House QR Code & Visual Signature Engine aktif (Level H + Circular Badge).');
+
 })(typeof window !== 'undefined' ? window : this);
+
 </script>

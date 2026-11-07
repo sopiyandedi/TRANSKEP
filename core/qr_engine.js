@@ -651,19 +651,46 @@
     if (logoImageCache[src]) {
       return Promise.resolve(logoImageCache[src]);
     }
-    return new Promise(function(resolve) {
-      const img = new Image();
-      img.crossOrigin = 'Anonymous';
-      img.onload = function() {
-        logoImageCache[src] = img;
-        resolve(img);
-      };
-      img.onerror = function(err) {
-        console.warn('⚠️ [QR Engine] Gagal memuat logo gambar dari:', src, err);
-        resolve(null); // Fallback: resolve null agar QR tetap digambar tanpa crash
-      };
-      img.src = src;
-    });
+
+    const candidateUrls = [
+      src,
+      'img/Logo_PA_Imy.png',
+      'https://sopiyandedi.github.io/TRANSKEP/img/Logo_PA_Imy.png'
+    ].filter((v, i, a) => v && a.indexOf(v) === i);
+
+    function tryCandidate(index) {
+      if (index >= candidateUrls.length) {
+        console.warn('⚠️ [QR Engine] Seluruh kandidat URL logo gagal dimuat.');
+        return Promise.resolve(null);
+      }
+      const currentUrl = candidateUrls[index];
+
+      return new Promise(function(resolve) {
+        const img = new Image();
+        img.crossOrigin = 'Anonymous';
+        img.onload = function() {
+          logoImageCache[src] = img;
+          logoImageCache[currentUrl] = img;
+          resolve(img);
+        };
+        img.onerror = function() {
+          // Retry tanpa crossOrigin untuk proteksi pembatasan CORS browser
+          const retryImg = new Image();
+          retryImg.onload = function() {
+            logoImageCache[src] = retryImg;
+            logoImageCache[currentUrl] = retryImg;
+            resolve(retryImg);
+          };
+          retryImg.onerror = function() {
+            tryCandidate(index + 1).then(resolve);
+          };
+          retryImg.src = currentUrl;
+        };
+        img.src = currentUrl;
+      });
+    }
+
+    return tryCandidate(0);
   }
 
   // -------------------------------------------------------------------------
@@ -679,7 +706,9 @@
     options = options || {};
     const size = options.size || 300;
     const margin = options.margin !== undefined ? options.margin : 2;
-    const logoSrc = options.logoSrc || 'img/Logo_PA_Imy.png';
+    const isGhPages = (typeof window !== 'undefined' && window.location && window.location.origin.includes('github.io'));
+    const defaultLogo = isGhPages ? 'img/Logo_PA_Imy.png' : 'https://sopiyandedi.github.io/TRANSKEP/img/Logo_PA_Imy.png';
+    const logoSrc = options.logoSrc || defaultLogo;
     const logoRatio = options.logoRatio || 0.28; // Ukuran logo proporsional (~28% tinggi QR)
     const colorDark = options.colorDark || '#000000';
     const colorLight = options.colorLight || '#ffffff';

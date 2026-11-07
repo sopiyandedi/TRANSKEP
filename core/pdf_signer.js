@@ -760,7 +760,7 @@ ${absXrefOffset}
       const vW5 = 190;
       const vW6 = contentWidth - leftW - vW4 - vW5; // 45.28 pt
       const rightW = vW5 + vW6; // 235.28 pt (Kolom 5-6)
-      const rowH5 = 16.5;
+      const rowH5 = 14.5; // Ketinggian baris proporsional & rapat rapih identik HTML
 
       const sec5TopY = currentY;
 
@@ -775,7 +775,7 @@ ${absXrefOffset}
       // Kanan: 2. Cuti Besar
       drawTableRow(rightX, yRow1, rightW, rowH5, [
         { text: '2. Cuti Besar', w: vW5, size: 9.5 },
-        { text: String(pns.s_besar || '0'), w: vW6, align: 'center', bold: true, size: 10 }
+        { text: String(pns.s_besar || '0'), w: vW6, align: 'center', bold: true, size: 9.5 }
       ]);
 
       // -------------------------------------------------------------
@@ -791,7 +791,7 @@ ${absXrefOffset}
       // Kanan: 3. Cuti Sakit
       drawTableRow(rightX, yRow2, rightW, rowH5, [
         { text: '3. Cuti Sakit', w: vW5, size: 9.5 },
-        { text: String(pns.s_sakit || '0'), w: vW6, align: 'center', bold: true, size: 10 }
+        { text: String(pns.s_sakit || '0'), w: vW6, align: 'center', bold: true, size: 9.5 }
       ]);
 
       // -------------------------------------------------------------
@@ -807,7 +807,7 @@ ${absXrefOffset}
       // Kanan: 4. Cuti Melahirkan
       drawTableRow(rightX, yRow3, rightW, rowH5, [
         { text: '4. Cuti Melahirkan', w: vW5, size: 9.5 },
-        { text: String(pns.s_melahirkan || '0'), w: vW6, align: 'center', bold: true, size: 10 }
+        { text: String(pns.s_melahirkan || '0'), w: vW6, align: 'center', bold: true, size: 9.5 }
       ]);
 
       // -------------------------------------------------------------
@@ -823,7 +823,7 @@ ${absXrefOffset}
       // Kanan: 5. Cuti Karena Alasan Penting
       drawTableRow(rightX, yRow4, rightW, rowH5, [
         { text: '5. Cuti Karena Alasan Penting', w: vW5, size: 9.5 },
-        { text: String(pns.s_penting || '0'), w: vW6, align: 'center', bold: true, size: 10 }
+        { text: String(pns.s_penting || '0'), w: vW6, align: 'center', bold: true, size: 9.5 }
       ]);
 
       // -------------------------------------------------------------
@@ -839,13 +839,13 @@ ${absXrefOffset}
       // Kanan: 6. Cuti di Luar Tanggungan Negara
       drawTableRow(rightX, yRow5, rightW, rowH5, [
         { text: '6. Cuti di Luar Tanggungan Negara', w: vW5, size: 9.5 },
-        { text: String(pns.s_cltn || '0'), w: vW6, align: 'center', bold: true, size: 10 }
+        { text: String(pns.s_cltn || '0'), w: vW6, align: 'center', bold: true, size: 9.5 }
       ]);
 
       // -------------------------------------------------------------
       // Kolom 4 (Paraf Petugas Cuti): 2 Kotak Bersih Seamless Identik HTML
       // -------------------------------------------------------------
-      // Kotak 1 (Header): Rowspan 2 baris (Row 1 & 2), tinggi 33 pt tanpa sekat horizontal
+      // Kotak 1 (Header): Rowspan 2 baris (Row 1 & 2), tinggi 29 pt (rapih & proporsional)
       page.drawRectangle({
         x: parafX,
         y: yRow2,
@@ -864,7 +864,7 @@ ${absXrefOffset}
         color: black
       });
 
-      // Kotak 2 (QR Barcode): Rowspan 3 baris (Row 3, 4, 5), tinggi 49.5 pt tanpa sekat horizontal
+      // Kotak 2 (QR Barcode): Rowspan 3 baris (Row 3, 4, 5), tinggi 43.5 pt tanpa sekat horizontal
       page.drawRectangle({
         x: parafX,
         y: yRow5,
@@ -876,7 +876,7 @@ ${absXrefOffset}
 
       // Gambar Barcode QR Paraf persis di tengah Kotak 2
       if (qrParafImg) {
-        const pQrSize = 38;
+        const pQrSize = 35;
         page.drawImage(qrParafImg, {
           x: parafX + (vW4 - pQrSize) / 2,
           y: yRow5 + ((rowH5 * 3) - pQrSize) / 2,
@@ -885,46 +885,95 @@ ${absXrefOffset}
         });
       }
 
-      currentY = yRow5 - 7;
+      currentY = yRow5 - 6;
 
       // =============================================================
       // VI. ALAMAT SELAMA MENJALANKAN CUTI & SIGNATURE PEMOHON
       // =============================================================
       const viLeftW = 345;
-      const viBlockH = 80;
+      const telpColW = 95;
+      const alamatColW = viLeftW - telpColW; // 250 pt
 
-      // Tabel Alamat (Kiri)
-      page.drawRectangle({ x: marginX, y: currentY - viBlockH, width: viLeftW, height: viBlockH, borderColor: black, borderWidth: 0.6 });
-      page.drawRectangle({ x: marginX, y: currentY - secTitleH, width: viLeftW, height: secTitleH, color: headerBg, borderColor: black, borderWidth: 0.6 });
-      page.drawText('VI. ALAMAT SELAMA MENJALANKAN CUTI', { x: marginX + 5, y: currentY - 11, size: 9.5, font: fontBold, color: black });
-
-      const telpColW = 90;
-      page.drawLine({ start: { x: marginX + viLeftW - telpColW, y: currentY }, end: { x: marginX + viLeftW - telpColW, y: currentY - viBlockH }, color: black, thickness: 0.6 });
-      page.drawText('TELPON / HP', { x: marginX + viLeftW - telpColW + 12, y: currentY - 11, size: 9.5, font: fontBold, color: black });
-
-      // Isi Alamat (Bungkus baris otomatis)
       const alamatRaw = log.alamat || '-';
-      const alamatLines = wrapText(alamatRaw, fontRegular, 9.5, viLeftW - telpColW - 12);
-      let alY = currentY - secTitleH - 13;
+      const alamatLines = wrapText(alamatRaw, fontRegular, 9.5, alamatColW - 14);
+
+      // Tinggi tabel alamat kiri proporsional (mengikuti baris teks seperti HTML)
+      const viContentH = Math.max(38, (alamatLines.length * 13) + 12);
+      const viTableTotalH = secTitleH + viContentH;
+
+      // 1. Header Tabel Alamat & Telepon (Kiri)
+      page.drawRectangle({
+        x: marginX,
+        y: currentY - secTitleH,
+        width: viLeftW,
+        height: secTitleH,
+        color: headerBg,
+        borderColor: black,
+        borderWidth: 0.6
+      });
+      page.drawText('VI. ALAMAT SELAMA MENJALANKAN CUTI', {
+        x: marginX + 6,
+        y: currentY - 11,
+        size: 9.5,
+        font: fontBold,
+        color: black
+      });
+      const telpHeaderTxt = 'TELPON / HP';
+      const telpHeaderW = fontBold.widthOfTextAtSize(telpHeaderTxt, 9.5);
+      page.drawText(telpHeaderTxt, {
+        x: marginX + alamatColW + (telpColW - telpHeaderW) / 2,
+        y: currentY - 11,
+        size: 9.5,
+        font: fontBold,
+        color: black
+      });
+
+      // 2. Kotak Konten Alamat & Telepon (Kiri)
+      page.drawRectangle({
+        x: marginX,
+        y: currentY - viTableTotalH,
+        width: viLeftW,
+        height: viContentH,
+        borderColor: black,
+        borderWidth: 0.6
+      });
+      // Garis Pemisah Vertikal Alamat dan Telepon
+      page.drawLine({
+        start: { x: marginX + alamatColW, y: currentY },
+        end: { x: marginX + alamatColW, y: currentY - viTableTotalH },
+        color: black,
+        thickness: 0.6
+      });
+
+      // 3. Teks Isi Alamat (Bungkus Baris Rapi dengan Padding Seimbang Atas & Bawah)
+      let alY = currentY - secTitleH - 14;
       for (const aLine of alamatLines) {
         page.drawText(safeWinAnsi(aLine), { x: marginX + 6, y: alY, size: 9.5, font: fontRegular, color: black });
         alY -= 13;
       }
 
-      // Isi No HP
+      // 4. Teks No HP (Tengah Vertikal & Horizontal Presisi)
       const hpText = safeWinAnsi(pns.no_hp || log.no_hp || '-');
-      page.drawText(hpText, { x: marginX + viLeftW - telpColW + (telpColW - fontBold.widthOfTextAtSize(hpText, 9.5)) / 2, y: currentY - secTitleH - 28, size: 9.5, font: fontBold, color: black });
+      const hpTextW = fontBold.widthOfTextAtSize(hpText, 9.5);
+      const hpY = (currentY - viTableTotalH) + ((viContentH - 9.5) / 2) + 1;
+      page.drawText(hpText, {
+        x: marginX + alamatColW + (telpColW - hpTextW) / 2,
+        y: hpY,
+        size: 9.5,
+        font: fontBold,
+        color: black
+      });
 
-      // Area TTD Pemohon (Kanan, rata kanan)
+      // 5. Area TTD Pemohon (Kanan, rata rapih berdampingan)
       const pemohonX = marginX + viLeftW + 25;
       const pemohonY = currentY;
       page.drawText('Hormat Saya,', { x: pemohonX, y: currentY - 10, size: 9.5, font: fontRegular, color: black });
 
-      const qrSize = 48;
+      const qrSize = 44;
       if (qrPemohonImg) {
         page.drawImage(qrPemohonImg, {
           x: pemohonX,
-          y: currentY - 14 - qrSize,
+          y: currentY - 13 - qrSize,
           width: qrSize,
           height: qrSize
         });
@@ -932,11 +981,24 @@ ${absXrefOffset}
 
       const pnsNama = safeWinAnsi(pns.nama || '-');
       const pnsNamaW = fontBold.widthOfTextAtSize(pnsNama, 9.5);
-      page.drawText(pnsNama, { x: pemohonX, y: currentY - 69, size: 9.5, font: fontBold, color: black });
-      page.drawLine({ start: { x: pemohonX, y: currentY - 70.5 }, end: { x: pemohonX + pnsNamaW, y: currentY - 70.5 }, color: black, thickness: 0.6 });
-      page.drawText(safeWinAnsi(`NIP. ${pns.nip || '-'}`), { x: pemohonX, y: currentY - 80, size: 9, font: fontRegular, color: black });
+      const ttdBottomY = currentY - 13 - qrSize;
+      page.drawText(pnsNama, { x: pemohonX, y: ttdBottomY - 12, size: 9.5, font: fontBold, color: black });
+      page.drawLine({
+        start: { x: pemohonX, y: ttdBottomY - 13.5 },
+        end: { x: pemohonX + pnsNamaW, y: ttdBottomY - 13.5 },
+        color: black,
+        thickness: 0.6
+      });
+      page.drawText(safeWinAnsi(`NIP. ${pns.nip || '-'}`), {
+        x: pemohonX,
+        y: ttdBottomY - 24,
+        size: 9,
+        font: fontRegular,
+        color: black
+      });
 
-      currentY -= viBlockH + 7;
+      const totalSec6H = Math.max(viTableTotalH, 13 + qrSize + 26);
+      currentY -= totalSec6H + 6;
 
       // =============================================================
       // VII. PERTIMBANGAN ATASAN LANGSUNG
@@ -1198,7 +1260,10 @@ ${absXrefOffset}
         let qrPejabatDataUrl = '';
         let qrParafDataUrl = '';
 
-        const logoEmblemUrl = 'https://sopiyandedi.github.io/TRANSKEP/transkep-web/img/Logo_PA_Imy.png';
+        const isGhPages = (global.window && global.window.location && global.window.location.origin.includes('github.io'));
+        const logoEmblemUrl = isGhPages
+          ? 'img/Logo_PA_Imy.png'
+          : 'https://sopiyandedi.github.io/TRANSKEP/img/Logo_PA_Imy.png';
 
         if (global.generateQRCodeWithLogo) {
           qrPemohonDataUrl = await global.generateQRCodeWithLogo(verifyUrlPemohon, { size: 300, logoSrc: logoEmblemUrl });
@@ -1209,12 +1274,12 @@ ${absXrefOffset}
             qrPejabatDataUrl = await global.generateQRCodeWithLogo(verifyUrlPejabat, { size: 300, logoSrc: logoEmblemUrl });
           }
         } else if (global.TranskepQrEngine) {
-          qrPemohonDataUrl = await global.TranskepQrEngine.generateQrDataUrl(verifyUrlPemohon, { size: 300, logoRatio: 0.28 });
+          qrPemohonDataUrl = await global.TranskepQrEngine.generateQrDataUrl(verifyUrlPemohon, { size: 300, logoRatio: 0.28, logoSrc: logoEmblemUrl });
           if (isSetujuAtasan) {
-            qrAtasanDataUrl = await global.TranskepQrEngine.generateQrDataUrl(verifyUrlAtasan, { size: 300, logoRatio: 0.28 });
+            qrAtasanDataUrl = await global.TranskepQrEngine.generateQrDataUrl(verifyUrlAtasan, { size: 300, logoRatio: 0.28, logoSrc: logoEmblemUrl });
           }
           if (isSetujuPejabat) {
-            qrPejabatDataUrl = await global.TranskepQrEngine.generateQrDataUrl(verifyUrlPejabat, { size: 300, logoRatio: 0.28 });
+            qrPejabatDataUrl = await global.TranskepQrEngine.generateQrDataUrl(verifyUrlPejabat, { size: 300, logoRatio: 0.28, logoSrc: logoEmblemUrl });
           }
         }
 

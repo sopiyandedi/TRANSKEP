@@ -136,7 +136,8 @@
       let qrPejabat = "";
       let qrParaf = "";
 
-      const logoEmblemUrl = 'https://sopiyandedi.github.io/TRANSKEP/transkep-web/img/Logo_PA_Imy.png';
+      const isGhPages = (window.location && window.location.origin.includes('github.io'));
+      const logoEmblemUrl = isGhPages ? 'img/Logo_PA_Imy.png' : 'https://sopiyandedi.github.io/TRANSKEP/img/Logo_PA_Imy.png';
 
       try {
           if (window.generateQRCodeWithLogo) {
