@@ -501,6 +501,7 @@ function readCutiSheetDecrypted_(sheetCuti) {
 function ensureAllPiiSheetsEncrypted_() {
   try {
     const ss = getDB();
+    ensureAnnualCutiRollover_(ss);
     const sheetUser = ss.getSheetByName('user_data');
     const sheetCuti = ss.getSheetByName('cuti_log');
     const sheetReset = ss.getSheetByName('log_reset_pass');
@@ -558,6 +559,449 @@ function onEdit(e) {
       readCutiSheetDecrypted_(sheet);
     }
   } catch (err) {}
+}
+
+// =========================================================================
+// 5C. MESIN KALENDER HARI KERJA SKB 3 MENTERI (2026 & 2027) & ROLLOVER CUTI
+// Sesuai SE Sekretaris Mahkamah Agung RI No. 13 Tahun 2019 & SKB 1205/3/2 Tahun 2026
+// =========================================================================
+var TRANSKEP_HOLIDAYS_MAP_ = {
+  // --- HARI LIBUR NASIONAL & CUTI BERSAMA TAHUN 2026 ---
+  '2026-01-01': 'Tahun Baru 2026 Masehi',
+  '2026-01-16': 'Isra Mikraj Nabi Muhammad S.A.W.',
+  '2026-02-16': 'Cuti Bersama Tahun Baru Imlek 2577 Kongzili',
+  '2026-02-17': 'Tahun Baru Imlek 2577 Kongzili',
+  '2026-03-18': 'Cuti Bersama Hari Suci Nyepi',
+  '2026-03-19': 'Hari Suci Nyepi (Tahun Baru Saka 1948)',
+  '2026-03-20': 'Cuti Bersama Idul Fitri 1447 H',
+  '2026-03-21': 'Idul Fitri 1447 Hijriah',
+  '2026-03-22': 'Idul Fitri 1447 Hijriah',
+  '2026-03-23': 'Cuti Bersama Idul Fitri 1447 H',
+  '2026-03-24': 'Cuti Bersama Idul Fitri 1447 H',
+  '2026-04-03': 'Wafat Yesus Kristus',
+  '2026-04-05': 'Kebangkitan Yesus Kristus (Paskah)',
+  '2026-05-01': 'Hari Buruh Internasional',
+  '2026-05-14': 'Kenaikan Yesus Kristus',
+  '2026-05-15': 'Cuti Bersama Kenaikan Yesus Kristus',
+  '2026-05-27': 'Idul Adha 1447 Hijriah',
+  '2026-05-28': 'Cuti Bersama Idul Adha 1447 H',
+  '2026-05-31': 'Hari Raya Waisak 2570 BE',
+  '2026-06-01': 'Hari Lahir Pancasila',
+  '2026-06-16': 'Tahun Baru Islam 1448 Hijriah',
+  '2026-08-17': 'Proklamasi Kemerdekaan RI',
+  '2026-08-25': 'Maulid Nabi Muhammad S.A.W.',
+  '2026-12-24': 'Cuti Bersama Kelahiran Yesus Kristus',
+  '2026-12-25': 'Kelahiran Yesus Kristus',
+
+  // --- HARI LIBUR NASIONAL & CUTI BERSAMA TAHUN 2027 (SKB Nomor 1205/3/2 Tahun 2026) ---
+  '2027-01-01': 'Tahun Baru 2027 Masehi',
+  '2027-01-05': 'Isra Mikraj Nabi Muhammad S.A.W. 1448 H',
+  '2027-02-05': 'Cuti Bersama Tahun Baru Imlek 2578 Kongzili',
+  '2027-02-06': 'Tahun Baru Imlek 2578 Kongzili',
+  '2027-03-08': 'Hari Suci Nyepi (Tahun Baru Saka 1949)',
+  '2027-03-09': 'Cuti Bersama Idul Fitri 1448 H',
+  '2027-03-10': 'Idul Fitri 1448 Hijriah',
+  '2027-03-11': 'Idul Fitri 1448 Hijriah',
+  '2027-03-12': 'Cuti Bersama Idul Fitri 1448 H',
+  '2027-03-15': 'Cuti Bersama Idul Fitri 1448 H',
+  '2027-03-25': 'Cuti Bersama Wafat Yesus Kristus',
+  '2027-03-26': 'Wafat Yesus Kristus',
+  '2027-03-28': 'Kebangkitan Yesus Kristus (Paskah)',
+  '2027-05-01': 'Hari Buruh Internasional',
+  '2027-05-06': 'Kenaikan Yesus Kristus',
+  '2027-05-17': 'Idul Adha 1448 Hijriah',
+  '2027-05-18': 'Cuti Bersama Idul Adha 1448 H',
+  '2027-05-19': 'Cuti Bersama Hari Raya Waisak 2571 BE',
+  '2027-05-20': 'Hari Raya Waisak 2571 BE',
+  '2027-06-01': 'Hari Lahir Pancasila',
+  '2027-06-06': '1 Muharam Tahun Baru Islam 1449 H',
+  '2027-08-15': 'Maulid Nabi Muhammad S.A.W.',
+  '2027-08-17': 'Proklamasi Kemerdekaan RI',
+  '2027-12-24': 'Cuti Bersama Kelahiran Yesus Kristus',
+  '2027-12-25': 'Kelahiran Yesus Kristus',
+  '2027-12-26': 'Isra Mikraj Nabi Muhammad S.A.W. 1449 H'
+};
+
+function getActiveYearWIB_() {
+  try {
+    return parseInt(Utilities.formatDate(new Date(), 'Asia/Jakarta', 'yyyy'), 10);
+  } catch (e) {
+    return new Date().getFullYear();
+  }
+}
+
+function parseYmdSafe_(dateStr) {
+  if (!dateStr) return null;
+  const norm = normalizeDateDB(String(dateStr).trim());
+  const parts = norm.split('-');
+  if (parts.length === 3) {
+    const y = parseInt(parts[0], 10);
+    const m = parseInt(parts[1], 10);
+    const d = parseInt(parts[2], 10);
+    if (!isNaN(y) && !isNaN(m) && !isNaN(d)) {
+      return new Date(y, m - 1, d, 12, 0, 0);
+    }
+  }
+  const fallback = new Date(dateStr);
+  if (isNaN(fallback.getTime())) return null;
+  return new Date(fallback.getFullYear(), fallback.getMonth(), fallback.getDate(), 12, 0, 0);
+}
+
+function hitungHariKerjaCuti_(tglMulaiStr, tglSelesaiStr) {
+  const d1 = parseYmdSafe_(tglMulaiStr);
+  const d2 = parseYmdSafe_(tglSelesaiStr);
+  if (!d1 || !d2 || d2 < d1) {
+    return { durasi: 0, holidayCount: 0, weekendCount: 0, skippedHolidays: [] };
+  }
+
+  let durasi = 0;
+  let holidayCount = 0;
+  let weekendCount = 0;
+  const skippedHolidays = [];
+
+  for (let d = new Date(d1.getTime()); d <= d2; d.setDate(d.getDate() + 1)) {
+    const dow = d.getDay();
+    if (dow === 0 || dow === 6) {
+      weekendCount++;
+      continue;
+    }
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    const ymd = y + '-' + m + '-' + day;
+
+    if (TRANSKEP_HOLIDAYS_MAP_[ymd]) {
+      holidayCount++;
+      skippedHolidays.push({ date: ymd, name: TRANSKEP_HOLIDAYS_MAP_[ymd] });
+    } else {
+      durasi++;
+    }
+  }
+
+  return {
+    durasi: durasi,
+    holidayCount: holidayCount,
+    weekendCount: weekendCount,
+    skippedHolidays: skippedHolidays
+  };
+}
+
+var _cachedRolloverCheckedYear_ = 0;
+
+/**
+ * Mesin Auto-Rollover Saldo Cuti Tahunan 3 Tahun (N-2, N-1, N) Tepat Tengah Malam 1 Januari 00:00 WIB
+ * Patuh penuh pada SE Sekretaris Mahkamah Agung RI No. 13 Tahun 2019 (Huruf F angka 1.d s.d. 1.h)
+ */
+function ensureAnnualCutiRollover_(ss) {
+  const currentYear = getActiveYearWIB_();
+  if (_cachedRolloverCheckedYear_ === currentYear) return currentYear;
+
+  try {
+    const props = PropertiesService.getScriptProperties();
+    let lastRolloverYear = parseInt(props.getProperty('LAST_CUTI_ROLLOVER_YEAR') || '0', 10);
+
+    if (!ss) ss = getDB();
+    const sheetUser = ss.getSheetByName('user_data');
+    if (!sheetUser || sheetUser.getLastRow() <= 1) {
+      _cachedRolloverCheckedYear_ = currentYear;
+      return currentYear;
+    }
+
+    // Jika properti belum pernah diinisialisasi, deteksi tahun aktif dari header Kolom I (indeks 9)
+    if (!lastRolloverYear || isNaN(lastRolloverYear)) {
+      const col9Header = String(sheetUser.getRange(1, 9).getDisplayValue() || '').trim();
+      const matchYear = col9Header.match(/(\d{4})/);
+      const detectedHeaderYear = matchYear ? parseInt(matchYear[1], 10) : 2026;
+      lastRolloverYear = detectedHeaderYear;
+      props.setProperty('LAST_CUTI_ROLLOVER_YEAR', String(lastRolloverYear));
+    }
+
+    if (lastRolloverYear >= currentYear) {
+      _cachedRolloverCheckedYear_ = currentYear;
+      return currentYear;
+    }
+
+    // Kunci eksekusi agar tidak terjadi race condition saat pergantian tahun baru tengah malam
+    const lock = LockService.getScriptLock();
+    if (!lock.tryLock(10000)) return currentYear;
+
+    try {
+      lastRolloverYear = parseInt(props.getProperty('LAST_CUTI_ROLLOVER_YEAR') || String(lastRolloverYear), 10);
+      if (lastRolloverYear >= currentYear) {
+        _cachedRolloverCheckedYear_ = currentYear;
+        return currentYear;
+      }
+
+      const sheetCuti = ss.getSheetByName('cuti_log');
+      const cData = sheetCuti ? readCutiSheetDecrypted_(sheetCuti) : [];
+
+      let yearCursor = lastRolloverYear;
+      while (yearCursor < currentYear) {
+        const nextYear = yearCursor + 1; // Contoh: 2026 -> 2027
+        const prevN1Year = yearCursor - 1; // Contoh: 2025
+
+        // Petakan pemakaian Cuti Tahunan aktif/disetujui per tahun (prevN1Year & yearCursor)
+        const usedPrevN1Map = {};
+        const usedCurrMap = {};
+        for (let c = 1; c < cData.length; c++) {
+          const jenis = String(cData[c][3] || '').trim();
+          const status = String(cData[c][7] || '').trim();
+          if (jenis === 'Tahunan' && status !== 'Ditolak' && status !== 'DIBATALKAN') {
+            const cNip = String(cData[c][2] || '').replace(/['"\s]/g, '');
+            const dMulai = parseYmdSafe_(cData[c][4]);
+            const yMulai = dMulai ? dMulai.getFullYear() : 0;
+            if (cNip) {
+              if (yMulai === prevN1Year) usedPrevN1Map[cNip] = true;
+              if (yMulai === yearCursor) usedCurrMap[cNip] = true;
+            }
+          }
+        }
+
+        // Cek snapshot NIP yang utuh 12 hari pada prevN1Year (jika pernah disimpan saat rollover tahun sebelumnya)
+        let prevN1UtuhSet = null;
+        const rawPrevUtuh = props.getProperty('CUTI_UTUH_NIPS_' + prevN1Year);
+        if (rawPrevUtuh) {
+          try {
+            const arr = JSON.parse(rawPrevUtuh);
+            if (Array.isArray(arr)) {
+              prevN1UtuhSet = {};
+              for (let k = 0; k < arr.length; k++) prevN1UtuhSet[String(arr[k])] = true;
+            }
+          } catch (eJson) {}
+        }
+
+        const uData = readUserSheetDecrypted_(sheetUser);
+        const numRows = uData.length - 1;
+        const newQuotas = [];
+        const currYearUtuhList = [];
+
+        for (let i = 1; i < uData.length; i++) {
+          const empNip = String(uData[i][0] || '').replace(/['"\s]/g, '');
+          const oldN1 = Math.max(0, Number(uData[i][7]) || 0); // Contoh: saldo 2025
+          const oldN  = Math.max(0, Number(uData[i][8]) || 0); // Contoh: saldo 2026
+
+          const wasCurrUtuh = (oldN >= 12) && !usedCurrMap[empNip];
+          if (wasCurrUtuh && empNip) {
+            currYearUtuhList.push(empNip);
+          }
+
+          const wasPrevN1Utuh = prevN1UtuhSet
+            ? (!!prevN1UtuhSet[empNip] && (oldN1 === 6 || oldN1 >= 12) && !usedPrevN1Map[empNip])
+            : ((oldN1 === 6 || oldN1 >= 12) && !usedPrevN1Map[empNip]);
+
+          // 1. Saldo N-2 baru (2025): Hanya bernilai 6 jika TIDAK DIGUNAKAN SAMA SEKALI selama 2 tahun berturut-turut (SE SEKMA F.1.e & F.1.f)
+          const isUtuhDuaTahun = wasCurrUtuh && wasPrevN1Utuh;
+          const newN2 = isUtuhDuaTahun ? 6 : 0;
+
+          // 2. Saldo N-1 baru (2026): Jika 7..12 -> 6, jika 6 -> 6, jika 1..5 -> sesuai sisanya (SE SEKMA F.1.g)
+          const newN1 = oldN > 6 ? 6 : oldN;
+
+          // 3. Saldo N baru (2027): Otomatis diisi 12 hari
+          const newN = 12;
+
+          newQuotas.push([newN2, newN1, newN]);
+        }
+
+        if (numRows > 0) {
+          sheetUser.getRange(2, 7, numRows, 3).setValues(newQuotas);
+        }
+
+        try {
+          props.setProperty('CUTI_UTUH_NIPS_' + yearCursor, JSON.stringify(currYearUtuhList));
+        } catch (eProp) {}
+
+        // Perbarui judul kolom G, H, I di Google Sheet
+        sheetUser.getRange(1, 7, 1, 3).setValues([[
+          'Sisa_Tahunan_' + (nextYear - 2),
+          'Sisa_Tahunan_' + (nextYear - 1),
+          'Sisa_Tahunan_' + nextYear
+        ]]);
+
+        yearCursor = nextYear;
+        props.setProperty('LAST_CUTI_ROLLOVER_YEAR', String(yearCursor));
+      }
+
+      bumpDataVersion();
+      _cachedRolloverCheckedYear_ = currentYear;
+    } finally {
+      lock.releaseLock();
+    }
+  } catch (errRoll) {
+    Logger.log("Auto-Rollover Cuti Tahunan warning: " + errRoll.toString());
+  }
+
+  return currentYear;
+}
+
+/**
+ * Mesin Pemotongan Saldo Cuti Terpusat (SE SEKMA No. 13 Tahun 2019)
+ * - Cuti Tahunan dengan N-2 > 0: Jika durasi <= (N-1 + N) maka N-2 otomatis hangus jadi 0 & potong mulai dari N-1.
+ *   Jika durasi > (N-1 + N) [misal 19..24 hari], maka N-2 ikut dipakai penuh lalu N-1 lalu N.
+ * - Cuti Besar: Selain memotong kuota Cuti Besar, otomatis mengenolkan Cuti Tahunan tahun berjalan (N = 0).
+ */
+function potongSaldoCutiServer_(sheetUser, rowIndex, jenis, durasi, activeYear) {
+  const yr = activeYear || getActiveYearWIB_();
+  const historyJson = {
+    y24: 0,
+    y25: 0,
+    y26: 0,
+    hangus_n2: 0,
+    hangus_n_besar: 0,
+    year_n: yr,
+    dur: durasi
+  };
+
+  const rowVals = sheetUser.getRange(rowIndex, 7, 1, 7).getValues()[0]; // Kolom 7..13 (indeks 0..6)
+  let sN2 = Math.max(0, Number(rowVals[0]) || 0);
+  let sN1 = Math.max(0, Number(rowVals[1]) || 0);
+  let sN  = Math.max(0, Number(rowVals[2]) || 0);
+  historyJson.snap_awal = [sN2, sN1, sN];
+  historyJson.snap_akhir = [sN2, sN1, sN];
+
+  if (jenis === 'Dinas Luar') return historyJson;
+  if (durasi <= 0) {
+    throw new Error("Rentang tanggal yang dipilih seluruhnya merupakan akhir pekan atau Hari Libur Nasional / Cuti Bersama (0 hari kerja efektif).");
+  }
+  if (jenis === 'CLTN') return historyJson;
+
+  if (jenis === 'Tahunan') {
+    const totalTersedia = sN2 + sN1 + sN;
+    if (totalTersedia < durasi) {
+      throw new Error("Saldo cuti tahunan tidak mencukupi (Tersedia: " + totalTersedia + " hari, Pengajuan: " + durasi + " hari).");
+    }
+
+    const batasTanpaN2 = sN1 + sN; // Standar 6 + 12 = 18 hari
+    let sisaPotong = durasi;
+
+    if (sN2 > 0 && durasi <= batasTanpaN2) {
+      // Pengajuan 1..18 hari: N-2 otomatis hangus menjadi 0, pemotongan dimulai dari N-1 lalu N
+      historyJson.hangus_n2 = sN2;
+      sheetUser.getRange(rowIndex, 7).setValue(0);
+
+      if (sN1 >= sisaPotong) {
+        historyJson.y25 = sisaPotong;
+        sheetUser.getRange(rowIndex, 8).setValue(sN1 - sisaPotong);
+        sisaPotong = 0;
+      } else {
+        historyJson.y25 = sN1;
+        sisaPotong -= sN1;
+        sheetUser.getRange(rowIndex, 8).setValue(0);
+      }
+
+      if (sisaPotong > 0) {
+        historyJson.y26 = sisaPotong;
+        sheetUser.getRange(rowIndex, 9).setValue(sN - sisaPotong);
+      }
+    } else {
+      // Pengajuan 19..24 hari (atau N-2 memang 0): Potong urut N-2 -> N-1 -> N
+      if (sN2 >= sisaPotong) {
+        historyJson.y24 = sisaPotong;
+        sheetUser.getRange(rowIndex, 7).setValue(sN2 - sisaPotong);
+        sisaPotong = 0;
+      } else {
+        historyJson.y24 = sN2;
+        sisaPotong -= sN2;
+        sheetUser.getRange(rowIndex, 7).setValue(0);
+      }
+
+      if (sisaPotong > 0) {
+        if (sN1 >= sisaPotong) {
+          historyJson.y25 = sisaPotong;
+          sheetUser.getRange(rowIndex, 8).setValue(sN1 - sisaPotong);
+          sisaPotong = 0;
+        } else {
+          historyJson.y25 = sN1;
+          sisaPotong -= sN1;
+          sheetUser.getRange(rowIndex, 8).setValue(0);
+        }
+      }
+
+      if (sisaPotong > 0) {
+        if (sN >= sisaPotong) {
+          historyJson.y26 = sisaPotong;
+          sheetUser.getRange(rowIndex, 9).setValue(sN - sisaPotong);
+          sisaPotong = 0;
+        } else {
+          throw new Error("Saldo cuti tahunan tidak mencukupi.");
+        }
+      }
+    }
+  } else {
+    const mapCol = { 'Sakit': 10, 'Alasan Penting': 11, 'Penting': 11, 'Besar': 12, 'Melahirkan': 13 };
+    const col = mapCol[jenis];
+    if (col) {
+      const sCuti = Math.max(0, Number(sheetUser.getRange(rowIndex, col).getValue()) || 0);
+      if (sCuti < durasi) {
+        throw new Error("Saldo cuti " + jenis + " Anda tidak mencukupi.");
+      }
+      sheetUser.getRange(rowIndex, col).setValue(sCuti - durasi);
+
+      // SE SEKMA Hal. 10 angka 2.a.4: Mengambil Cuti Besar otomatis mengenolkan Cuti Tahunan tahun berjalan (N = 0)
+      if (jenis === 'Besar' && sN > 0) {
+        historyJson.hangus_n_besar = sN;
+        sheetUser.getRange(rowIndex, 9).setValue(0);
+      }
+    }
+  }
+
+  historyJson.snap_akhir = [
+    Math.max(0, sN2 - historyJson.y24 - historyJson.hangus_n2),
+    Math.max(0, sN1 - historyJson.y25),
+    Math.max(0, sN - historyJson.y26 - historyJson.hangus_n_besar)
+  ];
+
+  return historyJson;
+}
+
+/**
+ * Mesin Pemulihan (Refund) Saldo Cuti Terpusat (Saat Ditolak / Diedit / Ditarik / Dibatalkan)
+ * Mengembalikan potongan kuota sekaligus memulihkan N-2 yang sempat hangus atau N yang nol akibat Cuti Besar.
+ */
+function pulihkanSaldoCutiServer_(sheetUser, rowIndex, jenis, historyStr) {
+  if (!sheetUser || rowIndex <= 1 || jenis === 'Dinas Luar') return;
+
+  let h24 = 0, h25 = 0, h26 = 0, hangusN2 = 0, hangusNBesar = 0, hLain = 0, histYear = 0;
+  if (historyStr) {
+    try {
+      const h = (typeof historyStr === 'string') ? JSON.parse(historyStr) : historyStr;
+      h24 = Number(h.y24) || 0;
+      h25 = Number(h.y25) || 0;
+      h26 = Number(h.y26) || 0;
+      hangusN2 = Number(h.hangus_n2) || 0;
+      hangusNBesar = Number(h.hangus_n_besar) || 0;
+      hLain = Number(h.dur) || 0;
+      histYear = Number(h.year_n) || 0;
+    } catch (e) {}
+  }
+
+  const currentYear = getActiveYearWIB_();
+  const yearShift = (histYear > 0 && currentYear > histYear) ? (currentYear - histYear) : 0;
+
+  if (jenis === 'Tahunan') {
+    const c24 = Number(sheetUser.getRange(rowIndex, 7).getValue() || 0);
+    const c25 = Number(sheetUser.getRange(rowIndex, 8).getValue() || 0);
+    const c26 = Number(sheetUser.getRange(rowIndex, 9).getValue() || 0);
+
+    if (yearShift === 0) {
+      sheetUser.getRange(rowIndex, 7).setValue(c24 + h24 + hangusN2);
+      sheetUser.getRange(rowIndex, 8).setValue(c25 + h25);
+      sheetUser.getRange(rowIndex, 9).setValue(c26 + h26);
+    } else if (yearShift === 1) {
+      // Jika cuti akhir Desember tahun lalu ditolak/dibatalkan pada Januari tahun baru: pulihkan ke N-1 (maks 6)
+      sheetUser.getRange(rowIndex, 8).setValue(Math.min(6, c25 + h26));
+    }
+  } else {
+    const mapKolom = { 'Sakit': 10, 'Alasan Penting': 11, 'Penting': 11, 'Besar': 12, 'Melahirkan': 13, 'CLTN': 14 };
+    const col = mapKolom[jenis];
+    if (col) {
+      const cVal = Number(sheetUser.getRange(rowIndex, col).getValue() || 0);
+      sheetUser.getRange(rowIndex, col).setValue(cVal + hLain);
+    }
+    if (jenis === 'Besar' && hangusNBesar > 0 && yearShift === 0) {
+      const c26 = Number(sheetUser.getRange(rowIndex, 9).getValue() || 0);
+      sheetUser.getRange(rowIndex, 9).setValue(c26 + hangusNBesar);
+    }
+  }
 }
 
 // 6. Revokasi Sesi Server-Side (CWE-613)
@@ -664,8 +1108,10 @@ function sendWhatsAppMessage_(rawPhone, text, metaPayload) {
 // ------------------------------------------
 function verifyLogin(nip, pass) {
   try {
-    // Memanggil koneksi database terpusat
+    // Memanggil koneksi database terpusat & cek pergantian tahun otomatis
     const ss = getDB();
+    const activeYear = ensureAnnualCutiRollover_(ss);
+    const cutiYears = [activeYear - 2, activeYear - 1, activeYear];
     
     const sheet = ss.getSheetByName('user_data');
     const data = readUserSheetDecrypted_(sheet);
@@ -685,7 +1131,7 @@ function verifyLogin(nip, pass) {
             no_hp: data[i][4], s_tahunan_2024: data[i][6], s_tahunan_2025: data[i][7],
             s_tahunan_2026: data[i][8], s_sakit: data[i][9], s_penting: data[i][10],
             s_besar: data[i][11], s_melahirkan: data[i][12], s_cltn: data[i][13],
-            pangkat: data[i][14], alamat: data[i][15]
+            pangkat: data[i][14], alamat: data[i][15], cuti_years: cutiYears
           };
 
           const sessionToken = Utilities.getUuid();
@@ -813,8 +1259,10 @@ function getBulkData(nip, clientToken, clientVersion) {
         return { status: 'error', message: 'Akses Ditolak: Sesi kedaluwarsa atau manipulasi terdeteksi. Silakan login ulang.' };
     }
 
-    // Memanggil koneksi database terpusat & cek self-healing enkripsi sebelum short-circuit versi
+    // Memanggil koneksi database terpusat, auto-rollover tahun baru, & self-healing enkripsi sebelum short-circuit versi
     const ss = getDB();
+    const activeYear = ensureAnnualCutiRollover_(ss);
+    const cutiYears = [activeYear - 2, activeYear - 1, activeYear];
     const sheetUser = ss.getSheetByName('user_data');
     const uData = sheetUser ? readUserSheetDecrypted_(sheetUser) : [];
 
@@ -822,7 +1270,7 @@ function getBulkData(nip, clientToken, clientVersion) {
 
     // DELTA SYNC SHORT-CIRCUIT (TAHAP 2):
     if (clientVersion && String(clientVersion) === String(serverVersion)) {
-      return { status: 'NOT_MODIFIED', version: serverVersion };
+      return { status: 'NOT_MODIFIED', version: serverVersion, cuti_years: cutiYears };
     }
 
     let cachedTempPass = null;
@@ -835,7 +1283,8 @@ function getBulkData(nip, clientToken, clientVersion) {
       usersList: [], 
       pendingPkpCount: 0,
       must_change_password: !!cachedTempPass,
-      temp_pass: cachedTempPass || ''
+      temp_pass: cachedTempPass || '',
+      cuti_years: cutiYears
     };
 
     if(sheetUser && uData.length > 0) {
@@ -889,7 +1338,8 @@ function getBulkData(nip, clientToken, clientVersion) {
             bup: uData[i][colBup], status_kgb: uData[i][colStatusKgb] || '', tgl_selesai_kgb: uData[i][colTglKgb] || '',
             status_knp: uData[i][colStatusKnp] || '', tgl_selesai_knp: uData[i][colTglKnp] || '',
             status_pensiun: uData[i][colStatusPensiun] || '', tgl_selesai_pensiun: uData[i][colTglPensiun] || '',
-            jenis_jabatan: uData[i][colJenisJab] || 'Fungsional Umum'
+            jenis_jabatan: uData[i][colJenisJab] || 'Fungsional Umum',
+            cuti_years: cutiYears
           };
           data.usersList.push(u);
           if (isCurrentUser) data.user = u;

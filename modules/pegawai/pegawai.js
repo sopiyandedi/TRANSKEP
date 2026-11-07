@@ -41,6 +41,14 @@
         currentUser() {
           return window.vueState ? window.vueState.user : null;
         },
+        cutiYears() {
+          const u = this.currentUser || (this.usersList && this.usersList[0]);
+          const y = new Date().getFullYear();
+          if (u && Array.isArray(u.cuti_years) && u.cuti_years.length === 3 && Number(u.cuti_years[2]) >= y) {
+            return u.cuti_years.map(Number);
+          }
+          return [y - 2, y - 1, y];
+        },
         filteredUsers() {
           let users = this.usersList.slice() || [];
           
@@ -238,13 +246,21 @@
              if(window.showNotify) window.showNotify('Library Terblokir', 'Modul export excel gagal dimuat koneksi.', 'error');
              return;
           }
-          const dataExport = this.usersList.map(u => ({
-              'NIP': u.nip, 'Nama': u.nama, 'Jabatan': u.jabatan, 'Role': u.role, 'No_HP': u.no_hp, 'Password': u.pass,
-              'Sisa_Tahunan_2024': u.s_tahunan_2024, 'Sisa_Tahunan_2025': u.s_tahunan_2025, 'Sisa_Tahunan_2026': u.s_tahunan_2026,
-              'Sisa_Sakit': u.s_sakit, 'Sisa_Penting': u.s_penting, 'Sisa_Besar': u.s_besar, 'Sisa_Melahirkan': u.s_melahirkan, 'Sisa_CLTN': u.s_cltn,
-              'Pangkat': u.pangkat, 'Jenis_Jabatan': (u.jenis_jabatan || 'Fungsional Umum'), 'Alamat': u.alamat,
-              'TMT_KGB': u.tmt_kgb, 'TMT_KNP': u.tmt_knp, 'BUP': u.bup
-          }));
+          const yrs = this.cutiYears;
+          const dataExport = this.usersList.map(u => {
+              const row = {
+                  'NIP': u.nip, 'Nama': u.nama, 'Jabatan': u.jabatan, 'Role': u.role, 'No_HP': u.no_hp, 'Password': u.pass
+              };
+              row['Sisa_Tahunan_' + yrs[0]] = u.s_tahunan_2024;
+              row['Sisa_Tahunan_' + yrs[1]] = u.s_tahunan_2025;
+              row['Sisa_Tahunan_' + yrs[2]] = u.s_tahunan_2026;
+              Object.assign(row, {
+                  'Sisa_Sakit': u.s_sakit, 'Sisa_Penting': u.s_penting, 'Sisa_Besar': u.s_besar, 'Sisa_Melahirkan': u.s_melahirkan, 'Sisa_CLTN': u.s_cltn,
+                  'Pangkat': u.pangkat, 'Jenis_Jabatan': (u.jenis_jabatan || 'Fungsional Umum'), 'Alamat': u.alamat,
+                  'TMT_KGB': u.tmt_kgb, 'TMT_KNP': u.tmt_knp, 'BUP': u.bup
+              });
+              return row;
+          });
           if(dataExport.length === 0) {
               if(window.showNotify) window.showNotify('Perhatian', 'Tidak ada data untuk dibackup.', 'error'); return;
           }

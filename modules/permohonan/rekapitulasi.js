@@ -335,6 +335,8 @@
                           if (!res || res.status !== 'success') {
                               this.s.cutiLogs = backupCuti;
                               if(window.showNotify) window.showNotify("Gagal Membatalkan", (res ? res.message : "Terjadi kesalahan.") + " (Status dikembalikan)", "error");
+                          } else if (typeof syncAllServerData === 'function') {
+                              syncAllServerData(true);
                           }
                       } catch (err) {
                           this.s.cutiLogs = backupCuti;

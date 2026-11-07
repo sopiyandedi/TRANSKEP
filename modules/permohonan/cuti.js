@@ -139,13 +139,276 @@
       }
   }
 
-  function calculateDuration(start, end) {
-      const d1 = new Date(start); const d2 = new Date(end);
-      let count = 0;
-      for (let d = new Date(d1); d <= d2; d.setDate(d.getDate() + 1)) {
-          if (d.getDay() !== 0 && d.getDay() !== 6) count++;
+  // =========================================================================
+  // MESIN KALENDER SKB 3 MENTERI (2026 & 2027) & SIMULATOR SALDO SE SEKMA 13/2019
+  // =========================================================================
+  window.TRANSKEP_HOLIDAYS_MAP = {
+      // --- HARI LIBUR NASIONAL & CUTI BERSAMA TAHUN 2026 ---
+      '2026-01-01': 'Tahun Baru 2026 Masehi',
+      '2026-01-16': 'Isra Mikraj Nabi Muhammad S.A.W.',
+      '2026-02-16': 'Cuti Bersama Tahun Baru Imlek 2577 Kongzili',
+      '2026-02-17': 'Tahun Baru Imlek 2577 Kongzili',
+      '2026-03-18': 'Cuti Bersama Hari Suci Nyepi',
+      '2026-03-19': 'Hari Suci Nyepi (Tahun Baru Saka 1948)',
+      '2026-03-20': 'Cuti Bersama Idul Fitri 1447 H',
+      '2026-03-21': 'Idul Fitri 1447 Hijriah',
+      '2026-03-22': 'Idul Fitri 1447 Hijriah',
+      '2026-03-23': 'Cuti Bersama Idul Fitri 1447 H',
+      '2026-03-24': 'Cuti Bersama Idul Fitri 1447 H',
+      '2026-04-03': 'Wafat Yesus Kristus',
+      '2026-04-05': 'Kebangkitan Yesus Kristus (Paskah)',
+      '2026-05-01': 'Hari Buruh Internasional',
+      '2026-05-14': 'Kenaikan Yesus Kristus',
+      '2026-05-15': 'Cuti Bersama Kenaikan Yesus Kristus',
+      '2026-05-27': 'Idul Adha 1447 Hijriah',
+      '2026-05-28': 'Cuti Bersama Idul Adha 1447 H',
+      '2026-05-31': 'Hari Raya Waisak 2570 BE',
+      '2026-06-01': 'Hari Lahir Pancasila',
+      '2026-06-16': 'Tahun Baru Islam 1448 Hijriah',
+      '2026-08-17': 'Proklamasi Kemerdekaan RI',
+      '2026-08-25': 'Maulid Nabi Muhammad S.A.W.',
+      '2026-12-24': 'Cuti Bersama Kelahiran Yesus Kristus',
+      '2026-12-25': 'Kelahiran Yesus Kristus',
+
+      // --- HARI LIBUR NASIONAL & CUTI BERSAMA TAHUN 2027 (SKB Nomor 1205/3/2 Tahun 2026) ---
+      '2027-01-01': 'Tahun Baru 2027 Masehi',
+      '2027-01-05': 'Isra Mikraj Nabi Muhammad S.A.W. 1448 H',
+      '2027-02-05': 'Cuti Bersama Tahun Baru Imlek 2578 Kongzili',
+      '2027-02-06': 'Tahun Baru Imlek 2578 Kongzili',
+      '2027-03-08': 'Hari Suci Nyepi (Tahun Baru Saka 1949)',
+      '2027-03-09': 'Cuti Bersama Idul Fitri 1448 H',
+      '2027-03-10': 'Idul Fitri 1448 Hijriah',
+      '2027-03-11': 'Idul Fitri 1448 Hijriah',
+      '2027-03-12': 'Cuti Bersama Idul Fitri 1448 H',
+      '2027-03-15': 'Cuti Bersama Idul Fitri 1448 H',
+      '2027-03-25': 'Cuti Bersama Wafat Yesus Kristus',
+      '2027-03-26': 'Wafat Yesus Kristus',
+      '2027-03-28': 'Kebangkitan Yesus Kristus (Paskah)',
+      '2027-05-01': 'Hari Buruh Internasional',
+      '2027-05-06': 'Kenaikan Yesus Kristus',
+      '2027-05-17': 'Idul Adha 1448 Hijriah',
+      '2027-05-18': 'Cuti Bersama Idul Adha 1448 H',
+      '2027-05-19': 'Cuti Bersama Hari Raya Waisak 2571 BE',
+      '2027-05-20': 'Hari Raya Waisak 2571 BE',
+      '2027-06-01': 'Hari Lahir Pancasila',
+      '2027-06-06': '1 Muharam Tahun Baru Islam 1449 H',
+      '2027-08-15': 'Maulid Nabi Muhammad S.A.W.',
+      '2027-08-17': 'Proklamasi Kemerdekaan RI',
+      '2027-12-24': 'Cuti Bersama Kelahiran Yesus Kristus',
+      '2027-12-25': 'Kelahiran Yesus Kristus',
+      '2027-12-26': 'Isra Mikraj Nabi Muhammad S.A.W. 1449 H'
+  };
+
+  window.getActiveCutiYears = function(userObj) {
+      const liveYear = new Date().getFullYear();
+      if (userObj && Array.isArray(userObj.cuti_years) && userObj.cuti_years.length === 3 && Number(userObj.cuti_years[2]) >= liveYear) {
+          return userObj.cuti_years.map(Number);
       }
-      return count;
+      return [liveYear - 2, liveYear - 1, liveYear];
+  };
+
+  window.parseLocalYmdCuti = function(str) {
+      if (!str) return null;
+      const s = String(str).trim();
+      const parts = s.includes('/') ? s.split('/') : s.split('-');
+      if (parts.length === 3) {
+          if (parts[0].length === 4) {
+              return new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10), 12, 0, 0);
+          } else {
+              const yr = parts[2].length === 2 ? parseInt('20' + parts[2], 10) : parseInt(parts[2], 10);
+              return new Date(yr, parseInt(parts[1], 10) - 1, parseInt(parts[0], 10), 12, 0, 0);
+          }
+      }
+      const d = new Date(s);
+      return isNaN(d.getTime()) ? null : new Date(d.getFullYear(), d.getMonth(), d.getDate(), 12, 0, 0);
+  };
+
+  window.hitungHariKerjaCuti = function(startStr, endStr) {
+      const d1 = window.parseLocalYmdCuti(startStr);
+      const d2 = window.parseLocalYmdCuti(endStr);
+      if (!d1 || !d2 || d2 < d1) {
+          return { durasi: 0, holidayCount: 0, weekendCount: 0, skippedHolidays: [], invalidOrder: Boolean(d1 && d2 && d2 < d1) };
+      }
+      let durasi = 0, holidayCount = 0, weekendCount = 0;
+      const skippedHolidays = [];
+      for (let d = new Date(d1.getTime()); d <= d2; d.setDate(d.getDate() + 1)) {
+          const dow = d.getDay();
+          if (dow === 0 || dow === 6) {
+              weekendCount++;
+              continue;
+          }
+          const ymd = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+          if (window.TRANSKEP_HOLIDAYS_MAP[ymd]) {
+              holidayCount++;
+              skippedHolidays.push({ date: ymd, name: window.TRANSKEP_HOLIDAYS_MAP[ymd] });
+          } else {
+              durasi++;
+          }
+      }
+      return { durasi, holidayCount, weekendCount, skippedHolidays, invalidOrder: false };
+  };
+
+  window.simulasiPotongCutiClient = function(userObj, jenis, durasi, editLog) {
+      const years = window.getActiveCutiYears(userObj);
+      if (!userObj) return { valid: true, durasi, years };
+
+      let sN2 = Math.max(0, Number(userObj.s_tahunan_2024 || 0));
+      let sN1 = Math.max(0, Number(userObj.s_tahunan_2025 || 0));
+      let sN  = Math.max(0, Number(userObj.s_tahunan_2026 || 0));
+      let sSakit = Math.max(0, Number(userObj.s_sakit || 0));
+      let sPenting = Math.max(0, Number(userObj.s_penting || 0));
+      let sBesar = Math.max(0, Number(userObj.s_besar || 0));
+      let sMelahirkan = Math.max(0, Number(userObj.s_melahirkan || 0));
+
+      // Jika sedang mode Edit pengajuan berstatus Menunggu, pulihkan dulu potongan lama secara virtual
+      if (editLog && String(editLog.status || '').toLowerCase() === 'menunggu') {
+          let h = {};
+          try { h = (typeof editLog.history === 'string') ? JSON.parse(editLog.history || '{}') : (editLog.history || {}); } catch(e) {}
+          if (editLog.jenis === 'Tahunan') {
+              sN2 += (Number(h.y24) || 0) + (Number(h.hangus_n2) || 0);
+              sN1 += (Number(h.y25) || 0);
+              sN  += (Number(h.y26) || 0);
+          } else {
+              const oldDur = Number(h.dur || editLog.sisa_cuti || 0);
+              if (editLog.jenis === 'Sakit') sSakit += oldDur;
+              else if (editLog.jenis === 'Alasan Penting' || editLog.jenis === 'Penting') sPenting += oldDur;
+              else if (editLog.jenis === 'Besar') {
+                  sBesar += oldDur;
+                  sN += (Number(h.hangus_n_besar) || 0);
+              }
+              else if (editLog.jenis === 'Melahirkan') sMelahirkan += oldDur;
+          }
+      }
+
+      if (jenis === 'Dinas Luar' || jenis === 'CLTN') {
+          return { valid: durasi > 0 || jenis === 'Dinas Luar', durasi, years, tersedia: '-', sisaAkhir: '-', hangusN2: 0, hangusNBesar: 0 };
+      }
+
+      if (durasi <= 0) {
+          return {
+              valid: false,
+              errorMsg: 'Rentang tanggal yang dipilih seluruhnya akhir pekan atau Libur Nasional / Cuti Bersama SKB (0 hari kerja efektif).',
+              durasi: 0, years, tersedia: 0, sisaAkhir: 0, hangusN2: 0, hangusNBesar: 0
+          };
+      }
+
+      if (jenis === 'Tahunan') {
+          const totalTersedia = sN2 + sN1 + sN;
+          const batasTanpaN2 = sN1 + sN;
+          if (totalTersedia < durasi) {
+              return {
+                  valid: false,
+                  errorMsg: 'Maaf, sisa kuota Cuti Tahunan (' + totalTersedia + ' Hari) tidak mencukupi untuk pengajuan ' + durasi + ' Hari.',
+                  durasi, years, tersedia: totalTersedia, sisaAkhir: totalTersedia - durasi,
+                  sN2_awal: sN2, sN1_awal: sN1, sN_awal: sN, batasTanpaN2, hangusN2: 0, hangusNBesar: 0
+              };
+          }
+
+          let potongN2 = 0, potongN1 = 0, potongN = 0, hangusN2 = 0;
+          let sN2_akhir = sN2, sN1_akhir = sN1, sN_akhir = sN;
+          let sisa = durasi;
+
+          if (sN2 > 0 && durasi <= batasTanpaN2) {
+              hangusN2 = sN2;
+              sN2_akhir = 0;
+              if (sN1 >= sisa) { potongN1 = sisa; sN1_akhir = sN1 - sisa; sisa = 0; }
+              else { potongN1 = sN1; sisa -= sN1; sN1_akhir = 0; }
+              if (sisa > 0) { potongN = sisa; sN_akhir = sN - sisa; sisa = 0; }
+          } else {
+              if (sN2 >= sisa) { potongN2 = sisa; sN2_akhir = sN2 - sisa; sisa = 0; }
+              else { potongN2 = sN2; sisa -= sN2; sN2_akhir = 0; }
+              if (sisa > 0) {
+                  if (sN1 >= sisa) { potongN1 = sisa; sN1_akhir = sN1 - sisa; sisa = 0; }
+                  else { potongN1 = sN1; sisa -= sN1; sN1_akhir = 0; }
+              }
+              if (sisa > 0) { potongN = sisa; sN_akhir = sN - sisa; sisa = 0; }
+          }
+
+          return {
+              valid: true, durasi, years,
+              tersedia: totalTersedia,
+              sisaAkhir: sN2_akhir + sN1_akhir + sN_akhir,
+              sN2_awal: sN2, sN1_awal: sN1, sN_awal: sN,
+              sN2_akhir, sN1_akhir, sN_akhir,
+              potongN2, potongN1, potongN,
+              batasTanpaN2, hangusN2, hangusNBesar: 0
+          };
+      }
+
+      const poolMap = { 'Sakit': sSakit, 'Alasan Penting': sPenting, 'Penting': sPenting, 'Besar': sBesar, 'Melahirkan': sMelahirkan };
+      const tersedia = poolMap[jenis] !== undefined ? poolMap[jenis] : 0;
+      if (tersedia < durasi) {
+          return {
+              valid: false,
+              errorMsg: 'Maaf, sisa kuota Cuti ' + jenis + ' (' + tersedia + ' Hari) tidak mencukupi untuk pengajuan ' + durasi + ' Hari.',
+              durasi, years, tersedia, sisaAkhir: tersedia - durasi, hangusN2: 0, hangusNBesar: 0
+          };
+      }
+
+      const hangusNBesar = (jenis === 'Besar' && sN > 0) ? sN : 0;
+      return {
+          valid: true, durasi, years,
+          tersedia,
+          sisaAkhir: tersedia - durasi,
+          sN_akhir: hangusNBesar > 0 ? 0 : sN,
+          hangusN2: 0,
+          hangusNBesar
+      };
+  };
+
+  window.terapkanPotongCutiClient = function(userObj, jenis, historyOrSim, durasiFallback) {
+      if (!userObj || jenis === 'Dinas Luar' || jenis === 'CLTN') return;
+      let h = {};
+      if (historyOrSim) {
+          try { h = (typeof historyOrSim === 'string') ? JSON.parse(historyOrSim) : historyOrSim; } catch(e) {}
+      }
+      if (jenis === 'Tahunan') {
+          const p24 = Number(h.y24 !== undefined ? h.y24 : h.potongN2) || 0;
+          const p25 = Number(h.y25 !== undefined ? h.y25 : h.potongN1) || 0;
+          const p26 = Number(h.y26 !== undefined ? h.y26 : h.potongN) || 0;
+          const hgN2 = Number(h.hangus_n2 !== undefined ? h.hangus_n2 : h.hangusN2) || 0;
+          userObj.s_tahunan_2024 = Math.max(0, Number(userObj.s_tahunan_2024 || 0) - p24 - hgN2);
+          userObj.s_tahunan_2025 = Math.max(0, Number(userObj.s_tahunan_2025 || 0) - p25);
+          userObj.s_tahunan_2026 = Math.max(0, Number(userObj.s_tahunan_2026 || 0) - p26);
+      } else {
+          const mapCol = { 'Sakit': 's_sakit', 'Alasan Penting': 's_penting', 'Penting': 's_penting', 'Besar': 's_besar', 'Melahirkan': 's_melahirkan' };
+          const fld = mapCol[jenis];
+          const dur = Number(h.dur || durasiFallback || 0);
+          if (fld && userObj[fld] !== undefined) {
+              userObj[fld] = Math.max(0, Number(userObj[fld] || 0) - dur);
+          }
+          const hgBesar = Number(h.hangus_n_besar !== undefined ? h.hangus_n_besar : h.hangusNBesar) || 0;
+          if (jenis === 'Besar' && hgBesar > 0) {
+              userObj.s_tahunan_2026 = Math.max(0, Number(userObj.s_tahunan_2026 || 0) - hgBesar);
+          }
+      }
+  };
+
+  window.terapkanRefundCutiClient = function(userObj, logRecord) {
+      if (!userObj || !logRecord || logRecord.jenis === 'Dinas Luar') return;
+      let h = {};
+      try { h = (typeof logRecord.history === 'string') ? JSON.parse(logRecord.history || '{}') : (logRecord.history || {}); } catch(e) {}
+      if (logRecord.jenis === 'Tahunan') {
+          userObj.s_tahunan_2024 = Number(userObj.s_tahunan_2024 || 0) + (Number(h.y24) || 0) + (Number(h.hangus_n2) || 0);
+          userObj.s_tahunan_2025 = Number(userObj.s_tahunan_2025 || 0) + (Number(h.y25) || 0);
+          userObj.s_tahunan_2026 = Number(userObj.s_tahunan_2026 || 0) + (Number(h.y26) || 0);
+      } else {
+          let field = '';
+          if (logRecord.jenis === 'Sakit') field = 's_sakit';
+          else if (logRecord.jenis === 'Alasan Penting' || logRecord.jenis === 'Penting') field = 's_penting';
+          else if (logRecord.jenis === 'Besar') field = 's_besar';
+          else if (logRecord.jenis === 'Melahirkan') field = 's_melahirkan';
+          else if (logRecord.jenis === 'CLTN') field = 's_cltn';
+          const dur = Number(h.dur || logRecord.sisa_cuti || 0);
+          if (field !== '') userObj[field] = Number(userObj[field] || 0) + dur;
+          if (logRecord.jenis === 'Besar' && Number(h.hangus_n_besar) > 0) {
+              userObj.s_tahunan_2026 = Number(userObj.s_tahunan_2026 || 0) + Number(h.hangus_n_besar);
+          }
+      }
+  };
+
+  function calculateDuration(start, end) {
+      return window.hitungHariKerjaCuti(start, end).durasi;
   }
 
   function renderPermohonanView() {
@@ -490,24 +753,9 @@
                                   if (logIndex !== -1) {
                                       const logToCancel = this.s.cutiLogs[logIndex];
                                       const logStatus = String(logToCancel.status || '').trim().toLowerCase();
-                                      // Proses Refund Saldo (Hanya jika belum pernah ditolak atau dibatalkan)
-                                      if (logStatus !== 'ditolak' && logStatus !== 'dibatalkan') {
-                                          if (logToCancel.jenis === 'Tahunan') {
-                                              try {
-                                                  let h = JSON.parse(logToCancel.history || "{}");
-                                                  this.s.user.s_tahunan_2024 = Number(this.s.user.s_tahunan_2024 || 0) + (Number(h.y24) || 0);
-                                                  this.s.user.s_tahunan_2025 = Number(this.s.user.s_tahunan_2025 || 0) + (Number(h.y25) || 0);
-                                                  this.s.user.s_tahunan_2026 = Number(this.s.user.s_tahunan_2026 || 0) + (Number(h.y26) || 0);
-                                              } catch(e) {}
-                                          } else {
-                                              let field = "";
-                                              if(logToCancel.jenis === 'Sakit') field = 's_sakit';
-                                              else if(logToCancel.jenis === 'Alasan Penting' || logToCancel.jenis === 'Penting') field = 's_penting';
-                                              else if(logToCancel.jenis === 'Besar') field = 's_besar';
-                                              else if(logToCancel.jenis === 'Melahirkan') field = 's_melahirkan';
-                                              else if(logToCancel.jenis === 'CLTN') field = 's_cltn';
-                                              if (field !== "") this.s.user[field] = Number(this.s.user[field] || 0) + Number(logToCancel.sisa_cuti || 0);
-                                          }
+                                      // Proses Refund Saldo (Hanya jika belum pernah ditolak, diminta perubahan, atau dibatalkan)
+                                      if (logStatus !== 'ditolak' && logStatus !== 'perubahan' && logStatus !== 'dibatalkan') {
+                                          window.terapkanRefundCutiClient(this.s.user, logToCancel);
                                       }
                                       
                                       // Update juga referensi di usersList agar data admin tidak desinkronisasi
@@ -700,6 +948,55 @@
                       return this.s.usersList.find(u => String(u.nip) === String(this.form.bypassNip));
                   }
                   return this.s.user;
+              },
+              cutiPreviewInfo() {
+                  if (!this.form.mulai || !this.form.selesai) return null;
+                  const calc = window.hitungHariKerjaCuti(this.form.mulai, this.form.selesai);
+                  if (calc.invalidOrder) {
+                      return {
+                          isError: true,
+                          durasi: 0,
+                          holidayCount: 0,
+                          holidayNames: '',
+                          errorText: 'Tanggal selesai tidak boleh mendahului tanggal mulai pelaksanaan.'
+                      };
+                  }
+                  const editObj = this.currentEditId && this.s && this.s.cutiLogs
+                      ? this.s.cutiLogs.find(l => String(l.id) === String(this.currentEditId))
+                      : null;
+                  const sim = window.simulasiPotongCutiClient(this.targetUser, this.form.jenis, calc.durasi, editObj);
+                  const yrs = sim.years || window.getActiveCutiYears(this.targetUser);
+                  const holidayNames = (calc.skippedHolidays || []).map(h => h.date + ' (' + h.name + ')').join(', ');
+
+                  if (!sim.valid) {
+                      return {
+                          isError: true,
+                          durasi: calc.durasi,
+                          holidayCount: calc.holidayCount,
+                          holidayNames,
+                          errorText: sim.errorMsg
+                      };
+                  }
+
+                  let rincianSisa = '';
+                  if (this.form.jenis === 'Tahunan' && sim.sN2_akhir !== undefined) {
+                      rincianSisa = yrs[0] + ': ' + sim.sN2_akhir + ' | ' + yrs[1] + ': ' + sim.sN1_akhir + ' | ' + yrs[2] + ': ' + sim.sN_akhir;
+                  }
+
+                  return {
+                      isError: false,
+                      durasi: calc.durasi,
+                      holidayCount: calc.holidayCount,
+                      holidayNames,
+                      sisaAkhir: sim.sisaAkhir,
+                      rincianSisa,
+                      hangusN2: sim.hangusN2 || 0,
+                      batasTanpaN2: sim.batasTanpaN2 || 18,
+                      hangusNBesar: sim.hangusNBesar || 0,
+                      yearN2: yrs[0],
+                      yearN1: yrs[1],
+                      yearN: yrs[2]
+                  };
               },
               // FIX: Logika filtering untuk kolom pencarian bypass
               filteredBypassUsers() {
@@ -950,17 +1247,25 @@
                       fileData: this.fileData, fileName: this.fileName, fileMimeType: this.fileMimeType
                   };
 
-                  if (new Date(payload.tgl_selesai) < new Date(payload.tgl_mulai)) {
+                  const calc = window.hitungHariKerjaCuti(payload.tgl_mulai, payload.tgl_selesai);
+                  if (calc.invalidOrder) {
                      if(window.showNotify) window.showNotify("Tanggal Invalid", "Selesai pelaksanaan tidak boleh sebelum tanggal mulai.", "error"); return;
                   }
+                  const durasi = calc.durasi;
+                  if (payload.jenis !== 'Dinas Luar' && durasi <= 0) {
+                     if(window.showNotify) window.showNotify("0 Hari Kerja Efektif", "Rentang tanggal yang dipilih seluruhnya akhir pekan atau Hari Libur Nasional / Cuti Bersama SKB.", "warning"); return;
+                  }
 
-                  const newStart = new Date(payload.tgl_mulai); newStart.setHours(0,0,0,0);
-                  const newEnd = new Date(payload.tgl_selesai); newEnd.setHours(0,0,0,0);
+                  const newStart = window.parseLocalYmdCuti(payload.tgl_mulai); newStart.setHours(0,0,0,0);
+                  const newEnd = window.parseLocalYmdCuti(payload.tgl_selesai); newEnd.setHours(0,0,0,0);
 
                   const isOverlap = this.s.cutiLogs.some(log => {
                       if (String(log.nip) === String(payload.nip) && log.status !== 'Ditolak' && log.status !== 'DIBATALKAN' && String(log.id) !== String(payload.id)) {
-                          const existingStart = new Date(log.tgl_mulai); existingStart.setHours(0,0,0,0);
-                          const existingEnd = new Date(log.tgl_selesai); existingEnd.setHours(0,0,0,0);
+                          const existingStart = window.parseLocalYmdCuti(log.tgl_mulai);
+                          const existingEnd = window.parseLocalYmdCuti(log.tgl_selesai);
+                          if (!existingStart || !existingEnd) return false;
+                          existingStart.setHours(0,0,0,0);
+                          existingEnd.setHours(0,0,0,0);
                           return (newStart <= existingEnd && newEnd >= existingStart);
                       }
                       return false;
@@ -970,37 +1275,11 @@
                       if(window.showNotify) window.showNotify("Tanggal Bentrok", "Pengajuan gagal! Anda (atau pegawai ini) sudah memiliki izin/cuti yang aktif pada rentang tanggal tersebut.", "warning"); return;
                   }
 
-                  let d1 = new Date(payload.tgl_mulai); let d2 = new Date(payload.tgl_selesai);
-                  let durasi = 0;
-                  for (let d = new Date(d1); d <= d2; d.setDate(d.getDate() + 1)) {
-                      if (d.getDay() !== 0 && d.getDay() !== 6) durasi++;
-                  }
-
                   let tUser = this.targetUser;
-                  if (tUser && payload.jenis !== 'Dinas Luar' && payload.jenis !== 'CLTN') {
-                      let refundDurasiLama = 0;
-                      if (payload.id) {
-                          let logLama = this.s.cutiLogs.find(l => String(l.id) === String(payload.id));
-                          if (logLama) refundDurasiLama = Number(logLama.sisa_cuti || 0);
-                      }
-
-                      if (payload.jenis === 'Tahunan') {
-                          let totalTahunan = Number(tUser.s_tahunan_2024 || 0) + Number(tUser.s_tahunan_2025 || 0) + Number(tUser.s_tahunan_2026 || 0) + refundDurasiLama;
-                          if (totalTahunan < durasi) {
-                              if(window.showNotify) window.showNotify("Saldo Habis/Kurang", "Maaf, sisa kuota Cuti Tahunan Anda ("+totalTahunan+" Hari) tidak mencukupi untuk pengajuan durasi "+durasi+" Hari.", "error"); return;
-                          }
-                      } else {
-                          let field = "";
-                          if(payload.jenis === 'Sakit') field = 's_sakit'; else if(payload.jenis === 'Alasan Penting' || payload.jenis === 'Penting') field = 's_penting';
-                          else if(payload.jenis === 'Besar') field = 's_besar'; else if(payload.jenis === 'Melahirkan') field = 's_melahirkan';
-                          
-                          if (field !== "") {
-                              let sisa = Number(tUser[field] || 0) + refundDurasiLama;
-                              if (sisa < durasi) {
-                                  if(window.showNotify) window.showNotify("Saldo Habis/Kurang", "Maaf, sisa kuota Cuti " + payload.jenis + " ("+sisa+" Hari) tidak mencukupi untuk pengajuan "+durasi+" Hari.", "error"); return;
-                              }
-                          }
-                      }
+                  let editLogObj = payload.id ? this.s.cutiLogs.find(l => String(l.id) === String(payload.id)) : null;
+                  const sim = window.simulasiPotongCutiClient(tUser, payload.jenis, durasi, editLogObj);
+                  if (tUser && !sim.valid) {
+                      if(window.showNotify) window.showNotify("Saldo Habis/Kurang", sim.errorMsg, "error"); return;
                   }
 
                   if(window.showLoading) window.showLoading("Memverifikasi ketersediaan Pejabat...");
@@ -1027,6 +1306,7 @@
                               let routingMsg = routeRes.data.pesan;
                               
                               // OPTIMISTIC UI TAHAP 4 (0ms Update & Auto-Rollback)
+                              if(window.hideLoading) window.hideLoading();
                               this.closeModal();
                               const backupCutiLogs = JSON.parse(JSON.stringify(this.s.cutiLogs || []));
                               const backupUser = JSON.parse(JSON.stringify(this.s.user || {}));
@@ -1042,25 +1322,27 @@
                                       this.s.cutiLogs[existIdx].tgl_selesai = payload.tgl_selesai; this.s.cutiLogs[existIdx].alasan = payload.alasan;
                                       this.s.cutiLogs[existIdx].alamat = payload.alamat; this.s.cutiLogs[existIdx].atasan_nip = payload.atasan_nip;
                                       this.s.cutiLogs[existIdx].pejabat_nip = payload.pejabat_nip; this.s.cutiLogs[existIdx].plh_nip = payload.plh_nip;
+                                      this.s.cutiLogs[existIdx].sisa_cuti = durasiNumber;
                                   }
                               } else {
                                   const targetPegawai = (String(payload.nip) === String(this.s.user.nip)) ? this.s.user : (this.s.usersList ? this.s.usersList.find(u => String(u.nip) === String(payload.nip)) : null);
                                   if (targetPegawai && payload.jenis !== 'Dinas Luar' && payload.jenis !== 'CLTN') {
-                                      if (payload.jenis === 'Tahunan') {
-                                          if (targetPegawai.s_tahunan_2024 >= durasiNumber) targetPegawai.s_tahunan_2024 -= durasiNumber;
-                                          else if (targetPegawai.s_tahunan_2025 >= durasiNumber) targetPegawai.s_tahunan_2025 -= durasiNumber;
-                                          else if (targetPegawai.s_tahunan_2026 >= durasiNumber) targetPegawai.s_tahunan_2026 -= durasiNumber;
-                                      } else {
-                                          const mapCol = { 'Sakit': 's_sakit', 'Alasan Penting': 's_penting', 'Penting': 's_penting', 'Besar': 's_besar', 'Melahirkan': 's_melahirkan' };
-                                          const fld = mapCol[payload.jenis];
-                                          if (fld && targetPegawai[fld] !== undefined) targetPegawai[fld] = Math.max(0, Number(targetPegawai[fld] || 0) - durasiNumber);
-                                      }
+                                      window.terapkanPotongCutiClient(targetPegawai, payload.jenis, sim, durasiNumber);
                                       if (this.s.usersList && targetPegawai.nip) {
                                           const uIdx = this.s.usersList.findIndex(u => String(u.nip) === String(targetPegawai.nip));
                                           if (uIdx !== -1) this.s.usersList[uIdx] = Object.assign({}, targetPegawai);
                                       }
                                   }
 
+                                  const optHistObj = {
+                                      y24: sim.potongN2 || 0,
+                                      y25: sim.potongN1 || 0,
+                                      y26: sim.potongN || 0,
+                                      hangus_n2: sim.hangusN2 || 0,
+                                      hangus_n_besar: sim.hangusNBesar || 0,
+                                      year_n: (sim.years && sim.years[2]) || new Date().getFullYear(),
+                                      dur: durasiNumber
+                                  };
                                   const optimisticLog = {
                                       id: tempOptId, tgl_pengajuan: new Date().toLocaleDateString('id-ID'), nip: payload.nip,
                                       jenis: payload.jenis, tgl_mulai: payload.tgl_mulai, tgl_selesai: payload.tgl_selesai,
@@ -1068,7 +1350,7 @@
                                       status_atasan: (payload.jenis === 'Dinas Luar' ? 'Disetujui' : 'Menunggu'),
                                       status_pejabat: (payload.jenis === 'Dinas Luar' ? 'Disetujui' : 'Menunggu'),
                                       atasan_nip: payload.atasan_nip, pejabat_nip: payload.pejabat_nip, sisa_cuti: durasiNumber,
-                                      alamat: payload.alamat, plh_nip: payload.plh_nip, isOptimistic: true
+                                      alamat: payload.alamat, plh_nip: payload.plh_nip, history: JSON.stringify(optHistObj), isOptimistic: true
                                   };
                                   if (this.s && this.s.cutiLogs) this.s.cutiLogs.unshift(optimisticLog);
                               }
@@ -1085,7 +1367,7 @@
                                           if (payload.id) runner.updateCutiLog(payload, currentNip, token);
                                           else runner.addCutiLog(payload, currentNip, token);
                                       } else {
-                                          resolve({ status: 'success', message: 'Data cuti tersimpan [Demo]', data: { id: 'CUTI-DEMO-' + Date.now(), tgl_pengajuan: new Date().toISOString(), status: 'Menunggu', durasi: 1 } });
+                                          resolve({ status: 'success', message: 'Data cuti tersimpan [Demo]', data: { id: 'CUTI-DEMO-' + Date.now(), tgl_pengajuan: new Date().toISOString(), status: 'Menunggu', durasi: durasiNumber } });
                                       }
                                   });
 
@@ -1096,36 +1378,37 @@
                                       
                                       if (res.data) {
                                           if (payload.id) {
+                                              // Pulihkan saldo baseline lalu terapkan history resmi dari server
+                                              this.s.user = JSON.parse(JSON.stringify(backupUser));
+                                              if (backupUsersList) this.s.usersList = JSON.parse(JSON.stringify(backupUsersList));
+                                              const oldRec = backupCutiLogs.find(l => String(l.id) === String(payload.id));
+                                              const targetPegawai = (String(payload.nip) === String(this.s.user.nip)) ? this.s.user : (this.s.usersList ? this.s.usersList.find(u => String(u.nip) === String(payload.nip)) : null);
+                                              if (targetPegawai) {
+                                                  if (oldRec) window.terapkanRefundCutiClient(targetPegawai, oldRec);
+                                                  window.terapkanPotongCutiClient(targetPegawai, payload.jenis, res.data.history, Number(res.data.durasi || durasi));
+                                                  if (this.s.usersList && targetPegawai.nip) {
+                                                      const uIdx = this.s.usersList.findIndex(u => String(u.nip) === String(targetPegawai.nip));
+                                                      if (uIdx !== -1) this.s.usersList[uIdx] = Object.assign({}, targetPegawai);
+                                                  }
+                                              }
                                               const existIdx = this.s.cutiLogs.findIndex(l => String(l.id) === String(payload.id));
                                               if (existIdx > -1) {
                                                   this.s.cutiLogs[existIdx].jenis = payload.jenis; this.s.cutiLogs[existIdx].tgl_mulai = payload.tgl_mulai;
                                                   this.s.cutiLogs[existIdx].tgl_selesai = payload.tgl_selesai; this.s.cutiLogs[existIdx].alasan = payload.alasan;
                                                   this.s.cutiLogs[existIdx].alamat = payload.alamat; this.s.cutiLogs[existIdx].atasan_nip = payload.atasan_nip;
                                                   this.s.cutiLogs[existIdx].pejabat_nip = payload.pejabat_nip; this.s.cutiLogs[existIdx].plh_nip = payload.plh_nip;
+                                                  this.s.cutiLogs[existIdx].sisa_cuti = Number(res.data.durasi || durasi);
+                                                  this.s.cutiLogs[existIdx].history = res.data.history;
                                                   if (res.data.fileUrl) this.s.cutiLogs[existIdx].bukti_url = res.data.fileUrl;
                                               }
                                           } else {
-                                               // TAHAP 37: Potong kuota cuti lokal secara reaktif & instan
-                                               const durasiNumber = Number(res.data.durasi || durasi || 0);
+                                               // Pulihkan baseline pra-optimistic agar tidak terpotong ganda, lalu terapkan history resmi server
+                                               this.s.user = JSON.parse(JSON.stringify(backupUser));
+                                               if (backupUsersList) this.s.usersList = JSON.parse(JSON.stringify(backupUsersList));
+                                               const durasiServer = Number(res.data.durasi || durasi || 0);
                                                const targetPegawai = (String(payload.nip) === String(this.s.user.nip)) ? this.s.user : (this.s.usersList ? this.s.usersList.find(u => String(u.nip) === String(payload.nip)) : null);
                                                if (targetPegawai && payload.jenis !== 'Dinas Luar' && payload.jenis !== 'CLTN') {
-                                                   if (payload.jenis === 'Tahunan') {
-                                                       try {
-                                                           let h = (typeof res.data.history === 'string') ? JSON.parse(res.data.history || '{}') : (res.data.history || {});
-                                                           targetPegawai.s_tahunan_2024 = Math.max(0, Number(targetPegawai.s_tahunan_2024 || 0) - (Number(h.y24) || 0));
-                                                           targetPegawai.s_tahunan_2025 = Math.max(0, Number(targetPegawai.s_tahunan_2025 || 0) - (Number(h.y25) || 0));
-                                                           targetPegawai.s_tahunan_2026 = Math.max(0, Number(targetPegawai.s_tahunan_2026 || 0) - (Number(h.y26) || 0));
-                                                       } catch(e) {}
-                                                   } else {
-                                                       let field = "";
-                                                       if (payload.jenis === 'Sakit') field = 's_sakit';
-                                                       else if (payload.jenis === 'Alasan Penting' || payload.jenis === 'Penting') field = 's_penting';
-                                                       else if (payload.jenis === 'Besar') field = 's_besar';
-                                                       else if (payload.jenis === 'Melahirkan') field = 's_melahirkan';
-                                                       if (field !== "" && targetPegawai[field] !== undefined) {
-                                                           targetPegawai[field] = Math.max(0, Number(targetPegawai[field] || 0) - durasiNumber);
-                                                       }
-                                                   }
+                                                   window.terapkanPotongCutiClient(targetPegawai, payload.jenis, res.data.history, durasiServer);
                                                    if (this.s.usersList && targetPegawai.nip) {
                                                        const uIdx = this.s.usersList.findIndex(u => String(u.nip) === String(targetPegawai.nip));
                                                        if (uIdx !== -1) this.s.usersList[uIdx] = Object.assign({}, targetPegawai);
@@ -1136,13 +1419,16 @@
                                                    id: res.data.id, tgl_pengajuan: res.data.tgl_pengajuan, nip: payload.nip,
                                                    jenis: payload.jenis, tgl_mulai: payload.tgl_mulai, tgl_selesai: payload.tgl_selesai,
                                                    alasan: payload.alasan, status: res.data.status, status_atasan: res.data.status,
-                                                   atasan_nip: payload.atasan_nip, pejabat_nip: payload.pejabat_nip, sisa_cuti: durasiNumber,
+                                                   atasan_nip: payload.atasan_nip, pejabat_nip: payload.pejabat_nip, sisa_cuti: durasiServer,
                                                    status_pejabat: res.data.status, alamat: payload.alamat, history: res.data.history, bukti_url: res.data.fileUrl,
                                                    plh_nip: payload.plh_nip
                                                };
-                                               if (this.s && this.s.cutiLogs) this.s.cutiLogs.unshift(logVirtual);
+                                               if (this.s && this.s.cutiLogs) {
+                                                   const optIdx = this.s.cutiLogs.findIndex(l => l.id === tempOptId);
+                                                   if (optIdx !== -1) this.s.cutiLogs.splice(optIdx, 1, logVirtual);
+                                                   else this.s.cutiLogs.unshift(logVirtual);
+                                               }
                                            }
-                                           // TAHAP 37: Jalankan silent sync tanpa dialog blocking & tanpa kedip
                                            if (typeof syncAllServerData === 'function') {
                                                syncAllServerData(true);
                                            } else if (typeof syncBackgroundData === 'function') {
@@ -1150,8 +1436,16 @@
                                            }
                                       }
                                   } else {
+                                      this.s.cutiLogs = backupCutiLogs;
+                                      this.s.user = backupUser;
+                                      if (backupUsersList) this.s.usersList = backupUsersList;
                                       if(window.showNotify) window.showNotify("Gagal", res ? res.message : "Gagal menyimpan cuti.", "error");
                                   }
+                              }).catch((errSave) => {
+                                  this.s.cutiLogs = backupCutiLogs;
+                                  this.s.user = backupUser;
+                                  if (backupUsersList) this.s.usersList = backupUsersList;
+                                  throw errSave;
                               });
                           } else {
                               if(window.hideLoading) window.hideLoading();

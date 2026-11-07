@@ -646,17 +646,52 @@ ${absXrefOffset}
       ], headerBg);
       currentY -= 13;
 
-      let hist = { y24: 0, y25: 0, y26: 0 };
-      if (log.jenis === 'Tahunan' && log.history) {
-        try { hist = typeof log.history === 'string' ? JSON.parse(log.history) : log.history; } catch (e) {}
+      let hist = {};
+      if (log.history) {
+        try { hist = typeof log.history === 'string' ? JSON.parse(log.history) : log.history; } catch (e) { hist = {}; }
       }
-      const sAw24 = Number(pns.s_tahunan_2024 || 0) + Number(hist.y24 || 0);
-      const sAw25 = Number(pns.s_tahunan_2025 || 0) + Number(hist.y25 || 0);
-      const sAw26 = Number(pns.s_tahunan_2026 || 0) + Number(hist.y26 || 0);
 
-      const sAk24 = sAw24 - Number(hist.y24 || 0);
-      const sAk25 = sAw25 - Number(hist.y25 || 0);
-      const sAk26 = sAw26 - Number(hist.y26 || 0);
+      let leaveYear = Number(hist.year_n) || 0;
+      if (!leaveYear && log.tgl_mulai) {
+        const pMulai = String(log.tgl_mulai).trim().split(/[-/]/);
+        if (pMulai.length === 3) {
+          const cand = pMulai[0].length === 4 ? parseInt(pMulai[0], 10) : parseInt(pMulai[2], 10);
+          if (cand >= 2020 && cand <= 2100) leaveYear = cand;
+        }
+      }
+      if (!leaveYear && log.tgl_pengajuan) {
+        const pAju = String(log.tgl_pengajuan).trim().split(/[-/]/);
+        if (pAju.length === 3) {
+          const cand = pAju[0].length === 4 ? parseInt(pAju[0], 10) : parseInt(pAju[2], 10);
+          if (cand >= 2020 && cand <= 2100) leaveYear = cand;
+        }
+      }
+      if (!leaveYear) leaveYear = new Date().getFullYear();
+
+      const statusLower = String(log.status || '').trim().toLowerCase();
+      const isRefunded = (statusLower === 'ditolak' || statusLower === 'perubahan' || statusLower === 'dibatalkan');
+      const hY24 = (!isRefunded && log.jenis === 'Tahunan') ? Number(hist.y24 || 0) : 0;
+      const hY25 = (!isRefunded && log.jenis === 'Tahunan') ? Number(hist.y25 || 0) : 0;
+      const hY26 = (!isRefunded && log.jenis === 'Tahunan') ? Number(hist.y26 || 0) : 0;
+      const hHangusN2 = (!isRefunded && log.jenis === 'Tahunan') ? Number(hist.hangus_n2 || 0) : 0;
+      const hHangusBesar = (!isRefunded && log.jenis === 'Besar') ? Number(hist.hangus_n_besar || 0) : 0;
+
+      let sAw24, sAw25, sAw26, sAk24, sAk25, sAk26;
+      if (Array.isArray(hist.snap_awal) && hist.snap_awal.length === 3 && Array.isArray(hist.snap_akhir) && hist.snap_akhir.length === 3) {
+        sAw24 = Number(hist.snap_awal[0] || 0);
+        sAw25 = Number(hist.snap_awal[1] || 0);
+        sAw26 = Number(hist.snap_awal[2] || 0);
+        sAk24 = isRefunded ? sAw24 : Number(hist.snap_akhir[0] || 0);
+        sAk25 = isRefunded ? sAw25 : Number(hist.snap_akhir[1] || 0);
+        sAk26 = isRefunded ? sAw26 : Number(hist.snap_akhir[2] || 0);
+      } else {
+        sAw24 = Number(pns.s_tahunan_2024 || 0) + hY24 + hHangusN2;
+        sAw25 = Number(pns.s_tahunan_2025 || 0) + hY25;
+        sAw26 = Number(pns.s_tahunan_2026 || 0) + hY26 + hHangusBesar;
+        sAk24 = Math.max(0, sAw24 - hY24 - hHangusN2);
+        sAk25 = Math.max(0, sAw25 - hY25);
+        sAk26 = Math.max(0, sAw26 - hY26 - hHangusBesar);
+      }
 
       const vW1 = 42;
       const vW2 = 68;
@@ -685,9 +720,9 @@ ${absXrefOffset}
       ]);
       currentY -= 12;
 
-      // Baris Data 2024
+      // Baris Data N-2
       drawTableRow(marginX, currentY - 12, contentWidth, 12, [
-        { text: '2024', w: vW1, align: 'center' },
+        { text: String(leaveYear - 2), w: vW1, align: 'center' },
         { text: String(sAw24), w: vW2, align: 'center' },
         { text: String(sAk24), w: vW3, align: 'center' },
         { text: '', w: vW4 },
@@ -696,9 +731,9 @@ ${absXrefOffset}
       ]);
       currentY -= 12;
 
-      // Baris Data 2025
+      // Baris Data N-1
       drawTableRow(marginX, currentY - 12, contentWidth, 12, [
-        { text: '2025', w: vW1, align: 'center' },
+        { text: String(leaveYear - 1), w: vW1, align: 'center' },
         { text: String(sAw25), w: vW2, align: 'center' },
         { text: String(sAk25), w: vW3, align: 'center' },
         { text: '', w: vW4 },
@@ -707,9 +742,9 @@ ${absXrefOffset}
       ]);
       currentY -= 12;
 
-      // Baris Data 2026
+      // Baris Data N
       drawTableRow(marginX, currentY - 12, contentWidth, 12, [
-        { text: '2026', w: vW1, align: 'center' },
+        { text: String(leaveYear), w: vW1, align: 'center' },
         { text: String(sAw26), w: vW2, align: 'center' },
         { text: String(sAk26), w: vW3, align: 'center' },
         { text: '', w: vW4 },

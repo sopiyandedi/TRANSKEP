@@ -858,3 +858,22 @@ ZONA BAWAH: MASTER CONTEXT & STATUS MIGRASI TERKINI (LIVING CONTEXT)
     - **Penguncian 1 Baris = 1 SK & Sinkronisasi Revisi SK (`🌿`)**: Membuka Smart SK Studio atau Revisi SK pada baris manapun mengikat langsung `sk.id` baris tersebut, mengonversi otomatis `members` menjadi Lampiran I & III jika lampiran belum ada, dan menyinkronkan hasil amandemen versinya (`v2`, `v3`, dst.) kembali ke dokumen Firestore baris terkait.
     - **Kamus 19 Placeholder Google Docs & Pratinjau A4 5-Halaman**: Menyediakan panel kamus placeholder (`{{PEJABAT_PEMBUAT}}` s.d. `{{BAGAN_LAMPIRAN_3}}`) dengan fitur salin 1-klik serta pratinjau cetak A4 berlogo Pengadilan Agama Indramayu.
     - **Versioning**: Versi cache PWA dinaikkan ke **`v3.8.17`** di [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) dan [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js). Commit dan push ke `origin/main`.
+
+
+72. **Enkripsi Kolom Data Pribadi Rahasia di Google Sheets (PII Field-Level Encryption `ENC$` & Smart Auto-Encrypt Self-Healing - Tahap 95 - v3.8.18 - Selesai & Aktif ✅):**
+    - **Brankas Kunci 256-bit & Enkripsi Deterministik (`ENC$<tag>$<hex>`)**: Mengenkripsi 5 kolom rahasia (`NIP`, `No_HP`, `Password`, `Alamat Pegawai`, dan `Alamat Cuti`) pada `user_data`, `cuti_log`, dan `log_reset_pass` menggunakan kunci master `TRANSKEP_ENC_SECRET` di `PropertiesService.getScriptProperties()`.
+    - **Smart Self-Healing**: Middleware pembaca `readUserSheetDecrypted_()` dan `readCutiSheetDecrypted_()` otomatis mendeteksi input darurat plaintext di Google Sheet, langsung mengenkripsinya ke format `ENC$...` secara batch, dan mengembalikan nilai asli yang telah didekripsi ke memori aplikasi TRANSKEP.
+
+
+73. **Upgrade Menyeluruh Sistem Cuti Tahunan 3 Tahun (`N-2, N-1, N`), Auto-Rollover Tengah Malam 1 Januari, Kalender SKB 3 Menteri 2026–2027 & Aturan SE SEKMA No. 13 Tahun 2019 (Tahap 96 - v3.8.19 - Selesai & Aktif ✅):**
+    - **Auto-Rollover Tengah Malam `1 Januari 00:00 WIB` (`ensureAnnualCutiRollover_`)**: Menggeser jendela 3 tahun (`N-2, N-1, N`) secara otomatis berdasarkan zona waktu `Asia/Jakarta` dengan proteksi `LockService`, `LAST_CUTI_ROLLOVER_YEAR`, dan pelacak utuh lintas-tahun `CUTI_UTUH_NIPS_<year>`:
+      * `N-2` lama hangus; `N-2` baru bernilai `6` hari hanya bila Cuti Tahunan tidak pernah diambil selama 2 tahun berturut-turut (`N-1` lama & `N` lama utuh), selain itu `0` hari.
+      * `N-1` baru dipangkas maksimal `6` hari (`7..12 -> 6`, `6 -> 6`, `1..5 -> tetap sesuai sisanya`).
+      * `N` baru otomatis diisi `12` hari dan header Kolom G, H, I di `user_data` diperbarui otomatis (`Sisa_Tahunan_<N-2>`, `Sisa_Tahunan_<N-1>`, `Sisa_Tahunan_<N>`).
+    - **Logika Pemotongan & Pemulihan Saldo Presisi (`potongSaldoCutiServer_` & `pulihkanSaldoCutiServer_`)**:
+      * Cuti Tahunan dengan `N-2 > 0`: Pengambilan `durasi > (N-1 + N)` (misal `19–24` hari sekaligus) memakai `N-2 -> N-1 -> N`; pengambilan `durasi <= (N-1 + N)` (misal `1–18` hari) otomatis menghanguskan `N-2 = 0` (`hangus_n2`) dan memotong mulai dari `N-1` lalu `N`.
+      * Cuti Besar: Otomatis mengenolkan saldo Cuti Tahunan tahun berjalan (`N = 0`, tercatat di `hangus_n_besar`).
+      * Auto-Refund: Penolakan (`Ditolak`), permintaan `Perubahan`, penarikan mandiri (`deleteCutiLog`), revisi (`updateCutiLog`), maupun persetujuan pembatalan (`DIBATALKAN`) mengembalikan seluruh potongan beserta `hangus_n2` / `hangus_n_besar` tanpa celah *double-refund*.
+    - **Kalender Hari Kerja SKB 3 Menteri (2026 & 2027)**: Memuat lengkap 51 tanggal Libur Nasional & Cuti Bersama 2026 (25 tanggal) dan 2027 (26 tanggal sesuai SKB Nomor 1205/3/2 Tahun 2026); otomatis melewati akhir pekan & tanggal merah serta menolak rentang `0` hari kerja efektif (kecuali `Dinas Luar`). Batas H-5 tetap tidak dikunci.
+    - **Slim Pill Bar & Label Tahun Dinamis (`cutiYears`)**: Menampilkan info real-time hari kerja efektif, tanggal libur SKB yang dilewati, kuota tersedia, dan sisa akhir tepat di bawah input tanggal `Mulai/Selesai Pelaksanaan`, serta memperbarui label tahun secara dinamis di Modal Sisa Cuti, Kelola Pegawai, Export/Import Excel, Blanko Cetak Cuti (`V. CATATAN CUTI`), dan PDF Signer TTE (`snap_awal` & `snap_akhir`).
+    - **Versioning**: Versi cache PWA dinaikkan ke **`v3.8.19`** di [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) dan [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js).

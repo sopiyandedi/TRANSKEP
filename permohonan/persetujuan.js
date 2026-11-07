@@ -8,6 +8,7 @@ function updateCutiStatus(id, decision, notes, userNip, bypassMode, clientToken)
     if (!cekOtorisasi(userNip, clientToken)) return { status: 'error', message: 'Akses Ditolak: Sesi tidak valid.' };
 
     const ss = getDB();
+    ensureAnnualCutiRollover_(ss);
     const sheetCuti = ss.getSheetByName('cuti_log');
     const sheetUser = ss.getSheetByName('user_data');
     
@@ -48,21 +49,11 @@ function updateCutiStatus(id, decision, notes, userNip, bypassMode, clientToken)
        
        if (decision === 'Disetujui') {
            const historyStr = String(logRecord[16] || "");
-           let h24 = 0, h25 = 0, h26 = 0, hLain = 0;
-           if (historyStr) { try { const h = JSON.parse(historyStr); h24 = h.y24 || 0; h25 = h.y25 || 0; h26 = h.y26 || 0; hLain = h.dur || 0; } catch(e) {} }
-           
            let userRowIndex = -1;
            for (let i = 1; i < userData.length; i++) { if (String(userData[i][0]) === nip) { userRowIndex = i + 1; break; } }
            
            if (userRowIndex !== -1) {
-              if (jenis === 'Tahunan') {
-                 const c24 = Number(sheetUser.getRange(userRowIndex, 7).getValue() || 0); const c25 = Number(sheetUser.getRange(userRowIndex, 8).getValue() || 0); const c26 = Number(sheetUser.getRange(userRowIndex, 9).getValue() || 0);
-                 sheetUser.getRange(userRowIndex, 7).setValue(c24 + h24); sheetUser.getRange(userRowIndex, 8).setValue(c25 + h25); sheetUser.getRange(userRowIndex, 9).setValue(c26 + h26);
-              } else {
-                 const mapKolom = { 'Sakit': 10, 'Alasan Penting': 11, 'Besar': 12, 'Melahirkan': 13, 'CLTN': 14 };
-                 const col = mapKolom[jenis];
-                 if (col) { const cVal = Number(sheetUser.getRange(userRowIndex, col).getValue() || 0); sheetUser.getRange(userRowIndex, col).setValue(cVal + hLain); }
-              }
+              pulihkanSaldoCutiServer_(sheetUser, userRowIndex, jenis, historyStr);
            }
            sheetCuti.getRange(rowIndex, 8).setValue('DIBATALKAN');
        } else {
@@ -124,21 +115,11 @@ function updateCutiStatus(id, decision, notes, userNip, bypassMode, clientToken)
     
     if (finalStatus === 'Ditolak' || finalStatus === 'Perubahan') {
         const historyStr = String(logRecord[16] || "");
-        let h24 = 0, h25 = 0, h26 = 0, hLain = 0;
-        if (historyStr) { try { const h = JSON.parse(historyStr); h24 = h.y24 || 0; h25 = h.y25 || 0; h26 = h.y26 || 0; hLain = h.dur || 0; } catch(e) {} }
-        
         let userRowIndex = -1;
         for (let i = 1; i < userData.length; i++) { if (String(userData[i][0]) === nip) { userRowIndex = i + 1; break; } }
         
         if (userRowIndex !== -1) {
-           if (jenis === 'Tahunan') {
-              const current24 = Number(sheetUser.getRange(userRowIndex, 7).getValue() || 0); const current25 = Number(sheetUser.getRange(userRowIndex, 8).getValue() || 0); const current26 = Number(sheetUser.getRange(userRowIndex, 9).getValue() || 0);
-              sheetUser.getRange(userRowIndex, 7).setValue(current24 + h24); sheetUser.getRange(userRowIndex, 8).setValue(current25 + h25); sheetUser.getRange(userRowIndex, 9).setValue(current26 + h26);
-           } else {
-              const mapKolom = { 'Sakit': 10, 'Alasan Penting': 11, 'Besar': 12, 'Melahirkan': 13, 'CLTN': 14 };
-              const col = mapKolom[jenis];
-              if (col) { const currentVal = Number(sheetUser.getRange(userRowIndex, col).getValue() || 0); sheetUser.getRange(userRowIndex, col).setValue(currentVal + hLain); }
-           }
+           pulihkanSaldoCutiServer_(sheetUser, userRowIndex, jenis, historyStr);
         }
     }
     if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush(); 
@@ -188,6 +169,7 @@ function getCutiByToken(token) {
     }
     
     const ss = getDB();
+    ensureAnnualCutiRollover_(ss);
     const sheetCuti = ss.getSheetByName('cuti_log');
     const sheetUser = ss.getSheetByName('user_data');
     if (!sheetCuti || !sheetUser) throw new Error("Basis data belum siap.");
@@ -283,6 +265,7 @@ function processMagicLinkApproval(token, decision, notes) {
     }
     
     const ss = getDB();
+    ensureAnnualCutiRollover_(ss);
     const sheetCuti = ss.getSheetByName('cuti_log');
     const sheetUser = ss.getSheetByName('user_data');
     if (!sheetCuti || !sheetUser) throw new Error("Basis data belum siap.");
@@ -480,7 +463,7 @@ function processMagicLinkApproval(token, decision, notes) {
   }
 }
 
-// Fungsi Internal Pengembalian Saldo Cuti (DRY)
+// Fungsi Internal Pengembalian Saldo Cuti (DRY - Terpusat ke pulihkanSaldoCutiServer_)
 function refundCutiSaldo_(sheetUser, nip, jenis, historyStr) {
   try {
     const userData = readUserSheetDecrypted_(sheetUser);
@@ -492,33 +475,7 @@ function refundCutiSaldo_(sheetUser, nip, jenis, historyStr) {
       }
     }
     if (userRowIndex === -1) return;
-    
-    let h24 = 0, h25 = 0, h26 = 0, hLain = 0;
-    if (historyStr) {
-      try {
-        const h = JSON.parse(historyStr);
-        h24 = h.y24 || 0;
-        h25 = h.y25 || 0;
-        h26 = h.y26 || 0;
-        hLain = h.dur || 0;
-      } catch(e) {}
-    }
-    
-    if (jenis === 'Tahunan') {
-      const c24 = Number(sheetUser.getRange(userRowIndex, 7).getValue() || 0);
-      const c25 = Number(sheetUser.getRange(userRowIndex, 8).getValue() || 0);
-      const c26 = Number(sheetUser.getRange(userRowIndex, 9).getValue() || 0);
-      sheetUser.getRange(userRowIndex, 7).setValue(c24 + h24);
-      sheetUser.getRange(userRowIndex, 8).setValue(c25 + h25);
-      sheetUser.getRange(userRowIndex, 9).setValue(c26 + h26);
-    } else {
-      const mapKolom = { 'Sakit': 10, 'Alasan Penting': 11, 'Besar': 12, 'Melahirkan': 13, 'CLTN': 14 };
-      const col = mapKolom[jenis];
-      if (col) {
-        const cVal = Number(sheetUser.getRange(userRowIndex, col).getValue() || 0);
-        sheetUser.getRange(userRowIndex, col).setValue(cVal + hLain);
-      }
-    }
+    pulihkanSaldoCutiServer_(sheetUser, userRowIndex, jenis, historyStr);
   } catch (e) {
     Logger.log("Gagal memulihkan saldo cuti: " + e.toString());
   }
@@ -532,6 +489,7 @@ function resendCutiWhatsApp(cutiId, adminNip, clientToken) {
     }
     
     const ss = getDB();
+    ensureAnnualCutiRollover_(ss);
     const sheetCuti = ss.getSheetByName('cuti_log');
     const sheetUser = ss.getSheetByName('user_data');
     if (!sheetCuti || !sheetUser) throw new Error("Basis data belum siap.");

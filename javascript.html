@@ -1344,6 +1344,16 @@ let gSyncWatchdog = null;
                   showOldPass: false, showNewPass: false, showConfirmPass: false
               };
           },
+          computed: {
+              cutiYears() {
+                  const u = this.currentUser;
+                  const y = new Date().getFullYear();
+                  if (u && Array.isArray(u.cuti_years) && u.cuti_years.length === 3 && Number(u.cuti_years[2]) >= y) {
+                      return u.cuti_years.map(Number);
+                  }
+                  return [y - 2, y - 1, y];
+              }
+          },
           methods: {
               cancelPasswordModal() {
                   if (this.isMandatory) {

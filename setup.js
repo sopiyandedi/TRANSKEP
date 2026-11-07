@@ -43,9 +43,10 @@ function setupDatabase_() {
     if (!userSheet) userSheet = ss.insertSheet('user_data');
     
     if (userSheet.getLastRow() === 0) {
+        const initYear = new Date().getFullYear();
         const userHeaders = [
           'NIP', 'Nama', 'Jabatan', 'Role', 'No_HP', 'Password', 
-          'Sisa_Tahunan_2024', 'Sisa_Tahunan_2025', 'Sisa_Tahunan_2026', 'Sisa_Sakit', 
+          'Sisa_Tahunan_' + (initYear - 2), 'Sisa_Tahunan_' + (initYear - 1), 'Sisa_Tahunan_' + initYear, 'Sisa_Sakit', 
           'Sisa_Penting', 'Sisa_Besar', 'Sisa_Melahirkan', 'Sisa_CLTN',
           'Pangkat', 'Alamat', 'TMT_KGB', 'TMT_KNP', 'BUP',
           'Status_KGB', 'Tgl_Selesai_KGB', 'Status_KNP', 'Tgl_Selesai_KNP', 

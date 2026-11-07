@@ -9,6 +9,7 @@ function addCutiLog(payload, aktorNip, clientToken) {
     if (!cekOtorisasi(aktorNip, clientToken)) return { status: 'error', message: 'Akses Ditolak: Sesi tidak valid.' };
 
     const ss = getDB();
+    const activeYear = ensureAnnualCutiRollover_(ss);
     let sheetCuti = ss.getSheetByName('cuti_log');
     if(!sheetCuti) sheetCuti = ss.insertSheet('cuti_log');
     const sheetUser = ss.getSheetByName('user_data');
@@ -30,10 +31,10 @@ function addCutiLog(payload, aktorNip, clientToken) {
         } catch(e) { Logger.log("Gagal mengunggah file bukti: " + e.toString()); }
     }
 
-    let d1 = new Date(payload.tgl_mulai); let d2 = new Date(payload.tgl_selesai);
-    let durasi = 0;
-    for (let d = new Date(d1); d <= d2; d.setDate(d.getDate() + 1)) {
-        if (d.getDay() !== 0 && d.getDay() !== 6) durasi++;
+    const calc = hitungHariKerjaCuti_(payload.tgl_mulai, payload.tgl_selesai);
+    const durasi = calc.durasi;
+    if (payload.jenis !== 'Dinas Luar' && durasi <= 0) {
+        throw new Error("Rentang tanggal yang dipilih seluruhnya merupakan akhir pekan atau Hari Libur Nasional / Cuti Bersama (0 hari kerja efektif).");
     }
 
     const uData = readUserSheetDecrypted_(sheetUser); 
@@ -44,35 +45,8 @@ function addCutiLog(payload, aktorNip, clientToken) {
     }
     if (rowIndex === -1) throw new Error("Pegawai tidak ditemukan.");
 
-    let historyJson = { y24:0, y25:0, y26:0, dur: durasi };
-    
-    // Potong saldo
-    if (payload.jenis !== 'Dinas Luar' && payload.jenis !== 'CLTN') {
-        if (payload.jenis === 'Tahunan') {
-            let s24 = Number(uData[rowIndex - 1][6]), s25 = Number(uData[rowIndex - 1][7]), s26 = Number(uData[rowIndex - 1][8]);
-            let sisaPotong = durasi;
-            
-            if (s24 >= sisaPotong) { historyJson.y24 = sisaPotong; sheetUser.getRange(rowIndex, 7).setValue(s24 - sisaPotong); sisaPotong = 0; } 
-            else { historyJson.y24 = s24; sisaPotong -= s24; sheetUser.getRange(rowIndex, 7).setValue(0); }
-            
-            if (sisaPotong > 0) {
-                if (s25 >= sisaPotong) { historyJson.y25 = sisaPotong; sheetUser.getRange(rowIndex, 8).setValue(s25 - sisaPotong); sisaPotong = 0; } 
-                else { historyJson.y25 = s25; sisaPotong -= s25; sheetUser.getRange(rowIndex, 8).setValue(0); }
-            }
-            if (sisaPotong > 0) {
-                if (s26 >= sisaPotong) { historyJson.y26 = sisaPotong; sheetUser.getRange(rowIndex, 9).setValue(s26 - sisaPotong); } 
-                else { throw new Error("Saldo cuti tahunan tidak mencukupi."); }
-            }
-        } else {
-            const mapCol = { 'Sakit': 10, 'Alasan Penting': 11, 'Besar': 12, 'Melahirkan': 13 };
-            const col = mapCol[payload.jenis];
-            if (col) {
-                let sCuti = Number(uData[rowIndex - 1][col - 1]);
-                if (sCuti < durasi) throw new Error(`Saldo cuti ${payload.jenis} Anda tidak mencukupi.`);
-                sheetUser.getRange(rowIndex, col).setValue(sCuti - durasi);
-            }
-        }
-    }
+    // Potong saldo terpusat (SE SEKMA No. 13 Tahun 2019 & SKB 3 Menteri)
+    const historyJson = potongSaldoCutiServer_(sheetUser, rowIndex, payload.jenis, durasi, activeYear);
 
     const uniquePrefix = payload.jenis === 'Dinas Luar' ? "DL-" : "CUTI-";
     const newId = uniquePrefix + new Date().getTime() + Math.floor(Math.random() * 1000);
@@ -142,6 +116,7 @@ function updateCutiLog(payload, aktorNip, clientToken) {
     if (!cekOtorisasi(aktorNip, clientToken)) return { status: 'error', message: 'Akses Ditolak: Sesi tidak valid.' };
 
     const ss = getDB();
+    const activeYear = ensureAnnualCutiRollover_(ss);
     const sheetCuti = ss.getSheetByName('cuti_log');
     const sheetUser = ss.getSheetByName('user_data');
     if (!sheetCuti || !sheetUser) throw new Error("Database belum siap.");
@@ -163,67 +138,27 @@ function updateCutiLog(payload, aktorNip, clientToken) {
     }
     if (rowIndexUser === -1) throw new Error("Pegawai tidak ditemukan.");
 
-    // Hitung Durasi Cuti Baru
-    let d1 = new Date(payload.tgl_mulai); let d2 = new Date(payload.tgl_selesai);
-    let durasiBaru = 0;
-    for (let d = new Date(d1); d <= d2; d.setDate(d.getDate() + 1)) {
-        if (d.getDay() !== 0 && d.getDay() !== 6) durasiBaru++;
+    // Hitung Durasi Cuti Baru (lewati akhir pekan + SKB Libur Nasional & Cuti Bersama)
+    const calcBaru = hitungHariKerjaCuti_(payload.tgl_mulai, payload.tgl_selesai);
+    const durasiBaru = calcBaru.durasi;
+    if (payload.jenis !== 'Dinas Luar' && durasiBaru <= 0) {
+        throw new Error("Rentang tanggal yang dipilih seluruhnya merupakan akhir pekan atau Hari Libur Nasional / Cuti Bersama (0 hari kerja efektif).");
     }
 
-    // Eksekusi Saldo (Hanya jika bukan DL/CLTN)
-    let historyJson = { y24:0, y25:0, y26:0, dur: durasiBaru };
-    if (payload.jenis !== 'Dinas Luar' && payload.jenis !== 'CLTN') {
-        
-        // --- 1. REFUND SALDO CUTI LAMA ---
+    // Eksekusi Refund Saldo Lama + Potong Saldo Baru secara Atomik (Rollback otomatis jika validasi kuota gagal)
+    const snapshotQuotas = sheetUser.getRange(rowIndexUser, 7, 1, 8).getValues();
+    let historyJson;
+    try {
         const historyStr = String(logLama[16] || "");
-        let h24 = 0, h25 = 0, h26 = 0, hLain = 0;
-        if (historyStr) { try { const h = JSON.parse(historyStr); h24 = h.y24 || 0; h25 = h.y25 || 0; h26 = h.y26 || 0; hLain = h.dur || 0; } catch(e) {} }
+        const jenisLama = String(logLama[3] || '').trim();
+        pulihkanSaldoCutiServer_(sheetUser, rowIndexUser, jenisLama, historyStr);
+        SpreadsheetApp.flush();
 
-        const jenisLama = String(logLama[3]);
-        if (jenisLama === 'Tahunan') {
-            const cur24 = Number(sheetUser.getRange(rowIndexUser, 7).getValue() || 0);
-            const cur25 = Number(sheetUser.getRange(rowIndexUser, 8).getValue() || 0);
-            const cur26 = Number(sheetUser.getRange(rowIndexUser, 9).getValue() || 0);
-            sheetUser.getRange(rowIndexUser, 7).setValue(cur24 + h24); 
-            sheetUser.getRange(rowIndexUser, 8).setValue(cur25 + h25); 
-            sheetUser.getRange(rowIndexUser, 9).setValue(cur26 + h26);
-        } else {
-            const mapKolom = { 'Sakit': 10, 'Alasan Penting': 11, 'Besar': 12, 'Melahirkan': 13 };
-            const colLama = mapKolom[jenisLama];
-            if (colLama) {
-                const cVal = Number(sheetUser.getRange(rowIndexUser, colLama).getValue() || 0); 
-                sheetUser.getRange(rowIndexUser, colLama).setValue(cVal + hLain);
-            }
-        }
-        if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush(); // Commit Refund sebelum potong ulang!
-
-        // --- 2. POTONG SALDO DENGAN DURASI & JENIS BARU ---
-        const freshUser = sheetUser.getRange(rowIndexUser, 1, 1, 15).getValues()[0];
-        
-        if (payload.jenis === 'Tahunan') {
-            let s24 = Number(freshUser[6]), s25 = Number(freshUser[7]), s26 = Number(freshUser[8]);
-            let sisaPotong = durasiBaru;
-            
-            if (s24 >= sisaPotong) { historyJson.y24 = sisaPotong; sheetUser.getRange(rowIndexUser, 7).setValue(s24 - sisaPotong); sisaPotong = 0; } 
-            else { historyJson.y24 = s24; sisaPotong -= s24; sheetUser.getRange(rowIndexUser, 7).setValue(0); }
-            
-            if (sisaPotong > 0) {
-                if (s25 >= sisaPotong) { historyJson.y25 = sisaPotong; sheetUser.getRange(rowIndexUser, 8).setValue(s25 - sisaPotong); sisaPotong = 0; } 
-                else { historyJson.y25 = s25; sisaPotong -= s25; sheetUser.getRange(rowIndexUser, 8).setValue(0); }
-            }
-            if (sisaPotong > 0) {
-                if (s26 >= sisaPotong) { historyJson.y26 = sisaPotong; sheetUser.getRange(rowIndexUser, 9).setValue(s26 - sisaPotong); } 
-                else { throw new Error("Saldo cuti tahunan tidak mencukupi untuk update tanggal baru."); }
-            }
-        } else {
-            const mapCol = { 'Sakit': 10, 'Alasan Penting': 11, 'Besar': 12, 'Melahirkan': 13 };
-            const colBaru = mapCol[payload.jenis];
-            if (colBaru) {
-                let sCuti = Number(freshUser[colBaru - 1]);
-                if (sCuti < durasiBaru) throw new Error(`Saldo cuti ${payload.jenis} Anda tidak mencukupi.`);
-                sheetUser.getRange(rowIndexUser, colBaru).setValue(sCuti - durasiBaru);
-            }
-        }
+        historyJson = potongSaldoCutiServer_(sheetUser, rowIndexUser, payload.jenis, durasiBaru, activeYear);
+    } catch (errSaldo) {
+        sheetUser.getRange(rowIndexUser, 7, 1, 8).setValues(snapshotQuotas);
+        SpreadsheetApp.flush();
+        throw errSaldo;
     }
 
     // Upload Lampiran Baru (Jika Ada)
@@ -265,6 +200,7 @@ function deleteCutiLog(id, forceDelete, userNip, clientToken) {
     if (!cekOtorisasi(userNip, clientToken)) return { status: 'error', message: 'Akses Ditolak: Sesi tidak valid.' };
 
     const ss = getDB();
+    const activeYear = ensureAnnualCutiRollover_(ss);
     const sheetCuti = ss.getSheetByName('cuti_log');
     const sheetUser = ss.getSheetByName('user_data');
     
@@ -305,20 +241,9 @@ function deleteCutiLog(id, forceDelete, userNip, clientToken) {
     const nip = ownerNip; 
     const jenis = String(logRecord[3] || '').trim();
     
-    // Kembalikan saldo kuota jika cuti belum pernah ditolak atau dibatalkan sebelumnya
-    if (jenis !== 'Dinas Luar' && statusClean !== 'ditolak' && statusClean !== 'dibatalkan') {
+    // Kembalikan saldo kuota jika cuti belum pernah ditolak, diminta perubahan, atau dibatalkan sebelumnya
+    if (jenis !== 'Dinas Luar' && statusClean !== 'ditolak' && statusClean !== 'perubahan' && statusClean !== 'dibatalkan') {
         const historyStr = String(logRecord[16] || "");
-        let h24 = 0, h25 = 0, h26 = 0, hLain = 0;
-        if (historyStr) { 
-          try { 
-            const h = JSON.parse(historyStr); 
-            h24 = h.y24 || 0; 
-            h25 = h.y25 || 0; 
-            h26 = h.y26 || 0; 
-            hLain = h.dur || 0; 
-          } catch(e) {} 
-        }
-        
         const userData = readUserSheetDecrypted_(sheetUser);
         let userRowIndex = -1;
         for (let i = 1; i < userData.length; i++) { 
@@ -329,21 +254,7 @@ function deleteCutiLog(id, forceDelete, userNip, clientToken) {
         }
         
         if (userRowIndex !== -1) {
-           if (jenis === 'Tahunan') {
-              const c24 = Number(sheetUser.getRange(userRowIndex, 7).getValue() || 0); 
-              const c25 = Number(sheetUser.getRange(userRowIndex, 8).getValue() || 0); 
-              const c26 = Number(sheetUser.getRange(userRowIndex, 9).getValue() || 0);
-              sheetUser.getRange(userRowIndex, 7).setValue(c24 + h24); 
-              sheetUser.getRange(userRowIndex, 8).setValue(c25 + h25); 
-              sheetUser.getRange(userRowIndex, 9).setValue(c26 + h26);
-           } else {
-              const mapKolom = { 'Sakit': 10, 'Alasan Penting': 11, 'Besar': 12, 'Melahirkan': 13, 'CLTN': 14 };
-              const col = mapKolom[jenis];
-              if (col) { 
-                const cVal = Number(sheetUser.getRange(userRowIndex, col).getValue() || 0); 
-                sheetUser.getRange(userRowIndex, col).setValue(cVal + hLain); 
-              }
-           }
+           pulihkanSaldoCutiServer_(sheetUser, userRowIndex, jenis, historyStr);
         }
     }
     
@@ -370,6 +281,7 @@ function requestCancelCuti(id, alasanBatal, userNip, clientToken) {
     if (!cekOtorisasi(userNip, clientToken)) return { status: 'error', message: 'Akses Ditolak: Sesi tidak valid.' };
 
     const ss = getDB();
+    const activeYear = ensureAnnualCutiRollover_(ss);
     const sheetCuti = ss.getSheetByName('cuti_log');
     
     const cutiData = readCutiSheetDecrypted_(sheetCuti);

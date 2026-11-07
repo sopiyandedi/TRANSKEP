@@ -224,6 +224,38 @@
           </div>
         </div>
 
+        <!-- SLIM PILL BAR: RINGKASAN HARI KERJA EFEKTIF SKB & ESTIMASI KUOTA SE SEKMA 13/2019 -->
+        <div v-if="cutiPreviewInfo" :class="cutiPreviewInfo.isError ? 'bg-rose-500/10 border-rose-500/30 text-rose-300' : 'bg-indigo-500/10 border-indigo-500/25 text-slate-200'" class="px-3.5 py-2.5 rounded-xl border transition-all space-y-1">
+          <div class="flex flex-wrap items-center justify-between gap-2 text-[11px]">
+            <div class="flex flex-wrap items-center gap-2">
+              <span v-if="cutiPreviewInfo.isError" class="font-bold text-rose-400 flex items-center gap-1.5">
+                <i class="fa-solid fa-circle-exclamation"></i> {{ cutiPreviewInfo.errorText }}
+              </span>
+              <template v-else>
+                <span class="font-bold text-indigo-300 flex items-center gap-1.5">
+                  <i class="fa-solid fa-calendar-check text-indigo-400"></i> {{ cutiPreviewInfo.durasi }} Hari Kerja Efektif
+                </span>
+                <span v-if="cutiPreviewInfo.holidayCount > 0" :title="cutiPreviewInfo.holidayNames" class="px-2 py-0.5 rounded-md bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-[10px] font-semibold cursor-help">
+                  {{ cutiPreviewInfo.holidayCount }} Libur/Cuti Bersama SKB dilewati
+                </span>
+              </template>
+            </div>
+            <div v-if="!cutiPreviewInfo.isError && cutiPreviewInfo.sisaAkhir !== '-'" class="text-[10px] font-semibold text-slate-300 flex items-center gap-1.5">
+              <span class="text-slate-400">Estimasi Sisa:</span>
+              <span class="px-2 py-0.5 rounded-md bg-slate-900/80 border border-slate-700/80 text-emerald-400 font-bold">{{ cutiPreviewInfo.sisaAkhir }} Hari</span>
+              <span v-if="cutiPreviewInfo.rincianSisa" class="text-slate-400 hidden sm:inline">({{ cutiPreviewInfo.rincianSisa }})</span>
+            </div>
+          </div>
+          <div v-if="!cutiPreviewInfo.isError && cutiPreviewInfo.hangusN2 > 0" class="text-[10px] text-amber-300/90 flex items-start gap-1.5 pt-1 border-t border-indigo-500/15">
+            <i class="fa-solid fa-scale-balanced mt-0.5 text-amber-400 shrink-0"></i>
+            <span>Sesuai SE MA 13/2019: Pengajuan &le; {{ cutiPreviewInfo.batasTanpaN2 }} hari otomatis menghanguskan sisa N-2 ({{ cutiPreviewInfo.yearN2 }}: {{ cutiPreviewInfo.hangusN2 }} hari) &amp; memotong mulai {{ cutiPreviewInfo.yearN1 }}.</span>
+          </div>
+          <div v-if="!cutiPreviewInfo.isError && cutiPreviewInfo.hangusNBesar > 0" class="text-[10px] text-amber-300/90 flex items-start gap-1.5 pt-1 border-t border-indigo-500/15">
+            <i class="fa-solid fa-scale-balanced mt-0.5 text-amber-400 shrink-0"></i>
+            <span>Sesuai SE MA 13/2019: Mengambil Cuti Besar otomatis mengenolkan sisa Cuti Tahunan {{ cutiPreviewInfo.yearN }} ({{ cutiPreviewInfo.hangusNBesar }} hari).</span>
+          </div>
+        </div>
+
         <div>
           <label class="block text-slate-400 uppercase font-bold mb-1">Keperluan / Alasan Cuti</label>
           <textarea v-model="form.alasan" required rows="2" placeholder="Jelaskan alasan pengajuan cuti Anda..." class="w-full px-3.5 py-3 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>

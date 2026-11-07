@@ -42,6 +42,55 @@
                   }
                   return this.s.user;
               },
+              cutiPreviewInfo() {
+                  if (!this.form.mulai || !this.form.selesai || typeof window.hitungHariKerjaCuti !== 'function') return null;
+                  const calc = window.hitungHariKerjaCuti(this.form.mulai, this.form.selesai);
+                  if (calc.invalidOrder) {
+                      return {
+                          isError: true,
+                          durasi: 0,
+                          holidayCount: 0,
+                          holidayNames: '',
+                          errorText: 'Tanggal selesai tidak boleh mendahului tanggal mulai pelaksanaan.'
+                      };
+                  }
+                  const editObj = this.currentEditId && this.s && this.s.cutiLogs
+                      ? this.s.cutiLogs.find(l => String(l.id) === String(this.currentEditId))
+                      : null;
+                  const sim = window.simulasiPotongCutiClient(this.targetUser, this.form.jenis, calc.durasi, editObj);
+                  const yrs = sim.years || window.getActiveCutiYears(this.targetUser);
+                  const holidayNames = (calc.skippedHolidays || []).map(h => h.date + ' (' + h.name + ')').join(', ');
+
+                  if (!sim.valid) {
+                      return {
+                          isError: true,
+                          durasi: calc.durasi,
+                          holidayCount: calc.holidayCount,
+                          holidayNames,
+                          errorText: sim.errorMsg
+                      };
+                  }
+
+                  let rincianSisa = '';
+                  if (this.form.jenis === 'Tahunan' && sim.sN2_akhir !== undefined) {
+                      rincianSisa = yrs[0] + ': ' + sim.sN2_akhir + ' | ' + yrs[1] + ': ' + sim.sN1_akhir + ' | ' + yrs[2] + ': ' + sim.sN_akhir;
+                  }
+
+                  return {
+                      isError: false,
+                      durasi: calc.durasi,
+                      holidayCount: calc.holidayCount,
+                      holidayNames,
+                      sisaAkhir: sim.sisaAkhir,
+                      rincianSisa,
+                      hangusN2: sim.hangusN2 || 0,
+                      batasTanpaN2: sim.batasTanpaN2 || 18,
+                      hangusNBesar: sim.hangusNBesar || 0,
+                      yearN2: yrs[0],
+                      yearN1: yrs[1],
+                      yearN: yrs[2]
+                  };
+              },
               // FIX: Logika filtering untuk kolom pencarian bypass
               filteredBypassUsers() {
                   if (!this.s || !this.s.usersList) return [];
@@ -284,17 +333,25 @@
                       fileData: this.fileData, fileName: this.fileName, fileMimeType: this.fileMimeType
                   };
 
-                  if (new Date(payload.tgl_selesai) < new Date(payload.tgl_mulai)) {
+                  const calc = window.hitungHariKerjaCuti(payload.tgl_mulai, payload.tgl_selesai);
+                  if (calc.invalidOrder) {
                      if(window.showNotify) window.showNotify("Tanggal Invalid", "Selesai pelaksanaan tidak boleh sebelum tanggal mulai.", "error"); return;
                   }
+                  const durasi = calc.durasi;
+                  if (payload.jenis !== 'Dinas Luar' && durasi <= 0) {
+                     if(window.showNotify) window.showNotify("0 Hari Kerja Efektif", "Rentang tanggal yang dipilih seluruhnya akhir pekan atau Hari Libur Nasional / Cuti Bersama SKB.", "warning"); return;
+                  }
 
-                  const newStart = new Date(payload.tgl_mulai); newStart.setHours(0,0,0,0);
-                  const newEnd = new Date(payload.tgl_selesai); newEnd.setHours(0,0,0,0);
+                  const newStart = window.parseLocalYmdCuti(payload.tgl_mulai); newStart.setHours(0,0,0,0);
+                  const newEnd = window.parseLocalYmdCuti(payload.tgl_selesai); newEnd.setHours(0,0,0,0);
 
                   const isOverlap = this.s.cutiLogs.some(log => {
                       if (String(log.nip) === String(payload.nip) && log.status !== 'Ditolak' && log.status !== 'DIBATALKAN' && String(log.id) !== String(payload.id)) {
-                          const existingStart = new Date(log.tgl_mulai); existingStart.setHours(0,0,0,0);
-                          const existingEnd = new Date(log.tgl_selesai); existingEnd.setHours(0,0,0,0);
+                          const existingStart = window.parseLocalYmdCuti(log.tgl_mulai);
+                          const existingEnd = window.parseLocalYmdCuti(log.tgl_selesai);
+                          if (!existingStart || !existingEnd) return false;
+                          existingStart.setHours(0,0,0,0);
+                          existingEnd.setHours(0,0,0,0);
                           return (newStart <= existingEnd && newEnd >= existingStart);
                       }
                       return false;
@@ -304,37 +361,11 @@
                       if(window.showNotify) window.showNotify("Tanggal Bentrok", "Pengajuan gagal! Anda (atau pegawai ini) sudah memiliki izin/cuti yang aktif pada rentang tanggal tersebut.", "warning"); return;
                   }
 
-                  let d1 = new Date(payload.tgl_mulai); let d2 = new Date(payload.tgl_selesai);
-                  let durasi = 0;
-                  for (let d = new Date(d1); d <= d2; d.setDate(d.getDate() + 1)) {
-                      if (d.getDay() !== 0 && d.getDay() !== 6) durasi++;
-                  }
-
                   let tUser = this.targetUser;
-                  if (tUser && payload.jenis !== 'Dinas Luar' && payload.jenis !== 'CLTN') {
-                      let refundDurasiLama = 0;
-                      if (payload.id) {
-                          let logLama = this.s.cutiLogs.find(l => String(l.id) === String(payload.id));
-                          if (logLama) refundDurasiLama = Number(logLama.sisa_cuti || 0);
-                      }
-
-                      if (payload.jenis === 'Tahunan') {
-                          let totalTahunan = Number(tUser.s_tahunan_2024 || 0) + Number(tUser.s_tahunan_2025 || 0) + Number(tUser.s_tahunan_2026 || 0) + refundDurasiLama;
-                          if (totalTahunan < durasi) {
-                              if(window.showNotify) window.showNotify("Saldo Habis/Kurang", "Maaf, sisa kuota Cuti Tahunan Anda ("+totalTahunan+" Hari) tidak mencukupi untuk pengajuan durasi "+durasi+" Hari.", "error"); return;
-                          }
-                      } else {
-                          let field = "";
-                          if(payload.jenis === 'Sakit') field = 's_sakit'; else if(payload.jenis === 'Alasan Penting' || payload.jenis === 'Penting') field = 's_penting';
-                          else if(payload.jenis === 'Besar') field = 's_besar'; else if(payload.jenis === 'Melahirkan') field = 's_melahirkan';
-                          
-                          if (field !== "") {
-                              let sisa = Number(tUser[field] || 0) + refundDurasiLama;
-                              if (sisa < durasi) {
-                                  if(window.showNotify) window.showNotify("Saldo Habis/Kurang", "Maaf, sisa kuota Cuti " + payload.jenis + " ("+sisa+" Hari) tidak mencukupi untuk pengajuan "+durasi+" Hari.", "error"); return;
-                              }
-                          }
-                      }
+                  let editLogObj = payload.id ? this.s.cutiLogs.find(l => String(l.id) === String(payload.id)) : null;
+                  const sim = window.simulasiPotongCutiClient(tUser, payload.jenis, durasi, editLogObj);
+                  if (tUser && !sim.valid) {
+                      if(window.showNotify) window.showNotify("Saldo Habis/Kurang", sim.errorMsg, "error"); return;
                   }
 
                   if(window.showLoading) window.showLoading("Memverifikasi ketersediaan Pejabat...");
@@ -360,34 +391,29 @@
                                         if (payload.id) {
                                             const existIdx = this.s.cutiLogs.findIndex(l => String(l.id) === String(payload.id));
                                             if (existIdx > -1) {
+                                                const oldRec = Object.assign({}, this.s.cutiLogs[existIdx]);
+                                                const targetPegawai = (String(payload.nip) === String(this.s.user.nip)) ? this.s.user : (this.s.usersList ? this.s.usersList.find(u => String(u.nip) === String(payload.nip)) : null);
+                                                if (targetPegawai) {
+                                                    window.terapkanRefundCutiClient(targetPegawai, oldRec);
+                                                    window.terapkanPotongCutiClient(targetPegawai, payload.jenis, res.data.history, Number(res.data.durasi || durasi));
+                                                    if (this.s.usersList && targetPegawai.nip) {
+                                                        const uIdx = this.s.usersList.findIndex(u => String(u.nip) === String(targetPegawai.nip));
+                                                        if (uIdx !== -1) this.s.usersList[uIdx] = Object.assign({}, targetPegawai);
+                                                    }
+                                                }
                                                 this.s.cutiLogs[existIdx].jenis = payload.jenis; this.s.cutiLogs[existIdx].tgl_mulai = payload.tgl_mulai;
                                                 this.s.cutiLogs[existIdx].tgl_selesai = payload.tgl_selesai; this.s.cutiLogs[existIdx].alasan = payload.alasan;
                                                 this.s.cutiLogs[existIdx].alamat = payload.alamat; this.s.cutiLogs[existIdx].atasan_nip = payload.atasan_nip;
                                                 this.s.cutiLogs[existIdx].pejabat_nip = payload.pejabat_nip; this.s.cutiLogs[existIdx].plh_nip = payload.plh_nip;
+                                                this.s.cutiLogs[existIdx].sisa_cuti = Number(res.data.durasi || durasi);
+                                                this.s.cutiLogs[existIdx].history = res.data.history;
                                                 if (res.data.fileUrl) this.s.cutiLogs[existIdx].bukti_url = res.data.fileUrl;
                                             }
                                         } else {
-                                            // TAHAP 37: Potong kuota cuti lokal secara reaktif & instan
                                             const durasiNumber = Number(res.data.durasi || durasi || 0);
                                             const targetPegawai = (String(payload.nip) === String(this.s.user.nip)) ? this.s.user : (this.s.usersList ? this.s.usersList.find(u => String(u.nip) === String(payload.nip)) : null);
                                             if (targetPegawai && payload.jenis !== 'Dinas Luar' && payload.jenis !== 'CLTN') {
-                                                if (payload.jenis === 'Tahunan') {
-                                                    try {
-                                                        let h = (typeof res.data.history === 'string') ? JSON.parse(res.data.history || '{}') : (res.data.history || {});
-                                                        targetPegawai.s_tahunan_2024 = Math.max(0, Number(targetPegawai.s_tahunan_2024 || 0) - (Number(h.y24) || 0));
-                                                        targetPegawai.s_tahunan_2025 = Math.max(0, Number(targetPegawai.s_tahunan_2025 || 0) - (Number(h.y25) || 0));
-                                                        targetPegawai.s_tahunan_2026 = Math.max(0, Number(targetPegawai.s_tahunan_2026 || 0) - (Number(h.y26) || 0));
-                                                    } catch(e) {}
-                                                } else {
-                                                    let field = "";
-                                                    if (payload.jenis === 'Sakit') field = 's_sakit';
-                                                    else if (payload.jenis === 'Alasan Penting' || payload.jenis === 'Penting') field = 's_penting';
-                                                    else if (payload.jenis === 'Besar') field = 's_besar';
-                                                    else if (payload.jenis === 'Melahirkan') field = 's_melahirkan';
-                                                    if (field !== "" && targetPegawai[field] !== undefined) {
-                                                        targetPegawai[field] = Math.max(0, Number(targetPegawai[field] || 0) - durasiNumber);
-                                                    }
-                                                }
+                                                window.terapkanPotongCutiClient(targetPegawai, payload.jenis, res.data.history, durasiNumber);
                                                 if (this.s.usersList && targetPegawai.nip) {
                                                     const uIdx = this.s.usersList.findIndex(u => String(u.nip) === String(targetPegawai.nip));
                                                     if (uIdx !== -1) this.s.usersList[uIdx] = Object.assign({}, targetPegawai);

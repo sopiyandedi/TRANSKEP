@@ -351,25 +351,15 @@
                   }
 
                   let isRefundNeeded = false;
-                  if (log.status === 'Ditolak' && statusBefore !== 'Ditolak') isRefundNeeded = true;
+                  if ((log.status === 'Ditolak' || log.status === 'Perubahan') && statusBefore !== 'Ditolak' && statusBefore !== 'Perubahan') isRefundNeeded = true;
                   if (log.status === 'DIBATALKAN' && statusBefore !== 'DIBATALKAN') isRefundNeeded = true;
 
                   if (isRefundNeeded) {
                       const tIdx = this.s.usersList.findIndex(u => String(u.nip) === String(log.nip));
                       if (tIdx !== -1) {
                           let tUser = this.s.usersList[tIdx];
-                          if (log.jenis === 'Tahunan') {
-                              try {
-                                  let h = JSON.parse(log.history || "{}");
-                                  tUser.s_tahunan_2024 = Number(tUser.s_tahunan_2024 || 0) + Number(h.y24 || 0);
-                                  tUser.s_tahunan_2025 = Number(tUser.s_tahunan_2025 || 0) + Number(h.y25 || 0);
-                                  tUser.s_tahunan_2026 = Number(tUser.s_tahunan_2026 || 0) + Number(h.y26 || 0);
-                              } catch(e) {}
-                          } else if (log.jenis !== 'Dinas Luar') {
-                              let field = "";
-                              if(log.jenis === 'Sakit') field = 's_sakit'; else if(log.jenis === 'Alasan Penting' || log.jenis === 'Penting') field = 's_penting';
-                              else if(log.jenis === 'Besar') field = 's_besar'; else if(log.jenis === 'Melahirkan') field = 's_melahirkan'; else if(log.jenis === 'CLTN') field = 's_cltn';
-                              if (field !== "") tUser[field] = Number(tUser[field] || 0) + Number(log.sisa_cuti || 0);
+                          if (typeof window.terapkanRefundCutiClient === 'function') {
+                              window.terapkanRefundCutiClient(tUser, log);
                           }
                           if (String(log.nip) === String(this.s.user.nip)) this.s.user = Object.assign({}, tUser);
                       }

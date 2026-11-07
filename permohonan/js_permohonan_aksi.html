@@ -17,21 +17,9 @@
                 const logIndex = state.cutiLogs.findIndex(function(l) { return String(l.id) === String(id); });
                 if (logIndex !== -1) {
                     const logToCancel = state.cutiLogs[logIndex];
-                    if (logToCancel.jenis === 'Tahunan') {
-                        try {
-                            let h = JSON.parse(logToCancel.history || "{}");
-                            state.user.s_tahunan_2024 = Number(state.user.s_tahunan_2024 || 0) + (Number(h.y24) || 0);
-                            state.user.s_tahunan_2025 = Number(state.user.s_tahunan_2025 || 0) + (Number(h.y25) || 0);
-                            state.user.s_tahunan_2026 = Number(state.user.s_tahunan_2026 || 0) + (Number(h.y26) || 0);
-                        } catch(e) {}
-                    } else {
-                        let field = "";
-                        if(logToCancel.jenis === 'Sakit') field = 's_sakit';
-                        else if(logToCancel.jenis === 'Alasan Penting' || logToCancel.jenis === 'Penting') field = 's_penting';
-                        else if(logToCancel.jenis === 'Besar') field = 's_besar';
-                        else if(logToCancel.jenis === 'Melahirkan') field = 's_melahirkan';
-                        else if(logToCancel.jenis === 'CLTN') field = 's_cltn';
-                        if (field !== "") state.user[field] = Number(state.user[field] || 0) + Number(logToCancel.sisa_cuti || 0);
+                    const logStatus = String(logToCancel.status || '').trim().toLowerCase();
+                    if (logStatus !== 'ditolak' && logStatus !== 'perubahan' && logStatus !== 'dibatalkan' && typeof window.terapkanRefundCutiClient === 'function') {
+                        window.terapkanRefundCutiClient(state.user, logToCancel);
                     }
                     
                     if (state.usersList) {

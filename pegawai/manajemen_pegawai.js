@@ -137,6 +137,7 @@ function importBulkUsers(jsonArray, adminNip, clientToken) {
     }
 
     const ss = getDB();
+    const activeYear = ensureAnnualCutiRollover_(ss);
     const sheet = ss.getSheetByName('user_data');
     const existingData = readUserSheetDecrypted_(sheet);
     
@@ -156,9 +157,13 @@ function importBulkUsers(jsonArray, adminNip, clientToken) {
        const encPass = encryptPasswordField_(payload['Password'] || '123456');
        const encAlamat = encryptField_(payload['Alamat'] || '');
 
+       const valN2 = payload['Sisa_Tahunan_' + (activeYear - 2)] !== undefined ? payload['Sisa_Tahunan_' + (activeYear - 2)] : payload['Sisa_Tahunan_2024'];
+       const valN1 = payload['Sisa_Tahunan_' + (activeYear - 1)] !== undefined ? payload['Sisa_Tahunan_' + (activeYear - 1)] : payload['Sisa_Tahunan_2025'];
+       const valN  = payload['Sisa_Tahunan_' + activeYear] !== undefined ? payload['Sisa_Tahunan_' + activeYear] : payload['Sisa_Tahunan_2026'];
+
        const rowData = [
           encNip, payload['Nama'], payload['Jabatan']||'', payload['Role']||'Pegawai', encHp, encPass,
-          Number(payload['Sisa_Tahunan_2024'])||0, Number(payload['Sisa_Tahunan_2025'])||0, Number(payload['Sisa_Tahunan_2026'])||0,
+          Number(valN2)||0, Number(valN1)||0, Number(valN)||0,
           Number(payload['Sisa_Sakit'])||0, Number(payload['Sisa_Penting'])||0, Number(payload['Sisa_Besar'])||0, 
           Number(payload['Sisa_Melahirkan'])||0, Number(payload['Sisa_CLTN'])||0,
           payload['Pangkat']||'', encAlamat, payload['TMT_KGB']||'', payload['TMT_KNP']||'', Number(payload['BUP'])||58

@@ -25,16 +25,16 @@
            
            <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
               <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 shadow-inner">
-                 <p class="text-[9px] text-slate-500 font-bold uppercase tracking-wider mb-1">Tahunan 2024</p>
+                 <p class="text-[9px] text-slate-500 font-bold uppercase tracking-wider mb-1">Tahunan {{ cutiYears[0] }}</p>
                  <p class="text-2xl font-black text-slate-300">{{ currentUser.s_tahunan_2024 || 0 }} <span class="text-[10px] font-bold uppercase text-slate-500">Hari</span></p>
               </div>
               <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 shadow-inner">
-                 <p class="text-[9px] text-slate-500 font-bold uppercase tracking-wider mb-1">Tahunan 2025</p>
+                 <p class="text-[9px] text-slate-500 font-bold uppercase tracking-wider mb-1">Tahunan {{ cutiYears[1] }}</p>
                  <p class="text-2xl font-black text-slate-300">{{ currentUser.s_tahunan_2025 || 0 }} <span class="text-[10px] font-bold uppercase text-slate-500">Hari</span></p>
               </div>
               <div class="bg-slate-950 p-4 rounded-xl border border-indigo-500/30 shadow-inner bg-indigo-500/5 relative overflow-hidden">
                  <div class="absolute top-0 right-0 w-8 h-8 bg-indigo-500/20 rounded-bl-full"></div>
-                 <p class="text-[9px] text-indigo-400 font-bold uppercase tracking-wider mb-1">Tahunan 2026</p>
+                 <p class="text-[9px] text-indigo-400 font-bold uppercase tracking-wider mb-1">Tahunan {{ cutiYears[2] }}</p>
                  <p class="text-2xl font-black text-indigo-400">{{ currentUser.s_tahunan_2026 || 0 }} <span class="text-[10px] font-bold uppercase text-indigo-500/50">Hari</span></p>
               </div>
               <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 shadow-inner">
@@ -53,7 +53,7 @@
            
            <div class="mt-2 bg-emerald-500/10 border border-emerald-500/20 p-3 rounded-xl flex items-center gap-3">
               <i class="fa-solid fa-circle-info text-emerald-400"></i>
-              <p class="text-[10px] text-emerald-400/80 leading-relaxed font-medium">Data sisa cuti ini otomatis terupdate setiap kali pengajuan cuti Anda disetujui (atau dipotong di awal untuk Cuti Tahunan).</p>
+              <p class="text-[10px] text-emerald-400/80 leading-relaxed font-medium">Data sisa cuti otomatis terupdate setiap pengajuan serta bergeser otomatis ke 3 tahun berjalan ({{ cutiYears[0] }}, {{ cutiYears[1] }}, {{ cutiYears[2] }}) tepat pergantian tahun.</p>
            </div>
         </div>
       </div>
