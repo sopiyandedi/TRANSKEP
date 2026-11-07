@@ -753,96 +753,139 @@ ${absXrefOffset}
       const vW1 = 40;
       const vW2 = 74;
       const vW3 = 106;
-      const vW4 = 100;
+      const leftW = vW1 + vW2 + vW3; // 220 pt (Kolom 1-3)
+      const vW4 = 100; // 100 pt (Kolom 4 Paraf)
+      const parafX = marginX + leftW; // Titik awal Kolom 4
+      const rightX = parafX + vW4; // Titik awal Kolom 5-6
       const vW5 = 190;
-      const vW6 = contentWidth - vW1 - vW2 - vW3 - vW4 - vW5;
+      const vW6 = contentWidth - leftW - vW4 - vW5; // 45.28 pt
+      const rightW = vW5 + vW6; // 235.28 pt (Kolom 5-6)
       const rowH5 = 16.5;
 
-      // Baris Sub-Header 1
-      drawTableRow(marginX, currentY - rowH5, contentWidth, rowH5, [
-        { text: '1. Cuti Tahunan', w: vW1 + vW2 + vW3, bold: true, size: 9.5 },
-        { text: 'Paraf Petugas Cuti', w: vW4, align: 'center', bold: true, size: 9.5 },
+      const sec5TopY = currentY;
+
+      // -------------------------------------------------------------
+      // Baris 1: Row 1
+      // -------------------------------------------------------------
+      const yRow1 = sec5TopY - rowH5;
+      // Kiri: 1. Cuti Tahunan
+      drawTableRow(marginX, yRow1, leftW, rowH5, [
+        { text: '1. Cuti Tahunan', w: leftW, bold: true, size: 9.5 }
+      ]);
+      // Kanan: 2. Cuti Besar
+      drawTableRow(rightX, yRow1, rightW, rowH5, [
         { text: '2. Cuti Besar', w: vW5, size: 9.5 },
         { text: String(pns.s_besar || '0'), w: vW6, align: 'center', bold: true, size: 10 }
       ]);
-      currentY -= rowH5;
 
-      // Baris Sub-Header 2
-      drawTableRow(marginX, currentY - rowH5, contentWidth, rowH5, [
+      // -------------------------------------------------------------
+      // Baris 2: Row 2 (Sub-Header Tabel Cuti Tahunan)
+      // -------------------------------------------------------------
+      const yRow2 = sec5TopY - (rowH5 * 2);
+      // Kiri: Tahun | Sisa (Awal) | Keterangan (Sisa)
+      drawTableRow(marginX, yRow2, leftW, rowH5, [
         { text: 'Tahun', w: vW1, align: 'center', bold: true, size: 9.5 },
         { text: 'Sisa (Awal)', w: vW2, align: 'center', bold: true, size: 9.5 },
-        { text: 'Keterangan (Sisa)', w: vW3, align: 'center', bold: true, size: 9.5 },
-        { text: '', w: vW4 },
+        { text: 'Keterangan (Sisa)', w: vW3, align: 'center', bold: true, size: 9.5 }
+      ]);
+      // Kanan: 3. Cuti Sakit
+      drawTableRow(rightX, yRow2, rightW, rowH5, [
         { text: '3. Cuti Sakit', w: vW5, size: 9.5 },
         { text: String(pns.s_sakit || '0'), w: vW6, align: 'center', bold: true, size: 10 }
       ]);
-      currentY -= rowH5;
 
-      // Baris N-2
-      drawTableRow(marginX, currentY - rowH5, contentWidth, rowH5, [
+      // -------------------------------------------------------------
+      // Baris 3: Row 3 (N-2)
+      // -------------------------------------------------------------
+      const yRow3 = sec5TopY - (rowH5 * 3);
+      // Kiri: Tahun N-2
+      drawTableRow(marginX, yRow3, leftW, rowH5, [
         { text: String(leaveYear - 2), w: vW1, align: 'center', size: 9.5 },
         { text: String(sAw24), w: vW2, align: 'center', size: 9.5 },
-        { text: String(sAk24), w: vW3, align: 'center', size: 9.5 },
-        { text: '', w: vW4 },
+        { text: String(sAk24), w: vW3, align: 'center', size: 9.5 }
+      ]);
+      // Kanan: 4. Cuti Melahirkan
+      drawTableRow(rightX, yRow3, rightW, rowH5, [
         { text: '4. Cuti Melahirkan', w: vW5, size: 9.5 },
         { text: String(pns.s_melahirkan || '0'), w: vW6, align: 'center', bold: true, size: 10 }
       ]);
-      currentY -= rowH5;
 
-      // Baris N-1
-      drawTableRow(marginX, currentY - rowH5, contentWidth, rowH5, [
+      // -------------------------------------------------------------
+      // Baris 4: Row 4 (N-1)
+      // -------------------------------------------------------------
+      const yRow4 = sec5TopY - (rowH5 * 4);
+      // Kiri: Tahun N-1
+      drawTableRow(marginX, yRow4, leftW, rowH5, [
         { text: String(leaveYear - 1), w: vW1, align: 'center', size: 9.5 },
         { text: String(sAw25), w: vW2, align: 'center', size: 9.5 },
-        { text: String(sAk25), w: vW3, align: 'center', size: 9.5 },
-        { text: '', w: vW4 },
+        { text: String(sAk25), w: vW3, align: 'center', size: 9.5 }
+      ]);
+      // Kanan: 5. Cuti Karena Alasan Penting
+      drawTableRow(rightX, yRow4, rightW, rowH5, [
         { text: '5. Cuti Karena Alasan Penting', w: vW5, size: 9.5 },
         { text: String(pns.s_penting || '0'), w: vW6, align: 'center', bold: true, size: 10 }
       ]);
-      currentY -= rowH5;
 
-      // Baris N
-      drawTableRow(marginX, currentY - rowH5, contentWidth, rowH5, [
+      // -------------------------------------------------------------
+      // Baris 5: Row 5 (N)
+      // -------------------------------------------------------------
+      const yRow5 = sec5TopY - (rowH5 * 5);
+      // Kiri: Tahun N
+      drawTableRow(marginX, yRow5, leftW, rowH5, [
         { text: String(leaveYear), w: vW1, align: 'center', size: 9.5 },
         { text: String(sAw26), w: vW2, align: 'center', size: 9.5 },
-        { text: String(sAk26), w: vW3, align: 'center', size: 9.5 },
-        { text: '', w: vW4 },
+        { text: String(sAk26), w: vW3, align: 'center', size: 9.5 }
+      ]);
+      // Kanan: 6. Cuti di Luar Tanggungan Negara
+      drawTableRow(rightX, yRow5, rightW, rowH5, [
         { text: '6. Cuti di Luar Tanggungan Negara', w: vW5, size: 9.5 },
         { text: String(pns.s_cltn || '0'), w: vW6, align: 'center', bold: true, size: 10 }
       ]);
 
-      // Kotak Penyatuan Border Paraf Petugas Cuti (Rows 1 & 2)
-      const parafHeaderTop = currentY + (rowH5 * 4);
+      // -------------------------------------------------------------
+      // Kolom 4 (Paraf Petugas Cuti): 2 Kotak Bersih Seamless Identik HTML
+      // -------------------------------------------------------------
+      // Kotak 1 (Header): Rowspan 2 baris (Row 1 & 2), tinggi 33 pt tanpa sekat horizontal
       page.drawRectangle({
-        x: marginX + vW1 + vW2 + vW3,
-        y: parafHeaderTop,
+        x: parafX,
+        y: yRow2,
         width: vW4,
         height: rowH5 * 2,
         borderColor: black,
         borderWidth: 0.6
       });
+      const parafTitle = 'Paraf Petugas Cuti';
+      const parafTitleW = fontBold.widthOfTextAtSize(parafTitle, 9.5);
+      page.drawText(parafTitle, {
+        x: parafX + (vW4 - parafTitleW) / 2,
+        y: yRow2 + ((rowH5 * 2) - 9.5) / 2 + 1,
+        size: 9.5,
+        font: fontBold,
+        color: black
+      });
 
-      // Kotak Penyatuan Border QR Paraf (Rows 3, 4, 5)
+      // Kotak 2 (QR Barcode): Rowspan 3 baris (Row 3, 4, 5), tinggi 49.5 pt tanpa sekat horizontal
       page.drawRectangle({
-        x: marginX + vW1 + vW2 + vW3,
-        y: currentY - rowH5,
+        x: parafX,
+        y: yRow5,
         width: vW4,
         height: rowH5 * 3,
         borderColor: black,
         borderWidth: 0.6
       });
 
-      // Gambar QR Paraf Petugas Cuti di tengah kotak Rows 3-5
+      // Gambar Barcode QR Paraf persis di tengah Kotak 2
       if (qrParafImg) {
-        const pQrSize = 36;
+        const pQrSize = 38;
         page.drawImage(qrParafImg, {
-          x: marginX + vW1 + vW2 + vW3 + (vW4 - pQrSize) / 2,
-          y: (currentY - rowH5) + ((rowH5 * 3) - pQrSize) / 2,
+          x: parafX + (vW4 - pQrSize) / 2,
+          y: yRow5 + ((rowH5 * 3) - pQrSize) / 2,
           width: pQrSize,
           height: pQrSize
         });
       }
 
-      currentY -= rowH5 + 7;
+      currentY = yRow5 - 7;
 
       // =============================================================
       // VI. ALAMAT SELAMA MENJALANKAN CUTI & SIGNATURE PEMOHON
