@@ -178,6 +178,10 @@ function handleApiPost_(payload, e) {
       case 'requestPasswordReset':
         return jsonResponse_(requestPasswordReset(payload.no_wa || payload.noWa));
 
+      // Integrasi Surat Keluar MYSIMS via n8n
+      case 'updateNomorSuratCuti':
+        return jsonResponse_(updateNomorSuratCutiFromExternal_(payload));
+
       // Fallback: Jika action cocok dengan fungsi global terdaftar yang aman
       default:
         return handleRpcCall_(action, payload.args || [payload.data, payload.nip, payload.token]);

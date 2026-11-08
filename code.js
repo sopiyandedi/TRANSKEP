@@ -1446,7 +1446,8 @@ function getBackgroundData(nip, clientToken, clientVersion) {
             status_pejabat: cData[i][14],
             alamat: cData[i][15],
             history: cData[i][16],
-            bukti_url: cData[i][17]
+            bukti_url: cData[i][17],
+            nomor_surat: String(cData[i][19] || '').trim()
           });
        }
     }

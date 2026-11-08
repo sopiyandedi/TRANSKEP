@@ -5299,3 +5299,41 @@ Pengguna melaporkan bahwa pratinjau (*preview*) dokumen PDF di modal SK dan SOP 
   5. `sw.js` (Bump CACHE_NAME ke transkep-v3.8.23)
   6. `revisi.md` (Dokumentasi Tahap 98)
 - **Status:** `[SELESAI & AKTIF]` ✅
+
+
+---
+
+### TAHAP 99: Integrasi Otomasi Surat Keluar Cuti MYSIMS via n8n & Ekstensi Kolom 20 Nomor Surat Resmi (v3.8.24)
+
+#### 1. Latar Belakang & Analisis Kebutuhan
+- **Kebutuhan Pengguna:** Menghubungkan aplikasi pencatatan surat keluar dinas Pengadilan Agama Indramayu (**MYSIMS** pada server intranet `http://192.168.188.10/mysim/index.php/...`) dengan sistem TRANSKEP. Setiap permohonan Cuti Tahunan yang disetujui secara resmi oleh Pejabat Berwenang / Ketua (ACC Final) harus otomatis dibuatkan nomor surat keluarnya di MYSIMS, melampirkan berkas, dan nomor surat resmi tersebut otomatis dicatat kembali ke database TRANSKEP serta ditampilkan pada blanko cetak dan dokumen PDF ber-TTE.
+- **Kredensial MYSIMS:**
+  - Akun: `ketua`
+  - Sandi: `admin`
+  - Tahun Anggaran: `2026`
+- **Parameter Teknis MYSIMS (Reverse-Engineering DevTools Form-Data):**
+  - Endpoint Login: `POST http://192.168.188.10/mysim/index.php/admin/do_login` (`u=ketua`, `p=admin`, `ta=2026`).
+  - Endpoint Simpan: `POST http://192.168.188.10/mysim/index.php/admin/surat_keluar/act_add` (`enctype="multipart/form-data"`).
+  - Field Form: `idp`, `no_agenda`, `dari` (Nama Pemohon), `no_surat` (`KPA.W10-A2/`), `uraian` (Permohonan Cuti Tahunan a.n. [Nama]), `kode` (`KP5.3`), `tgl_surat` (`YYYY-MM-DD`), `sifat` (`Biasa`), `ket` (`cuti tahunan`), `file_surat` (Upload file PDF).
+
+#### 2. Rencana Implementasi & Solusi Rekayasa
+1. **Ekstensi Skema Database Cuti (Kolom ke-20 `cuti_log`):**
+   - Menambahkan Kolom T (`nomor_surat`) pada sheet `cuti_log` tanpa menggeser kolom 1–19 eksisting.
+   - Memetakan `nomor_surat: String(cData[i][19] || '').trim()` pada `getBackgroundData()` di [`code.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/code.js) dan menyinkronkan array appendRow 20 kolom di [`permohonan/permohonan.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/permohonan.js).
+2. **Pemicu Non-Blocking Webhook n8n di Backend Google Apps Script:**
+   - Memasang `triggerN8nSuratKeluarCuti_` pada [`permohonan/persetujuan.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/persetujuan.js) saat `finalStatus === 'Disetujui'` (baik via UI Transkep maupun via Magic Link).
+   - Eksekusi menggunakan `UrlFetchApp.fetch(webhookUrl, options)` dengan try-catch terisolasi dan non-blocking agar tidak pernah membatalkan atau memblokir persetujuan cuti jika webhook/server n8n sedang offline.
+3. **Endpoint Callback API TRANSKEP:**
+   - Mendaftarkan route `updateNomorSuratCuti` di [`api_router.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/api_router.js) yang memanggil `updateNomorSuratCutiFromExternal_(payload)`.
+   - Mengamankan callback menggunakan verifikasi `TRANSKEP_WEBHOOK_KEY`, menulis nomor surat ke Kolom 20 `cuti_log`, dan memanggil `bumpDataVersion()`.
+4. **Rendering Nomor Surat Dinamis pada Cetak HTML & PDF Signer TTE:**
+   - Menyediakan variabel `nomorSuratCetak` pada [`permohonan/js_cetak_cuti.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/js_cetak_cuti.html) dan [`modules/permohonan/cetak/cetak_cuti.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/permohonan/cetak/cetak_cuti.js).
+   - Memperbarui template cetak di [`permohonan/template_cetak_cuti.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/template_cetak_cuti.html) dan [`modules/permohonan/cetak/cetak_cuti.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/permohonan/cetak/cetak_cuti.html) agar menampilkan nomor surat resmi jika telah terbit, atau fallback blanko standar jika belum.
+   - Menyelaraskan mesin PDF signer di [`core/pdf_signer.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/core/pdf_signer.js) dan [`permohonan/js_pdf_signer.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/js_pdf_signer.html).
+5. **Workflow n8n Siap Import (`n8n_workflow_mysims_surat_keluar.json`):**
+   - Merancang workflow n8n 6-node: Webhook Trigger -> HTTP Login MYSIMS (`ketua`/`admin`/`2026`) -> Code Cookie Sesi -> HTTP Add Surat Keluar MYSIMS -> HTTP Get Surat Keluar -> Code Ekstraksi Nomor Surat -> HTTP Callback ke TRANSKEP.
+6. **Versioning:**
+   - PWA Cache bumped ke `transkep-v3.8.24` di `sw.js` dan `APP_BUILD_VER` ke `3.8.24` di `index.html`.
+
+#### 3. Estimasi Dampak & File yang Dimodifikasi
+- **Status:** `[SELESAI & AKTIF]` ✅

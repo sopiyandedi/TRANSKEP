@@ -564,7 +564,10 @@ ${absXrefOffset}
       const romawiArr = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
       const romawiCetak = (partsTgl[1] ? romawiArr[parseInt(partsTgl[1], 10) - 1] : 'X') || 'X';
       const tahunCetak = partsTgl[2] || new Date().getFullYear();
-      const noSurat = `Nomor :          /KPA.W10-A/KP5.3/${romawiCetak}/${tahunCetak}`;
+      const defaultNoSurat = `Nomor :          /KPA.W10-A/KP5.3/${romawiCetak}/${tahunCetak}`;
+      const noSurat = (log.nomor_surat && String(log.nomor_surat).trim() !== '')
+        ? `Nomor : ${String(log.nomor_surat).trim()}`
+        : defaultNoSurat;
       const noW = fontRegular.widthOfTextAtSize(noSurat, 9.5);
       page.drawText(noSurat, { x: (width - noW) / 2, y: currentY - 24, size: 9.5, font: fontRegular, color: black });
 

@@ -113,6 +113,22 @@ function updateCutiStatus(id, decision, notes, userNip, bypassMode, clientToken)
     
     sheetCuti.getRange(rowIndex, 8).setValue(finalStatus);
     
+    if (finalStatus === 'Disetujui') {
+        // TRIGGER OTOMATIS: Integrasi n8n & MYSIMS Surat Keluar (Non-blocking & Aman)
+        try {
+            let namaPemohon = "";
+            for (let u = 1; u < userData.length; u++) {
+                if (String(userData[u][0]) === nip) {
+                    namaPemohon = userData[u][1];
+                    break;
+                }
+            }
+            triggerN8nSuratKeluarCuti_(id, logRecord, namaPemohon, nip);
+        } catch (errN8n) {
+            Logger.log("⚠️ [n8n Trigger Cuti] Peringatan trigger webhook (diabaikan): " + errN8n.toString());
+        }
+    }
+
     if (finalStatus === 'Ditolak' || finalStatus === 'Perubahan') {
         const historyStr = String(logRecord[16] || "");
         let userRowIndex = -1;
@@ -403,6 +419,13 @@ function processMagicLinkApproval(token, decision, notes) {
         sheetCuti.getRange(rowIndex, 8).setValue('Disetujui'); // Final status
         if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush();
         
+        // Pemicu Otomatis Webhook n8n untuk Surat Keluar MYSIMS (Non-Blocking & Aman)
+        try {
+          triggerN8nSuratKeluarCuti_(targetRow[0], targetRow, pemohon.nama, pemohonNip);
+        } catch (errN8n) {
+          Logger.log("⚠️ [n8n Trigger MagicLink] Peringatan: " + errN8n.toString());
+        }
+
         // Kirim konfirmasi persetujuan resmi ke pemohon
         if (pemohon.no_wa && pemohon.no_wa.length > 8) {
           const msgAcc = "*TRANSKEP - CUTI TELAH RESMI DISETUJUI* 🎉\n\n" +
@@ -624,3 +647,123 @@ function resendCutiWhatsApp(cutiId, adminNip, clientToken) {
     return { status: 'error', message: err.toString() };
   }
 }
+
+/**
+ * Trigger Otomatis Webhook n8n untuk Permintaan Nomor Surat Keluar MYSIMS
+ * Dijalankan SECARA NON-BLOCKING & AMAN tepat setelah status permohonan cuti menjadi 'Disetujui' (ACC Final).
+ */
+function triggerN8nSuratKeluarCuti_(id, logRecord, namaPemohon, nip) {
+  try {
+    const props = PropertiesService.getScriptProperties();
+    const webhookUrl = props.getProperty('N8N_WEBHOOK_SURAT_KELUAR');
+    if (!webhookUrl) {
+      Logger.log("ℹ️ [n8n Trigger] N8N_WEBHOOK_SURAT_KELUAR belum disetel di Script Properties. Trigger dilewati.");
+      return;
+    }
+
+    const jenisCuti = String(logRecord[3] || 'Tahunan');
+    const tglMulai = String(logRecord[4] || '');
+    const tglSelesai = String(logRecord[5] || '');
+    const alasan = String(logRecord[6] || '');
+    const tglSuratToday = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'yyyy-MM-dd');
+
+    // Menghasilkan payload terstruktur siap konsumsi untuk n8n dan MYSIMS
+    const payload = {
+      event: 'CUTI_APPROVED_FINAL',
+      cuti_id: String(id),
+      nama_pegawai: namaPemohon || 'Pegawai',
+      nip: String(nip || ''),
+      jenis_cuti: jenisCuti,
+      tgl_mulai: tglMulai,
+      tgl_selesai: tglSelesai,
+      alasan: alasan,
+      tanggal_surat: tglSuratToday,
+      kode_klasifikasi: 'KP5.3',
+      sifat: 'Biasa',
+      keterangan: 'cuti ' + jenisCuti.toLowerCase(),
+      // Parameter form MYSIMS siap pakai untuk node HTTP Request n8n
+      mysims_payload: {
+        idp: '',
+        dari: namaPemohon || 'Pegawai',
+        no_surat: 'KPA.W10-A2/',
+        uraian: 'Permohonan Cuti ' + jenisCuti + ' a.n. ' + (namaPemohon || 'Pegawai'),
+        kode: 'KP5.3',
+        tgl_surat: tglSuratToday,
+        sifat: 'Biasa',
+        ket: 'cuti ' + jenisCuti.toLowerCase()
+      },
+      callback_url: ScriptApp.getService().getUrl(),
+      secret_key: props.getProperty('TRANSKEP_WEBHOOK_KEY') || 'TRANSKEP_WA_BOT_2026',
+      timestamp: new Date().toISOString()
+    };
+
+    const options = {
+      method: 'post',
+      contentType: 'application/json',
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true
+    };
+
+    const response = UrlFetchApp.fetch(webhookUrl, options);
+    Logger.log("✅ [n8n Trigger] Webhook surat keluar terkirim. Respon code: " + response.getResponseCode());
+  } catch (err) {
+    Logger.log("⚠️ [n8n Trigger] Peringatan saat mengirim webhook n8n (diabaikan agar alur tetap aman): " + err.toString());
+  }
+}
+
+/**
+ * Callback API dari n8n untuk memperbarui Nomor Surat Keluar MYSIMS pada baris cuti_log
+ * @param {Object} payload { id: 'CUTI-...', nomor_surat: '1084/KPA.W10-A2/KP5.3/XI/2026', secret_key: '...' }
+ */
+function updateNomorSuratCutiFromExternal_(payload) {
+  try {
+    if (!payload || !payload.id || !payload.nomor_surat) {
+      return { status: 'error', message: "Parameter 'id' dan 'nomor_surat' wajib disertakan." };
+    }
+
+    const scriptProps = PropertiesService.getScriptProperties();
+    const configuredKey = scriptProps.getProperty("TRANSKEP_WEBHOOK_KEY") || "TRANSKEP_WA_BOT_2026";
+    if (payload.secret_key && payload.secret_key !== configuredKey) {
+      return { status: 'error', message: "Akses ditolak: Secret Key tidak valid." };
+    }
+
+    const ss = getDB();
+    const sheetCuti = ss.getSheetByName('cuti_log');
+    if (!sheetCuti) throw new Error("Sheet cuti_log tidak ditemukan.");
+
+    const data = sheetCuti.getDataRange().getValues();
+    let targetRow = -1;
+    for (let i = 1; i < data.length; i++) {
+      if (String(data[i][0]) === String(payload.id)) {
+        targetRow = i + 1; // 1-based row index
+        break;
+      }
+    }
+
+    if (targetRow === -1) {
+      return { status: 'error', message: "Data cuti dengan ID " + payload.id + " tidak ditemukan." };
+    }
+
+    // Pastikan header kolom 20 (Kolom T) adalah nomor_surat
+    if (sheetCuti.getLastColumn() < 20 || String(sheetCuti.getRange(1, 20).getValue()).trim() === '') {
+      sheetCuti.getRange(1, 20).setValue('nomor_surat');
+    }
+
+    const cleanNomor = String(payload.nomor_surat).trim();
+    sheetCuti.getRange(targetRow, 20).setValue(cleanNomor);
+
+    if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush();
+
+    Logger.log("✅ [n8n Callback] Nomor surat cuti ID " + payload.id + " berhasil diupdate ke: " + cleanNomor);
+    return {
+      status: 'success',
+      message: 'Nomor surat cuti berhasil diperbarui.',
+      id: payload.id,
+      nomor_surat: cleanNomor
+    };
+  } catch (err) {
+    Logger.log("❌ [n8n Callback] Error: " + err.toString());
+    return { status: 'error', message: err.toString() };
+  }
+}
+

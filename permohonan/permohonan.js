@@ -57,7 +57,7 @@ function addCutiLog(payload, aktorNip, clientToken) {
     const magicToken = Utilities.getUuid();
     sheetCuti.appendRow(sanitizeRowArray([
       newId, tglForm, encryptField_(payload.nip), payload.jenis, payload.tgl_mulai, payload.tgl_selesai, payload.alasan,
-      statusAwal, '', encryptField_(payload.atasan_nip || '-'), encryptField_(payload.pejabat_nip || '-'), durasi, payload.plh_nip || '', statusAwal, statusAwal, encryptField_(payload.alamat || '-'), JSON.stringify(historyJson), fileUrl, magicToken
+      statusAwal, '', encryptField_(payload.atasan_nip || '-'), encryptField_(payload.pejabat_nip || '-'), durasi, payload.plh_nip || '', statusAwal, statusAwal, encryptField_(payload.alamat || '-'), JSON.stringify(historyJson), fileUrl, magicToken, ''
     ]));
     
     if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush(); 

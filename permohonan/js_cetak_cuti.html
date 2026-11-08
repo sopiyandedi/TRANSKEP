@@ -210,10 +210,16 @@
           showAlasan = parts[0].trim() + " [USULAN PEMBATALAN]: " + parts[1].trim();
       }
 
+      const romawiBulan = (log.tgl_pengajuan && log.tgl_pengajuan.split('/')[1] ? ["I","II","III","IV","V","VI","VII","VIII","IX","X","XI","XII"][parseInt(log.tgl_pengajuan.split('/')[1], 10)-1] : "-");
+      const tahunPengajuan = (log.tgl_pengajuan ? log.tgl_pengajuan.split('/')[2] : "-");
+      const defaultNomorBlanko = "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/KPA.W10-A/KP5.3/" + romawiBulan + "/" + tahunPengajuan;
+      const nomorSuratCetak = (log.nomor_surat && String(log.nomor_surat).trim() !== '') ? String(log.nomor_surat).trim() : defaultNomorBlanko;
+
       const replacements = {
           "{{formatPengajuanLengkap}}": formatDateIndoCetak(log.tgl_pengajuan),
-          "{{romawiCetak}}": (log.tgl_pengajuan && log.tgl_pengajuan.split('/')[1] ? ["I","II","III","IV","V","VI","VII","VIII","IX","X","XI","XII"][parseInt(log.tgl_pengajuan.split('/')[1], 10)-1] : "-"),
-          "{{tahunCetak}}": (log.tgl_pengajuan ? log.tgl_pengajuan.split('/')[2] : "-"),
+          "{{nomorSuratCetak}}": nomorSuratCetak,
+          "{{romawiCetak}}": romawiBulan,
+          "{{tahunCetak}}": tahunPengajuan,
           
           "{{pns_nama}}": pns.nama,
           "{{pns_nip}}": pns.nip,
