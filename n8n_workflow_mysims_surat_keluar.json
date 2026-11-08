@@ -43,9 +43,15 @@
         },
         "options": {
           "allowUnauthorizedCerts": true,
+          "redirect": {
+            "redirect": {
+              "followRedirect": false
+            }
+          },
           "response": {
             "response": {
-              "fullResponse": true
+              "fullResponse": true,
+              "neverError": true
             }
           }
         }
@@ -61,7 +67,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Ekstraksi Cookie Sesi MYSIMS dari Header Respons Login\nconst headers = $input.first().json.headers || {};\nconst rawCookies = headers['set-cookie'] || [];\nlet sessionCookie = '';\n\nif (Array.isArray(rawCookies)) {\n  for (const cookieStr of rawCookies) {\n    if (cookieStr.includes('ci_session=') || cookieStr.includes('mysim_session=')) {\n      sessionCookie = cookieStr.split(';')[0];\n      break;\n    }\n  }\n  if (!sessionCookie && rawCookies.length > 0) {\n    sessionCookie = rawCookies[0].split(';')[0];\n  }\n} else if (typeof rawCookies === 'string') {\n  sessionCookie = rawCookies.split(';')[0];\n}\n\n// Ambil payload asli yang dikirim oleh TRANSKEP dari Webhook node\nconst webhookData = $('Webhook Trigger').first().json.body || $('Webhook Trigger').first().json || {};\nconst mysims = webhookData.mysims_payload || {};\n\nreturn [{\n  json: {\n    session_cookie: sessionCookie,\n    cuti_id: webhookData.cuti_id || '',\n    nama_pegawai: webhookData.nama_pegawai || '',\n    nip: webhookData.nip || '',\n    jenis_cuti: webhookData.jenis_cuti || '',\n    callback_url: webhookData.callback_url || '',\n    secret_key: webhookData.secret_key || 'TRANSKEP_WA_BOT_2026',\n    mysims_dari: mysims.dari || webhookData.nama_pegawai || 'Pegawai',\n    mysims_uraian: mysims.uraian || ('Permohonan Cuti ' + (webhookData.jenis_cuti || '') + ' a.n. ' + (webhookData.nama_pegawai || 'Pegawai')),\n    mysims_kode: mysims.kode || 'KP5.3',\n    mysims_tgl_surat: mysims.tgl_surat || new Date().toISOString().slice(0, 10),\n    mysims_sifat: mysims.sifat || 'Biasa',\n    mysims_ket: mysims.ket || 'cuti tahunan'\n  }\n}];"
+        "jsCode": "// Ekstraksi Cookie Sesi MYSIMS dari Header Respons Login (302 Redirect)\nconst loginNode = $('Login MYSIMS').first().json || {};\nconst headers = loginNode.headers || {};\nconst rawCookies = headers['set-cookie'] || [];\nlet cookies = [];\n\nif (Array.isArray(rawCookies)) {\n  for (const c of rawCookies) {\n    if (c) cookies.push(c.split(';')[0].trim());\n  }\n} else if (typeof rawCookies === 'string' && rawCookies.trim() !== '') {\n  cookies.push(rawCookies.split(';')[0].trim());\n}\n\n// Gabungkan semua cookie (ci_session, PHPSESSID, dsb)\nconst sessionCookie = cookies.join('; ');\n\n// Ambil payload dari trigger TRANSKEP\nconst webhookData = $('Webhook Trigger').first().json.body || $('Webhook Trigger').first().json || {};\nconst mysims = webhookData.mysims_payload || {};\n\n// Format tanggal surat (YYYY-MM-DD)\nconst todayYmd = mysims.tgl_surat || new Date().toISOString().slice(0, 10);\n\nreturn [{\n  json: {\n    session_cookie: sessionCookie,\n    cuti_id: webhookData.cuti_id || '',\n    nama_pegawai: webhookData.nama_pegawai || '',\n    nip: webhookData.nip || '',\n    jenis_cuti: webhookData.jenis_cuti || '',\n    callback_url: webhookData.callback_url || '',\n    secret_key: webhookData.secret_key || 'TRANSKEP_WA_BOT_2026',\n    mysims_dari: mysims.dari || webhookData.nama_pegawai || 'Pegawai',\n    mysims_uraian: mysims.uraian || ('Permohonan Cuti ' + (webhookData.jenis_cuti || '') + ' a.n. ' + (webhookData.nama_pegawai || 'Pegawai')),\n    mysims_kode: mysims.kode || 'KP5.3',\n    mysims_tgl_surat: todayYmd,\n    mysims_sifat: mysims.sifat || 'Biasa',\n    mysims_ket: mysims.ket || 'cuti tahunan'\n  }\n}];"
       },
       "id": "code-extract-cookie",
       "name": "Parse Session & Prepare Form",
@@ -129,9 +135,15 @@
         },
         "options": {
           "allowUnauthorizedCerts": true,
+          "redirect": {
+            "redirect": {
+              "followRedirect": false
+            }
+          },
           "response": {
             "response": {
-              "fullResponse": true
+              "fullResponse": true,
+              "neverError": true
             }
           }
         }
@@ -159,7 +171,12 @@
           ]
         },
         "options": {
-          "allowUnauthorizedCerts": true
+          "allowUnauthorizedCerts": true,
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          }
         }
       },
       "id": "http-get-list-surat",
@@ -173,7 +190,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Ekstraksi Nomor Surat Keluar Resmi dari Halaman Tabel MYSIMS\nconst html = String($input.first().json.data || $input.first().json.body || $input.first().json || '');\nconst prepData = $('Parse Session & Prepare Form').first().json;\n\n// Cari pattern nomor surat MYSIMS: e.g. 1085/KPA.W10-A2/KP5.3/XI/2026 atau varian nomor agenda\nlet nomorSuratFound = '';\n\n// 1. Regex spesifik format Pengadilan Agama Indramayu\nconst regexSurat = /\\b(\\d+\\/KPA\\.W10-A2\\/[A-Za-z0-9.]+\\/[IVXLCDM]+\\/\\d{4})\\b/i;\nconst match1 = html.match(regexSurat);\nif (match1 && match1[1]) {\n  nomorSuratFound = match1[1].trim();\n} else {\n  // 2. Fallback pencarian nomor surat pada baris tabel pertama setelah <tbody>\n  const rowRegex = /<tr[^>]*>[\\s\\S]*?KPA\\.W10-A2[\\s\\S]*?<\\/tr>/i;\n  const rowMatch = html.match(rowRegex);\n  if (rowMatch) {\n    const rowText = rowMatch[0];\n    const subMatch = rowText.match(/(\\d+\\/[A-Za-z0-9.\\/-]+)/);\n    if (subMatch && subMatch[1]) {\n      nomorSuratFound = subMatch[1].trim();\n    }\n  }\n}\n\n// 3. Fallback cerdas jika HTML terpotong tapi nomor prefix ada\nif (!nomorSuratFound) {\n  const simpleMatch = html.match(/(\\d{3,5}\\/KPA\\.W10-A2[^<\"\\s]+)/i);\n  if (simpleMatch && simpleMatch[1]) {\n    nomorSuratFound = simpleMatch[1].trim();\n  }\n}\n\nreturn [{\n  json: {\n    cuti_id: prepData.cuti_id,\n    nomor_surat: nomorSuratFound || 'NOMOR_MYSIMS_TERCATAT',\n    secret_key: prepData.secret_key,\n    callback_url: prepData.callback_url,\n    nama_pegawai: prepData.nama_pegawai,\n    jenis_cuti: prepData.jenis_cuti\n  }\n}];"
+        "jsCode": "// Ekstraksi Nomor Surat Keluar Resmi dari Baris Teratas Tabel MYSIMS\nconst rawHtml = String($input.first().json.data || $input.first().json.body || $input.first().json || '');\nconst prepData = $('Parse Session & Prepare Form').first().json;\n\nlet nomorSuratFound = '';\n\n// 1. Regex spesifik format nomor surat PA Indramayu: e.g. 1085/KPA.W10-A2/KP5.3/XI/2026\nconst regexSurat = /(\\d+\\/KPA\\.W10-A2\\/[A-Za-z0-9.]+\\/[IVXLCDM]+\\/\\d{4})/i;\nconst match1 = rawHtml.match(regexSurat);\nif (match1 && match1[1]) {\n  nomorSuratFound = match1[1].trim();\n} else {\n  // 2. Fallback pencarian nomor prefix KPA.W10-A2\n  const subMatch = rawHtml.match(/(\\d{3,5}\\/KPA\\.W10-A2[^<\"'\\s]+)/i);\n  if (subMatch && subMatch[1]) {\n    nomorSuratFound = subMatch[1].trim();\n  }\n}\n\nreturn [{\n  json: {\n    cuti_id: prepData.cuti_id,\n    nomor_surat: nomorSuratFound || 'NOMOR_MYSIMS_TERCATAT',\n    secret_key: prepData.secret_key,\n    callback_url: prepData.callback_url,\n    nama_pegawai: prepData.nama_pegawai,\n    debug_cookie_sent: prepData.session_cookie ? 'ADA' : 'KOSONG'\n  }\n}];"
       },
       "id": "code-extract-nomor-surat",
       "name": "Ekstrak Nomor Surat dari HTML",
