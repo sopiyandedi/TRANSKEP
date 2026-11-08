@@ -1020,13 +1020,15 @@ function triggerN8nSuratKeluarCuti_(id, logRecord, namaPemohon, nip) {
  */
 function updateNomorSuratCutiFromExternal_(payload) {
   try {
-    if (!payload || !payload.id || !payload.nomor_surat) {
+    const cutiId = payload.id || payload.cuti_id;
+    const nomorSurat = payload.nomor_surat || payload.no_surat;
+    if (!payload || !cutiId || !nomorSurat) {
       return { status: 'error', message: "Parameter 'id' dan 'nomor_surat' wajib disertakan." };
     }
 
     const scriptProps = PropertiesService.getScriptProperties();
     const configuredKey = scriptProps.getProperty("TRANSKEP_WEBHOOK_KEY") || "TRANSKEP_WA_BOT_2026";
-    if (payload.secret_key && payload.secret_key !== configuredKey) {
+    if (payload.secret_key && String(payload.secret_key).trim() !== configuredKey.trim()) {
       return { status: 'error', message: "Akses ditolak: Secret Key tidak valid." };
     }
 
@@ -1037,14 +1039,14 @@ function updateNomorSuratCutiFromExternal_(payload) {
     const data = sheetCuti.getDataRange().getValues();
     let targetRow = -1;
     for (let i = 1; i < data.length; i++) {
-      if (String(data[i][0]) === String(payload.id)) {
+      if (String(data[i][0]).trim() === String(cutiId).trim()) {
         targetRow = i + 1; // 1-based row index
         break;
       }
     }
 
     if (targetRow === -1) {
-      return { status: 'error', message: "Data cuti dengan ID " + payload.id + " tidak ditemukan." };
+      return { status: 'error', message: "Data cuti dengan ID " + cutiId + " tidak ditemukan." };
     }
 
     // Pastikan header kolom 20 (Kolom T) adalah nomor_surat
@@ -1052,16 +1054,17 @@ function updateNomorSuratCutiFromExternal_(payload) {
       sheetCuti.getRange(1, 20).setValue('nomor_surat');
     }
 
-    const cleanNomor = String(payload.nomor_surat).trim();
-    sheetCuti.getRange(targetRow, 20).setValue(cleanNomor);
+    const cleanNomor = String(nomorSurat).trim();
+    sheetCuti.getRange(targetRow, 20).setNumberFormat('@').setValue(cleanNomor);
 
-    if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush();
+    SpreadsheetApp.flush();
+    if (typeof bumpDataVersion === "function") bumpDataVersion();
 
-    Logger.log("✅ [n8n Callback] Nomor surat cuti ID " + payload.id + " berhasil diupdate ke: " + cleanNomor);
+    Logger.log("✅ [n8n Callback] Nomor surat cuti ID " + cutiId + " berhasil diupdate ke: " + cleanNomor);
     return {
       status: 'success',
       message: 'Nomor surat cuti berhasil diperbarui.',
-      id: payload.id,
+      id: cutiId,
       nomor_surat: cleanNomor
     };
   } catch (err) {

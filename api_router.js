@@ -59,6 +59,11 @@ function handleApiGet_(e) {
       return jsonResponse_(getCutiByToken(token));
     }
 
+    // 5. Update Nomor Surat Cuti MYSIMS (GET fallback)
+    if (action === 'updateNomorSuratCuti') {
+      return jsonResponse_(updateNomorSuratCutiFromExternal_(params));
+    }
+
     return jsonResponse_({
       status: 'error',
       message: "Aksi GET '" + action + "' tidak dikenali atau memerlukan metode POST."
