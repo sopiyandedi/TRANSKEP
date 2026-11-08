@@ -5385,3 +5385,30 @@ Berdasarkan hasil uji langsung pada MYSIMS (`1085/KP5.3` terbit tanpa file) dan 
 - [`modules/permohonan/persetujuan.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/permohonan/persetujuan.js) & [`permohonan/js_persetujuan.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/js_persetujuan.html)
 - [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) & [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js)
 - **Status:** `[SELESAI & AKTIF]` ✅
+
+
+---
+
+### TAHAP 101: Sinkronisasi Otomatis Hapus/Edit Manual di Google Sheets (Anti-Stale Server Cache `CacheService` & `Delta Sync` v3.8.28)
+
+#### 1. Analisis Akar Masalah (Root Cause Analysis)
+Saat baris di sheet `cuti_log` dihapus langsung secara manual di Google Sheets (`CUTI-1794130417602804` & `CUTI-1794128507226624`), data masih muncul di tampilan TRANSKEP karena **2 lapis cache versi**:
+1. **Cache Server 6 Jam (`CacheService` pada `getBackgroundData` di [`code.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/code.js#L1398-L1409)):**
+   - Fungsi `getBackgroundData` menyimpan snapshot data ke `CacheService` dengan kunci `'TRANSKEP_BG_DATA_' + serverVersion` selama **6 jam (`21600` detik)**.
+   - Penghapusan baris langsung di Google Sheets (*Delete Row* / *Clear Cells*) **tidak memanggil `bumpDataVersion()`**, sehingga nilai `TRANSKEP_DATA_VERSION` di `ScriptProperties` tidak berubah. Akibatnya, walaupun browser di-refresh (`Ctrl + F5`), server Apps Script tetap membalas dari snapshot lama di `CacheService` (atau mengembalikan `NOT_MODIFIED` ke `localStorage` browser).
+2. **Trigger `onEdit(e)` Belum Memanggil `bumpDataVersion()`:**
+   - Pada [`onEdit(e)`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/code.js#L550-L562), pengeditan manual sel di Google Sheets hanya mengecek enkripsi PII dan belum memicu `bumpDataVersion()`, serta aksi klik kanan *Delete Row* di Google Sheets memang tidak menembakkan simple trigger `onEdit`.
+
+#### 2. Rencana Implementasi Solusi Permanen
+1. **Sidik Jari Baris Dinamis (`getServerDataVersion_(ssOpt)` di [`code.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/code.js#L1166-L1197)):**
+   - Menggabungkan timestamp `TRANSKEP_DATA_VERSION` dengan *lightweight sheet fingerprint* (`lastRow` + ID baris terakhir pada `cuti_log`, `user_data`, `izin_keluar_log`, `izin_pribadi_log`, dan `wfh_log`).
+   - Begitu ada baris yang dihapus manual di Google Sheets (misal baris 69–70 dihapus sehingga `lastRow` turun menjadi `68`), sidik jari versi server **otomatis berubah seketika** dalam 0 detik tanpa perlu klik tombol apapun, langsung menembus `CacheService` 6 jam maupun `localStorage` browser saat halaman di-refresh!
+2. **Auto-Bump pada `onEdit(e)` di [`code.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/code.js#L550-L563):**
+   - Menambahkan pemanggilan `bumpDataVersion()` setiap kali admin mengedit atau menghapus isi sel secara manual langsung di Google Sheets.
+3. **Versioning:**
+   - Menaikkan versi PWA cache ke `v3.8.28` di [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) dan [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js).
+
+#### 3. Estimasi Dampak & File yang Dimodifikasi
+- [`code.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/code.js)
+- [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) & [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js)
+- **Status:** `[SELESAI & AKTIF]` ✅

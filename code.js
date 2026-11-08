@@ -558,6 +558,7 @@ function onEdit(e) {
     } else if (name === 'cuti_log') {
       readCutiSheetDecrypted_(sheet);
     }
+    bumpDataVersion();
   } catch (err) {}
 }
 
@@ -1162,7 +1163,7 @@ function verifyLogin(nip, pass) {
 // TAHAP 2: SERVER-SIDE CACHING & VERSIONING
 // ==========================================
 
-function getServerDataVersion_() {
+function getServerDataVersion_(ssOpt) {
   let v = null;
   try {
     v = PropertiesService.getScriptProperties().getProperty('TRANSKEP_DATA_VERSION');
@@ -1173,6 +1174,25 @@ function getServerDataVersion_() {
       PropertiesService.getScriptProperties().setProperty('TRANSKEP_DATA_VERSION', v);
     } catch(e) {}
   }
+  try {
+    const ss = ssOpt || getDB();
+    if (ss) {
+      const shCuti = ss.getSheetByName('cuti_log');
+      const shUser = ss.getSheetByName('user_data');
+      const shIk = ss.getSheetByName('izin_keluar_log');
+      const shIp = ss.getSheetByName('izin_pribadi_log');
+      const shWfh = ss.getSheetByName('wfh_log');
+
+      const cRow = shCuti ? shCuti.getLastRow() : 0;
+      const cLastId = (shCuti && cRow > 1) ? String(shCuti.getRange(cRow, 1).getDisplayValue() || '').slice(-8) : '0';
+      const uRow = shUser ? shUser.getLastRow() : 0;
+      const ikRow = shIk ? shIk.getLastRow() : 0;
+      const ipRow = shIp ? shIp.getLastRow() : 0;
+      const wfhRow = shWfh ? shWfh.getLastRow() : 0;
+
+      return v + '_' + cRow + '-' + cLastId + '_' + uRow + '_' + ikRow + '_' + ipRow + '_' + wfhRow;
+    }
+  } catch (errFp) {}
   return v;
 }
 
@@ -1266,7 +1286,7 @@ function getBulkData(nip, clientToken, clientVersion) {
     const sheetUser = ss.getSheetByName('user_data');
     const uData = sheetUser ? readUserSheetDecrypted_(sheetUser) : [];
 
-    const serverVersion = getServerDataVersion_();
+    const serverVersion = getServerDataVersion_(ss);
 
     // DELTA SYNC SHORT-CIRCUIT (TAHAP 2):
     if (clientVersion && String(clientVersion) === String(serverVersion)) {
@@ -1395,7 +1415,9 @@ function getBackgroundData(nip, clientToken, clientVersion) {
         return { status: 'error', message: 'Sesi kedaluwarsa atau tidak valid.' };
     }
     
-    const serverVersion = getServerDataVersion_();
+    // Memanggil koneksi database terpusat & menghitung sidik jari baris real-time
+    const ss = getDB();
+    const serverVersion = getServerDataVersion_(ss);
 
     // DELTA SYNC SHORT-CIRCUIT (TAHAP 2):
     if (clientVersion && String(clientVersion) === String(serverVersion)) {
@@ -1407,9 +1429,6 @@ function getBackgroundData(nip, clientToken, clientVersion) {
     if (cachedBg) {
       return { status: 'UPDATED', version: serverVersion, data: cachedBg };
     }
-
-    // Memanggil koneksi database terpusat
-    const ss = getDB();
 
     const data = { cutiLogs: [], jobdesList: [], skList: [], skAckList: [], masterKinerjaList: [], ikLogs: [], ipLogs: [], wfhLogs: [], kinerjaList: [], stList: [], sopList: [], sopAckList: [] };
 
