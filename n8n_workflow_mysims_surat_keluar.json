@@ -21,183 +21,46 @@
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "http://192.168.188.10/mysim/index.php/admin/do_login",
-        "sendBody": true,
-        "contentType": "form-urlencoded",
-        "bodyParameters": {
-          "parameters": [
-            {
-              "name": "u",
-              "value": "ketua"
-            },
-            {
-              "name": "p",
-              "value": "admin"
-            },
-            {
-              "name": "ta",
-              "value": "2026"
-            }
-          ]
-        },
-        "options": {
-          "allowUnauthorizedCerts": true,
-          "redirect": {
-            "redirect": {
-              "followRedirect": false
-            }
-          },
-          "response": {
-            "response": {
-              "fullResponse": true,
-              "neverError": true
-            }
-          }
-        }
+        "jsCode": "// =========================================================================\n// MESIN OTOMASI MYSIMS (LOGIN + SUBMIT FORM + SCRAPE NOMOR SURAT RESMI)\n// =========================================================================\n\nconst webhookData = $('Webhook Trigger').first().json.body || $('Webhook Trigger').first().json || {};\nconst cutiId = webhookData.cuti_id || '';\nconst namaPegawai = webhookData.nama_pegawai || 'Pegawai';\nconst jenisCuti = webhookData.jenis_cuti || 'Tahunan';\nconst callbackUrl = webhookData.callback_url || '';\nconst secretKey = webhookData.secret_key || 'TRANSKEP_WA_BOT_2026';\n\nconst mysims = webhookData.mysims_payload || {};\nconst dari = mysims.dari || namaPegawai;\nconst uraian = mysims.uraian || ('Permohonan Cuti ' + jenisCuti + ' a.n. ' + namaPegawai);\nconst kode = mysims.kode || 'KP5.3';\nconst tglSurat = mysims.tgl_surat || new Date().toISOString().slice(0, 10);\nconst sifat = mysims.sifat || 'Biasa';\nconst ket = mysims.ket || ('cuti ' + jenisCuti.toLowerCase());\n\nlet sessionCookie = '';\nlet nomorSurat = '';\nlet debugLog = [];\n\n// -------------------------------------------------------------------------\n// LANGKAH 1: LOGIN KE MYSIMS (Menangkap Cookie ci_session)\n// -------------------------------------------------------------------------\ndebugLog.push('1. Mengirim login ke MYSIMS...');\ntry {\n  const loginBody = 'u=' + encodeURIComponent('ketua') + '&p=' + encodeURIComponent('admin') + '&ta=' + encodeURIComponent('2026');\n  const loginResp = await this.helpers.httpRequest({\n    method: 'POST',\n    url: 'http://192.168.188.10/mysim/index.php/admin/do_login',\n    headers: {\n      'Content-Type': 'application/x-www-form-urlencoded',\n      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) TRANSKEP-Bot/1.0'\n    },\n    body: loginBody,\n    disableFollowRedirect: true,\n    returnFullResponse: true,\n    ignoreHttpStatusErrors: true\n  });\n\n  const headers = loginResp.headers || {};\n  const rawCookies = headers['set-cookie'] || [];\n  const list = Array.isArray(rawCookies) ? rawCookies : (rawCookies ? [rawCookies] : []);\n  const cookieParts = list.map(c => String(c).split(';')[0].trim()).filter(Boolean);\n  sessionCookie = cookieParts.join('; ');\n  debugLog.push('Login selesai. Status: ' + (loginResp.statusCode || loginResp.status) + ', Cookie: ' + (sessionCookie || 'KOSONG'));\n} catch (errLogin) {\n  debugLog.push('Login error: ' + errLogin.message);\n}\n\n// -------------------------------------------------------------------------\n// LANGKAH 2: SUBMIT FORMULIR SURAT KELUAR MYSIMS (act_add)\n// -------------------------------------------------------------------------\ndebugLog.push('2. Mengirim formulir surat keluar...');\ntry {\n  const formParams = {\n    idp: '',\n    no_agenda: '',\n    dari: dari,\n    no_surat: 'KPA.W10-A2/',\n    uraian: uraian,\n    kode: kode,\n    tgl_surat: tglSurat,\n    sifat: sifat,\n    ket: ket,\n    submit: 'Simpan',\n    simpan: 'Simpan'\n  };\n\n  const formBody = Object.keys(formParams)\n    .map(k => encodeURIComponent(k) + '=' + encodeURIComponent(formParams[k]))\n    .join('&');\n\n  const addResp = await this.helpers.httpRequest({\n    method: 'POST',\n    url: 'http://192.168.188.10/mysim/index.php/admin/surat_keluar/act_add',\n    headers: {\n      'Cookie': sessionCookie,\n      'Content-Type': 'application/x-www-form-urlencoded',\n      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) TRANSKEP-Bot/1.0'\n    },\n    body: formBody,\n    disableFollowRedirect: true,\n    returnFullResponse: true,\n    ignoreHttpStatusErrors: true\n  });\n\n  debugLog.push('Submit surat status: ' + (addResp.statusCode || addResp.status));\n} catch (errSubmit) {\n  debugLog.push('Submit error: ' + errSubmit.message);\n}\n\n// -------------------------------------------------------------------------\n// LANGKAH 3: AMBIL DAFTAR SURAT KELUAR TERBARU & EKSTRAK NOMOR SURAT\n// -------------------------------------------------------------------------\ndebugLog.push('3. Mengambil halaman daftar surat keluar...');\ntry {\n  const listResp = await this.helpers.httpRequest({\n    method: 'GET',\n    url: 'http://192.168.188.10/mysim/index.php/admin/surat_keluar',\n    headers: {\n      'Cookie': sessionCookie,\n      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) TRANSKEP-Bot/1.0'\n    },\n    returnFullResponse: true,\n    ignoreHttpStatusErrors: true\n  });\n\n  const htmlContent = String(listResp.body || listResp.data || listResp || '');\n  debugLog.push('HTML panjang: ' + htmlContent.length + ' karakter');\n\n  // Regex mencari format resmi PA Indramayu: angka/KPA.W10-A2/kode/bulan/tahun\n  const regex = /(\\d+\\/KPA\\.W10-A2\\/[A-Za-z0-9.]+\\/[IVXLCDM]+\\/\\d{4})/i;\n  const match = htmlContent.match(regex);\n  if (match && match[1]) {\n    nomorSurat = match[1].trim();\n    debugLog.push('BERHASIL! Nomor surat ditemukan: ' + nomorSurat);\n  } else {\n    debugLog.push('Regex belum menemukan nomor surat pada tabel MYSIMS.');\n  }\n} catch (errList) {\n  debugLog.push('Ambil list error: ' + errList.message);\n}\n\nreturn [{\n  json: {\n    cuti_id: cutiId,\n    nomor_surat: nomorSurat,\n    secret_key: secretKey,\n    callback_url: callbackUrl,\n    nama_pegawai: namaPegawai,\n    debug_log: debugLog.join(' | ')\n  }\n}];"
       },
-      "id": "http-login-mysims",
-      "name": "Login MYSIMS",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        460,
-        300
-      ]
-    },
-    {
-      "parameters": {
-        "jsCode": "// Ekstraksi Cookie Sesi MYSIMS dari Header Respons Login (302 Redirect)\nconst loginNode = $('Login MYSIMS').first().json || {};\nconst headers = loginNode.headers || {};\nconst rawCookies = headers['set-cookie'] || [];\nlet cookies = [];\n\nif (Array.isArray(rawCookies)) {\n  for (const c of rawCookies) {\n    if (c) cookies.push(c.split(';')[0].trim());\n  }\n} else if (typeof rawCookies === 'string' && rawCookies.trim() !== '') {\n  cookies.push(rawCookies.split(';')[0].trim());\n}\n\n// Gabungkan semua cookie (ci_session, PHPSESSID, dsb)\nconst sessionCookie = cookies.join('; ');\n\n// Ambil payload dari trigger TRANSKEP\nconst webhookData = $('Webhook Trigger').first().json.body || $('Webhook Trigger').first().json || {};\nconst mysims = webhookData.mysims_payload || {};\n\n// Format tanggal surat (YYYY-MM-DD)\nconst todayYmd = mysims.tgl_surat || new Date().toISOString().slice(0, 10);\n\nreturn [{\n  json: {\n    session_cookie: sessionCookie,\n    cuti_id: webhookData.cuti_id || '',\n    nama_pegawai: webhookData.nama_pegawai || '',\n    nip: webhookData.nip || '',\n    jenis_cuti: webhookData.jenis_cuti || '',\n    callback_url: webhookData.callback_url || '',\n    secret_key: webhookData.secret_key || 'TRANSKEP_WA_BOT_2026',\n    mysims_dari: mysims.dari || webhookData.nama_pegawai || 'Pegawai',\n    mysims_uraian: mysims.uraian || ('Permohonan Cuti ' + (webhookData.jenis_cuti || '') + ' a.n. ' + (webhookData.nama_pegawai || 'Pegawai')),\n    mysims_kode: mysims.kode || 'KP5.3',\n    mysims_tgl_surat: todayYmd,\n    mysims_sifat: mysims.sifat || 'Biasa',\n    mysims_ket: mysims.ket || 'cuti tahunan'\n  }\n}];"
-      },
-      "id": "code-extract-cookie",
-      "name": "Parse Session & Prepare Form",
+      "id": "code-engine-mysims",
+      "name": "Mesin Otomasi MYSIMS",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        700,
+        500,
         300
       ]
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "http://192.168.188.10/mysim/index.php/admin/surat_keluar/act_add",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Cookie",
-              "value": "={{ $json.session_cookie }}"
-            }
-          ]
-        },
-        "sendBody": true,
-        "contentType": "multipart-form-data",
-        "bodyParameters": {
-          "parameters": [
-            {
-              "name": "idp",
-              "value": ""
-            },
-            {
-              "name": "no_agenda",
-              "value": ""
-            },
-            {
-              "name": "dari",
-              "value": "={{ $json.mysims_dari }}"
-            },
-            {
-              "name": "no_surat",
-              "value": "KPA.W10-A2/"
-            },
-            {
-              "name": "uraian",
-              "value": "={{ $json.mysims_uraian }}"
-            },
-            {
-              "name": "kode",
-              "value": "={{ $json.mysims_kode }}"
-            },
-            {
-              "name": "tgl_surat",
-              "value": "={{ $json.mysims_tgl_surat }}"
-            },
-            {
-              "name": "sifat",
-              "value": "={{ $json.mysims_sifat }}"
-            },
-            {
-              "name": "ket",
-              "value": "={{ $json.mysims_ket }}"
-            }
-          ]
-        },
-        "options": {
-          "allowUnauthorizedCerts": true,
-          "redirect": {
-            "redirect": {
-              "followRedirect": false
-            }
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
           },
-          "response": {
-            "response": {
-              "fullResponse": true,
-              "neverError": true
-            }
-          }
-        }
-      },
-      "id": "http-submit-surat-keluar",
-      "name": "Submit Surat Keluar MYSIMS",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        940,
-        300
-      ]
-    },
-    {
-      "parameters": {
-        "method": "GET",
-        "url": "http://192.168.188.10/mysim/index.php/admin/surat_keluar",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
+          "conditions": [
             {
-              "name": "Cookie",
-              "value": "={{ $('Parse Session & Prepare Form').first().json.session_cookie }}"
+              "id": "condition-nomor-valid",
+              "leftValue": "={{ $json.nomor_surat }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
             }
-          ]
+          ],
+          "combinator": "and"
         },
-        "options": {
-          "allowUnauthorizedCerts": true,
-          "response": {
-            "response": {
-              "responseFormat": "text"
-            }
-          }
-        }
+        "options": {}
       },
-      "id": "http-get-list-surat",
-      "name": "Ambil Daftar Surat Keluar Terbaru",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        1180,
-        300
-      ]
-    },
-    {
-      "parameters": {
-        "jsCode": "// Ekstraksi Nomor Surat Keluar Resmi dari Baris Teratas Tabel MYSIMS\nconst rawHtml = String($input.first().json.data || $input.first().json.body || $input.first().json || '');\nconst prepData = $('Parse Session & Prepare Form').first().json;\n\nlet nomorSuratFound = '';\n\n// 1. Regex spesifik format nomor surat PA Indramayu: e.g. 1085/KPA.W10-A2/KP5.3/XI/2026\nconst regexSurat = /(\\d+\\/KPA\\.W10-A2\\/[A-Za-z0-9.]+\\/[IVXLCDM]+\\/\\d{4})/i;\nconst match1 = rawHtml.match(regexSurat);\nif (match1 && match1[1]) {\n  nomorSuratFound = match1[1].trim();\n} else {\n  // 2. Fallback pencarian nomor prefix KPA.W10-A2\n  const subMatch = rawHtml.match(/(\\d{3,5}\\/KPA\\.W10-A2[^<\"'\\s]+)/i);\n  if (subMatch && subMatch[1]) {\n    nomorSuratFound = subMatch[1].trim();\n  }\n}\n\nreturn [{\n  json: {\n    cuti_id: prepData.cuti_id,\n    nomor_surat: nomorSuratFound || 'NOMOR_MYSIMS_TERCATAT',\n    secret_key: prepData.secret_key,\n    callback_url: prepData.callback_url,\n    nama_pegawai: prepData.nama_pegawai,\n    debug_cookie_sent: prepData.session_cookie ? 'ADA' : 'KOSONG'\n  }\n}];"
-      },
-      "id": "code-extract-nomor-surat",
-      "name": "Ekstrak Nomor Surat dari HTML",
-      "type": "n8n-nodes-base.code",
+      "id": "if-nomor-valid",
+      "name": "Cek Nomor Surat Valid?",
+      "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [
-        1420,
+        780,
         300
       ]
     },
@@ -236,8 +99,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        1660,
-        300
+        1040,
+        280
       ]
     }
   ],
@@ -246,58 +109,25 @@
       "main": [
         [
           {
-            "node": "Login MYSIMS",
+            "node": "Mesin Otomasi MYSIMS",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Login MYSIMS": {
+    "Mesin Otomasi MYSIMS": {
       "main": [
         [
           {
-            "node": "Parse Session & Prepare Form",
+            "node": "Cek Nomor Surat Valid?",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Parse Session & Prepare Form": {
-      "main": [
-        [
-          {
-            "node": "Submit Surat Keluar MYSIMS",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Submit Surat Keluar MYSIMS": {
-      "main": [
-        [
-          {
-            "node": "Ambil Daftar Surat Keluar Terbaru",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Ambil Daftar Surat Keluar Terbaru": {
-      "main": [
-        [
-          {
-            "node": "Ekstrak Nomor Surat dari HTML",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Ekstrak Nomor Surat dari HTML": {
+    "Cek Nomor Surat Valid?": {
       "main": [
         [
           {
