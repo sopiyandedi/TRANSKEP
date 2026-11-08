@@ -5337,3 +5337,51 @@ Pengguna melaporkan bahwa pratinjau (*preview*) dokumen PDF di modal SK dan SOP 
 
 #### 3. Estimasi Dampak & File yang Dimodifikasi
 - **Status:** `[SELESAI & AKTIF]` ✅
+
+
+---
+
+### TAHAP 100: Perbaikan Presisi Nomor Surat Baru MYSIMS (`1085` vs `1084`) & Injeksi Binary File PDF 2-Tahap Ber-Nomor Resmi ke MYSIMS (v3.8.27)
+
+#### 1. Analisis Akar Masalah (Root Cause Analysis)
+Berdasarkan hasil uji langsung pada MYSIMS (`1085/KP5.3` terbit tanpa file) dan blanko cetak TRANSKEP (`Nomor : 1084/KPA.W10-A2/KP5.3/XI/2026`), ditemukan **4 akar masalah teknis**:
+
+1. **Penyebab Nomor Tercetak `1084` (Bukan `1085`) di Blanko TRANSKEP:**
+   - **Bug URL Deployment Callback (`ScriptApp.getService().getUrl()`):** Repositori GAS memiliki **21 deployment aktif**. Pemanggilan `ScriptApp.getService().getUrl()` di Google Apps Script V8 mengembalikan URL deployment lama/`@HEAD` (bukan deployment aktif `AKfycbzFrbQTqmVzMio7mderK-S9ntFVjXiWYFgnXfy9fW_SUKOcIxfPywP2He1flhaK_AZ0ZA`), ditambah redirect `302` Google Apps Script pada metode `POST` dari `this.helpers.httpRequest` menyebabkan callback baru gagal menimpa nilai `1084` sisa pengujian sebelumnya (atau cache memori frontend `state.cutiLogs` belum di-refresh otomatis setelah callback selesai).
+   - **Scraping Tabel Belum Memfilter Baris Pemohon & Angka Agenda Maksimum:** Regex sebelumnya hanya mengambil kemunculan pertama di HTML tanpa memvalidasi bahwa nomor agenda harus lebih besar dari nomor tertinggi sebelum submit (`agendaNum > maxAgendaBefore`) dan cocok dengan nama pemohon (`dari`).
+
+2. **Penyebab File PDF Masih Kosong (`File : `) di MYSIMS:**
+   - **Limitasi Sandbox Code Node n8n terhadap `Buffer` Multipart:** Di dalam sandbox JavaScript node `Code` n8n (`typeVersion: 2`), pengiriman objek `Buffer` mentah melalui `this.helpers.httpRequest({ body: bodyBuffer })` otomatis ter-serialisasi sebagai JSON `{"type":"Buffer","data":[...]}`, bukan stream biner `multipart/form-data`. Akibatnya langkah multipart ditolak oleh PHP MYSIMS (`$_POST` & `$_FILES` kosong), lalu sistem jatuh ke *fallback* `application/x-www-form-urlencoded` yang memang berhasil membuat nomor `1085` tetapi tidak bisa membawa file PDF.
+   - **Urutan Logika PDF (Masalah Ayam & Telur):** Sebelumnya PDF di-generate di GAS *sebelum* nomor surat keluar `1085` terbit di MYSIMS, sehingga seandainya ter-upload pun, PDF di dalam MYSIMS belum memiliki nomor surat resmi di bagian kop-nya. Selain itu, indeks NIP Pejabat pada `generateCutiPdfBase64Server_` sebelumnya membaca `logRecord[12]` (catatan pejabat) padahal seharusnya `logRecord[10]` (`pejabat_nip`), serta gambar QR eksternal perlu di-embed sebagai `data:image/png;base64` agar dirender utuh oleh engine PDF GAS.
+
+#### 2. Rencana Implementasi & Arsitektur Solusi (2-Stage Gold Standard)
+1. **Perbaikan Backend GAS ([`permohonan/persetujuan.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/persetujuan.js)):**
+   - Mengunci `callback_url` ke URL deployment produksi terverifikasi (`https://script.google.com/macros/s/AKfycbzFrbQTqmVzMio7mderK-S9ntFVjXiWYFgnXfy9fW_SUKOcIxfPywP2He1flhaK_AZ0ZA/exec` / `ScriptProperties`) agar tidak pernah meleset ke deployment lama.
+   - Memindahkan pembuatan PDF (`generateCutiPdfBase64Server_`) ke dalam `updateNomorSuratCutiFromExternal_(payload)` **tepat setelah nomor surat baru (`1085/...`) disimpan ke Kolom 20 `cuti_log`**. Keuntungannya ganda:
+     1. Klik tombol **ACC** oleh Ketua di TRANSKEP kembali instan (< 0,5 detik).
+     2. File PDF `TRANSKEP_[nama]_ct.pdf` yang dikirim balik ke n8n untuk disuntikkan ke MYSIMS **sudah tercetak lengkap dengan Nomor Surat Resmi baru (`1085/...`)**!
+   - Memperbaiki indeks `pejabatNip` dari `logRecord[12]` menjadi `logRecord[10]` serta mengubah 4 gambar QR TTE menjadi inline Base64 PNG (`UrlFetchApp` -> `data:image/png;base64,...`) agar barcode tampil tajam 100% di PDF MYSIMS.
+
+2. **Arsitektur 3-Node Native Binary di n8n ([`n8n_workflow_mysims_surat_keluar.json`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/n8n_workflow_mysims_surat_keluar.json)):**
+   - **Node 1 (`Webhook Trigger`):** Menerima sinyal ACC Final dari TRANSKEP.
+   - **Node 2 (`Mesin Otomasi MYSIMS & Callback TRANSKEP` - Code Node):**
+     1. Login ke MYSIMS (`ketua`/`admin`/`2026`) dengan deduplikasi cookie `ci_session` terbaru.
+     2. Cek daftar `/admin/surat_keluar` awal dan catat angka agenda tertinggi (`maxAgendaBefore`).
+     3. Submit surat keluar baru via `POST /admin/surat_keluar/act_add` (`x-www-form-urlencoded` — cepat & 100% pasti terbit nomor baru).
+     4. Scrape baris `<tr>` baru yang memiliki `agenda > maxAgendaBefore` & sesuai `dari`: ekstrak **`nomor_surat` baru** sekaligus **link tombol `Edit`** (`.../surat_keluar/edt/<idp>`) dari baris tersebut.
+     5. Buka halaman Edit (`GET .../edt/<idp>`, timeout 5 detik) untuk mengambil URL `<form action="...">` (`act_edt`), seluruh nilai field eksisting (`idp`, `no_agenda`, `no_surat`, dll.), nilai opsi Sifat `"Biasa"`, dan nama field file (`file_surat`).
+     6. Panggil Callback TRANSKEP (mendukung protokol redirect 2-langkah GAS `POST 302` -> `GET Location` + fallback `GET`) untuk menyimpan nomor surat baru ke `cuti_log` sekaligus menerima balasan `pdf_base64` yang sudah bernomor resmi.
+     7. Konversi `pdf_base64` menjadi objek **Binary Native n8n** menggunakan `await this.helpers.prepareBinaryData(...)`.
+   - **Node 3 (`Suntik PDF & Sifat Biasa ke MYSIMS` - Native HTTP Request Node v4.2):**
+     - Menggunakan engine bawaan n8n **`Body Content Type: Form-Data (Multipart)`** + **`n8n Binary File`** ke `act_edt` MYSIMS untuk menyuntikkan berkas PDF asli (`TRANSKEP_[nama]_ct.pdf`) dan mengunci kolom `sifat = Biasa` langsung ke baris surat keluar yang baru terbit!
+
+3. **Sinkronisasi Otomatis Memori Frontend Setelah ACC Final:**
+   - Pada [`modules/permohonan/persetujuan.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/permohonan/persetujuan.js) dan [`permohonan/js_persetujuan.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/js_persetujuan.html), menambahkan *silent background refresh* otomatis beberapa detik setelah keputusan `Disetujui` disimpan agar `nomor_surat` baru dari n8n otomatis masuk ke state browser tanpa harus *hard-refresh* manual.
+   - Menaikkan versi cache PWA di [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) & [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) ke `v3.8.27`.
+
+#### 3. Estimasi Dampak & File yang Akan Dimodifikasi
+- [`permohonan/persetujuan.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/persetujuan.js)
+- [`n8n_workflow_mysims_surat_keluar.json`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/n8n_workflow_mysims_surat_keluar.json)
+- [`modules/permohonan/persetujuan.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/permohonan/persetujuan.js) & [`permohonan/js_persetujuan.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/js_persetujuan.html)
+- [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) & [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js)
+- **Status:** `[SELESAI & AKTIF]` ✅

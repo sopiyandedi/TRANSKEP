@@ -268,7 +268,11 @@
                   actionPromise
                     .then((res) => {
                         if (res && res.status === 'success') {
-                            // Sukses tersinkronisasi diam-diam
+                            // Sukses tersinkronisasi diam-diam + tarik nomor_surat baru MYSIMS dari n8n di latar belakang
+                            if (zType === 'Cuti' && decision === 'Disetujui') {
+                                setTimeout(() => { if (typeof syncBackgroundData === 'function') syncBackgroundData(true); }, 5500);
+                                setTimeout(() => { if (typeof syncBackgroundData === 'function') syncBackgroundData(true); }, 11000);
+                            }
                         } else {
                             // Rollback jika server menolak
                             this.s.cutiLogs = backupLogs; this.s.ikLogs = backupIk; this.s.ipLogs = backupIp; this.s.wfhLogs = backupWfh;
@@ -307,12 +311,16 @@
                   this.selectedItems = [];
                   if(window.showNotify) window.showNotify("Keputusan Massal Diterapkan ⚡", countItems + " berkas berhasil diperbarui (0ms).", "success");
 
+                  const hasCutiApproved = (this.bulkDecision === 'Disetujui') && processedItems.some(it => it.type === 'Cuti');
                   PersetujuanDataService.processBulkApproval(processedItems, this.bulkDecision, notes, this.s.user.nip, this.bypassMode, token)
                       .then((res) => {
                           if (!res || res.status !== 'success') {
                               this.s.cutiLogs = backupLogs; this.s.ikLogs = backupIk; this.s.ipLogs = backupIp; this.s.wfhLogs = backupWfh;
                               if(typeof updateBadgePermohonan === 'function') setTimeout(updateBadgePermohonan, 50);
                               if(window.showNotify) window.showNotify("Gagal Massal", (res ? res.message : "Gagal memproses.") + " (Data dikembalikan)", "error");
+                          } else if (hasCutiApproved) {
+                              setTimeout(() => { if (typeof syncBackgroundData === 'function') syncBackgroundData(true); }, 6000);
+                              setTimeout(() => { if (typeof syncBackgroundData === 'function') syncBackgroundData(true); }, 12000);
                           }
                       })
                       .catch((err) => {

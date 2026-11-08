@@ -649,19 +649,51 @@ function resendCutiWhatsApp(cutiId, adminNip, clientToken) {
 }
 
 /**
- * Menghasilkan PDF Formulir Permintaan dan Pemberian Cuti di Server GAS (Opsi A)
- * Menggunakan template resmi TRANSKEP, melengkapi seluruh metadata, TTE QR Mandiri,
- * dan mengonversi ke PDF Blob yang di-encode Base64 untuk diunggah ke MYSIMS.
+ * Helper Batch Fetch QR Code menjadi Data URI PNG Base64 untuk Engine PDF Server GAS
  */
-function generateCutiPdfBase64Server_(id, logRecord, namaPemohon, nip) {
+function fetchQrBatchDataUrisServer_(urls) {
+  const results = urls.slice();
+  try {
+    const requests = urls.map(function(u) {
+      return { url: u, method: 'get', muteHttpExceptions: true };
+    });
+    const responses = UrlFetchApp.fetchAll(requests);
+    for (let i = 0; i < responses.length; i++) {
+      if (responses[i] && responses[i].getResponseCode() === 200) {
+        const b64 = Utilities.base64Encode(responses[i].getContent());
+        if (b64 && b64.length > 50) {
+          results[i] = 'data:image/png;base64,' + b64;
+        }
+      }
+    }
+  } catch (e) {
+    Logger.log("⚠️ [fetchQrBatchDataUrisServer_] Fallback ke URL langsung: " + e.toString());
+  }
+  return results;
+}
+
+function escapeHtmlServer_(str) {
+  return String(str == null ? '' : str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+/**
+ * Menghasilkan PDF Formulir Permintaan dan Pemberian Cuti di Server GAS (Opsi A - 2-Stage Gold Standard)
+ * Menggunakan layout tabel A4 1 halaman presisi, melengkapi Nomor Surat Resmi MYSIMS, TTE QR Inline PNG,
+ * dan mengonversi ke PDF Blob Base64 siap suntik ke MYSIMS.
+ */
+function generateCutiPdfBase64Server_(id, logRecord, namaPemohon, nip, nomorSuratOverride) {
   try {
     const ss = getDB();
     const sheetUser = ss.getSheetByName('user_data');
     if (!sheetUser) throw new Error("Sheet user_data tidak ditemukan.");
 
     const uData = readUserSheetDecrypted_(sheetUser);
-    const uHeaders = (uData && uData.length > 0) ? uData[0].map(h => String(h || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '')) : [];
-    const findColIdx = (name, fallback) => {
+    const uHeaders = (uData && uData.length > 0) ? uData[0].map(function(h) { return String(h || '').trim().toLowerCase().replace(/[^a-z0-9]/g, ''); }) : [];
+    const findColIdx = function(name, fallback) {
       const clean = name.toLowerCase().replace(/[^a-z0-9]/g, '');
       const idx = uHeaders.indexOf(clean);
       return idx !== -1 ? idx : fallback;
@@ -675,7 +707,7 @@ function generateCutiPdfBase64Server_(id, logRecord, namaPemohon, nip) {
 
     const userMap = {};
     for (let i = 1; i < uData.length; i++) {
-      const uNip = String(uData[i][colNip] || '').trim();
+      const uNip = String(uData[i][colNip] || '').replace(/^'+/, '').trim();
       if (!uNip) continue;
       userMap[uNip] = {
         nip: uNip,
@@ -694,51 +726,26 @@ function generateCutiPdfBase64Server_(id, logRecord, namaPemohon, nip) {
       };
     }
 
-    const pemohonNip = String(nip || logRecord[2] || '').trim();
-    const atasanNip = String(logRecord[9] || '').trim();
-    const pejabatNip = String(logRecord[12] || '').trim();
+    const pemohonNip = String(nip || logRecord[2] || '').replace(/^'+/, '').trim();
+    const atasanNip = String(logRecord[9] || '').replace(/^'+/, '').trim();
+    const pejabatNip = String(logRecord[10] || '').replace(/^'+/, '').trim();
 
     const pns = userMap[pemohonNip] || { nama: namaPemohon || 'Pegawai', nip: pemohonNip, jabatan: '-', no_hp: '-' };
     const atasan = userMap[atasanNip] || { nama: 'Atasan Langsung', nip: atasanNip, jabatan: 'Atasan Langsung' };
     const pejabat = userMap[pejabatNip] || { nama: 'Ketua', nip: pejabatNip, jabatan: 'Ketua' };
 
-    // Baca Template Cetak Cuti secara bertahap
-    let templateHtml = '';
-    const candidateFiles = [
-      'permohonan/template_cetak_cuti',
-      'modules/permohonan/cetak/cetak_cuti',
-      'template_cetak_cuti',
-      'cetak_cuti'
-    ];
-    for (let f = 0; f < candidateFiles.length; f++) {
-      try {
-        templateHtml = HtmlService.createHtmlOutputFromFile(candidateFiles[f]).getContent();
-        if (templateHtml && templateHtml.length > 100) break;
-      } catch (errFind) {}
-    }
-
-    if (!templateHtml) {
-      Logger.log("⚠️ [generateCutiPdfBase64Server_] Template HTML tidak ditemukan pada semua alias.");
-      return '';
-    }
-
-    // Hilangkan wrapper style="display: none;" agar konten form tampil penuh pada PDF GAS
-    templateHtml = templateHtml.replace(/<div id="template-cetak-container"[^>]*>/i, '<div style="width: 100%; background: #ffffff;">');
-
     const jenisCuti = String(logRecord[3] || 'Tahunan');
     let cTahunan = "", cBesar = "", cSakit = "", cMelahirkan = "", cPenting = "", cCltn = "";
-    if (jenisCuti === 'Tahunan') cTahunan = "✓";
-    else if (jenisCuti === 'Besar') cBesar = "✓";
-    else if (jenisCuti === 'Sakit') cSakit = "✓";
-    else if (jenisCuti === 'Melahirkan') cMelahirkan = "✓";
-    else if (jenisCuti === 'Alasan Penting' || jenisCuti === 'Penting') cPenting = "✓";
-    else if (jenisCuti === 'CLTN') cCltn = "✓";
+    if (jenisCuti === 'Tahunan') cTahunan = "&#10003;";
+    else if (jenisCuti === 'Besar') cBesar = "&#10003;";
+    else if (jenisCuti === 'Sakit') cSakit = "&#10003;";
+    else if (jenisCuti === 'Melahirkan') cMelahirkan = "&#10003;";
+    else if (jenisCuti === 'Alasan Penting' || jenisCuti === 'Penting') cPenting = "&#10003;";
+    else if (jenisCuti === 'CLTN') cCltn = "&#10003;";
 
-    // Pertimbangan & Keputusan
-    const cAtasanSetuju = "✓", cAtasanUbah = "", cAtasanTangguh = "", cAtasanTolak = "";
-    const cPejabatSetuju = "✓", cPejabatUbah = "", cPejabatTangguh = "", cPejabatTolak = "";
+    const cAtasanSetuju = "&#10003;", cAtasanUbah = "", cAtasanTangguh = "", cAtasanTolak = "";
+    const cPejabatSetuju = "&#10003;", cPejabatUbah = "", cPejabatTangguh = "", cPejabatTolak = "";
 
-    // History Saldo Cuti
     let hist = {};
     if (logRecord[16]) {
       try { hist = typeof logRecord[16] === 'string' ? JSON.parse(logRecord[16]) : logRecord[16]; } catch (e) { hist = {}; }
@@ -777,50 +784,27 @@ function generateCutiPdfBase64Server_(id, logRecord, namaPemohon, nip) {
       sisaAk26 = Math.max(0, sisaAw26 - hY26 - hHangusBesar);
     }
 
-    // QR Code Mandiri Berbasis URL Publik Verifikasi (Rendered via high-reliability QR API untuk PDF GAS)
+    // QR Code TTE Mandiri (Inline PNG Base64 agar 100% ter-render tajam di engine PDF GAS)
     const baseUrl = 'https://sso.pa-indramayu.go.id/';
     const verifyUrlPegawai = baseUrl + '?action=verifyCuti&id=' + encodeURIComponent(id) + '&type=pemohon&nip=' + encodeURIComponent(pns.nip);
     const verifyUrlAtasan = baseUrl + '?action=verifyCuti&id=' + encodeURIComponent(id) + '&type=atasan&nip=' + encodeURIComponent(atasan.nip);
     const verifyUrlPejabat = baseUrl + '?action=verifyCuti&id=' + encodeURIComponent(id) + '&type=pejabat&nip=' + encodeURIComponent(pejabat.nip);
 
-    const qrPegawaiSrc = 'https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=' + encodeURIComponent(verifyUrlPegawai);
-    const qrAtasanSrc = 'https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=' + encodeURIComponent(verifyUrlAtasan);
-    const qrPejabatSrc = 'https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=' + encodeURIComponent(verifyUrlPejabat);
-    const qrParafSrc = 'https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=' + encodeURIComponent("Sudah diparaf oleh Petugas Cuti PA Indramayu");
+    const rawQrUrls = [
+      'https://api.qrserver.com/v1/create-qr-code/?size=150x150&margin=2&data=' + encodeURIComponent(verifyUrlPegawai),
+      'https://api.qrserver.com/v1/create-qr-code/?size=150x150&margin=2&data=' + encodeURIComponent("Sudah diparaf oleh Petugas Cuti PA Indramayu"),
+      'https://api.qrserver.com/v1/create-qr-code/?size=150x150&margin=2&data=' + encodeURIComponent(verifyUrlAtasan),
+      'https://api.qrserver.com/v1/create-qr-code/?size=150x150&margin=2&data=' + encodeURIComponent(verifyUrlPejabat)
+    ];
+    const qrDataUris = fetchQrBatchDataUrisServer_(rawQrUrls);
 
-    const qrPegawaiImg = "<img src='" + qrPegawaiSrc + "' width='64' height='64' alt='TTE Pegawai' style='display: block; margin: 2px 0 4px 0;' />";
-    const qrParafImg = "<img src='" + qrParafSrc + "' width='45' height='45' alt='Paraf' style='margin: 0 auto; display: block;' />";
-    const qrAtasanImg = "<img src='" + qrAtasanSrc + "' width='64' height='64' alt='QR Atasan' style='display: block; margin: 2px 0 4px 0;' />";
-    const qrPejabatImg = "<img src='" + qrPejabatSrc + "' width='64' height='64' alt='QR Pejabat' style='display: block; margin: 2px 0 4px 0;' />";
+    const qrPegawaiImg = "<img src='" + qrDataUris[0] + "' width='56' height='56' style='display:block; margin:2px 0 3px 0;' />";
+    const qrParafImg = "<img src='" + qrDataUris[1] + "' width='44' height='44' style='display:block; margin:0 auto;' />";
+    const qrAtasanImg = "<img src='" + qrDataUris[2] + "' width='56' height='56' style='display:block; margin:2px 0 3px 0;' />";
+    const qrPejabatImg = "<img src='" + qrDataUris[3] + "' width='56' height='56' style='display:block; margin:2px 0 3px 0;' />";
 
-    const atasanJabatanStr = formatJabatanSingkatServer_(atasan.jabatan);
-    const pejabatJabatanStr = formatJabatanSingkatServer_(pejabat.jabatan);
-
-    const atasanSig = "<div style='width: 100%; display: flex; justify-content: flex-end;'>" +
-                        "<div style='width: 38%; display: flex; flex-direction: column; align-items: flex-start; text-align: left; min-width: 180px;'>" +
-                          "<div style='font-size: 10pt !important; font-family: \"Times New Roman\", Times, serif; font-weight: bold; margin-bottom: 2px;'>" + 
-                            atasanJabatanStr + 
-                          "</div>" +
-                          qrAtasanImg +
-                          "<div style='font-size: 10pt !important; line-height: 1.2; font-family: \"Times New Roman\", Times, serif; margin-top: 2px;'>" +
-                            "<span style='text-decoration: underline; font-weight: bold;'>" + atasan.nama + "</span><br>" +
-                            "NIP. " + atasan.nip +
-                          "</div>" +
-                        "</div>" +
-                      "</div>";
-
-    const pejabatSig = "<div style='width: 100%; display: flex; justify-content: flex-end;'>" +
-                         "<div style='width: 38%; display: flex; flex-direction: column; align-items: flex-start; text-align: left; min-width: 180px;'>" +
-                           "<div style='font-size: 10pt !important; font-family: \"Times New Roman\", Times, serif; font-weight: bold; margin-bottom: 2px;'>" + 
-                             pejabatJabatanStr + 
-                           "</div>" +
-                           qrPejabatImg +
-                           "<div style='font-size: 10pt !important; line-height: 1.2; font-family: \"Times New Roman\", Times, serif; margin-top: 2px;'>" +
-                             "<span style='text-decoration: underline; font-weight: bold;'>" + pejabat.nama + "</span><br>" +
-                             "NIP. " + pejabat.nip +
-                           "</div>" +
-                         "</div>" +
-                       "</div>";
+    const atasanJabatanStr = escapeHtmlServer_(formatJabatanSingkatServer_(atasan.jabatan));
+    const pejabatJabatanStr = escapeHtmlServer_(formatJabatanSingkatServer_(pejabat.jabatan));
 
     const tglAju = String(logRecord[1] || '');
     let romawiBulan = "-";
@@ -836,10 +820,10 @@ function generateCutiPdfBase64Server_(id, logRecord, namaPemohon, nip) {
       }
     }
 
-    const defaultNomorBlanko = "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/KPA.W10-A/KP5.3/" + romawiBulan + "/" + tahunPengajuan;
-    const rawNomor = String(logRecord[19] || '').trim();
+    const defaultNomorBlanko = "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/KPA.W10-A2/KP5.3/" + romawiBulan + "/" + tahunPengajuan;
+    const rawNomor = String(nomorSuratOverride || logRecord[19] || '').trim();
     const isValidNomor = rawNomor !== '' && !rawNomor.includes('NOMOR_MYSIMS_TERCATAT') && !rawNomor.includes('undefined');
-    const nomorSuratCetak = isValidNomor ? rawNomor : defaultNomorBlanko;
+    const nomorSuratCetak = isValidNomor ? escapeHtmlServer_(rawNomor) : defaultNomorBlanko;
 
     let showAlasan = String(logRecord[6] || '-');
     if (showAlasan.includes("[USULAN PEMBATALAN]:")) {
@@ -847,57 +831,115 @@ function generateCutiPdfBase64Server_(id, logRecord, namaPemohon, nip) {
       showAlasan = parts[0].trim() + " [USULAN PEMBATALAN]: " + parts[1].trim();
     }
 
-    const replacements = {
-      "{{formatPengajuanLengkap}}": formatDateIndoCetakServer_(tglAju),
-      "{{nomorSuratCetak}}": nomorSuratCetak,
-      "{{romawiCetak}}": romawiBulan,
-      "{{tahunCetak}}": tahunPengajuan,
-      "{{pns_nama}}": pns.nama,
-      "{{pns_nip}}": pns.nip,
-      "{{pns_jabatan}}": formatJabatanSingkatServer_(pns.jabatan),
-      "{{pns_no_hp}}": pns.no_hp || '-',
-      "{{chk_tahunan}}": cTahunan, "{{chk_besar}}": cBesar, "{{chk_sakit}}": cSakit,
-      "{{chk_melahirkan}}": cMelahirkan, "{{chk_penting}}": cPenting, "{{chk_cltn}}": cCltn,
-      "{{log_alasan}}": showAlasan,
-      "{{log_sisa_cuti}}": (logRecord[11] || 0),
-      "{{log_tgl_mulai}}": formatDateIndoCetakServer_(logRecord[4]),
-      "{{log_tgl_selesai}}": formatDateIndoCetakServer_(logRecord[5]),
-      "{{log_alamat}}": (logRecord[15] || '-'),
-      "{{yearN2}}": (leaveYear - 2),
-      "{{yearN1}}": (leaveYear - 1),
-      "{{yearN}}": leaveYear,
-      "{{before24}}": sisaAw24, "{{after24}}": sisaAk24,
-      "{{before25}}": sisaAw25, "{{after25}}": sisaAk25,
-      "{{before26}}": sisaAw26, "{{after26}}": sisaAk26,
-      "{{cuti_besar}}": (pns.s_besar || 0), "{{cuti_sakit}}": (pns.s_sakit || 0),
-      "{{cuti_melahirkan}}": (pns.s_melahirkan || 0), "{{cuti_penting}}": (pns.s_penting || 0),
-      "{{cuti_cltn}}": (pns.s_cltn || 0),
-      "{{qrPegawaiImg}}": qrPegawaiImg,
-      "{{qrParafImg}}": qrParafImg,
-      "{{qrPegawaiUrl}}": qrPegawaiSrc,
-      "{{qrParafUrl}}": qrParafSrc,
-      "{{atasanSignatureContent}}": atasanSig,
-      "{{pejabatSignatureContent}}": pejabatSig,
-      "{{jarak_ttd}}": "40px",
-      "{{chk_atasan_setuju}}": cAtasanSetuju,
-      "{{chk_atasan_ubah}}": cAtasanUbah,
-      "{{chk_atasan_tangguh}}": cAtasanTangguh,
-      "{{chk_atasan_tolak}}": cAtasanTolak,
-      "{{chk_pejabat_setuju}}": cPejabatSetuju,
-      "{{chk_pejabat_ubah}}": cPejabatUbah,
-      "{{chk_pejabat_tangguh}}": cPejabatTangguh,
-      "{{chk_pejabat_tolak}}": cPejabatTolak
-    };
+    const fullHtml = '<!DOCTYPE html><html><head><meta charset="utf-8"><style>' +
+      '@page { size: A4; margin: 5mm 7mm; }' +
+      'body { margin: 0; padding: 0; font-family: "Times New Roman", Times, serif; font-size: 9.8pt; line-height: 1.2; color: #000000; background-color: #ffffff; }' +
+      '.hdr-tbl { width: 100%; border-collapse: collapse; margin-bottom: 3px; }' +
+      '.hdr-tbl td { border: none; padding: 1px 0; vertical-align: top; font-size: 10pt; }' +
+      '.title-box { text-align: center; margin-bottom: 5px; }' +
+      '.title-box h2 { font-size: 11.5pt; font-weight: bold; text-decoration: underline; margin: 0; letter-spacing: 0.4px; }' +
+      '.title-box p { font-size: 10pt; margin: 1px 0 0 0; }' +
+      '.bdr { width: 100%; border-collapse: collapse; table-layout: fixed; margin-bottom: 4px; }' +
+      '.bdr td { border: 1px solid #000000; padding: 2px 5px; vertical-align: middle; font-size: 9.8pt; word-wrap: break-word; }' +
+      '.sec-hd { font-weight: bold; background-color: #f2f2f2; text-transform: uppercase; font-size: 9.8pt; letter-spacing: 0.3px; }' +
+      '.sig-wrap { width: 100%; border-collapse: collapse; margin-top: 1px; margin-bottom: 3px; }' +
+      '.sig-wrap td { border: none; padding: 0; vertical-align: top; font-size: 9.8pt; }' +
+      '</style></head><body>' +
 
-    let populatedHtml = templateHtml;
-    for (const [key, val] of Object.entries(replacements)) {
-      populatedHtml = populatedHtml.split(key).join(String(val));
-    }
+      // HEADER ALAMAT & TANGGAL
+      '<table class="hdr-tbl"><tr>' +
+      '<td style="width:55%;">Kepada Yth.<br>Ketua Pengadilan Agama Indramayu<br>Di-<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Indramayu</td>' +
+      '<td style="width:45%; text-align:right;">Indramayu, ' + escapeHtmlServer_(formatDateIndoCetakServer_(tglAju)) + '</td>' +
+      '</tr></table>' +
 
-    // Buat HTML lengkap untuk parser PDF Google Apps Script
-    const fullHtml = '<!DOCTYPE html><html><head><meta charset="utf-8">' +
-      '<style>@page { size: A4; margin: 3mm 6mm; } body { margin: 0; padding: 0; font-family: "Times New Roman", Times, serif; background-color: #ffffff; color: #000000; }</style>' +
-      '</head><body>' + populatedHtml + '</body></html>';
+      // JUDUL & NOMOR SURAT RESMI MYSIMS
+      '<div class="title-box"><h2>PERMINTAAN DAN PEMBERIAN CUTI</h2><p>Nomor : ' + nomorSuratCetak + '</p></div>' +
+
+      // I. DATA PEGAWAI
+      '<table class="bdr">' +
+      '<tr><td colspan="4" class="sec-hd">I. DATA PEGAWAI</td></tr>' +
+      '<tr><td style="width:15%;">Nama</td><td style="width:42%; font-weight:bold; font-size:10.5pt;">' + escapeHtmlServer_(pns.nama) + '</td><td style="width:15%;">NIP</td><td style="width:28%; font-weight:bold; font-size:10.5pt;">' + escapeHtmlServer_(pns.nip) + '</td></tr>' +
+      '<tr><td>Jabatan</td><td>' + escapeHtmlServer_(formatJabatanSingkatServer_(pns.jabatan)) + '</td><td>Masa Kerja</td><td>-</td></tr>' +
+      '<tr><td>Unit Kerja</td><td colspan="3">Pengadilan Agama Indramayu</td></tr>' +
+      '</table>' +
+
+      // II. JENIS CUTI YANG DIAMBIL
+      '<table class="bdr">' +
+      '<tr><td colspan="4" class="sec-hd">II. JENIS CUTI YANG DIAMBIL</td></tr>' +
+      '<tr><td style="width:40%;">1. Cuti Tahunan</td><td style="width:10%; text-align:center; font-weight:bold; font-size:10.5pt;">' + cTahunan + '</td><td style="width:40%;">4. Cuti Melahirkan</td><td style="width:10%; text-align:center; font-weight:bold; font-size:10.5pt;">' + cMelahirkan + '</td></tr>' +
+      '<tr><td>2. Cuti Besar</td><td style="text-align:center; font-weight:bold; font-size:10.5pt;">' + cBesar + '</td><td>5. Cuti Karena Alasan Penting</td><td style="text-align:center; font-weight:bold; font-size:10.5pt;">' + cPenting + '</td></tr>' +
+      '<tr><td>3. Cuti Sakit</td><td style="text-align:center; font-weight:bold; font-size:10.5pt;">' + cSakit + '</td><td>6. Cuti di Luar Tanggungan Negara</td><td style="text-align:center; font-weight:bold; font-size:10.5pt;">' + cCltn + '</td></tr>' +
+      '</table>' +
+
+      // III. ALASAN CUTI
+      '<table class="bdr">' +
+      '<tr><td class="sec-hd">III. ALASAN CUTI</td></tr>' +
+      '<tr><td style="min-height:16px;">' + escapeHtmlServer_(showAlasan) + '</td></tr>' +
+      '</table>' +
+
+      // IV. LAMANYA CUTI
+      '<table class="bdr">' +
+      '<tr><td colspan="7" class="sec-hd">IV. LAMANYA CUTI</td></tr>' +
+      '<tr>' +
+      '<td style="width:10%;">Selama</td>' +
+      '<td style="width:8%; text-align:center; font-weight:bold;">' + escapeHtmlServer_(logRecord[11] || 0) + '</td>' +
+      '<td style="width:21%;">Hari / <span style="text-decoration:line-through;">Bulan</span> / <span style="text-decoration:line-through;">Tahun</span></td>' +
+      '<td style="width:15%;">mulai tanggal</td>' +
+      '<td style="width:20%; text-align:center;">' + escapeHtmlServer_(formatDateIndoCetakServer_(logRecord[4])) + '</td>' +
+      '<td style="width:6%; text-align:center;">s.d</td>' +
+      '<td style="width:20%; text-align:center;">' + escapeHtmlServer_(formatDateIndoCetakServer_(logRecord[5])) + '</td>' +
+      '</tr></table>' +
+
+      // V. CATATAN CUTI
+      '<table class="bdr">' +
+      '<tr><td colspan="6" class="sec-hd">V. CATATAN CUTI</td></tr>' +
+      '<tr><td colspan="3" style="font-weight:bold;">1. Cuti Tahunan</td><td rowspan="2" style="width:18%; text-align:center; font-weight:bold;">Paraf Petugas Cuti</td><td style="width:35%;">2. Cuti Besar</td><td style="width:8%; text-align:center; font-weight:bold;">' + (pns.s_besar || 0) + '</td></tr>' +
+      '<tr><td style="width:8%; text-align:center; font-weight:bold;">Tahun</td><td style="width:13%; text-align:center; font-weight:bold;">Sisa (Awal)</td><td style="width:18%; text-align:center; font-weight:bold;">Keterangan (Sisa)</td><td>3. Cuti Sakit</td><td style="text-align:center; font-weight:bold;">' + (pns.s_sakit || 0) + '</td></tr>' +
+      '<tr><td style="text-align:center;">' + (leaveYear - 2) + '</td><td style="text-align:center;">' + sisaAw24 + '</td><td style="text-align:center;">' + sisaAk24 + '</td><td rowspan="3" style="text-align:center; vertical-align:middle;">' + qrParafImg + '</td><td>4. Cuti Melahirkan</td><td style="text-align:center; font-weight:bold;">' + (pns.s_melahirkan || 0) + '</td></tr>' +
+      '<tr><td style="text-align:center;">' + (leaveYear - 1) + '</td><td style="text-align:center;">' + sisaAw25 + '</td><td style="text-align:center;">' + sisaAk25 + '</td><td>5. Cuti Karena Alasan Penting</td><td style="text-align:center; font-weight:bold;">' + (pns.s_penting || 0) + '</td></tr>' +
+      '<tr><td style="text-align:center;">' + leaveYear + '</td><td style="text-align:center;">' + sisaAw26 + '</td><td style="text-align:center;">' + sisaAk26 + '</td><td>6. Cuti di Luar Tanggungan Negara</td><td style="text-align:center; font-weight:bold;">' + (pns.s_cltn || 0) + '</td></tr>' +
+      '</table>' +
+
+      // VI. ALAMAT SELAMA MENJALANKAN CUTI + TTE PEMOHON (2-Column Pure Table agar 100% stabil di PDF GAS)
+      '<table class="sig-wrap" style="margin-bottom:4px;"><tr>' +
+      '<td style="width:60%; padding-right:8px;">' +
+        '<table class="bdr" style="margin-bottom:0;">' +
+        '<tr><td style="width:72%;" class="sec-hd">VI. ALAMAT SELAMA MENJALANKAN CUTI</td><td style="width:28%; text-align:center;" class="sec-hd">TELPON / HP</td></tr>' +
+        '<tr><td style="vertical-align:top; line-height:1.25; padding:4px 5px;">' + escapeHtmlServer_(logRecord[15] || '-') + '</td><td style="text-align:center; font-weight:bold;">' + escapeHtmlServer_(pns.no_hp || '-') + '</td></tr>' +
+        '</table>' +
+      '</td>' +
+      '<td style="width:40%; padding-left:14px;">' +
+        '<div>Hormat Saya,</div>' +
+        qrPegawaiImg +
+        '<div style="line-height:1.2;"><span style="text-decoration:underline; font-weight:bold;">' + escapeHtmlServer_(pns.nama) + '</span><br>NIP. ' + escapeHtmlServer_(pns.nip) + '</div>' +
+      '</td>' +
+      '</tr></table>' +
+
+      // VII. PERTIMBANGAN ATASAN LANGSUNG
+      '<table class="bdr">' +
+      '<tr><td colspan="4" class="sec-hd">VII. PERTIMBANGAN ATASAN LANGSUNG</td></tr>' +
+      '<tr style="text-align:center; font-weight:bold;"><td style="width:25%;">DISETUJUI</td><td style="width:25%;">PERUBAHAN</td><td style="width:25%;">DITANGGUHKAN</td><td style="width:25%;">TIDAK DISETUJUI</td></tr>' +
+      '<tr style="text-align:center; font-weight:bold; height:16px;"><td>' + cAtasanSetuju + '</td><td>' + cAtasanUbah + '</td><td>' + cAtasanTangguh + '</td><td>' + cAtasanTolak + '</td></tr>' +
+      '</table>' +
+      '<table class="sig-wrap"><tr><td style="width:60%;"></td><td style="width:40%; padding-left:14px;">' +
+        '<div style="font-weight:bold;">' + atasanJabatanStr + '</div>' +
+        qrAtasanImg +
+        '<div style="line-height:1.2;"><span style="text-decoration:underline; font-weight:bold;">' + escapeHtmlServer_(atasan.nama) + '</span><br>NIP. ' + escapeHtmlServer_(atasan.nip) + '</div>' +
+      '</td></tr></table>' +
+
+      // VIII. KEPUTUSAN PEJABAT YANG BERWENANG MEMBERIKAN CUTI
+      '<table class="bdr">' +
+      '<tr><td colspan="4" class="sec-hd">VIII. KEPUTUSAN PEJABAT YANG BERWENANG MEMBERIKAN CUTI</td></tr>' +
+      '<tr style="text-align:center; font-weight:bold;"><td style="width:25%;">DISETUJUI</td><td style="width:25%;">PERUBAHAN</td><td style="width:25%;">DITANGGUHKAN</td><td style="width:25%;">TIDAK DISETUJUI</td></tr>' +
+      '<tr style="text-align:center; font-weight:bold; height:16px;"><td>' + cPejabatSetuju + '</td><td>' + cPejabatUbah + '</td><td>' + cPejabatTangguh + '</td><td>' + cPejabatTolak + '</td></tr>' +
+      '</table>' +
+      '<table class="sig-wrap"><tr><td style="width:60%;"></td><td style="width:40%; padding-left:14px;">' +
+        '<div style="font-weight:bold;">' + pejabatJabatanStr + '</div>' +
+        qrPejabatImg +
+        '<div style="line-height:1.2;"><span style="text-decoration:underline; font-weight:bold;">' + escapeHtmlServer_(pejabat.nama) + '</span><br>NIP. ' + escapeHtmlServer_(pejabat.nip) + '</div>' +
+      '</td></tr></table>' +
+
+      '</body></html>';
 
     const cleanFirst = String(pns.nama || 'pegawai').replace(/[^a-zA-Z0-9]/g, ' ').trim().split(/\s+/)[0].toLowerCase();
     const pdfFileName = 'TRANSKEP_' + cleanFirst + '_ct.pdf';
@@ -905,9 +947,7 @@ function generateCutiPdfBase64Server_(id, logRecord, namaPemohon, nip) {
     const htmlOutput = HtmlService.createHtmlOutput(fullHtml);
     const pdfBlob = htmlOutput.getAs('application/pdf').setName(pdfFileName);
     const pdfBytes = pdfBlob.getBytes();
-    const pdfBase64 = Utilities.base64Encode(pdfBytes);
-
-    return pdfBase64;
+    return Utilities.base64Encode(pdfBytes);
   } catch (err) {
     Logger.log("⚠️ [generateCutiPdfBase64Server_] Error: " + err.toString());
     return '';
@@ -939,7 +979,8 @@ function formatDateIndoCetakServer_(dateStr) {
 
 /**
  * Trigger Otomatis Webhook n8n untuk Permintaan Nomor Surat Keluar MYSIMS
- * Dijalankan SECARA NON-BLOCKING & AMAN tepat setelah status permohonan cuti menjadi 'Disetujui' (ACC Final).
+ * Dijalankan SECARA NON-BLOCKING & INSTAN tepat setelah status permohonan cuti menjadi 'Disetujui' (ACC Final).
+ * Pembuatan PDF dilakukan di tahap Callback (Tahap 2) agar PDF yang diunggah ke MYSIMS sudah bernomor resmi!
  */
 function triggerN8nSuratKeluarCuti_(id, logRecord, namaPemohon, nip) {
   try {
@@ -956,19 +997,13 @@ function triggerN8nSuratKeluarCuti_(id, logRecord, namaPemohon, nip) {
     const alasan = String(logRecord[6] || '');
     const tglSuratToday = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'yyyy-MM-dd');
 
-    // Opsi A: Generate Berkas PDF Cuti Resmi di Server & Encode ke Base64
-    let pdfBase64 = '';
     const cleanFirst = String(namaPemohon || 'pegawai').replace(/[^a-zA-Z0-9]/g, ' ').trim().split(/\s+/)[0].toLowerCase();
     const pdfFileName = 'TRANSKEP_' + cleanFirst + '_ct.pdf';
 
-    try {
-      pdfBase64 = generateCutiPdfBase64Server_(id, logRecord, namaPemohon, nip);
-      Logger.log("✅ [n8n Trigger] Berkas PDF Cuti berhasil dibuat di server (" + pdfFileName + ")");
-    } catch (errPdf) {
-      Logger.log("⚠️ [n8n Trigger] Peringatan saat membuat PDF di server (diabaikan agar tetap jalan): " + errPdf.toString());
-    }
+    // Kunci callback_url ke URL Deployment Produksi Terverifikasi (Anti Meleset ke Deployment Lama)
+    const verifiedExecUrl = props.getProperty('TRANSKEP_EXEC_URL') ||
+      'https://script.google.com/macros/s/AKfycbzFrbQTqmVzMio7mderK-S9ntFVjXiWYFgnXfy9fW_SUKOcIxfPywP2He1flhaK_AZ0ZA/exec';
 
-    // Menghasilkan payload terstruktur siap konsumsi untuk n8n dan MYSIMS
     const payload = {
       event: 'CUTI_APPROVED_FINAL',
       cuti_id: String(id),
@@ -982,9 +1017,7 @@ function triggerN8nSuratKeluarCuti_(id, logRecord, namaPemohon, nip) {
       kode_klasifikasi: 'KP5.3',
       sifat: 'Biasa',
       keterangan: 'cuti ' + jenisCuti.toLowerCase(),
-      pdf_base64: pdfBase64,
       pdf_filename: pdfFileName,
-      // Parameter form MYSIMS siap pakai untuk node HTTP Request n8n
       mysims_payload: {
         idp: '',
         dari: namaPemohon || 'Pegawai',
@@ -995,7 +1028,7 @@ function triggerN8nSuratKeluarCuti_(id, logRecord, namaPemohon, nip) {
         sifat: 'Biasa',
         ket: 'cuti ' + jenisCuti.toLowerCase()
       },
-      callback_url: ScriptApp.getService().getUrl(),
+      callback_url: verifiedExecUrl,
       secret_key: props.getProperty('TRANSKEP_WEBHOOK_KEY') || 'TRANSKEP_WA_BOT_2026',
       timestamp: new Date().toISOString()
     };
@@ -1016,12 +1049,13 @@ function triggerN8nSuratKeluarCuti_(id, logRecord, namaPemohon, nip) {
 
 /**
  * Callback API dari n8n untuk memperbarui Nomor Surat Keluar MYSIMS pada baris cuti_log
- * @param {Object} payload { id: 'CUTI-...', nomor_surat: '1084/KPA.W10-A2/KP5.3/XI/2026', secret_key: '...' }
+ * Sekaligus meng-generate PDF Cuti Resmi yang SUDAH TERCETAK Nomor Surat Baru untuk disuntikkan balik ke MYSIMS!
+ * @param {Object} payload { id: 'CUTI-...', nomor_surat: '1085/KPA.W10-A2/KP5.3/XI/2026', secret_key: '...' }
  */
 function updateNomorSuratCutiFromExternal_(payload) {
   try {
-    const cutiId = payload.id || payload.cuti_id;
-    const nomorSurat = payload.nomor_surat || payload.no_surat;
+    const cutiId = payload ? (payload.id || payload.cuti_id) : '';
+    const nomorSurat = payload ? (payload.nomor_surat || payload.no_surat) : '';
     if (!payload || !cutiId || !nomorSurat) {
       return { status: 'error', message: "Parameter 'id' dan 'nomor_surat' wajib disertakan." };
     }
@@ -1032,20 +1066,28 @@ function updateNomorSuratCutiFromExternal_(payload) {
       return { status: 'error', message: "Akses ditolak: Secret Key tidak valid." };
     }
 
+    const cleanNomor = String(nomorSurat).trim();
+    if (cleanNomor === '' || cleanNomor.indexOf('NOMOR_MYSIMS_TERCATAT') !== -1) {
+      return { status: 'error', message: "Nomor surat tidak valid." };
+    }
+
     const ss = getDB();
     const sheetCuti = ss.getSheetByName('cuti_log');
     if (!sheetCuti) throw new Error("Sheet cuti_log tidak ditemukan.");
 
-    const data = sheetCuti.getDataRange().getValues();
+    // Gunakan pembaca terdekripsi agar NIP, Alamat, dan format tanggal siap pakai untuk generator PDF
+    const cutiData = readCutiSheetDecrypted_(sheetCuti);
     let targetRow = -1;
-    for (let i = 1; i < data.length; i++) {
-      if (String(data[i][0]).trim() === String(cutiId).trim()) {
+    let targetRecord = null;
+    for (let i = 1; i < cutiData.length; i++) {
+      if (String(cutiData[i][0]).trim() === String(cutiId).trim()) {
         targetRow = i + 1; // 1-based row index
+        targetRecord = cutiData[i];
         break;
       }
     }
 
-    if (targetRow === -1) {
+    if (targetRow === -1 || !targetRecord) {
       return { status: 'error', message: "Data cuti dengan ID " + cutiId + " tidak ditemukan." };
     }
 
@@ -1054,18 +1096,45 @@ function updateNomorSuratCutiFromExternal_(payload) {
       sheetCuti.getRange(1, 20).setValue('nomor_surat');
     }
 
-    const cleanNomor = String(nomorSurat).trim();
     sheetCuti.getRange(targetRow, 20).setNumberFormat('@').setValue(cleanNomor);
+    targetRecord[19] = cleanNomor;
 
     SpreadsheetApp.flush();
     if (typeof bumpDataVersion === "function") bumpDataVersion();
 
-    Logger.log("✅ [n8n Callback] Nomor surat cuti ID " + cutiId + " berhasil diupdate ke: " + cleanNomor);
+    // Generate PDF Resmi yang SUDAH memuat Nomor Surat Baru MYSIMS (untuk disuntikkan ke MYSIMS oleh Node 3 n8n)
+    let pdfBase64 = '';
+    let pdfFileName = 'TRANSKEP_pegawai_ct.pdf';
+    try {
+      const pemohonNip = String(targetRecord[2] || '').replace(/^'+/, '').trim();
+      let namaPemohon = String(payload.nama_pegawai || '').trim();
+      if (!namaPemohon) {
+        const sheetUser = ss.getSheetByName('user_data');
+        if (sheetUser) {
+          const uData = readUserSheetDecrypted_(sheetUser);
+          for (let u = 1; u < uData.length; u++) {
+            if (String(uData[u][0] || '').replace(/^'+/, '').trim() === pemohonNip) {
+              namaPemohon = String(uData[u][1] || '').trim();
+              break;
+            }
+          }
+        }
+      }
+      const cleanFirst = String(namaPemohon || 'pegawai').replace(/[^a-zA-Z0-9]/g, ' ').trim().split(/\s+/)[0].toLowerCase();
+      pdfFileName = 'TRANSKEP_' + cleanFirst + '_ct.pdf';
+      pdfBase64 = generateCutiPdfBase64Server_(cutiId, targetRecord, namaPemohon, pemohonNip, cleanNomor);
+    } catch (errPdf) {
+      Logger.log("⚠️ [n8n Callback PDF] Peringatan saat generate PDF bernomor: " + errPdf.toString());
+    }
+
+    Logger.log("✅ [n8n Callback] Nomor surat cuti ID " + cutiId + " berhasil diupdate ke: " + cleanNomor + " (PDF bytes b64: " + (pdfBase64 ? pdfBase64.length : 0) + ")");
     return {
       status: 'success',
-      message: 'Nomor surat cuti berhasil diperbarui.',
+      message: 'Nomor surat cuti berhasil diperbarui & PDF bernomor siap diunggah.',
       id: cutiId,
-      nomor_surat: cleanNomor
+      nomor_surat: cleanNomor,
+      pdf_base64: pdfBase64,
+      pdf_filename: pdfFileName
     };
   } catch (err) {
     Logger.log("❌ [n8n Callback] Error: " + err.toString());
