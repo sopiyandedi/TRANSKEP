@@ -46,6 +46,14 @@ function addSuratTugas(payload, userNip, clientToken) {
     ]));
     
     if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush();
+
+    // Trigger Otomasi Surat Keluar MYSIMS via n8n (ST, SPD, Plh)
+    try {
+      triggerN8nSuratTugas_(idST, payload);
+    } catch (errN8n) {
+      Logger.log("⚠️ [n8n ST Trigger Error] " + errN8n.toString());
+    }
+
     return { status: 'success', message: 'Surat Tugas berhasil diterbitkan.', id: idST };
   } catch (err) { return { status: 'error', message: err.toString() }; }
 }
@@ -151,4 +159,210 @@ function getSettingsST() {
       }
     };
   } catch (e) { return { status: 'error', data: {} }; }
+}
+
+// =========================================================================
+// INTEGRASI SURAT TUGAS TERPADU MYSIMS VIA N8N (ST, SPD, PLH) - TAHAP 102
+// =========================================================================
+
+/**
+ * Trigger Webhook n8n untuk Surat Tugas Terpadu (ST, SPD, Plh)
+ * Dijalankan HANYA saat pembuatan ST baru (addSuratTugas), TIDAK saat Edit!
+ */
+function triggerN8nSuratTugas_(idST, payload) {
+  try {
+    const props = PropertiesService.getScriptProperties();
+    const webhookUrl = props.getProperty('N8N_WEBHOOK_SURAT_KELUAR');
+    if (!webhookUrl) {
+      Logger.log("ℹ️ [n8n ST Trigger] N8N_WEBHOOK_SURAT_KELUAR belum disetel. Trigger dilewati.");
+      return;
+    }
+
+    const verifiedExecUrl = props.getProperty('TRANSKEP_EXEC_URL') ||
+      'https://script.google.com/macros/s/AKfycbzFrbQTqmVzMio7mderK-S9ntFVjXiWYFgnXfy9fW_SUKOcIxfPywP2He1flhaK_AZ0ZA/exec';
+
+    let pesertaList = [];
+    try {
+      pesertaList = JSON.parse(payload.peserta_json || '[]');
+    } catch (e) {}
+
+    let ekstraData = {};
+    try {
+      ekstraData = JSON.parse(payload.data_ekstra_json || '{}');
+    } catch (e) {}
+
+    const tglSuratToday = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'yyyy-MM-dd');
+    const tasks = [];
+
+    // 1. TASK SURAT TUGAS (ST)
+    const namaFirst = (pesertaList.length > 0 && pesertaList[0].nama) ? String(pesertaList[0].nama).trim() : 'Pegawai';
+    const kepadaST = pesertaList.length > 1 ? (namaFirst + ', dkk.') : namaFirst;
+    const uraianST = 'Surat Tugas ' + String(payload.tujuan || 'Kedinasan').trim() + (payload.tempat ? (' ke ' + String(payload.tempat).trim()) : '');
+
+    // Kode ST: bersihkan prefix ST. jika user mengetikkan ST.
+    let rawKodeST = String(payload.nomor_surat || 'HM3.1.1').trim();
+    rawKodeST = rawKodeST.replace(/^ST\./i, '').trim() || 'HM3.1.1';
+
+    tasks.push({
+      tipe: 'ST',
+      jabatan_penandatangan: String(payload.pejabat_ttd || 'Ketua').trim(),
+      kode_klasifikasi: rawKodeST,
+      kepada: kepadaST,
+      uraian: uraianST,
+      tgl_surat: tglSuratToday
+    });
+
+    // 2. TASK SPD (JIKA ADA FASILITAS SPD / NOMOR SPD DIAKTIFKAN)
+    const hasSpd = pesertaList.some(function(p) { return p.spd_active; }) ||
+      Boolean(ekstraData.nomor_spd && String(ekstraData.nomor_spd).trim() !== '') ||
+      Boolean(ekstraData.tempat_tujuan_spd && String(ekstraData.tempat_tujuan_spd).trim() !== '');
+
+    if (hasSpd) {
+      const uraianSPD = 'Surat Perjalanan Dinas ' + String(payload.tujuan || 'Kedinasan').trim() + (payload.tempat ? (' ke ' + String(payload.tempat).trim()) : '');
+      tasks.push({
+        tipe: 'SPD',
+        jabatan_penandatangan: 'Sekretaris',
+        kode_klasifikasi: 'KU1',
+        kepada: kepadaST,
+        uraian: uraianSPD,
+        tgl_surat: tglSuratToday
+      });
+    }
+
+    // 3. TASK PLH (UNTUK SETIAP PEJABAT YANG DITUNJUKKAN PLH)
+    const plhItems = pesertaList.filter(function(p) {
+      return p.plh_nip && String(p.plh_nip).trim() !== '';
+    });
+
+    for (let i = 0; i < plhItems.length; i++) {
+      const plhTarget = plhItems[i];
+      const namaPlh = String(plhTarget.plh_nama || 'Pejabat Plh').trim();
+      const jabatanYangDiganti = String(plhTarget.jabatan || 'Pejabat').trim();
+      const uraianPLH = 'Surat Perintah Pelaksana Harian (Plh) ' + jabatanYangDiganti + ' a.n. ' + namaPlh;
+
+      tasks.push({
+        tipe: 'PLH',
+        jabatan_penandatangan: 'Ketua',
+        kode_klasifikasi: 'KP7.4',
+        kepada: namaPlh,
+        uraian: uraianPLH,
+        nip_pejabat_asal: String(plhTarget.nip || ''),
+        plh_nip: String(plhTarget.plh_nip || ''),
+        plh_nama: namaPlh,
+        tgl_surat: tglSuratToday
+      });
+    }
+
+    const payloadN8n = {
+      event: 'ST_TERPADU',
+      id_st: String(idST),
+      tanggal_surat: tglSuratToday,
+      callback_url: verifiedExecUrl,
+      secret_key: props.getProperty('TRANSKEP_WEBHOOK_KEY') || 'TRANSKEP_WA_BOT_2026',
+      tasks: tasks,
+      timestamp: new Date().toISOString()
+    };
+
+    const options = {
+      method: 'post',
+      contentType: 'application/json',
+      payload: JSON.stringify(payloadN8n),
+      muteHttpExceptions: true
+    };
+
+    const resp = UrlFetchApp.fetch(webhookUrl, options);
+    Logger.log("✅ [n8n ST Trigger] Webhook ST Terpadu (" + tasks.length + " tasks) terkirim. Respon code: " + resp.getResponseCode());
+  } catch (err) {
+    Logger.log("⚠️ [n8n ST Trigger Error] " + err.toString());
+  }
+}
+
+/**
+ * Callback API dari n8n untuk memperbarui Nomor Surat Tugas, SPD, dan Plh pada database st_log
+ */
+function updateNomorSuratTugasFromExternal_(payload) {
+  try {
+    const idST = payload ? (payload.id_st || payload.id) : '';
+    if (!payload || !idST) {
+      return { status: 'error', message: "Parameter 'id_st' wajib disertakan." };
+    }
+
+    const scriptProps = PropertiesService.getScriptProperties();
+    const configuredKey = scriptProps.getProperty("TRANSKEP_WEBHOOK_KEY") || "TRANSKEP_WA_BOT_2026";
+    if (payload.secret_key && String(payload.secret_key).trim() !== configuredKey.trim()) {
+      return { status: 'error', message: "Akses ditolak: Secret Key tidak valid." };
+    }
+
+    const ss = getDB();
+    const sheetST = ss.getSheetByName('st_log');
+    if (!sheetST) throw new Error("Database st_log tidak ditemukan.");
+
+    const data = sheetST.getDataRange().getValues();
+    let rowIndex = -1;
+    let targetRow = null;
+    for (let i = 1; i < data.length; i++) {
+      if (String(data[i][0]).trim() === String(idST).trim()) {
+        rowIndex = i + 1; // 1-based index
+        targetRow = data[i];
+        break;
+      }
+    }
+
+    if (rowIndex === -1 || !targetRow) {
+      return { status: 'error', message: "Surat Tugas dengan ID " + idST + " tidak ditemukan." };
+    }
+
+    // 1. Update Nomor ST (Kolom 3 / C)
+    if (payload.nomor_st && String(payload.nomor_st).trim() !== '') {
+      sheetST.getRange(rowIndex, 3).setNumberFormat('@').setValue(String(payload.nomor_st).trim());
+    }
+
+    // 2. Update Data Ekstra (Kolom 14 / N) untuk nomor_spd & nomor_plh
+    let ekstra = {};
+    try {
+      ekstra = JSON.parse(targetRow[13] || '{}');
+    } catch (e) {}
+
+    if (payload.nomor_spd && String(payload.nomor_spd).trim() !== '') {
+      ekstra.nomor_spd = String(payload.nomor_spd).trim();
+    }
+    if (payload.nomor_plh && String(payload.nomor_plh).trim() !== '') {
+      ekstra.nomor_plh = String(payload.nomor_plh).trim();
+    }
+    sheetST.getRange(rowIndex, 14).setValue(JSON.stringify(ekstra));
+
+    // 3. Update Data Peserta (Kolom 11 / K) jika ada plh_results perorangan
+    let pesertaList = [];
+    try {
+      pesertaList = JSON.parse(targetRow[10] || '[]');
+    } catch (e) {}
+
+    if (payload.plh_results && Array.isArray(payload.plh_results)) {
+      for (let r = 0; r < payload.plh_results.length; r++) {
+        const item = payload.plh_results[r];
+        for (let p = 0; p < pesertaList.length; p++) {
+          if (pesertaList[p].plh_nip && String(pesertaList[p].plh_nip).trim() === String(item.plh_nip).trim()) {
+            pesertaList[p].nomor_plh = item.nomor_plh;
+          }
+        }
+      }
+      sheetST.getRange(rowIndex, 11).setValue(JSON.stringify(pesertaList));
+    }
+
+    SpreadsheetApp.flush();
+    if (typeof bumpDataVersion === "function") bumpDataVersion();
+
+    Logger.log("✅ [n8n ST Callback] Sukses update ST ID: " + idST + " -> ST: " + payload.nomor_st + ", SPD: " + payload.nomor_spd);
+    return {
+      status: 'success',
+      message: 'Nomor Surat Tugas terpadu berhasil diperbarui di database.',
+      id_st: idST,
+      nomor_st: payload.nomor_st || '',
+      nomor_spd: payload.nomor_spd || '',
+      nomor_plh: payload.nomor_plh || ''
+    };
+  } catch (err) {
+    Logger.log("❌ [n8n ST Callback Error] " + err.toString());
+    return { status: 'error', message: err.toString() };
+  }
 }

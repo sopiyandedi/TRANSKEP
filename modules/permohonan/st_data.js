@@ -57,6 +57,16 @@ const StDataService = {
       return TranskepFirebase.saveSuratTugasToFirestore(stObj)
         .then(() => {
           console.log("⚡ [StDataService] Surat Tugas berhasil diterbitkan murni di Cloud Firestore:", idST);
+
+          // Cold Backup ke Sheets & Trigger Otomasi n8n Surat Keluar MYSIMS di latar belakang
+          try {
+            if (typeof window.TranskepAPI !== 'undefined' && window.TranskepAPI.call) {
+              window.TranskepAPI.call('addSuratTugas', [payload, nip, token]).catch(e => console.warn('Cold backup ST:', e));
+            } else if (typeof google !== 'undefined' && google.script && google.script.run) {
+              google.script.run.addSuratTugas(payload, nip, token);
+            }
+          } catch(e) {}
+
           return { status: 'success', message: 'Surat Tugas berhasil diterbitkan.', id: idST };
         })
         .catch((err) => {
@@ -101,6 +111,16 @@ const StDataService = {
       return TranskepFirebase.saveSuratTugasToFirestore(stObj)
         .then(() => {
           console.log("⚡ [StDataService] Pembaruan Surat Tugas berhasil disimpan murni di Cloud Firestore:", idST);
+
+          // Cold Backup ke Sheets (Tanpa trigger n8n)
+          try {
+            if (typeof window.TranskepAPI !== 'undefined' && window.TranskepAPI.call) {
+              window.TranskepAPI.call('updateSuratTugas', [payload, nip, token]).catch(e => console.warn('Cold backup update ST:', e));
+            } else if (typeof google !== 'undefined' && google.script && google.script.run) {
+              google.script.run.updateSuratTugas(payload, nip, token);
+            }
+          } catch(e) {}
+
           return { status: 'success', message: 'Data Surat Tugas berhasil diperbarui secara permanen.' };
         })
         .catch((err) => {

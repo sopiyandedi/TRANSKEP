@@ -912,3 +912,21 @@ ZONA BAWAH: MASTER CONTEXT & STATUS MIGRASI TERKINI (LIVING CONTEXT)
     - **Auto-Invalidasi pada Trigger `onEdit(e)` ([`code.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/code.js#L550-L563))**:
       * Menambahkan pemanggilan `bumpDataVersion()` pada `onEdit(e)` agar pengeditan atau pengosongan isi sel secara manual langsung di Google Sheets turut memperbarui versi data server seketika.
     - **Versioning**: Versi cache PWA dinaikkan ke **`v3.8.28`** di [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) dan [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js). Commit dan push ke `origin/main` serta deployment ke Google Apps Script (`@348`).
+
+
+77. **Otomasi Surat Tugas Terpadu (ST, SPD, Plh) ke MYSIMS via n8n (Multi-Account, Dynamic Queue & Anti-Duplicate on Edit - Tahap 102 - v3.8.29 - Selesai & Aktif ✅):**
+    - **Penyederhanaan Input di Pop-up ST (`modules/permohonan/view_permohonan.html` & `permohonan/st/view_st.html`)**:
+      * Admin cukup memasukkan kode klasifikasi pokok ST (misal `HM3.1.1` tanpa harus mengetik prefix `ST.` atau nomor panjang).
+      * Kolom SPD otomatis dikunci ke kode **`KU1`** jika peserta menggunakan fasilitas SPD.
+      * Kolom Plh otomatis dikunci ke kode **`KP7.4`** jika ada penunjukan Plh.
+    - **Workflow n8n Multi-Surat & Multi-Akun via Node Switch (`n8n_workflow_mysims_surat_keluar.json`)**:
+      * Webhook tunggal (`/webhook/generate-surat-keluar`) dilengkapi **Node Switch Router**: mengalirkan `CUTI_APPROVED_FINAL` ke alur Cuti eksisting, dan `ST_TERPADU` ke **Mesin Otomasi ST Terpadu**.
+      * Mendukung antrean dinamis 1 s.d. 3 surat (ST saja [1], ST+SPD [2], ST+SPD+Plh [3, atau lebih jika banyak pejabat nunjuk Plh]).
+      * Kamus Akun MYSIMS: Ketua (`KPA.W10-A2`), Wakil Ketua (`WKPA.W10-A2`), Panitera (`PAN.PA.W10-A2`), dan Sekretaris (`SEK.PA.W10-A2`).
+      * Aturan MYSIMS: ST menggunakan format `[SATKER]/ST.` dan penerima `[Nama], dkk.`; SPD menggunakan akun Sekretaris kode `KU1`; Plh menggunakan akun Ketua kode `KP7.4` dengan penerima nama pejabat yang ditunjuk sebagai Plh.
+      * Callback tunggal ke TRANSKEP mengembalikan seluruh nomor yang terbit secara atomik.
+    - **Backend GAS & Proteksi Anti-Duplikasi Nomor saat Edit (`permohonan/st/st.js` & `api_router.js`)**:
+      * `addSuratTugas` memicu `triggerN8nSuratTugas_` saat pembuatan ST baru.
+      * `updateSuratTugas` dikunci mutlak **TIDAK memanggil n8n** saat edit isi ST, menjaga nomor surat eksisting tetap aman.
+      * Callback handler `updateNomorSuratTugasFromExternal_` menyimpan nomor ST ke Kolom 3 `Nomor_Surat`, `nomor_spd` & `nomor_plh` ke `Data_Ekstra_JSON`, dan `nomor_plh` perorangan ke `Data_Peserta_JSON`.
+    - **Versioning**: Versi cache PWA dinaikkan ke **`v3.8.29`** di [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) dan [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js). Commit dan push ke `origin/main` serta deployment ke Google Apps Script (`@349`).

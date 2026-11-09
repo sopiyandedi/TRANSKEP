@@ -5412,3 +5412,61 @@ Saat baris di sheet `cuti_log` dihapus langsung secara manual di Google Sheets (
 - [`code.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/code.js)
 - [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) & [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js)
 - **Status:** `[SELESAI & AKTIF]` ✅
+
+
+---
+
+### TAHAP 102: Integrasi Otomasi Surat Tugas Terpadu (ST, SPD, Plh) ke MYSIMS via n8n (Multi-Account, Dynamic Queue & Anti-Duplicate on Edit - v3.8.29)
+
+#### 1. Latar Belakang & Analisis Arsitektur
+1. **Kebutuhan Penerbitan 3 Surat dalam 1 Pop-up Terpadu:**
+   - Dalam administrasi Pengadilan Agama Indramayu, penerbitan Surat Tugas (ST) seringkali terintegrasi dengan Surat Perjalanan Dinas (SPD) dan Surat Penunjukan Pelaksana Harian (Plh).
+   - Pengajuan bisa dinamis:
+     * Cuma Surat Tugas -> Minta 1 nomor surat.
+     * Surat Tugas + SPD -> Minta 2 nomor surat.
+     * Surat Tugas + SPD + Plh -> Minta 3 nomor surat.
+2. **Kamus Akun & Aturan Khusus MYSIMS:**
+   - **Surat Tugas (ST):** Ditandatangani oleh pimpinan terkait (Ketua, Wakil Ketua, Panitera, atau Sekretaris). Format nomor dinas wajib memiliki prefix `ST.` (misal: `1086/KPA.W10-A2/ST.HM3.1.1/XI/2026`). Di MYSIMS, `no_surat` diisi `[KODE_SATKER]/ST.` dan `kode` diisi kode pokok (misal `HM3.1.1`).
+   - **SPD:** Penandatangan PPK, di MYSIMS menggunakan akun `sekretaris` (`SEK.PA.W10-A2`), kode klasifikasi wajib **`KU1`**.
+   - **Plh:** Selalu menggunakan akun `ketua` (`KPA.W10-A2`), kode klasifikasi wajib **`KP7.4`**.
+   - Kredensial MYSIMS Terdaftar:
+     * Ketua: user `ketua`, pass `admin`, satker `KPA.W10-A2`
+     * Wakil Ketua: user `wakilketua`, pass `admin`, satker `WKPA.W10-A2`
+     * Panitera: user `panitera`, pass `panitera`, satker `PAN.PA.W10-A2`
+     * Sekretaris: user `sekretaris`, pass `sekretaris`, satker `SEK.PA.W10-A2`
+3. **Proteksi Anti-Duplikasi Nomor saat Edit:**
+   - Saat pengguna mengedit isi Surat Tugas eksisting (misal ganti waktu/tempat/peserta) dan menyimpan ulang via `updateSuratTugas`, sistem **DILARANG KERAS** memanggil n8n untuk meminta nomor surat baru. Permintaan nomor ke MYSIMS HANYA dijalankan pada pembuatan ST baru via `addSuratTugas` saat nomor surat belum ada.
+
+#### 2. Rencana Implementasi Bertahap
+1. **Penyempurnaan Workflow n8n (`n8n_workflow_mysims_surat_keluar.json`):**
+   - Menambahkan **Node Switch** setelah `Webhook Trigger` (`/webhook/generate-surat-keluar`):
+     * Output 0: `event === 'CUTI_APPROVED_FINAL'` -> Alur Cuti eksisting (utuh dan terisolasi).
+     * Output 1: `event === 'ST_TERPADU'` -> Mesin Otomasi ST Terpadu.
+   - Node `Mesin Otomasi ST Terpadu` membaca array `tasks` (berisi 1 s.d. 3 item), melakukan loop interaktif:
+     * Login MYSIMS dengan akun pejabat yang sesuai.
+     * Cek `maxAgendaBefore` dan submit `act_add`.
+     * Scrape nomor surat baru yang terbit.
+     * Mengumpulkan nomor (`nomor_st`, `nomor_spd`, `nomor_plh`), lalu mengirimkan 1 callback terpadu ke endpoint TRANSKEP.
+2. **Backend Google Apps Script (`permohonan/st/st.js` & `api_router.js`):**
+   - Di [`permohonan/st/st.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/st/st.js):
+     * `addSuratTugas`: Tembak webhook n8n dengan payload antrean tugas `tasks: [...]` secara non-blocking.
+     * `updateSuratTugas`: Ditegaskan murni mengupdate data di `st_log` tanpa memanggil webhook n8n sama sekali.
+     * Tambahkan fungsi callback `updateNomorSuratTugasFromExternal_(payload)` untuk menerima nomor ST, SPD, dan Plh baru dari n8n, lalu menyimpan ke sheet `st_log` (`Nomor_Surat` kolom 3 dan `Data_Ekstra_JSON`).
+   - Di [`api_router.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/api_router.js):
+     * Daftarkan rute `action === 'updateNomorSuratTugas'` pada handler GET & POST.
+3. **Frontend Pop-up ST (`permohonan/st/view_st.html` & `permohonan/st/js_st.html`):**
+   - Input nomor surat ST disederhanakan: pengguna cukup memasukkan kode klasifikasi pokok (misal `HM3.1.1`).
+   - Kolom SPD otomatis mengunci kode `KU1` jika diaktifkan.
+   - Kolom Plh otomatis mengunci kode `KP7.4` jika diaktifkan.
+   - Saat mode Edit (`isEditing === true`), nomor surat yang sudah ada tetap ditampilkan dan dikunci agar tidak tertimpa.
+4. **Versioning & Deployment:**
+   - Naikkan versi PWA ke `v3.8.29` di [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide\projek\TRANSKEP\index.html) dan [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide\projek\TRANSKEP\sw.js).
+
+#### 3. Estimasi Dampak & File yang Dimodifikasi
+- [`n8n_workflow_mysims_surat_keluar.json`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/n8n_workflow_mysims_surat_keluar.json)
+- [`permohonan/st/st.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/st/st.js)
+- [`api_router.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/api_router.js)
+- [`permohonan/st/view_st.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/st/view_st.html) & [`modules/permohonan/view_permohonan.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/permohonan/view_permohonan.html)
+- [`modules/permohonan/st_data.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/permohonan/st_data.js)
+- [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) & [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js)
+- **Status:** `[SELESAI & AKTIF]` ✅

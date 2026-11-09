@@ -788,16 +788,19 @@
             
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <label class="block text-slate-400 uppercase font-bold mb-1 text-[11px]">Nomor Surat Tugas <span class="text-rose-400">*</span></label>
-                <input type="text" v-model="form.nomor_surat" required placeholder="Contoh: .../ST.HM3.1.1/VIII/2026" class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <label class="block text-slate-400 uppercase font-bold mb-1 text-[11px]">Kode / Nomor Surat Tugas <span class="text-rose-400">*</span></label>
+                <input type="text" v-model="form.nomor_surat" required placeholder="Ketik kode: HM3.1.1" class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <span class="text-[10px] text-slate-500 mt-1 block">Cukup kode pokok (misal: HM3.1.1). Prefix ST. & nomor otomatis dari MYSIMS.</span>
               </div>
               <div>
-                <label class="block text-slate-400 uppercase font-bold mb-1 text-[11px]">Nomor SPD <span class="text-slate-500 font-normal">(Kosongkan jika tdk ada)</span></label>
-                <input type="text" v-model="form.nomor_spd" placeholder="Contoh: .../KU.01/VIII/2026" class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                <label class="block text-slate-400 uppercase font-bold mb-1 text-[11px]">Nomor SPD <span class="text-slate-500 font-normal">(Otomatis KU1)</span></label>
+                <input type="text" v-model="form.nomor_spd" placeholder="Otomatis MYSIMS (KU1) jika ada SPD" class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                <span class="text-[10px] text-slate-500 mt-1 block">Otomatis akun Sekretaris jika fasilitas SPD dicentang.</span>
               </div>
               <div>
-                <label class="block text-slate-400 uppercase font-bold mb-1 text-[11px]">Nomor Plh <span class="text-slate-500 font-normal">(Kosongkan jika tdk ada)</span></label>
-                <input type="text" v-model="form.nomor_plh" placeholder="Contoh: .../KP7.4/II/2026" class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-purple-500">
+                <label class="block text-slate-400 uppercase font-bold mb-1 text-[11px]">Nomor Plh <span class="text-slate-500 font-normal">(Otomatis KP7.4)</span></label>
+                <input type="text" v-model="form.nomor_plh" placeholder="Otomatis MYSIMS (KP7.4) dari Ketua" class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-purple-500">
+                <span class="text-[10px] text-slate-500 mt-1 block">Otomatis akun Ketua jika ada penunjukan Plh.</span>
               </div>
             </div>
 

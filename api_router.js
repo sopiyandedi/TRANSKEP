@@ -64,6 +64,11 @@ function handleApiGet_(e) {
       return jsonResponse_(updateNomorSuratCutiFromExternal_(params));
     }
 
+    // 6. Update Nomor Surat Tugas Terpadu MYSIMS (GET fallback)
+    if (action === 'updateNomorSuratTugas') {
+      return jsonResponse_(updateNomorSuratTugasFromExternal_(params));
+    }
+
     return jsonResponse_({
       status: 'error',
       message: "Aksi GET '" + action + "' tidak dikenali atau memerlukan metode POST."
@@ -186,6 +191,9 @@ function handleApiPost_(payload, e) {
       // Integrasi Surat Keluar MYSIMS via n8n
       case 'updateNomorSuratCuti':
         return jsonResponse_(updateNomorSuratCutiFromExternal_(payload));
+
+      case 'updateNomorSuratTugas':
+        return jsonResponse_(updateNomorSuratTugasFromExternal_(payload));
 
       // Fallback: Jika action cocok dengan fungsi global terdaftar yang aman
       default:
