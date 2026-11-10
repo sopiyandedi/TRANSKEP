@@ -352,14 +352,71 @@ function updateNomorSuratTugasFromExternal_(payload) {
     SpreadsheetApp.flush();
     if (typeof bumpDataVersion === "function") bumpDataVersion();
 
-    Logger.log("✅ [n8n ST Callback] Sukses update ST ID: " + idST + " -> ST: " + payload.nomor_st + ", SPD: " + payload.nomor_spd);
+    // 4. Kompilasi Headless PDF Resmi (ST, SPD, & Plh) untuk Disuntikkan ke MYSIMS
+    let pdfStRes = { pdf_base64: '', pdf_filename: '' };
+    let pdfSpdRes = { pdf_base64: '', pdf_filename: '' };
+    const plhPdfList = [];
+
+    try {
+      // Ambil snapshot record terupdate
+      const updatedRecord = [...targetRow];
+      if (payload.nomor_st) updatedRecord[2] = String(payload.nomor_st).trim();
+
+      // A. Kompilasi PDF Surat Tugas
+      if (typeof generateSuratTugasPdfBase64_ === 'function') {
+        pdfStRes = generateSuratTugasPdfBase64_(updatedRecord, pesertaList, ekstra, payload.nomor_st);
+      }
+
+      // B. Kompilasi PDF SPD (jika ada nomor SPD atau ada peserta dengan fasilitas SPD)
+      const hasSpd = (payload.nomor_spd && String(payload.nomor_spd).trim() !== '') ||
+                     pesertaList.some(function(p) { return p.get_spd === true; });
+      if (hasSpd && typeof generateSpdPdfBase64_ === 'function') {
+        pdfSpdRes = generateSpdPdfBase64_(updatedRecord, pesertaList, ekstra, payload.nomor_spd);
+      }
+
+      // C. Kompilasi PDF Surat Penunjukan Plh (untuk setiap pejabat yang dinas & tunjuk Plh)
+      if (typeof generatePlhPdfBase64_ === 'function') {
+        let plhTargets = [];
+        if (payload.plh_results) {
+          if (Array.isArray(payload.plh_results)) {
+            plhTargets = payload.plh_results;
+          } else if (typeof payload.plh_results === 'string') {
+            try { plhTargets = JSON.parse(payload.plh_results); } catch (e) { plhTargets = []; }
+          }
+        }
+        if (!plhTargets || plhTargets.length === 0) {
+          plhTargets = pesertaList.filter(function(p) { return p.plh_nip && String(p.plh_nip).trim() !== ''; });
+        }
+
+        for (let t = 0; t < plhTargets.length; t++) {
+          const target = plhTargets[t];
+          const noPlhItem = target.nomor_plh || payload.nomor_plh || (ekstra ? ekstra.nomor_plh : '') || '';
+          const singlePlhPdf = generatePlhPdfBase64_(updatedRecord, target, ekstra, noPlhItem);
+          plhPdfList.push({
+            nip_pejabat_asal: target.nip_pejabat_asal || target.nip || '',
+            plh_nip: target.plh_nip || '',
+            plh_nama: target.plh_nama || '',
+            nomor_plh: noPlhItem,
+            pdf_base64: singlePlhPdf.pdf_base64,
+            pdf_filename: singlePlhPdf.pdf_filename
+          });
+        }
+      }
+    } catch (errPdf) {
+      Logger.log("⚠️ [n8n ST Callback PDF Error] Gagal kompilasi PDF: " + errPdf.toString());
+    }
+
+    Logger.log("✅ [n8n ST Callback] Sukses update ST ID: " + idST + " -> ST: " + payload.nomor_st + ", SPD: " + payload.nomor_spd + " (PDFs ready: ST=" + (pdfStRes.pdf_base64 ? 'OK' : 'NO') + ", SPD=" + (pdfSpdRes.pdf_base64 ? 'OK' : 'NO') + ", PLH=" + plhPdfList.length + ")");
     return {
       status: 'success',
-      message: 'Nomor Surat Tugas terpadu berhasil diperbarui di database.',
+      message: 'Nomor Surat Tugas terpadu berhasil diperbarui & PDF resmi siap disuntikkan.',
       id_st: idST,
       nomor_st: payload.nomor_st || '',
       nomor_spd: payload.nomor_spd || '',
-      nomor_plh: payload.nomor_plh || ''
+      nomor_plh: payload.nomor_plh || '',
+      pdf_st: pdfStRes,
+      pdf_spd: pdfSpdRes,
+      pdf_plh_list: plhPdfList
     };
   } catch (err) {
     Logger.log("❌ [n8n ST Callback Error] " + err.toString());

@@ -930,3 +930,15 @@ ZONA BAWAH: MASTER CONTEXT & STATUS MIGRASI TERKINI (LIVING CONTEXT)
       * `updateSuratTugas` dikunci mutlak **TIDAK memanggil n8n** saat edit isi ST, menjaga nomor surat eksisting tetap aman.
       * Callback handler `updateNomorSuratTugasFromExternal_` menyimpan nomor ST ke Kolom 3 `Nomor_Surat`, `nomor_spd` & `nomor_plh` ke `Data_Ekstra_JSON`, dan `nomor_plh` perorangan ke `Data_Peserta_JSON`.
     - **Versioning**: Versi cache PWA dinaikkan ke **`v3.8.29`** di [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) dan [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js). Commit dan push ke `origin/main` serta deployment ke Google Apps Script (`@349`).
+ 
+
+78. **Headless PDF Compiler ST, SPD, & Plh + Auto Injection MYSIMS via n8n (Tahap 102 Opsi B - v3.8.30 - Selesai & Aktif ✅):**
+    - **Clean Architecture Headless PDF Compiler ([`permohonan/st/st_pdf_compiler.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/st/st_pdf_compiler.js))**:
+      * Modul backend terpisah khusus kompilasi dokumen dinas resmi: `generateSuratTugasPdfBase64_` (Surat Tugas format A4 standar PA Indramayu), `generateSpdPdfBase64_` (Blanko Resmi SPD Mahkamah Agung 2 Halaman lengkap dengan Visum Perjalanan Dinas), dan `generatePlhPdfBase64_` (Surat Penunjukan Pelaksana Harian resmi Ketua PA Indramayu).
+      * Menggunakan generator native GAS `HtmlService.createHtmlOutput(...).getAs('application/pdf')` yang ringan, cepat, dan tajam tanpa membebani Google Drive.
+    - **Auto PDF Callback Integration ([`permohonan/st/st.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/st/st.js))**:
+      * Fungsi `updateNomorSuratTugasFromExternal_` setelah menyimpan nomor resmi dari MYSIMS ke database `st_log`, langsung mengompilasi dan mengembalikan file PDF resmi bertanda tangan (`pdf_st`, `pdf_spd`, dan `pdf_plh_list`) dalam format Base64 ke n8n.
+    - **Workflow Symmetrical 4-Node n8n ([`n8n_workflow_mysims_surat_keluar.json`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/n8n_workflow_mysims_surat_keluar.json))**:
+      * Cabang atas dilengkapi node HTTP multipart resmi: **`Suntik PDF ST Terpadu ke MYSIMS`** (`http-inject-pdf-st-mysims`) di posisi `[1020, 180]` yang menerima item biner dari `Mesin Otomasi ST Terpadu`.
+      * Menyuntikkan seluruh file PDF yang diterbitkan langsung ke form `act_edt` baris surat keluar MYSIMS, mengunci `Sifat = Biasa`, sehingga buku agenda MYSIMS 100% lengkap memiliki lampiran PDF resmi (mencegah kecurigaan pihak TI/internal).
+    - **Versioning**: Versi cache PWA dinaikkan ke **`v3.8.30`** di [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) dan [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js). Commit dan push ke `origin/main` serta deployment ke Google Apps Script.

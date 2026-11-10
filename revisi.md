@@ -5468,5 +5468,28 @@ Saat baris di sheet `cuti_log` dihapus langsung secara manual di Google Sheets (
 - [`api_router.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/api_router.js)
 - [`permohonan/st/view_st.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/st/view_st.html) & [`modules/permohonan/view_permohonan.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/permohonan/view_permohonan.html)
 - [`modules/permohonan/st_data.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/permohonan/st_data.js)
+
+---
+
+### TAHAP 102 - OPSI B (SELESAI & AKTIF): Headless PDF Compiler ST, SPD, & Plh + Otomasi Suntik PDF ke MYSIMS via n8n (v3.8.30)
+*Status: [SELESAI & AKTIF] ✅*
+
+1. **Latar Belakang & Kebutuhan (Opsi B):**
+   - Agar buku agenda keluar MYSIMS tidak hanya terisi nomor reservasi tanpa file lampiran (mencegah kecurigaan pihak TI/internal), seluruh penerbitan nomor Surat Tugas, SPD, dan Plh di MYSIMS diwajibkan langsung terlampir file PDF resmi yang valid dan siap diunduh.
+2. **Kompiler PDF Mandiri ([`permohonan/st/st_pdf_compiler.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/st/st_pdf_compiler.js)):**
+   - Menerapkan arsitektur *Clean Code* dengan memisahkan modul kompilasi PDF ke berkas khusus.
+   - Menyediakan 3 fungsi headless generator berbasis `HtmlService.createHtmlOutput(...).getAs('application/pdf')`:
+     * `generateSuratTugasPdfBase64_`: PDF A4 resmi Surat Tugas lengkap dengan Kop PA Indramayu, tabel peserta dinamis, uraian kegiatan, dan tanda tangan pimpinan terkait.
+     * `generateSpdPdfBase64_`: PDF Blanko Resmi SPD Mahkamah Agung 2 Halaman (Lembar 1 Rincian 9 butir + Lembar 2 Visum Perjalanan).
+     * `generatePlhPdfBase64_`: PDF Surat Penunjukan Pelaksana Harian resmi dari Ketua PA Indramayu.
+3. **Pembaruan Callback ([`permohonan/st/st.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/st/st.js)):**
+   - Fungsi `updateNomorSuratTugasFromExternal_` setelah mengupdate database `st_log`, langsung mengompilasi dan mengembalikan data `pdf_st`, `pdf_spd`, dan `pdf_plh_list` (Base64) ke n8n.
+4. **Pembaruan Workflow n8n ([`n8n_workflow_mysims_surat_keluar.json`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/n8n_workflow_mysims_surat_keluar.json)):**
+   - `Mesin Otomasi ST Terpadu` menangkap `idp` dan `editHref` untuk setiap transaksi nomor yang terbit.
+   - Menerima file PDF resmi dari callback TRANSKEP, mengubahnya menjadi Binary Data n8n per item.
+   - Menambahkan node HTTP Request baru: **`Suntik PDF ST Terpadu ke MYSIMS`** (`http-inject-pdf-st-mysims`) pada posisi `[1020, 180]` yang terkoneksi langsung dari `Mesin Otomasi ST Terpadu` untuk mengunggah PDF secara multipart ke `act_edt` di MYSIMS.
+5. **Versioning PWA:**
+   - Dinaikkan ke versi `v3.8.30` di `index.html` dan `sw.js`.
+
 - [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) & [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js)
 - **Status:** `[SELESAI & AKTIF]` ✅
