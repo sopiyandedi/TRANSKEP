@@ -5553,3 +5553,32 @@ Saat baris di sheet `cuti_log` dihapus langsung secara manual di Google Sheets (
    - [`n8n_workflow_mysims_surat_keluar.json`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/n8n_workflow_mysims_surat_keluar.json)
    - [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) & [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) (`v3.8.31`)
 - **Status:** `[SELESAI & AKTIF]` ✅
+
+
+---
+
+### TAHAP 103 - OTOMASI GAJI KGB PP NO. 5/2024, FITUR KALENDER, TEMPAT LAHIR & HOTFIX SORTING E-OFFICE (v3.8.32)
+*Status: [SELESAI & AKTIF] ✅*
+
+1. **Hotfix Render E-Office Blank (TypeError: `localeCompare`):**
+   - **Akar Masalah:** Saat status pegawai diubah di dashboard, Firestore menyimpan `updated_at` atau tanggal sebagai objek Firestore Timestamp `{ seconds: ..., nanoseconds: ... }`. Pada computed property `unifiedList` di [`modules/eoffice/eoffice.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/eoffice.js) dan [`eoffice/js_eoffice.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/js_eoffice.html), pemanggilan `(b.sortDate || "").localeCompare(...)` menyebabkan TypeError karena `b.sortDate` adalah objek (bukan string), merusak siklus render Vue.js sehingga tampilan E-Office hilang blank.
+   - **Solusi:** Diterapkan fungsi normalisasi `toSortStr(val)` yang aman mengonversi Firestore Timestamp, Objek Date, angka, atau string ke format ISO 8601 sebelum diurutkan.
+
+2. **Kebijakan Basis Data KGB & Notulen Rapat:**
+   - Dikonfirmasi dan ditetapkan 100% tersimpan aman di Cloud Firestore (`kgb_documents` & `eoffice_rapat`) serta berkas Google Drive tanpa perlu pencatatan ke Google Sheets.
+
+3. **Modul Mandiri Tabel Gaji PP No. 5 Tahun 2024 ([`modules/eoffice/tabel_gaji_pp5_2024.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/tabel_gaji_pp5_2024.js)):**
+   - Dibuat file terpisah rapi untuk memuat matriks lengkap gaji pokok PNS sesuai Lampiran Peraturan Pemerintah Nomor 5 Tahun 2024 (Golongan I/a-I/d, II/a-II/d, III/a-III/d, IV/a-IV/e untuk seluruh MKG 0 s.d. 33 tahun).
+   - Menyediakan fungsi `hitungGajiPnsPp5(golongan, mkgTahun)` dengan algoritma pencarian tangga gaji presisi (`mkg <= input MKG`).
+   - Dilengkapi fungsi `formatRibuanRupiah()` dan `terbilangRupiah()` yang otomatis mengeluarkan ejaan terbilang (contoh: "tiga juta lima puluh tujuh ribu tiga ratus rupiah").
+
+4. **Pembaruan Antarmuka & Otomasi Modal KGB ([`modules/eoffice/view_eoffice.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/view_eoffice.html), [`eoffice/view_kgb.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/view_kgb.html), [`modules/eoffice/kgb.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/kgb.js)):**
+   - **Bagian 2 (Identitas Pegawai):** Menambahkan kolom Tempat Lahir (`kgbFieldTempatLahir`) di samping Tanggal Lahir yang otomatis terisi dari profil user.
+   - **Bagian 3 (Dasar SK Terakhir):** Menambahkan dropdown Golongan SK Lama (`kgbFieldGolonganLama`), tombol hitung cepat, serta mengubah `Tanggal SK Lama` dan `TMT Gaji Lama` menjadi pemilih tanggal kalender HTML5 (`<input type="date">`) dengan pratinjau teks format Indonesia di bawahnya.
+   - **Bagian 4 (Penetapan Gaji Pokok Baru):** Menambahkan dropdown Golongan Baru (`kgbFieldGolonganBaru`), mengubah `Mulai Tanggal (TMT Baru)` dan `Kenaikan Gaji YAD` menjadi pemilih kalender interaktif. Saat MKG Baru dan Golongan Baru dipilih, nominal gaji dan terbilang rupiah otomatis keluar (`0ms`). Pemilihan tanggal TMT Baru otomatis menghitung TMT YAD (+2 tahun).
+
+5. **Pembaruan Dokumen Cetak & Generator Google Docs:**
+   - [`modules/eoffice/cetak/cetak_kgb.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/cetak/cetak_kgb.html), [`modules/eoffice/cetak/js_cetak_kgb.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/cetak/js_cetak_kgb.js), [`eoffice/cetak_kgb.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/cetak_kgb.html), dan [`eoffice/kgb.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/kgb.js) kini mencantumkan `Tempat, Tanggal Lahir` (contoh: "Indramayu, 13 Oktober 1995") dan `Golongan Baru`.
+
+6. **Versioning PWA & Deployment:**
+   - Dinaikkan ke versi `v3.8.32` (`transkep-v3.8.32`) di [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) dan [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js).

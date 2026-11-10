@@ -277,6 +277,10 @@ function createKgbGoogleDoc_(p, idKgb) {
   const mkgBaru = parseMasaKerjaKgbBackend_(p.tahun_baru, p.bulan_baru, p.mkg_baru);
   const tglSurat = formatTglIndoKgb_(p.tanggal_surat || new Date());
   const tglLahir = formatTglIndoKgb_(p.tanggal_lahir);
+  const tempatLahir = String(p.tempat_lahir || '').trim();
+  const tempatTanggalLahir = tempatLahir ? (tempatLahir + ', ' + tglLahir) : tglLahir;
+  const golonganBaru = String(p.golongan_baru || p.golongan || '-');
+  const golonganLama = String(p.golongan_lama || p.golongan || '-');
   const tglSkLama = formatTglIndoKgb_(p.tanggal_sk_lama);
   const tmtLama = formatTglIndoKgb_(p.tmt_lama);
   const tmtBaru = formatTglIndoKgb_(p.tmt_baru);
@@ -309,9 +313,11 @@ function createKgbGoogleDoc_(p, idKgb) {
         '{{tujuan_kppn}}': String(p.tujuan_kppn || 'Kepala KPPN Cirebon di- CIREBON'),
         '{{nama}}': namaPegawai,
         '{{nama_gelar}}': namaPegawai,
-        '{{tanggl lahir}}': tglLahir,
-        '{{tanggal lahir}}': tglLahir,
-        '{{tanggal_lahir}}': tglLahir,
+        '{{tempat_lahir}}': tempatLahir,
+        '{{tempat_tanggal_lahir}}': tempatTanggalLahir,
+        '{{tanggl lahir}}': tempatTanggalLahir,
+        '{{tanggal lahir}}': tempatTanggalLahir,
+        '{{tanggal_lahir}}': tempatTanggalLahir,
         '{{NIP}}': String(p.nip || '-'),
         '{{nip}}': String(p.nip || '-'),
         '{{pangkat}}': String(p.pangkat || '-'),
@@ -333,7 +339,9 @@ function createKgbGoogleDoc_(p, idKgb) {
         '{{tahun_baru}}': mkgBaru.tahun,
         '{{bulan_baru}}': mkgBaru.bulan,
         '{{mkg_baru}}': mkgBaru.full,
-        '{{golongan}}': String(p.golongan || '-'),
+        '{{golongan_lama}}': golonganLama,
+        '{{golongan_baru}}': golonganBaru,
+        '{{golongan}}': golonganBaru,
         '{{tmt_mulai}}': tmtBaru,
         '{{tmt_baru}}': tmtBaru,
         '{{tmt_datang}}': tmtYad,
@@ -405,17 +413,17 @@ function createKgbGoogleDoc_(p, idKgb) {
     pIsi1.setFontSize(10);
 
     const pPoints1 = body.appendParagraph(
-      "1. Nama/Tanggal lahir   : " + namaPegawai + "/" + tglLahir + "\n" +
-      "2. NIP                  : " + (p.nip || "-") + "\n" +
-      "3. Pangkat/Jabatan      : " + (p.pangkat || "-") + "/" + (p.jabatan || "-") + "\n" +
-      "4. Unit Kerja           : " + (p.unit_kerja || "Pengadilan Agama Indramayu Kelas 1.A.") + "\n" +
-      "5. Gaji Pokok Lama      : Rp " + gajiLama + ",-\n" +
+      "1. Nama/Tempat, Tanggal lahir : " + namaPegawai + "/" + tempatTanggalLahir + "\n" +
+      "2. NIP                        : " + (p.nip || "-") + "\n" +
+      "3. Pangkat/Jabatan            : " + (p.pangkat || "-") + "/" + (p.jabatan || "-") + "\n" +
+      "4. Unit Kerja                 : " + (p.unit_kerja || "Pengadilan Agama Indramayu Kelas 1.A.") + "\n" +
+      "5. Gaji Pokok Lama            : Rp " + gajiLama + ",-\n" +
       "   (atas dasar Skp. terakhir tentang gaji/pangkat yang di tetapkan)\n" +
-      "   a. Oleh pejabat        : " + (p.pejabat_lama || "Ketua Pengadilan Agama Indramayu") + "\n" +
-      "      Tanggal dan nomor   : " + tglSkLama + "\n" +
-      "                            " + (p.nomor_sk_lama || "-") + "\n" +
-      "   b. Tanggal mulai gaji  : " + tmtLama + "\n" +
-      "   c. Masa kerja golongan : " + mkgLama.tahun + " Tahun " + mkgLama.bulan + " bulan"
+      "   a. Oleh pejabat              : " + (p.pejabat_lama || "Ketua Pengadilan Agama Indramayu") + "\n" +
+      "      Tanggal dan nomor         : " + tglSkLama + "\n" +
+      "                                  " + (p.nomor_sk_lama || "-") + "\n" +
+      "   b. Tanggal mulai gaji        : " + tmtLama + "\n" +
+      "   c. Masa kerja golongan       : " + mkgLama.tahun + " Tahun " + mkgLama.bulan + " bulan"
     );
     pPoints1.setFontSize(10);
 
@@ -423,11 +431,11 @@ function createKgbGoogleDoc_(p, idKgb) {
     pDiberikan.setFontSize(10);
 
     const pPoints2 = body.appendParagraph(
-      "6. Gaji pokok baru      : Rp. " + gajiBaru + ",- (" + hurufGaji + ")\n" +
-      "7. Masa kerja           : " + mkgBaru.tahun + " Tahun\n" +
-      "8. Golongan/Ruang       : " + (p.golongan || "-") + "\n" +
-      "9. Mulai tanggal        : " + tmtBaru + "\n" +
-      "10. Kenaikan gaji Yad.  : " + tmtYad
+      "6. Gaji pokok baru            : Rp. " + gajiBaru + ",- (" + hurufGaji + ")\n" +
+      "7. Masa kerja                 : " + mkgBaru.tahun + " Tahun\n" +
+      "8. Golongan/Ruang             : " + golonganBaru + "\n" +
+      "9. Mulai tanggal              : " + tmtBaru + "\n" +
+      "10. Kenaikan gaji Yad.        : " + tmtYad
     );
     pPoints2.setFontSize(10);
 

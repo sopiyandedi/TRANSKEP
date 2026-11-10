@@ -4,7 +4,7 @@
 // ENGINE: TRANSKEP PWA Engine v1.0.0 
 // =========================================================================
 
-const CACHE_NAME = 'transkep-v3.8.31';
+const CACHE_NAME = 'transkep-v3.8.32';
 
 // Daftar aset inti yang di-cache saat Service Worker dipasang (Install)
 const PRECACHE_ASSETS = [
@@ -98,6 +98,7 @@ const PRECACHE_ASSETS = [
   './modules/kinerja/kinerja_data.js',
   './modules/kinerja/kinerja.js',
   './modules/eoffice/view_eoffice.html',
+  './modules/eoffice/tabel_gaji_pp5_2024.js',
   './modules/eoffice/eoffice_data.js',
   './modules/eoffice/eoffice.js',
   './modules/eoffice/kgb.js',

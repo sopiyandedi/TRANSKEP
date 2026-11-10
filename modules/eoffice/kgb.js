@@ -91,21 +91,129 @@ function formatTanggalIndoKgb(dateObj) {
   if (typeof dateObj === 'string' && /[a-zA-Z]{3,}/.test(dateObj) && dateObj.indexOf('T') === -1) {
     return dateObj.trim();
   }
+  var s = String(dateObj).trim();
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
+    var p = s.split('T')[0].split('-');
+    var yr = parseInt(p[0], 10);
+    var mn = parseInt(p[1], 10) - 1;
+    var dy = parseInt(p[2], 10);
+    var bIndo = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+    if (!isNaN(yr) && !isNaN(mn) && !isNaN(dy) && mn >= 0 && mn <= 11) {
+      return dy + " " + bIndo[mn] + " " + yr;
+    }
+  }
   var d = new Date(dateObj);
   if (isNaN(d.getTime())) return String(dateObj);
   var namaBulan = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
   return d.getDate() + " " + namaBulan[d.getMonth()] + " " + d.getFullYear();
 }
 
+function parseIndoDateToIsoKgb(str) {
+  if (window.TabelGajiPns2024 && typeof window.TabelGajiPns2024.parseIndoDateToIso === 'function') {
+    return window.TabelGajiPns2024.parseIndoDateToIso(str);
+  }
+  if (!str) return '';
+  var s = String(str).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  var d = new Date(s);
+  if (!isNaN(d.getTime())) {
+    var y = d.getFullYear();
+    var mn = ('0' + (d.getMonth() + 1)).slice(-2);
+    var dy = ('0' + d.getDate()).slice(-2);
+    return y + '-' + mn + '-' + dy;
+  }
+  return '';
+}
+
+function updateKgbDatePreview(fieldId, previewId) {
+  var elField = document.getElementById(fieldId);
+  var elPrev = document.getElementById(previewId);
+  if (!elPrev) return;
+  var val = elField ? elField.value : '';
+  if (!val) {
+    elPrev.textContent = '';
+    return;
+  }
+  elPrev.textContent = formatTanggalIndoKgb(val);
+}
+
 function hitungTmtYadOtomatis(tmtBaruStr) {
   if (!tmtBaruStr) return "";
-  var matchYear = String(tmtBaruStr).match(/\b(20\d{2})\b/);
+  var s = String(tmtBaruStr).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+    var parts = s.split('-');
+    var yr = parseInt(parts[0], 10);
+    if (!isNaN(yr)) {
+      return (yr + 2) + '-' + parts[1] + '-' + parts[2];
+    }
+  }
+  var matchYear = s.match(/\b(20\d{2})\b/);
   if (matchYear) {
     var y = parseInt(matchYear[1], 10);
     var nextY = y + 2;
-    return String(tmtBaruStr).replace(String(y), String(nextY));
+    return s.replace(String(y), String(nextY));
   }
   return "";
+}
+
+// ==========================================
+// RUMUS GAJI OTOMATIS BERDASARKAN PP NO. 5 TAHUN 2024
+// ==========================================
+function autoHitungGajiBaruKgb() {
+  var elGolBaru = document.getElementById('kgbFieldGolonganBaru');
+  var elGolIdentitas = document.getElementById('kgbFieldGolongan');
+  var elThnBaru = document.getElementById('kgbFieldTahunBaru');
+  var elGajiBaru = document.getElementById('kgbFieldGajiBaru');
+  var elTerbilang = document.getElementById('kgbFieldTerbilang');
+
+  var gol = (elGolBaru && elGolBaru.value) ? elGolBaru.value.trim() : (elGolIdentitas ? elGolIdentitas.value.trim() : '');
+  var thn = elThnBaru ? elThnBaru.value.trim() : '';
+
+  if (!gol || thn === '') return;
+
+  var fnHitung = (window.TabelGajiPns2024 && typeof window.TabelGajiPns2024.hitungGajiPnsPp5 === 'function')
+    ? window.TabelGajiPns2024.hitungGajiPnsPp5
+    : (typeof hitungGajiPnsPp5 === 'function' ? hitungGajiPnsPp5 : null);
+
+  if (typeof fnHitung !== 'function') return;
+
+  var nominal = fnHitung(gol, thn);
+  if (nominal && elGajiBaru) {
+    var fnFmt = (window.TabelGajiPns2024 && typeof window.TabelGajiPns2024.formatRibuanRupiah === 'function')
+      ? window.TabelGajiPns2024.formatRibuanRupiah
+      : (typeof formatRibuanRupiah === 'function' ? formatRibuanRupiah : null);
+    elGajiBaru.value = fnFmt ? fnFmt(nominal) : String(nominal);
+    if (elTerbilang) {
+      elTerbilang.value = terbilangRupiah(nominal);
+    }
+  }
+}
+
+function autoHitungGajiLamaKgb(forceRecalc) {
+  var elGolLama = document.getElementById('kgbFieldGolonganLama');
+  var elGolIdentitas = document.getElementById('kgbFieldGolongan');
+  var elThnLama = document.getElementById('kgbFieldTahunLama');
+  var elGajiLama = document.getElementById('kgbFieldGajiLama');
+
+  var gol = (elGolLama && elGolLama.value) ? elGolLama.value.trim() : (elGolIdentitas ? elGolIdentitas.value.trim() : '');
+  var thn = elThnLama ? elThnLama.value.trim() : '';
+
+  if (!gol || thn === '') return;
+  if (!forceRecalc && elGajiLama && elGajiLama.value.trim() !== '') return;
+
+  var fnHitung = (window.TabelGajiPns2024 && typeof window.TabelGajiPns2024.hitungGajiPnsPp5 === 'function')
+    ? window.TabelGajiPns2024.hitungGajiPnsPp5
+    : (typeof hitungGajiPnsPp5 === 'function' ? hitungGajiPnsPp5 : null);
+
+  if (typeof fnHitung !== 'function') return;
+
+  var nominal = fnHitung(gol, thn);
+  if (nominal && elGajiLama) {
+    var fnFmt = (window.TabelGajiPns2024 && typeof window.TabelGajiPns2024.formatRibuanRupiah === 'function')
+      ? window.TabelGajiPns2024.formatRibuanRupiah
+      : (typeof formatRibuanRupiah === 'function' ? formatRibuanRupiah : null);
+    elGajiLama.value = fnFmt ? fnFmt(nominal) : String(nominal);
+  }
 }
 
 // ==========================================
@@ -120,6 +228,7 @@ function syncNomorSuratKgbOtomatis() {
   var noUrut = elNoKgb ? elNoKgb.value.trim() : '';
   var tglSurat = elTglSurat ? elTglSurat.value.trim() : '';
   elNoSurat.value = generateNomorKgbOtomatis(noUrut, tglSurat);
+  updateKgbDatePreview('kgbFieldTanggalSurat', 'kgbPreviewTanggalSurat');
 }
 
 function syncMkgCombinedFields() {
@@ -164,6 +273,7 @@ function handleTahunLamaInput(val) {
     }
   }
   syncMkgCombinedFields();
+  autoHitungGajiBaruKgb();
 }
 
 function handleGajiBaruInput(val) {
@@ -179,6 +289,8 @@ function handleTmtBaruChange(val) {
     fieldYad.value = hitungTmtYadOtomatis(val);
     fieldYad.dataset.auto = "true";
   }
+  updateKgbDatePreview('kgbFieldTmtBaru', 'kgbPreviewTmtBaru');
+  updateKgbDatePreview('kgbFieldTmtYad', 'kgbPreviewTmtYad');
 }
 
 // ==========================================
@@ -284,14 +396,33 @@ window.openKgbModalForm = function(kgbData) {
   // Identitas Pegawai
   document.getElementById('kgbDisplayNip').value = nip;
   document.getElementById('kgbFieldNama').value = working.nama_pegawai || (userObj ? userObj.nama : '');
-  document.getElementById('kgbFieldTglLahir').value = formatTanggalIndoKgb(working.tanggal_lahir || (userObj ? (userObj.tgl_lahir || userObj.tanggal_lahir || '') : ''));
+  
+  var elTempatLahir = document.getElementById('kgbFieldTempatLahir');
+  if (elTempatLahir) {
+    elTempatLahir.value = working.tempat_lahir || (userObj ? (userObj.tempat_lahir || userObj.tmpt_lahir || '') : '');
+  }
+
+  var rawTglLahir = working.tanggal_lahir || (userObj ? (userObj.tgl_lahir || userObj.tanggal_lahir || '') : '');
+  var elTglLahir = document.getElementById('kgbFieldTglLahir');
+  if (elTglLahir) {
+    elTglLahir.value = parseIndoDateToIsoKgb(rawTglLahir);
+    updateKgbDatePreview('kgbFieldTglLahir', 'kgbPreviewTglLahir');
+  }
+
   document.getElementById('kgbFieldPangkat').value = rawPangkat;
   document.getElementById('kgbFieldGolongan').value = rawGolongan;
   document.getElementById('kgbFieldJabatan').value = working.jabatan || (userObj ? userObj.jabatan : '');
   document.getElementById('kgbFieldUnitKerja').value = working.unit_kerja || 'Pengadilan Agama Indramayu Kelas 1.A.';
 
   // Identitas Surat Dinas (No Urut KGB & Nomor Lengkap)
-  var tglSuratVal = working.tanggal_surat ? formatTanggalIndoKgb(working.tanggal_surat) : formatTanggalIndoKgb(new Date());
+  var rawTglSurat = working.tanggal_surat ? formatTanggalIndoKgb(working.tanggal_surat) : formatTanggalIndoKgb(new Date());
+  var isoTglSurat = parseIndoDateToIsoKgb(rawTglSurat) || new Date().toISOString().slice(0, 10);
+  var elTglSurat = document.getElementById('kgbFieldTanggalSurat');
+  if (elTglSurat) {
+    elTglSurat.value = isoTglSurat;
+    updateKgbDatePreview('kgbFieldTanggalSurat', 'kgbPreviewTanggalSurat');
+  }
+
   var noKgbVal = String(working.nokgb || '').trim();
   if (!noKgbVal && working.nomor_surat && String(working.nomor_surat).indexOf('/') !== -1) {
     var firstSeg = String(working.nomor_surat).split('/')[0].trim();
@@ -301,16 +432,30 @@ window.openKgbModalForm = function(kgbData) {
   }
   var elNoKgb = document.getElementById('kgbFieldNoKgb');
   if (elNoKgb) elNoKgb.value = noKgbVal;
-  document.getElementById('kgbFieldTanggalSurat').value = tglSuratVal;
-  document.getElementById('kgbFieldNomorSurat').value = working.nomor_surat || generateNomorKgbOtomatis(noKgbVal, tglSuratVal);
+  document.getElementById('kgbFieldNomorSurat').value = working.nomor_surat || generateNomorKgbOtomatis(noKgbVal, rawTglSurat);
   document.getElementById('kgbFieldTujuanKppn').value = working.tujuan_kppn || 'Kepala Kantor Pelayanan Perbendaharaan Negara Cirebon di- CIREBON';
 
   // Data SK Lama
+  var elGolLama = document.getElementById('kgbFieldGolonganLama');
+  if (elGolLama) {
+    elGolLama.value = working.golongan_lama || working.golongan || rawGolongan || '';
+  }
+
   document.getElementById('kgbFieldGajiLama').value = working.gaji_lama || '';
   document.getElementById('kgbFieldPejabatLama').value = working.pejabat_lama || 'Ketua Pengadilan Agama Indramayu';
   document.getElementById('kgbFieldNomorSkLama').value = working.nomor_sk_lama || '';
-  document.getElementById('kgbFieldTanggalSkLama').value = formatTanggalIndoKgb(working.tanggal_sk_lama || '');
-  document.getElementById('kgbFieldTmtLama').value = formatTanggalIndoKgb(working.tmt_lama || '');
+
+  var elTglSkLama = document.getElementById('kgbFieldTanggalSkLama');
+  if (elTglSkLama) {
+    elTglSkLama.value = parseIndoDateToIsoKgb(working.tanggal_sk_lama || '');
+    updateKgbDatePreview('kgbFieldTanggalSkLama', 'kgbPreviewTanggalSkLama');
+  }
+
+  var elTmtLama = document.getElementById('kgbFieldTmtLama');
+  if (elTmtLama) {
+    elTmtLama.value = parseIndoDateToIsoKgb(working.tmt_lama || '');
+    updateKgbDatePreview('kgbFieldTmtLama', 'kgbPreviewTmtLama');
+  }
 
   var mkgLamaObj = (working.tahun_lama !== undefined || working.mkg_lama)
     ? parseMasaKerjaKgbLocal(working.tahun_lama, working.bulan_lama, working.mkg_lama)
@@ -321,6 +466,11 @@ window.openKgbModalForm = function(kgbData) {
   if (elBlnLama) elBlnLama.value = (mkgLamaObj.tahun !== '' && !( !working.tahun_lama && !working.mkg_lama )) ? (mkgLamaObj.bulan || '0') : '';
 
   // Data KGB Baru
+  var elGolBaru = document.getElementById('kgbFieldGolonganBaru');
+  if (elGolBaru) {
+    elGolBaru.value = working.golongan_baru || working.golongan || rawGolongan || '';
+  }
+
   document.getElementById('kgbFieldGajiBaru').value = working.gaji_baru || '';
   document.getElementById('kgbFieldTerbilang').value = working.terbilang_gaji || terbilangRupiah(working.gaji_baru);
 
@@ -350,14 +500,31 @@ window.openKgbModalForm = function(kgbData) {
 
   syncMkgCombinedFields();
 
-  document.getElementById('kgbFieldTmtBaru').value = tmtBaruVal;
-  var tmtYadVal = working.tmt_yad ? formatTanggalIndoKgb(working.tmt_yad) : hitungTmtYadOtomatis(tmtBaruVal);
+  var elTmtBaru = document.getElementById('kgbFieldTmtBaru');
+  var isoTmtBaru = parseIndoDateToIsoKgb(working.tmt_baru || '');
+  if (elTmtBaru) {
+    elTmtBaru.value = isoTmtBaru;
+    updateKgbDatePreview('kgbFieldTmtBaru', 'kgbPreviewTmtBaru');
+  }
+
+  var rawTmtYad = working.tmt_yad || (isoTmtBaru ? hitungTmtYadOtomatis(isoTmtBaru) : hitungTmtYadOtomatis(tmtBaruVal));
   var elTmtYad = document.getElementById('kgbFieldTmtYad');
-  elTmtYad.value = tmtYadVal;
-  elTmtYad.dataset.auto = working.tmt_yad ? "false" : "true";
+  if (elTmtYad) {
+    elTmtYad.value = parseIndoDateToIsoKgb(rawTmtYad);
+    elTmtYad.dataset.auto = working.tmt_yad ? "false" : "true";
+    updateKgbDatePreview('kgbFieldTmtYad', 'kgbPreviewTmtYad');
+  }
 
   document.getElementById('kgbFieldNamaKetua').value = working.nama_ketua || defaultNamaKetua;
   document.getElementById('kgbFieldDasarPp').value = working.dasar_pp || 'Peraturan Pemerintah Republik Indonesia Nomor : 05 Tahun 2024';
+
+  // Otomasi Gaji: Jika gaji baru belum terisi atau dari dashboard usulan baru, hitung dari tabel
+  if (!working.gaji_baru || working.is_from_dashboard) {
+    autoHitungGajiBaruKgb();
+  }
+  if (!working.gaji_lama && elThnLama && elThnLama.value !== '') {
+    autoHitungGajiLamaKgb(false);
+  }
 
   // Update Badge Status (3 Status Siklus KGB)
   var badge = document.getElementById('kgbBadgeStatus');
@@ -399,8 +566,9 @@ function closeKgbModalForm() {
 function collectKgbFormPayload_() {
   syncMkgCombinedFields();
 
-  var tglSurat = document.getElementById('kgbFieldTanggalSurat').value;
-  var bt = extractBulanTahunKgbLocal(tglSurat);
+  var elTglSurat = document.getElementById('kgbFieldTanggalSurat');
+  var tglSuratFormatted = formatTanggalIndoKgb(elTglSurat ? elTglSurat.value : '') || formatTanggalIndoKgb(new Date());
+  var bt = extractBulanTahunKgbLocal(tglSuratFormatted);
   var elNoKgb = document.getElementById('kgbFieldNoKgb');
   var noSurat = document.getElementById('kgbFieldNomorSurat').value;
   var noKgb = elNoKgb ? elNoKgb.value.trim() : '';
@@ -416,6 +584,18 @@ function collectKgbFormPayload_() {
   var elBlnLama = document.getElementById('kgbFieldBulanLama');
   var elThnBaru = document.getElementById('kgbFieldTahunBaru');
   var elBlnBaru = document.getElementById('kgbFieldBulanBaru');
+  var elTempatLahir = document.getElementById('kgbFieldTempatLahir');
+  var elTglLahir = document.getElementById('kgbFieldTglLahir');
+  var elGolLama = document.getElementById('kgbFieldGolonganLama');
+  var elTglSkLama = document.getElementById('kgbFieldTanggalSkLama');
+  var elTmtLama = document.getElementById('kgbFieldTmtLama');
+  var elGolBaru = document.getElementById('kgbFieldGolonganBaru');
+  var elGolIdentitas = document.getElementById('kgbFieldGolongan');
+  var elTmtBaru = document.getElementById('kgbFieldTmtBaru');
+  var elTmtYad = document.getElementById('kgbFieldTmtYad');
+
+  var finalGolBaru = (elGolBaru && elGolBaru.value) ? elGolBaru.value.trim() : (elGolIdentitas ? elGolIdentitas.value.trim() : '');
+  var finalGolLama = (elGolLama && elGolLama.value) ? elGolLama.value.trim() : (elGolIdentitas ? elGolIdentitas.value.trim() : '');
 
   return {
     id_kgb: document.getElementById('kgbFieldIdKgb').value,
@@ -427,19 +607,22 @@ function collectKgbFormPayload_() {
     bulan_surat: bt.bulan,
     tahun_surat: bt.tahun,
     nomor_surat: noSurat,
-    tanggal_surat: tglSurat,
+    tanggal_surat: tglSuratFormatted,
     tujuan_kppn: document.getElementById('kgbFieldTujuanKppn').value,
     nama_pegawai: document.getElementById('kgbFieldNama').value,
-    tanggal_lahir: document.getElementById('kgbFieldTglLahir').value,
+    tempat_lahir: elTempatLahir ? elTempatLahir.value.trim() : '',
+    tanggal_lahir: formatTanggalIndoKgb(elTglLahir ? elTglLahir.value : ''),
     pangkat: document.getElementById('kgbFieldPangkat').value,
-    golongan: document.getElementById('kgbFieldGolongan').value,
+    golongan: finalGolBaru,
+    golongan_lama: finalGolLama,
+    golongan_baru: finalGolBaru,
     jabatan: document.getElementById('kgbFieldJabatan').value,
     unit_kerja: document.getElementById('kgbFieldUnitKerja').value,
     gaji_lama: document.getElementById('kgbFieldGajiLama').value,
     pejabat_lama: document.getElementById('kgbFieldPejabatLama').value,
     nomor_sk_lama: document.getElementById('kgbFieldNomorSkLama').value,
-    tanggal_sk_lama: document.getElementById('kgbFieldTanggalSkLama').value,
-    tmt_lama: document.getElementById('kgbFieldTmtLama').value,
+    tanggal_sk_lama: formatTanggalIndoKgb(elTglSkLama ? elTglSkLama.value : ''),
+    tmt_lama: formatTanggalIndoKgb(elTmtLama ? elTmtLama.value : ''),
     tahun_lama: elThnLama ? elThnLama.value : '',
     bulan_lama: elBlnLama ? elBlnLama.value : '0',
     mkg_lama: document.getElementById('kgbFieldMkgLama').value,
@@ -448,8 +631,8 @@ function collectKgbFormPayload_() {
     tahun_baru: elThnBaru ? elThnBaru.value : '',
     bulan_baru: elBlnBaru ? elBlnBaru.value : '0',
     mkg_baru: document.getElementById('kgbFieldMkgBaru').value,
-    tmt_baru: document.getElementById('kgbFieldTmtBaru').value,
-    tmt_yad: document.getElementById('kgbFieldTmtYad').value,
+    tmt_baru: formatTanggalIndoKgb(elTmtBaru ? elTmtBaru.value : ''),
+    tmt_yad: formatTanggalIndoKgb(elTmtYad ? elTmtYad.value : ''),
     nama_ketua: document.getElementById('kgbFieldNamaKetua').value,
     dasar_pp: document.getElementById('kgbFieldDasarPp').value
   };
@@ -532,6 +715,10 @@ window.syncMkgCombinedFields = syncMkgCombinedFields;
 window.handleTahunLamaInput = handleTahunLamaInput;
 window.handleGajiBaruInput = handleGajiBaruInput;
 window.handleTmtBaruChange = handleTmtBaruChange;
+window.autoHitungGajiBaruKgb = autoHitungGajiBaruKgb;
+window.autoHitungGajiLamaKgb = autoHitungGajiLamaKgb;
+window.updateKgbDatePreview = updateKgbDatePreview;
+window.parseIndoDateToIsoKgb = parseIndoDateToIsoKgb;
 window.closeKgbModalForm = closeKgbModalForm;
 window.printKgbFromModal = printKgbFromModal;
 window.submitKgbForm = submitKgbForm;

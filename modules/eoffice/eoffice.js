@@ -110,6 +110,13 @@ document.addEventListener("DOMContentLoaded", () => {
               descText = 'Gaji Baru: Rp ' + k.gaji_baru;
             }
 
+            let sDate = k.updated_at || k.tanggal_input || k.tmt_baru || '';
+            if (sDate && typeof sDate === 'object') {
+              if (sDate.seconds) sDate = new Date(sDate.seconds * 1000).toISOString();
+              else if (sDate instanceof Date) sDate = sDate.toISOString();
+              else sDate = String(sDate);
+            }
+
             result.push({
               keyId: 'kgb-' + (k.id_kgb || idx),
               itemType: 'KGB',
@@ -119,8 +126,8 @@ document.addEventListener("DOMContentLoaded", () => {
               userNip: String(k.nip || ''),
               datePrimary: k.tmt_baru ? ('TMT Baru: ' + k.tmt_baru) : (k.tmt_lama ? 'TMT: ' + k.tmt_lama : 'TMT Belum Diset'),
               dateSecondary: k.tmt_yad ? ('YAD: ' + k.tmt_yad) : '',
-              sortDate: k.updated_at || k.tanggal_input || k.tmt_baru || '',
-              filterDate: String(k.tanggal_input || k.tmt_baru || '').slice(0, 10),
+              sortDate: sDate,
+              filterDate: String(sDate || '').slice(0, 10),
               description: descText,
               rawStatus: rawStatus,
               statusText: statusText,
@@ -137,6 +144,13 @@ document.addEventListener("DOMContentLoaded", () => {
         if (Array.isArray(this.rawRapatList)) {
           this.rawRapatList.forEach((r, idx) => {
             const isDone = (r.status === 'Selesai');
+            let rDate = r.tanggal_input || r.created_at || '';
+            if (rDate && typeof rDate === 'object') {
+              if (rDate.seconds) rDate = new Date(rDate.seconds * 1000).toISOString();
+              else if (rDate instanceof Date) rDate = rDate.toISOString();
+              else rDate = String(rDate);
+            }
+
             result.push({
               keyId: 'rapat-' + (r.id_rapat || idx),
               itemType: 'Rapat',
@@ -146,8 +160,8 @@ document.addEventListener("DOMContentLoaded", () => {
               userNip: '',
               datePrimary: r.hari_tanggal || 'Tanggal Belum Diset',
               dateSecondary: (r.waktu_mulai ? r.waktu_mulai : '') + (r.waktu_selesai ? ' - ' + r.waktu_selesai : ''),
-              sortDate: r.tanggal_input || '',
-              filterDate: String(r.tanggal_input || '').slice(0, 10),
+              sortDate: rDate,
+              filterDate: String(rDate || '').slice(0, 10),
               description: r.notulis ? ('Notulis: ' + r.notulis) : (r.nomor_undangan ? 'No: ' + r.nomor_undangan : 'Paket Dokumen Rapat'),
               rawStatus: r.status || 'Terjadwal',
               statusText: isDone ? 'Selesai' : 'Terjadwal',
@@ -161,8 +175,16 @@ document.addEventListener("DOMContentLoaded", () => {
           });
         }
 
-        // Urutkan paling baru di atas
-        return result.sort((a, b) => (b.sortDate || '').localeCompare(a.sortDate || ''));
+        // Urutkan paling baru di atas (Aman dari objek Timestamp Firestore / Date)
+        const toSortStr = (val) => {
+          if (!val) return '';
+          if (typeof val === 'string') return val;
+          if (typeof val === 'number') return String(val);
+          if (val.seconds) return new Date(val.seconds * 1000).toISOString();
+          if (val instanceof Date) return val.toISOString();
+          return String(val);
+        };
+        return result.sort((a, b) => toSortStr(b.sortDate).localeCompare(toSortStr(a.sortDate)));
       },
 
       filteredList() {

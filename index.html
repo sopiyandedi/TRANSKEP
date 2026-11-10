@@ -468,6 +468,7 @@
         'modules/sk/sk_data.js',
         'modules/sop/sop_data.js',
         'modules/kinerja/kinerja_data.js',
+        'modules/eoffice/tabel_gaji_pp5_2024.js',
         'modules/eoffice/eoffice_data.js',
         'modules/pegawai/pegawai_data.js'
       ];
@@ -514,7 +515,7 @@
       ];
 
       try {
-        const APP_BUILD_VER = window.APP_BUILD_VER || '3.8.31';
+        const APP_BUILD_VER = window.APP_BUILD_VER || '3.8.32';
         console.log('🔄 [TRANSKEP Loader] Memuat komponen tampilan views/ secara paralel...');
         await Promise.all(VIEW_SLOTS.map(async item => {
           const res = await fetch(item.file + '?v=' + APP_BUILD_VER, { cache: 'no-cache' });

@@ -202,10 +202,13 @@
     var mkgBaru = resolveMasaKerjaKgb(kgbObj.tahun_baru, kgbObj.bulan_baru, kgbObj.mkg_baru);
 
     var namaPegawai = kgbObj.nama_pegawai || (userRef ? userRef.nama : '') || '-';
+    var tempatLahir = kgbObj.tempat_lahir || (userRef ? (userRef.tempat_lahir || userRef.tmpt_lahir) : '') || '';
     var tglLahir = formatTglCetakKgb(kgbObj.tanggal_lahir || (userRef ? (userRef.tgl_lahir || userRef.tanggal_lahir) : ''));
+    var tempatTanggalLahir = tempatLahir ? (tempatLahir + ', ' + tglLahir) : tglLahir;
     var nipPegawai = String(kgbObj.nip || (userRef ? userRef.nip : '') || '-');
     var pangkat = kgbObj.pangkat || (userRef ? userRef.pangkat : '') || '-';
-    var golongan = kgbObj.golongan || (userRef ? userRef.golongan : '') || '-';
+    var golongan = kgbObj.golongan_baru || kgbObj.golongan || (userRef ? userRef.golongan : '') || '-';
+    var golonganLama = kgbObj.golongan_lama || kgbObj.golongan || (userRef ? userRef.golongan : '') || '-';
     var jabatan = kgbObj.jabatan || (userRef ? userRef.jabatan : '') || '-';
     var unitKerja = kgbObj.unit_kerja || 'Pengadilan Agama Indramayu Kelas 1.A.';
 
@@ -237,12 +240,16 @@
       '{{tanggal_surat}}': tglSuratStr,
       '{{nama}}': namaPegawai,
       '{{nama_gelar}}': namaPegawai,
-      '{{tanggl lahir}}': tglLahir,
-      '{{tanggal lahir}}': tglLahir,
-      '{{tanggal_lahir}}': tglLahir,
+      '{{tempat_lahir}}': tempatLahir,
+      '{{tempat_tanggal_lahir}}': tempatTanggalLahir,
+      '{{tanggl lahir}}': tempatTanggalLahir,
+      '{{tanggal lahir}}': tempatTanggalLahir,
+      '{{tanggal_lahir}}': tempatTanggalLahir,
       '{{NIP}}': nipPegawai,
       '{{nip}}': nipPegawai,
       '{{pangkat}}': pangkat,
+      '{{golongan_lama}}': golonganLama,
+      '{{golongan_baru}}': golongan,
       '{{jabatan}}': jabatan,
       '{{unit_kerja}}': unitKerja,
       '{{gaji_lama}}': gajiLamaStr,

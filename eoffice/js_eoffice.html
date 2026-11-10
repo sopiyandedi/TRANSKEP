@@ -162,8 +162,16 @@
             });
           }
 
-          // Urutkan paling baru di atas
-          return result.sort((a, b) => (b.sortDate || '').localeCompare(a.sortDate || ''));
+          // Urutkan paling baru di atas (Aman dari objek Timestamp Firestore / Date)
+          const toSortStr = (val) => {
+            if (!val) return '';
+            if (typeof val === 'string') return val;
+            if (typeof val === 'number') return String(val);
+            if (val.seconds) return new Date(val.seconds * 1000).toISOString();
+            if (val instanceof Date) return val.toISOString();
+            return String(val);
+          };
+          return result.sort((a, b) => toSortStr(b.sortDate).localeCompare(toSortStr(a.sortDate)));
         },
 
         filteredList() {

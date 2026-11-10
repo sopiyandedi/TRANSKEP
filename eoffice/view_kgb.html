@@ -54,7 +54,8 @@
 
             <div class="md:col-span-3">
               <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Tanggal Surat</label>
-              <input type="text" id="kgbFieldTanggalSurat" oninput="syncNomorSuratKgbOtomatis()" placeholder="29 Oktober 2026" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-slate-200 text-xs focus:ring-1 focus:ring-indigo-500 outline-none">
+              <input type="date" id="kgbFieldTanggalSurat" onchange="syncNomorSuratKgbOtomatis(); updateKgbDatePreview('kgbFieldTanggalSurat', 'kgbPreviewTanggalSurat')" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-slate-200 text-xs focus:ring-1 focus:ring-indigo-500 outline-none">
+              <span id="kgbPreviewTanggalSurat" class="block text-[10px] text-slate-400 mt-1 font-medium"></span>
             </div>
 
             <div class="md:col-span-3">
@@ -71,19 +72,25 @@
           </div>
 
           <div class="grid grid-cols-1 md:grid-cols-12 gap-3">
-            <div class="md:col-span-6">
+            <div class="md:col-span-4">
               <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Nama Lengkap (dengan gelar)</label>
               <input type="text" id="kgbFieldNama" placeholder="Nama pegawai..." class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-slate-200 font-bold text-xs focus:ring-1 focus:ring-indigo-500 outline-none">
             </div>
 
-            <div class="md:col-span-3">
+            <div class="md:col-span-2">
               <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">NIP</label>
               <input type="text" id="kgbDisplayNip" readonly class="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-400 font-mono text-xs cursor-not-allowed">
             </div>
 
             <div class="md:col-span-3">
+              <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Tempat Lahir</label>
+              <input type="text" id="kgbFieldTempatLahir" placeholder="Indramayu" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-slate-200 text-xs focus:ring-1 focus:ring-indigo-500 outline-none">
+            </div>
+
+            <div class="md:col-span-3">
               <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Tanggal Lahir</label>
-              <input type="text" id="kgbFieldTglLahir" placeholder="13 Oktober 1995" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-slate-200 text-xs focus:ring-1 focus:ring-indigo-500 outline-none">
+              <input type="date" id="kgbFieldTglLahir" onchange="updateKgbDatePreview('kgbFieldTglLahir', 'kgbPreviewTglLahir')" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-slate-200 text-xs focus:ring-1 focus:ring-indigo-500 outline-none">
+              <span id="kgbPreviewTglLahir" class="block text-[10px] text-slate-400 mt-1 font-medium"></span>
             </div>
 
             <div class="md:col-span-4">
@@ -114,25 +121,57 @@
               <i class="fa-solid fa-clock-rotate-left text-amber-400"></i>
               <h4 class="font-bold text-slate-200 uppercase tracking-wider text-[11px]">3. Dasar SK Terakhir (Data Lama)</h4>
             </div>
-            <span id="kgbAutoPrefillBadge" class="hidden px-2.5 py-0.5 rounded-full text-[9px] font-bold bg-amber-500/10 border border-amber-500/30 text-amber-300">
-              <i class="fa-solid fa-wand-magic-sparkles mr-1"></i>Otomatis Ditarik dari Arsip KGB Sebelumnya
-            </span>
+            <div class="flex items-center gap-2">
+              <button type="button" onclick="autoHitungGajiLamaKgb(true)" title="Hitung ulang gaji lama berdasarkan tabel PP 5/2024"
+                class="px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 transition flex items-center gap-1">
+                <i class="fa-solid fa-calculator"></i>Hitung dari Tabel
+              </button>
+              <span id="kgbAutoPrefillBadge" class="hidden px-2.5 py-0.5 rounded-full text-[9px] font-bold bg-amber-500/10 border border-amber-500/30 text-amber-300">
+                <i class="fa-solid fa-wand-magic-sparkles mr-1"></i>Otomatis Ditarik dari Arsip KGB Sebelumnya
+              </span>
+            </div>
           </div>
 
           <div class="grid grid-cols-1 md:grid-cols-12 gap-3">
-            <div class="md:col-span-4">
+            <div class="md:col-span-3">
+              <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Golongan SK Lama</label>
+              <select id="kgbFieldGolonganLama" onchange="autoHitungGajiLamaKgb()"
+                class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-amber-300 font-bold text-xs focus:ring-1 focus:ring-indigo-500 outline-none">
+                <option value="">-- Pilih Golongan --</option>
+                <option value="I/a">I/a</option>
+                <option value="I/b">I/b</option>
+                <option value="I/c">I/c</option>
+                <option value="I/d">I/d</option>
+                <option value="II/a">II/a</option>
+                <option value="II/b">II/b</option>
+                <option value="II/c">II/c</option>
+                <option value="II/d">II/d</option>
+                <option value="III/a">III/a</option>
+                <option value="III/b">III/b</option>
+                <option value="III/c">III/c</option>
+                <option value="III/d">III/d</option>
+                <option value="IV/a">IV/a</option>
+                <option value="IV/b">IV/b</option>
+                <option value="IV/c">IV/c</option>
+                <option value="IV/d">IV/d</option>
+                <option value="IV/e">IV/e</option>
+              </select>
+            </div>
+
+            <div class="md:col-span-3">
               <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Gaji Pokok Lama (Rp)</label>
               <input type="text" id="kgbFieldGajiLama" placeholder="Contoh: 2.785.700" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-slate-200 font-mono text-xs focus:ring-1 focus:ring-indigo-500 outline-none">
             </div>
 
-            <div class="md:col-span-4">
+            <div class="md:col-span-3">
               <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Oleh Pejabat (SK Lama)</label>
               <input type="text" id="kgbFieldPejabatLama" value="Ketua Pengadilan Agama Indramayu" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-slate-200 text-xs focus:ring-1 focus:ring-indigo-500 outline-none">
             </div>
 
-            <div class="md:col-span-4">
+            <div class="md:col-span-3">
               <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Tanggal SK Lama</label>
-              <input type="text" id="kgbFieldTanggalSkLama" placeholder="31 Oktober 2024" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-slate-200 text-xs focus:ring-1 focus:ring-indigo-500 outline-none">
+              <input type="date" id="kgbFieldTanggalSkLama" onchange="updateKgbDatePreview('kgbFieldTanggalSkLama', 'kgbPreviewTanggalSkLama')" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-slate-200 text-xs focus:ring-1 focus:ring-indigo-500 outline-none">
+              <span id="kgbPreviewTanggalSkLama" class="block text-[10px] text-slate-400 mt-1 font-medium"></span>
             </div>
 
             <div class="md:col-span-5">
@@ -142,12 +181,13 @@
 
             <div class="md:col-span-3">
               <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">TMT Gaji Lama</label>
-              <input type="text" id="kgbFieldTmtLama" placeholder="1 Desember 2024" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-slate-200 text-xs focus:ring-1 focus:ring-indigo-500 outline-none">
+              <input type="date" id="kgbFieldTmtLama" onchange="updateKgbDatePreview('kgbFieldTmtLama', 'kgbPreviewTmtLama')" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-slate-200 text-xs focus:ring-1 focus:ring-indigo-500 outline-none">
+              <span id="kgbPreviewTmtLama" class="block text-[10px] text-slate-400 mt-1 font-medium"></span>
             </div>
 
             <div class="md:col-span-2">
               <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">MKG Lama (Thn)</label>
-              <input type="number" min="0" id="kgbFieldTahunLama" oninput="handleTahunLamaInput(this.value)" placeholder="2" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-slate-200 font-bold text-xs focus:ring-1 focus:ring-indigo-500 outline-none">
+              <input type="number" min="0" id="kgbFieldTahunLama" oninput="handleTahunLamaInput(this.value); autoHitungGajiLamaKgb()" placeholder="2" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-slate-200 font-bold text-xs focus:ring-1 focus:ring-indigo-500 outline-none">
             </div>
 
             <div class="md:col-span-2">
@@ -168,7 +208,32 @@
           </div>
 
           <div class="grid grid-cols-1 md:grid-cols-12 gap-3">
-            <div class="md:col-span-4">
+            <div class="md:col-span-3">
+              <label class="block text-[10px] font-bold text-indigo-300 uppercase tracking-wider mb-1">Golongan Baru</label>
+              <select id="kgbFieldGolonganBaru" onchange="autoHitungGajiBaruKgb()"
+                class="w-full px-3 py-2 bg-slate-900 border border-indigo-500/40 rounded-xl text-emerald-300 font-bold text-xs focus:ring-2 focus:ring-indigo-500 outline-none">
+                <option value="">-- Pilih Golongan --</option>
+                <option value="I/a">I/a</option>
+                <option value="I/b">I/b</option>
+                <option value="I/c">I/c</option>
+                <option value="I/d">I/d</option>
+                <option value="II/a">II/a</option>
+                <option value="II/b">II/b</option>
+                <option value="II/c">II/c</option>
+                <option value="II/d">II/d</option>
+                <option value="III/a">III/a</option>
+                <option value="III/b">III/b</option>
+                <option value="III/c">III/c</option>
+                <option value="III/d">III/d</option>
+                <option value="IV/a">IV/a</option>
+                <option value="IV/b">IV/b</option>
+                <option value="IV/c">IV/c</option>
+                <option value="IV/d">IV/d</option>
+                <option value="IV/e">IV/e</option>
+              </select>
+            </div>
+
+            <div class="md:col-span-3">
               <label class="block text-[10px] font-bold text-indigo-300 uppercase tracking-wider mb-1">Gaji Pokok Baru (Rp)</label>
               <div class="relative">
                 <span class="absolute left-3 top-2 text-slate-400 font-bold">Rp</span>
@@ -176,14 +241,14 @@
               </div>
             </div>
 
-            <div class="md:col-span-8">
+            <div class="md:col-span-6">
               <label class="block text-[10px] font-bold text-indigo-300 uppercase tracking-wider mb-1">Terbilang Huruf</label>
               <input type="text" id="kgbFieldTerbilang" placeholder="dua juta sembilan ratus enam puluh empat ribu rupiah" class="w-full px-3 py-2 bg-slate-900/90 border border-indigo-500/30 rounded-xl text-slate-200 italic text-xs outline-none">
             </div>
 
             <div class="md:col-span-2">
               <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">MKG Baru (Thn)</label>
-              <input type="number" min="0" id="kgbFieldTahunBaru" oninput="syncMkgCombinedFields()" placeholder="4" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-white font-bold text-xs focus:ring-1 focus:ring-indigo-500 outline-none">
+              <input type="number" min="0" id="kgbFieldTahunBaru" oninput="syncMkgCombinedFields(); autoHitungGajiBaruKgb()" placeholder="4" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-white font-bold text-xs focus:ring-1 focus:ring-indigo-500 outline-none">
             </div>
 
             <div class="md:col-span-1">
@@ -194,12 +259,14 @@
 
             <div class="md:col-span-3">
               <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Mulai Tanggal (TMT Baru)</label>
-              <input type="text" id="kgbFieldTmtBaru" oninput="handleTmtBaruChange(this.value)" placeholder="1 Desember 2026" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-slate-200 text-xs focus:ring-1 focus:ring-indigo-500 outline-none">
+              <input type="date" id="kgbFieldTmtBaru" onchange="handleTmtBaruChange(this.value)" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-slate-200 text-xs focus:ring-1 focus:ring-indigo-500 outline-none">
+              <span id="kgbPreviewTmtBaru" class="block text-[10px] text-emerald-400 mt-1 font-medium"></span>
             </div>
 
             <div class="md:col-span-3">
               <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Kenaikan Gaji YAD (+2 Thn)</label>
-              <input type="text" id="kgbFieldTmtYad" placeholder="1 Desember 2028" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-indigo-300 font-bold text-xs focus:ring-1 focus:ring-indigo-500 outline-none">
+              <input type="date" id="kgbFieldTmtYad" onchange="updateKgbDatePreview('kgbFieldTmtYad', 'kgbPreviewTmtYad')" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-indigo-300 font-bold text-xs focus:ring-1 focus:ring-indigo-500 outline-none">
+              <span id="kgbPreviewTmtYad" class="block text-[10px] text-indigo-300 mt-1 font-medium"></span>
             </div>
 
             <div class="md:col-span-3">
