@@ -284,8 +284,11 @@ document.addEventListener("DOMContentLoaded", () => {
                     tingkat_spd: this.form.tingkat_spd, paragraf_biaya: this.form.paragraf_biaya
                 };
 
+                const targetIdSt = this.currentEditId || ('ST-' + Date.now() + Math.floor(Math.random() * 1000));
+                const uTtd = (this.s.usersList || []).find(x => String(x.nip) === String(this.form.pejabat_ttd));
+
                 const payload = {
-                    id_st: this.currentEditId,
+                    id_st: targetIdSt,
                     nomor_surat: this.form.nomor_surat,
                     menimbang: this.form.menimbang,
                     dasar: this.form.dasar,
@@ -295,6 +298,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     tgl_selesai: this.form.tgl_selesai,
                     jam: this.form.jam,
                     pejabat_ttd: this.form.pejabat_ttd,
+                    pejabat_ttd_jabatan: uTtd ? (uTtd.jabatan || '') : '',
                     peserta_json: JSON.stringify(this.pesertaList), 
                     data_ekstra_json: JSON.stringify(ekstraData) 
                 };
@@ -302,7 +306,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 // OPTIMISTIC ST TAHAP 4 (0ms Update & Auto-Rollback)
                 this.closeModalST();
                 const backupSt = [...(this.s.stList || [])];
-                const tempStId = this.currentEditId || ('ST-OPT-' + Date.now());
+                const tempStId = targetIdSt;
 
                 if (this.currentEditId) {
                     const idx = this.s.stList.findIndex(x => String(x.id) === String(this.currentEditId));
@@ -311,9 +315,9 @@ document.addEventListener("DOMContentLoaded", () => {
                     }
                 } else {
                     const optimisticSt = {
-                        id: tempStId, nomor_st: payload.nomor_st, tujuan: payload.tujuan,
+                        id: tempStId, nomor: payload.nomor_surat, nomor_st: payload.nomor_surat, tujuan: payload.tujuan,
                         tempat: payload.tempat, tgl_mulai: payload.tgl_mulai, tgl_selesai: payload.tgl_selesai,
-                        peserta: payload.peserta_json, waktu: new Date().toLocaleDateString('id-ID')
+                        peserta: payload.peserta_json, data_ekstra: payload.data_ekstra_json, waktu: new Date().toLocaleDateString('id-ID')
                     };
                     if (this.s.stList) this.s.stList.unshift(optimisticSt);
                 }
@@ -322,7 +326,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     window.showNotify("Surat Tugas Diterbitkan ⚡", this.currentEditId ? "Perubahan Surat Tugas disimpan (0ms)." : "Surat Tugas & rombongan dinas diterbitkan (0ms).", "success");
                 }
 
-                const token = localStorage.getItem('transkep_session_token'); 
+                const token = localStorage.getItem('transkep_session_token') || localStorage.getItem('transkep_token') || (this.s && this.s.token) || ''; 
                 const actionPromise = this.currentEditId
                     ? StDataService.updateSuratTugas(payload, this.s.user.nip, token)
                     : StDataService.addSuratTugas(payload, this.s.user.nip, token);

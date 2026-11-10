@@ -282,8 +282,12 @@ document.addEventListener("DOMContentLoaded", () => {
                     tingkat_spd: this.form.tingkat_spd, paragraf_biaya: this.form.paragraf_biaya
                 };
 
+                const isEditMode = Boolean(this.currentEditId);
+                const targetIdSt = this.currentEditId || ('ST-' + Date.now() + Math.floor(Math.random() * 1000));
+                const uTtd = (this.s.usersList || []).find(x => String(x.nip) === String(this.form.pejabat_ttd));
+
                 const payload = {
-                    id_st: this.currentEditId,
+                    id_st: targetIdSt,
                     nomor_surat: this.form.nomor_surat,
                     menimbang: this.form.menimbang,
                     dasar: this.form.dasar,
@@ -293,6 +297,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     tgl_selesai: this.form.tgl_selesai,
                     jam: this.form.jam,
                     pejabat_ttd: this.form.pejabat_ttd,
+                    pejabat_ttd_jabatan: uTtd ? (uTtd.jabatan || '') : '',
                     peserta_json: JSON.stringify(this.pesertaList), 
                     data_ekstra_json: JSON.stringify(ekstraData) 
                 };
@@ -300,35 +305,66 @@ document.addEventListener("DOMContentLoaded", () => {
                 // OPTIMISTIC ST TAHAP 4 (0ms Update & Auto-Rollback)
                 this.closeModalST();
                 const backupSt = [...(this.s.stList || [])];
-                const tempStId = this.currentEditId || ('ST-OPT-' + Date.now());
+                const tempStId = targetIdSt;
 
-                if (this.currentEditId) {
+                if (isEditMode) {
                     const idx = this.s.stList.findIndex(x => String(x.id) === String(this.currentEditId));
                     if (idx !== -1) {
                         this.s.stList[idx] = Object.assign({}, this.s.stList[idx], payload);
                     }
                 } else {
                     const optimisticSt = {
-                        id: tempStId, nomor_st: payload.nomor_st, tujuan: payload.tujuan,
+                        id: tempStId, nomor: payload.nomor_surat, nomor_st: payload.nomor_surat, tujuan: payload.tujuan,
                         tempat: payload.tempat, tgl_mulai: payload.tgl_mulai, tgl_selesai: payload.tgl_selesai,
-                        peserta: payload.peserta_json, waktu: new Date().toLocaleDateString('id-ID')
+                        peserta: payload.peserta_json, data_ekstra: payload.data_ekstra_json, waktu: new Date().toLocaleDateString('id-ID')
                     };
                     if (this.s.stList) this.s.stList.unshift(optimisticSt);
                 }
 
                 if(window.showNotify) {
-                    window.showNotify("Surat Tugas Diterbitkan ⚡", this.currentEditId ? "Perubahan Surat Tugas disimpan (0ms)." : "Surat Tugas & rombongan dinas diterbitkan (0ms).", "success");
+                    window.showNotify("Surat Tugas Diterbitkan ⚡", isEditMode ? "Perubahan Surat Tugas disimpan (0ms)." : "Surat Tugas & rombongan dinas diterbitkan (0ms).", "success");
                 }
 
-                const idST = this.currentEditId || tempStId;
-                // TAHAP 79: Simpan murni ke Cloud Firestore (Input Sheets diputus)
+                const idST = targetIdSt;
+                const token = localStorage.getItem('transkep_session_token') || localStorage.getItem('transkep_token') || (this.s && this.s.token) || '';
+
+                // TAHAP 79 & 102: Simpan ke Cloud Firestore + Cold Backup ke Sheets & Trigger Otomasi n8n MYSIMS
                 if (typeof TranskepFirebase !== 'undefined' && TranskepFirebase.isReady && TranskepFirebase.isReady()) {
-                    TranskepFirebase.saveSuratTugasToFirestore({ ...payload, id: idST, id_st: idST, is_firebase: true }).catch(e => {
+                    TranskepFirebase.saveSuratTugasToFirestore({
+                        id: idST,
+                        nomor: payload.nomor_surat || '',
+                        menimbang: payload.menimbang || '',
+                        dasar: payload.dasar || '',
+                        tujuan: payload.tujuan || '',
+                        tempat: payload.tempat || '',
+                        tgl_mulai: payload.tgl_mulai || '',
+                        tgl_selesai: payload.tgl_selesai || '',
+                        jam: payload.jam || '',
+                        pejabat_ttd: payload.pejabat_ttd || '',
+                        peserta: payload.peserta_json || '[]',
+                        data_ekstra: payload.data_ekstra_json || '{}',
+                        status: 'DISETUJUI',
+                        is_firebase: true
+                    }).catch(e => {
                         console.warn('Firestore ST error:', e);
                         this.s.stList = backupSt;
                         if(window.showNotify) window.showNotify("Gagal Simpan", "Gagal menyimpan ke Cloud Firestore. (Data dikembalikan)", "error");
                     });
                 }
+
+                try {
+                    const payloadWithId = Object.assign({}, payload, { id: idST, id_st: idST });
+                    if (typeof window.TranskepAPI !== 'undefined' && window.TranskepAPI.call) {
+                        window.TranskepAPI.call(isEditMode ? 'updateSuratTugas' : 'addSuratTugas', payloadWithId, this.s.user.nip, token)
+                            .catch(e => console.warn('Cold backup ST:', e));
+                    } else if (typeof google !== 'undefined' && google.script && google.script.run) {
+                        if (isEditMode) {
+                            google.script.run.updateSuratTugas(payloadWithId, this.s.user.nip, token);
+                        } else {
+                            google.script.run.addSuratTugas(payloadWithId, this.s.user.nip, token);
+                        }
+                    }
+                } catch (e) {}
             },
 
             // ===============================================

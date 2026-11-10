@@ -942,3 +942,16 @@ ZONA BAWAH: MASTER CONTEXT & STATUS MIGRASI TERKINI (LIVING CONTEXT)
       * Cabang atas dilengkapi node HTTP multipart resmi: **`Suntik PDF ST Terpadu ke MYSIMS`** (`http-inject-pdf-st-mysims`) di posisi `[1020, 180]` yang menerima item biner dari `Mesin Otomasi ST Terpadu`.
       * Menyuntikkan seluruh file PDF yang diterbitkan langsung ke form `act_edt` baris surat keluar MYSIMS, mengunci `Sifat = Biasa`, sehingga buku agenda MYSIMS 100% lengkap memiliki lampiran PDF resmi (mencegah kecurigaan pihak TI/internal).
     - **Versioning**: Versi cache PWA dinaikkan ke **`v3.8.30`** di [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) dan [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js). Commit dan push ke `origin/main` serta deployment ke Google Apps Script.
+
+
+79. **Hotfix Trigger Otomasi n8n ST Terpadu, Sinkronisasi Realtime Cloud Firestore & Regex Satker MYSIMS (Tahap 102 Hotfix - v3.8.31 - Selesai & Aktif ✅):**
+    - **Perbaikan Pemanggilan RPC & Auto-Unwrap (`modules/permohonan/st_data.js`, `permohonan/st/js_st.html`, `permohonan/st/st.js`)**:
+      * Memperbaiki pemanggilan `window.TranskepAPI.call('addSuratTugas', payloadWithId, nip, token)` agar mengirim 3 argumen terpisah (bukan array terbungkus) serta menambahkan *auto-unwrap* di sisi server GAS agar kompatibel dengan cache lama.
+      * Menyematkan ID Surat Tugas (`id_st`) yang identik antara dokumen Cloud Firestore (`surat_tugas_documents`) dan baris Google Sheets (`st_log`), serta mengaktifkan pemanggilan backend `addSuratTugas` pada `permohonan/st/js_st.html`.
+    - **Resolusi Jabatan Penandatangan dari NIP & Flag `get_spd` (`permohonan/st/st.js`)**:
+      * `triggerN8nSuratTugas_` kini otomatis menerjemahkan NIP `pejabat_ttd` menjadi nama jabatan (`Ketua`, `Wakil Ketua`, `Panitera`, `Sekretaris`) melalui lookup `getUserMapStCompiler_()` serta mendeteksi `p.get_spd` pada daftar peserta.
+    - **Sinkronisasi Dua Arah Cloud Firestore (`syncFirestoreSuratTugasNumbers_` & `fetchFirestoreSuratTugasRow_`)**:
+      * Saat n8n mengirimkan callback `updateNomorSuratTugas`, backend GAS tidak hanya mengupdate `st_log` di Google Sheets tetapi juga langsung melakukan `PATCH` REST API ke `surat_tugas_documents/${idST}` di Cloud Firestore sehingga nomor surat di layar pengguna langsung berubah otomatis (`0ms`) tanpa refresh.
+    - **Perbaikan Regex Satker Ber-Tanda Hubung (`-`) & Form Scraping Edit MYSIMS (`n8n_workflow_mysims_surat_keluar.json`)**:
+      * Memperbarui regex `parseSuratKeluarRows` pada `Mesin Otomasi ST Terpadu` menjadi `/(\d+)\/([A-Za-z0-9.-]+\/[A-Za-z0-9.-]+\/[IVXLCDM]+\/\d{4})/i` agar mengenali kode satker `KPA.W10-A2`, `WKPA.W10-A2`, `PAN.PA.W10-A2`, dan `SEK.PA.W10-A2`, serta mengekstrak field asli form `/edt/<idp>` sebelum menyuntikkan PDF ke `act_edt`.
+    - **Versioning**: Versi cache PWA dinaikkan ke **`v3.8.31`** di [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) dan [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js). Commit dan push ke `origin/main` serta deployment ke Google Apps Script.

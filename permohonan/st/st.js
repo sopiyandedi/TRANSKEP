@@ -26,6 +26,12 @@ function setupSheetST() {
 
 function addSuratTugas(payload, userNip, clientToken) {
   try {
+    // Auto-unwrap jika dipanggil dengan array terbungkus [payload, nip, token]
+    if (Array.isArray(payload)) {
+      userNip = userNip || payload[1];
+      clientToken = clientToken || payload[2];
+      payload = payload[0] || {};
+    }
     if (!cekOtorisasi(userNip, clientToken)) return { status: 'error', message: 'Akses Ditolak: Sesi tidak valid.' };
 
     const ss = getDB();
@@ -35,7 +41,9 @@ function addSuratTugas(payload, userNip, clientToken) {
       sheetST = ss.getSheetByName('st_log');
     }
 
-    const idST = "ST-" + new Date().getTime() + Math.floor(Math.random() * 1000);
+    const idST = (payload && (payload.id_st || payload.id))
+      ? String(payload.id_st || payload.id).trim()
+      : ("ST-" + new Date().getTime() + Math.floor(Math.random() * 1000));
     const waktuDibuat = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'dd/MM/yyyy HH:mm:ss');
     
     sheetST.appendRow(sanitizeRowArray([
@@ -60,6 +68,11 @@ function addSuratTugas(payload, userNip, clientToken) {
 
 function updateSuratTugas(payload, userNip, clientToken) {
   try {
+    if (Array.isArray(payload)) {
+      userNip = userNip || payload[1];
+      clientToken = clientToken || payload[2];
+      payload = payload[0] || {};
+    }
     if (!cekOtorisasi(userNip, clientToken)) return { status: 'error', message: 'Akses Ditolak: Sesi tidak valid.' };
 
     const ss = getDB();
@@ -172,11 +185,8 @@ function getSettingsST() {
 function triggerN8nSuratTugas_(idST, payload) {
   try {
     const props = PropertiesService.getScriptProperties();
-    const webhookUrl = props.getProperty('N8N_WEBHOOK_SURAT_KELUAR');
-    if (!webhookUrl) {
-      Logger.log("ℹ️ [n8n ST Trigger] N8N_WEBHOOK_SURAT_KELUAR belum disetel. Trigger dilewati.");
-      return;
-    }
+    const webhookUrl = props.getProperty('N8N_WEBHOOK_SURAT_KELUAR') ||
+      'https://supernova-endpoint-unsubtly.ngrok-free.dev/webhook/generate-surat-keluar';
 
     const verifiedExecUrl = props.getProperty('TRANSKEP_EXEC_URL') ||
       'https://script.google.com/macros/s/AKfycbzFrbQTqmVzMio7mderK-S9ntFVjXiWYFgnXfy9fW_SUKOcIxfPywP2He1flhaK_AZ0ZA/exec';
@@ -190,6 +200,21 @@ function triggerN8nSuratTugas_(idST, payload) {
     try {
       ekstraData = JSON.parse(payload.data_ekstra_json || '{}');
     } catch (e) {}
+
+    // Resolusi Jabatan Pimpinan Penandatangan dari NIP (payload.pejabat_ttd)
+    let jabatanPenandatangan = String(payload.pejabat_ttd_jabatan || '').trim();
+    if (!jabatanPenandatangan && payload.pejabat_ttd) {
+      const rawTtd = String(payload.pejabat_ttd).replace(/^'+/, '').trim();
+      if (/^\d{8,}$/.test(rawTtd) && typeof getUserMapStCompiler_ === 'function') {
+        const uMap = getUserMapStCompiler_();
+        if (uMap[rawTtd] && uMap[rawTtd].jabatan) {
+          jabatanPenandatangan = uMap[rawTtd].jabatan;
+        }
+      } else {
+        jabatanPenandatangan = rawTtd;
+      }
+    }
+    if (!jabatanPenandatangan) jabatanPenandatangan = 'Ketua';
 
     const tglSuratToday = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'yyyy-MM-dd');
     const tasks = [];
@@ -205,7 +230,7 @@ function triggerN8nSuratTugas_(idST, payload) {
 
     tasks.push({
       tipe: 'ST',
-      jabatan_penandatangan: String(payload.pejabat_ttd || 'Ketua').trim(),
+      jabatan_penandatangan: jabatanPenandatangan,
       kode_klasifikasi: rawKodeST,
       kepada: kepadaST,
       uraian: uraianST,
@@ -213,9 +238,8 @@ function triggerN8nSuratTugas_(idST, payload) {
     });
 
     // 2. TASK SPD (JIKA ADA FASILITAS SPD / NOMOR SPD DIAKTIFKAN)
-    const hasSpd = pesertaList.some(function(p) { return p.spd_active; }) ||
-      Boolean(ekstraData.nomor_spd && String(ekstraData.nomor_spd).trim() !== '') ||
-      Boolean(ekstraData.tempat_tujuan_spd && String(ekstraData.tempat_tujuan_spd).trim() !== '');
+    const hasSpd = pesertaList.some(function(p) { return Boolean(p.get_spd || p.spd_active); }) ||
+      Boolean(ekstraData.nomor_spd && String(ekstraData.nomor_spd).trim() !== '');
 
     if (hasSpd) {
       const uraianSPD = 'Surat Perjalanan Dinas ' + String(payload.tujuan || 'Kedinasan').trim() + (payload.tempat ? (' ke ' + String(payload.tempat).trim()) : '');
@@ -278,7 +302,76 @@ function triggerN8nSuratTugas_(idST, payload) {
 }
 
 /**
- * Callback API dari n8n untuk memperbarui Nomor Surat Tugas, SPD, dan Plh pada database st_log
+ * Helper Sinkronisasi Nomor Resmi ke Cloud Firestore (surat_tugas_documents)
+ * Memastikan UI Realtime Listener di Browser langsung memperbarui nomor ST, SPD, & Plh (0ms)
+ */
+function syncFirestoreSuratTugasNumbers_(idST, nomorST, ekstra, pesertaList) {
+  try {
+    const baseUrl = 'https://firestore.googleapis.com/v1/projects/transkep-314c0/databases/(default)/documents/surat_tugas_documents/' + encodeURIComponent(String(idST).trim());
+    const masks = [];
+    const fields = {};
+
+    if (nomorST && String(nomorST).trim() !== '') {
+      masks.push('updateMask.fieldPaths=nomor');
+      fields.nomor = { stringValue: String(nomorST).trim() };
+    }
+    if (ekstra) {
+      masks.push('updateMask.fieldPaths=data_ekstra');
+      fields.data_ekstra = { stringValue: typeof ekstra === 'string' ? ekstra : JSON.stringify(ekstra) };
+    }
+    if (pesertaList) {
+      masks.push('updateMask.fieldPaths=peserta');
+      fields.peserta = { stringValue: typeof pesertaList === 'string' ? pesertaList : JSON.stringify(pesertaList) };
+    }
+
+    if (masks.length === 0) return;
+
+    const patchUrl = baseUrl + '?' + masks.join('&');
+    UrlFetchApp.fetch(patchUrl, {
+      method: 'patch',
+      contentType: 'application/json',
+      payload: JSON.stringify({ fields: fields }),
+      muteHttpExceptions: true
+    });
+  } catch (errFs) {
+    Logger.log("⚠️ [Firestore ST Sync Warning] " + errFs.toString());
+  }
+}
+
+/**
+ * Helper Fallback: Ambil dokumen Surat Tugas dari Cloud Firestore jika belum masuk ke st_log
+ */
+function fetchFirestoreSuratTugasRow_(idST) {
+  try {
+    const url = 'https://firestore.googleapis.com/v1/projects/transkep-314c0/databases/(default)/documents/surat_tugas_documents/' + encodeURIComponent(String(idST).trim());
+    const resp = UrlFetchApp.fetch(url, { method: 'get', muteHttpExceptions: true });
+    if (resp.getResponseCode() !== 200) return null;
+    const doc = JSON.parse(resp.getContentText());
+    const f = doc.fields || {};
+    const s = function(k) { return (f[k] && f[k].stringValue !== undefined) ? String(f[k].stringValue) : ''; };
+    return [
+      s('id') || String(idST),
+      s('waktu') || Utilities.formatDate(new Date(), 'Asia/Jakarta', 'dd/MM/yyyy HH:mm:ss'),
+      s('nomor'),
+      s('menimbang'),
+      s('dasar'),
+      s('tujuan'),
+      s('tempat'),
+      s('tgl_mulai'),
+      s('tgl_selesai'),
+      s('jam'),
+      s('peserta') || '[]',
+      s('pejabat_ttd'),
+      s('status') || 'DISETUJUI',
+      s('data_ekstra') || '{}'
+    ];
+  } catch (e) {
+    return null;
+  }
+}
+
+/**
+ * Callback API dari n8n untuk memperbarui Nomor Surat Tugas, SPD, dan Plh pada database st_log & Cloud Firestore
  */
 function updateNomorSuratTugasFromExternal_(payload) {
   try {
@@ -294,8 +387,11 @@ function updateNomorSuratTugasFromExternal_(payload) {
     }
 
     const ss = getDB();
-    const sheetST = ss.getSheetByName('st_log');
-    if (!sheetST) throw new Error("Database st_log tidak ditemukan.");
+    let sheetST = ss.getSheetByName('st_log');
+    if (!sheetST) {
+      setupSheetST();
+      sheetST = ss.getSheetByName('st_log');
+    }
 
     const data = sheetST.getDataRange().getValues();
     let rowIndex = -1;
@@ -308,8 +404,17 @@ function updateNomorSuratTugasFromExternal_(payload) {
       }
     }
 
+    // Fallback: Jika baris belum ada di st_log, tarik dari Cloud Firestore & sisipkan ke st_log
     if (rowIndex === -1 || !targetRow) {
-      return { status: 'error', message: "Surat Tugas dengan ID " + idST + " tidak ditemukan." };
+      const fsRow = fetchFirestoreSuratTugasRow_(idST);
+      if (fsRow) {
+        sheetST.appendRow(sanitizeRowArray(fsRow));
+        SpreadsheetApp.flush();
+        rowIndex = sheetST.getLastRow();
+        targetRow = fsRow;
+      } else {
+        return { status: 'error', message: "Surat Tugas dengan ID " + idST + " tidak ditemukan." };
+      }
     }
 
     // 1. Update Nomor ST (Kolom 3 / C)
@@ -337,9 +442,14 @@ function updateNomorSuratTugasFromExternal_(payload) {
       pesertaList = JSON.parse(targetRow[10] || '[]');
     } catch (e) {}
 
-    if (payload.plh_results && Array.isArray(payload.plh_results)) {
-      for (let r = 0; r < payload.plh_results.length; r++) {
-        const item = payload.plh_results[r];
+    let parsedPlhResults = payload.plh_results;
+    if (typeof parsedPlhResults === 'string') {
+      try { parsedPlhResults = JSON.parse(parsedPlhResults); } catch (e) { parsedPlhResults = []; }
+    }
+
+    if (parsedPlhResults && Array.isArray(parsedPlhResults)) {
+      for (let r = 0; r < parsedPlhResults.length; r++) {
+        const item = parsedPlhResults[r];
         for (let p = 0; p < pesertaList.length; p++) {
           if (pesertaList[p].plh_nip && String(pesertaList[p].plh_nip).trim() === String(item.plh_nip).trim()) {
             pesertaList[p].nomor_plh = item.nomor_plh;
@@ -351,6 +461,9 @@ function updateNomorSuratTugasFromExternal_(payload) {
 
     SpreadsheetApp.flush();
     if (typeof bumpDataVersion === "function") bumpDataVersion();
+
+    // Sinkronkan juga nomor baru ke Cloud Firestore agar UI Browser update otomatis (0ms)
+    syncFirestoreSuratTugasNumbers_(idST, payload.nomor_st, ekstra, pesertaList);
 
     // 4. Kompilasi Headless PDF Resmi (ST, SPD, & Plh) untuk Disuntikkan ke MYSIMS
     let pdfStRes = { pdf_base64: '', pdf_filename: '' };

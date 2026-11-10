@@ -5386,6 +5386,26 @@ Berdasarkan hasil uji langsung pada MYSIMS (`1085/KP5.3` terbit tanpa file) dan 
 - [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) & [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js)
 - **Status:** `[SELESAI & AKTIF]` ✅
 
+---
+
+### TAHAP 102 - HOTFIX (SELESAI & AKTIF): Fix Trigger Webhook n8n ST Terpadu, Sinkronisasi Realtime Cloud Firestore & Regex Satker MYSIMS (v3.8.31)
+*Status: [SELESAI & AKTIF] ✅*
+
+1. **Akar Masalah ("Tidak Ada Proses" di n8n & Nomor Tetap Kode Klasifikasi):**
+   - **Argumen Array Terbungkus di `st_data.js`:** `window.TranskepAPI.call('addSuratTugas', [payload, nip, token])` menggunakan rest parameter `...args` sehingga mengirim `[[payload, nip, token]]`. Akibatnya `userNip` dan `clientToken` di backend GAS bernilai `undefined` dan ditolak `cekOtorisasi` sebelum `triggerN8nSuratTugas_` sempat dieksekusi.
+   - **Trigger GAS Belum Dipanggil di `permohonan/st/js_st.html`:** Saat diakses via Google Sites / GAS Web App HTML, `submitST()` hanya menyimpan ke Cloud Firestore tanpa memanggil `addSuratTugas` di backend GAS.
+   - **Resolusi NIP Pejabat & Flag `get_spd` di `permohonan/st/st.js`:** `payload.pejabat_ttd` menyimpan NIP pimpinan (misal `197309081998031001`), bukan nama jabatan (`Ketua`), serta properti fasilitas SPD di objek peserta adalah `p.get_spd` (bukan hanya `p.spd_active`).
+   - **Sinkronisasi Nomor Baru ke Cloud Firestore (`surat_tugas_documents`):** Karena frontend menjadikan Cloud Firestore sebagai *Single Source of Truth*, callback `updateNomorSuratTugasFromExternal_` wajib melakukan `PATCH` ke dokumen Firestore (`surat_tugas_documents/${idST}`) agar tampilan tabel dan cetakan di browser langsung berubah menjadi nomor resmi MYSIMS (`0ms`) tanpa perlu refresh.
+   - **Regex Satker Ber-Tanda Hubung (`-`) di `n8n_workflow_mysims_surat_keluar.json`:** Regex `parseSuratKeluarRows` di `Mesin Otomasi ST Terpadu` diperbaiki menjadi `/(\d+)\/([A-Za-z0-9.-]+\/[A-Za-z0-9.-]+\/[IVXLCDM]+\/\d{4})/i` (menambahkan karakter `-`) agar cocok dengan kode satker `KPA.W10-A2`, `WKPA.W10-A2`, `PAN.PA.W10-A2`, dan `SEK.PA.W10-A2`, serta dilengkapi *scraping* form edit (`/edt/<idp>`) untuk akurasi injeksi PDF ke `act_edt`.
+2. **File yang Dimodifikasi:**
+   - [`modules/permohonan/st_data.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/permohonan/st_data.js)
+   - [`modules/permohonan/st.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/permohonan/st.js)
+   - [`permohonan/st/js_st.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/st/js_st.html)
+   - [`permohonan/st/st.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/st/st.js)
+   - [`n8n_workflow_mysims_surat_keluar.json`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/n8n_workflow_mysims_surat_keluar.json)
+   - [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) & [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) (`v3.8.31`)
+- **Status:** `[SELESAI & AKTIF]` ✅
+
 
 ---
 
@@ -5411,6 +5431,26 @@ Saat baris di sheet `cuti_log` dihapus langsung secara manual di Google Sheets (
 #### 3. Estimasi Dampak & File yang Dimodifikasi
 - [`code.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/code.js)
 - [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) & [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js)
+- **Status:** `[SELESAI & AKTIF]` ✅
+
+---
+
+### TAHAP 102 - HOTFIX (SELESAI & AKTIF): Fix Trigger Webhook n8n ST Terpadu, Sinkronisasi Realtime Cloud Firestore & Regex Satker MYSIMS (v3.8.31)
+*Status: [SELESAI & AKTIF] ✅*
+
+1. **Akar Masalah ("Tidak Ada Proses" di n8n & Nomor Tetap Kode Klasifikasi):**
+   - **Argumen Array Terbungkus di `st_data.js`:** `window.TranskepAPI.call('addSuratTugas', [payload, nip, token])` menggunakan rest parameter `...args` sehingga mengirim `[[payload, nip, token]]`. Akibatnya `userNip` dan `clientToken` di backend GAS bernilai `undefined` dan ditolak `cekOtorisasi` sebelum `triggerN8nSuratTugas_` sempat dieksekusi.
+   - **Trigger GAS Belum Dipanggil di `permohonan/st/js_st.html`:** Saat diakses via Google Sites / GAS Web App HTML, `submitST()` hanya menyimpan ke Cloud Firestore tanpa memanggil `addSuratTugas` di backend GAS.
+   - **Resolusi NIP Pejabat & Flag `get_spd` di `permohonan/st/st.js`:** `payload.pejabat_ttd` menyimpan NIP pimpinan (misal `197309081998031001`), bukan nama jabatan (`Ketua`), serta properti fasilitas SPD di objek peserta adalah `p.get_spd` (bukan hanya `p.spd_active`).
+   - **Sinkronisasi Nomor Baru ke Cloud Firestore (`surat_tugas_documents`):** Karena frontend menjadikan Cloud Firestore sebagai *Single Source of Truth*, callback `updateNomorSuratTugasFromExternal_` wajib melakukan `PATCH` ke dokumen Firestore (`surat_tugas_documents/${idST}`) agar tampilan tabel dan cetakan di browser langsung berubah menjadi nomor resmi MYSIMS (`0ms`) tanpa perlu refresh.
+   - **Regex Satker Ber-Tanda Hubung (`-`) di `n8n_workflow_mysims_surat_keluar.json`:** Regex `parseSuratKeluarRows` di `Mesin Otomasi ST Terpadu` diperbaiki menjadi `/(\d+)\/([A-Za-z0-9.-]+\/[A-Za-z0-9.-]+\/[IVXLCDM]+\/\d{4})/i` (menambahkan karakter `-`) agar cocok dengan kode satker `KPA.W10-A2`, `WKPA.W10-A2`, `PAN.PA.W10-A2`, dan `SEK.PA.W10-A2`, serta dilengkapi *scraping* form edit (`/edt/<idp>`) untuk akurasi injeksi PDF ke `act_edt`.
+2. **File yang Dimodifikasi:**
+   - [`modules/permohonan/st_data.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/permohonan/st_data.js)
+   - [`modules/permohonan/st.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/permohonan/st.js)
+   - [`permohonan/st/js_st.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/st/js_st.html)
+   - [`permohonan/st/st.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/st/st.js)
+   - [`n8n_workflow_mysims_surat_keluar.json`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/n8n_workflow_mysims_surat_keluar.json)
+   - [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) & [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) (`v3.8.31`)
 - **Status:** `[SELESAI & AKTIF]` ✅
 
 
@@ -5492,4 +5532,24 @@ Saat baris di sheet `cuti_log` dihapus langsung secara manual di Google Sheets (
    - Dinaikkan ke versi `v3.8.30` di `index.html` dan `sw.js`.
 
 - [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) & [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js)
+- **Status:** `[SELESAI & AKTIF]` ✅
+
+---
+
+### TAHAP 102 - HOTFIX (SELESAI & AKTIF): Fix Trigger Webhook n8n ST Terpadu, Sinkronisasi Realtime Cloud Firestore & Regex Satker MYSIMS (v3.8.31)
+*Status: [SELESAI & AKTIF] ✅*
+
+1. **Akar Masalah ("Tidak Ada Proses" di n8n & Nomor Tetap Kode Klasifikasi):**
+   - **Argumen Array Terbungkus di `st_data.js`:** `window.TranskepAPI.call('addSuratTugas', [payload, nip, token])` menggunakan rest parameter `...args` sehingga mengirim `[[payload, nip, token]]`. Akibatnya `userNip` dan `clientToken` di backend GAS bernilai `undefined` dan ditolak `cekOtorisasi` sebelum `triggerN8nSuratTugas_` sempat dieksekusi.
+   - **Trigger GAS Belum Dipanggil di `permohonan/st/js_st.html`:** Saat diakses via Google Sites / GAS Web App HTML, `submitST()` hanya menyimpan ke Cloud Firestore tanpa memanggil `addSuratTugas` di backend GAS.
+   - **Resolusi NIP Pejabat & Flag `get_spd` di `permohonan/st/st.js`:** `payload.pejabat_ttd` menyimpan NIP pimpinan (misal `197309081998031001`), bukan nama jabatan (`Ketua`), serta properti fasilitas SPD di objek peserta adalah `p.get_spd` (bukan hanya `p.spd_active`).
+   - **Sinkronisasi Nomor Baru ke Cloud Firestore (`surat_tugas_documents`):** Karena frontend menjadikan Cloud Firestore sebagai *Single Source of Truth*, callback `updateNomorSuratTugasFromExternal_` wajib melakukan `PATCH` ke dokumen Firestore (`surat_tugas_documents/${idST}`) agar tampilan tabel dan cetakan di browser langsung berubah menjadi nomor resmi MYSIMS (`0ms`) tanpa perlu refresh.
+   - **Regex Satker Ber-Tanda Hubung (`-`) di `n8n_workflow_mysims_surat_keluar.json`:** Regex `parseSuratKeluarRows` di `Mesin Otomasi ST Terpadu` diperbaiki menjadi `/(\d+)\/([A-Za-z0-9.-]+\/[A-Za-z0-9.-]+\/[IVXLCDM]+\/\d{4})/i` (menambahkan karakter `-`) agar cocok dengan kode satker `KPA.W10-A2`, `WKPA.W10-A2`, `PAN.PA.W10-A2`, dan `SEK.PA.W10-A2`, serta dilengkapi *scraping* form edit (`/edt/<idp>`) untuk akurasi injeksi PDF ke `act_edt`.
+2. **File yang Dimodifikasi:**
+   - [`modules/permohonan/st_data.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/permohonan/st_data.js)
+   - [`modules/permohonan/st.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/permohonan/st.js)
+   - [`permohonan/st/js_st.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/st/js_st.html)
+   - [`permohonan/st/st.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/st/st.js)
+   - [`n8n_workflow_mysims_surat_keluar.json`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/n8n_workflow_mysims_surat_keluar.json)
+   - [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) & [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) (`v3.8.31`)
 - **Status:** `[SELESAI & AKTIF]` ✅
