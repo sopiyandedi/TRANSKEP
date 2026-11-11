@@ -361,6 +361,17 @@ function createKgbGoogleDoc_(p, idKgb) {
         }
       });
 
+      // Kunci Ukuran Halaman Legal (21.6 cm x 35.6 cm) & Margin Resmi: Atas 1cm, Bawah 1.5cm, Kiri 2cm, Kanan 1.5cm
+      const docBody = doc.getBody();
+      if (docBody) {
+        docBody.setPageWidth(612); // 21.6 cm (8.5 in)
+        docBody.setPageHeight(1008); // 35.6 cm (14.0 in)
+        docBody.setMarginTop(28.35); // 1.0 cm
+        docBody.setMarginBottom(42.52); // 1.5 cm
+        docBody.setMarginLeft(56.69); // 2.0 cm
+        docBody.setMarginRight(42.52); // 1.5 cm
+      }
+
       doc.saveAndClose();
     } catch (e) {
       Logger.log("Template ID error, fallback ke Generator Otomatis: " + e.toString());
@@ -376,10 +387,12 @@ function createKgbGoogleDoc_(p, idKgb) {
       try { file.moveTo(targetFolder); } catch (mvErr) {}
     }
     const body = doc.getBody();
-    body.setMarginLeft(56.7);
-    body.setMarginRight(45.3);
-    body.setMarginTop(36.0);
-    body.setMarginBottom(36.0);
+    body.setPageWidth(612); // 21.6 cm (8.5 in)
+    body.setPageHeight(1008); // 35.6 cm (14.0 in)
+    body.setMarginTop(28.35); // 1.0 cm
+    body.setMarginBottom(42.52); // 1.5 cm
+    body.setMarginLeft(56.69); // 2.0 cm
+    body.setMarginRight(42.52); // 1.5 cm
 
     const pKop1 = body.appendParagraph("MAHKAMAH AGUNG REPUBLIK INDONESIA\nDIREKTORAT JENDERAL BADAN PERADILAN AGAMA\nPENGADILAN TINGGI AGAMA BANDUNG\nPENGADILAN AGAMA INDRAMAYU");
     pKop1.setAlignment(DocumentApp.HorizontalAlignment.CENTER);

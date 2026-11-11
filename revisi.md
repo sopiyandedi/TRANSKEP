@@ -5605,3 +5605,34 @@ Saat baris di sheet `cuti_log` dihapus langsung secara manual di Google Sheets (
 
 #### 3. Versioning PWA & Git Sync:
 - Versi sistem dinaikkan menjadi `v3.8.33` (`transkep-v3.8.33`) di [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) dan [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js).
+
+---
+
+### TAHAP 105 - STANDARDISASI UKURAN KERTAS LEGAL (21,6 CM X 35,6 CM) & MARGIN RESMI FORM KGB (v3.8.34)
+*Status: [SELESAI & AKTIF] ✅*
+
+#### 1. Penataan Halaman Presisi Sesuai Standar Resmi:
+- **Ukuran Kertas**: `Legal (21,6 cm x 35,6 cm)` / `216mm x 356mm` / `8.5 in x 14.0 in`.
+- **Orientasi**: `Potret` (`portrait`).
+- **Margin Presisi**:
+  * **Atas**: `1 cm` (`10mm` / `28.35 pt`)
+  * **Bawah**: `1.5 cm` (`15mm` / `42.52 pt`)
+  * **Kiri**: `2 cm` (`20mm` / `56.69 pt`)
+  * **Kanan**: `1.5 cm` (`15mm` / `42.52 pt`)
+
+#### 2. Penyesuaian Komponen & Berkas:
+- **Template Cetak HTML ([`modules/eoffice/cetak/cetak_kgb.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/cetak/cetak_kgb.html) & [`eoffice/cetak_kgb.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/cetak_kgb.html))**:
+  * Mengubah `@page { size: 216mm 356mm; margin: 0mm !important; }`.
+  * Menyelaraskan `.kgb-print-wrapper` dengan `max-width: 216mm; min-height: 356mm;` dan `padding: 10mm 15mm 15mm 20mm;`.
+  * Tipografi ditingkatkan ke `font-size: 11pt` dan `line-height: 1.35` Bookman Old Style sehingga keterbacaan sangat lega dan seimbang di atas lembar Legal.
+- **Engine Cetak Klien ([`modules/eoffice/cetak/js_cetak_kgb.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/cetak/js_cetak_kgb.js) & [`eoffice/js_cetak_kgb.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/js_cetak_kgb.html))**:
+  * Memperbarui `KGB_PRINT_CONFIG` dengan spesifikasi ukuran Legal dan margin 1 cm / 1.5 cm / 2 cm / 1.5 cm.
+  * Menyuntikkan style `@page { size: 216mm 356mm; margin: 0mm !important; }` ke dalam iframe cetak agar dialog print browser langsung mengunci ukuran Legal secara otomatis.
+- **Backend Generator Google Docs ([`eoffice/kgb.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/kgb.js))**:
+  * Memasang konfigurasi halaman Google Docs otomatis: `setPageWidth(612)` (21.6 cm), `setPageHeight(1008)` (35.6 cm), `setMarginTop(28.35)` (1 cm), `setMarginBottom(42.52)` (1.5 cm), `setMarginLeft(56.69)` (2 cm), dan `setMarginRight(42.52)` (1.5 cm) baik pada mode clone template maupun mode fallback generator.
+- **Antarmuka Pengguna ([`modules/eoffice/view_eoffice.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/view_eoffice.html) & [`eoffice/view_eoffice.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/view_eoffice.html))**:
+  * Memperbarui label tooltip tombol cetak menjadi `Cetak Form SK KGB (Legal 21,6 x 35,6 cm / Save PDF)`.
+
+#### 3. Versioning PWA & Git Sync:
+- Versi sistem dinaikkan menjadi `v3.8.34` (`transkep-v3.8.34`) di [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) dan [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js).
+- Clasp push & deploy ke Google Apps Script serta git push ke `origin/main`.

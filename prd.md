@@ -986,3 +986,15 @@ ZONA BAWAH: MASTER CONTEXT & STATUS MIGRASI TERKINI (LIVING CONTEXT)
       * Mengimplementasikan modul cetak mandiri A4 1-halaman (*single layout*) client-side 0ms dengan format dan tipografi yang 100% identik dengan berkas resmi Microsoft Word (`KGB_FORM.docx`) dan logo hitam-putih Mahkamah Agung / PA Indramayu.
       * Menyertakan garis ganda pembatas kop resmi (`3px double`), metadata KPPN Cirebon, 10 poin rincian gaji, blok tanda tangan Ketua PA Indramayu, serta 3 tembusan dinas.
     - **Versioning**: Versi cache PWA dinaikkan ke **`v3.8.33`** di [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) dan [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js). Commit dan push ke `origin/main` serta deployment ke Google Apps Script.
+
+
+82. **Standardisasi Ukuran Kertas Legal (21,6 cm x 35,6 cm) & Margin Resmi Form KGB (Tahap 105 - v3.8.34 - Selesai & Aktif ✅):**
+    - **Penataan Halaman Standar Mahkamah Agung / PA Indramayu**:
+      * Ukuran kertas: **Legal (21,6 cm x 35,6 cm)** / `216mm x 356mm` / `8.5 in x 14.0 in`.
+      * Orientasi: **Potret** (`portrait`).
+      * Margin resmi: **Atas 1 cm**, **Bawah 1.5 cm**, **Kiri 2 cm**, **Kanan 1.5 cm**.
+    - **Penyelarasan Seluruh Komponen Fisik & Mesin Cetak**:
+      * **Template Cetak HTML ([`modules/eoffice/cetak/cetak_kgb.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/cetak/cetak_kgb.html) & [`eoffice/cetak_kgb.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/cetak_kgb.html))**: Menetapkan `@page { size: 216mm 356mm; margin: 0mm !important; }` serta `.kgb-print-wrapper` berukuran `max-width: 216mm; min-height: 356mm;` dengan padding presisi `10mm 15mm 15mm 20mm`. Tipografi dinaikkan ke Bookman Old Style `11pt` dan line-height `1.35` agar sangat proporsional dan mudah dibaca pada lembar Legal.
+      * **Client Print Engine ([`modules/eoffice/cetak/js_cetak_kgb.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/cetak/js_cetak_kgb.js) & [`eoffice/js_cetak_kgb.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/js_cetak_kgb.html))**: Menyesuaikan `KGB_PRINT_CONFIG` dan menyuntikkan `@page { size: 216mm 356mm; margin: 0mm !important; }` pada iframe cetak agar dialog cetak browser otomatis memilih ukuran Legal.
+      * **Generator Google Docs Backend ([`eoffice/kgb.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/kgb.js))**: Mengunci `setPageWidth(612)`, `setPageHeight(1008)`, `setMarginTop(28.35)`, `setMarginBottom(42.52)`, `setMarginLeft(56.69)`, dan `setMarginRight(42.52)` pada pembuatan/kloning dokumen Google Docs.
+    - **Versioning**: Versi cache PWA dinaikkan ke **`v3.8.34`** di [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) dan [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js). Commit dan push ke `origin/main` serta deployment ke Google Apps Script.

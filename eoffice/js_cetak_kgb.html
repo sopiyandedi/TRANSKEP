@@ -2,21 +2,28 @@
 // ==========================================
 // FILE: eoffice/js_cetak_kgb.html (GAS Mirror - Modular Print Engine KGB)
 // DESKRIPSI: Mesin Render & Cetak Instan (0ms) Formulir SK KGB PA Indramayu
-// STANDAR: 1 Orang = 1 Dokumen Presisi A4 (Sesuai Format Resmi Word PP 05/2024)
+// STANDAR: 1 Orang = 1 Dokumen Presisi Legal (21,6 cm x 35,6 cm)
+// MARGIN RESMI: Atas 1 cm | Bawah 1.5 cm | Kiri 2 cm | Kanan 1.5 cm
 // ==========================================
 
 (function(global) {
   'use strict';
 
   // ==========================================
-  // KONFIGURASI CSS & TATA LETAK CETAK KGB A4
+  // KONFIGURASI CSS & TATA LETAK CETAK KGB LEGAL
   // ==========================================
   var KGB_PRINT_CONFIG = {
     fontFamily: "'Bookman Old Style', 'Times New Roman', serif",
-    fontSize: "10.5pt",
-    lineHeight: "1.24",
+    fontSize: "11pt",
+    lineHeight: "1.35",
+    paperSize: "Legal (21,6 cm x 35,6 cm)",
+    pageSizeCss: "216mm 356mm",
     pageMargin: "0mm",
-    wrapperPadding: "8mm 15mm 8mm 20mm",
+    wrapperPadding: "10mm 15mm 15mm 20mm", // Atas: 1cm (10mm), Kanan: 1.5cm (15mm), Bawah: 1.5cm (15mm), Kiri: 2cm (20mm)
+    marginTop: "10mm",
+    marginBottom: "15mm",
+    marginLeft: "20mm",
+    marginRight: "15mm",
     jarakTtd: "52px",
     kopBorderBottom: "3px double #000000"
   };
@@ -300,7 +307,7 @@
     }
 
     var docTitle = 'SK_KGB_' + String(namaPegawai).replace(/[^a-zA-Z0-9]/g, '_');
-    var finalHTML = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>' + docTitle + '</title></head><body>' + htmlContent + '</body></html>';
+    var finalHTML = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>' + docTitle + '</title><style>@page{size:216mm 356mm;margin:0mm !important;}</style></head><body>' + htmlContent + '</body></html>';
 
     var iframe = document.createElement('iframe');
     iframe.style.position = 'fixed';
