@@ -5675,3 +5675,40 @@ Saat baris di sheet `cuti_log` dihapus langsung secara manual di Google Sheets (
 - [`eoffice/js_cetak_kgb.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/js_cetak_kgb.html)
 - [`eoffice/kgb.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/kgb.js)
 - [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) & [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) (`v3.8.35`)
+
+---
+
+### TAHAP 107 - REFINEMENT 1:1 KOP SURAT PROPORSIONAL & PENYELARASAN POSISI LURUS TITIK DUA HEADER (v3.8.36)
+*Status: [SELESAI & AKTIF] ✅*
+
+#### 1. Masalah & Kebutuhan Pengguna:
+1. **Bagian Kop Kurang Proporsional**:
+   - Pengguna meminta proporsi kop surat disesuaikan 1 banding 1 dengan contoh dokumen Word resmi: logo dan 4 baris judul instansi harus seimbang, tidak bertingkat-tingkat ukurannya, dan logo memiliki tinggi yang mengisi ruang teks secara proporsional.
+2. **Posisi Harus Lurus dengan Titik Dua di Atas**:
+   - Pengguna menunjukkan gambar ilustrasi dengan garis kuning tegak lurus yang ditarik dari titik dua (`:`) pada baris `Nomor :` / `Perihal :`.
+   - Sebelumnya elemen-elemen seperti nomor urut 1 s.d. 5, sub-poin a s.d. c, baris "DIBERIKAN...", nomor urut 6 s.d. 10, dan daftar tembusan mepet ke tepi kiri margin (x = 0).
+   - Pengguna meminta seluruh elemen tersebut di-indentasi lurus sempurna sejajar dengan posisi titik dua (`:`) di atas.
+
+#### 2. Realisasi Solusi Presisi:
+1. **Kop Surat Proporsional 1:1**:
+   - Menerapkan layout tabel 2-kolom kokoh: kolom logo `width: 90px; vertical-align: middle;` dengan gambar logo `width: 84px; height: auto;` (asli monokrom 864x1080 px).
+   - 4 Baris judul instansi (*Mahkamah Agung RI, Ditjen Badilag, PTA Bandung, PA Indramayu*) diseragamkan menjadi **13.5pt Bold** Bookman Old Style dengan `line-height: 1.16` dan `letter-spacing: 0.2px` (menciptakan blok kop yang gagah, bersih, dan proporsional 1:1).
+   - Teks alamat dan kontak berukuran 8pt reguler dengan jarak yang pas di atas garis pembatas tunggal 2px hitam solid.
+2. **Penyelarasan Vertikal Lurus Titik Dua Header (`indent: 92px`)**:
+   - Tabel header `Nomor`, `Lampiran`, `Perihal` diatur kolom label `78px` dan kolom titik dua `14px` (`78 + 14 = 92px`), sehingga posisi titik dua dan awal nilai berada tepat pada garis horizontal `92px`.
+   - Mengatur seluruh elemen di bawahnya agar sisi kirinya lurus sempurna di garis `92px`:
+     * Blok `Kepada / Yth. Kepala KPPN Cirebon`: `margin-left: 92px;`
+     * Paragraf pembuka: `text-indent: 92px; margin-left: 0;` (baris pertama lurus di 92px, baris berikutnya membungkus ke margin kiri).
+     * Tabel rincian pegawai (poin 1 s.d. 5): `margin-left: 92px; width: calc(100% - 92px);` (angka 1 s.d. 5 lurus di 92px).
+     * Catatan SKP terakhir: `margin-left: 92px;`, sub-tabel a s.d. c: `margin-left: 112px;`.
+     * Baris penetapan: `DIBERIKAN KENAIKAN GAJI BERKALA HINGGA MEMPEROLEH :` `margin-left: 92px;` (tidak di-bold).
+     * Tabel rincian gaji baru (poin 6 s.d. 10): `margin-left: 92px; width: calc(100% - 92px);` (angka 6 s.d. 10 lurus di 92px, poin 6 tidak di-bold).
+     * Paragraf penutup: `text-indent: 92px; margin-left: 0;`.
+     * Tabel daftar tembusan (poin 1, 2, 3): `margin-left: 92px; width: calc(100% - 92px);` (angka 1, 2, 3 lurus di 92px).
+
+#### 3. Berkas yang Dimodifikasi:
+- [`modules/eoffice/cetak/cetak_kgb.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/cetak/cetak_kgb.html)
+- [`eoffice/cetak_kgb.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/cetak_kgb.html)
+- [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) (`window.APP_BUILD_VER = '3.8.36'`)
+- [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) (`transkep-v3.8.36`)
+- [`prd.md`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/prd.md) & [`revisi.md`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/revisi.md)

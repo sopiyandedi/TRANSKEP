@@ -1010,3 +1010,20 @@ ZONA BAWAH: MASTER CONTEXT & STATUS MIGRASI TERKINI (LIVING CONTEXT)
       * **Format Regular (Non-Bold) Baris Diberikan & Nomor 6**: Baris `DIBERIKAN KENAIKAN GAJI BERKALA...` dan baris nomor `6. Gaji pokok baru` diubah ke berat huruf normal (`font-weight: normal`) dan rata kiri.
       * **Nama Ketua Tanpa Gelar**: Memasang fungsi `stripGelarKgb` sehingga nama Ketua dicetak murni tanpa gelar akademik maupun keagamaan (**`Zulkifli`**).
     - **Versioning**: Versi cache PWA dinaikkan ke **`v3.8.35`** di [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) dan [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js). Commit dan push ke `origin/main` serta deployment ke Google Apps Script.
+
+84. **Refinement 1:1 Kop Surat Proporsional & Penyelarasan Posisi Lurus Titik Dua Header (Tahap 107 - v3.8.36 - Selesai & Aktif ✅):**
+    - **Kop Surat Proporsional 1:1**:
+      * Menerapkan struktur tabel 2-kolom seimbang untuk kop surat: kolom logo `width: 90px;` (logo `width: 84px; height: auto;`) dan kolom teks instansi `text-align: center;`.
+      * Menyeragamkan 4 baris judul instansi (*Mahkamah Agung RI, Ditjen Badilag, PTA Bandung, PA Indramayu*) menjadi ukuran seragam **13.5pt Bold** Bookman Old Style dengan `line-height: 1.16` dan `letter-spacing: 0.2px`, sehingga proporsi ketinggian logo dan teks persis seimbang 1 banding 1 dengan dokumen master.
+      * Teks alamat dan situs resmi 8pt reguler proporsional di atas garis pembatas tunggal 2px hitam.
+    - **Penyelarasan Posisi Lurus Titik Dua Header (`indent: 92px`)**:
+      * Menyelaraskan seluruh elemen konten dokumen agar sisi kirinya berdiri tegak lurus sempurna sejajar dengan titik dua (`:`) pada header dokumen (`Nomor :`, `Lampiran :`, `Perihal :`) yang berada di posisi `92px`:
+        - Blok tujuan `Kepada / Yth. Kepala KPPN Cirebon`: `margin-left: 92px;`
+        - Baris pertama paragraf pembuka: `text-indent: 92px; margin-left: 0;`
+        - Tabel rincian pegawai poin 1 s.d. 5: `margin-left: 92px; width: calc(100% - 92px);`
+        - Catatan dasar SKP: `margin-left: 92px;`, sub-poin a s.d. c: `margin-left: 112px;`
+        - Baris penetapan `DIBERIKAN KENAIKAN GAJI BERKALA...`: `margin-left: 92px;` (normal non-bold)
+        - Tabel penetapan gaji baru poin 6 s.d. 10: `margin-left: 92px; width: calc(100% - 92px);` (poin 6 normal non-bold)
+        - Baris pertama paragraf penutup: `text-indent: 92px; margin-left: 0;`
+        - Daftar tembusan poin 1 s.d. 3: `margin-left: 92px; width: calc(100% - 92px);`
+    - **Versioning**: Versi cache PWA dinaikkan ke **`v3.8.36`** di [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) dan [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js). Clasp push & deploy (@357) dan git push ke `origin/main`.

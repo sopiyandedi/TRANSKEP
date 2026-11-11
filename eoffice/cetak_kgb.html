@@ -1,3 +1,4 @@
+<!-- VIEW COMPONENT: eoffice/cetak_kgb.html -->
 <!-- ==========================================
      FILE: eoffice/cetak_kgb.html (GAS Mirror - Template Cetak SK KGB)
      SESUAI FORMAT DOKUMEN RESMI PENGADILAN AGAMA INDRAMAYU (PP NO. 05 TAHUN 2024)
@@ -40,47 +41,52 @@
       background: #ffffff;
     }
 
-    /* KOP SURAT PENGADILAN AGAMA INDRAMAYU */
-    .kgb-kop-container {
-      display: flex;
-      align-items: center;
-      padding-bottom: 2px;
+    /* 1. KOP SURAT PENGADILAN AGAMA INDRAMAYU (PROPORSIONAL 1 BANDING 1) */
+    .kgb-kop-table {
+      width: 100%;
+      border-collapse: collapse;
       margin-bottom: 2px;
     }
+    .kgb-kop-logo-cell {
+      width: 90px;
+      vertical-align: middle;
+      text-align: left;
+      padding: 0;
+    }
     .kgb-kop-logo {
-      width: 76px;
+      width: 84px;
       height: auto;
-      flex-shrink: 0;
-      object-fit: contain;
+      display: block;
       filter: grayscale(100%) contrast(120%);
       -webkit-filter: grayscale(100%) contrast(120%);
     }
-    .kgb-kop-text {
-      flex-grow: 1;
+    .kgb-kop-text-cell {
       text-align: center;
-      padding-right: 15px;
+      vertical-align: middle;
+      padding: 0 5px 0 0;
     }
-    .kgb-kop-text h3 {
-      margin: 0;
-      font-size: 12pt;
+    .kgb-kop-line1,
+    .kgb-kop-line2,
+    .kgb-kop-line3,
+    .kgb-kop-line4 {
+      font-family: 'Bookman Old Style', 'Times New Roman', serif;
+      font-size: 13.5pt;
       font-weight: bold;
+      line-height: 1.16;
       text-transform: uppercase;
-      line-height: 1.15;
-    }
-    .kgb-kop-text h2 {
+      letter-spacing: 0.2px;
       margin: 0;
-      font-size: 14pt;
-      font-weight: bold;
-      text-transform: uppercase;
-      line-height: 1.15;
     }
-    .kgb-kop-text p {
-      margin: 2px 0 0 0;
+    .kgb-kop-address {
+      font-family: 'Bookman Old Style', 'Times New Roman', serif;
       font-size: 8pt;
-      line-height: 1.2;
+      line-height: 1.25;
+      margin: 4px 0 0 0;
+      font-weight: normal;
+      color: #000000;
     }
 
-    /* GARIS TUNGGAL KOP SURAT (ITEM 3: SATU GARIS SAJA PERSIS GAMBAR) */
+    /* GARIS TUNGGAL KOP SURAT */
     .kgb-kop-divider {
       border-top: none;
       border-bottom: 2px solid #000000;
@@ -88,11 +94,10 @@
       margin: 4px 0 10px 0;
     }
 
-    /* HEADER NOMOR, LAMPIRAN, PERIHAL & TANGGAL (ITEM 5: LURUS MARGIN KIRI) */
+    /* HEADER NOMOR, LAMPIRAN, PERIHAL & TANGGAL */
     .kgb-meta-table {
       width: 100%;
       border-collapse: collapse;
-      margin-left: 0;
       margin-bottom: 8px;
       font-size: 11pt;
     }
@@ -101,29 +106,29 @@
       padding: 1.5px 0;
     }
 
-    /* TUJUAN KPPN (ITEM 5: LURUS MARGIN KIRI DENGAN NOMOR) */
+    /* TUJUAN KPPN (LURUS PERSIS TITIK DUA DI ATAS) */
     .kgb-tujuan-box {
-      margin-left: 0;
+      margin-left: 92px;
       margin-top: 10px;
       margin-bottom: 12px;
       font-size: 11pt;
       line-height: 1.35;
     }
 
-    /* PARAGRAF PEMBUKA & PENUTUP (ITEM 5: LURUS MARGIN KIRI) */
+    /* PARAGRAF PEMBUKA & PENUTUP (BARIS PERTAMA INDEN LURUS PERSIS TITIK DUA DI ATAS) */
     .kgb-paragraf {
       text-align: justify;
-      text-indent: 0;
+      text-indent: 92px;
       margin: 10px 0;
       font-size: 11pt;
       line-height: 1.38;
     }
 
-    /* TABEL RINCIAN POIN 1 - 10 (ITEM 5: LURUS MARGIN KIRI SEJAJAR KUNING) */
+    /* TABEL RINCIAN POIN 1 - 10 (LURUS PERSIS TITIK DUA DI ATAS) */
     .kgb-detail-table {
-      width: 100%;
+      width: calc(100% - 92px);
+      margin-left: 92px;
       border-collapse: collapse;
-      margin-left: 0;
       font-size: 11pt;
     }
     .kgb-detail-table td {
@@ -146,13 +151,15 @@
     }
 
     .kgb-subnote {
-      margin: 4px 0 4px 0;
+      margin-left: 92px;
+      margin-top: 3px;
+      margin-bottom: 3px;
       font-size: 11pt;
     }
 
-    /* ITEM 6: BARIS DIBERIKAN JANGAN DI BOLD & LURUS MARGIN KIRI */
+    /* BARIS DIBERIKAN... (LURUS PERSIS TITIK DUA DI ATAS & TIDAK DI-BOLD) */
     .kgb-section-banner {
-      margin: 12px 0 8px 0;
+      margin: 12px 0 8px 92px;
       text-align: left;
       font-size: 11pt;
       font-weight: normal !important;
@@ -171,36 +178,40 @@
       font-size: 11pt;
     }
 
-    /* TEMBUSAN (ITEM 5: LURUS MARGIN KIRI) */
+    /* TEMBUSAN (LURUS PERSIS TITIK DUA DI ATAS) */
     .kgb-tembusan {
       clear: both;
       margin-top: 20px;
-      font-size: 10pt;
+      font-size: 10.5pt;
       line-height: 1.35;
     }
   </style>
 
   <div class="kgb-print-wrapper">
-    <!-- 1. KOP SURAT (ITEM 1: LOGO HITAM PUTIH, ITEM 3: GARIS TUNGGAL) -->
-    <div class="kgb-kop-container">
-      <img src="img/logo_pa_indramayu_bw.png" onerror="this.onerror=null;this.src='https://drive.google.com/thumbnail?id=1_Qbv_fdPOa2YEQAXXkvRxXevsd_4u1jZ&sz=w500';" class="kgb-kop-logo" alt="Logo PA Indramayu">
-      <div class="kgb-kop-text">
-        <h3>MAHKAMAH AGUNG REPUBLIK INDONESIA</h3>
-        <h3>DIREKTORAT JENDERAL BADAN PERADILAN AGAMA</h3>
-        <h3>PENGADILAN TINGGI AGAMA BANDUNG</h3>
-        <h2>PENGADILAN AGAMA INDRAMAYU</h2>
-        <p>
-          Jalan M.T. Haryono No.2A Kel. Sindang Kec.Sindang Kab. Indramayu Kode Pos 45222<br>
-          Telepon (0234) 273880 | Situs : <span style="color: #1d4ed8; text-decoration: underline;">www.pa-indramayu.go.id</span> | e-mail : pa.indramayu_ptabdg@yahoo.co.id
-        </p>
-      </div>
-    </div>
+    <!-- 1. KOP SURAT (PROPORSIONAL 1 BANDING 1) -->
+    <table class="kgb-kop-table">
+      <tr>
+        <td class="kgb-kop-logo-cell">
+          <img src="img/logo_pa_indramayu_bw.png" onerror="this.onerror=null;this.src='https://drive.google.com/thumbnail?id=1_Qbv_fdPOa2YEQAXXkvRxXevsd_4u1jZ&sz=w500';" class="kgb-kop-logo" alt="Logo PA Indramayu">
+        </td>
+        <td class="kgb-kop-text-cell">
+          <div class="kgb-kop-line1">MAHKAMAH AGUNG REPUBLIK INDONESIA</div>
+          <div class="kgb-kop-line2">DIREKTORAT JENDERAL BADAN PERADILAN AGAMA</div>
+          <div class="kgb-kop-line3">PENGADILAN TINGGI AGAMA BANDUNG</div>
+          <div class="kgb-kop-line4">PENGADILAN AGAMA INDRAMAYU</div>
+          <div class="kgb-kop-address">
+            Jalan M.T. Haryono No.2A Kel. Sindang Kec. Sindang Kab. Indramayu Kode Pos 45222<br>
+            Telepon (0234) 273880 | Situs : <span style="text-decoration: underline;">www.pa-indramayu.go.id</span> | e-mail : <span style="text-decoration: underline;">pa.indramayu_ptabdg@yahoo.co.id</span>
+          </div>
+        </td>
+      </tr>
+    </table>
     <div class="kgb-kop-divider"></div>
 
-    <!-- 2. NOMOR, LAMPIRAN, PERIHAL & TANGGAL (ITEM 5: LURUS MARGIN KIRI) -->
+    <!-- 2. NOMOR, LAMPIRAN, PERIHAL & TANGGAL -->
     <table class="kgb-meta-table">
       <tr>
-        <td style="width: 76px;">Nomor</td>
+        <td style="width: 78px;">Nomor</td>
         <td style="width: 14px; text-align: center;">:</td>
         <td>{{nokgb}}/KPA.W10-A2/KP2.1.2/{{bulan}}/{{tahun}}</td>
         <td style="text-align: right; white-space: nowrap; padding-left: 10px;">{{tanggal}}</td>
@@ -220,7 +231,7 @@
       </tr>
     </table>
 
-    <!-- 3. KEPADA YTH (ITEM 5: LURUS MARGIN KIRI DENGAN NOMOR) -->
+    <!-- 3. KEPADA YTH (LURUS DENGAN TITIK DUA DI ATAS) -->
     <div class="kgb-tujuan-box">
       Kepada<br>
       Yth. Kepala Kantor Pelayanan Perbendaharaan<br>
@@ -229,12 +240,12 @@
       <div style="margin-left: 36px; text-decoration: underline; letter-spacing: 2px;">C I R E B O N</div>
     </div>
 
-    <!-- 4. PEMBUKA (ITEM 5: LURUS MARGIN KIRI) -->
+    <!-- 4. PEMBUKA (BARIS PERTAMA INDEN LURUS PERSIS TITIK DUA DI ATAS) -->
     <p class="kgb-paragraf">
       Dengan ini kami beritahukan, bahwa berhubung dengan telah terpenuhinya masa kerja dan syarat- syarat lainnya atas:
     </p>
 
-    <!-- 5. RINCIAN PEGAWAI & GAJI LAMA (POIN 1 - 5: ITEM 5 LURUS MARGIN KIRI) -->
+    <!-- 5. RINCIAN PEGAWAI & GAJI LAMA (POIN 1 - 5: LURUS PERSIS TITIK DUA DI ATAS) -->
     <table class="kgb-detail-table">
       <tr>
         <td class="kgb-col-no">1.</td>
@@ -272,7 +283,7 @@
       (atas dasar Skp. terakhir tentang gaji/pangkat yang di tetapkan)
     </div>
 
-    <table class="kgb-detail-table" style="margin-left: 20px; width: calc(100% - 20px);">
+    <table class="kgb-detail-table" style="margin-left: 112px; width: calc(100% - 112px);">
       <tr>
         <td style="width: 20px;">a.</td>
         <td style="width: 155px;">Oleh pejabat</td>
@@ -302,7 +313,7 @@
       </tr>
     </table>
 
-    <!-- 6. PENETAPAN KENAIKAN GAJI BERKALA BARU (ITEM 6: TIDAK DI BOLD, ITEM 5: LURUS MARGIN KIRI) -->
+    <!-- 6. PENETAPAN KENAIKAN GAJI BERKALA BARU (LURUS PERSIS TITIK DUA DI ATAS) -->
     <div class="kgb-section-banner">
       DIBERIKAN KENAIKAN GAJI BERKALA HINGGA MEMPEROLEH :
     </div>
@@ -340,12 +351,12 @@
       </tr>
     </table>
 
-    <!-- 7. PENUTUP (ITEM 5: LURUS MARGIN KIRI) -->
+    <!-- 7. PENUTUP (BARIS PERTAMA INDEN LURUS PERSIS TITIK DUA DI ATAS) -->
     <p class="kgb-paragraf" style="margin-top: 12px;">
       Kami harap sesuai dengan {{dasar_pp}}, kepada Pegawai tersebut agar dibayarkan penghasilannya berdasarkan gaji pokoknya yang baru.
     </p>
 
-    <!-- 8. TANDA TANGAN KETUA (ITEM 7: NAMA KETUA TANPA GELAR) -->
+    <!-- 8. TANDA TANGAN KETUA (NAMA KETUA TANPA GELAR) -->
     <div class="kgb-ttd-area">
       <div class="kgb-ttd-box">
         <div>Ketua,</div>
@@ -354,21 +365,21 @@
       </div>
     </div>
 
-    <!-- 9. TEMBUSAN (ITEM 5: LURUS MARGIN KIRI) -->
+    <!-- 9. TEMBUSAN (LURUS PERSIS TITIK DUA DI ATAS) -->
     <div class="kgb-tembusan">
       <div>Tembusan :</div>
-      <table style="width: 100%; border-collapse: collapse; margin-top: 2px;">
+      <table style="width: calc(100% - 92px); margin-left: 92px; border-collapse: collapse; margin-top: 2px;">
         <tr>
           <td style="width: 20px; vertical-align: top;">1.</td>
-          <td>Ketua Pengadilan Tinggi Agama Bandung di Bandung;</td>
+          <td style="vertical-align: top;">Ketua Pengadilan Tinggi Agama Bandung di Bandung;</td>
         </tr>
         <tr>
           <td style="width: 20px; vertical-align: top;">2.</td>
-          <td>Kepala Kantor Cabang PT. TASPEN di Cirebon;</td>
+          <td style="vertical-align: top;">Kepala Kantor Cabang PT. TASPEN di Cirebon;</td>
         </tr>
         <tr>
           <td style="width: 20px; vertical-align: top;">3.</td>
-          <td>Sdr. <strong>{{nama}}</strong> di Indramayu.</td>
+          <td style="vertical-align: top;">Sdr. <strong>{{nama}}</strong> di Indramayu.</td>
         </tr>
       </table>
     </div>
