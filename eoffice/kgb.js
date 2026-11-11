@@ -112,6 +112,30 @@ function parseNomorKgbBackend_(p) {
 }
 
 /**
+ * Helper: Hapus seluruh gelar akademik & keagamaan untuk nama Ketua (Item 7)
+ */
+function stripGelarKgb_(nama) {
+  if (!nama) return '';
+  let s = String(nama).trim();
+  if (!s || s === '-') return '-';
+  s = s.replace(/^(?:(?:H\.|Hj\.|Drs\.|Dra\.|Dr\.|K\.H\.|Prof\.|Ir\.|H|Hj|Drs|Dra|Dr|Prof|Ir)\s+)+/gi, '');
+  while (/,\s*[^,]+$/.test(s)) {
+    const m = s.match(/,\s*([^,]+)$/);
+    if (m) {
+      const cand = m[1].trim();
+      if (/^[A-Za-z.\s]+$/.test(cand) && cand.length < 25) {
+        s = s.substring(0, s.lastIndexOf(',')).trim();
+      } else {
+        break;
+      }
+    } else {
+      break;
+    }
+  }
+  return s.trim();
+}
+
+/**
  * Helper: Ekstrak komponen Masa Kerja { tahun, bulan, full }
  */
 function parseMasaKerjaKgbBackend_(tahunExp, bulanExp, combinedStr) {
@@ -289,7 +313,7 @@ function createKgbGoogleDoc_(p, idKgb) {
   const gajiBaru = formatRibuanGajiKgb_(p.gaji_baru);
   const hurufGaji = String(p.terbilang_gaji || p.huruf_gaji || '-');
   const namaPegawai = String(p.nama_pegawai || '-');
-  const namaTtd = String(p.nama_ketua || p.nama_ttd || '-');
+  const namaTtd = stripGelarKgb_(p.nama_ketua || p.nama_ttd || '-'); // ITEM 7: Nama Ketua tanpa gelar (Zulkifli)
 
   let doc = null;
   let file = null;

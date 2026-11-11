@@ -998,3 +998,15 @@ ZONA BAWAH: MASTER CONTEXT & STATUS MIGRASI TERKINI (LIVING CONTEXT)
       * **Client Print Engine ([`modules/eoffice/cetak/js_cetak_kgb.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/cetak/js_cetak_kgb.js) & [`eoffice/js_cetak_kgb.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/js_cetak_kgb.html))**: Menyesuaikan `KGB_PRINT_CONFIG` dan menyuntikkan `@page { size: 216mm 356mm; margin: 0mm !important; }` pada iframe cetak agar dialog cetak browser otomatis memilih ukuran Legal.
       * **Generator Google Docs Backend ([`eoffice/kgb.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/kgb.js))**: Mengunci `setPageWidth(612)`, `setPageHeight(1008)`, `setMarginTop(28.35)`, `setMarginBottom(42.52)`, `setMarginLeft(56.69)`, dan `setMarginRight(42.52)` pada pembuatan/kloning dokumen Google Docs.
     - **Versioning**: Versi cache PWA dinaikkan ke **`v3.8.34`** di [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) dan [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js). Commit dan push ke `origin/main` serta deployment ke Google Apps Script.
+
+
+83. **Refinement Presisi Form KGB: Logo B&W, Garis Tunggal Kop, Alignment Margin Kiri, Non-Bold & Nama Ketua Tanpa Gelar (Tahap 106 - v3.8.35 - Selesai & Aktif ✅):**
+    - **Realisasi 7 Poin Koreksi Desain Fisik Dokumen KGB**:
+      * **Logo Hitam Putih Resmi**: Menggunakan file gambar resmi monokrom Mahkamah Agung / PA Indramayu (`img/logo_pa_indramayu_bw.png`) yang diekstrak langsung dari berkas template Word `KGB_FORM.docx` dengan filter grayscale monokrom tajam.
+      * **Proporsi Font Bookman Old Style**: Kop surat 12–14pt tebal, alamat 8pt, dan isi teks 11pt dengan `line-height: 1.38` seimbang mengisi halaman Legal.
+      * **Garis Kop Tunggal**: Garis pembatas kop surat disetel menjadi satu garis hitam tunggal tegas (`border-bottom: 2px solid #000;`) menggantikan garis ganda sebelumnya.
+      * **Distribusi Padding & Margin**: Memasang padding Legal presisi Atas 1 cm, Kanan 1.5 cm, Bawah 1.5 cm, Kiri 2 cm dengan distribusi vertikal seimbang.
+      * **Alignment Margin Kiri (Sesuai Garis Kuning)**: Menghilangkan indentasi pada Kepada, paragraf pembuka, tabel rincian poin 1 s.d. 10, paragraf penutup, dan tembusan sehingga seluruh nomor dan paragraf berdiri lurus sempurna di sisi margin kiri (*flush-left*).
+      * **Format Regular (Non-Bold) Baris Diberikan & Nomor 6**: Baris `DIBERIKAN KENAIKAN GAJI BERKALA...` dan baris nomor `6. Gaji pokok baru` diubah ke berat huruf normal (`font-weight: normal`) dan rata kiri.
+      * **Nama Ketua Tanpa Gelar**: Memasang fungsi `stripGelarKgb` sehingga nama Ketua dicetak murni tanpa gelar akademik maupun keagamaan (**`Zulkifli`**).
+    - **Versioning**: Versi cache PWA dinaikkan ke **`v3.8.35`** di [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) dan [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js). Commit dan push ke `origin/main` serta deployment ke Google Apps Script.

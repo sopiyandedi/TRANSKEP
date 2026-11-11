@@ -14,7 +14,7 @@
   var KGB_PRINT_CONFIG = {
     fontFamily: "'Bookman Old Style', 'Times New Roman', serif",
     fontSize: "11pt",
-    lineHeight: "1.35",
+    lineHeight: "1.38",
     paperSize: "Legal (21,6 cm x 35,6 cm)",
     pageSizeCss: "216mm 356mm",
     pageMargin: "0mm",
@@ -23,9 +23,35 @@
     marginBottom: "15mm",
     marginLeft: "20mm",
     marginRight: "15mm",
-    jarakTtd: "52px",
-    kopBorderBottom: "3px double #000000"
+    jarakTtd: "56px",
+    kopBorderBottom: "2px solid #000000"
   };
+
+  /**
+   * Helper: Menghapus seluruh gelar akademik & keagamaan untuk nama Ketua (Item 7)
+   */
+  function stripGelarKgb(nama) {
+    if (!nama) return '';
+    var s = String(nama).trim();
+    if (!s || s === '-') return '-';
+    // Hapus gelar depan: H., Hj., Drs., Dra., Dr., K.H., Prof., Ir., dll
+    s = s.replace(/^(?:(?:H\.|Hj\.|Drs\.|Dra\.|Dr\.|K\.H\.|Prof\.|Ir\.|H|Hj|Drs|Dra|Dr|Prof|Ir)\s+)+/gi, '');
+    // Hapus gelar belakang berulang setelah koma: , S.Ag., S.H., M.H., dll
+    while (/,\s*[^,]+$/.test(s)) {
+      var m = s.match(/,\s*([^,]+)$/);
+      if (m) {
+        var cand = m[1].trim();
+        if (/^[A-Za-z.\s]+$/.test(cand) && cand.length < 25) {
+          s = s.substring(0, s.lastIndexOf(',')).trim();
+        } else {
+          break;
+        }
+      } else {
+        break;
+      }
+    }
+    return s.trim();
+  }
 
   var BULAN_INDO_KGB = [
     'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
@@ -222,9 +248,20 @@
     var mkgBaru = resolveMasaKerjaKgb(kgbObj.tahun_baru, kgbObj.bulan_baru, kgbObj.mkg_baru);
 
     var namaPegawai = kgbObj.nama_pegawai || (userRef ? userRef.nama : '') || '-';
-    var tempatLahir = kgbObj.tempat_lahir || (userRef ? (userRef.tempat_lahir || userRef.tmpt_lahir) : '') || '';
-    var tglLahir = formatTglCetakKgb(kgbObj.tanggal_lahir || (userRef ? (userRef.tgl_lahir || userRef.tanggal_lahir) : ''));
-    var tempatTanggalLahir = tempatLahir ? (tempatLahir + ', ' + tglLahir) : tglLahir;
+    var tempatLahir = String(kgbObj.tempat_lahir || (userRef ? (userRef.tempat_lahir || userRef.tmpt_lahir) : '') || '').trim();
+    var tglLahirRaw = kgbObj.tanggal_lahir || (userRef ? (userRef.tgl_lahir || userRef.tanggal_lahir) : '');
+    var tglLahir = formatTglCetakKgb(tglLahirRaw);
+    if (tglLahir === '-') tglLahir = '';
+    var tempatTanggalLahir = '';
+    if (tempatLahir && tglLahir) {
+      tempatTanggalLahir = tempatLahir + ', ' + tglLahir;
+    } else if (tempatLahir) {
+      tempatTanggalLahir = tempatLahir;
+    } else if (tglLahir) {
+      tempatTanggalLahir = tglLahir;
+    } else {
+      tempatTanggalLahir = '-';
+    }
     var nipPegawai = String(kgbObj.nip || (userRef ? userRef.nip : '') || '-');
     var pangkat = kgbObj.pangkat || (userRef ? userRef.pangkat : '') || '-';
     var golongan = kgbObj.golongan_baru || kgbObj.golongan || (userRef ? userRef.golongan : '') || '-';
@@ -241,7 +278,8 @@
     var tmtLamaStr = formatTglCetakKgb(kgbObj.tmt_lama);
     var tmtBaruStr = formatTglCetakKgb(kgbObj.tmt_baru);
     var tmtYadStr = formatTglCetakKgb(kgbObj.tmt_yad);
-    var namaTtd = kgbObj.nama_ketua || kgbObj.nama_ttd || defaultKetua || '-';
+    var rawKetua = kgbObj.nama_ketua || kgbObj.nama_ttd || defaultKetua || '-';
+    var namaTtd = stripGelarKgb(rawKetua); // ITEM 7: Nama Ketua harus tanpa gelar (Zulkifli)
     var dasarPp = kgbObj.dasar_pp || 'Peraturan Pemerintah Republik Indonesia Nomor : 05 Tahun 2024';
 
     var htmlContent = template.innerHTML;
@@ -260,6 +298,8 @@
       '{{tanggal_surat}}': tglSuratStr,
       '{{nama}}': namaPegawai,
       '{{nama_gelar}}': namaPegawai,
+      '{{nama}}/{{tempat_tanggal_lahir}}': (tempatTanggalLahir && tempatTanggalLahir !== '-') ? (namaPegawai + ' / ' + tempatTanggalLahir) : namaPegawai,
+      '{{nama}}/{{tanggal_lahir}}': (tempatTanggalLahir && tempatTanggalLahir !== '-') ? (namaPegawai + ' / ' + tempatTanggalLahir) : namaPegawai,
       '{{tempat_lahir}}': tempatLahir,
       '{{tempat_tanggal_lahir}}': tempatTanggalLahir,
       '{{tanggl lahir}}': tempatTanggalLahir,

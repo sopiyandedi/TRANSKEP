@@ -5636,3 +5636,42 @@ Saat baris di sheet `cuti_log` dihapus langsung secara manual di Google Sheets (
 #### 3. Versioning PWA & Git Sync:
 - Versi sistem dinaikkan menjadi `v3.8.34` (`transkep-v3.8.34`) di [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) dan [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js).
 - Clasp push & deploy ke Google Apps Script serta git push ke `origin/main`.
+
+---
+
+### TAHAP 106 - REFINEMENT PRESISI FORM KGB: LOGO B&W, GARIS TUNGGAL KOP, ALIGNMENT MARGIN KIRI, NON-BOLD & NAMA KETUA TANPA GELAR (v3.8.35)
+*Status: [SELESAI & AKTIF] ✅*
+
+#### 1. Realisasi 7 Poin Koreksi Pengguna:
+1. **Logo Hitam Putih Resmi**:
+   - Mengekstrak logo resmi hitam-putih Mahkamah Agung / PA Indramayu (`img/logo_pa_indramayu_bw.png`) langsung dari dokumen Word asli `KGB_FORM.docx` (resolusi tajam 864x1080 px).
+   - Menambahkan filter CSS `grayscale(100%) contrast(120%)` untuk menjamin hasil cetakan 100% hitam putih monokrom tajam tanpa gradasi warna hijau.
+2. **Proporsi Huruf Bookman Old Style**:
+   - Kop surat: Mahkamah Agung (12pt), Ditjen Badilag (13pt), PTA Bandung (13pt), PA Indramayu (14pt), Alamat (8pt).
+   - Isi dokumen: 11pt dengan `line-height: 1.38` sangat proporsional mengisi bidang vertikal kertas Legal 35.6 cm.
+3. **Garis Kop Tunggal**:
+   - Mengubah garis ganda menjadi satu garis hitam tegas (`border-bottom: 2px solid #000000;`) persis seperti pada contoh Gambar 1.
+4. **Padding & Spacing Atas/Bawah**:
+   - Penataan padding Legal: Atas 1 cm (10mm), Kanan 1.5 cm (15mm), Bawah 1.5 cm (15mm), Kiri 2 cm (20mm).
+   - Distribusi jarak antar-bagian diperbaiki agar dokumen mengisi halaman Legal secara anggun dan tidak menumpuk di atas.
+5. **Alignment Garis Kuning (Lurus Margin Kiri Rapi)**:
+   - Menghilangkan `margin-left: 90px;` pada blok Kepada.
+   - Menghilangkan `text-indent: 32px;` pada paragraf pembuka dan penutup.
+   - Menghilangkan `margin-left: 12px;` pada tabel rincian poin 1 s.d. 10.
+   - Mengganti list tembusan `<ol>` menjadi tabel bersih dengan nomor `1.`, `2.`, `3.` yang rata kiri presisi.
+   - Hasil: Seluruh baris Nomor, Kepada, Paragraf, Angka 1 s.d. 5, Angka 6 s.d. 10, dan Tembusan berada tepat dalam satu garis vertikal lurus (*straight flush-left*).
+6. **Baris Diberikan & Nomor 6 Tanpa Bold (Regular Text)**:
+   - `DIBERIKAN KENAIKAN GAJI BERKALA HINGGA MEMPEROLEH :` diubah menjadi `font-weight: normal;` dan rata kiri.
+   - Poin nomor 6 (`Gaji pokok baru : Rp. ...`) diubah menjadi `font-weight: normal;` (tanpa bold).
+7. **Nama Ketua Tanpa Gelar (Zulkifli)**:
+   - Menambahkan algoritma pembersihan gelar komprehensif (`stripGelarKgb`) yang memotong gelar depan (`H.`, `Drs.`, `Dr.`) maupun gelar belakang (`S.Ag.`, `S.H.`, `M.H.`).
+   - Nama penandatangan Ketua otomatis terbit murni: **`Zulkifli`** (tanpa gelar, dicetak tebal).
+
+#### 2. File Dimodifikasi:
+- [`img/logo_pa_indramayu_bw.png`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/img/logo_pa_indramayu_bw.png)
+- [`modules/eoffice/cetak/cetak_kgb.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/cetak/cetak_kgb.html)
+- [`eoffice/cetak_kgb.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/cetak_kgb.html)
+- [`modules/eoffice/cetak/js_cetak_kgb.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/cetak/js_cetak_kgb.js)
+- [`eoffice/js_cetak_kgb.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/js_cetak_kgb.html)
+- [`eoffice/kgb.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/kgb.js)
+- [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) & [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) (`v3.8.35`)
