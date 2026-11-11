@@ -233,7 +233,7 @@
     var dt = new Date(s);
     if (!isNaN(dt.getTime())) {
       var y = dt.getFullYear();
-      var mn = ('0' + (d.getMonth() + 1)).slice(-2);
+      var mn = ('0' + (dt.getMonth() + 1)).slice(-2);
       var dy = ('0' + dt.getDate()).slice(-2);
       return y + '-' + mn + '-' + dy;
     }
