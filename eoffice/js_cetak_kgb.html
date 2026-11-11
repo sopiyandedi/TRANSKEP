@@ -1,12 +1,25 @@
 <script>
 // ==========================================
-// FILE: js_cetak_kgb.js (Modular Print Engine KGB)
+// FILE: eoffice/js_cetak_kgb.html (GAS Mirror - Modular Print Engine KGB)
 // DESKRIPSI: Mesin Render & Cetak Instan (0ms) Formulir SK KGB PA Indramayu
-// SINKRON DENGAN GOOGLE DOC: 1guFYYKbZ1ylW3i7zjgvFZv1fdbB88XWKJwmaJCKeefg
+// STANDAR: 1 Orang = 1 Dokumen Presisi A4 (Sesuai Format Resmi Word PP 05/2024)
 // ==========================================
 
 (function(global) {
   'use strict';
+
+  // ==========================================
+  // KONFIGURASI CSS & TATA LETAK CETAK KGB A4
+  // ==========================================
+  var KGB_PRINT_CONFIG = {
+    fontFamily: "'Bookman Old Style', 'Times New Roman', serif",
+    fontSize: "10.5pt",
+    lineHeight: "1.24",
+    pageMargin: "0mm",
+    wrapperPadding: "8mm 15mm 8mm 20mm",
+    jarakTtd: "52px",
+    kopBorderBottom: "3px double #000000"
+  };
 
   var BULAN_INDO_KGB = [
     'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
@@ -276,7 +289,7 @@
       '{{nama_ttd}}': namaTtd,
       '{{nama_ketua}}': namaTtd,
       '{{tte_qr_slot}}': kgbObj.tte_qr_url
-        ? '<img src="' + kgbObj.tte_qr_url + '" style="width:62px;height:62px;" alt="QR TTE">'
+        ? '<img src="' + kgbObj.tte_qr_url + '" style="width:58px;height:58px;" alt="QR TTE">'
         : ''
     };
 
@@ -312,10 +325,11 @@
           document.body.removeChild(iframe);
         }
       }, 3500);
-    }, 900);
+    }, 800);
   }
 
-  // Ekspos helper & fungsi cetak ke global window
+  // Ekspos konfigurasi CSS, helper & fungsi cetak ke global window
+  global.KGB_PRINT_CONFIG = KGB_PRINT_CONFIG;
   global.printSuratKgb = printSuratKgb;
   global.KgbPrintHelper = {
     formatTglCetakKgb: formatTglCetakKgb,
@@ -326,6 +340,4 @@
   };
 
 })(typeof window !== 'undefined' ? window : this);
-
-
 </script>

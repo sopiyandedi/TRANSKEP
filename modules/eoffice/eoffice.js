@@ -4,13 +4,13 @@
 // ENGINE: TRANSKEP Core v1.0.0
 // ==========================================
 
-window.renderEofficeView = function() {
+window.renderEofficeView = function () {
   if (window.vmEoffice && window.vmEoffice.isAdmin) {
     window.vmEoffice.loadData();
   }
 };
 
-window.refreshEofficeData = function() {
+window.refreshEofficeData = function () {
   if (window.vmEoffice && window.vmEoffice.isAdmin) {
     window.vmEoffice.loadData(true);
   }

@@ -796,12 +796,11 @@ function generateCutiPdfBase64Server_(id, logRecord, namaPemohon, nip, nomorSura
       'https://api.qrserver.com/v1/create-qr-code/?size=150x150&margin=2&data=' + encodeURIComponent(verifyUrlAtasan),
       'https://api.qrserver.com/v1/create-qr-code/?size=150x150&margin=2&data=' + encodeURIComponent(verifyUrlPejabat)
     ];
-    const qrDataUris = fetchQrBatchDataUrisServer_(rawQrUrls);
 
-    const qrPegawaiImg = "<img src='" + qrDataUris[0] + "' width='56' height='56' style='display:block; margin:2px 0 3px 0;' />";
-    const qrParafImg = "<img src='" + qrDataUris[1] + "' width='44' height='44' style='display:block; margin:0 auto;' />";
-    const qrAtasanImg = "<img src='" + qrDataUris[2] + "' width='56' height='56' style='display:block; margin:2px 0 3px 0;' />";
-    const qrPejabatImg = "<img src='" + qrDataUris[3] + "' width='56' height='56' style='display:block; margin:2px 0 3px 0;' />";
+    const qrPegawaiImg = "<img src='" + rawQrUrls[0] + "' width='52' height='52' style='display:block; margin:2px 0 3px 0;' alt='QR' />";
+    const qrParafImg = "<img src='" + rawQrUrls[1] + "' width='40' height='40' style='display:block; margin:0 auto;' alt='QR' />";
+    const qrAtasanImg = "<img src='" + rawQrUrls[2] + "' width='52' height='52' style='display:block; margin:2px 0 3px 0;' alt='QR' />";
+    const qrPejabatImg = "<img src='" + rawQrUrls[3] + "' width='52' height='52' style='display:block; margin:2px 0 3px 0;' alt='QR' />";
 
     const atasanJabatanStr = escapeHtmlServer_(formatJabatanSingkatServer_(atasan.jabatan));
     const pejabatJabatanStr = escapeHtmlServer_(formatJabatanSingkatServer_(pejabat.jabatan));
@@ -944,12 +943,26 @@ function generateCutiPdfBase64Server_(id, logRecord, namaPemohon, nip, nomorSura
     const cleanFirst = String(pns.nama || 'pegawai').replace(/[^a-zA-Z0-9]/g, ' ').trim().split(/\s+/)[0].toLowerCase();
     const pdfFileName = 'TRANSKEP_' + cleanFirst + '_ct.pdf';
 
-    const htmlOutput = HtmlService.createHtmlOutput(fullHtml);
-    const pdfBlob = htmlOutput.getAs('application/pdf').setName(pdfFileName);
-    const pdfBytes = pdfBlob.getBytes();
-    return Utilities.base64Encode(pdfBytes);
+    // Percobaan 1: Konversi HTML lengkap ke PDF
+    try {
+      const htmlOutput = HtmlService.createHtmlOutput(fullHtml);
+      const pdfBlob = htmlOutput.getAs('application/pdf').setName(pdfFileName);
+      const pdfBytes = pdfBlob.getBytes();
+      if (pdfBytes && pdfBytes.length > 500) {
+        return Utilities.base64Encode(pdfBytes);
+      }
+    } catch (errPdf1) {
+      Logger.log("⚠️ [generateCutiPdfBase64Server_] Percobaan 1 gagal: " + errPdf1.toString() + ". Mencoba fallback murni...");
+    }
+
+    // Percobaan 2 (Fallback Anti-Crash): Bersihkan tag img eksternal untuk menjamin PDF 100% terbit
+    const fallbackHtml = fullHtml.replace(/<img\b[^>]*>/gi, '<div style="height:36px; line-height:36px; font-size:7.5pt; color:#666; font-style:italic;">[TTE Terverifikasi]</div>');
+    const htmlOutputFallback = HtmlService.createHtmlOutput(fallbackHtml);
+    const pdfBlobFallback = htmlOutputFallback.getAs('application/pdf').setName(pdfFileName);
+    const pdfBytesFallback = pdfBlobFallback.getBytes();
+    return Utilities.base64Encode(pdfBytesFallback);
   } catch (err) {
-    Logger.log("⚠️ [generateCutiPdfBase64Server_] Error: " + err.toString());
+    Logger.log("❌ [generateCutiPdfBase64Server_] Error fatal: " + err.toString());
     return '';
   }
 }

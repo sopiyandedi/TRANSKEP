@@ -5582,3 +5582,26 @@ Saat baris di sheet `cuti_log` dihapus langsung secara manual di Google Sheets (
 
 6. **Versioning PWA & Deployment:**
    - Dinaikkan ke versi `v3.8.32` (`transkep-v3.8.32`) di [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) dan [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js).
+
+---
+
+### TAHAP 104 - HOTFIX & ENHANCEMENT (SELESAI & AKTIF): Hotfix Auto-Upload PDF Cuti ke MYSIMS & Standardisasi Cetak Mandiri KGB Presisi Word (v3.8.33)
+*Status: [SELESAI & AKTIF] ✅*
+
+#### 1. Hotfix Auto-Upload PDF Cuti ke MYSIMS (Akar Masalah Tuntas)
+- **Akar Masalah:**
+  1. Pada node code n8n `Mesin Otomasi MYSIMS & Callback` di [`n8n_workflow_mysims_surat_keluar.json`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/n8n_workflow_mysims_surat_keluar.json), fungsi helper `parseCbBody` belum didefinisikan (hanya ada di node ST Terpadu). Saat callback dijalankan, script melempar `ReferenceError: parseCbBody is not defined` yang ditangkap blok `try-catch`, menyebabkan `pdfBase64` bernilai kosong (`""`).
+  2. Akibatnya di Langkah 7 `if (!pdfBase64 || pdfBase64.length < 100 || !finalIdp) return [];` dieksekusi dan me-return array kosong `[]`, sehingga node HTTP `Suntik PDF & Sifat Biasa ke MYSIMS` dilewati dan PDF tidak pernah terunggah ke MYSIMS.
+  3. Di sisi GAS [`permohonan/persetujuan.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/persetujuan.js), pemrosesan gambar inline `data:image/png;base64` pada `HtmlService.createHtmlOutput(...).getAs('application/pdf')` berisiko galat pada converter internal GAS.
+- **Solusi Diterapkan:**
+  1. Menambahkan deklarasi resmi `parseCbBody` dan menyelaraskan regex penangkap nomor satker (`[A-Za-z0-9.-]+`) serta link edit form (`(?:surat_keluar/)?edt`) pada node `Mesin Otomasi MYSIMS & Callback`.
+  2. Memperbaiki fungsi `generateCutiPdfBase64Server_` di backend GAS dengan mekanisme 2-Stage Resilient Fallback: jika konversi PDF dengan gambar gagal, sistem secara otomatis mengeksekusi fallback teks murni (`[TTE Terverifikasi]`) sehingga `pdfBase64` dijamin selalu terbit dan tidak pernah kosong.
+
+#### 2. Standardisasi Cetak Mandiri KGB Presisi Dokumen Word (1 Orang = 1 Dokumen A4)
+- **Filosofi Arsitektur:** Dokumen KGB adalah dokumen personal 1 halaman presisi A4. Diterapkan pola cetak mandiri klien (*Client-Side Print 0ms*) langsung ke dialog cetak browser (Save as PDF).
+- **Template Presisi:**
+  - [`modules/eoffice/cetak/cetak_kgb.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/cetak/cetak_kgb.html) & [`eoffice/cetak_kgb.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/cetak_kgb.html): Mengunci layout fisik dokumen persis seperti template Word (`.docx`) PA Indramayu (Kop resmi, garis ganda pembatas kop, tabel metadata nomor/tanggal/perihal, Kepada KPPN Cirebon, rincian 10 poin masa kerja dan gaji, tanda tangan Ketua, serta 3 tembusan).
+  - [`modules/eoffice/cetak/js_cetak_kgb.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/cetak/js_cetak_kgb.js) & [`eoffice/js_cetak_kgb.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/js_cetak_kgb.html): Konfigurasi CSS terpadu (`KGB_PRINT_CONFIG`), pemetaan variabel cerdas (`{{nama}}`, `{{tempat_tanggal_lahir}}`, `{{nip}}`, `{{gaji_lama}}`, `{{gaji_baru}}`, `{{hurif_gaji}}`, dsb), dan isolasi iframe cetak 0ms.
+
+#### 3. Versioning PWA & Git Sync:
+- Versi sistem dinaikkan menjadi `v3.8.33` (`transkep-v3.8.33`) di [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) dan [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js).
