@@ -94,7 +94,7 @@
       margin: 4px 0 10px 0;
     }
 
-    /* HEADER NOMOR, LAMPIRAN, PERIHAL & TANGGAL */
+    /* 2. HEADER NOMOR, LAMPIRAN, PERIHAL & TANGGAL (RATA MARGIN KIRI) */
     .kgb-meta-table {
       width: 100%;
       border-collapse: collapse;
@@ -106,7 +106,7 @@
       padding: 1.5px 0;
     }
 
-    /* TUJUAN KPPN (LURUS PERSIS TITIK DUA DI ATAS) */
+    /* 3. TUJUAN KPPN (LURUS 92px) */
     .kgb-tujuan-box {
       margin-left: 92px;
       margin-top: 10px;
@@ -115,19 +115,21 @@
       line-height: 1.35;
     }
 
-    /* PARAGRAF PEMBUKA & PENUTUP (BARIS PERTAMA INDEN LURUS PERSIS TITIK DUA DI ATAS) */
+    /* 4. PARAGRAF PEMBUKA (BASE MARGIN 92px, FIRST LINE INDENT 32px, LINE 2 RATA 92px, TIDAK MENONJOL KE KIRI) */
     .kgb-paragraf {
       text-align: justify;
-      text-indent: 92px;
-      margin: 10px 0;
+      margin-left: 92px;
+      text-indent: 32px;
+      margin-top: 10px;
+      margin-bottom: 10px;
       font-size: 11pt;
       line-height: 1.38;
     }
 
-    /* TABEL RINCIAN POIN 1 - 10 (LURUS PERSIS TITIK DUA DI ATAS) */
+    /* 5. TABEL RINCIAN POIN 1 - 5 (MARGIN 112px, INDENT 20px DARI 92px) */
     .kgb-detail-table {
-      width: calc(100% - 92px);
-      margin-left: 92px;
+      width: calc(100% - 112px);
+      margin-left: 112px;
       border-collapse: collapse;
       font-size: 11pt;
     }
@@ -157,7 +159,18 @@
       font-size: 11pt;
     }
 
-    /* BARIS DIBERIKAN... (LURUS PERSIS TITIK DUA DI ATAS & TIDAK DI-BOLD) */
+    .kgb-subdetail-table {
+      width: calc(100% - 132px);
+      margin-left: 132px;
+      border-collapse: collapse;
+      font-size: 11pt;
+    }
+    .kgb-subdetail-table td {
+      vertical-align: top;
+      padding: 1.5px 0;
+    }
+
+    /* 6. BARIS DIBERIKAN... (LURUS 92px & TIDAK DI-BOLD) */
     .kgb-section-banner {
       margin: 12px 0 8px 92px;
       text-align: left;
@@ -166,7 +179,7 @@
       letter-spacing: 0.2px;
     }
 
-    /* TANDA TANGAN KETUA */
+    /* 8. TANDA TANGAN KETUA */
     .kgb-ttd-area {
       width: 100%;
       margin-top: 18px;
@@ -178,12 +191,22 @@
       font-size: 11pt;
     }
 
-    /* TEMBUSAN (LURUS PERSIS TITIK DUA DI ATAS) */
+    /* 9. TEMBUSAN (BASE MARGIN 92px, TIDAK MENONJOL KE KIRI) */
     .kgb-tembusan {
       clear: both;
+      margin-left: 92px;
       margin-top: 20px;
       font-size: 10.5pt;
       line-height: 1.35;
+    }
+    .kgb-tembusan-table {
+      width: calc(100% - 20px);
+      margin-left: 20px;
+      border-collapse: collapse;
+      margin-top: 2px;
+    }
+    .kgb-tembusan-table td {
+      vertical-align: top;
     }
   </style>
 
@@ -208,7 +231,7 @@
     </table>
     <div class="kgb-kop-divider"></div>
 
-    <!-- 2. NOMOR, LAMPIRAN, PERIHAL & TANGGAL -->
+    <!-- 2. NOMOR, LAMPIRAN, PERIHAL & TANGGAL (RATA MARGIN KIRI) -->
     <table class="kgb-meta-table">
       <tr>
         <td style="width: 78px;">Nomor</td>
@@ -231,7 +254,7 @@
       </tr>
     </table>
 
-    <!-- 3. KEPADA YTH (LURUS DENGAN TITIK DUA DI ATAS) -->
+    <!-- 3. KEPADA YTH (LURUS 92px) -->
     <div class="kgb-tujuan-box">
       Kepada<br>
       Yth. Kepala Kantor Pelayanan Perbendaharaan<br>
@@ -240,12 +263,12 @@
       <div style="margin-left: 36px; text-decoration: underline; letter-spacing: 2px;">C I R E B O N</div>
     </div>
 
-    <!-- 4. PEMBUKA (BARIS PERTAMA INDEN LURUS PERSIS TITIK DUA DI ATAS) -->
+    <!-- 4. PEMBUKA (BASE MARGIN 92px, FIRST LINE INDENT 32px, LINE 2 RATA 92px) -->
     <p class="kgb-paragraf">
       Dengan ini kami beritahukan, bahwa berhubung dengan telah terpenuhinya masa kerja dan syarat- syarat lainnya atas:
     </p>
 
-    <!-- 5. RINCIAN PEGAWAI & GAJI LAMA (POIN 1 - 5: LURUS PERSIS TITIK DUA DI ATAS) -->
+    <!-- 5. RINCIAN PEGAWAI & GAJI LAMA (POIN 1 - 5: MARGIN 112px) -->
     <table class="kgb-detail-table">
       <tr>
         <td class="kgb-col-no">1.</td>
@@ -283,7 +306,7 @@
       (atas dasar Skp. terakhir tentang gaji/pangkat yang di tetapkan)
     </div>
 
-    <table class="kgb-detail-table" style="margin-left: 112px; width: calc(100% - 112px);">
+    <table class="kgb-subdetail-table">
       <tr>
         <td style="width: 20px;">a.</td>
         <td style="width: 155px;">Oleh pejabat</td>
@@ -313,7 +336,7 @@
       </tr>
     </table>
 
-    <!-- 6. PENETAPAN KENAIKAN GAJI BERKALA BARU (LURUS PERSIS TITIK DUA DI ATAS) -->
+    <!-- 6. PENETAPAN KENAIKAN GAJI BERKALA BARU (LURUS 92px) -->
     <div class="kgb-section-banner">
       DIBERIKAN KENAIKAN GAJI BERKALA HINGGA MEMPEROLEH :
     </div>
@@ -351,7 +374,7 @@
       </tr>
     </table>
 
-    <!-- 7. PENUTUP (BARIS PERTAMA INDEN LURUS PERSIS TITIK DUA DI ATAS) -->
+    <!-- 7. PENUTUP (BASE MARGIN 92px, FIRST LINE INDENT 32px, LINE 2 & 3 RATA 92px, TIDAK MENONJOL KE KIRI) -->
     <p class="kgb-paragraf" style="margin-top: 12px;">
       Kami harap sesuai dengan {{dasar_pp}}, kepada Pegawai tersebut agar dibayarkan penghasilannya berdasarkan gaji pokoknya yang baru.
     </p>
@@ -365,21 +388,21 @@
       </div>
     </div>
 
-    <!-- 9. TEMBUSAN (LURUS PERSIS TITIK DUA DI ATAS) -->
+    <!-- 9. TEMBUSAN (BASE MARGIN 92px, TIDAK MENONJOL KE KIRI) -->
     <div class="kgb-tembusan">
       <div>Tembusan :</div>
-      <table style="width: calc(100% - 92px); margin-left: 92px; border-collapse: collapse; margin-top: 2px;">
+      <table class="kgb-tembusan-table">
         <tr>
-          <td style="width: 20px; vertical-align: top;">1.</td>
-          <td style="vertical-align: top;">Ketua Pengadilan Tinggi Agama Bandung di Bandung;</td>
+          <td style="width: 20px;">1.</td>
+          <td>Ketua Pengadilan Tinggi Agama Bandung di Bandung;</td>
         </tr>
         <tr>
-          <td style="width: 20px; vertical-align: top;">2.</td>
-          <td style="vertical-align: top;">Kepala Kantor Cabang PT. TASPEN di Cirebon;</td>
+          <td style="width: 20px;">2.</td>
+          <td>Kepala Kantor Cabang PT. TASPEN di Cirebon;</td>
         </tr>
         <tr>
-          <td style="width: 20px; vertical-align: top;">3.</td>
-          <td style="vertical-align: top;">Sdr. <strong>{{nama}}</strong> di Indramayu.</td>
+          <td style="width: 20px;">3.</td>
+          <td>Sdr. <strong>{{nama}}</strong> di Indramayu.</td>
         </tr>
       </table>
     </div>

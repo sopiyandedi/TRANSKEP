@@ -1027,3 +1027,10 @@ ZONA BAWAH: MASTER CONTEXT & STATUS MIGRASI TERKINI (LIVING CONTEXT)
         - Baris pertama paragraf penutup: `text-indent: 92px; margin-left: 0;`
         - Daftar tembusan poin 1 s.d. 3: `margin-left: 92px; width: calc(100% - 92px);`
     - **Versioning**: Versi cache PWA dinaikkan ke **`v3.8.36`** di [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) dan [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js). Clasp push & deploy (@357) dan git push ke `origin/main`.
+
+85. **Penyempurnaan Wrapping Indentasi Form KGB - Eliminasi Menonjol ke Kiri (Tahap 108 - v3.8.37 - Selesai & Aktif ✅):**
+    - **Pencegahan Teks Menonjol ke Margin Kiri 0**:
+      * Memperbaiki `.kgb-paragraf` dari `margin-left: 0; text-indent: 92px;` menjadi `margin-left: 92px; text-indent: 32px; text-align: justify;`. Baris pertama berindentasi `124px`, dan baris ke-2 / ke-3 membungkus rapi tepat pada garis batas `92px` sejajar dengan `Kepada` dan titik dua header.
+      * Menyelaraskan tabel rincian pegawai dan gaji baru: `margin-left: 112px; width: calc(100% - 112px);` sehingga nomor poin 1 s.d. 5 dan 6 s.d. 10 berada 20px di dalam kalimat pengantar, persis dokumen master Word.
+      * Memperbaiki `.kgb-tembusan` menjadi `margin-left: 92px;` sehingga kata `Tembusan :` tidak lagi menonjol ke margin kiri 0.
+    - **Versioning**: Versi cache PWA dinaikkan ke **`v3.8.37`** di [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) dan [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js). Clasp push & deploy (@358) dan git push ke `origin/main`.

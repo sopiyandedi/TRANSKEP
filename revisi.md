@@ -4952,6 +4952,7 @@ Pengguna melaporkan bahwa pratinjau (*preview*) dokumen PDF di modal SK dan SOP 
      * Saat PK tahunan disimpan via form sasaran kerja, `PkpDataService.submitBulkPKP` menyimpan ke Firestore lalu memanggil Apps Script `submitBulkPKP` yang menulis puluhan baris ke sheet `pkp_dokumen` dan `pkp_rencana`.
      * Saat PCK bulanan disimpan, `PkpDataService.submitBulkPCK` menyimpan ke Firestore lalu memanggil Apps Script `submitBulkPCK` yang menulis baris ke sheet `pck_dokumen` dan `pck_realisasi`.
      * Saat aksi status dijalankan (Kirim, Setujui, Tolak, Hapus), `PkpDataService.aksiDokumenPKP` dan `aksiDokumenPCK` memanggil Apps Script `aksiDokumenPKP` dan `aksiDokumenPCK` yang memanipulasi baris Google Sheets.
+     * Di [`pkp/js_pkp_core.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/pkp/js_pkp_core.html), fungsi `hapusDokumenPK`, `hapusDokumenPCK`, `kirimDokumenPK`, `kirimDokumenPCK`, dan `validasiCepatDokumen` masih memanggil langsung `google.script.run.ak
      * Di [`pkp/js_pkp_core.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/pkp/js_pkp_core.html), fungsi `hapusDokumenPK`, `hapusDokumenPCK`, `kirimDokumenPK`, `kirimDokumenPCK`, dan `validasiCepatDokumen` masih memanggil langsung `google.script.run.aksiDokumenPKP` / `aksiDokumenPCK`.
 
 2. **Sasaran Perubahan:**
@@ -5711,4 +5712,32 @@ Saat baris di sheet `cuti_log` dihapus langsung secara manual di Google Sheets (
 - [`eoffice/cetak_kgb.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/cetak_kgb.html)
 - [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) (`window.APP_BUILD_VER = '3.8.36'`)
 - [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) (`transkep-v3.8.36`)
+- [`prd.md`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/prd.md) & [`revisi.md`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/revisi.md)
+
+---
+
+### TAHAP 108 - PENYEMPURNAAN WRAPPING INDENTASI FORM KGB (ELIMINASI MENONJOL KE KIRI) (v3.8.37)
+*Status: [SELESAI & AKTIF] ✅*
+
+#### 1. Masalah & Koreksi Pengguna:
+- Pada tangkapan layar cetak, teks pembungkus baris ke-2 paragraf pembuka (*"masa kerja dan syarat-syarat lainnya atas:"*), baris pembungkus paragraf penutup (*"Tahun 2024, kepada Pegawai tersebut..."* & *"pokoknya yang baru."*), serta blok *"Tembusan"* menonjol keluar ke batas paling kiri margin (*x = 0*).
+- Pengguna meminta agar teks tidak menonjol ke kiri dan persis sesuai contoh gambar master Word (`KGB_FORM.docx`), di mana baris kedua paragraf dan tembusan tetap membungkus di garis indentasi `92px`, bukan keluar ke tepi margin `0`.
+
+#### 2. Realisasi Solusi Presisi:
+1. **Paragraf Pembuka & Penutup Rapi (`margin-left: 92px`)**:
+   - Mengubah `.kgb-paragraf` dari `margin-left: 0; text-indent: 92px;` menjadi:
+     `margin-left: 92px; text-indent: 32px; text-align: justify;`
+   - Hasil: Baris pertama berindentasi anggun di `124px`, dan baris ke-2 / ke-3 membungkus rapi tepat pada garis batas `92px` (lurus sejajar dengan `Kepada` dan titik dua header). Tidak ada lagi kata yang menonjol keluar ke kiri.
+2. **Tabel Rincian Pegawai & Gaji Baru**:
+   - Diberikan indentasi yang seimbang: `margin-left: 112px; width: calc(100% - 112px);` sehingga nomor poin 1 s.d. 5 dan 6 s.d. 10 berada sedikit di dalam kalimat pengantar, persis seperti tata letak dokumen master Word.
+   - Sub-rincian a s.d. c berindentasi `132px`.
+3. **Blok Tembusan Lurus di 92px**:
+   - Mengubah `.kgb-tembusan` menjadi `margin-left: 92px;` sehingga kata `Tembusan :` tidak lagi menonjol ke margin kiri 0.
+   - Daftar tembusan 1, 2, 3 diatur rapi berjarak 20px di dalamnya (`margin-left: 20px;`).
+
+#### 3. Berkas yang Dimodifikasi:
+- [`modules/eoffice/cetak/cetak_kgb.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/cetak/cetak_kgb.html)
+- [`eoffice/cetak_kgb.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/cetak_kgb.html)
+- [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) (`window.APP_BUILD_VER = '3.8.37'`)
+- [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) (`transkep-v3.8.37`)
 - [`prd.md`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/prd.md) & [`revisi.md`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/revisi.md)
