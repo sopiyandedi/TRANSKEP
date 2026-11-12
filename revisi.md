@@ -5776,3 +5776,29 @@ Saat baris di sheet `cuti_log` dihapus langsung secara manual di Google Sheets (
 - [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) (`window.APP_BUILD_VER = '3.8.38'`)
 - [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) (`transkep-v3.8.38`)
 - [`prd.md`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/prd.md) & [`revisi.md`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/revisi.md)
+
+---
+
+### TAHAP 110 - ADAPTASI KOP SURAT RAPIH & PROPORSIONAL DARI FORM SURAT TUGAS KE FORM CETAK KGB (v3.8.39)
+*Status: [SELESAI & AKTIF] ✅*
+
+#### 1. Masalah & Permintaan Pengguna:
+- Pengguna meminta agar kop surat pada form cetak KGB (`modules/eoffice/cetak/cetak_kgb.html` dan `eoffice/cetak_kgb.html`) diganti dengan kop surat dari form Surat Tugas (`modules/permohonan/cetak/cetak_st.html` / `permohonan/st/template_cetak_st.html`) yang telah terbukti rapih dan proporsional.
+
+#### 2. Realisasi Solusi Presisi:
+1. **Penerapan Struktur & Styling Kop Surat Tugas**:
+   - Menggantikan struktur tabel kop lama dengan arsitektur flexbox kop Surat Tugas (`.kgb-kop-container`):
+     * Logo: `width: 90px; height: auto; flex-shrink: 0;` menggunakan URL gambar resmi yang sama dengan Surat Tugas (`https://drive.google.com/thumbnail?id=1_Qbv_fdPOa2YEQAXXkvRxXevsd_4u1jZ&sz=w500`) dengan fallback graceful `img/logo_pa_indramayu_bw.png`.
+     * Kolom Teks: `flex-grow: 1; text-align: center; padding-right: 30px;` untuk mengimbangi lebar logo 90px sehingga judul teks berada tepat di tengah halaman secara optis.
+     * Tipografi Judul: `h3` dan `h2` berukuran `14pt` tebal huruf kapital dengan `line-height: 1.15` Bookman Old Style.
+     * Teks Alamat & Kontak: `p` berukuran `8pt` dengan link situs dan email identik dengan form Surat Tugas.
+     * Garis Pembatas Kop: `border-bottom: 2px solid black; padding-bottom: 5px; margin-bottom: 14px;` langsung melekat pada container kop tanpa divider terpisah.
+2. **Kesesuaian dengan Isi Dokumen 12pt**:
+   - Struktur kop baru terintegrasi mulus dengan layout isi dokumen 12pt yang telah dirapikan pada tahap sebelumnya (align poin a-c, 1-5, 6-10, TTD, dan tembusan tetap terjaga presisi).
+
+#### 3. Berkas yang Dimodifikasi:
+- [`modules/eoffice/cetak/cetak_kgb.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/cetak/cetak_kgb.html)
+- [`eoffice/cetak_kgb.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/cetak_kgb.html)
+- [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) (`window.APP_BUILD_VER = '3.8.39'`)
+- [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) (`transkep-v3.8.39`)
+- [`prd.md`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/prd.md) & [`revisi.md`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/revisi.md)

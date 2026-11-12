@@ -42,57 +42,38 @@
       background: #ffffff;
     }
 
-    /* 1. KOP SURAT PENGADILAN AGAMA INDRAMAYU (PROPORSIONAL 1 BANDING 1) */
-    .kgb-kop-table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-bottom: 2px;
-    }
-    .kgb-kop-logo-cell {
-      width: 90px;
-      vertical-align: middle;
-      text-align: left;
-      padding: 0;
+    /* 1. KOP SURAT PENGADILAN AGAMA INDRAMAYU (ADAPTASI PERSIS DARI FORM SURAT TUGAS) */
+    .kgb-kop-container {
+      display: flex;
+      align-items: center;
+      padding-bottom: 5px;
+      border-bottom: 2px solid black;
+      margin-bottom: 14px;
     }
     .kgb-kop-logo {
-      width: 84px;
+      width: 90px;
       height: auto;
-      display: block;
-      filter: grayscale(100%) contrast(120%);
-      -webkit-filter: grayscale(100%) contrast(120%);
+      flex-shrink: 0;
     }
-    .kgb-kop-text-cell {
+    .kgb-kop-text {
+      flex-grow: 1;
       text-align: center;
-      vertical-align: middle;
-      padding: 0 5px 0 0;
+      padding-right: 30px;
     }
-    .kgb-kop-line1,
-    .kgb-kop-line2,
-    .kgb-kop-line3,
-    .kgb-kop-line4 {
-      font-family: 'Bookman Old Style', 'Times New Roman', serif;
-      font-size: 13.5pt;
-      font-weight: bold;
-      line-height: 1.16;
-      text-transform: uppercase;
-      letter-spacing: 0.2px;
+    .kgb-kop-text h3,
+    .kgb-kop-text h2 {
       margin: 0;
-    }
-    .kgb-kop-address {
+      font-size: 14pt;
+      font-weight: bold;
+      text-transform: uppercase;
+      line-height: 1.15;
       font-family: 'Bookman Old Style', 'Times New Roman', serif;
+    }
+    .kgb-kop-text p {
+      margin: 2px 0 0 0;
       font-size: 8pt;
       line-height: 1.25;
-      margin: 4px 0 0 0;
-      font-weight: normal;
-      color: #000000;
-    }
-
-    /* GARIS TUNGGAL KOP SURAT */
-    .kgb-kop-divider {
-      border-top: none;
-      border-bottom: 2px solid #000000;
-      height: 0;
-      margin: 4px 0 14px 0;
+      font-family: 'Bookman Old Style', 'Times New Roman', serif;
     }
 
     /* 2. HEADER NOMOR, LAMPIRAN, PERIHAL & TANGGAL (12pt) */
@@ -202,25 +183,18 @@
   </style>
 
   <div class="kgb-print-wrapper">
-    <!-- 1. KOP SURAT (PROPORSIONAL 1 BANDING 1) -->
-    <table class="kgb-kop-table">
-      <tr>
-        <td class="kgb-kop-logo-cell">
-          <img src="img/logo_pa_indramayu_bw.png" onerror="this.onerror=null;this.src='https://drive.google.com/thumbnail?id=1_Qbv_fdPOa2YEQAXXkvRxXevsd_4u1jZ&sz=w500';" class="kgb-kop-logo" alt="Logo PA Indramayu">
-        </td>
-        <td class="kgb-kop-text-cell">
-          <div class="kgb-kop-line1">MAHKAMAH AGUNG REPUBLIK INDONESIA</div>
-          <div class="kgb-kop-line2">DIREKTORAT JENDERAL BADAN PERADILAN AGAMA</div>
-          <div class="kgb-kop-line3">PENGADILAN TINGGI AGAMA BANDUNG</div>
-          <div class="kgb-kop-line4">PENGADILAN AGAMA INDRAMAYU</div>
-          <div class="kgb-kop-address">
-            Jalan M.T. Haryono No.2A Kel. Sindang Kec. Sindang Kab. Indramayu Kode Pos 45222<br>
-            Telepon (0234) 273880 | Situs : <span style="text-decoration: underline;">www.pa-indramayu.go.id</span> | e-mail : <span style="text-decoration: underline;">pa.indramayu_ptabdg@yahoo.co.id</span>
-          </div>
-        </td>
-      </tr>
-    </table>
-    <div class="kgb-kop-divider"></div>
+    <!-- 1. KOP SURAT (DARI FORM SURAT TUGAS - RAPIH & PROPORSIONAL) -->
+    <div class="kgb-kop-container">
+      <img src="https://drive.google.com/thumbnail?id=1_Qbv_fdPOa2YEQAXXkvRxXevsd_4u1jZ&sz=w500" onerror="this.onerror=null;this.src='img/logo_pa_indramayu_bw.png';" class="kgb-kop-logo" alt="Logo">
+      <div class="kgb-kop-text">
+        <h3>MAHKAMAH AGUNG REPUBLIK INDONESIA</h3>
+        <h3>DIREKTORAT JENDERAL BADAN PERADILAN AGAMA</h3>
+        <h3>PENGADILAN TINGGI AGAMA BANDUNG</h3>
+        <h2>PENGADILAN AGAMA INDRAMAYU</h2>
+        <p>Jalan M.T. Haryono No.2A Kel. Sindang Kec. Sindang Kab. Indramayu Kode Pos 45222<br>
+        Telepon (0234) 273880 | Situs: <a href="https://www.pa-indramayu.go.id" style="color: blue; text-decoration: none;">www.pa-indramayu.go.id</a> | e-mail: <a href="mailto:pa.indramayu_ptabdg@yahoo.co.id" style="color: blue; text-decoration: none;">pa.indramayu_ptabdg@yahoo.co.id</a></p>
+      </div>
+    </div>
 
     <!-- 2. NOMOR, LAMPIRAN, PERIHAL & TANGGAL (12pt) -->
     <table class="kgb-meta-table">
