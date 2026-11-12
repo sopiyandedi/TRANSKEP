@@ -16,7 +16,9 @@
         /* ⬇️ MARGIN HALAMAN CETAK: 0mm agar batas tepi dikontrol penuh oleh padding .kgb-print-wrapper ⬇️ */
         margin: 0mm !important;
       }
-      html, body {
+
+      html,
+      body {
         background-color: #ffffff !important;
         color: #000000 !important;
         font-family: 'Bookman Old Style', 'Times New Roman', serif !important;
@@ -27,7 +29,10 @@
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
       }
-      .no-print { display: none !important; }
+
+      .no-print {
+        display: none !important;
+      }
     }
 
     /* =========================================================================
@@ -60,18 +65,21 @@
       /* ⬇️ TAG 2C: Jarak garis kop surat ke tabel nomor surat ⬇️ */
       margin-bottom: 14px;
     }
+
     .kgb-kop-logo {
       /* ⬇️ TAG 2D: Lebar logo pengadilan di sebelah kiri ⬇️ */
       width: 90px;
       height: auto;
       flex-shrink: 0;
     }
+
     .kgb-kop-text {
       flex-grow: 1;
       text-align: center;
       /* ⬇️ TAG 2E: Padding kanan penyeimbang lebar logo agar judul kop persis di tengah optis halaman ⬇️ */
       padding-right: 30px;
     }
+
     .kgb-kop-text h3,
     .kgb-kop-text h2 {
       margin: 0;
@@ -82,6 +90,7 @@
       line-height: 1.15;
       font-family: 'Bookman Old Style', 'Times New Roman', serif;
     }
+
     .kgb-kop-text p {
       /* ⬇️ TAG 2G: Jarak baris nama instansi ke baris alamat kantor ⬇️ */
       margin: 2px 0 0 0;
@@ -98,6 +107,7 @@
       margin-bottom: 14px;
       font-size: 12pt;
     }
+
     .kgb-meta-table td {
       vertical-align: top;
       /* ⬇️ TAG 3B: Jarak antar-baris Nomor, Lampiran, dan Perihal ⬇️ */
@@ -140,25 +150,30 @@
       border-collapse: collapse;
       font-size: 12pt;
     }
+
     .kgb-detail-table td {
       vertical-align: top;
       /* ⬇️ TAG 6B: Jarak vertikal antar-baris setiap poin ⬇️ */
       padding: 2px 0;
     }
+
     .kgb-col-no {
       /* ⬇️ TAG 6C: Lebar kolom nomor/huruf poin (1., 2., a., b., 6., dsb) ⬇️ */
       width: 26px;
       text-align: left;
     }
+
     .kgb-col-label {
       /* ⬇️ TAG 6D: Lebar kolom nama atribut/label (Nama, NIP, Pangkat/Jabatan, dsb) ⬇️ */
       width: 180px;
     }
+
     .kgb-col-colon {
       /* ⬇️ TAG 6E: Lebar kolom titik dua (:) ⬇️ */
       width: 14px;
       text-align: center;
     }
+
     .kgb-col-val {
       text-align: left;
     }
@@ -190,6 +205,7 @@
       /* ⬇️ TAG 9A: Jarak dari paragraf penutup ke blok tanda tangan ⬇️ */
       margin-top: 24px;
     }
+
     .kgb-ttd-box {
       float: right;
       /* ⬇️ TAG 9B: Lebar blok tanda tangan Ketua di sisi kanan ⬇️ */
@@ -208,6 +224,7 @@
       font-size: 12pt;
       line-height: 1.38;
     }
+
     .kgb-tembusan-table {
       width: 100%;
       border-collapse: collapse;
@@ -215,6 +232,7 @@
       margin-top: 4px;
       font-size: 12pt;
     }
+
     .kgb-tembusan-table td {
       vertical-align: top;
       /* ⬇️ TAG 10D: Jarak antar-baris poin tembusan 1, 2, 3 ⬇️ */
@@ -225,14 +243,18 @@
   <div class="kgb-print-wrapper">
     <!-- 1. KOP SURAT (DARI FORM SURAT TUGAS - RAPIH & PROPORSIONAL) -->
     <div class="kgb-kop-container">
-      <img src="https://drive.google.com/thumbnail?id=1_Qbv_fdPOa2YEQAXXkvRxXevsd_4u1jZ&sz=w500" onerror="this.onerror=null;this.src='img/logo_pa_indramayu_bw.png';" class="kgb-kop-logo" alt="Logo">
+      <img src="https://drive.google.com/thumbnail?id=1_Qbv_fdPOa2YEQAXXkvRxXevsd_4u1jZ&sz=w500"
+        onerror="this.onerror=null;this.src='img/logo_pa_indramayu_bw.png';" class="kgb-kop-logo" alt="Logo">
       <div class="kgb-kop-text">
         <h3>MAHKAMAH AGUNG REPUBLIK INDONESIA</h3>
         <h3>DIREKTORAT JENDERAL BADAN PERADILAN AGAMA</h3>
         <h3>PENGADILAN TINGGI AGAMA BANDUNG</h3>
         <h2>PENGADILAN AGAMA INDRAMAYU</h2>
         <p>Jalan M.T. Haryono No.2A Kel. Sindang Kec. Sindang Kab. Indramayu Kode Pos 45222<br>
-        Telepon (0234) 273880 | Situs: <a href="https://www.pa-indramayu.go.id" style="color: blue; text-decoration: none;">www.pa-indramayu.go.id</a> | e-mail: <a href="mailto:pa.indramayu_ptabdg@yahoo.co.id" style="color: blue; text-decoration: none;">pa.indramayu_ptabdg@yahoo.co.id</a></p>
+          Telepon (0234) 273880 | Situs: <a href="https://www.pa-indramayu.go.id"
+            style="color: blue; text-decoration: none;">www.pa-indramayu.go.id</a> | e-mail: <a
+            href="mailto:pa.indramayu_ptabdg@yahoo.co.id"
+            style="color: blue; text-decoration: none;">pa.indramayu_ptabdg@yahoo.co.id</a></p>
       </div>
     </div>
 
@@ -267,7 +289,7 @@
       Negara Cirebon<br>
       di-<br>
       <!-- ⬇️ HILANGKAN UNDERLINE PADA CIREBON & INDENTASI 36px ⬇️ -->
-      <div style="margin-left: 36px; letter-spacing: 2px;">C I R E B O N</div>
+      <div style="margin-left: 36px; letter-spacing: 2px;">Cirebon</div>
     </div>
 
     <!-- 4. PEMBUKA (12pt, BASE MARGIN 92px, FIRST LINE INDENT 32px, LINE 2 RATA 92px) -->
@@ -386,7 +408,8 @@
 
     <!-- 7. PENUTUP (12pt, BASE MARGIN 92px, FIRST LINE INDENT 32px, LINE 2 & 3 RATA 92px) -->
     <p class="kgb-paragraf" style="margin-top: 14px;">
-      Kami harap sesuai dengan {{dasar_pp}}, kepada Pegawai tersebut agar dibayarkan penghasilannya berdasarkan gaji pokoknya yang baru.
+      Kami harap sesuai dengan {{dasar_pp}}, kepada Pegawai tersebut agar dibayarkan penghasilannya berdasarkan gaji
+      pokoknya yang baru.
     </p>
 
     <!-- 8. TANDA TANGAN KETUA (12pt, NAMA KETUA TANPA GELAR) -->

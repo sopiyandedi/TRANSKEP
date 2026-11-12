@@ -5834,3 +5834,36 @@ Saat baris di sheet `cuti_log` dihapus langsung secara manual di Google Sheets (
 - [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) *(Versi `v3.8.40`)*
 - [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) *(Cache `v3.8.40`)*
 - [`prd.md`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/prd.md) & [`revisi.md`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/revisi.md)
+
+---
+
+### TAHAP 112 - PEMBERSIHAN FILE DUPLIKAT/MIRROR E-OFFICE & RESTUKTURISASI ARSITEKTUR BERSIH (v3.8.41)
+*Status: [SELESAI & AKTIF] ✅*
+
+#### 1. Masalah & Permintaan Pengguna:
+- Pengguna melihat berkas di folder luar `eoffice/` dan `modules/eoffice/` terkesan ganda (*double*), membingungkan saat navigasi di VS Code Explorer, dan meminta untuk dirapikan menjadi 1 sumber kebenaran (*single source of truth*).
+
+#### 2. Realisasi Solusi Presisi:
+1. **Pemisahan Tegas Frontend vs Backend**:
+   - Seluruh berkas HTML tampilan dan client script lama yang bersifat duplikat/mirror di folder luar `eoffice/` resmi dihapus:
+     * `eoffice/cetak_kgb.html` (Dihapus, dipusatkan di `modules/eoffice/cetak/cetak_kgb.html`)
+     * `eoffice/js_cetak_kgb.html` (Dihapus, dipusatkan di `modules/eoffice/cetak/js_cetak_kgb.js`)
+     * `eoffice/js_eoffice.html` (Dihapus, dipusatkan di `modules/eoffice/eoffice.js`)
+     * `eoffice/js_kgb.html` (Dihapus, dipusatkan di `modules/eoffice/kgb.js`)
+     * `eoffice/js_rapat.html` (Dihapus, dipusatkan di `modules/eoffice/rapat.js`)
+     * `eoffice/view_eoffice.html` (Dihapus, dipusatkan di `modules/eoffice/view_eoffice.html`)
+     * `eoffice/view_kgb.html` & `eoffice/view_rapat.html` (Dihapus, subview legacy sudah terintegrasi utuh di `modules/eoffice/view_eoffice.html`)
+2. **Folder Luar `eoffice/` Murni Menjadi Backend Server GAS**:
+   - Folder `eoffice/` kini hanya berisi berkas server-side murni:
+     * `eoffice/eoffice.js` (Backend API Service)
+     * `eoffice/kgb.js` (Google Docs & Drive Generator Service)
+     * `eoffice/rapat.js` (Rapat Backend Service)
+     * `eoffice/tabel_gaji_pp5_2024.js` (Tabel Gaji Backend)
+3. **PWA & Firebase Tetap Berjalan Normal 100%**:
+   - PWA (`index.html` dan `sw.js`) memuat dari `modules/eoffice/` dan Firebase berkomunikasi langsung tanpa kendala.
+
+#### 3. Berkas yang Dimodifikasi / Dihapus:
+- Dihapus: 8 berkas HTML mirror di `eoffice/` (`cetak_kgb.html`, `js_cetak_kgb.html`, `js_eoffice.html`, `js_kgb.html`, `js_rapat.html`, `view_eoffice.html`, `view_kgb.html`, `view_rapat.html`).
+- [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) *(Versi `v3.8.41`)*
+- [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) *(Cache `v3.8.41`)*
+- [`prd.md`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/prd.md) & [`revisi.md`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/revisi.md)
