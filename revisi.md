@@ -5802,3 +5802,35 @@ Saat baris di sheet `cuti_log` dihapus langsung secara manual di Google Sheets (
 - [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) (`window.APP_BUILD_VER = '3.8.39'`)
 - [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) (`transkep-v3.8.39`)
 - [`prd.md`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/prd.md) & [`revisi.md`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/revisi.md)
+
+---
+
+### TAHAP 111 - REFINEMENT FORM CETAK KGB (HAPUS UNDERLINE, FORMAT TANGGAL ANGKA, FILTER PANGKAT MURNI & DOKUMENTASI SPACING LENGKAP) (v3.8.40)
+*Status: [SELESAI & AKTIF] ✅*
+
+#### 1. Batasan & Lingkup Kerja:
+- **HANYA** menyentuh berkas yang berhubungan dengan form KGB, **DILARANG** menyentuh berkas menu lain (Cuti, Surat Tugas, WFH, PKP, Kinerja, SOP, dsb).
+
+#### 2. Realisasi Perubahan Presisi:
+1. **Penghapusan Garis Bawah (Underline)**:
+   - Menghapus tag `<u>...</u>` pada perihal: `Berkala a.n. Sdr. <strong>{{nama}}</strong>`.
+   - Menghapus `text-decoration: underline;` pada teks tujuan: `C I R E B O N`.
+2. **Format Tanggal Lahir Hanya Angka (`DD-MM-YYYY`)**:
+   - Menambahkan helper `formatTglAngkaKgb(val, nip)` pada `js_cetak_kgb.js` dan `eoffice/js_cetak_kgb.html`.
+   - Menghasilkan format angka murni `DD-MM-YYYY` (misal: `24-12-2026`).
+   - Jika data tanggal lahir kosong, sistem mengekstrak 8 digit pertama NIP pegawai (`YYYYMMDD` diubah ke format `DD-MM-YYYY`).
+   - Tampilan Poin 1: `{{nama}}/{{tanggal_lahir}}`.
+3. **Filter Pangkat Murni (Tanpa Golongan/Ruang)**:
+   - Menambahkan helper `stripGolonganRuangKgb(pangkatStr)` yang membuang golongan dan ruang (seperti `(III/d)`, `III/d`, dsb.) dari nama pangkat.
+   - Poin 3 murni menampilkan pangkat: `Penata Tingkat I/Panitera Muda Gugatan`.
+4. **Dokumentasi Lengkap Setiap Padding, Margin, dan Spacing**:
+   - Memberikan komentar/keterangan penanda yang jelas (`/* ⬇️ TAG ...: Keterangan fungsi & panduan ubah nilai ⬇️ */`) pada setiap baris CSS dan elemen HTML pengatur jarak di form cetak KGB (`modules/eoffice/cetak/cetak_kgb.html` dan `eoffice/cetak_kgb.html`).
+
+#### 3. Berkas yang Dimodifikasi:
+- [`modules/eoffice/cetak/cetak_kgb.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/cetak/cetak_kgb.html) *(Template PWA Modular)*
+- [`eoffice/cetak_kgb.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/cetak_kgb.html) *(Template GAS Mirror)*
+- [`modules/eoffice/cetak/js_cetak_kgb.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/cetak/js_cetak_kgb.js) *(Engine Render PWA Modular)*
+- [`eoffice/js_cetak_kgb.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/js_cetak_kgb.html) *(Engine Render GAS Mirror)*
+- [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) *(Versi `v3.8.40`)*
+- [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) *(Cache `v3.8.40`)*
+- [`prd.md`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/prd.md) & [`revisi.md`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/revisi.md)

@@ -1,4 +1,4 @@
-<script>
+﻿<script>
 // ==========================================
 // FILE: eoffice/js_cetak_kgb.html (GAS Mirror - Modular Print Engine KGB)
 // DESKRIPSI: Mesin Render & Cetak Instan (0ms) Formulir SK KGB PA Indramayu
@@ -54,12 +54,105 @@
     return s.trim();
   }
 
+  /**
+   * Helper: Menghapus golongan & ruang dari nama pangkat (contoh: "Penata Tingkat I (III/d)" -> "Penata Tingkat I")
+   */
+  function stripGolonganRuangKgb(pangkatStr) {
+    if (!pangkatStr || pangkatStr === '-') return '-';
+    var s = String(pangkatStr).trim();
+    // Hapus format dalam kurung: (III/d), (IV/a), [III/d], dsb.
+    s = s.replace(/\s*[\(\[\{]\s*(?:I{1,3}|IV|V)\s*\/\s*[a-eA-E]\s*[\)\]\}]/gi, '');
+    // Hapus format tanpa kurung setelah koma, strip, atau slash: ", III/d", " - III/d", "/ III/d", " III/d"
+    s = s.replace(/(?:[\s,\-\/]+)?\b(?:I{1,3}|IV|V)\s*\/\s*[a-eA-E]\b/gi, '');
+    // Hapus sisa tanda baca di akhir string
+    s = s.replace(/[\s,\-\/\(\[\{]+$/, '').trim();
+    return s || '-';
+  }
+
   var BULAN_INDO_KGB = [
     'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
     'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
   ];
 
   var BULAN_ROMAWI_KGB = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
+
+  /**
+   * Format tanggal lahir murni angka dengan strip: DD-MM-YYYY (contoh: "24-12-2026")
+   * Jika nilai tanggal kosong, otomatis mencoba mengekstrak 8 digit pertama NIP (YYYYMMDD -> DD-MM-YYYY)
+   */
+  function formatTglAngkaKgb(val, nip) {
+    var pad = function(n) { return (n < 10 ? '0' : '') + n; };
+    var str = val ? String(val).trim() : '';
+
+    // Jika sudah format DD-MM-YYYY murni angka
+    if (/^\d{2}-\d{2}-\d{4}$/.test(str)) {
+      return str;
+    }
+
+    var d, m, y;
+    if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
+      var parts = str.split('T')[0].split('-');
+      y = parseInt(parts[0], 10);
+      m = parseInt(parts[1], 10);
+      d = parseInt(parts[2], 10);
+      if (!isNaN(d) && !isNaN(m) && !isNaN(y)) {
+        return pad(d) + '-' + pad(m) + '-' + y;
+      }
+    } else if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(str)) {
+      var sParts = str.split('/');
+      d = parseInt(sParts[0], 10);
+      m = parseInt(sParts[1], 10);
+      y = parseInt(sParts[2], 10);
+      if (!isNaN(d) && !isNaN(m) && !isNaN(y)) {
+        return pad(d) + '-' + pad(m) + '-' + y;
+      }
+    } else if (/^\d{1,2}-\d{1,2}-\d{4}$/.test(str)) {
+      var dParts = str.split('-');
+      d = parseInt(dParts[0], 10);
+      m = parseInt(dParts[1], 10);
+      y = parseInt(dParts[2], 10);
+      if (!isNaN(d) && !isNaN(m) && !isNaN(y)) {
+        return pad(d) + '-' + pad(m) + '-' + y;
+      }
+    } else if (str) {
+      // Coba periksa jika ada format teks nama bulan (contoh "24 Desember 2026")
+      var lower = str.toLowerCase();
+      var foundMonth = -1;
+      for (var bi = 0; bi < BULAN_INDO_KGB.length; bi++) {
+        if (lower.indexOf(BULAN_INDO_KGB[bi].toLowerCase()) !== -1) {
+          foundMonth = bi + 1;
+          break;
+        }
+      }
+      var numMatches = str.match(/\d+/g);
+      if (foundMonth !== -1 && numMatches && numMatches.length >= 2) {
+        var dayCand = parseInt(numMatches[0], 10);
+        var yearCand = parseInt(numMatches[numMatches.length - 1], 10);
+        if (dayCand >= 1 && dayCand <= 31 && yearCand >= 1940 && yearCand <= 2099) {
+          return pad(dayCand) + '-' + pad(foundMonth) + '-' + yearCand;
+        }
+      }
+      var parsed = new Date(str);
+      if (!isNaN(parsed.getTime())) {
+        return pad(parsed.getDate()) + '-' + pad(parsed.getMonth() + 1) + '-' + parsed.getFullYear();
+      }
+    }
+
+    // Fallback otomatis: Jika tanggal kosong, ekstrak dari 8 digit pertama NIP pegawai (YYYYMMDD -> DD-MM-YYYY)
+    if (nip) {
+      var digits = String(nip).replace(/[^0-9]/g, '');
+      if (digits.length >= 8) {
+        var nY = parseInt(digits.substring(0, 4), 10);
+        var nM = parseInt(digits.substring(4, 6), 10);
+        var nD = parseInt(digits.substring(6, 8), 10);
+        if (nY >= 1940 && nY <= 2099 && nM >= 1 && nM <= 12 && nD >= 1 && nD <= 31) {
+          return pad(nD) + '-' + pad(nM) + '-' + nY;
+        }
+      }
+    }
+
+    return str || '-';
+  }
 
   /**
    * Format tanggal YYYY-MM-DD atau DD/MM/YYYY ke Bahasa Indonesia (contoh: "1 Desember 2026")
@@ -249,22 +342,15 @@
     var mkgBaru = resolveMasaKerjaKgb(kgbObj.tahun_baru, kgbObj.bulan_baru, kgbObj.mkg_baru);
 
     var namaPegawai = kgbObj.nama_pegawai || (userRef ? userRef.nama : '') || '-';
+    var nipPegawai = String(kgbObj.nip || (userRef ? userRef.nip : '') || '-');
     var tempatLahir = String(kgbObj.tempat_lahir || (userRef ? (userRef.tempat_lahir || userRef.tmpt_lahir) : '') || '').trim();
     var tglLahirRaw = kgbObj.tanggal_lahir || (userRef ? (userRef.tgl_lahir || userRef.tanggal_lahir) : '');
-    var tglLahir = formatTglCetakKgb(tglLahirRaw);
-    if (tglLahir === '-') tglLahir = '';
-    var tempatTanggalLahir = '';
-    if (tempatLahir && tglLahir) {
-      tempatTanggalLahir = tempatLahir + ', ' + tglLahir;
-    } else if (tempatLahir) {
-      tempatTanggalLahir = tempatLahir;
-    } else if (tglLahir) {
-      tempatTanggalLahir = tglLahir;
-    } else {
-      tempatTanggalLahir = '-';
-    }
-    var nipPegawai = String(kgbObj.nip || (userRef ? userRef.nip : '') || '-');
-    var pangkat = kgbObj.pangkat || (userRef ? userRef.pangkat : '') || '-';
+    // POIN 2: Format tanggal lahir murni angka saja DD-MM-YYYY (contoh: 24-12-2026)
+    var tglLahirAngka = formatTglAngkaKgb(tglLahirRaw, nipPegawai);
+
+    var rawPangkat = kgbObj.pangkat || (userRef ? userRef.pangkat : '') || '-';
+    // POIN 3: Input pangkat saja, golongan dan ruang (seperti III/d) tidak diinput
+    var pangkat = stripGolonganRuangKgb(rawPangkat);
     var golongan = kgbObj.golongan_baru || kgbObj.golongan || (userRef ? userRef.golongan : '') || '-';
     var golonganLama = kgbObj.golongan_lama || kgbObj.golongan || (userRef ? userRef.golongan : '') || '-';
     var jabatan = kgbObj.jabatan || (userRef ? userRef.jabatan : '') || '-';
@@ -299,13 +385,13 @@
       '{{tanggal_surat}}': tglSuratStr,
       '{{nama}}': namaPegawai,
       '{{nama_gelar}}': namaPegawai,
-      '{{nama}}/{{tempat_tanggal_lahir}}': (tempatTanggalLahir && tempatTanggalLahir !== '-') ? (namaPegawai + ' / ' + tempatTanggalLahir) : namaPegawai,
-      '{{nama}}/{{tanggal_lahir}}': (tempatTanggalLahir && tempatTanggalLahir !== '-') ? (namaPegawai + ' / ' + tempatTanggalLahir) : namaPegawai,
+      '{{nama}}/{{tempat_tanggal_lahir}}': (tglLahirAngka && tglLahirAngka !== '-') ? (namaPegawai + '/' + tglLahirAngka) : (namaPegawai + '/-'),
+      '{{nama}}/{{tanggal_lahir}}': (tglLahirAngka && tglLahirAngka !== '-') ? (namaPegawai + '/' + tglLahirAngka) : (namaPegawai + '/-'),
       '{{tempat_lahir}}': tempatLahir,
-      '{{tempat_tanggal_lahir}}': tempatTanggalLahir,
-      '{{tanggl lahir}}': tempatTanggalLahir,
-      '{{tanggal lahir}}': tempatTanggalLahir,
-      '{{tanggal_lahir}}': tempatTanggalLahir,
+      '{{tempat_tanggal_lahir}}': tglLahirAngka,
+      '{{tanggl lahir}}': tglLahirAngka,
+      '{{tanggal lahir}}': tglLahirAngka,
+      '{{tanggal_lahir}}': tglLahirAngka,
       '{{NIP}}': nipPegawai,
       '{{nip}}': nipPegawai,
       '{{pangkat}}': pangkat,
