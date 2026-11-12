@@ -13,8 +13,8 @@
   // ==========================================
   var KGB_PRINT_CONFIG = {
     fontFamily: "'Bookman Old Style', 'Times New Roman', serif",
-    fontSize: "11pt",
-    lineHeight: "1.38",
+    fontSize: "12pt",
+    lineHeight: "1.4",
     paperSize: "Legal (21,6 cm x 35,6 cm)",
     pageSizeCss: "216mm 356mm",
     pageMargin: "0mm",
@@ -23,7 +23,7 @@
     marginBottom: "15mm",
     marginLeft: "20mm",
     marginRight: "15mm",
-    jarakTtd: "56px",
+    jarakTtd: "64px",
     kopBorderBottom: "2px solid #000000"
   };
 

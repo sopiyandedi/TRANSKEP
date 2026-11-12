@@ -5741,3 +5741,38 @@ Saat baris di sheet `cuti_log` dihapus langsung secara manual di Google Sheets (
 - [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) (`window.APP_BUILD_VER = '3.8.37'`)
 - [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) (`transkep-v3.8.37`)
 - [`prd.md`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/prd.md) & [`revisi.md`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/revisi.md)
+
+---
+
+### TAHAP 109 - ALIGNMENT POIN a, b, c DENGAN 1, 2, 3, PENETAPAN UKURAN ISI 12pt & PADDING PROPORSIONAL LEGAL (v3.8.38)
+*Status: [SELESAI & AKTIF] ✅*
+
+#### 1. Masalah & Koreksi Pengguna:
+1. **Poin a, b, c Belum Lurus dengan 1, 2, 3**:
+   - Sub-poin a, b, c sebelumnya berada lebih menjorok ke kanan (`132px`), tidak sejajar dengan angka `1.` s.d. `5.` di atasnya maupun `6.` s.d. `10.` di bawahnya.
+   - Pengguna meminta agar huruf `a.`, `b.`, `c.` berada tepat dalam satu garis lurus vertikal dengan angka `1.` s.d. `5.` dan `6.` s.d. `10.`.
+2. **Ukuran Font Isi KGB 12pt**:
+   - Seluruh teks isi dokumen KGB dari nomor surat sampai akhir tembusan (kata *Indramayu.*) diminta diubah ke **12pt** Bookman Old Style (sebelumnya 11pt).
+3. **Padding & Spacing Proporsional Halaman Legal**:
+   - Mengatur distribusi jarak antar-seksi vertikal (header, kepada, pengantar, tabel, penetapan, penutup, TTD, tembusan) agar seimbang mengisi kertas Legal secara anggun dan tidak menyisakan ruang kosong besar di bagian bawah.
+
+#### 2. Realisasi Solusi Presisi:
+1. **Penyelarasan Sempurna Poin a, b, c**:
+   - Menyatukan struktur kelas CSS `.kgb-detail-table` untuk seluruh blok poin (1 s.d. 5, a s.d. c, dan 6 s.d. 10) dengan `margin-left: 92px; width: calc(100% - 92px);`.
+   - Kolom nomor/huruf diseragamkan `width: 26px; text-align: left;`, kolom label `width: 180px;`, dan kolom titik dua `width: 14px; text-align: center;`.
+   - Hasil: Huruf `a.`, `b.`, `c.` berdiri tepat lurus di bawah angka `1.`, `2.`, `3.`, `4.`, `5.` dan tepat lurus di atas angka `6.`, `7.`, `8.`, `9.`, `10.`. Seluruh titik dua (`:`) juga sejajar sempurna dalam satu garis vertikal!
+2. **Ukuran Huruf 12pt Penuh**:
+   - Menerapkan `font-size: 12pt; line-height: 1.4;` pada seluruh isi dokumen: nomor, lampiran, perihal, tanggal, kepada, paragraf pembuka, tabel rincian pegawai 1-5, catatan SKP lama, poin a-c, baris penetapan, poin 6-10, paragraf penutup, tanda tangan Ketua, serta tembusan 1-3.
+3. **Distribusi Padding Proporsional**:
+   - Padding kertas Legal: Atas 1 cm (10mm), Kanan 1.5 cm (15mm), Bawah 1.5 cm (15mm), Kiri 2 cm (20mm).
+   - Jarak antar seksi ditingkatkan secara proporsional: margin pembatas kop 14px, jarak bawah perihal 14px, jarak bawah Kepada 14px, jarak pembuka 14px, jarak banner penetapan 14px, jarak penutup 14px, jarak blok TTD 24px (tinggi TTE 64px), dan jarak tembusan 28px.
+   - Dokumen mengisi ~96% bidang vertikal Legal secara elegan tanpa tumpah ke halaman 2.
+
+#### 3. Berkas yang Dimodifikasi:
+- [`modules/eoffice/cetak/cetak_kgb.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/cetak/cetak_kgb.html)
+- [`eoffice/cetak_kgb.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/cetak_kgb.html)
+- [`modules/eoffice/cetak/js_cetak_kgb.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/cetak/js_cetak_kgb.js)
+- [`eoffice/js_cetak_kgb.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/js_cetak_kgb.html)
+- [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) (`window.APP_BUILD_VER = '3.8.38'`)
+- [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) (`transkep-v3.8.38`)
+- [`prd.md`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/prd.md) & [`revisi.md`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/revisi.md)

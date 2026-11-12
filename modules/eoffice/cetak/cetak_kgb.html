@@ -5,6 +5,7 @@
      INSTANSI: Pengadilan Agama Indramayu Kelas 1.A.
      STANDAR: 1 Orang = 1 Dokumen Presisi Legal (21,6 cm x 35,6 cm)
      MARGIN RESMI: Atas 1 cm | Bawah 1.5 cm | Kiri 2 cm | Kanan 1.5 cm
+     STANDAR TIPOGRAFI: Isi KGB 12pt Bookman Old Style (Lurus Presisi)
      ========================================== -->
 <div id="template-cetak-kgb-container" style="display: none;" class="hidden no-print">
   <style>
@@ -17,8 +18,8 @@
         background-color: #ffffff !important;
         color: #000000 !important;
         font-family: 'Bookman Old Style', 'Times New Roman', serif !important;
-        font-size: 11pt !important;
-        line-height: 1.38 !important;
+        font-size: 12pt !important;
+        line-height: 1.4 !important;
         margin: 0 !important;
         padding: 0 !important;
         -webkit-print-color-adjust: exact;
@@ -35,9 +36,9 @@
       padding: 10mm 15mm 15mm 20mm; /* Atas: 1cm (10mm), Kanan: 1.5cm (15mm), Bawah: 1.5cm (15mm), Kiri: 2cm (20mm) */
       box-sizing: border-box;
       font-family: 'Bookman Old Style', 'Times New Roman', serif;
-      font-size: 11pt;
+      font-size: 12pt;
       color: #000000;
-      line-height: 1.38;
+      line-height: 1.4;
       background: #ffffff;
     }
 
@@ -91,58 +92,58 @@
       border-top: none;
       border-bottom: 2px solid #000000;
       height: 0;
-      margin: 4px 0 10px 0;
+      margin: 4px 0 14px 0;
     }
 
-    /* 2. HEADER NOMOR, LAMPIRAN, PERIHAL & TANGGAL (RATA MARGIN KIRI 0) */
+    /* 2. HEADER NOMOR, LAMPIRAN, PERIHAL & TANGGAL (12pt) */
     .kgb-meta-table {
       width: 100%;
       border-collapse: collapse;
-      margin-bottom: 8px;
-      font-size: 11pt;
+      margin-bottom: 14px;
+      font-size: 12pt;
     }
     .kgb-meta-table td {
       vertical-align: top;
-      padding: 1.5px 0;
+      padding: 2px 0;
     }
 
-    /* 3. TUJUAN KPPN (LURUS 92px) */
+    /* 3. TUJUAN KPPN (12pt, LURUS 92px) */
     .kgb-tujuan-box {
       margin-left: 92px;
-      margin-top: 10px;
-      margin-bottom: 12px;
-      font-size: 11pt;
-      line-height: 1.35;
+      margin-top: 14px;
+      margin-bottom: 14px;
+      font-size: 12pt;
+      line-height: 1.38;
     }
 
-    /* 4. PARAGRAF PEMBUKA (BASE MARGIN 92px, FIRST LINE INDENT 32px, LINE 2 RATA 92px, TIDAK MENONJOL KE KIRI) */
+    /* 4. PARAGRAF PEMBUKA (12pt, BASE MARGIN 92px, FIRST LINE INDENT 32px, LINE 2 RATA 92px) */
     .kgb-paragraf {
       text-align: justify;
       margin-left: 92px;
       text-indent: 32px;
-      margin-top: 10px;
-      margin-bottom: 10px;
-      font-size: 11pt;
-      line-height: 1.38;
+      margin-top: 14px;
+      margin-bottom: 12px;
+      font-size: 12pt;
+      line-height: 1.4;
     }
 
-    /* 5. TABEL RINCIAN POIN 1 - 5 (MARGIN 112px, INDENT 20px DARI 92px) */
+    /* 5. TABEL RINCIAN PEGAWAI 1-5, a-c, 6-10 (POIN a, b, c LURUS PERSIS DENGAN 1, 2, 3) */
     .kgb-detail-table {
-      width: calc(100% - 112px);
-      margin-left: 112px;
+      width: calc(100% - 92px);
+      margin-left: 92px;
       border-collapse: collapse;
-      font-size: 11pt;
+      font-size: 12pt;
     }
     .kgb-detail-table td {
       vertical-align: top;
-      padding: 1.5px 0;
+      padding: 2px 0;
     }
     .kgb-col-no {
-      width: 24px;
+      width: 26px;
       text-align: left;
     }
     .kgb-col-label {
-      width: 175px;
+      width: 180px;
     }
     .kgb-col-colon {
       width: 14px;
@@ -154,59 +155,49 @@
 
     .kgb-subnote {
       margin-left: 92px;
-      margin-top: 3px;
-      margin-bottom: 3px;
-      font-size: 11pt;
+      margin-top: 6px;
+      margin-bottom: 6px;
+      font-size: 12pt;
     }
 
-    .kgb-subdetail-table {
-      width: calc(100% - 132px);
-      margin-left: 132px;
-      border-collapse: collapse;
-      font-size: 11pt;
-    }
-    .kgb-subdetail-table td {
-      vertical-align: top;
-      padding: 1.5px 0;
-    }
-
-    /* 6. BARIS DIBERIKAN... (LURUS 92px & TIDAK DI-BOLD) */
+    /* 6. BARIS DIBERIKAN... (12pt, LURUS 92px & TIDAK DI-BOLD) */
     .kgb-section-banner {
-      margin: 12px 0 8px 92px;
+      margin: 14px 0 12px 92px;
       text-align: left;
-      font-size: 11pt;
+      font-size: 12pt;
       font-weight: normal !important;
       letter-spacing: 0.2px;
     }
 
-    /* 8. TANDA TANGAN KETUA */
+    /* 8. TANDA TANGAN KETUA (12pt) */
     .kgb-ttd-area {
       width: 100%;
-      margin-top: 18px;
+      margin-top: 24px;
     }
     .kgb-ttd-box {
       float: right;
       width: 260px;
       text-align: left;
-      font-size: 11pt;
+      font-size: 12pt;
     }
 
-    /* 9. TEMBUSAN (BASE MARGIN 92px, TIDAK MENONJOL KE KIRI) */
+    /* 9. TEMBUSAN (12pt, BASE MARGIN 92px, TIDAK MENONJOL KE KIRI) */
     .kgb-tembusan {
       clear: both;
       margin-left: 92px;
-      margin-top: 20px;
-      font-size: 10.5pt;
-      line-height: 1.35;
+      margin-top: 28px;
+      font-size: 12pt;
+      line-height: 1.38;
     }
     .kgb-tembusan-table {
-      width: calc(100% - 20px);
-      margin-left: 20px;
+      width: 100%;
       border-collapse: collapse;
-      margin-top: 2px;
+      margin-top: 4px;
+      font-size: 12pt;
     }
     .kgb-tembusan-table td {
       vertical-align: top;
+      padding: 2px 0;
     }
   </style>
 
@@ -231,10 +222,10 @@
     </table>
     <div class="kgb-kop-divider"></div>
 
-    <!-- 2. NOMOR, LAMPIRAN, PERIHAL & TANGGAL (RATA MARGIN KIRI) -->
+    <!-- 2. NOMOR, LAMPIRAN, PERIHAL & TANGGAL (12pt) -->
     <table class="kgb-meta-table">
       <tr>
-        <td style="width: 78px;">Nomor</td>
+        <td style="width: 82px;">Nomor</td>
         <td style="width: 14px; text-align: center;">:</td>
         <td>{{nokgb}}/KPA.W10-A2/KP2.1.2/{{bulan}}/{{tahun}}</td>
         <td style="text-align: right; white-space: nowrap; padding-left: 10px;">{{tanggal}}</td>
@@ -254,7 +245,7 @@
       </tr>
     </table>
 
-    <!-- 3. KEPADA YTH (LURUS 92px) -->
+    <!-- 3. KEPADA YTH (12pt, LURUS 92px) -->
     <div class="kgb-tujuan-box">
       Kepada<br>
       Yth. Kepala Kantor Pelayanan Perbendaharaan<br>
@@ -263,12 +254,12 @@
       <div style="margin-left: 36px; text-decoration: underline; letter-spacing: 2px;">C I R E B O N</div>
     </div>
 
-    <!-- 4. PEMBUKA (BASE MARGIN 92px, FIRST LINE INDENT 32px, LINE 2 RATA 92px) -->
+    <!-- 4. PEMBUKA (12pt, BASE MARGIN 92px, FIRST LINE INDENT 32px, LINE 2 RATA 92px) -->
     <p class="kgb-paragraf">
       Dengan ini kami beritahukan, bahwa berhubung dengan telah terpenuhinya masa kerja dan syarat- syarat lainnya atas:
     </p>
 
-    <!-- 5. RINCIAN PEGAWAI & GAJI LAMA (POIN 1 - 5: MARGIN 112px) -->
+    <!-- 5. RINCIAN PEGAWAI & GAJI LAMA (POIN 1 - 5: 12pt, MARGIN 92px) -->
     <table class="kgb-detail-table">
       <tr>
         <td class="kgb-col-no">1.</td>
@@ -306,16 +297,17 @@
       (atas dasar Skp. terakhir tentang gaji/pangkat yang di tetapkan)
     </div>
 
-    <table class="kgb-subdetail-table">
+    <!-- POIN a, b, c: LURUS PERSIS DENGAN POIN 1, 2, 3 DI ATAS & POIN 6, 7, 8 DI BAWAH -->
+    <table class="kgb-detail-table">
       <tr>
-        <td style="width: 20px;">a.</td>
-        <td style="width: 155px;">Oleh pejabat</td>
+        <td class="kgb-col-no">a.</td>
+        <td class="kgb-col-label">Oleh pejabat</td>
         <td class="kgb-col-colon">:</td>
         <td class="kgb-col-val">{{pejabat_lama}}</td>
       </tr>
       <tr>
-        <td style="width: 20px;"></td>
-        <td style="width: 155px;">Tanggal dan nomor</td>
+        <td class="kgb-col-no"></td>
+        <td class="kgb-col-label">Tanggal dan nomor</td>
         <td class="kgb-col-colon">:</td>
         <td class="kgb-col-val">
           {{tanggal_sk_lama}}<br>
@@ -323,24 +315,25 @@
         </td>
       </tr>
       <tr>
-        <td style="width: 20px;">b.</td>
-        <td style="width: 155px;">Tanggal mulai gaji</td>
+        <td class="kgb-col-no">b.</td>
+        <td class="kgb-col-label">Tanggal mulai gaji</td>
         <td class="kgb-col-colon">:</td>
         <td class="kgb-col-val">{{tmt_gaji_lama}}</td>
       </tr>
       <tr>
-        <td style="width: 20px;">c.</td>
-        <td style="width: 155px;">Masa kerja golongan</td>
+        <td class="kgb-col-no">c.</td>
+        <td class="kgb-col-label">Masa kerja golongan</td>
         <td class="kgb-col-colon">:</td>
         <td class="kgb-col-val">{{tahun_lama}} Tahun {{bulan_lama}} bulan</td>
       </tr>
     </table>
 
-    <!-- 6. PENETAPAN KENAIKAN GAJI BERKALA BARU (LURUS 92px) -->
+    <!-- 6. PENETAPAN KENAIKAN GAJI BERKALA BARU (12pt, LURUS 92px) -->
     <div class="kgb-section-banner">
       DIBERIKAN KENAIKAN GAJI BERKALA HINGGA MEMPEROLEH :
     </div>
 
+    <!-- POIN 6 - 10: LURUS PERSIS DENGAN POIN a, b, c DAN 1, 2, 3 -->
     <table class="kgb-detail-table">
       <tr>
         <td class="kgb-col-no">6.</td>
@@ -374,34 +367,34 @@
       </tr>
     </table>
 
-    <!-- 7. PENUTUP (BASE MARGIN 92px, FIRST LINE INDENT 32px, LINE 2 & 3 RATA 92px, TIDAK MENONJOL KE KIRI) -->
-    <p class="kgb-paragraf" style="margin-top: 12px;">
+    <!-- 7. PENUTUP (12pt, BASE MARGIN 92px, FIRST LINE INDENT 32px, LINE 2 & 3 RATA 92px) -->
+    <p class="kgb-paragraf" style="margin-top: 14px;">
       Kami harap sesuai dengan {{dasar_pp}}, kepada Pegawai tersebut agar dibayarkan penghasilannya berdasarkan gaji pokoknya yang baru.
     </p>
 
-    <!-- 8. TANDA TANGAN KETUA (NAMA KETUA TANPA GELAR) -->
+    <!-- 8. TANDA TANGAN KETUA (12pt, NAMA KETUA TANPA GELAR) -->
     <div class="kgb-ttd-area">
       <div class="kgb-ttd-box">
         <div>Ketua,</div>
-        <div style="min-height: 56px; display: flex; align-items: center; padding: 4px 0;">{{tte_qr_slot}}</div>
+        <div style="min-height: 64px; display: flex; align-items: center; padding: 4px 0;">{{tte_qr_slot}}</div>
         <div style="font-weight: bold;">{{nama_ttd}}</div>
       </div>
     </div>
 
-    <!-- 9. TEMBUSAN (BASE MARGIN 92px, TIDAK MENONJOL KE KIRI) -->
+    <!-- 9. TEMBUSAN (12pt, BASE MARGIN 92px, TIDAK MENONJOL KE KIRI) -->
     <div class="kgb-tembusan">
       <div>Tembusan :</div>
       <table class="kgb-tembusan-table">
         <tr>
-          <td style="width: 20px;">1.</td>
+          <td style="width: 24px;">1.</td>
           <td>Ketua Pengadilan Tinggi Agama Bandung di Bandung;</td>
         </tr>
         <tr>
-          <td style="width: 20px;">2.</td>
+          <td style="width: 24px;">2.</td>
           <td>Kepala Kantor Cabang PT. TASPEN di Cirebon;</td>
         </tr>
         <tr>
-          <td style="width: 20px;">3.</td>
+          <td style="width: 24px;">3.</td>
           <td>Sdr. <strong>{{nama}}</strong> di Indramayu.</td>
         </tr>
       </table>
