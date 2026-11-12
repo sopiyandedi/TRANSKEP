@@ -5867,3 +5867,45 @@ Saat baris di sheet `cuti_log` dihapus langsung secara manual di Google Sheets (
 - [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) *(Versi `v3.8.41`)*
 - [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) *(Cache `v3.8.41`)*
 - [`prd.md`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/prd.md) & [`revisi.md`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/revisi.md)
+
+---
+
+### TAHAP 113 - RESTUKTURISASI ARSITEKTUR TOTAL: ELIMINASI 84 BERKAS HTML LEGACY ROOT (v3.8.42)
+*Status: [SELESAI & AKTIF] ✅*
+
+#### 1. Masalah & Permintaan Pengguna:
+- Pengguna meminta implementasi **Opsi 1** (pembersihan total seluruh berkas ganda/duplikat di seluruh modul proyek TRANSKEP secara hati-hati tanpa merusak satupun fungsionalitas sistem).
+
+#### 2. Realisasi Solusi Presisi:
+1. **Eliminasi 84 Berkas HTML Legacy di Seluruh Folder Root**:
+   - Seluruh berkas HTML warisan Web App Google Sites (yang sudah 100% dimigrasikan ke `modules/` dan `core/`) resmi dihapus:
+     * `dashboard/` (+ `referensi/`): 8 berkas HTML dihapus (`js_dashboard.html`, `js_dashboard_grafik.html`, `js_dashboard_peringatan.html`, `view_dashboard.html`, `referensi/js_kode.html`, `referensi/js_referensi.html`, `referensi/view_kode.html`, `referensi/view_referensi.html`).
+     * `jobdes/`: 4 berkas HTML dihapus (`js_cetak_jobdes.html`, `js_jobdes.html`, `template_cetak_jobdes.html`, `view_jobdes.html`).
+     * `kinerja/`: 2 berkas HTML dihapus (`js_kinerja.html`, `view_kinerja.html`).
+     * `pegawai/`: 2 berkas HTML dihapus (`js_manajemen_pegawai.html`, `view_manajemen_pegawai.html`).
+     * `permohonan/` (+ `ik/`, `ip/`, `st/`, `wfh/`): 35 berkas HTML dihapus.
+     * `pkp/`: 10 berkas HTML dihapus (`PCK_template.html`, `PK_template.html`, `js_PCK_cetak.html`, `js_PK_cetak.html`, `js_pkp_core.html`, `js_pkp_modal.html`, `js_pkp_render.html`, `js_rekap_cetak.html`, `rekap_pkp_template.html`, `view_pkp.html`).
+     * `sk/`: 10 berkas HTML dihapus (`css_animations.html`, `css_sk_builder.html`, `js_iframepdf.html`, `js_sk.html`, `js_sk_builder.html`, `js_sortir.html`, `view_iframepdf.html`, `view_sk.html`, `view_sk_builder.html`, `view_sk_revisi.html`).
+     * `sop/`: 2 berkas HTML dihapus (`js_sop.html`, `view_sop.html`).
+     * `front_view/`: 8 berkas HTML + direktori dihapus (telah digantikan penuh oleh `core/view_sidebar.html`, `core/view_mobile_nav.html`, `core/view_login.html`, `core/sidebar.js`, dll).
+     * Root utama: 3 berkas HTML dihapus (`javascript.html`, `javascript_firebase.html`, `stylesheet.html`).
+2. **Preservasi 100% Backend Google Apps Script (20 Berkas JS Subfolder + Root Core JS)**:
+   - Folder root kini murni dan bersih menjadi direktori backend server-side Google Apps Script:
+     * `dashboard/dashboard.js`
+     * `eoffice/` (`eoffice.js`, `kgb.js`, `rapat.js`, `tabel_gaji_pp5_2024.js`)
+     * `jobdes/jobdes.js`
+     * `kinerja/kinerja.js`
+     * `pegawai/manajemen_pegawai.js`
+     * `permohonan/` (`permohonan.js`, `persetujuan.js`, `rekapitulasi.js`, `ik/ik.js`, `ip/ip.js`, `st/st.js`, `st/st_pdf_compiler.js`, `wfh/wfh.js`)
+     * `pkp/` (`pkp.js`, `setup_pkp.js`)
+     * `sk/sk.js`
+     * `sop/sop.js`
+     * Root: `code.js`, `api_router.js`, `backup.js`, `setup.js`, `appsscript.json`.
+3. **PWA Frontend Single Source of Truth**:
+   - Seluruh template antarmuka, CSS, dan client script aktif 100% dilayani dari `modules/` dan `core/` via `index.html` dan `sw.js` (Build `v3.8.42`).
+
+#### 3. Berkas yang Dimodifikasi / Dihapus:
+- Dihapus: 84 berkas HTML legacy dan folder `front_view/`.
+- [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) *(Versi dinaikkan ke `v3.8.42`)*
+- [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) *(Cache dinaikkan ke `transkep-v3.8.42`)*
+- [`prd.md`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/prd.md) & [`revisi.md`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/revisi.md)
