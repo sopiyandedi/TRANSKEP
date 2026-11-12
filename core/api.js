@@ -6,18 +6,16 @@
 // ==========================================
 
 const TranskepAPI = (function () {
-  // URL DEPLOYMENT RESMI WEB APP (Google Apps Script Versi 273)
+  // URL DEPLOYMENT RESMI WEB APP (Google Apps Script - Target ID: AKfycbzFrbQTqmVzMio7mderK-S9ntFVjXiWYFgnXfy9fW_SUKOcIxfPywP2He1flhaK_AZ0ZA)
   const VERIFIED_URL = 'https://script.google.com/macros/s/AKfycbzFrbQTqmVzMio7mderK-S9ntFVjXiWYFgnXfy9fW_SUKOcIxfPywP2He1flhaK_AZ0ZA/exec';
 
-  // Validasi & Auto-Sinkronisasi URL jika tersimpan URL lama / typo di localStorage
-  let savedUrl = (typeof localStorage !== 'undefined') ? localStorage.getItem('transkep_api_url') : null;
-  if (!savedUrl || savedUrl.includes('SUKOclxf') || savedUrl.includes('AKfycbx...')) {
-    savedUrl = VERIFIED_URL;
-    if (typeof localStorage !== 'undefined') localStorage.setItem('transkep_api_url', VERIFIED_URL);
+  // Selalu pastikan API URL merujuk ke VERIFIED_URL yang sah dan mutakhir
+  if (typeof localStorage !== 'undefined') {
+    localStorage.setItem('transkep_api_url', VERIFIED_URL);
   }
 
   const CONFIG = {
-    apiUrl: savedUrl,
+    apiUrl: VERIFIED_URL,
     timeout: 30000 // 30 detik
   };
 
@@ -107,6 +105,9 @@ const TranskepAPI = (function () {
     }
 
     try {
+      if (payload.action === 'login' || payload.method === 'verifyLogin') {
+        console.log('🔄 [TranskepAPI] Mengirim verifikasi login ke server Apps Script...');
+      }
       const response = await fetch(CONFIG.apiUrl, fetchOptions);
       if (timeoutTimer) clearTimeout(timeoutTimer);
       if (!response.ok) {
@@ -114,14 +115,20 @@ const TranskepAPI = (function () {
       }
 
       const rawText = await response.text();
+      let parsed = null;
       try {
-        return JSON.parse(rawText);
+        parsed = JSON.parse(rawText);
       } catch (parseErr) {
         if (rawText.includes('Maaf') || rawText.includes('Google Drive') || rawText.includes('drive-logo')) {
           throw new Error('Server Google Apps Script sedang sibuk atau URL deployment perlu diperbarui.');
         }
         throw new Error('Respon server tidak valid: ' + rawText.substring(0, 100));
       }
+
+      if (payload.action === 'login' || payload.method === 'verifyLogin') {
+        console.log('📥 [TranskepAPI] Respon verifikasi login diterima:', parsed ? parsed.status : 'kosong');
+      }
+      return parsed;
     } catch (err) {
       if (timeoutTimer) clearTimeout(timeoutTimer);
       if (err && err.name === 'AbortError') {

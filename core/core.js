@@ -1156,7 +1156,10 @@ function resetLoginFormUI() {
 window.resetLoginFormUI = resetLoginFormUI;
 
 function handleLogin(event) {
-  if (event) event.preventDefault();
+  if (event) {
+    event.preventDefault();
+    if (typeof event.stopPropagation === 'function') event.stopPropagation();
+  }
 
   if (typeof LoginRateLimiter !== 'undefined' && LoginRateLimiter.isLocked()) {
     const sec = LoginRateLimiter.getRemainingSeconds();
@@ -1196,7 +1199,15 @@ function handleLogin(event) {
     }
   };
 
+  // Timeout Pengaman (Anti-Stuck): Pulihkan tombol jika koneksi jaringan tertunda > 20 detik
+  let loginTimeout = setTimeout(() => {
+    resetBtn();
+    showNotify("Koneksi Lambat", "Respon server membutuhkan waktu lebih lama. Silakan periksa jaringan dan coba lagi.", "warning");
+  }, 20000);
+
   const handleSuccess = function (response) {
+    if (loginTimeout) clearTimeout(loginTimeout);
+    console.log('📥 [TRANSKEP Auth] Respon verifikasi:', response);
     if (response && (response.status === 'success' || response.status === 'UPDATED')) {
       const applyLoginSuccess = () => {
         if (typeof LoginRateLimiter !== 'undefined') {
@@ -1317,6 +1328,7 @@ function handleLogin(event) {
   };
 
   const handleFailure = function (error) {
+    if (loginTimeout) clearTimeout(loginTimeout);
     resetBtn();
     // Gangguan jaringan/server tidak dihitung sebagai percobaan salah sandi (anti false-lockout)
     showNotify("Error Server", (error && error.message) ? error.message : "Gagal menghubungi server", "error");

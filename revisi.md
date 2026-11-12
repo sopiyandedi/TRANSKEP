@@ -5909,3 +5909,39 @@ Saat baris di sheet `cuti_log` dihapus langsung secara manual di Google Sheets (
 - [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) *(Versi dinaikkan ke `v3.8.42`)*
 - [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) *(Cache dinaikkan ke `transkep-v3.8.42`)*
 - [`prd.md`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/prd.md) & [`revisi.md`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/revisi.md)
+
+---
+
+### TAHAP 114 - PERBAIKAN CSP MAP/RECAPTCHA & HARDENING FLOW VERIFIKASI LOGIN (v3.8.43)
+*Status: [SELESAI & AKTIF] ✅*
+
+#### 1. Masalah & Investigasi Kendala:
+- Pengguna melaporkan error saat login pada `sso.pa-indramayu.go.id/?` di mana tombol tertahan pada status *Memverifikasi...* dan console memunculkan 4 pelanggaran Content Security Policy (CSP) merah terkait pemblokiran fetch `.js.map` ke `cdn.jsdelivr.net` dan `www.gstatic.com`.
+- Investigasi mendalam menemukan:
+  1. Direktif CSP `connect-src` pada `index.html` belum mengizinkan domain source map CDN (`cdn.jsdelivr.net`, `www.gstatic.com`, `cdnjs.cloudflare.com`, `unpkg.com`) serta domain Google dynamic redirect/reCAPTCHA (`*.googleusercontent.com`, `*.google.com`, `*.recaptcha.net`).
+  2. Form login belum memiliki return preventer eksplisit (`return false;`), sehingga penekanan tombol dapat memicu submit GET default browser ke `/?`.
+  3. URL `transkep_api_url` pada `api.js` perlu disinkronkan absolut ke `VERIFIED_URL` resmi agar browser klien tidak tersangkut URL deployment lama di `localStorage`.
+  4. Tombol verifikasi login membutuhkan timeout guard (20s) agar tidak terus berputar (*infinite spinner*) jika jaringan atau cold-start Apps Script tertunda.
+
+#### 2. Realisasi Solusi Presisi:
+1. **Pembaruan CSP `connect-src`**:
+   - Menambahkan `https://*.googleusercontent.com`, `https://*.google.com`, `https://recaptcha.net`, `https://*.recaptcha.net`, `https://cdn.jsdelivr.net`, `https://www.gstatic.com`, `https://cdnjs.cloudflare.com`, dan `https://unpkg.com` ke dalam direktif `connect-src`.
+   - Mengeliminasi 100% error merah CSP di DevTools console.
+2. **Hardening Form Login & Anti-Navigation**:
+   - Memasang `onsubmit="handleLogin(event); return false;"` pada `core/view_login.html`.
+   - Menambahkan `event.stopPropagation()` pada `handleLogin` di `core/core.js`.
+3. **Guard Timeout & Debug Logging Login**:
+   - Memasang `loginTimeout` 20 detik di `core/core.js` untuk otomatis memulihkan tombol dan memberi tahu pengguna jika server/jaringan lambat.
+   - Menambahkan logging diagnostik terstruktur `[TRANSKEP Auth]` dan `[TranskepAPI]` ke console.
+4. **Enforcement URL Deployment Resmi di `core/api.js`**:
+   - Memastikan `CONFIG.apiUrl` secara mutlak menggunakan deployment target resmi `AKfycbzFrbQTqmVzMio7mderK-S9ntFVjXiWYFgnXfy9fW_SUKOcIxfPywP2He1flhaK_AZ0ZA` dan memperbarui `localStorage`.
+5. **Bypass Service Worker untuk Redirect Google**:
+   - Menambahkan `googleusercontent.com` pada filter bypass `sw.js` agar redirect fetch Apps Script langsung melalui jaringan tanpa halangan SW.
+
+#### 3. Berkas yang Dimodifikasi:
+- [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) *(CSP diperluas & Build dinaikkan ke `v3.8.43`)*
+- [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js) *(Cache dinaikkan ke `transkep-v3.8.43` & bypass googleusercontent.com)*
+- [`core/api.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/core/api.js) *(Enforcement VERIFIED_URL mutlak & logging)*
+- [`core/view_login.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/core/view_login.html) *(Form anti-reload `return false;`)*
+- [`core/core.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/core/core.js) *(Anti-stuck timeout 20s & diagnostik login)*
+- [`prd.md`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/prd.md) & [`revisi.md`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/revisi.md)

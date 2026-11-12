@@ -1,10 +1,10 @@
 // =========================================================================
 // FILE: sw.js (TRANSKEP Progressive Web App Service Worker)
 // DESKRIPSI: Offline Asset Caching, Fast Load & Network Pass-Through
-// ENGINE: TRANSKEP PWA Engine v1.0.0 (Build: v3.8.42 - Eliminasi 84 HTML Legacy Root)
+// ENGINE: TRANSKEP PWA Engine v1.0.0 (Build: v3.8.43 - Login Hardening & CSP Fix)
 // =========================================================================
 
-const CACHE_NAME = 'transkep-v3.8.42';
+const CACHE_NAME = 'transkep-v3.8.43';
 
 // Daftar aset inti yang di-cache saat Service Worker dipasang (Install)
 const PRECACHE_ASSETS = [
@@ -151,7 +151,7 @@ self.addEventListener('fetch', (event) => {
   // A. WAJIB BYPASS: Jangan pernah cache request API backend Google Apps Script / POST
   if (
     reqUrl.hostname.includes('script.google.com') ||
-    reqUrl.hostname.includes('script.googleusercontent.com') ||
+    reqUrl.hostname.includes('googleusercontent.com') ||
     event.request.method !== 'GET'
   ) {
     return; // Serahkan sepenuhnya ke jaringan langsung (Network Only)
