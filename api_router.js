@@ -22,13 +22,14 @@ function handleApiGet_(e) {
     const params = (e && e.parameter) ? e.parameter : {};
     const action = params.action || 'ping';
 
-    // 1. Healthcheck / Ping (+ Auto-Heal PII Vault Encryption)
+    // 1. Healthcheck / Ping (+ Auto-Heal PII Vault Encryption secara internal)
     if (action === 'ping') {
-      const vaultStatus = (typeof ensureAllPiiSheetsEncrypted_ === 'function') ? ensureAllPiiSheetsEncrypted_() : null;
+      if (typeof ensureAllPiiSheetsEncrypted_ === 'function') {
+        try { ensureAllPiiSheetsEncrypted_(); } catch (eVault) {}
+      }
       return jsonResponse_({
         status: 'success',
         message: 'TRANSKEP Headless API Gateway v3.0 Aktif!',
-        piiVault: vaultStatus,
         timestamp: new Date().toISOString()
       });
     }
@@ -98,7 +99,7 @@ function handleApiPost_(payload, e) {
     // Format: { action: 'call', method: 'namaFungsi', args: [...] }
     // ----------------------------------------------------
     if (action === 'call') {
-      return handleRpcCall_(payload.method, payload.args);
+      return handleRpcCall_(payload.method, payload.args, payload.nip, payload.token);
     }
 
     // ----------------------------------------------------
@@ -114,7 +115,13 @@ function handleApiPost_(payload, e) {
         });
 
       case 'testWaha':
-        return jsonResponse_(sendWhatsAppMessage_(payload.phone || '6285139811819', payload.text || 'Test WAHA diagnostic'));
+        if (!cekOtorisasiAdmin(payload.nip, payload.token)) {
+          return jsonResponse_({ status: 'error', message: 'Akses Ditolak: Diagnostik WAHA khusus Admin terotorisasi.' });
+        }
+        if (!payload.phone) {
+          return jsonResponse_({ status: 'error', message: "Parameter 'phone' wajib disertakan." });
+        }
+        return jsonResponse_(sendWhatsAppMessage_(payload.phone, payload.text || 'Test WAHA diagnostic'));
 
       // Autentikasi & Sesi
       case 'verifyLogin':
@@ -124,12 +131,6 @@ function handleApiPost_(payload, e) {
       case 'logoutSession':
       case 'logout':
         return jsonResponse_(logoutSession(payload.nip, payload.token));
-
-      case 'submitLupaPassword':
-        return jsonResponse_(submitLupaPassword(payload.nip, payload.noHp, payload.alasan));
-
-      case 'gantiPasswordUser':
-        return jsonResponse_(gantiPasswordUser(payload.nip, payload.passLama, payload.passBaru, payload.token));
 
       // Core Data Fetch
       case 'getBulkData':
@@ -172,9 +173,6 @@ function handleApiPost_(payload, e) {
       case 'deleteKgbDocRecord':
         return jsonResponse_(deleteKgbDocRecord(payload.id_kgb || payload.idKgb, payload.targetNip, payload.resetUserStatus, payload.nip, payload.token));
 
-      case 'saveOrGenerateRapatDoc':
-        return jsonResponse_(saveOrGenerateRapatDoc(payload.data, payload.actionType, payload.nip, payload.token));
-
       // Magic Link Approval & Resend WA
       case 'getCutiByToken':
         return jsonResponse_(getCutiByToken(payload.token));
@@ -195,9 +193,14 @@ function handleApiPost_(payload, e) {
       case 'updateNomorSuratTugas':
         return jsonResponse_(updateNomorSuratTugasFromExternal_(payload));
 
-      // Fallback: Jika action cocok dengan fungsi global terdaftar yang aman
+      // Fallback: Hanya izinkan method dalam whitelist RPC resmi
       default:
-        return handleRpcCall_(action, payload.args || [payload.data, payload.nip, payload.token]);
+        return handleRpcCall_(
+          action,
+          Array.isArray(payload.args) ? payload.args : [payload.data, payload.nip, payload.token],
+          payload.nip,
+          payload.token
+        );
     }
 
   } catch (err) {
@@ -208,24 +211,112 @@ function handleApiPost_(payload, e) {
   }
 }
 
+var PUBLIC_RPC_METHODS_ = {
+  verifyLogin: true,
+  logoutSession: true,
+  requestPasswordReset: true,
+  getCutiByToken: true,
+  processMagicLinkApproval: true
+};
+
+var AUTHENTICATED_RPC_METHODS_ = {
+  getBulkData: true,
+  getBackgroundData: true,
+  changeMyPassword: true,
+  updateTmtStatus: true,
+  forwardTmtDateByFrontend: true,
+  getEofficeData: true,
+  saveOrGenerateKgbDoc: true,
+  deleteKgbDocRecord: true,
+  createPaketRapatDocs: true,
+  saveJobdes: true,
+  createPdfJobdes: true,
+  getUsulanMenunggu: true,
+  tandaiUsulanSelesai: true,
+  addKinerjaLog: true,
+  approveKinerja: true,
+  addUser: true,
+  updateUser: true,
+  deleteUser: true,
+  importBulkUsers: true,
+  simpanDataMassal: true,
+  getResetPasswordQueue: true,
+  markResetAsDone: true,
+  submitIzinKeluar: true,
+  getIzinKeluarById: true,
+  updateIkStatus: true,
+  deleteIzinKeluarLog: true,
+  updateIzinKeluarLog: true,
+  submitIzinPribadi: true,
+  getIzinPribadiById: true,
+  updateIpStatus: true,
+  deleteIzinPribadiLog: true,
+  updateIzinPribadiLog: true,
+  addCutiLog: true,
+  updateCutiLog: true,
+  deleteCutiLog: true,
+  requestCancelCuti: true,
+  updateCutiStatus: true,
+  processBulkApproval: true,
+  resendCutiWhatsApp: true,
+  getSmartRouting: true,
+  addSuratTugas: true,
+  updateSuratTugas: true,
+  deleteSuratTugasLog: true,
+  saveSettingsST: true,
+  getSettingsST: true,
+  submitRencanaWFH: true,
+  getRencanaWFHById: true,
+  submitLaporanWFH: true,
+  updateWfhStatus: true,
+  deleteWfhLog: true,
+  updateRencanaWfhLog: true,
+  generatePdfLaporanWFH: true,
+  generatePdfRencanaWFH: true,
+  getDataDokumenPKP: true,
+  generatePdfPK: true,
+  generatePdfPCK: true,
+  submitBulkPKP: true,
+  getDetailPKP: true,
+  submitBulkPCK: true,
+  getDataDokumenPCK: true,
+  getDetailLengkapPCK: true,
+  aksiDokumenPKP: true,
+  aksiDokumenPCK: true,
+  getSkDriveFolderUrl: true,
+  saveSk: true,
+  deleteSk: true,
+  acknowledgeSk: true,
+  getSopDriveFolderUrl: true,
+  saveSopData: true,
+  acknowledgeSop: true
+};
+
 /**
- * Universal RPC Dispatcher Aman (Mengeksekusi fungsi server sesuai hak akses)
+ * Universal RPC Dispatcher Aman (Strict Allowlist & Wajib Validasi Token Sesi)
  */
-function handleRpcCall_(methodName, args) {
+function handleRpcCall_(methodName, args, authNip, authToken) {
   if (!methodName || typeof methodName !== 'string') {
     return jsonResponse_({ status: 'error', message: 'Nama method RPC tidak valid.' });
   }
 
-  // DAFTAR HITAM: Larang memanggil fungsi internal, setup, atau gateway
-  const FORBIDDEN_METHODS = [
-    'doGet', 'doPost', 'include', 'getDB', 'sanitizeFormulaInput', 'sanitizeRowArray',
-    'jsonResponse_', 'handleApiGet_', 'handleApiPost_', 'handleRpcCall_', 'handleWebhookST_',
-    'setupDatabase_', 'runDailyBackup_', 'cleanupOldBackups_'
-  ];
+  const isPublic = Object.prototype.hasOwnProperty.call(PUBLIC_RPC_METHODS_, methodName);
+  const isAuthMethod = Object.prototype.hasOwnProperty.call(AUTHENTICATED_RPC_METHODS_, methodName);
 
-  // Larang fungsi berakhiran underscore (_) karena merupakan fungsi privat
-  if (methodName.endsWith('_') || FORBIDDEN_METHODS.indexOf(methodName) !== -1) {
+  // DEFAULT-DENY ALLOWLIST: Tolak seluruh fungsi internal, inisialisasi DB, diagnostik, atau private (_)
+  if ((!isPublic && !isAuthMethod) || methodName.endsWith('_')) {
     return jsonResponse_({ status: 'error', message: 'Akses ke fungsi ' + methodName + ' ditolak oleh proteksi sistem.' });
+  }
+
+  // Penegakan otorisasi sesi terpusat untuk seluruh endpoint terproteksi
+  let verifiedSess = null;
+  if (isAuthMethod) {
+    verifiedSess = (typeof getVerifiedSession_ === 'function')
+      ? getVerifiedSession_(authNip, authToken)
+      : (cekOtorisasi(authNip, authToken) ? { nip: String(authNip || '').trim(), role: '' } : null);
+    if (!verifiedSess) {
+      return jsonResponse_({ status: 'error', message: 'Akses Ditolak: Sesi tidak valid atau kedaluwarsa. Silakan login ulang.' });
+    }
   }
 
   const globalScope = (typeof globalThis !== 'undefined') ? globalThis : this;
@@ -236,7 +327,13 @@ function handleRpcCall_(methodName, args) {
   }
 
   const cleanArgs = Array.isArray(args) ? args : [];
-  const result = targetFn.apply(globalScope, cleanArgs);
+  let result;
+  if (typeof setActiveSession_ === 'function') setActiveSession_(verifiedSess);
+  try {
+    result = targetFn.apply(globalScope, cleanArgs);
+  } finally {
+    if (typeof clearActiveSession_ === 'function') clearActiveSession_();
+  }
 
   // Jika result adalah Array, kembalikan langsung sebagai JSON Array identik dengan google.script.run
   if (Array.isArray(result)) {

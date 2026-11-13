@@ -92,8 +92,8 @@ function updateTmtStatus(actorNip, targetNip, type, newStatus, clientToken) {
 
 function forwardTmtDateByFrontend(actorNip, targetNip, type, newDateStr, clientToken) {
   try {
-    if (!cekOtorisasi(actorNip, clientToken)) {
-        return { status: 'error', message: 'Akses Ditolak: Sesi kedaluwarsa atau manipulasi terdeteksi.' };
+    if (!cekOtorisasiAdmin(actorNip, clientToken)) {
+        return { status: 'error', message: 'Akses Ditolak: Hanya Admin atau Operator yang dapat memajukan tanggal TMT.' };
     }
 
     const ss = getDB(); // TRANSKEP: Menggunakan konektor terpusat
@@ -127,7 +127,8 @@ function forwardTmtDateByFrontend(actorNip, targetNip, type, newDateStr, clientT
       return { status: 'error', message: 'Tipe berkas tidak valid.' };
     }
 
-    sheet.getRange(rowIndex, colTmt).setValue(newDateStr);
+    const safeDateVal = (typeof sanitizeFormulaInput === 'function') ? sanitizeFormulaInput(newDateStr) : newDateStr;
+    sheet.getRange(rowIndex, colTmt).setValue(safeDateVal);
     sheet.getRange(rowIndex, colTmt).setNumberFormat('@'); 
     
     if (colStatus > 0) {

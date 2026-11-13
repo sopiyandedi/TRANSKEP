@@ -24,9 +24,32 @@ function generateKodePKP(sheetName, prefix) {
   return prefix + "-" + new Date().getTime();
 }
 
+function hasPkpAccess_(docNip, penilaiNip, atasanNip, sess) {
+  if (!sess) return false;
+  if (typeof isAdminRole_ === "function" && isAdminRole_(sess.role)) return true;
+  const caller = (typeof normalizeNipKey_ === "function") ? normalizeNipKey_(sess.nip) : String(sess.nip || "").replace(/'/g, "").trim();
+  if (!caller) return false;
+  const norm = (typeof normalizeNipKey_ === "function") ? normalizeNipKey_ : (v => String(v || "").replace(/'/g, "").trim());
+  return norm(docNip) === caller || norm(penilaiNip) === caller || norm(atasanNip) === caller;
+}
+
+function findPkpDocRow_(ss, idPkp) {
+  const sheetDoc = ss.getSheetByName("pkp_dokumen");
+  if (!sheetDoc) return null;
+  const rows = sheetDoc.getDataRange().getDisplayValues();
+  const target = String(idPkp || "").trim();
+  for (let i = 1; i < rows.length; i++) {
+    if (String(rows[i][0] || "").trim() === target) {
+      return { rowIndex: i + 1, row: rows[i] };
+    }
+  }
+  return null;
+}
+
 function getDataDokumenPKP(nipPegawai, userRole, clientToken) {
   try {
-    if (!cekOtorisasi(nipPegawai, clientToken)) return [];
+    const callerSess = getVerifiedSession_(nipPegawai, clientToken);
+    if (!callerSess) return [];
 
     const sheet = getDB().getSheetByName("pkp_dokumen");
     const lastRow = sheet.getLastRow();
@@ -35,13 +58,13 @@ function getDataDokumenPKP(nipPegawai, userRole, clientToken) {
     
     const data = sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn()).getDisplayValues();
     let result = [];
-    const isAdmin = (userRole === "Admin" || userRole === "Operator");
-    const cleanNipPegawai = String(nipPegawai).replace(/'/g, "").trim();
+    const isAdmin = isAdminRole_(callerSess.role);
+    const cleanNipPegawai = normalizeNipKey_(callerSess.nip);
     
     for (let i = 0; i < data.length; i++) {
-      let dbNip = String(data[i][1]).replace(/'/g, "").trim();
-      let dbPenilai = String(data[i][2]).replace(/'/g, "").trim();
-      let dbAtasan = String(data[i][7] || "").replace(/'/g, "").trim(); 
+      let dbNip = normalizeNipKey_(data[i][1]);
+      let dbPenilai = normalizeNipKey_(data[i][2]);
+      let dbAtasan = normalizeNipKey_(data[i][7] || ""); 
       
       if (isAdmin || dbNip === cleanNipPegawai || dbPenilai === cleanNipPegawai || dbAtasan === cleanNipPegawai) { 
         result.push({
@@ -63,10 +86,16 @@ function getDataDokumenPKP(nipPegawai, userRole, clientToken) {
 
 function saveDokumenPKPBaru(nipPegawai, nipPenilai, tahun) {
   try {
+    const sess = resolveCallerSession_(null, null);
+    if (!sess) return { success: false, message: "Akses Ditolak: Sesi tidak valid." };
+    if (!isAdminRole_(sess.role) && normalizeNipKey_(nipPegawai) !== normalizeNipKey_(sess.nip)) {
+      return { success: false, message: "Akses Ditolak." };
+    }
+
     const sheet = getDB().getSheetByName("pkp_dokumen");
     const newId = generateKodePKP("pkp_dokumen", "PKP");
     const timestamp = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'dd/MM/yyyy HH:mm:ss');
-    const rowData = [newId, nipPegawai, nipPenilai, tahun, "Draft", "0", timestamp, ""]; 
+    const rowData = sanitizeRowArray([newId, nipPegawai, nipPenilai, tahun, "Draft", "0", timestamp, ""]); 
     
     sheet.appendRow(rowData);
     if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush(); 
@@ -79,7 +108,15 @@ function saveDokumenPKPBaru(nipPegawai, nipPenilai, tahun) {
 
 function getItemsPKP(idPKP) {
   try {
+    const sess = resolveCallerSession_(null, null);
+    if (!sess) return [];
+
     const ss = getDB();
+    const docEntry = findPkpDocRow_(ss, idPKP);
+    if (!docEntry || !hasPkpAccess_(docEntry.row[1], docEntry.row[2], docEntry.row[7], sess)) {
+      return [];
+    }
+
     const sheetRencana = ss.getSheetByName("pkp_rencana");
     const sheetEvaluasi = ss.getSheetByName("pkp_evaluasi");
     
@@ -128,11 +165,20 @@ function getItemsPKP(idPKP) {
 
 function saveItemPKP(idPKP, jenis, sasaran, indikator, kuantitas, satuan, mutu, waktu, pagu) {
   try {
-    const sheet = getDB().getSheetByName("pkp_rencana");
+    const sess = resolveCallerSession_(null, null);
+    if (!sess) return { success: false, message: "Akses Ditolak: Sesi tidak valid." };
+
+    const ss = getDB();
+    const docEntry = findPkpDocRow_(ss, idPKP);
+    if (!docEntry || !hasPkpAccess_(docEntry.row[1], docEntry.row[2], docEntry.row[7], sess)) {
+      return { success: false, message: "Akses Ditolak: Anda tidak memiliki hak akses dokumen PKP ini." };
+    }
+
+    const sheet = ss.getSheetByName("pkp_rencana");
     const newItemId = generateKodePKP("pkp_rencana", "ITEM");
     const timestamp = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'dd/MM/yyyy HH:mm:ss');
     
-    const rowData = [newItemId, idPKP, jenis, sasaran, indikator, kuantitas, satuan, mutu, waktu, pagu, "Aktif", timestamp];
+    const rowData = sanitizeRowArray([newItemId, idPKP, jenis, sasaran, indikator, kuantitas, satuan, mutu, waktu, pagu, "Aktif", timestamp]);
     sheet.appendRow(rowData);
     if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush();
     
@@ -144,11 +190,30 @@ function saveItemPKP(idPKP, jenis, sasaran, indikator, kuantitas, satuan, mutu, 
 
 function saveEvaluasiPKP(idItem, periode, capaianAngka) {
   try {
-    const sheet = getDB().getSheetByName("pkp_evaluasi");
+    const sess = resolveCallerSession_(null, null);
+    if (!sess) return { success: false, message: "Akses Ditolak: Sesi tidak valid." };
+
+    const ss = getDB();
+    const sheetRencana = ss.getSheetByName("pkp_rencana");
+    if (!sheetRencana) return { success: false, message: "Sheet rencana tidak ditemukan." };
+    const renData = sheetRencana.getDataRange().getDisplayValues();
+    let targetIdPkp = "";
+    for (let i = 1; i < renData.length; i++) {
+      if (String(renData[i][0] || "").trim() === String(idItem || "").trim()) {
+        targetIdPkp = renData[i][1];
+        break;
+      }
+    }
+    const docEntry = targetIdPkp ? findPkpDocRow_(ss, targetIdPkp) : null;
+    if (!docEntry || !hasPkpAccess_(docEntry.row[1], docEntry.row[2], docEntry.row[7], sess)) {
+      return { success: false, message: "Akses Ditolak: Anda tidak memiliki hak akses item PKP ini." };
+    }
+
+    const sheet = ss.getSheetByName("pkp_evaluasi");
     const newItemId = generateKodePKP("pkp_evaluasi", "EVAL");
     const timestamp = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'dd/MM/yyyy HH:mm:ss');
     
-    const rowData = [newItemId, idItem, periode, capaianAngka, "", timestamp];
+    const rowData = sanitizeRowArray([newItemId, idItem, periode, capaianAngka, "", timestamp]);
     sheet.appendRow(rowData);
     if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush();
     
@@ -160,13 +225,21 @@ function saveEvaluasiPKP(idItem, periode, capaianAngka) {
 
 function sahkanDokumenPKP(idPKP, nilaiAkhir) {
   try {
+    const sess = resolveCallerSession_(null, null);
+    if (!sess) return { success: false, message: "Akses Ditolak: Sesi tidak valid." };
+
     const sheet = getDB().getSheetByName("pkp_dokumen");
     const data = sheet.getDataRange().getValues();
+    const callerNip = normalizeNipKey_(sess.nip);
     
     for (let i = 1; i < data.length; i++) {
       if (String(data[i][0]) === String(idPKP)) {
+        const isAllowedSigner = isAdminRole_(sess.role) || normalizeNipKey_(data[i][2]) === callerNip || normalizeNipKey_(data[i][7]) === callerNip;
+        if (!isAllowedSigner) {
+          return { success: false, message: "Akses Ditolak: Hanya Penilai/Atasan/Admin yang dapat mengesahkan PKP." };
+        }
         sheet.getRange(i + 1, 5).setValue("Disetujui");
-        sheet.getRange(i + 1, 6).setValue(nilaiAkhir); 
+        sheet.getRange(i + 1, 6).setValue(sanitizeFormulaInput(nilaiAkhir)); 
         if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush();
         return { success: true, message: "Dokumen PKP berhasil disahkan." };
       }
@@ -186,7 +259,8 @@ function generatePdfPK(idPkp, userNip, clientToken) {
   
   try {
     // 1. Cek Otorisasi
-    if (!cekOtorisasi(userNip, clientToken)) return { status: 'error', message: 'Akses Ditolak.' };
+    const callerSess = getVerifiedSession_(userNip, clientToken);
+    if (!callerSess) return { status: 'error', message: 'Akses Ditolak.' };
 
     const ss = getDB();
     const sheetDokumen = ss.getSheetByName('pkp_dokumen');
@@ -208,6 +282,9 @@ function generatePdfPK(idPkp, userNip, clientToken) {
       }
     }
     if (!header) throw new Error("Data PKP tidak ditemukan.");
+    if (!hasPkpAccess_(header.nip, header.penilai, header.atasan_pejabat, callerSess)) {
+      return { status: 'error', message: 'Akses Ditolak: Anda tidak memiliki hak akses dokumen PKP ini.' };
+    }
 
     // 3. Tarik Data User (Bawahan, Penilai, Atasan Penilai)
     const dataUser = readUserSheetDecrypted_(sheetUser);
@@ -353,7 +430,8 @@ function generatePdfPCK(idPck, userNip, clientToken) {
   
   try {
     // 1. Cek Otorisasi
-    if (!cekOtorisasi(userNip, clientToken)) return { status: 'error', message: 'Akses Ditolak.' };
+    const callerSess = getVerifiedSession_(userNip, clientToken);
+    if (!callerSess) return { status: 'error', message: 'Akses Ditolak.' };
 
     const ss = getDB();
     const sheetPck = ss.getSheetByName('pck_dokumen');
@@ -374,11 +452,16 @@ function generatePdfPCK(idPck, userNip, clientToken) {
     // 3. Ambil NIP Penilai dari dokumen PKP di tahun yang sama
     const dataPkp = sheetPkp.getDataRange().getDisplayValues();
     let nipPenilai = "-";
+    let nipAtasan = "";
     for (let i = 1; i < dataPkp.length; i++) {
-      if (String(dataPkp[i][1]) === String(pckHeader.nip) && String(dataPkp[i][3]) === String(pckHeader.tahun)) {
+      if (normalizeNipKey_(dataPkp[i][1]) === normalizeNipKey_(pckHeader.nip) && String(dataPkp[i][3]).trim() === String(pckHeader.tahun).trim()) {
         nipPenilai = dataPkp[i][2];
+        nipAtasan = dataPkp[i][7] || "";
         break;
       }
+    }
+    if (!hasPkpAccess_(pckHeader.nip, nipPenilai, nipAtasan, callerSess)) {
+      return { status: 'error', message: 'Akses Ditolak: Anda tidak memiliki hak akses laporan PCK ini.' };
     }
 
     // 4. Ambil Identitas Lengkap (Pencarian Kolom Dinamis)

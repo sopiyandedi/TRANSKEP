@@ -52,7 +52,8 @@ function submitBulkPKP(payload, userNip, clientToken) {
 
 function getDetailPKP(idPkp, userNip, clientToken) {
   try {
-    if (!cekOtorisasi(userNip, clientToken)) {
+    const callerSess = getVerifiedSession_(userNip, clientToken);
+    if (!callerSess) {
         return { success: false, message: 'Akses Ditolak: Sesi tidak valid.' };
     }
 
@@ -73,6 +74,9 @@ function getDetailPKP(idPkp, userNip, clientToken) {
       }
     }
     if (!header) throw new Error("Dokumen PKP tidak ditemukan.");
+    if (!hasPkpAccess_(header.nip, header.penilai, header.atasan_pejabat, callerSess)) {
+      return { success: false, message: 'Akses Ditolak: Anda tidak memiliki hak akses ke dokumen PKP ini.' };
+    }
     
     var sheetRencana = ss.getSheetByName("pkp_rencana");
     var renData = sheetRencana.getDataRange().getDisplayValues();
@@ -117,7 +121,8 @@ function submitBulkPCK(payload, userNip, clientToken) {
 
 function getDataDokumenPCK(nipPegawai, userRole, clientToken) {
   try {
-    if (!cekOtorisasi(nipPegawai, clientToken)) {
+    const callerSess = getVerifiedSession_(nipPegawai, clientToken);
+    if (!callerSess) {
         return [];
     }
 
@@ -132,20 +137,24 @@ function getDataDokumenPCK(nipPegawai, userRole, clientToken) {
     var pkpData = sheetPKP.getDataRange().getDisplayValues();
     
     var bawahanMap = {};
+    var atasanMap = {};
     for (var j = 1; j < pkpData.length; j++) {
-        bawahanMap[pkpData[j][1] + "-" + pkpData[j][3]] = pkpData[j][2]; 
+        var pkpKey = normalizeNipKey_(pkpData[j][1]) + "-" + String(pkpData[j][3]).trim();
+        bawahanMap[pkpKey] = pkpData[j][2];
+        atasanMap[pkpKey] = pkpData[j][7] || "";
     }
     
     var result = [];
-    var isAdmin = (userRole === "Admin" || userRole === "Operator");
-    var cleanNipPegawai = String(nipPegawai).replace(/'/g, "").trim();
+    var isAdmin = isAdminRole_(callerSess.role);
+    var cleanNipPegawai = normalizeNipKey_(callerSess.nip);
     
     for (var i = 0; i < pckData.length; i++) {
-      var nipPemilik = String(pckData[i][1]).replace(/'/g, "").trim();
-      var tahunDoc = pckData[i][3];
-      var nipPenilaiDoc = String(bawahanMap[nipPemilik + "-" + tahunDoc] || "").replace(/'/g, "").trim();
+      var nipPemilik = normalizeNipKey_(pckData[i][1]);
+      var tahunDoc = String(pckData[i][3]).trim();
+      var nipPenilaiDoc = normalizeNipKey_(bawahanMap[nipPemilik + "-" + tahunDoc] || "");
+      var nipAtasanDoc = normalizeNipKey_(atasanMap[nipPemilik + "-" + tahunDoc] || "");
       
-      if (isAdmin || nipPemilik === cleanNipPegawai || nipPenilaiDoc === cleanNipPegawai) { 
+      if (isAdmin || nipPemilik === cleanNipPegawai || nipPenilaiDoc === cleanNipPegawai || nipAtasanDoc === cleanNipPegawai) { 
         result.push({
           id_pck: pckData[i][0],
           nip: pckData[i][1],
@@ -164,7 +173,8 @@ function getDataDokumenPCK(nipPegawai, userRole, clientToken) {
 
 function getDetailLengkapPCK(nipPegawai, bulanStr, tahunStr, userNip, clientToken) {
   try {
-    if (!cekOtorisasi(userNip, clientToken)) {
+    const callerSess = getVerifiedSession_(userNip, clientToken);
+    if (!callerSess) {
         return { success: false, message: "Akses Ditolak: Sesi tidak valid." };
     }
 
@@ -172,16 +182,26 @@ function getDetailLengkapPCK(nipPegawai, bulanStr, tahunStr, userNip, clientToke
     var sheetPK = ss.getSheetByName("pkp_dokumen");
     var docPK = sheetPK.getDataRange().getDisplayValues();
     var idPkpFound = null;
+    var targetDoc = null;
     
-    var cleanNip = String(nipPegawai).replace(/'/g, "").trim();
+    var cleanNip = normalizeNipKey_(nipPegawai);
     
     for (var i = 1; i < docPK.length; i++) {
-      if (String(docPK[i][1]).replace(/'/g, "").trim() === cleanNip && String(docPK[i][3]).trim() === String(tahunStr).trim()) {
+      if (normalizeNipKey_(docPK[i][1]) === cleanNip && String(docPK[i][3]).trim() === String(tahunStr).trim()) {
         idPkpFound = docPK[i][0];
+        targetDoc = docPK[i];
         break;
       }
     }
     
+    if (targetDoc) {
+      if (!hasPkpAccess_(targetDoc[1], targetDoc[2], targetDoc[7], callerSess)) {
+        return { success: false, message: "Akses Ditolak: Anda tidak memiliki hak akses ke data PCK pegawai ini." };
+      }
+    } else if (!isAdminRole_(callerSess.role) && cleanNip !== normalizeNipKey_(callerSess.nip)) {
+      return { success: false, message: "Akses Ditolak: Anda tidak memiliki hak akses ke data PCK pegawai ini." };
+    }
+
     if (!idPkpFound) return { success: false, message: "Dokumen PK tahun " + tahunStr + " belum dibuat. Buat PK terlebih dahulu." };
     
     var sheetRencana = ss.getSheetByName("pkp_rencana");

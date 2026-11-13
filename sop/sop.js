@@ -32,7 +32,7 @@ function autoInitSopSheets(ss) {
 // TRANSKEP: Fungsi Pintasan Mengambil URL Root Folder "TRANSKEP SOP"
 function getSopDriveFolderUrl(userNip, clientToken) {
   try {
-    if (!cekOtorisasi(userNip, clientToken)) return { status: 'error', message: 'Akses Ditolak: Sesi tidak valid.' };
+    if (!cekOtorisasiAdmin(userNip, clientToken)) return { status: 'error', message: 'Akses Ditolak: Khusus Admin/Operator.' };
     const rootFolderName = "TRANSKEP SOP";
     let rootFolder;
     const rootFolders = DriveApp.getFoldersByName(rootFolderName);
@@ -49,7 +49,7 @@ function getSopDriveFolderUrl(userNip, clientToken) {
 
 function saveSopData(payload, userNip, clientToken) {
   try {
-    if (!cekOtorisasi(userNip, clientToken)) return { status: 'error', message: 'Akses Ditolak: Sesi tidak valid.' };
+    if (!cekOtorisasiAdmin(userNip, clientToken)) return { status: 'error', message: 'Akses Ditolak: Khusus Admin/Operator.' };
 
     // ========================================================
     // FIX: PROSES AUTO-UPLOAD SOP KE FOLDER "TRANSKEP SOP"
@@ -115,7 +115,7 @@ function saveSopData(payload, userNip, clientToken) {
 
 function deleteSopData(id, userNip, clientToken) {
   try {
-    if (!cekOtorisasi(userNip, clientToken)) return { status: 'error', message: 'Akses Ditolak: Sesi tidak valid.' };
+    if (!cekOtorisasiAdmin(userNip, clientToken)) return { status: 'error', message: 'Akses Ditolak: Khusus Admin/Operator.' };
 
     // TAHAP 82: Penghapusan SOP murni dikelola di Cloud Firestore (sop_documents).
     return { status: 'success', message: 'Dokumen SOP berhasil dihapus dari Cloud Firestore.' };

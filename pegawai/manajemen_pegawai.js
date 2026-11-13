@@ -154,7 +154,13 @@ function importBulkUsers(jsonArray, adminNip, clientToken) {
        
        const encNip = encryptField_(nipStr);
        const encHp = encryptField_(payload['No_HP'] || '');
-       const encPass = encryptPasswordField_(payload['Password'] || '123456');
+       let rawImportPass = String(payload['Password'] || '').trim();
+       if ((!rawImportPass || rawImportPass.startsWith('[Telah')) && existingMap[nipStr]) {
+         rawImportPass = String(existingData[existingMap[nipStr] - 1][5] || '123456');
+       } else if (!rawImportPass || rawImportPass.startsWith('[Telah')) {
+         rawImportPass = '123456';
+       }
+       const encPass = encryptPasswordField_(rawImportPass);
        const encAlamat = encryptField_(payload['Alamat'] || '');
 
        const valN2 = payload['Sisa_Tahunan_' + (activeYear - 2)] !== undefined ? payload['Sisa_Tahunan_' + (activeYear - 2)] : payload['Sisa_Tahunan_2024'];

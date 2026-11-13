@@ -32,7 +32,7 @@ function addSuratTugas(payload, userNip, clientToken) {
       clientToken = clientToken || payload[2];
       payload = payload[0] || {};
     }
-    if (!cekOtorisasi(userNip, clientToken)) return { status: 'error', message: 'Akses Ditolak: Sesi tidak valid.' };
+    if (!cekOtorisasiAdmin(userNip, clientToken)) return { status: 'error', message: 'Akses Ditolak: Hanya Admin atau Operator yang berwenang menerbitkan Surat Tugas.' };
 
     const ss = getDB();
     let sheetST = ss.getSheetByName('st_log');
@@ -73,7 +73,7 @@ function updateSuratTugas(payload, userNip, clientToken) {
       clientToken = clientToken || payload[2];
       payload = payload[0] || {};
     }
-    if (!cekOtorisasi(userNip, clientToken)) return { status: 'error', message: 'Akses Ditolak: Sesi tidak valid.' };
+    if (!cekOtorisasiAdmin(userNip, clientToken)) return { status: 'error', message: 'Akses Ditolak: Hanya Admin atau Operator yang berwenang mengubah Surat Tugas.' };
 
     const ss = getDB();
     const sheetST = ss.getSheetByName('st_log');
@@ -88,12 +88,13 @@ function updateSuratTugas(payload, userNip, clientToken) {
 
     const originalWaktu = sheetST.getRange(rowIndex, 2).getValue();
     
-    const updatedRow = [
+    const rawRow = [
       payload.id_st, originalWaktu, payload.nomor_surat || '', payload.menimbang || '', payload.dasar || '',
       payload.tujuan || '', payload.tempat || '', payload.tgl_mulai || '', payload.tgl_selesai || '', 
       payload.jam || '', payload.peserta_json || '', payload.pejabat_ttd || '',
       'DISETUJUI', payload.data_ekstra_json || '' 
     ];
+    const updatedRow = (typeof sanitizeRowArray === 'function') ? sanitizeRowArray(rawRow) : rawRow;
     
     sheetST.getRange(rowIndex, 1, 1, updatedRow.length).setValues([updatedRow]);
     if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush();
@@ -101,8 +102,11 @@ function updateSuratTugas(payload, userNip, clientToken) {
   } catch (err) { return { status: 'error', message: err.toString() }; }
 }
 
-function getSuratTugasData() {
+function getSuratTugasData(userNip, clientToken) {
   try {
+    const callerSess = resolveCallerSession_(userNip, clientToken);
+    if (!callerSess) return [];
+
     const ss = getDB();
     const sheetST = ss.getSheetByName('st_log');
     if (!sheetST) return [];
@@ -122,7 +126,7 @@ function getSuratTugasData() {
 
 function deleteSuratTugasLog(id, userNip, clientToken) {
   try {
-    if (!cekOtorisasi(userNip, clientToken)) return { status: 'error', message: 'Akses Ditolak: Sesi tidak valid.' };
+    if (!cekOtorisasiAdmin(userNip, clientToken)) return { status: 'error', message: 'Akses Ditolak: Hanya Admin atau Operator yang berwenang menghapus Surat Tugas.' };
 
     const ss = getDB();
     const sheetST = ss.getSheetByName('st_log');
@@ -143,7 +147,7 @@ function deleteSuratTugasLog(id, userNip, clientToken) {
 
 function saveSettingsST(payload, userNip, clientToken) {
   try {
-    if (!cekOtorisasi(userNip, clientToken)) return { status: 'error', message: 'Akses Ditolak: Sesi tidak valid.' };
+    if (!cekOtorisasiAdmin(userNip, clientToken)) return { status: 'error', message: 'Akses Ditolak: Hanya Admin atau Operator yang berwenang mengubah pengaturan Surat Tugas.' };
     const props = PropertiesService.getScriptProperties();
     props.setProperty('ST_DEFAULT_PPK', payload.ppk);
     props.setProperty('ST_DEFAULT_MENIMBANG', payload.menimbang);
@@ -156,8 +160,11 @@ function saveSettingsST(payload, userNip, clientToken) {
   } catch (e) { return { status: 'error', message: e.toString() }; }
 }
 
-function getSettingsST() {
+function getSettingsST(userNip, clientToken) {
   try {
+    const callerSess = resolveCallerSession_(userNip, clientToken);
+    if (!callerSess) return { status: 'error', message: 'Akses Ditolak: Sesi tidak valid.', data: {} };
+
     const props = PropertiesService.getScriptProperties();
     return {
       status: 'success',
@@ -381,8 +388,12 @@ function updateNomorSuratTugasFromExternal_(payload) {
     }
 
     const scriptProps = PropertiesService.getScriptProperties();
-    const configuredKey = scriptProps.getProperty("TRANSKEP_WEBHOOK_KEY") || "TRANSKEP_WA_BOT_2026";
-    if (payload.secret_key && String(payload.secret_key).trim() !== configuredKey.trim()) {
+    const configuredKey = String(scriptProps.getProperty("TRANSKEP_WEBHOOK_KEY") || "TRANSKEP_WA_BOT_2026").trim();
+    const incomingKey = String(payload.secret_key || '').trim();
+    const isKeyMatch = (typeof constantTimeEquals_ === 'function')
+      ? constantTimeEquals_(incomingKey, configuredKey)
+      : (incomingKey !== '' && incomingKey === configuredKey);
+    if (!incomingKey || !isKeyMatch) {
       return { status: 'error', message: "Akses ditolak: Secret Key tidak valid." };
     }
 

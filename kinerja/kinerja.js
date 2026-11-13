@@ -5,8 +5,13 @@
 
 function addKinerjaLog(payload, clientToken) {
   try {
-    if (!cekOtorisasi(payload.nip, clientToken)) {
+    if (!payload) return { status: 'error', message: 'Payload tidak valid.' };
+    const callerSess = getVerifiedSession_(payload.nip, clientToken);
+    if (!callerSess) {
         return { status: 'error', message: 'Akses Ditolak: Sesi tidak valid.' };
+    }
+    if (!isAdminRole_(callerSess.role) && normalizeNipKey_(payload.nip) !== normalizeNipKey_(callerSess.nip)) {
+        return { status: 'error', message: 'Akses Ditolak: Hanya dapat mengunggah dokumen SKP milik sendiri.' };
     }
 
     const ss = getDB();
@@ -20,23 +25,25 @@ function addKinerjaLog(payload, clientToken) {
     let folders = DriveApp.getFoldersByName(folderName);
     let folder = folders.hasNext() ? folders.next() : DriveApp.createFolder(folderName);
 
+    const safeFileBase = String(payload.fileNameBase || callerSess.nip || 'SKP').replace(/[^a-zA-Z0-9._-]/g, '_');
+
     // 1. Upload File Penilaian
-    const blobPenilaian = Utilities.newBlob(Utilities.base64Decode(payload.filePenilaianData), payload.fileMimeType, `Penilaian_${payload.fileNameBase}.pdf`);
+    const blobPenilaian = Utilities.newBlob(Utilities.base64Decode(payload.filePenilaianData), payload.fileMimeType, `Penilaian_${safeFileBase}.pdf`);
     const filePen = folder.createFile(blobPenilaian);
     filePen.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
     
     // 2. Upload File Evaluasi
-    const blobEvaluasi = Utilities.newBlob(Utilities.base64Decode(payload.fileEvaluasiData), payload.fileMimeType, `Evaluasi_${payload.fileNameBase}.pdf`);
+    const blobEvaluasi = Utilities.newBlob(Utilities.base64Decode(payload.fileEvaluasiData), payload.fileMimeType, `Evaluasi_${safeFileBase}.pdf`);
     const fileEva = folder.createFile(blobEvaluasi);
     fileEva.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
 
     const newId = "SKP-" + new Date().getTime();
     const tglInput = new Date().toLocaleDateString('id-ID');
     
-    sheet.appendRow([
+    sheet.appendRow(sanitizeRowArray([
         newId, payload.nip, payload.pejabat_nip, payload.tahun, payload.periode, payload.predikat,
         filePen.getUrl(), fileEva.getUrl(), 'Menunggu TTE', '-', '-', tglInput
-    ]);
+    ]));
 
     sheet.getRange(sheet.getLastRow(), 2, 1, 2).setNumberFormat('@'); // Cegah NIP jadi angka
     
@@ -49,7 +56,8 @@ function addKinerjaLog(payload, clientToken) {
 
 function approveKinerja(id, userNip, clientToken) {
   try {
-    if (!cekOtorisasi(userNip, clientToken)) {
+    const callerSess = getVerifiedSession_(userNip, clientToken);
+    if (!callerSess) {
         return { status: 'error', message: 'Akses Ditolak: Sesi tidak valid.' };
     }
 
@@ -74,24 +82,33 @@ function approveKinerja(id, userNip, clientToken) {
     // TRANSKEP OPTIMIZATION 1: Menggunakan find untuk menarik data Pegawai & Pejabat
     const uData = readUserSheetDecrypted_(sheetUser);
     
-    const rowPegawai = uData.find((row, idx) => idx > 0 && String(row[0]) === String(record[1]));
+    const rowPegawai = uData.find((row, idx) => idx > 0 && normalizeNipKey_(row[0]) === normalizeNipKey_(record[1]));
     const pegawai = rowPegawai ? { nama: rowPegawai[1], nip: rowPegawai[0], jabatan: rowPegawai[2] } : { nama: 'Unknown', nip: record[1], jabatan: '-' };
     
-    const rowPejabat = uData.find((row, idx) => idx > 0 && String(row[0]) === String(record[2]));
+    const rowPejabat = uData.find((row, idx) => idx > 0 && normalizeNipKey_(row[0]) === normalizeNipKey_(record[2]));
     const pejabat = rowPejabat ? { nama: rowPejabat[1], nip: rowPejabat[0], jabatan: rowPejabat[2] } : { nama: 'Unknown', nip: record[2], jabatan: '-' };
     
-    const rowAdmin = uData.find((row, idx) => idx > 0 && String(row[0]) === String(userNip));
-    const isAdmin = rowAdmin ? String(rowAdmin[3]).toLowerCase().includes('admin') : false;
-
-    if (String(userNip) !== String(record[2]) && !isAdmin) {
+    const isAdmin = isAdminRole_(callerSess.role);
+    if (normalizeNipKey_(callerSess.nip) !== normalizeNipKey_(record[2]) && !isAdmin) {
         throw new Error("Akses Ditolak: Anda bukan Pejabat Penilai untuk dokumen ini.");
     }
 
     // --- MEMBANGUN LEMBAR PENGESAHAN (HTML to PDF) ---
+    const esc = (typeof escapeHtmlServer_ === 'function')
+      ? escapeHtmlServer_
+      : function(s) { return String(s === null || s === undefined ? '' : s).replace(/[&<>"']/g, function(m) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]; }); };
+    const safeHttpUrl = function(u) {
+      const s = String(u || '').trim();
+      return /^https?:\/\//i.test(s) ? s : '#';
+    };
+
     const tglTteLengkap = new Date().toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }) + " WIB";
     
     const qrText = `Telah DISAHKAN secara Elektronik oleh ${pejabat.nama} (Pejabat Penilai) pada tanggal ${tglTteLengkap}. ID Dokumen Asli: ${record[0]}`;
     const qrUrl = "https://quickchart.io/qr?size=150&margin=1&text=" + encodeURIComponent(qrText);
+
+    const safeUrlPenilaian = safeHttpUrl(record[6]);
+    const safeUrlEvaluasi = safeHttpUrl(record[7]);
 
     let htmlCover = `
     <html>
@@ -100,24 +117,24 @@ function approveKinerja(id, userNip, clientToken) {
          
          <p style="text-align: justify;">Menyatakan bahwa Dokumen Sasaran Kinerja Pegawai (SKP) atas nama:</p>
          <table style="margin: 0 auto; text-align: left; width: 80%; font-size: 12pt; margin-bottom: 20px;">
-            <tr><td width="30%">Nama Pegawai</td><td width="5%">:</td><td><b>${pegawai.nama}</b></td></tr>
-            <tr><td>NIP</td><td>:</td><td>${pegawai.nip}</td></tr>
-            <tr><td>Jabatan</td><td>:</td><td>${pegawai.jabatan}</td></tr>
-            <tr><td>Periode Penilaian</td><td>:</td><td><b>${record[4]} Tahun ${record[3]}</b></td></tr>
-            <tr><td>Predikat Kinerja</td><td>:</td><td><b>${record[5]}</b></td></tr>
+            <tr><td width="30%">Nama Pegawai</td><td width="5%">:</td><td><b>${esc(pegawai.nama)}</b></td></tr>
+            <tr><td>NIP</td><td>:</td><td>${esc(pegawai.nip)}</td></tr>
+            <tr><td>Jabatan</td><td>:</td><td>${esc(pegawai.jabatan)}</td></tr>
+            <tr><td>Periode Penilaian</td><td>:</td><td><b>${esc(record[4])} Tahun ${esc(record[3])}</b></td></tr>
+            <tr><td>Predikat Kinerja</td><td>:</td><td><b>${esc(record[5])}</b></td></tr>
          </table>
          
          <p style="text-align: justify;">Telah ditinjau dan dinyatakan <b>SAH</b> oleh Pejabat Penilai Kinerja secara elektronik melalui Sistem Terpadu (TRANSKEP). Dokumen rincian asli dapat diakses melalui pangkalan data arsip digital Pengadilan Agama Indramayu pada tautan berikut:</p>
          <div style="text-align: left; width: 80%; margin: 10px auto; font-size: 10pt;">
-            1. Dokumen Penilaian : <a href="${record[6]}">${record[6]}</a><br>
-            2. Dokumen Evaluasi &nbsp;: <a href="${record[7]}">${record[7]}</a>
+            1. Dokumen Penilaian : <a href="${esc(safeUrlPenilaian)}">${esc(safeUrlPenilaian)}</a><br>
+            2. Dokumen Evaluasi &nbsp;: <a href="${esc(safeUrlEvaluasi)}">${esc(safeUrlEvaluasi)}</a>
          </div>
 
          <div style="margin-top: 50px; float: right; width: 300px; text-align: center;">
             <p style="margin-bottom: 5px;">Disahkan secara Elektronik oleh:<br><b>Pejabat Penilai Kinerja</b></p>
-            <img src="${qrUrl}" width="100" height="100" crossorigin="anonymous" style="margin: 10px 0; border: 2px solid #000; padding: 2px;"/>
-            <br><u><b>${pejabat.nama}</b></u>
-            <br>NIP. ${pejabat.nip}
+            <img src="${esc(qrUrl)}" width="100" height="100" crossorigin="anonymous" style="margin: 10px 0; border: 2px solid #000; padding: 2px;"/>
+            <br><u><b>${esc(pejabat.nama)}</b></u>
+            <br>NIP. ${esc(pejabat.nip)}
          </div>
       </body>
     </html>`;

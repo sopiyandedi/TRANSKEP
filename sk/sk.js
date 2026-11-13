@@ -34,7 +34,7 @@ function autoInitSkSheets(ss) {
 // TRANSKEP: Fungsi Pintasan Mengambil URL Root Folder "TRANSKEP SK"
 function getSkDriveFolderUrl(userNip, clientToken) {
   try {
-    if (!cekOtorisasi(userNip, clientToken)) return { status: 'error', message: 'Akses Ditolak: Sesi tidak valid.' };
+    if (!cekOtorisasiAdmin(userNip, clientToken)) return { status: 'error', message: 'Akses Ditolak: Khusus Admin/Operator.' };
     const rootFolderName = "TRANSKEP SK";
     let rootFolder;
     const rootFolders = DriveApp.getFoldersByName(rootFolderName);
@@ -51,7 +51,7 @@ function getSkDriveFolderUrl(userNip, clientToken) {
 
 function saveSk(payload, userNip, clientToken) {
   try {
-    if (!cekOtorisasi(userNip, clientToken)) return { status: 'error', message: 'Akses Ditolak: Sesi tidak valid.' };
+    if (!cekOtorisasiAdmin(userNip, clientToken)) return { status: 'error', message: 'Akses Ditolak: Khusus Admin/Operator.' };
 
     // ========================================================
     // FIX: PROSES AUTO-UPLOAD KE FOLDER "TRANSKEP SK"
@@ -115,7 +115,7 @@ function saveSk(payload, userNip, clientToken) {
 
 function deleteSk(id, userNip, clientToken) {
   try {
-    if (!cekOtorisasi(userNip, clientToken)) return { status: 'error', message: 'Akses Ditolak: Sesi tidak valid.' };
+    if (!cekOtorisasiAdmin(userNip, clientToken)) return { status: 'error', message: 'Akses Ditolak: Khusus Admin/Operator.' };
 
     // TAHAP 81: Penghapusan SK murni dikelola di Cloud Firestore (sk_documents).
     return { status: 'success', message: 'Surat Keputusan berhasil dihapus dari Cloud Firestore.' };

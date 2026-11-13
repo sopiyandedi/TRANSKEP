@@ -6,172 +6,186 @@
 function updateCutiStatus(id, decision, notes, userNip, bypassMode, clientToken) {
   try {
     if (!cekOtorisasi(userNip, clientToken)) return { status: 'error', message: 'Akses Ditolak: Sesi tidak valid.' };
+    if (['Disetujui', 'Ditolak', 'Perubahan', 'Ditangguhkan'].indexOf(String(decision || '')) === -1) {
+      return { status: 'error', message: 'Keputusan persetujuan tidak valid.' };
+    }
 
     const ss = getDB();
     ensureAnnualCutiRollover_(ss);
     const sheetCuti = ss.getSheetByName('cuti_log');
     const sheetUser = ss.getSheetByName('user_data');
-    
-    const cutiData = readCutiSheetDecrypted_(sheetCuti); 
-    const userData = readUserSheetDecrypted_(sheetUser); 
-    
+
+    const cutiData = readCutiSheetDecrypted_(sheetCuti);
+    const userData = readUserSheetDecrypted_(sheetUser);
+
     let rowIndex = -1; let logRecord = null;
     for (let i = 1; i < cutiData.length; i++) {
       if (String(cutiData[i][0]) === String(id)) { rowIndex = i + 1; logRecord = cutiData[i]; break; }
     }
     if (rowIndex === -1) throw new Error("Data transaksi cuti tidak ditemukan.");
-    
+
     const nip = String(logRecord[2]); const jenis = String(logRecord[3]);
     const atasan_nip = String(logRecord[9]); const pejabat_nip = String(logRecord[10]);
     let cAtasan = String(logRecord[13]); let cPejabat = String(logRecord[14]); let cFinal = String(logRecord[7]);
 
     if (cFinal === 'Ditolak' || cFinal === 'DIBATALKAN') throw new Error("Transaksi ini sudah ditutup secara permanen.");
-    
-    let isAdmin = false; let isOperator = false; let namaPenyetuju = ""; 
+
+    const norm = (typeof normalizeNipKey_ === 'function') ? normalizeNipKey_ : (v => String(v || '').trim());
+    const sf = (typeof sanitizeFormulaInput === 'function') ? sanitizeFormulaInput : (v => v);
+    const cleanCallerNip = norm(userNip);
+
+    let isAdmin = false; let isOperator = false; let namaPenyetuju = "";
 
     for (let i = 1; i < userData.length; i++) {
-      if (String(userData[i][0]) === String(userNip)) { 
-          if (String(userData[i][3]) === 'Admin') isAdmin = true;
-          if (String(userData[i][3]) === 'Operator') isOperator = true;
-          namaPenyetuju = userData[i][1];
-          break;
+      if (norm(userData[i][0]) === cleanCallerNip) {
+        if (String(userData[i][3]).toLowerCase().trim() === 'admin') isAdmin = true;
+        if (String(userData[i][3]).toLowerCase().trim() === 'operator') isOperator = true;
+        namaPenyetuju = userData[i][1];
+        break;
       }
     }
-    
-    let isAtasan = (String(userNip) === atasan_nip); let isPejabat = (String(userNip) === pejabat_nip);
+
+    let isAtasan = (cleanCallerNip !== '' && cleanCallerNip === norm(atasan_nip)); let isPejabat = (cleanCallerNip !== '' && cleanCallerNip === norm(pejabat_nip));
     let isBypassAtasan = (bypassMode === 'atasan' && (isAdmin || isOperator));
     let isBypassPejabat = (bypassMode === 'pejabat' && (isAdmin || isOperator));
 
     if (!isAtasan && !isPejabat && !isBypassAtasan && !isBypassPejabat) throw new Error("Akses Ditolak. Anda bukan atasan/pejabat terkait.");
-    
+
     if (cFinal === 'Menunggu Pembatalan') {
-       if (!isPejabat && !isBypassPejabat) throw new Error("Hanya Pejabat Berwenang yang dapat memproses Usulan Pembatalan Cuti.");
-       
-       if (decision === 'Disetujui') {
-           const historyStr = String(logRecord[16] || "");
-           let userRowIndex = -1;
-           for (let i = 1; i < userData.length; i++) { if (String(userData[i][0]) === nip) { userRowIndex = i + 1; break; } }
-           
-           if (userRowIndex !== -1) {
-              pulihkanSaldoCutiServer_(sheetUser, userRowIndex, jenis, historyStr);
-           }
-           sheetCuti.getRange(rowIndex, 8).setValue('DIBATALKAN');
-       } else {
-           sheetCuti.getRange(rowIndex, 8).setValue('Disetujui');
-       }
-       
-       let notesLama = String(logRecord[12] || "");
-       let finalNotes = notesLama + "\n\n[JAWABAN PEMBATALAN]: " + notes;
-       if (isBypassPejabat) finalNotes += " *(via Bypass oleh " + namaPenyetuju + ")*";
-       sheetCuti.getRange(rowIndex, 13).setValue(finalNotes);
-       
-       if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush();
-       return { status: 'success', message: `Usulan Pembatalan telah di-${decision.toLowerCase()}.` };
+      if (!isPejabat && !isBypassPejabat) throw new Error("Hanya Pejabat Berwenang yang dapat memproses Usulan Pembatalan Cuti.");
+
+      if (decision === 'Disetujui') {
+        const historyStr = String(logRecord[16] || "");
+        let userRowIndex = -1;
+        for (let i = 1; i < userData.length; i++) { if (norm(userData[i][0]) === norm(nip)) { userRowIndex = i + 1; break; } }
+
+        if (userRowIndex !== -1) {
+          pulihkanSaldoCutiServer_(sheetUser, userRowIndex, jenis, historyStr);
+        }
+        sheetCuti.getRange(rowIndex, 8).setValue('DIBATALKAN');
+      } else {
+        sheetCuti.getRange(rowIndex, 8).setValue('Disetujui');
+      }
+
+      let notesLama = String(logRecord[12] || "");
+      let finalNotes = notesLama + "\n\n[JAWABAN PEMBATALAN]: " + (notes || '');
+      if (isBypassPejabat) finalNotes += " *(via Bypass oleh " + namaPenyetuju + ")*";
+      sheetCuti.getRange(rowIndex, 13).setValue(sf(finalNotes));
+
+      if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush();
+      return { status: 'success', message: `Usulan Pembatalan telah di-${decision.toLowerCase()}.` };
     }
 
     let updated = false;
-    let finalNotes = notes;
-    
+    let finalNotes = notes || '';
+
     if ((isAtasan && isPejabat) || (isBypassAtasan && isBypassPejabat)) {
-        if (isBypassAtasan) finalNotes += "\n\n*(Disetujui via Bypass Dual-Role oleh " + namaPenyetuju + ")*";
-        
-        cAtasan = decision;
-        cPejabat = decision;
-        sheetCuti.getRange(rowIndex, 9).setValue(finalNotes); 
-        sheetCuti.getRange(rowIndex, 14).setValue(decision);  
-        sheetCuti.getRange(rowIndex, 13).setValue(finalNotes);
-        sheetCuti.getRange(rowIndex, 15).setValue(decision);  
-        updated = true;
-    } 
-    else {
-        if (isAtasan || isBypassAtasan) {
-            if (cAtasan !== 'Menunggu') throw new Error("Berkas ini sudah diproses di tingkat Atasan.");
-            cAtasan = decision; 
-            if (isBypassAtasan) finalNotes += "\n\n*(Disetujui via Bypass Atasan oleh " + namaPenyetuju + ")*"; 
-            
-            sheetCuti.getRange(rowIndex, 9).setValue(finalNotes); 
-            sheetCuti.getRange(rowIndex, 14).setValue(decision); 
-            updated = true;
-        }
-        else if (isPejabat || isBypassPejabat) {
-            if (cPejabat !== 'Menunggu') throw new Error("Berkas ini sudah diproses di tingkat Pejabat.");
-            cPejabat = decision; 
-            if (isBypassPejabat) finalNotes += "\n\n*(Disetujui via Bypass Pejabat oleh " + namaPenyetuju + ")*"; 
-            
-            sheetCuti.getRange(rowIndex, 13).setValue(finalNotes); 
-            sheetCuti.getRange(rowIndex, 15).setValue(decision); 
-            updated = true;
-        }
+      if (isBypassAtasan) finalNotes += "\n\n*(Disetujui via Bypass Dual-Role oleh " + namaPenyetuju + ")*";
+
+      cAtasan = decision;
+      cPejabat = decision;
+      sheetCuti.getRange(rowIndex, 9).setValue(sf(finalNotes));
+      sheetCuti.getRange(rowIndex, 14).setValue(decision);
+      sheetCuti.getRange(rowIndex, 13).setValue(sf(finalNotes));
+      sheetCuti.getRange(rowIndex, 15).setValue(decision);
+      updated = true;
     }
-    
+    else {
+      if (isAtasan || isBypassAtasan) {
+        if (cAtasan !== 'Menunggu') throw new Error("Berkas ini sudah diproses di tingkat Atasan.");
+        cAtasan = decision;
+        if (isBypassAtasan) finalNotes += "\n\n*(Disetujui via Bypass Atasan oleh " + namaPenyetuju + ")*";
+
+        sheetCuti.getRange(rowIndex, 9).setValue(sf(finalNotes));
+        sheetCuti.getRange(rowIndex, 14).setValue(decision);
+        updated = true;
+      }
+      else if (isPejabat || isBypassPejabat) {
+        if (cPejabat !== 'Menunggu') throw new Error("Berkas ini sudah diproses di tingkat Pejabat.");
+        cPejabat = decision;
+        if (isBypassPejabat) finalNotes += "\n\n*(Disetujui via Bypass Pejabat oleh " + namaPenyetuju + ")*";
+
+        sheetCuti.getRange(rowIndex, 13).setValue(sf(finalNotes));
+        sheetCuti.getRange(rowIndex, 15).setValue(decision);
+        updated = true;
+      }
+    }
+
     if (!updated) throw new Error("Tidak ada aksi yang valid.");
-    
+
     let finalStatus = 'Menunggu';
     if (cAtasan === 'Ditolak' || cPejabat === 'Ditolak') finalStatus = 'Ditolak';
     else if (cAtasan === 'Disetujui' && cPejabat === 'Disetujui') finalStatus = 'Disetujui';
     else if (cAtasan === 'Perubahan' || cPejabat === 'Perubahan') finalStatus = 'Perubahan';
-    
+
     sheetCuti.getRange(rowIndex, 8).setValue(finalStatus);
-    
+
     if (finalStatus === 'Disetujui') {
-        // TRIGGER OTOMATIS: Integrasi n8n & MYSIMS Surat Keluar (Non-blocking & Aman)
-        try {
-            let namaPemohon = "";
-            for (let u = 1; u < userData.length; u++) {
-                if (String(userData[u][0]) === nip) {
-                    namaPemohon = userData[u][1];
-                    break;
-                }
-            }
-            triggerN8nSuratKeluarCuti_(id, logRecord, namaPemohon, nip);
-        } catch (errN8n) {
-            Logger.log("⚠️ [n8n Trigger Cuti] Peringatan trigger webhook (diabaikan): " + errN8n.toString());
+      // TRIGGER OTOMATIS: Integrasi n8n & MYSIMS Surat Keluar (Non-blocking & Aman)
+      try {
+        let namaPemohon = "";
+        for (let u = 1; u < userData.length; u++) {
+          if (norm(userData[u][0]) === norm(nip)) {
+            namaPemohon = userData[u][1];
+            break;
+          }
         }
+        triggerN8nSuratKeluarCuti_(id, logRecord, namaPemohon, nip);
+      } catch (errN8n) {
+        Logger.log("⚠️ [n8n Trigger Cuti] Peringatan trigger webhook (diabaikan): " + errN8n.toString());
+      }
     }
 
     if (finalStatus === 'Ditolak' || finalStatus === 'Perubahan') {
-        const historyStr = String(logRecord[16] || "");
-        let userRowIndex = -1;
-        for (let i = 1; i < userData.length; i++) { if (String(userData[i][0]) === nip) { userRowIndex = i + 1; break; } }
-        
-        if (userRowIndex !== -1) {
-           pulihkanSaldoCutiServer_(sheetUser, userRowIndex, jenis, historyStr);
-        }
+      const historyStr = String(logRecord[16] || "");
+      let userRowIndex = -1;
+      for (let i = 1; i < userData.length; i++) { if (norm(userData[i][0]) === norm(nip)) { userRowIndex = i + 1; break; } }
+
+      if (userRowIndex !== -1) {
+        pulihkanSaldoCutiServer_(sheetUser, userRowIndex, jenis, historyStr);
+      }
     }
-    if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush(); 
+    if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush();
     return { status: 'success', message: `Berkas berhasil ${decision.toLowerCase()}.` };
   } catch (err) { return { status: 'error', message: err.toString() }; }
 }
 
 function processBulkApproval(bulkItems, decision, notes, userNip, bypassMode, clientToken) {
-    try {
-        if (!cekOtorisasi(userNip, clientToken)) return { status: 'error', message: 'Akses Ditolak: Sesi tidak valid.' };
-        
-        let successCount = 0;
-        let failCount = 0;
-        
-        for (let i = 0; i < bulkItems.length; i++) {
-            let item = bulkItems[i];
-            try {
-                // Di sini kita sudah siapkan injeksi token untuk fungsi-fungsi IK, IP, WFH (akan diselesaikan di Fase 4B)
-                if (item.type === 'Cuti') updateCutiStatus(item.id, decision, notes, userNip, bypassMode, clientToken);
-                else if (item.type === 'IK') updateIkStatus(item.id, decision, notes, userNip, bypassMode, clientToken);
-                else if (item.type === 'IP') updateIpStatus(item.id, decision, notes, userNip, bypassMode, clientToken);
-                else if (item.type === 'WFH') updateWfhStatus(item.id, item.stage, decision, notes, userNip, bypassMode, clientToken);
-                successCount++;
-            } catch(err) {
-                failCount++;
-                Logger.log("Bulk Error pada ID " + item.id + ": " + err);
-            }
-        }
-        
-        return { 
-            status: 'success', 
-            message: `Proses persetujuan massal selesai. ${successCount} berkas berhasil diperbarui.` 
-        };
-    } catch(e) {
-        return { status: 'error', message: e.toString() };
+  try {
+    if (!cekOtorisasi(userNip, clientToken)) return { status: 'error', message: 'Akses Ditolak: Sesi tidak valid.' };
+    if (!Array.isArray(bulkItems) || bulkItems.length === 0) {
+      return { status: 'error', message: 'Daftar berkas persetujuan massal tidak valid.' };
     }
+
+    let successCount = 0;
+    let failCount = 0;
+
+    for (let i = 0; i < bulkItems.length; i++) {
+      let item = bulkItems[i];
+      try {
+        let res = null;
+        if (item.type === 'Cuti') res = updateCutiStatus(item.id, decision, notes, userNip, bypassMode, clientToken);
+        else if (item.type === 'IK') res = updateIkStatus(item.id, decision, notes, userNip, bypassMode, clientToken);
+        else if (item.type === 'IP') res = updateIpStatus(item.id, decision, notes, userNip, bypassMode, clientToken);
+        else if (item.type === 'WFH') res = updateWfhStatus(item.id, item.stage, decision, notes, userNip, bypassMode, clientToken);
+        if (res && res.status === 'success') successCount++;
+        else failCount++;
+      } catch (err) {
+        failCount++;
+        Logger.log("Bulk Error pada ID " + (item && item.id) + ": " + err);
+      }
+    }
+
+    if (successCount === 0 && failCount > 0) {
+      return { status: 'error', message: `Semua berkas (${failCount}) gagal diproses atau ditolak oleh validasi otorisasi.` };
+    }
+    return {
+      status: 'success',
+      message: `Proses persetujuan massal selesai. ${successCount} berkas berhasil diperbarui${failCount > 0 ? ', ' + failCount + ' berkas gagal/ditolak' : ''}.`
+    };
+  } catch (e) {
+    return { status: 'error', message: e.toString() };
+  }
 }
 
 // ==========================================
@@ -183,16 +197,16 @@ function getCutiByToken(token) {
     if (!token || String(token).trim() === '') {
       return { status: 'error', message: 'Token persetujuan tidak valid.' };
     }
-    
+
     const ss = getDB();
     ensureAnnualCutiRollover_(ss);
     const sheetCuti = ss.getSheetByName('cuti_log');
     const sheetUser = ss.getSheetByName('user_data');
     if (!sheetCuti || !sheetUser) throw new Error("Basis data belum siap.");
-    
+
     const cutiData = readCutiSheetDecrypted_(sheetCuti);
     const userData = readUserSheetDecrypted_(sheetUser);
-    
+
     // Pemetaan user untuk pencarian cepat nama & jabatan
     const userMap = {};
     for (let u = 1; u < userData.length; u++) {
@@ -203,7 +217,7 @@ function getCutiByToken(token) {
         no_wa: userData[u][4] || ''
       };
     }
-    
+
     let targetRow = null;
     let rowIndex = -1;
     // Kolom 19 (indeks 18) adalah magic_token
@@ -214,23 +228,23 @@ function getCutiByToken(token) {
         break;
       }
     }
-    
+
     if (!targetRow) {
       return { status: 'error', message: 'Tautan persetujuan tidak ditemukan atau sudah kedaluwarsa.' };
     }
-    
+
     const pemohon = userMap[String(targetRow[2]).trim()] || { nama: 'Pegawai', jabatan: '-' };
     const atasan = userMap[String(targetRow[9]).trim()] || { nama: 'Atasan Langsung', jabatan: '-' };
     const pejabat = userMap[String(targetRow[10]).trim()] || { nama: 'Pejabat Berwenang', jabatan: '-' };
-    
+
     const statusFinal = targetRow[7];
     const statusAtasan = targetRow[13];
     const statusPejabat = targetRow[14];
-    
+
     let currentStage = 'completed';
     let reviewerTitle = '';
     let reviewerName = '';
-    
+
     if (statusFinal === 'Ditolak' || statusFinal === 'DIBATALKAN') {
       currentStage = 'closed';
     } else if (statusAtasan === 'Menunggu') {
@@ -244,7 +258,7 @@ function getCutiByToken(token) {
     } else if (statusFinal === 'Disetujui') {
       currentStage = 'finished';
     }
-    
+
     return {
       status: 'success',
       data: {
@@ -279,16 +293,16 @@ function processMagicLinkApproval(token, decision, notes) {
     if (decision !== 'Disetujui' && decision !== 'Ditolak') {
       return { status: 'error', message: 'Keputusan tidak valid.' };
     }
-    
+
     const ss = getDB();
     ensureAnnualCutiRollover_(ss);
     const sheetCuti = ss.getSheetByName('cuti_log');
     const sheetUser = ss.getSheetByName('user_data');
     if (!sheetCuti || !sheetUser) throw new Error("Basis data belum siap.");
-    
+
     const cutiData = readCutiSheetDecrypted_(sheetCuti);
     const userData = readUserSheetDecrypted_(sheetUser);
-    
+
     const userMap = {};
     for (let u = 1; u < userData.length; u++) {
       userMap[String(userData[u][0]).trim()] = {
@@ -302,7 +316,7 @@ function processMagicLinkApproval(token, decision, notes) {
         s26: Number(userData[u][8]) || 0
       };
     }
-    
+
     let rowIndex = -1;
     let targetRow = null;
     for (let i = 1; i < cutiData.length; i++) {
@@ -312,40 +326,41 @@ function processMagicLinkApproval(token, decision, notes) {
         break;
       }
     }
-    
+
     if (rowIndex === -1) throw new Error("Berkas cuti tidak ditemukan.");
-    
+
     const pemohonNip = String(targetRow[2]).trim();
     const pemohon = userMap[pemohonNip] || { nama: 'Pegawai', no_wa: '' };
     const atasanNip = String(targetRow[9]).trim();
     const atasan = userMap[atasanNip] || { nama: 'Atasan Langsung', no_wa: '' };
     const pejabatNip = String(targetRow[10]).trim();
     const pejabat = userMap[pejabatNip] || { nama: 'Pejabat Berwenang', no_wa: '' };
-    
+
     const statusFinal = targetRow[7];
     const statusAtasan = targetRow[13];
     const statusPejabat = targetRow[14];
     const durasi = targetRow[11];
     const jenisCuti = targetRow[3];
     const periode = targetRow[4] + " s.d " + targetRow[5];
-    
+
     if (statusFinal === 'Ditolak' || statusFinal === 'DIBATALKAN') {
       throw new Error("Berkas cuti ini sudah berstatus ditolak/dibatalkan.");
     }
     if (statusFinal === 'Disetujui') {
       throw new Error("Berkas cuti ini sudah selesai disetujui sebelumnya.");
     }
-    
+
     let catatanBersih = (notes || '').trim();
-    
+    const sf = (typeof sanitizeFormulaInput === 'function') ? sanitizeFormulaInput : (v => v);
+
     // TAHAP 1: ATASAN LANGSUNG MEMPROSES
     if (statusAtasan === 'Menunggu') {
       sheetCuti.getRange(rowIndex, 14).setValue(decision); // status_atasan (col 14)
-      if (catatanBersih) sheetCuti.getRange(rowIndex, 9).setValue(catatanBersih); // catatan atasan (col 9)
-      
+      if (catatanBersih) sheetCuti.getRange(rowIndex, 9).setValue(sf(catatanBersih)); // catatan atasan (col 9)
+
       if (decision === 'Disetujui') {
         if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush();
-        
+
         // Teruskan Magic Link ke Pejabat Berwenang via WAHA
         if (pejabat.no_wa && pejabat.no_wa.length > 8) {
           const magicLink = "https://sso.pa-indramayu.go.id/?action=review_cuti&token=" + token;
@@ -359,7 +374,7 @@ function processMagicLinkApproval(token, decision, notes) {
             "📝 *Alasan:* " + targetRow[6] + "\n\n" +
             "Silakan klik tautan di bawah ini untuk melihat detail dan memberikan persetujuan langsung (tanpa login):\n" +
             "👉 " + magicLink;
-            
+
           sendWhatsAppMessage_(pejabat.no_wa, msgPejabat, {
             jenis_pesan: 'cuti_usulan',
             nama_tujuan: pejabat.nama,
@@ -372,19 +387,19 @@ function processMagicLinkApproval(token, decision, notes) {
             magic_link: magicLink
           });
         }
-        
-        return { 
-          status: 'success', 
-          message: 'Persetujuan Atasan Langsung berhasil disimpan. Notifikasi telah otomatis diteruskan ke Pejabat Berwenang.' 
+
+        return {
+          status: 'success',
+          message: 'Persetujuan Atasan Langsung berhasil disimpan. Notifikasi telah otomatis diteruskan ke Pejabat Berwenang.'
         };
       } else {
         // Atasan menolak
         sheetCuti.getRange(rowIndex, 8).setValue('Ditolak');
-        
+
         // Kembalikan saldo cuti
         refundCutiSaldo_(sheetUser, pemohonNip, jenisCuti, targetRow[16]);
         if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush();
-        
+
         // Kirim notifikasi penolakan ke pemohon
         if (pemohon.no_wa && pemohon.no_wa.length > 8) {
           const msgReject = "*TRANSKEP - STATUS USULAN CUTI* ⚠️\n\n" +
@@ -402,23 +417,23 @@ function processMagicLinkApproval(token, decision, notes) {
             catatan: catatanBersih || 'Tidak ada catatan khusus.'
           });
         }
-        
-        return { 
-          status: 'success', 
-          message: 'Permohonan cuti telah ditolak. Saldo pegawai telah dipulihkan dan notifikasi telah dikirimkan ke pemohon.' 
+
+        return {
+          status: 'success',
+          message: 'Permohonan cuti telah ditolak. Saldo pegawai telah dipulihkan dan notifikasi telah dikirimkan ke pemohon.'
         };
       }
     }
-    
+
     // TAHAP 2: PEJABAT BERWENANG MEMPROSES
     else if (statusAtasan === 'Disetujui' && statusPejabat === 'Menunggu') {
       sheetCuti.getRange(rowIndex, 15).setValue(decision); // status_pejabat (col 15)
-      if (catatanBersih) sheetCuti.getRange(rowIndex, 13).setValue(catatanBersih); // catatan pejabat (col 13)
-      
+      if (catatanBersih) sheetCuti.getRange(rowIndex, 13).setValue(sf(catatanBersih)); // catatan pejabat (col 13)
+
       if (decision === 'Disetujui') {
         sheetCuti.getRange(rowIndex, 8).setValue('Disetujui'); // Final status
         if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush();
-        
+
         // Pemicu Otomatis Webhook n8n untuk Surat Keluar MYSIMS (Non-Blocking & Aman)
         try {
           triggerN8nSuratKeluarCuti_(targetRow[0], targetRow, pemohon.nama, pemohonNip);
@@ -445,17 +460,17 @@ function processMagicLinkApproval(token, decision, notes) {
             catatan: 'Disetujui oleh Pejabat Berwenang'
           });
         }
-        
-        return { 
-          status: 'success', 
-          message: 'Persetujuan akhir Pejabat Berwenang berhasil disimpan. Status cuti resmi Disetujui dan notifikasi telah dikirimkan ke pegawai pemohon.' 
+
+        return {
+          status: 'success',
+          message: 'Persetujuan akhir Pejabat Berwenang berhasil disimpan. Status cuti resmi Disetujui dan notifikasi telah dikirimkan ke pegawai pemohon.'
         };
       } else {
         // Pejabat menolak
         sheetCuti.getRange(rowIndex, 8).setValue('Ditolak');
         refundCutiSaldo_(sheetUser, pemohonNip, jenisCuti, targetRow[16]);
         if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush();
-        
+
         if (pemohon.no_wa && pemohon.no_wa.length > 8) {
           const msgReject = "*TRANSKEP - STATUS USULAN CUTI* ⚠️\n\n" +
             "Halo *" + pemohon.nama + "*,\n\n" +
@@ -472,14 +487,14 @@ function processMagicLinkApproval(token, decision, notes) {
             catatan: catatanBersih || 'Tidak ada catatan khusus.'
           });
         }
-        
-        return { 
-          status: 'success', 
-          message: 'Permohonan cuti telah ditolak oleh Pejabat Berwenang. Saldo pegawai telah dipulihkan dan notifikasi telah dikirimkan ke pemohon.' 
+
+        return {
+          status: 'success',
+          message: 'Permohonan cuti telah ditolak oleh Pejabat Berwenang. Saldo pegawai telah dipulihkan dan notifikasi telah dikirimkan ke pemohon.'
         };
       }
     }
-    
+
     throw new Error("Tahapan persetujuan ini sudah selesai.");
   } catch (err) {
     return { status: 'error', message: err.toString() };
@@ -510,13 +525,13 @@ function resendCutiWhatsApp(cutiId, adminNip, clientToken) {
     if (!cekOtorisasi(adminNip, clientToken)) {
       return { status: 'error', message: 'Akses Ditolak: Sesi Anda tidak valid.' };
     }
-    
+
     const ss = getDB();
     ensureAnnualCutiRollover_(ss);
     const sheetCuti = ss.getSheetByName('cuti_log');
     const sheetUser = ss.getSheetByName('user_data');
     if (!sheetCuti || !sheetUser) throw new Error("Basis data belum siap.");
-    
+
     // Validasi Hak Akses Admin atau Operator
     const userData = readUserSheetDecrypted_(sheetUser);
     let isAuthorized = false;
@@ -530,7 +545,7 @@ function resendCutiWhatsApp(cutiId, adminNip, clientToken) {
     if (!isAuthorized) {
       return { status: 'error', message: 'Akses Ditolak: Fitur kirim ulang WA hanya untuk Admin dan Operator.' };
     }
-    
+
     const cutiData = readCutiSheetDecrypted_(sheetCuti);
     let rowIndex = -1;
     let targetRow = null;
@@ -541,24 +556,24 @@ function resendCutiWhatsApp(cutiId, adminNip, clientToken) {
         break;
       }
     }
-    
+
     if (rowIndex === -1) throw new Error("Data transaksi cuti tidak ditemukan.");
-    
+
     let magicToken = String(targetRow[18] || '').trim();
     if (!magicToken) {
       magicToken = Utilities.getUuid();
       sheetCuti.getRange(rowIndex, 19).setValue(magicToken);
       if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush();
     }
-    
+
     const statusAtasan = targetRow[13];
     const statusPejabat = targetRow[14];
     const statusFinal = targetRow[7];
-    
+
     if (statusFinal === 'Disetujui' || statusFinal === 'Ditolak' || statusFinal === 'DIBATALKAN') {
       return { status: 'error', message: `Berkas cuti ini sudah selesai diproses (Status: ${statusFinal}).` };
     }
-    
+
     const userMap = {};
     for (let u = 1; u < userData.length; u++) {
       userMap[String(userData[u][0]).trim()] = {
@@ -566,18 +581,18 @@ function resendCutiWhatsApp(cutiId, adminNip, clientToken) {
         no_wa: userData[u][4] || ''
       };
     }
-    
+
     const pemohon = userMap[String(targetRow[2]).trim()] || { nama: 'Pegawai' };
     const magicLink = "https://sso.pa-indramayu.go.id/?action=review_cuti&token=" + magicToken;
     const periode = targetRow[4] + " s.d " + targetRow[5];
-    
+
     // Jika menunggu persetujuan Atasan Langsung
     if (statusAtasan === 'Menunggu') {
       const atasan = userMap[String(targetRow[9]).trim()];
       if (!atasan || !atasan.no_wa || atasan.no_wa.length < 9) {
         return { status: 'error', message: 'Nomor WhatsApp Atasan Langsung tidak terdaftar di sistem.' };
       }
-      
+
       const msgWa = "*TRANSKEP - USULAN CUTI PEGAWAI* 📋\n\n" +
         "Yth. Bapak/Ibu *" + atasan.nama + "* (Atasan Langsung),\n\n" +
         "Pengingat pengajuan cuti staf Anda yang memerlukan persetujuan:\n\n" +
@@ -588,7 +603,7 @@ function resendCutiWhatsApp(cutiId, adminNip, clientToken) {
         "📝 *Alasan:* " + targetRow[6] + "\n\n" +
         "Silakan klik tautan di bawah ini untuk melihat detail dan memberikan persetujuan langsung (tanpa login):\n" +
         "👉 " + magicLink;
-        
+
       const res = sendWhatsAppMessage_(atasan.no_wa, msgWa, {
         jenis_pesan: 'cuti_usulan',
         nama_tujuan: atasan.nama,
@@ -612,7 +627,7 @@ function resendCutiWhatsApp(cutiId, adminNip, clientToken) {
       if (!pejabat || !pejabat.no_wa || pejabat.no_wa.length < 9) {
         return { status: 'error', message: 'Nomor WhatsApp Pejabat Berwenang tidak terdaftar di sistem.' };
       }
-      
+
       const msgWa = "*TRANSKEP - PERSETUJUAN CUTI TINGKAT AKHIR* 🏛️\n\n" +
         "Yth. Bapak/Ibu *" + pejabat.nama + "* (Pejabat Berwenang),\n\n" +
         "Pengingat usulan cuti yang telah disetujui Atasan dan menunggu persetujuan akhir Anda:\n\n" +
@@ -623,7 +638,7 @@ function resendCutiWhatsApp(cutiId, adminNip, clientToken) {
         "📝 *Alasan:* " + targetRow[6] + "\n\n" +
         "Silakan klik tautan di bawah ini untuk melihat detail dan memberikan persetujuan langsung (tanpa login):\n" +
         "👉 " + magicLink;
-        
+
       const res = sendWhatsAppMessage_(pejabat.no_wa, msgWa, {
         jenis_pesan: 'cuti_usulan',
         nama_tujuan: pejabat.nama,
@@ -654,7 +669,7 @@ function resendCutiWhatsApp(cutiId, adminNip, clientToken) {
 function fetchQrBatchDataUrisServer_(urls) {
   const results = urls.slice();
   try {
-    const requests = urls.map(function(u) {
+    const requests = urls.map(function (u) {
       return { url: u, method: 'get', muteHttpExceptions: true };
     });
     const responses = UrlFetchApp.fetchAll(requests);
@@ -692,8 +707,8 @@ function generateCutiPdfBase64Server_(id, logRecord, namaPemohon, nip, nomorSura
     if (!sheetUser) throw new Error("Sheet user_data tidak ditemukan.");
 
     const uData = readUserSheetDecrypted_(sheetUser);
-    const uHeaders = (uData && uData.length > 0) ? uData[0].map(function(h) { return String(h || '').trim().toLowerCase().replace(/[^a-z0-9]/g, ''); }) : [];
-    const findColIdx = function(name, fallback) {
+    const uHeaders = (uData && uData.length > 0) ? uData[0].map(function (h) { return String(h || '').trim().toLowerCase().replace(/[^a-z0-9]/g, ''); }) : [];
+    const findColIdx = function (name, fallback) {
       const clean = name.toLowerCase().replace(/[^a-z0-9]/g, '');
       const idx = uHeaders.indexOf(clean);
       return idx !== -1 ? idx : fallback;
@@ -812,7 +827,7 @@ function generateCutiPdfBase64Server_(id, logRecord, namaPemohon, nip, nomorSura
       const parts = tglAju.split('/');
       if (parts.length >= 2) {
         const mIdx = parseInt(parts[1], 10) - 1;
-        romawiBulan = ["I","II","III","IV","V","VI","VII","VIII","IX","X","XI","XII"][mIdx] || "-";
+        romawiBulan = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII"][mIdx] || "-";
       }
       if (parts.length >= 3) {
         tahunPengajuan = parts[2];
@@ -902,15 +917,15 @@ function generateCutiPdfBase64Server_(id, logRecord, namaPemohon, nip, nomorSura
       // VI. ALAMAT SELAMA MENJALANKAN CUTI + TTE PEMOHON (2-Column Pure Table agar 100% stabil di PDF GAS)
       '<table class="sig-wrap" style="margin-bottom:4px;"><tr>' +
       '<td style="width:60%; padding-right:8px;">' +
-        '<table class="bdr" style="margin-bottom:0;">' +
-        '<tr><td style="width:72%;" class="sec-hd">VI. ALAMAT SELAMA MENJALANKAN CUTI</td><td style="width:28%; text-align:center;" class="sec-hd">TELPON / HP</td></tr>' +
-        '<tr><td style="vertical-align:top; line-height:1.25; padding:4px 5px;">' + escapeHtmlServer_(logRecord[15] || '-') + '</td><td style="text-align:center; font-weight:bold;">' + escapeHtmlServer_(pns.no_hp || '-') + '</td></tr>' +
-        '</table>' +
+      '<table class="bdr" style="margin-bottom:0;">' +
+      '<tr><td style="width:72%;" class="sec-hd">VI. ALAMAT SELAMA MENJALANKAN CUTI</td><td style="width:28%; text-align:center;" class="sec-hd">TELPON / HP</td></tr>' +
+      '<tr><td style="vertical-align:top; line-height:1.25; padding:4px 5px;">' + escapeHtmlServer_(logRecord[15] || '-') + '</td><td style="text-align:center; font-weight:bold;">' + escapeHtmlServer_(pns.no_hp || '-') + '</td></tr>' +
+      '</table>' +
       '</td>' +
       '<td style="width:40%; padding-left:14px;">' +
-        '<div>Hormat Saya,</div>' +
-        qrPegawaiImg +
-        '<div style="line-height:1.2;"><span style="text-decoration:underline; font-weight:bold;">' + escapeHtmlServer_(pns.nama) + '</span><br>NIP. ' + escapeHtmlServer_(pns.nip) + '</div>' +
+      '<div>Hormat Saya,</div>' +
+      qrPegawaiImg +
+      '<div style="line-height:1.2;"><span style="text-decoration:underline; font-weight:bold;">' + escapeHtmlServer_(pns.nama) + '</span><br>NIP. ' + escapeHtmlServer_(pns.nip) + '</div>' +
       '</td>' +
       '</tr></table>' +
 
@@ -921,9 +936,9 @@ function generateCutiPdfBase64Server_(id, logRecord, namaPemohon, nip, nomorSura
       '<tr style="text-align:center; font-weight:bold; height:16px;"><td>' + cAtasanSetuju + '</td><td>' + cAtasanUbah + '</td><td>' + cAtasanTangguh + '</td><td>' + cAtasanTolak + '</td></tr>' +
       '</table>' +
       '<table class="sig-wrap"><tr><td style="width:60%;"></td><td style="width:40%; padding-left:14px;">' +
-        '<div style="font-weight:bold;">' + atasanJabatanStr + '</div>' +
-        qrAtasanImg +
-        '<div style="line-height:1.2;"><span style="text-decoration:underline; font-weight:bold;">' + escapeHtmlServer_(atasan.nama) + '</span><br>NIP. ' + escapeHtmlServer_(atasan.nip) + '</div>' +
+      '<div style="font-weight:bold;">' + atasanJabatanStr + '</div>' +
+      qrAtasanImg +
+      '<div style="line-height:1.2;"><span style="text-decoration:underline; font-weight:bold;">' + escapeHtmlServer_(atasan.nama) + '</span><br>NIP. ' + escapeHtmlServer_(atasan.nip) + '</div>' +
       '</td></tr></table>' +
 
       // VIII. KEPUTUSAN PEJABAT YANG BERWENANG MEMBERIKAN CUTI
@@ -933,9 +948,9 @@ function generateCutiPdfBase64Server_(id, logRecord, namaPemohon, nip, nomorSura
       '<tr style="text-align:center; font-weight:bold; height:16px;"><td>' + cPejabatSetuju + '</td><td>' + cPejabatUbah + '</td><td>' + cPejabatTangguh + '</td><td>' + cPejabatTolak + '</td></tr>' +
       '</table>' +
       '<table class="sig-wrap"><tr><td style="width:60%;"></td><td style="width:40%; padding-left:14px;">' +
-        '<div style="font-weight:bold;">' + pejabatJabatanStr + '</div>' +
-        qrPejabatImg +
-        '<div style="line-height:1.2;"><span style="text-decoration:underline; font-weight:bold;">' + escapeHtmlServer_(pejabat.nama) + '</span><br>NIP. ' + escapeHtmlServer_(pejabat.nip) + '</div>' +
+      '<div style="font-weight:bold;">' + pejabatJabatanStr + '</div>' +
+      qrPejabatImg +
+      '<div style="line-height:1.2;"><span style="text-decoration:underline; font-weight:bold;">' + escapeHtmlServer_(pejabat.nama) + '</span><br>NIP. ' + escapeHtmlServer_(pejabat.nip) + '</div>' +
       '</td></tr></table>' +
 
       '</body></html>';
@@ -1074,8 +1089,12 @@ function updateNomorSuratCutiFromExternal_(payload) {
     }
 
     const scriptProps = PropertiesService.getScriptProperties();
-    const configuredKey = scriptProps.getProperty("TRANSKEP_WEBHOOK_KEY") || "TRANSKEP_WA_BOT_2026";
-    if (payload.secret_key && String(payload.secret_key).trim() !== configuredKey.trim()) {
+    const configuredKey = String(scriptProps.getProperty("TRANSKEP_WEBHOOK_KEY") || "TRANSKEP_WA_BOT_2026").trim();
+    const incomingKey = String(payload.secret_key || '').trim();
+    const isKeyMatch = (typeof constantTimeEquals_ === 'function')
+      ? constantTimeEquals_(incomingKey, configuredKey)
+      : (incomingKey !== '' && incomingKey === configuredKey);
+    if (!incomingKey || !isKeyMatch) {
       return { status: 'error', message: "Akses ditolak: Secret Key tidak valid." };
     }
 

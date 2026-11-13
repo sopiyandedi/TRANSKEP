@@ -8,11 +8,11 @@ function doGet(e) {
     return handleApiGet_(e);
   }
 
-  // 2. Default: Tetap render Web App Google Apps Script (Google Sites Legacy 100% Utuh)
+  // 2. Default: Render Web App Google Apps Script dengan proteksi anti-clickjacking
   return HtmlService.createTemplateFromFile('index')
     .evaluate()
     .setTitle('TRANSKEP v2.1')
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DEFAULT)
     .addMetaTag('viewport', 'width=device-width, initial-scale=1');
 }
 
@@ -32,96 +32,310 @@ function getDB() {
   return ss;
 }
 
-// 2. Sentralisasi Validasi Token Sesi (DRY)
-function cekOtorisasi(nip, clientToken) {
-  if (!nip) return false;
-  if (clientToken) {
+// 2. Sentralisasi Token Sesi Kriptografis (HMAC-SHA256) & Validasi RBAC (DRY)
+var _cachedSessionSecret_ = null;
+var SESSION_TOKEN_TTL_SEC_ = 28800; // 8 jam masa berlaku token
+var SESSION_CACHE_TTL_SEC_ = 21600; // 6 jam batas maksimal CacheService GAS
+var REVOKED_JTIS_PROP_KEY_ = 'TRANSKEP_REVOKED_JTIS';
+
+function normalizeNipKey_(val) {
+  return String(val === null || val === undefined ? '' : val).replace(/['"\s]/g, '').trim();
+}
+
+function constantTimeEquals_(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string') return false;
+  if (a.length !== b.length || a.length === 0) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) {
+    diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return diff === 0;
+}
+
+function getSessionSecret_() {
+  if (_cachedSessionSecret_) return _cachedSessionSecret_;
+  const props = PropertiesService.getScriptProperties();
+  let secret = props.getProperty('TRANSKEP_SESSION_SECRET');
+  if (!secret) {
+    const lock = LockService.getScriptLock();
+    let locked = false;
+    try {
+      locked = lock.tryLock(5000);
+      secret = props.getProperty('TRANSKEP_SESSION_SECRET');
+      if (!secret) {
+        const seed = Utilities.getUuid() + ':' + Utilities.getUuid() + ':' + new Date().getTime();
+        const digest = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, seed, Utilities.Charset.UTF_8);
+        secret = bytesToHex_(digest);
+        props.setProperty('TRANSKEP_SESSION_SECRET', secret);
+      }
+    } finally {
+      if (locked) {
+        try { lock.releaseLock(); } catch (eLock) {}
+      }
+    }
+  }
+  if (!secret) throw new Error('Kunci sesi server tidak tersedia.');
+  _cachedSessionSecret_ = secret;
+  return secret;
+}
+
+function signSessionToken_(nip, role) {
+  const cleanNip = normalizeNipKey_(nip);
+  const nowSec = Math.floor(Date.now() / 1000);
+  const jti = Utilities.getUuid().replace(/-/g, '').substring(0, 16);
+  const payloadObj = {
+    n: cleanNip,
+    r: String(role || ''),
+    iat: nowSec,
+    exp: nowSec + SESSION_TOKEN_TTL_SEC_,
+    jti: jti
+  };
+  const payloadB64 = Utilities.base64EncodeWebSafe(JSON.stringify(payloadObj)).replace(/=+$/, '');
+  const signingInput = 'v2.' + payloadB64;
+  const sigHex = bytesToHex_(Utilities.computeHmacSha256Signature(signingInput, getSessionSecret_()));
+  return { token: signingInput + '.' + sigHex, jti: jti, exp: payloadObj.exp };
+}
+
+function parseAndVerifySignedToken_(token) {
+  if (!token || typeof token !== 'string') return null;
+  const parts = String(token).trim().split('.');
+  if (parts.length !== 3 || parts[0] !== 'v2' || !parts[1] || !parts[2]) return null;
+
+  const signingInput = parts[0] + '.' + parts[1];
+  let expectedHex = '';
+  try {
+    expectedHex = bytesToHex_(Utilities.computeHmacSha256Signature(signingInput, getSessionSecret_()));
+  } catch (e) {
+    return null;
+  }
+  if (!constantTimeEquals_(String(parts[2]).toLowerCase(), expectedHex.toLowerCase())) {
+    return null;
+  }
+
+  try {
+    const mod = parts[1].length % 4;
+    if (mod === 1) return null;
+    const paddedB64 = mod === 0 ? parts[1] : parts[1] + '==='.slice(0, 4 - mod);
+    const jsonStr = Utilities.newBlob(Utilities.base64DecodeWebSafe(paddedB64)).getDataAsString('UTF-8');
+    const payload = JSON.parse(jsonStr);
+    const nowSec = Math.floor(Date.now() / 1000);
+    if (!payload || !payload.n || !payload.jti || !payload.exp || Number(payload.exp) <= nowSec) {
+      return null;
+    }
+    return payload;
+  } catch (e) {
+    return null;
+  }
+}
+
+function isJtiRevoked_(jti) {
+  if (!jti) return true;
+  try {
     const cache = CacheService.getScriptCache();
-    const serverNipOwner = cache.get(clientToken);
-    if (serverNipOwner && serverNipOwner === String(nip)) return true;
-  }
-  
-  // Fallback: Jika cache ter-evict atau restart deployment, verifikasi NIP ke database
+    if (cache.get('revoked_' + jti)) return true;
+  } catch (e) {}
+
   try {
-    const ss = getDB();
-    const sheet = ss.getSheetByName('user_data');
-    if (!sheet) return false;
-    const data = readUserSheetDecrypted_(sheet);
-    const cleanNip = String(nip).replace(/['"\s]/g, '');
-    for (let i = 1; i < data.length; i++) {
-      const rowNip = String(data[i][0] || '').replace(/['"\s]/g, '');
-      if (rowNip === cleanNip) {
-        if (clientToken) {
-          const cache = CacheService.getScriptCache();
-          cache.put(clientToken, String(nip), 28800);
-          cache.put(clientToken + "_role", String(data[i][3]), 28800);
+    const raw = PropertiesService.getScriptProperties().getProperty(REVOKED_JTIS_PROP_KEY_);
+    if (!raw) return false;
+    const list = JSON.parse(raw);
+    const nowSec = Math.floor(Date.now() / 1000);
+    if (Array.isArray(list)) {
+      for (let i = 0; i < list.length; i++) {
+        if (list[i] && list[i].j === jti && Number(list[i].e) > nowSec) {
+          try {
+            CacheService.getScriptCache().put('revoked_' + jti, '1', Math.min(SESSION_CACHE_TTL_SEC_, Math.max(60, Number(list[i].e) - nowSec)));
+          } catch (eC) {}
+          return true;
         }
-        return true;
       }
     }
-  } catch(e) {}
+  } catch (e) {}
   return false;
 }
 
-// 3. Sentralisasi Validasi Role Admin (DRY & RBAC)
+function revokeSessionToken_(token) {
+  if (!token || typeof token !== 'string') return;
+  const cache = CacheService.getScriptCache();
+  try {
+    cache.remove(token);
+    cache.remove(token + '_role');
+  } catch (e) {}
+
+  const payload = parseAndVerifySignedToken_(token);
+  if (!payload || !payload.jti) return;
+
+  const nowSec = Math.floor(Date.now() / 1000);
+  const remSec = Math.min(SESSION_CACHE_TTL_SEC_, Math.max(60, Number(payload.exp) - nowSec));
+  try {
+    cache.remove('sess_' + payload.jti);
+    cache.put('revoked_' + payload.jti, '1', remSec);
+  } catch (e) {}
+
+  try {
+    const props = PropertiesService.getScriptProperties();
+    const raw = props.getProperty(REVOKED_JTIS_PROP_KEY_);
+    let list = [];
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) list = parsed;
+    }
+    const active = list.filter(item => item && item.j && item.j !== payload.jti && Number(item.e) > nowSec);
+    active.push({ j: payload.jti, e: Number(payload.exp) });
+    if (active.length > 80) active.splice(0, active.length - 80);
+    props.setProperty(REVOKED_JTIS_PROP_KEY_, JSON.stringify(active));
+  } catch (e) {}
+}
+
+function getVerifiedSession_(nip, clientToken) {
+  const cleanNip = normalizeNipKey_(nip);
+  if (!cleanNip || !clientToken || typeof clientToken !== 'string') return null;
+
+  const payload = parseAndVerifySignedToken_(clientToken);
+  if (!payload || normalizeNipKey_(payload.n) !== cleanNip) return null;
+  if (isJtiRevoked_(payload.jti)) return null;
+
+  const cache = CacheService.getScriptCache();
+  try {
+    const cachedSessStr = cache.get('sess_' + payload.jti);
+    if (cachedSessStr) {
+      const cachedSess = JSON.parse(cachedSessStr);
+      if (cachedSess && normalizeNipKey_(cachedSess.nip) === cleanNip) {
+        return { nip: cleanNip, role: String(cachedSess.role || ''), jti: payload.jti };
+      }
+      return null;
+    }
+  } catch (e) {}
+
+  // Pemulihan cache hanya dilakukan SETELAH tanda tangan HMAC + revokasi terverifikasi,
+  // sekaligus mengambil role terbaru & memastikan akun masih terdaftar di user_data.
+  try {
+    const ss = getDB();
+    const sheet = ss.getSheetByName('user_data');
+    if (!sheet) return null;
+    const data = readUserSheetDecrypted_(sheet);
+    for (let i = 1; i < data.length; i++) {
+      if (normalizeNipKey_(data[i][0]) === cleanNip) {
+        const liveRole = String(data[i][3] || '');
+        const nowSec = Math.floor(Date.now() / 1000);
+        const ttl = Math.min(SESSION_CACHE_TTL_SEC_, Math.max(60, Number(payload.exp) - nowSec));
+        try {
+          cache.put('sess_' + payload.jti, JSON.stringify({ nip: cleanNip, role: liveRole }), ttl);
+        } catch (ePut) {}
+        return { nip: cleanNip, role: liveRole, jti: payload.jti };
+      }
+    }
+  } catch (e) {}
+  return null;
+}
+
+function cekOtorisasi(nip, clientToken) {
+  return Boolean(getVerifiedSession_(nip, clientToken));
+}
+
+// 3. Sentralisasi Validasi Role Admin / Operator (DRY & RBAC)
 function cekOtorisasiAdmin(nip, clientToken) {
-  if (!nip) return false;
-  const cache = CacheService.getScriptCache();
-  if (clientToken) {
-    const cachedRole = cache.get(clientToken + "_role");
-    if (cachedRole) {
-      const cr = cachedRole.toLowerCase().trim();
-      if (cr === 'admin' || cr === 'operator') return true;
-    }
+  const sess = getVerifiedSession_(nip, clientToken);
+  if (!sess) return false;
+  const cr = String(sess.role || '').toLowerCase().trim();
+  return cr === 'admin' || cr === 'operator';
+}
+
+// 3b. Alias Kompatibilitas Validasi Role Admin / Operator (DRY & RBAC)
+function cekOtorisasiAdminOrOperator(nip, clientToken) {
+  return cekOtorisasiAdmin(nip, clientToken);
+}
+
+// 3c. Konteks Sesi Terverifikasi per-Request & Helper Otorisasi (Fase 2)
+var _ACTIVE_SESSION_ = null;
+
+function setActiveSession_(sess) {
+  _ACTIVE_SESSION_ = (sess && sess.nip) ? sess : null;
+}
+
+function getActiveSession_() {
+  return _ACTIVE_SESSION_;
+}
+
+function clearActiveSession_() {
+  _ACTIVE_SESSION_ = null;
+}
+
+function isAdminRole_(role) {
+  const cr = String(role || '').toLowerCase().trim();
+  return cr === 'admin' || cr === 'operator';
+}
+
+function resolveCallerSession_(explicitNip, clientToken) {
+  if (explicitNip !== undefined && explicitNip !== null && String(explicitNip).trim() !== '' && clientToken) {
+    return getVerifiedSession_(explicitNip, clientToken);
   }
-  
-  // Fallback verifikasi database jika cache role ter-evict
+  return getActiveSession_();
+}
+
+// 3d. Sanitasi HTML Server & PDF (Anti-XSS)
+function sanitizePdfHtml_(html) {
+  let str = String(html == null ? '' : html);
+  str = str
+    .replace(/<script\b[\s\S]*?<\/script>/gi, '')
+    .replace(/<iframe\b[\s\S]*?<\/iframe>/gi, '')
+    .replace(/<object\b[\s\S]*?<\/object>/gi, '')
+    .replace(/<embed\b[^>]*>/gi, '')
+    .replace(/<meta\b[^>]*http-equiv\s*=\s*(['"]?)refresh\1[^>]*>/gi, '')
+    .replace(/\son[a-z]+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '')
+    .replace(/(href|src|action)\s*=\s*(['"]?)\s*(javascript|vbscript|data\s*:\s*text\/html):/gi, '$1=$2blocked:');
+  return str;
+}
+
+// 3e. Server-Side Rate Limiting Berbasis CacheService (Anti Brute-Force & OTP Flooding)
+function checkRateLimitBlocked_(key, maxAttempts) {
   try {
-    const ss = getDB();
-    const sheet = ss.getSheetByName('user_data');
-    if (!sheet) return false;
-    const data = readUserSheetDecrypted_(sheet);
-    const cleanNip = String(nip).replace(/['"\s]/g, '');
-    for (let i = 1; i < data.length; i++) {
-      const rowNip = String(data[i][0] || '').replace(/['"\s]/g, '');
-      if (rowNip === cleanNip) {
-        const roleStr = String(data[i][3] || '').toLowerCase().trim();
-        const isAdm = (roleStr === 'admin' || roleStr === 'operator');
-        if (isAdm && clientToken) {
-          cache.put(clientToken, String(nip), 28800);
-          cache.put(clientToken + "_role", data[i][3], 28800);
-        }
-        return isAdm;
-      }
+    const cache = CacheService.getScriptCache();
+    const lockVal = cache.get('rl_lock_' + key);
+    if (lockVal) return true;
+    const raw = cache.get('rl_cnt_' + key);
+    if (!raw) return false;
+    const parsed = JSON.parse(raw);
+    const nowSec = Math.floor(Date.now() / 1000);
+    if (parsed && Number(parsed.exp) > nowSec && Number(parsed.c) >= maxAttempts) {
+      return true;
     }
-  } catch(e) {}
+  } catch (e) {}
   return false;
 }
 
-// 3b. Sentralisasi Validasi Role Admin / Operator (DRY & RBAC)
-function cekOtorisasiAdminOrOperator(nip, clientToken) {
-  if (!cekOtorisasi(nip, clientToken)) return false;
-  const cache = CacheService.getScriptCache();
-  const cachedRole = cache.get(clientToken + "_role");
-  if (cachedRole) {
-    const cr = cachedRole.toLowerCase().trim();
-    if (cr === 'admin' || cr === 'operator') return true;
-  }
-  
-  // Fallback verifikasi database jika cache role ter-evict
-  const ss = getDB();
-  const sheet = ss.getSheetByName('user_data');
-  if (!sheet) return false;
-  const data = readUserSheetDecrypted_(sheet);
-  for (let i = 1; i < data.length; i++) {
-    if (String(data[i][0]) === String(nip)) {
-      const roleStr = String(data[i][3] || '').toLowerCase().trim();
-      const isAuthorized = roleStr === 'admin' || roleStr === 'operator';
-      if (isAuthorized) cache.put(clientToken + "_role", data[i][3], 28800);
-      return isAuthorized;
+function recordRateLimitHit_(key, maxAttempts, windowSec, lockSec) {
+  try {
+    const cache = CacheService.getScriptCache();
+    const nowSec = Math.floor(Date.now() / 1000);
+    let count = 0;
+    let exp = nowSec + windowSec;
+    const raw = cache.get('rl_cnt_' + key);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && Number(parsed.exp) > nowSec) {
+        count = Number(parsed.c) || 0;
+        exp = Number(parsed.exp);
+      }
     }
+    count += 1;
+    const ttl = Math.min(21600, Math.max(10, exp - nowSec));
+    cache.put('rl_cnt_' + key, JSON.stringify({ c: count, exp: exp }), ttl);
+    if (count >= maxAttempts && lockSec > 0) {
+      cache.put('rl_lock_' + key, '1', Math.min(21600, Math.max(10, lockSec)));
+    }
+    return count;
+  } catch (e) {
+    return 0;
   }
-  return false;
+}
+
+function clearRateLimit_(key) {
+  try {
+    const cache = CacheService.getScriptCache();
+    cache.remove('rl_cnt_' + key);
+    cache.remove('rl_lock_' + key);
+  } catch (e) {}
 }
 
 // 4. Sentralisasi Sanitasi Anti Formula / CSV Injection (CWE-1236)
@@ -198,8 +412,7 @@ function getEncryptionSecret_() {
     _cachedEncSecret_ = secret;
     return secret;
   } catch (e) {
-    _cachedEncSecret_ = "TRANSKEP_FALLBACK_MASTER_VAULT_KEY_2026_SECURE";
-    return _cachedEncSecret_;
+    throw new Error('Gagal membaca/menginisialisasi TRANSKEP_ENC_SECRET dari ScriptProperties: ' + e.toString());
   }
 }
 
@@ -322,8 +535,8 @@ function encryptPasswordField_(passVal) {
   if (passVal === null || passVal === undefined) return '';
   const clean = String(passVal).replace(/^'+/, '').trim();
   if (clean === '' || clean === '-') return '';
-  if (isEncryptedField_(clean) || clean.startsWith('SHA256$')) return clean;
-  return encryptField_(clean);
+  if (clean.startsWith('SHA256$') || isEncryptedField_(clean)) return clean;
+  return hashPassword_(clean);
 }
 
 /**
@@ -375,15 +588,16 @@ function readUserSheetDecrypted_(sheetUser) {
       data[i][colHp] = decryptField_(rawHp);
     }
 
-    // 3. Kolom Password (mendukung ketik manual darurat -> langsung berubah jadi ENC$)
+    // 3. Kolom Password (ketik manual darurat -> langsung di-hash satu arah SHA256$; tidak pernah didekripsi ke memori)
     const rawPass = String(data[i][colPass] || '').replace(/^'+/, '').trim();
     if (rawPass !== '' && rawPass !== '-' && !isEncryptedField_(rawPass) && !rawPass.startsWith('SHA256$')) {
       dirtyPass = true;
-      encPassCol.push([encryptField_(rawPass)]);
-      data[i][colPass] = rawPass;
+      const hashedPass = hashPassword_(rawPass);
+      encPassCol.push([hashedPass]);
+      data[i][colPass] = hashedPass;
     } else {
       encPassCol.push([rawPass]);
-      data[i][colPass] = isEncryptedField_(rawPass) ? decryptField_(rawPass) : rawPass;
+      data[i][colPass] = rawPass;
     }
 
     // 4. Kolom Alamat Pegawai
@@ -1009,9 +1223,7 @@ function pulihkanSaldoCutiServer_(sheetUser, rowIndex, jenis, historyStr) {
 function logoutSession(nip, clientToken) {
   try {
     if (clientToken) {
-      const cache = CacheService.getScriptCache();
-      cache.remove(clientToken);
-      cache.remove(clientToken + "_role");
+      revokeSessionToken_(clientToken);
     }
     return { status: 'success' };
   } catch (e) {
@@ -1109,6 +1321,19 @@ function sendWhatsAppMessage_(rawPhone, text, metaPayload) {
 // ------------------------------------------
 function verifyLogin(nip, pass) {
   try {
+    const cleanInputNip = normalizeNipKey_(nip);
+    if (!cleanInputNip || !pass) {
+      return { status: 'error', message: 'NIP atau Sandi tidak valid' };
+    }
+
+    const loginRlKey = 'login_' + cleanInputNip;
+    if (checkRateLimitBlocked_(loginRlKey, 5)) {
+      return {
+        status: 'error',
+        message: 'Terlalu banyak percobaan login gagal. Akun dikunci sementara selama 10 menit demi keamanan.'
+      };
+    }
+
     // Memanggil koneksi database terpusat & cek pergantian tahun otomatis
     const ss = getDB();
     const activeYear = ensureAnnualCutiRollover_(ss);
@@ -1117,13 +1342,14 @@ function verifyLogin(nip, pass) {
     const sheet = ss.getSheetByName('user_data');
     const data = readUserSheetDecrypted_(sheet);
     for (let i = 1; i < data.length; i++) {
-      if (String(data[i][0]) === String(nip)) {
-        const storedPass = String(data[i][5]);
+      if (normalizeNipKey_(data[i][0]) === cleanInputNip) {
+        const storedPass = String(data[i][5] || '');
         if (verifyPasswordHash_(storedPass, pass)) {
-          // Auto-Upgrade jika sandi lama masih berformat SHA256$ menjadi format terpadu ENC$
-          if (storedPass.startsWith("SHA256$")) {
+          clearRateLimit_(loginRlKey);
+          // Auto-Upgrade ke Salted SHA-256 jika sandi masih format transisi ENC$ / plaintext
+          if (!storedPass.startsWith("SHA256$")) {
             try {
-              sheet.getRange(i + 1, 6).setNumberFormat('@').setValue(encryptField_(pass));
+              sheet.getRange(i + 1, 6).setNumberFormat('@').setValue(hashPassword_(pass));
             } catch (eUp) {}
           }
 
@@ -1135,26 +1361,29 @@ function verifyLogin(nip, pass) {
             pangkat: data[i][14], alamat: data[i][15], cuti_years: cutiYears
           };
 
-          const sessionToken = Utilities.getUuid();
+          const sess = signSessionToken_(user.nip, user.role);
           const cache = CacheService.getScriptCache();
-          cache.put(sessionToken, String(nip), 28800); 
-          cache.put(sessionToken + "_role", String(user.role), 28800);
+          try {
+            cache.put('sess_' + sess.jti, JSON.stringify({ nip: normalizeNipKey_(user.nip), role: String(user.role || '') }), SESSION_CACHE_TTL_SEC_);
+          } catch (eSessCache) {}
 
           let cachedTemp = null;
+          const cleanUserNip = normalizeNipKey_(user.nip);
           try {
-            cachedTemp = CacheService.getScriptCache().get("force_reset_" + nip);
+            cachedTemp = cache.get("force_reset_" + cleanUserNip) || cache.get("force_reset_" + user.nip);
           } catch(e) {}
 
           const isTempPass = (typeof pass === 'string' && /^TR-\d{6}$/.test(pass.trim())) || !!cachedTemp;
           if (typeof pass === 'string' && /^TR-\d{6}$/.test(pass.trim())) {
             try {
-              CacheService.getScriptCache().put("force_reset_" + nip, pass.trim(), 86400);
+              cache.put("force_reset_" + cleanUserNip, "1", SESSION_CACHE_TTL_SEC_);
             } catch(e) {}
           }
-          return { status: 'success', data: user, token: sessionToken, must_change_password: isTempPass };
+          return { status: 'success', data: user, token: sess.token, must_change_password: isTempPass };
         }
       }
     }
+    recordRateLimitHit_(loginRlKey, 5, 600, 600);
     return { status: 'error', message: 'NIP atau Sandi tidak valid' };
   } catch (e) { return { status: 'error', message: e.toString() }; }
 }
@@ -1293,17 +1522,18 @@ function getBulkData(nip, clientToken, clientVersion) {
       return { status: 'NOT_MODIFIED', version: serverVersion, cuti_years: cutiYears };
     }
 
-    let cachedTempPass = null;
+    let cachedTempFlag = null;
+    const cleanReqNip = normalizeNipKey_(nip);
     try {
-      cachedTempPass = CacheService.getScriptCache().get("force_reset_" + nip);
+      cachedTempFlag = CacheService.getScriptCache().get("force_reset_" + cleanReqNip) ||
+        CacheService.getScriptCache().get("force_reset_" + nip);
     } catch(e) {}
 
     const data = { 
       user: null, 
       usersList: [], 
       pendingPkpCount: 0,
-      must_change_password: !!cachedTempPass,
-      temp_pass: cachedTempPass || '',
+      must_change_password: !!cachedTempFlag,
       cuti_years: cutiYears
     };
 
@@ -1311,7 +1541,8 @@ function getBulkData(nip, clientToken, clientVersion) {
 
        let isRequesterAdmin = false;
        for (let i = 1; i < uData.length; i++) {
-          if (String(uData[i][0]) === String(nip) && String(uData[i][3]).toLowerCase() === 'admin') {
+          const rLower = String(uData[i][3] || '').toLowerCase().trim();
+          if (normalizeNipKey_(uData[i][0]) === cleanReqNip && (rLower === 'admin' || rLower === 'operator')) {
              isRequesterAdmin = true;
              break;
           }
@@ -1344,8 +1575,9 @@ function getBulkData(nip, clientToken, clientVersion) {
        const colJenisJab = findColIdx('Jenis_Jabatan', 25);
 
        for(let i=1; i<uData.length; i++) {
-          const isCurrentUser = (String(uData[i][colNip]) === String(nip));
-          const userPassword = (isRequesterAdmin || isCurrentUser) ? uData[i][colPass] : '';
+          const isCurrentUser = (normalizeNipKey_(uData[i][colNip]) === cleanReqNip);
+          const hasStoredPass = Boolean(String(uData[i][colPass] || '').trim());
+          const userPassword = ((isRequesterAdmin || isCurrentUser) && hasStoredPass) ? '[Telah Dienkripsi]' : '';
 
           const u = {
             nip: uData[i][colNip], nama: uData[i][colNama], jabatan: uData[i][colJab], role: uData[i][colRole],
@@ -1568,6 +1800,24 @@ function requestPasswordReset(no_wa) {
       return { status: 'error', message: 'Nomor WhatsApp tidak valid (minimal 9 digit).' };
     }
 
+    const phoneTailKey = 'pwd_reset_' + phone.slice(-9);
+    const phoneCdKey = 'pwd_reset_cd_' + phone.slice(-9);
+    const globalResetKey = 'pwd_reset_global';
+
+    if (checkRateLimitBlocked_(phoneCdKey, 1)) {
+      return { status: 'error', message: 'Mohon tunggu 60 detik sebelum mengirim permintaan reset sandi berikutnya.' };
+    }
+    if (checkRateLimitBlocked_(phoneTailKey, 2)) {
+      return { status: 'error', message: 'Batas permintaan reset sandi tercapai (maksimal 2 kali per 10 menit). Silakan tunggu sebelum mencoba lagi.' };
+    }
+    if (checkRateLimitBlocked_(globalResetKey, 20)) {
+      return { status: 'error', message: 'Layanan reset sandi sedang sibuk. Silakan coba kembali beberapa menit lagi.' };
+    }
+
+    recordRateLimitHit_(phoneCdKey, 1, 60, 60);
+    recordRateLimitHit_(phoneTailKey, 2, 600, 600);
+    recordRateLimitHit_(globalResetKey, 20, 300, 300);
+
     const ss = getDB(); // Menggunakan koneksi database terpusat
     const userSheet = ss.getSheetByName('user_data');
     if(!userSheet) throw new Error("Database user tidak ditemukan");
@@ -1600,13 +1850,13 @@ function requestPasswordReset(no_wa) {
 
     if (!userFound || userRowIndex === -1) return { status: 'error', message: 'Nomor WhatsApp ini tidak terdaftar di dalam sistem pegawai. Silakan periksa kembali atau hubungi Admin.' };
 
-    // 1. Generate Kata Sandi Sementara (6 Digit OTP) & Enkripsi Kolom (ENC$)
+    // 1. Generate Kata Sandi Sementara (6 Digit OTP) & Hash Salted SHA-256 (One-Way)
     const tempPass = "TR-" + Math.floor(100000 + Math.random() * 900000);
-    const newEncryptedPass = encryptField_(tempPass);
-    userSheet.getRange(userRowIndex, 6).setNumberFormat('@').setValue(newEncryptedPass);
+    const newHashedPass = hashPassword_(tempPass);
+    userSheet.getRange(userRowIndex, 6).setNumberFormat('@').setValue(newHashedPass);
 
     try {
-      CacheService.getScriptCache().put("force_reset_" + userFound.nip, tempPass, 86400);
+      CacheService.getScriptCache().put("force_reset_" + normalizeNipKey_(userFound.nip), "1", SESSION_CACHE_TTL_SEC_);
     } catch(e) {}
 
     // 2. Kirim otomatis via WhatsApp Gateway WAHA
@@ -1657,7 +1907,7 @@ function requestPasswordReset(no_wa) {
       
       const uniqueId = 'REQ-' + new Date().getTime();
       const timestamp = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'dd/MM/yyyy HH:mm:ss');
-      logSheet.appendRow([uniqueId, timestamp, encryptField_(userFound.nip), userFound.nama, encryptField_(userFound.no_wa), encryptField_(tempPass)]);
+      logSheet.appendRow(sanitizeRowArray([uniqueId, timestamp, encryptField_(userFound.nip), userFound.nama, encryptField_(userFound.no_wa), encryptField_(tempPass)]));
       bumpDataVersion();
 
       return { 
@@ -1680,25 +1930,15 @@ function getResetPasswordQueue(adminNip, clientToken) {
     const sheet = ss.getSheetByName('log_reset_pass');
     if (!sheet) return [];
     
-    // Tarik mapping password terkini dari user_data untuk diberikan ke Admin via WA secara aman
-    const userSheet = ss.getSheetByName('user_data');
-    const userMap = {};
-    if (userSheet) {
-      const uData = readUserSheetDecrypted_(userSheet);
-      for (let u = 1; u < uData.length; u++) {
-        userMap[String(uData[u][0])] = uData[u][5];
-      }
-    }
-
     const data = sheet.getDataRange().getDisplayValues();
     const queue = [];
     for(let i = 1; i < data.length; i++) {
       if(data[i][0] && String(data[i][0]).trim() !== '') { 
         const uNip = String(decryptField_(data[i][2]));
         const uNoWa = String(decryptField_(data[i][4]));
-        // Prioritaskan password sementara (TR-XXXXXX) yang tercatat di antrean log_reset_pass
-        let currentPass = decryptField_(data[i][5] || userMap[uNip] || '-');
-        if (currentPass && String(currentPass).startsWith("SHA256$")) {
+        // Hanya tampilkan sandi sementara (TR-XXXXXX) yang tercatat di antrean log_reset_pass
+        let currentPass = data[i][5] ? String(decryptField_(data[i][5])) : '';
+        if (!currentPass || currentPass === '-' || currentPass.startsWith("SHA256$")) {
           currentPass = "[Telah Dienkripsi - Reset di Edit Pegawai]";
         }
         queue.push({
@@ -1713,17 +1953,28 @@ function getResetPasswordQueue(adminNip, clientToken) {
 
 // Fungsi Pengujian & Trigger Otorisasi Satu Kali (Wajib Tanpa Try-Catch agar Google memunculkan dialog Otorisasi)
 function mintaIzinUrlFetch() {
-  const res = UrlFetchApp.fetch("https://supernova-endpoint-unsubtly.ngrok-free.dev/api/sessions", {
+  const cfg = getGatewayConfig_();
+  const baseUrl = String(cfg.url || '').replace(/\/webhook.*$/i, '').replace(/\/api.*$/i, '').replace(/\/+$/, '');
+  const res = UrlFetchApp.fetch(baseUrl + "/api/sessions", {
     headers: {
-      'X-Api-Key': '192167ce5e0147dcb4eaaaff7eccfc18',
+      'X-Api-Key': cfg.apiKey,
       'ngrok-skip-browser-warning': 'true'
     }
   });
   Logger.log("Koneksi Berhasil: " + res.getContentText());
 }
 
-function testKoneksiWAHA() {
-  const result = sendWhatsAppMessage_('6285139811819', 'TRANSKEP - Tes Koneksi n8n Gateway Berhasil Aktif! 🚀', {
+function testKoneksiWAHA(targetPhone, adminNip, clientToken) {
+  if (adminNip || clientToken) {
+    if (!cekOtorisasiAdmin(adminNip, clientToken)) {
+      return { status: 'error', message: 'Akses Ditolak: Hanya Admin yang dapat menjalankan diagnostik WAHA.' };
+    }
+  }
+  const dest = normalizePhone_(targetPhone || PropertiesService.getScriptProperties().getProperty('ADMIN_TEST_PHONE') || '');
+  if (!dest) {
+    return { status: 'error', message: 'Nomor tujuan tes WAHA belum disetel (kirim parameter targetPhone atau atur Script Property ADMIN_TEST_PHONE).' };
+  }
+  const result = sendWhatsAppMessage_(dest, 'TRANSKEP - Tes Koneksi n8n Gateway Berhasil Aktif! 🚀', {
     jenis_pesan: 'direct'
   });
   Logger.log("Hasil Uji n8n Gateway: " + JSON.stringify(result));
@@ -1770,24 +2021,30 @@ function changeMyPassword(nip, oldPass, newPass, clientToken) {
     if (!cekOtorisasi(nip, clientToken)) {
         return { status: 'error', message: 'Akses Ditolak: Sesi tidak valid atau kedaluwarsa. Silakan login ulang.' };
     }
+    if (!newPass || String(newPass).length < 5) {
+        return { status: 'error', message: 'Kata sandi baru minimal terdiri dari 5 karakter.' };
+    }
 
     // 2. Gunakan koneksi database terpusat
     const ss = getDB();
     const sheet = ss.getSheetByName('user_data');
     const data = readUserSheetDecrypted_(sheet);
+    const cleanTargetNip = normalizeNipKey_(nip);
 
     // 3. Cari pegawai dan verifikasi sandi lama
     for (let i = 1; i < data.length; i++) {
-      if (String(data[i][0]) === String(nip)) {
+      if (normalizeNipKey_(data[i][0]) === cleanTargetNip) {
         if (!verifyPasswordHash_(data[i][5], oldPass)) {
           return { status: 'error', message: 'Kata sandi lama yang Anda masukkan salah.' };
         }
         
-        // 4. Timpa dengan sandi baru berformat Enkripsi Kolom (ENC$)
-        const encryptedNewPass = encryptField_(newPass);
-        sheet.getRange(i + 1, 6).setNumberFormat('@').setValue(encryptedNewPass);
+        // 4. Timpa dengan sandi baru berformat Hash Salted SHA-256 (One-Way)
+        const hashedNewPass = hashPassword_(newPass);
+        sheet.getRange(i + 1, 6).setNumberFormat('@').setValue(hashedNewPass);
         try {
-          CacheService.getScriptCache().remove("force_reset_" + nip);
+          const cache = CacheService.getScriptCache();
+          cache.remove("force_reset_" + cleanTargetNip);
+          cache.remove("force_reset_" + nip);
         } catch(e) {}
         bumpDataVersion();
         return { status: 'success' };
@@ -1838,7 +2095,8 @@ function handleWebhookST_(payload) {
     scriptProps.setProperty("TRANSKEP_WEBHOOK_KEY", configuredKey);
   }
   
-  if (!payload.secret_key || payload.secret_key !== configuredKey) {
+  const incomingSecret = payload ? String(payload.secret_key || '').trim() : '';
+  if (!incomingSecret || !constantTimeEquals_(incomingSecret, String(configuredKey).trim())) {
     throw new Error("Akses ditolak: Secret Key tidak valid.");
   }
 

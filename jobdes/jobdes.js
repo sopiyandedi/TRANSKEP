@@ -51,7 +51,7 @@ function searchJobdesBackend(keyword, userNip, clientToken) {
 
 function saveJobdes(payload, userNip, clientToken) { 
   try {
-    if (!cekOtorisasi(userNip, clientToken)) return { status: 'error', message: 'Akses Ditolak: Sesi tidak valid.' };
+    if (!cekOtorisasiAdmin(userNip, clientToken)) return { status: 'error', message: 'Akses Ditolak: Hanya Admin atau Operator yang dapat menyimpan Uraian Tugas.' };
 
     const ss = getDB();
     let sheet = ss.getSheetByName('jobdes_data');
@@ -64,13 +64,14 @@ function saveJobdes(payload, userNip, clientToken) {
     
     // TRANSKEP OPTIMIZATION: Menggunakan metode native V8 findIndex 
     // melewati index 0 (header) agar pencarian baris jauh lebih cepat
-    const foundIndex = data.findIndex((row, index) => index > 0 && String(row[0]) === String(payload.nip));
+    const targetNip = normalizeNipKey_(payload.nip);
+    const foundIndex = data.findIndex((row, index) => index > 0 && normalizeNipKey_(row[0]) === targetNip);
     const rowIndex = foundIndex !== -1 ? foundIndex + 1 : -1;
     
-    const rowData = [
+    const rowData = sanitizeRowArray([
         payload.nip, payload.atasan_nip, payload.dasar_lampiran, payload.ikhtisar_jabatan,
         payload.tugas_pokok, payload.tugas_tambahan, payload.tanggung_jawab, payload.hasil_kerja
-    ];
+    ]);
     
     if (rowIndex === -1) {
         sheet.appendRow(rowData);
@@ -90,7 +91,9 @@ function createPdfJobdes(htmlContent, fileName, userNip, clientToken) {
   try {
     if (!cekOtorisasi(userNip, clientToken)) return { status: 'error', message: 'Akses Ditolak: Sesi tidak valid.' };
 
-    const blob = Utilities.newBlob(htmlContent, MimeType.HTML, fileName + ".html");
+    const cleanHtml = (typeof sanitizePdfHtml_ === 'function') ? sanitizePdfHtml_(htmlContent) : String(htmlContent || '');
+    const safeFileName = String(fileName || 'Jobdes').replace(/[^a-zA-Z0-9._-]/g, '_');
+    const blob = Utilities.newBlob(cleanHtml, MimeType.HTML, safeFileName + ".html");
     const pdfBlob = blob.getAs(MimeType.PDF);
     pdfBlob.setName(fileName + ".pdf");
     
@@ -144,14 +147,14 @@ function saveUsulanReposisi(payload, userNip, clientToken) {
     }
     
     const timestampId = new Date().getTime().toString();
-    sheet.appendRow([
+    sheet.appendRow(sanitizeRowArray([
        timestampId, 
        payload.nip_pegawai, 
        payload.nama_pegawai, 
        payload.nama_pengusul, 
        payload.isi_usulan, 
        'Menunggu'
-    ]);
+    ]));
     
     if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush();
     return { status: 'success', message: 'Usulan reposisi berhasil dikirim ke Admin.' };
@@ -162,7 +165,7 @@ function saveUsulanReposisi(payload, userNip, clientToken) {
 
 function getUsulanMenunggu(userNip, clientToken) {
   try {
-    if (!cekOtorisasi(userNip, clientToken)) return [];
+    if (!cekOtorisasiAdmin(userNip, clientToken)) return [];
 
     const ss = getDB();
     let sheet = ss.getSheetByName('usulan_jobdes_data');
@@ -190,7 +193,7 @@ function getUsulanMenunggu(userNip, clientToken) {
 
 function tandaiUsulanSelesai(timestampId, userNip, clientToken) {
   try {
-    if (!cekOtorisasi(userNip, clientToken)) return { status: 'error', message: 'Akses Ditolak: Sesi tidak valid.' };
+    if (!cekOtorisasiAdmin(userNip, clientToken)) return { status: 'error', message: 'Akses Ditolak: Khusus Admin/Operator.' };
 
     const ss = getDB();
     let sheet = ss.getSheetByName('usulan_jobdes_data');
