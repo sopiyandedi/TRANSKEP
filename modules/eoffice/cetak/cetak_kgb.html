@@ -236,7 +236,7 @@
     .kgb-tembusan-table td {
       vertical-align: top;
       /* ⬇️ TAG 10D: Jarak antar-baris poin tembusan 1, 2, 3 ⬇️ */
-      padding: 2px 0;
+      padding: 1px 0;
     }
   </style>
 
@@ -345,22 +345,25 @@
         <td class="kgb-col-val">{{pejabat_lama}}</td>
       </tr>
       <tr>
-        <td class="kgb-col-no"></td>
-        <td class="kgb-col-label">Tanggal dan nomor</td>
+        <td class="kgb-col-no">b.</td>
+        <td class="kgb-col-label">Nomor</td>
         <td class="kgb-col-colon">:</td>
-        <td class="kgb-col-val">
-          {{tanggal_sk_lama}}<br>
-          {{nomor_sk_lama}}
-        </td>
+        <td class="kgb-col-val">{{nomor_sk_lama}}</td>
       </tr>
       <tr>
-        <td class="kgb-col-no">b.</td>
+        <td class="kgb-col-no">c.</td>
+        <td class="kgb-col-label">Tanggal</td>
+        <td class="kgb-col-colon">:</td>
+        <td class="kgb-col-val">{{tanggal_sk_lama}}</td>
+      </tr>
+      <tr>
+        <td class="kgb-col-no">d.</td>
         <td class="kgb-col-label">Tanggal mulai gaji</td>
         <td class="kgb-col-colon">:</td>
         <td class="kgb-col-val">{{tmt_gaji_lama}}</td>
       </tr>
       <tr>
-        <td class="kgb-col-no">c.</td>
+        <td class="kgb-col-no">e.</td>
         <td class="kgb-col-label">Masa kerja golongan</td>
         <td class="kgb-col-colon">:</td>
         <td class="kgb-col-val">{{tahun_lama}} Tahun {{bulan_lama}} bulan</td>
