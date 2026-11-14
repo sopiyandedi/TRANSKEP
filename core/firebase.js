@@ -6,7 +6,7 @@
 // ========================================================
 
 const FIREBASE_CONFIG = {
-  apiKey: "AIzaSyAewaE6EvylqxK400uMHaL53bi7xs_bu9E",
+  apiKey: "AIzaSyBS64rl8AAwofd-tLfNTu_ibcFwHydiAgE",
   authDomain: "transkep-314c0.firebaseapp.com",
   projectId: "transkep-314c0",
   storageBucket: "transkep-314c0.firebasestorage.app",
