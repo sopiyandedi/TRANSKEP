@@ -258,22 +258,25 @@ function openReferensiModal() {
           return kodeMatch || deskMatch || typoMatch;
       });
       
+      const esc = window.escHtml || (v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[c])));
       if (results.length === 0) { 
-          resultContainer.innerHTML = '<div class="p-8 text-center text-slate-500 text-sm">Kode atau kata kunci "'+val+'" tidak ditemukan dalam database.</div>'; 
+          resultContainer.innerHTML = '<div class="p-8 text-center text-slate-500 text-sm">Kode atau kata kunci "'+esc(val)+'" tidak ditemukan dalam database.</div>'; 
           return; 
       }
       
       let html = '';
       results.forEach(item => {
+          const safeKode = esc(item.kode);
+          const safeDesk = esc(item.desk);
           html += 
           '<div class="p-4 bg-slate-900/60 border border-slate-800/80 hover:bg-slate-800 hover:border-emerald-500/30 transition rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4 group">' +
              '<div class="flex-1">' +
                  '<div class="flex items-center gap-3 mb-1">' +
-                     '<span class="px-2.5 py-1 bg-emerald-500/10 text-emerald-400 font-black text-sm rounded-lg border border-emerald-500/30 font-mono tracking-wide shadow-inner">' + item.kode + '</span>' +
+                     '<span class="px-2.5 py-1 bg-emerald-500/10 text-emerald-400 font-black text-sm rounded-lg border border-emerald-500/30 font-mono tracking-wide shadow-inner">' + safeKode + '</span>' +
                  '</div>' +
-                 '<p class="text-sm text-slate-300 leading-relaxed">' + item.desk + '</p>' +
+                 '<p class="text-sm text-slate-300 leading-relaxed">' + safeDesk + '</p>' +
              '</div>' +
-             '<button onclick="copyKodeToClipboard(\'' + item.kode + '\')" class="shrink-0 md:opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 px-4 py-2 bg-slate-800 hover:bg-emerald-600 text-slate-300 hover:text-white text-xs font-bold rounded-xl border border-slate-700 hover:border-emerald-500 w-full md:w-auto">' +
+             '<button data-kode="' + safeKode + '" onclick="copyKodeToClipboard(this.dataset.kode)" class="shrink-0 md:opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 px-4 py-2 bg-slate-800 hover:bg-emerald-600 text-slate-300 hover:text-white text-xs font-bold rounded-xl border border-slate-700 hover:border-emerald-500 w-full md:w-auto">' +
                  '<i class="fa-regular fa-copy"></i> Salin Kode' +
              '</button>' +
           '</div>';

@@ -485,6 +485,22 @@ window.escapeHtml = function(str) {
   return str.replace(/[&<>"']/g, m => map[m]);
 };
 
+window.escHtml = function(val) {
+  if (val === null || val === undefined) return '';
+  return window.escapeHtml(String(val));
+};
+
+window.sanitizeUiHtml = function(str) {
+  if (str === null || str === undefined) return '';
+  const escaped = window.escapeHtml(String(str));
+  return escaped
+    .replace(/&lt;br\s*\/?&gt;/gi, '<br>')
+    .replace(/&lt;(\/?(b|strong|i|em|u))&gt;/gi, (_, tag) => '<' + tag.toLowerCase() + '>')
+    .replace(/&lt;span\s+class=(?:&#039;|&quot;)([a-zA-Z0-9\s\-_:/\[\]\.]+)(?:&#039;|&quot;)&gt;/gi, (_, cls) => '<span class="' + cls + '">')
+    .replace(/&lt;span&gt;/gi, '<span>')
+    .replace(/&lt;\/span&gt;/gi, '</span>');
+};
+
 // =========================================================================
 // FILE: core.js (TRANSKEP Web Core Controller)
 // DESKRIPSI: State Management, Autentikasi Login, Routing Menu, Notifikasi & Modals
@@ -1246,7 +1262,7 @@ function handleLogin(event) {
         }
         initNavigationAccess();
 
-        const isTemporary = !!(response.must_change_password || (typeof pass === 'string' && /^TR-\d{6}$/.test(pass.trim())));
+        const isTemporary = !!(response.must_change_password || (typeof pass === 'string' && /^TR-[A-Z0-9]{6,12}$/.test(pass.trim())));
         if (isTemporary) {
           localStorage.setItem('transkep_force_change_password', pass.trim());
           setTimeout(() => {
@@ -2228,13 +2244,16 @@ function showNotify(title, message, type = 'success') {
 
   toast.className = `glass p-4 rounded-2xl border ${borderColor} bg-slate-900/90 shadow-2xl flex items-start gap-3 w-80 transform transition-all duration-300 translate-x-full opacity-0 pointer-events-auto`;
 
+  const safeTitle = window.escapeHtml(String(title == null ? '' : title));
+  const safeMessage = window.sanitizeUiHtml(message);
+
   toast.innerHTML = `
     <div class="mt-0.5 ${iconColor} ${bgColor} p-1.5 rounded-lg shrink-0">
       <i class="fa-solid ${iconClass} text-lg"></i>
     </div>
     <div>
-      <h4 class="text-sm font-bold text-slate-200">${title}</h4>
-      <p class="text-xs text-slate-400 mt-1 leading-relaxed">${message}</p>
+      <h4 class="text-sm font-bold text-slate-200">${safeTitle}</h4>
+      <p class="text-xs text-slate-400 mt-1 leading-relaxed">${safeMessage}</p>
     </div>
   `;
 
@@ -2271,13 +2290,16 @@ function showCustomConfirm(title, message, onConfirm) {
   overlay.id = 'custom-confirm-overlay';
   overlay.className = 'fixed inset-0 z-[999999] flex items-center justify-center bg-black/70 backdrop-blur-sm transition-opacity duration-200 opacity-0';
 
+  const safeConfirmTitle = window.escapeHtml(String(title == null ? '' : title));
+  const safeConfirmMessage = window.sanitizeUiHtml(message);
+
   overlay.innerHTML = `
     <div class="glass p-6 rounded-3xl border border-slate-800 bg-slate-900/95 max-w-sm w-full mx-4 shadow-2xl transform transition-all duration-200 scale-95 flex flex-col gap-4">
       <div class="flex items-center gap-3 text-rose-400">
         <div class="p-2.5 bg-rose-500/10 rounded-2xl shrink-0 border border-rose-500/20"><i class="fa-solid fa-triangle-exclamation text-xl"></i></div>
-        <h3 class="text-base font-bold text-white tracking-wide">${title}</h3>
+        <h3 class="text-base font-bold text-white tracking-wide">${safeConfirmTitle}</h3>
       </div>
-      <p class="text-xs text-slate-300 leading-relaxed">${message}</p>
+      <p class="text-xs text-slate-300 leading-relaxed">${safeConfirmMessage}</p>
       <div class="flex justify-end gap-2.5 mt-2 pt-2 border-t border-slate-800/80">
         <button id="btn-confirm-cancel" class="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-400 hover:text-white hover:bg-slate-800 transition">Batal</button>
         <button id="btn-confirm-yes" class="px-4 py-2.5 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white shadow-lg shadow-rose-600/30 transition flex items-center gap-1.5">

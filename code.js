@@ -354,6 +354,174 @@ function sanitizeRowArray(row) {
   return row.map(cell => sanitizeFormulaInput(cell));
 }
 
+// 4B. Sentralisasi Validasi Upload File (Allowlist MIME, Magic Bytes, Ekstensi Aman, & Batas Ukuran)
+function validateUploadedFile_(fileData, fileName, fileMimeType, opts) {
+  const cfg = opts || {};
+  const allowPdf = cfg.allowPdf !== false;
+  const allowImages = Boolean(cfg.allowImages);
+  const allowZip = Boolean(cfg.allowZip);
+  const maxBytes = Number(cfg.maxBytes) > 0 ? Number(cfg.maxBytes) : (10 * 1024 * 1024);
+
+  if (!fileData || typeof fileData !== 'string') {
+    throw new Error('Data berkas unggahan tidak valid atau kosong.');
+  }
+
+  let cleanB64 = fileData.trim();
+  let declaredDataUriMime = '';
+  const dataUriMatch = cleanB64.match(/^data:([^;]+);base64,/i);
+  if (dataUriMatch) {
+    declaredDataUriMime = String(dataUriMatch[1] || '').toLowerCase().trim();
+    cleanB64 = cleanB64.slice(dataUriMatch[0].length);
+  }
+  cleanB64 = cleanB64.replace(/\s+/g, '');
+
+  if (!cleanB64 || !/^[A-Za-z0-9+/=]+$/.test(cleanB64)) {
+    throw new Error('Format encoding Base64 berkas tidak valid.');
+  }
+
+  const estimatedBytes = Math.floor((cleanB64.length * 3) / 4);
+  if (estimatedBytes > maxBytes + 64) {
+    throw new Error('Ukuran berkas melebihi batas maksimum (' + Math.round(maxBytes / (1024 * 1024)) + ' MB).');
+  }
+
+  const bytes = Utilities.base64Decode(cleanB64);
+  if (!bytes || bytes.length === 0) {
+    throw new Error('Berkas kosong tidak dapat diunggah.');
+  }
+  if (bytes.length > maxBytes) {
+    throw new Error('Ukuran berkas melebihi batas maksimum (' + Math.round(maxBytes / (1024 * 1024)) + ' MB).');
+  }
+
+  const u = (idx) => (idx < bytes.length ? (bytes[idx] & 0xFF) : -1);
+  // Cek signature magic bytes terlebih dahulu
+  let sig = null;
+  if (bytes.length >= 5 && u(0) === 0x25 && u(1) === 0x50 && u(2) === 0x44 && u(3) === 0x46 && u(4) === 0x2D) {
+    sig = { type: 'pdf', mime: 'application/pdf', ext: 'pdf' };
+  } else if (bytes.length >= 8 && u(0) === 0x89 && u(1) === 0x50 && u(2) === 0x4E && u(3) === 0x47 && u(4) === 0x0D && u(5) === 0x0A && u(6) === 0x1A && u(7) === 0x0A) {
+    sig = { type: 'image', mime: 'image/png', ext: 'png' };
+  } else if (bytes.length >= 3 && u(0) === 0xFF && u(1) === 0xD8 && u(2) === 0xFF) {
+    sig = { type: 'image', mime: 'image/jpeg', ext: 'jpg' };
+  } else if (bytes.length >= 4 && u(0) === 0x50 && u(1) === 0x4B && ((u(2) === 0x03 && u(3) === 0x04) || (u(2) === 0x05 && u(3) === 0x06) || (u(2) === 0x07 && u(3) === 0x08))) {
+    sig = { type: 'zip', mime: 'application/zip', ext: 'zip' };
+  }
+
+  if (!sig) {
+    throw new Error('Format isi berkas tidak dikenali atau ditolak demi keamanan.');
+  }
+  if (sig.type === 'pdf' && !allowPdf) {
+    throw new Error('Berkas PDF tidak diizinkan untuk jenis unggahan ini.');
+  }
+  if (sig.type === 'image' && !allowImages) {
+    throw new Error('Hanya berkas PDF yang diizinkan untuk modul ini.');
+  }
+  if (sig.type === 'zip' && !allowZip) {
+    throw new Error('Berkas arsip ZIP tidak diizinkan untuk modul ini.');
+  }
+
+  // Tolak jika bagian awal payload meniru markup aktif (HTML/SVG/Script)
+  let headStr = '';
+  const headLen = Math.min(bytes.length, 256);
+  for (let h = 0; h < headLen; h++) {
+    const ch = bytes[h] & 0xFF;
+    if (ch >= 32 && ch <= 126) headStr += String.fromCharCode(ch);
+  }
+  const headLower = headStr.trim().toLowerCase();
+  if (headLower.startsWith('<!doctype') || headLower.startsWith('<html') || headLower.startsWith('<script') || headLower.startsWith('<svg')) {
+    throw new Error('Konten berkas mengandung markup berbahaya dan ditolak.');
+  }
+
+  const rawExt = String(fileName || '').split('.').pop().toLowerCase().trim();
+  const forbiddenExts = ['html', 'htm', 'svg', 'js', 'mjs', 'cjs', 'exe', 'bat', 'cmd', 'ps1', 'sh', 'php', 'jsp', 'asp', 'aspx'];
+  if (rawExt && forbiddenExts.indexOf(rawExt) !== -1) {
+    throw new Error('Ekstensi berkas .' + rawExt + ' dilarang oleh kebijakan keamanan.');
+  }
+
+  const mimeToCheck = String(fileMimeType || declaredDataUriMime || '').toLowerCase().trim();
+  if (mimeToCheck) {
+    const validMimesByType = {
+      pdf: ['application/pdf'],
+      image: ['image/png', 'image/jpeg', 'image/jpg'],
+      zip: ['application/zip', 'application/x-zip-compressed', 'application/octet-stream']
+    };
+    const allowedMimes = validMimesByType[sig.type] || [];
+    if (allowedMimes.indexOf(mimeToCheck) === -1) {
+      throw new Error('Tipe MIME berkas (' + mimeToCheck + ') tidak cocok dengan konten berkas asli.');
+    }
+  }
+
+  return {
+    bytes: bytes,
+    blobMimeType: sig.mime,
+    ext: sig.ext,
+    size: bytes.length
+  };
+}
+
+function generateSecureTempPass_() {
+  const charset = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const seed = Utilities.getUuid() + ':' + Utilities.getUuid() + ':' + new Date().getTime() + ':' + Math.random();
+  const digest = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, seed, Utilities.Charset.UTF_8);
+  let token = '';
+  for (let i = 0; i < 8; i++) {
+    const b = (digest[i] & 0xFF);
+    token += charset.charAt(b % charset.length);
+  }
+  return 'TR-' + token;
+}
+
+function verifyAndConsumePendingReset_(ss, userSheet, rowNum, cleanNip, inputPass) {
+  if (!cleanNip || !inputPass) return false;
+  const passStr = String(inputPass).trim();
+  if (!passStr) return false;
+
+  // 1. Cek kandidat reset sementara ber-TTL di CacheService (tidak menimpa password asli sebelum dipakai)
+  try {
+    const cache = CacheService.getScriptCache();
+    const rawPending = cache.get('pending_reset_' + cleanNip);
+    if (rawPending) {
+      const parsed = JSON.parse(rawPending);
+      if (parsed && parsed.hash && verifyPasswordHash_(parsed.hash, passStr)) {
+        userSheet.getRange(rowNum, 6).setNumberFormat('@').setValue(parsed.hash);
+        cache.remove('pending_reset_' + cleanNip);
+        try {
+          const logSheet = ss.getSheetByName('log_reset_pass');
+          if (logSheet) {
+            const lData = logSheet.getDataRange().getDisplayValues();
+            for (let r = lData.length - 1; r >= 1; r--) {
+              if (normalizeNipKey_(decryptField_(lData[r][2])) === cleanNip) {
+                logSheet.deleteRow(r + 1);
+              }
+            }
+          }
+        } catch (eClean) {}
+        return true;
+      }
+    }
+  } catch (eCache) {}
+
+  // 2. Plan B Fallback: Antrean manual Admin di log_reset_pass (ketika WAHA sempat offline)
+  try {
+    const logSheet = ss.getSheetByName('log_reset_pass');
+    if (logSheet && logSheet.getLastRow() > 1) {
+      const lData = logSheet.getDataRange().getDisplayValues();
+      for (let r = lData.length - 1; r >= 1; r--) {
+        if (normalizeNipKey_(decryptField_(lData[r][2])) === cleanNip) {
+          const candidateTemp = String(decryptField_(lData[r][5]) || '').trim();
+          if (candidateTemp && !candidateTemp.startsWith('SHA256$') && constantTimeEquals_(candidateTemp, passStr)) {
+            const promotedHash = hashPassword_(passStr);
+            userSheet.getRange(rowNum, 6).setNumberFormat('@').setValue(promotedHash);
+            logSheet.deleteRow(r + 1);
+            if (typeof bumpDataVersion === 'function') bumpDataVersion();
+            return true;
+          }
+        }
+      }
+    }
+  } catch (ePlanB) {}
+
+  return false;
+}
+
 // 5. Sentralisasi Hashing Kriptografis Salted SHA-256 & Enkripsi Dua Arah Kolom Rahasia (PII Vault)
 function hashPassword_(plainPassword, salt) {
   if (!salt) salt = Utilities.getUuid().substring(0, 8);
@@ -1344,13 +1512,23 @@ function verifyLogin(nip, pass) {
     for (let i = 1; i < data.length; i++) {
       if (normalizeNipKey_(data[i][0]) === cleanInputNip) {
         const storedPass = String(data[i][5] || '');
-        if (verifyPasswordHash_(storedPass, pass)) {
+        const isPrimaryMatch = verifyPasswordHash_(storedPass, pass);
+        let isPendingResetMatch = false;
+        if (!isPrimaryMatch) {
+          isPendingResetMatch = verifyAndConsumePendingReset_(ss, sheet, i + 1, cleanInputNip, pass);
+        }
+        if (isPrimaryMatch || isPendingResetMatch) {
           clearRateLimit_(loginRlKey);
           // Auto-Upgrade ke Salted SHA-256 jika sandi masih format transisi ENC$ / plaintext
-          if (!storedPass.startsWith("SHA256$")) {
+          if (isPrimaryMatch && !storedPass.startsWith("SHA256$")) {
             try {
               sheet.getRange(i + 1, 6).setNumberFormat('@').setValue(hashPassword_(pass));
             } catch (eUp) {}
+          }
+          if (isPendingResetMatch) {
+            try {
+              CacheService.getScriptCache().put("force_reset_" + cleanInputNip, "1", SESSION_CACHE_TTL_SEC_);
+            } catch (eFr) {}
           }
 
           const user = {
@@ -1373,8 +1551,8 @@ function verifyLogin(nip, pass) {
             cachedTemp = cache.get("force_reset_" + cleanUserNip) || cache.get("force_reset_" + user.nip);
           } catch(e) {}
 
-          const isTempPass = (typeof pass === 'string' && /^TR-\d{6}$/.test(pass.trim())) || !!cachedTemp;
-          if (typeof pass === 'string' && /^TR-\d{6}$/.test(pass.trim())) {
+          const isTempPass = (typeof pass === 'string' && /^TR-[A-Z0-9]{6,12}$/.test(pass.trim())) || !!cachedTemp;
+          if (typeof pass === 'string' && /^TR-[A-Z0-9]{6,12}$/.test(pass.trim())) {
             try {
               cache.put("force_reset_" + cleanUserNip, "1", SESSION_CACHE_TTL_SEC_);
             } catch(e) {}
@@ -1848,22 +2026,29 @@ function requestPasswordReset(no_wa) {
       }
     }
 
-    if (!userFound || userRowIndex === -1) return { status: 'error', message: 'Nomor WhatsApp ini tidak terdaftar di dalam sistem pegawai. Silakan periksa kembali atau hubungi Admin.' };
+    const neutralResetMsg = 'Permintaan pemulihan kata sandi telah diproses. Jika nomor WhatsApp tersebut terdaftar aktif di sistem, sandi sementara berdurasi 30 menit dikirimkan ke WhatsApp Anda (atau diteruskan ke antrean Admin) tanpa menonaktifkan kata sandi lama sebelum digunakan.';
 
-    // 1. Generate Kata Sandi Sementara (6 Digit OTP) & Hash Salted SHA-256 (One-Way)
-    const tempPass = "TR-" + Math.floor(100000 + Math.random() * 900000);
-    const newHashedPass = hashPassword_(tempPass);
-    userSheet.getRange(userRowIndex, 6).setNumberFormat('@').setValue(newHashedPass);
+    if (!userFound || userRowIndex === -1) {
+      return { status: 'success', message: neutralResetMsg };
+    }
+
+    // 1. Generate Kata Sandi Sementara Kriptografis & Hash Salted SHA-256 di Cache (Tanpa Lockout DoS)
+    const tempPass = generateSecureTempPass_();
+    const pendingHash = hashPassword_(tempPass);
 
     try {
-      CacheService.getScriptCache().put("force_reset_" + normalizeNipKey_(userFound.nip), "1", SESSION_CACHE_TTL_SEC_);
+      CacheService.getScriptCache().put(
+        "pending_reset_" + normalizeNipKey_(userFound.nip),
+        JSON.stringify({ hash: pendingHash, issuedAt: new Date().getTime() }),
+        1800
+      );
     } catch(e) {}
 
     // 2. Kirim otomatis via WhatsApp Gateway WAHA
     const waText = "*TRANSKEP - RESET SANDI SEMENTARA* 🏢\n\n" +
       "Halo *" + userFound.nama + "*,\n\n" +
       "Permintaan reset kata sandi akun TRANSKEP Anda berhasil diproses.\n" +
-      "Berikut kredensial masuk sementara Anda:\n\n" +
+      "Berikut kredensial masuk sementara Anda (berlaku 30 menit; kata sandi lama Anda tetap aktif hingga sandi sementara ini dipakai login):\n\n" +
       "👤 *NIP:* " + userFound.nip + "\n" +
       "🔑 *Sandi Sementara:* *" + tempPass + "*\n\n" +
       "⚠️ *Perhatian:* Segera login ke portal dan perbarui kata sandi Anda di menu profil demi keamanan akun.\n\n" +
@@ -1878,24 +2063,23 @@ function requestPasswordReset(no_wa) {
 
     // 3. Evaluasi Hasil Kirim WAHA
     if (waResult && waResult.status === 'success') {
-      // Jika berhasil kirim WA otomatis:
-      // Bersihkan antrean lama di log_reset_pass untuk user ini agar tidak masuk manual ke admin
+      // Jika berhasil kirim WA otomatis: bersihkan antrean lama di log_reset_pass untuk user ini
       try {
         let logSheet = ss.getSheetByName('log_reset_pass');
         if (logSheet) {
           const lData = logSheet.getDataRange().getDisplayValues();
+          const targetNipKey = normalizeNipKey_(userFound.nip);
           for (let r = lData.length - 1; r >= 1; r--) {
-            if (String(decryptField_(lData[r][2])).trim() === String(userFound.nip).trim()) {
+            if (normalizeNipKey_(decryptField_(lData[r][2])) === targetNipKey) {
               logSheet.deleteRow(r + 1);
             }
           }
         }
       } catch(e) {}
-      
-      bumpDataVersion();
-      return { 
-        status: 'success', 
-        message: 'Kata sandi sementara telah berhasil dikirim otomatis ke nomor WhatsApp Anda (' + userFound.no_wa + ').' 
+
+      return {
+        status: 'success',
+        message: neutralResetMsg
       };
     } else {
       // 4. PLAN B (CADANGAN): Hanya jika WAHA GAGAL / OFFLINE, catat ke antrean manual Admin!
@@ -1904,15 +2088,15 @@ function requestPasswordReset(no_wa) {
         initResetPasswordSheet();
         logSheet = ss.getSheetByName('log_reset_pass');
       }
-      
+
       const uniqueId = 'REQ-' + new Date().getTime();
       const timestamp = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'dd/MM/yyyy HH:mm:ss');
       logSheet.appendRow(sanitizeRowArray([uniqueId, timestamp, encryptField_(userFound.nip), userFound.nama, encryptField_(userFound.no_wa), encryptField_(tempPass)]));
       bumpDataVersion();
 
-      return { 
-        status: 'success', 
-        message: 'Layanan WhatsApp otomatis sedang sibuk/offline. Permintaan reset berhasil dicatat dan Admin akan segera mengirimkannya secara manual.' 
+      return {
+        status: 'success',
+        message: neutralResetMsg
       };
     }
   } catch (err) {

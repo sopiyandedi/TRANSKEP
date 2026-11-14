@@ -25,14 +25,17 @@ function addUser(payload, adminNip, clientToken) {
     const encPass = encryptPasswordField_(payload.pass || '123456');
     const encAlamat = encryptField_(payload.alamat || '');
 
-    const newRow = [
+    const sfRow = (typeof sanitizeRowArray === 'function') ? sanitizeRowArray : (r => r);
+    const sfVal = (typeof sanitizeFormulaInput === 'function') ? sanitizeFormulaInput : (v => v);
+
+    const newRow = sfRow([
       encNip, payload.nama, payload.jabatan, payload.role, encHp, encPass,
       payload.s_tahunan_2024, payload.s_tahunan_2025, payload.s_tahunan_2026,
       payload.s_sakit, payload.s_penting, payload.s_besar, payload.s_melahirkan, payload.s_cltn,
       payload.pangkat, encAlamat, payload.tmt_kgb, payload.tmt_knp, payload.bup,
       "", "", "", "", "", "", // Kolom 20-25 dikosongkan agar aman untuk sistem KNP/KGB
-      payload.jenis_jabatan || "Fungsional Umum" // Kolom 26: Parameter Baru Jenis Jabatan
-    ];
+      sfVal(payload.jenis_jabatan || "Fungsional Umum") // Kolom 26: Parameter Baru Jenis Jabatan
+    ]);
     
     sheet.appendRow(newRow);
     const lastRow = sheet.getLastRow();
@@ -80,11 +83,14 @@ function updateUser(payload, adminNip, clientToken) {
     const encPass = encryptPasswordField_(rawPassInput);
     const encAlamat = encryptField_(payload.alamat || '');
 
+    const sfRow = (typeof sanitizeRowArray === 'function') ? sanitizeRowArray : (r => r);
+    const sfVal = (typeof sanitizeFormulaInput === 'function') ? sanitizeFormulaInput : (v => v);
+
     const rowData = [
-      [encNip, payload.nama, payload.jabatan, payload.role, encHp, encPass,
+      sfRow([encNip, payload.nama, payload.jabatan, payload.role, encHp, encPass,
        payload.s_tahunan_2024, payload.s_tahunan_2025, payload.s_tahunan_2026,
        payload.s_sakit, payload.s_penting, payload.s_besar, payload.s_melahirkan, payload.s_cltn,
-       payload.pangkat, encAlamat, payload.tmt_kgb, payload.tmt_knp, payload.bup]
+       payload.pangkat, encAlamat, payload.tmt_kgb, payload.tmt_knp, payload.bup])
     ];
     
     sheet.getRange(rowIndex, 1, 1, 19).setValues(rowData);
@@ -93,7 +99,7 @@ function updateUser(payload, adminNip, clientToken) {
     sheet.getRange(rowIndex, 16).setNumberFormat('@');
     
     // FIX: Update kolom ke-26 secara spesifik
-    sheet.getRange(rowIndex, 26).setValue(payload.jenis_jabatan || "Fungsional Umum");
+    sheet.getRange(rowIndex, 26).setValue(sfVal(payload.jenis_jabatan || "Fungsional Umum"));
     
     if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush();
     return { status: 'success', message: 'Data profil pegawai berhasil diperbarui dan dienkripsi.' };
@@ -167,13 +173,16 @@ function importBulkUsers(jsonArray, adminNip, clientToken) {
        const valN1 = payload['Sisa_Tahunan_' + (activeYear - 1)] !== undefined ? payload['Sisa_Tahunan_' + (activeYear - 1)] : payload['Sisa_Tahunan_2025'];
        const valN  = payload['Sisa_Tahunan_' + activeYear] !== undefined ? payload['Sisa_Tahunan_' + activeYear] : payload['Sisa_Tahunan_2026'];
 
-       const rowData = [
+       const sfRow = (typeof sanitizeRowArray === 'function') ? sanitizeRowArray : (r => r);
+       const sfVal = (typeof sanitizeFormulaInput === 'function') ? sanitizeFormulaInput : (v => v);
+
+       const rowData = sfRow([
           encNip, payload['Nama'], payload['Jabatan']||'', payload['Role']||'Pegawai', encHp, encPass,
           Number(valN2)||0, Number(valN1)||0, Number(valN)||0,
           Number(payload['Sisa_Sakit'])||0, Number(payload['Sisa_Penting'])||0, Number(payload['Sisa_Besar'])||0, 
           Number(payload['Sisa_Melahirkan'])||0, Number(payload['Sisa_CLTN'])||0,
           payload['Pangkat']||'', encAlamat, payload['TMT_KGB']||'', payload['TMT_KNP']||'', Number(payload['BUP'])||58
-       ];
+       ]);
        
        if (existingMap[nipStr]) {
           const targetRow = existingMap[nipStr];
@@ -181,10 +190,10 @@ function importBulkUsers(jsonArray, adminNip, clientToken) {
           sheet.getRange(targetRow, 1).setNumberFormat('@');
           sheet.getRange(targetRow, 5, 1, 2).setNumberFormat('@');
           sheet.getRange(targetRow, 16).setNumberFormat('@');
-          sheet.getRange(targetRow, 26).setValue(jenis); // Set Kolom 26
+          sheet.getRange(targetRow, 26).setValue(sfVal(jenis)); // Set Kolom 26
        } else {
           // Buat data baru dan padding string kosong
-          const newRow = [...rowData, "", "", "", "", "", "", jenis];
+          const newRow = [...rowData, "", "", "", "", "", "", sfVal(jenis)];
           sheet.appendRow(newRow);
           const lastRow = sheet.getLastRow();
           sheet.getRange(lastRow, 1).setNumberFormat('@');

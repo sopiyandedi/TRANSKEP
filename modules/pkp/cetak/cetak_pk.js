@@ -33,6 +33,7 @@ function renderPrintTemplatePK(data) {
             groups[item.sasaran].push(item);
         });
 
+        var esc = window.escHtml || function(v) { return String(v == null ? '' : v).replace(/[&<>"']/g, function(c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[c]); }); };
         var numSasaran = 1;
         for (var sasaran in groups) {
             var kgiatans = groups[sasaran];
@@ -45,14 +46,14 @@ function renderPrintTemplatePK(data) {
                 html += "<tr>";
                 if (idx === 0) {
                     html += "<td rowspan='" + rowCount + "' class='text-center'>" + numSasaran + "</td>";
-                    html += "<td rowspan='" + rowCount + "'>" + sasaran + "</td>";
+                    html += "<td rowspan='" + rowCount + "'>" + esc(sasaran) + "</td>";
                 }
                 
                 html += "<td class='text-center'>" + (idx + 1) + "</td>";
-                html += "<td>" + kg.indikator + "</td>";
-                html += "<td class='text-center'>" + kg.mutu + "</td>";
-                html += "<td class='text-center'>" + kg.kuantitas + "</td>";
-                html += "<td class='text-center'>" + kg.satuan + "</td>";
+                html += "<td>" + esc(kg.indikator) + "</td>";
+                html += "<td class='text-center'>" + esc(kg.mutu) + "</td>";
+                html += "<td class='text-center'>" + esc(kg.kuantitas) + "</td>";
+                html += "<td class='text-center'>" + esc(kg.satuan) + "</td>";
                 
                 for (var bln = 1; bln <= 12; bln++) {
                     var cek = wktArr.includes(String(bln)) ? "√" : "";
@@ -63,7 +64,7 @@ function renderPrintTemplatePK(data) {
                 if (kg.pagu && kg.pagu !== "0") {
                     paguFmt = parseInt(kg.pagu).toLocaleString('id-ID');
                 }
-                html += "<td>IDR <span style='float:right'>" + paguFmt + "</span></td>";
+                html += "<td>IDR <span style='float:right'>" + esc(paguFmt) + "</span></td>";
                 html += "</tr>";
             }
             numSasaran++;

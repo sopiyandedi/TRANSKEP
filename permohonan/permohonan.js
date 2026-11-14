@@ -23,21 +23,35 @@ function addCutiLog(payload, aktorNip, clientToken) {
     if (!sheetCuti) sheetCuti = ss.insertSheet('cuti_log');
     const sheetUser = ss.getSheetByName('user_data');
 
+    let validatedCutiUpload = null;
+    if (payload.fileData && payload.fileName && payload.fileMimeType) {
+      validatedCutiUpload = (typeof validateUploadedFile_ === 'function')
+        ? validateUploadedFile_(payload.fileData, payload.fileName, payload.fileMimeType, {
+            allowPdf: true,
+            allowImages: true,
+            allowZip: false,
+            maxBytes: 5 * 1024 * 1024
+          })
+        : null;
+    }
+
     let fileUrl = "";
     if (payload.fileData && payload.fileName && payload.fileMimeType) {
-      try {
-        const folderName = "Bukti Cuti TRANSKEP";
-        let folders = DriveApp.getFoldersByName(folderName);
-        let folder = folders.hasNext() ? folders.next() : DriveApp.createFolder(folderName);
+      const folderName = "Bukti Cuti TRANSKEP";
+      let folders = DriveApp.getFoldersByName(folderName);
+      let folder = folders.hasNext() ? folders.next() : DriveApp.createFolder(folderName);
 
-        const cleanMime = payload.fileName.split('.').pop();
-        const generateName = "Bukti_" + payload.jenis + "_" + payload.nip + "_" + new Date().getTime() + "." + cleanMime;
+      const safeExt = validatedCutiUpload ? validatedCutiUpload.ext : 'pdf';
+      const safeBytes = validatedCutiUpload ? validatedCutiUpload.bytes : Utilities.base64Decode(payload.fileData);
+      const safeMime = validatedCutiUpload ? validatedCutiUpload.blobMimeType : payload.fileMimeType;
+      const safeNipSlug = String(payload.nip || '').replace(/[^a-zA-Z0-9_-]/g, '');
+      const safeJenisSlug = String(payload.jenis || 'Cuti').replace(/[^a-zA-Z0-9_-]/g, '_');
+      const generateName = "Bukti_" + safeJenisSlug + "_" + safeNipSlug + "_" + new Date().getTime() + "." + safeExt;
 
-        const blob = Utilities.newBlob(Utilities.base64Decode(payload.fileData), payload.fileMimeType, generateName);
-        const file = folder.createFile(blob);
-        file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-        fileUrl = file.getUrl();
-      } catch (e) { Logger.log("Gagal mengunggah file bukti: " + e.toString()); }
+      const blob = Utilities.newBlob(safeBytes, safeMime, generateName);
+      const file = folder.createFile(blob);
+      file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+      fileUrl = file.getUrl();
     }
 
     const calc = hitungHariKerjaCuti_(payload.tgl_mulai, payload.tgl_selesai);
@@ -63,7 +77,9 @@ function addCutiLog(payload, aktorNip, clientToken) {
 
     const statusAwal = payload.jenis === 'Dinas Luar' ? 'Disetujui' : 'Menunggu';
 
-    const magicToken = Utilities.getUuid();
+    const magicToken = (typeof generateMagicCutiToken_ === 'function')
+      ? generateMagicCutiToken_(14)
+      : (Utilities.getUuid() + '.' + (new Date().getTime() + 14 * 86400000));
     sheetCuti.appendRow(sanitizeRowArray([
       newId, tglForm, encryptField_(payload.nip), payload.jenis, payload.tgl_mulai, payload.tgl_selesai, payload.alasan,
       statusAwal, '', encryptField_(payload.atasan_nip || '-'), encryptField_(payload.pejabat_nip || '-'), durasi, payload.plh_nip || '', statusAwal, statusAwal, encryptField_(payload.alamat || '-'), JSON.stringify(historyJson), fileUrl, magicToken, ''
@@ -165,6 +181,18 @@ function updateCutiLog(payload, aktorNip, clientToken) {
       throw new Error("Rentang tanggal yang dipilih seluruhnya merupakan akhir pekan atau Hari Libur Nasional / Cuti Bersama (0 hari kerja efektif).");
     }
 
+    let validatedCutiEditUpload = null;
+    if (payload.fileData && payload.fileName && payload.fileMimeType) {
+      validatedCutiEditUpload = (typeof validateUploadedFile_ === 'function')
+        ? validateUploadedFile_(payload.fileData, payload.fileName, payload.fileMimeType, {
+            allowPdf: true,
+            allowImages: true,
+            allowZip: false,
+            maxBytes: 5 * 1024 * 1024
+          })
+        : null;
+    }
+
     // Eksekusi Refund Saldo Lama + Potong Saldo Baru secara Atomik (Rollback otomatis jika validasi kuota gagal)
     const snapshotQuotas = sheetUser.getRange(rowIndexUser, 7, 1, 8).getValues();
     let historyJson;
@@ -184,17 +212,19 @@ function updateCutiLog(payload, aktorNip, clientToken) {
     // Upload Lampiran Baru (Jika Ada)
     let fileUrlUpdate = logLama[17]; // Pakai URL lama sebagai default
     if (payload.fileData && payload.fileName && payload.fileMimeType) {
-      try {
-        const folderName = "Bukti Cuti TRANSKEP";
-        let folders = DriveApp.getFoldersByName(folderName);
-        let folder = folders.hasNext() ? folders.next() : DriveApp.createFolder(folderName);
-        const cleanMime = payload.fileName.split('.').pop();
-        const generateName = "Bukti_" + payload.jenis + "_" + payload.nip + "_" + new Date().getTime() + "." + cleanMime;
-        const blob = Utilities.newBlob(Utilities.base64Decode(payload.fileData), payload.fileMimeType, generateName);
-        const file = folder.createFile(blob);
-        file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-        fileUrlUpdate = file.getUrl();
-      } catch (e) { }
+      const folderName = "Bukti Cuti TRANSKEP";
+      let folders = DriveApp.getFoldersByName(folderName);
+      let folder = folders.hasNext() ? folders.next() : DriveApp.createFolder(folderName);
+      const safeExt = validatedCutiEditUpload ? validatedCutiEditUpload.ext : 'pdf';
+      const safeBytes = validatedCutiEditUpload ? validatedCutiEditUpload.bytes : Utilities.base64Decode(payload.fileData);
+      const safeMime = validatedCutiEditUpload ? validatedCutiEditUpload.blobMimeType : payload.fileMimeType;
+      const safeNipSlug = String(payload.nip || '').replace(/[^a-zA-Z0-9_-]/g, '');
+      const safeJenisSlug = String(payload.jenis || 'Cuti').replace(/[^a-zA-Z0-9_-]/g, '_');
+      const generateName = "Bukti_" + safeJenisSlug + "_" + safeNipSlug + "_" + new Date().getTime() + "." + safeExt;
+      const blob = Utilities.newBlob(safeBytes, safeMime, generateName);
+      const file = folder.createFile(blob);
+      file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+      fileUrlUpdate = file.getUrl();
     }
 
     // Update Baris Excel (Enkripsi Kolom Rahasia NIP & Alamat Cuti + Anti-Formula Injection)

@@ -629,19 +629,22 @@
 
                       let tglDecor = statusAkhir === 'DIBATALKAN' ? 'line-through text-slate-500' : 'text-slate-300';
                       
+                      const esc = window.escHtml || (v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[c])));
                       let pejabatHtml = '';
                       if (log.z_type === 'Cuti' || log.z_type === 'IP') {
-                          pejabatHtml = `<div class="flex items-center gap-1.5"><i class="fa-solid fa-circle text-[8px] ${pejabatDot}"></i><span class="text-slate-400 truncate max-w-[120px]" title="${pejabat.nama}">Pejabat: ${pejabat.nama}</span></div>`;
+                          const safePejabatNama = esc(pejabat.nama);
+                          pejabatHtml = `<div class="flex items-center gap-1.5"><i class="fa-solid fa-circle text-[8px] ${pejabatDot}"></i><span class="text-slate-400 truncate max-w-[120px]" title="${safePejabatNama}">Pejabat: ${safePejabatNama}</span></div>`;
                       } else {
                           pejabatHtml = `<div class="flex items-center gap-1.5 opacity-50"><i class="fa-solid fa-minus text-[8px] text-slate-600"></i><span class="text-slate-500">Tanpa Pejabat</span></div>`;
                       }
+                      const statusHtml = esc(statusAkhir).replace(' ', '<br>');
 
                       return {
                           ...log,
                           atasanNama: atasan.nama,
                           pejabatNama: pejabat.nama,
                           jenisText, tgl_1, tgl_2, tglDecor,
-                          durasiObj, statusAkhir, statusColor,
+                          durasiObj, statusAkhir, statusHtml, statusColor,
                           atasanDot, pejabatDot, pejabatHtml,
                           hasDropdown,
                           actions
@@ -1373,7 +1376,8 @@
 
                               return savePromise.then((res) => {
                                   if (res && res.status === 'success') {
-                                      if(routingMsg) window.showNotify("Berhasil Disimpan", res.message + "<br><br><span class='text-[10px] text-amber-400'>Info Pengalihan:</span><br><span class='text-[10px] leading-relaxed'>" + routingMsg + "</span>", "success");
+                                      const esc = window.escHtml || (v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[c])));
+                                      if(routingMsg) window.showNotify("Berhasil Disimpan", esc(res.message) + "<br><br><span class='text-[10px] text-amber-400'>Info Pengalihan:</span><br><span class='text-[10px] leading-relaxed'>" + esc(routingMsg) + "</span>", "success");
                                       else window.showNotify("Berhasil Disimpan", res.message, "success");
                                       
                                       if (res.data) {

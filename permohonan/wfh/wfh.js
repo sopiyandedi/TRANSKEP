@@ -98,19 +98,41 @@ function submitLaporanWFH(payload, clientToken) {
             
             const subFolderName = payload.nama + " (" + payload.nip + ")";
             let subFolders = mainFolder.getFoldersByName(subFolderName);
-            let subFolder = subFolders.hasNext() ? subFolders.next() : mainFolder.createFolder(subFolderName);
-            
+            const validatedWfhFiles = [];
             for (let i = 0; i < payload.newFiles.length; i++) {
                 const f = payload.newFiles[i];
-                const cleanMime = f.fileName.split('.').pop();
-                const generateName = "Eviden_WFH_" + Utilities.formatDate(new Date(), 'Asia/Jakarta', 'dd-MM-yyyy') + "_" + new Date().getTime() + "_" + i + "." + cleanMime;
+                const vf = (typeof validateUploadedFile_ === 'function')
+                  ? validateUploadedFile_(f.fileData, f.fileName, f.fileMimeType, {
+                      allowPdf: true,
+                      allowImages: true,
+                      allowZip: true,
+                      maxBytes: 10 * 1024 * 1024
+                    })
+                  : {
+                      bytes: Utilities.base64Decode(f.fileData),
+                      blobMimeType: f.fileMimeType,
+                      ext: String(f.fileName || '').split('.').pop()
+                    };
+                validatedWfhFiles.push(vf);
+            }
+
+            let subFolder = subFolders.hasNext() ? subFolders.next() : mainFolder.createFolder(subFolderName);
+            
+            for (let i = 0; i < validatedWfhFiles.length; i++) {
+                const vf = validatedWfhFiles[i];
+                const generateName = "Eviden_WFH_" + Utilities.formatDate(new Date(), 'Asia/Jakarta', 'dd-MM-yyyy') + "_" + new Date().getTime() + "_" + i + "." + vf.ext;
                 
-                const blob = Utilities.newBlob(Utilities.base64Decode(f.fileData), f.fileMimeType, generateName);
+                const blob = Utilities.newBlob(vf.bytes, vf.blobMimeType, generateName);
                 const file = subFolder.createFile(blob);
                 file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
                 finalUrls.push(file.getUrl()); 
             }
-        } catch(e) { Logger.log("Gagal mengunggah file WFH: " + e.toString()); }
+        } catch(e) {
+            if (e && /dilarang|ditolak|tidak valid|melebihi batas|tidak dikenali|tidak cocok|encoding|kosong/i.test(String(e.message || e))) {
+              throw e;
+            }
+            Logger.log("Gagal mengunggah file WFH: " + e.toString());
+        }
     }
 
     const finalJsonUrls = JSON.stringify(finalUrls); 

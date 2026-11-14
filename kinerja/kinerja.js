@@ -21,19 +21,37 @@ function addKinerjaLog(payload, clientToken) {
         sheet.appendRow(['ID_Kinerja', 'NIP_Pegawai', 'NIP_Penilai', 'Tahun', 'Periode', 'Predikat', 'URL_Penilaian', 'URL_Evaluasi', 'Status', 'Tgl_TTE', 'File_Pengesahan', 'Tgl_Input']);
     }
 
+    const safeFileBase = String(payload.fileNameBase || callerSess.nip || 'SKP').replace(/[^a-zA-Z0-9._-]/g, '_');
+
+    const vPen = (typeof validateUploadedFile_ === 'function')
+      ? validateUploadedFile_(payload.filePenilaianData, `Penilaian_${safeFileBase}.pdf`, payload.filePenilaianMimeType || payload.fileMimeType || 'application/pdf', {
+          allowPdf: true,
+          allowImages: false,
+          allowZip: false,
+          maxBytes: 10 * 1024 * 1024
+        })
+      : { bytes: Utilities.base64Decode(payload.filePenilaianData), blobMimeType: payload.fileMimeType || 'application/pdf', ext: 'pdf' };
+
+    const vEva = (typeof validateUploadedFile_ === 'function')
+      ? validateUploadedFile_(payload.fileEvaluasiData, `Evaluasi_${safeFileBase}.pdf`, payload.fileEvaluasiMimeType || payload.fileMimeType || 'application/pdf', {
+          allowPdf: true,
+          allowImages: false,
+          allowZip: false,
+          maxBytes: 10 * 1024 * 1024
+        })
+      : { bytes: Utilities.base64Decode(payload.fileEvaluasiData), blobMimeType: payload.fileMimeType || 'application/pdf', ext: 'pdf' };
+
     const folderName = "Arsip E-Kinerja TRANSKEP";
     let folders = DriveApp.getFoldersByName(folderName);
     let folder = folders.hasNext() ? folders.next() : DriveApp.createFolder(folderName);
 
-    const safeFileBase = String(payload.fileNameBase || callerSess.nip || 'SKP').replace(/[^a-zA-Z0-9._-]/g, '_');
-
     // 1. Upload File Penilaian
-    const blobPenilaian = Utilities.newBlob(Utilities.base64Decode(payload.filePenilaianData), payload.fileMimeType, `Penilaian_${safeFileBase}.pdf`);
+    const blobPenilaian = Utilities.newBlob(vPen.bytes, vPen.blobMimeType, `Penilaian_${safeFileBase}.${vPen.ext}`);
     const filePen = folder.createFile(blobPenilaian);
     filePen.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
     
     // 2. Upload File Evaluasi
-    const blobEvaluasi = Utilities.newBlob(Utilities.base64Decode(payload.fileEvaluasiData), payload.fileMimeType, `Evaluasi_${safeFileBase}.pdf`);
+    const blobEvaluasi = Utilities.newBlob(vEva.bytes, vEva.blobMimeType, `Evaluasi_${safeFileBase}.${vEva.ext}`);
     const fileEva = folder.createFile(blobEvaluasi);
     fileEva.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
 

@@ -70,11 +70,19 @@
         return;
       }
 
+      var rawUrlStr = String(driveUrl || '').trim();
+      var isHttpScheme = /^https:\/\//i.test(rawUrlStr);
+      var hasAnyScheme = /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(rawUrlStr);
+      var idMatch = (!hasAnyScheme || isHttpScheme) ? rawUrlStr.match(/[-\w]{25,}/) : null;
+      var safeDirectUrl = isHttpScheme
+        ? rawUrlStr
+        : (idMatch && idMatch[0] ? ("https://drive.google.com/file/d/" + idMatch[0] + "/view") : "#");
+
       var titleEl = document.getElementById('fbModalTitle');
       if (titleEl) titleEl.innerText = judulDokumen || "Dokumen PDF";
 
       var btnDl = document.getElementById('fbBtnDownloadDirect');
-      if (btnDl) btnDl.href = driveUrl;
+      if (btnDl) btnDl.href = safeDirectUrl;
 
       if (loader) {
         loader.classList.remove('hidden');
@@ -138,15 +146,19 @@
           tglSkEl.innerText = window.formatTglIndoPdf(targetSk.tgl_sk);
           pjSkEl.innerText = targetSk.pj_sk || '-';
 
+          var esc = window.escHtml || function(v) { return String(v == null ? '' : v).replace(/[&<>"']/g, function(c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[c]); }); };
           if (targetSk.members && targetSk.members.length > 0) {
             var skHtml = '';
             targetSk.members.forEach(function(m, idx) {
               var info = window.resolvePdfMemberInfo(m.nip);
               var prefix = info.isGroup ? '<i class="fa-solid fa-users text-emerald-400 mr-1"></i>' : (idx + 1) + '. ';
+              var safeNama = esc(info.nama);
+              var safeJabatan = esc(info.jabatan);
+              var safePeran = esc(m.peran || '-');
               skHtml += '<div class="bg-slate-950/80 border border-slate-800/80 p-2.5 rounded-lg hover:border-indigo-500/50 transition">' +
-                          '<p class="text-[11px] font-bold text-slate-200 truncate" title="' + info.nama + '">' + prefix + info.nama + '</p>' +
-                          '<p class="text-[9px] text-slate-400 truncate mt-0.5 leading-tight">' + info.jabatan + '</p>' +
-                          '<p class="text-[9px] text-indigo-300 font-bold mt-1.5 bg-indigo-500/10 inline-block px-1.5 py-0.5 rounded border border-indigo-500/20">' + (m.peran || '-') + '</p>' +
+                          '<p class="text-[11px] font-bold text-slate-200 truncate" title="' + safeNama + '">' + prefix + safeNama + '</p>' +
+                          '<p class="text-[9px] text-slate-400 truncate mt-0.5 leading-tight">' + safeJabatan + '</p>' +
+                          '<p class="text-[9px] text-indigo-300 font-bold mt-1.5 bg-indigo-500/10 inline-block px-1.5 py-0.5 rounded border border-indigo-500/20">' + safePeran + '</p>' +
                         '</div>';
             });
             membersListEl.innerHTML = skHtml;
@@ -169,10 +181,13 @@
             pelaksanaArr.forEach(function(m, idx) {
               var info = window.resolvePdfMemberInfo(m.nip);
               var prefix = info.isGroup ? '<i class="fa-solid fa-users text-emerald-400 mr-1"></i>' : (idx + 1) + '. ';
+              var safeNama = esc(info.nama);
+              var safeJabatan = esc(info.jabatan);
+              var safePeran = esc(m.peran || '-');
               sopHtml += '<div class="bg-slate-950/80 border border-emerald-800/50 p-2.5 rounded-lg hover:border-emerald-500/50 transition">' +
-                           '<p class="text-[11px] font-bold text-slate-200 truncate" title="' + info.nama + '">' + prefix + info.nama + '</p>' +
-                           '<p class="text-[9px] text-slate-400 truncate mt-0.5 leading-tight">' + info.jabatan + '</p>' +
-                           '<p class="text-[9px] text-emerald-300 font-bold mt-1.5 bg-emerald-500/10 inline-block px-1.5 py-0.5 rounded border border-emerald-500/20">' + (m.peran || '-') + '</p>' +
+                           '<p class="text-[11px] font-bold text-slate-200 truncate" title="' + safeNama + '">' + prefix + safeNama + '</p>' +
+                           '<p class="text-[9px] text-slate-400 truncate mt-0.5 leading-tight">' + safeJabatan + '</p>' +
+                           '<p class="text-[9px] text-emerald-300 font-bold mt-1.5 bg-emerald-500/10 inline-block px-1.5 py-0.5 rounded border border-emerald-500/20">' + safePeran + '</p>' +
                          '</div>';
             });
             membersListEl.innerHTML = sopHtml;
@@ -186,12 +201,13 @@
         }
       }
 
-      var idMatch = String(driveUrl).match(/[-\w]{25,}/);
       if (idMatch && idMatch[0]) {
         var fileId = idMatch[0];
         iframe.src = "https://drive.google.com/file/d/" + fileId + "/preview";
+      } else if (isHttpScheme) {
+        iframe.src = rawUrlStr;
       } else {
-        iframe.src = driveUrl;
+        iframe.src = "about:blank";
       }
 
       iframe.onload = function() {

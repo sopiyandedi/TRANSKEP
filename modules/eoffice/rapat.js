@@ -40,18 +40,20 @@
       });
     }
 
+    var esc = window.escHtml || function(v) { return String(v == null ? '' : v).replace(/[&<>"']/g, function(c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[c]); }); };
     var html = '';
     listPegawai.forEach(function(u) {
       var nipStr = String(u.nip || '');
+      var safeNip = esc(nipStr);
       var isChecked = selectedRapatPesertaNips.indexOf(nipStr) !== -1;
       html += 
         '<label class="flex items-start gap-2.5 p-2 rounded-xl border cursor-pointer transition ' + 
         (isChecked ? 'bg-cyan-500/10 border-cyan-500/30 text-white' : 'bg-slate-900 border-slate-800 text-slate-300 hover:bg-slate-800/60') + 
         '">' +
-          '<input type="checkbox" onchange="togglePesertaRapatCheck(\'' + nipStr + '\')" ' + (isChecked ? 'checked' : '') + ' class="mt-0.5 rounded border-slate-700 text-cyan-500 focus:ring-0 bg-slate-950">' +
+          '<input type="checkbox" data-nip="' + safeNip + '" onchange="togglePesertaRapatCheck(this.dataset.nip)" ' + (isChecked ? 'checked' : '') + ' class="mt-0.5 rounded border-slate-700 text-cyan-500 focus:ring-0 bg-slate-950">' +
           '<div class="min-w-0 flex-1 leading-tight">' +
-            '<div class="font-bold text-[11px] truncate">' + (u.nama || '-') + '</div>' +
-            '<div class="text-[9px] text-slate-500 truncate">' + (u.jabatan || '-') + '</div>' +
+            '<div class="font-bold text-[11px] truncate">' + esc(u.nama || '-') + '</div>' +
+            '<div class="text-[9px] text-slate-500 truncate">' + esc(u.jabatan || '-') + '</div>' +
           '</div>' +
         '</label>';
     });

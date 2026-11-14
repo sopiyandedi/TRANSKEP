@@ -58,6 +58,15 @@ function saveSk(payload, userNip, clientToken) {
     // ========================================================
     if (payload.fileBase64) {
        try {
+           const vSkFile = (typeof validateUploadedFile_ === 'function')
+             ? validateUploadedFile_(payload.fileBase64, (payload.judul_sk || 'SK') + '.pdf', payload.fileMimeType || 'application/pdf', {
+                 allowPdf: true,
+                 allowImages: false,
+                 allowZip: false,
+                 maxBytes: 15 * 1024 * 1024
+               })
+             : { bytes: Utilities.base64Decode(payload.fileBase64), blobMimeType: 'application/pdf', ext: 'pdf' };
+
            // 1. Inisialisasi Root Folder Khusus SK
            const rootFolderName = "TRANSKEP SK";
            let rootFolder;
@@ -84,10 +93,9 @@ function saveSk(payload, userNip, clientToken) {
            if (pjFolders.hasNext()) { pjFolder = pjFolders.next(); }
            else { pjFolder = yearFolder.createFolder(pjFolderStr); }
            
-           // 4. Decode File dan Rename sesuai Judul SK (Bersihkan karakter ilegal)
-           const decodedData = Utilities.base64Decode(payload.fileBase64);
-           let safeFileName = String(payload.judul_sk).replace(/[\\/:*?"<>|]/g, "_") + ".pdf";
-           const blob = Utilities.newBlob(decodedData, "application/pdf", safeFileName);
+           // 4. Gunakan bytes tervalidasi dan Rename sesuai Judul SK (Bersihkan karakter ilegal)
+           let safeFileName = String(payload.judul_sk).replace(/[\\/:*?"<>|]/g, "_") + "." + vSkFile.ext;
+           const blob = Utilities.newBlob(vSkFile.bytes, vSkFile.blobMimeType, safeFileName);
            
            // 5. Buat File & Set Izin Public (Agar Flipbook bisa baca)
            const file = pjFolder.createFile(blob);

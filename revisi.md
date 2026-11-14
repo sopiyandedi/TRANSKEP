@@ -5945,3 +5945,40 @@ Saat baris di sheet `cuti_log` dihapus langsung secara manual di Google Sheets (
 - [`core/view_login.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/core/view_login.html) *(Form anti-reload `return false;`)*
 - [`core/core.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/core/core.js) *(Anti-stuck timeout 20s & diagnostik login)*
 - [`prd.md`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/prd.md) & [`revisi.md`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/revisi.md)
+
+---
+
+### TAHAP 115 - SECURITY HARDENING FASE 3 (AUTH FLOW, XSS FRONTEND, SECRETS, & FIRESTORE)
+*Status: Fase 3A [SELESAI & TERVERIFIKASI LOKAL (BELUM COMMIT/DEPLOY)] ✅ | Fase 3B [MENUNGGU KONFIRMASI & KESIAPAN INFRASTRUKTUR] ⏳*
+*Prasyarat Terpasang: Hardening Backend GAS Fase 1 & Fase 2 telah diterapkan pada commit `874faa3` (`origin/main` & `prod/main`) dan aktif di GAS Deployment `@365`.*
+
+#### 1. Rencana & Realisasi Sub-Paket Fase 3A — Hardening Kode Mandiri ✅
+*(Terverifikasi lokal via Node `vm` mock sandbox GAS & browser DOM tanpa error sintaks across 87 file `.js`, serta lulus penuh pada `verify_fase1.js`, `verify_fase2.js`, dan `verify_fase3a.js` — 0 failures.)*
+Perubahan ini tidak membutuhkan perubahan konfigurasi eksternal (`ScriptProperties`, n8n, maupun Console Firebase) dan aman dijalankan langsung bersama alur aplikasi aktif:
+1. **Validasi Upload File (Allowlist MIME, Ekstensi Aman, & Batas Ukuran)**:
+   - Menambahkan helper terpusat (mis. `validateUploadedFile_`) di [`code.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/code.js) dengan allowlist MIME & ekstensi aman (PDF, PNG, JPG/JPEG) serta batas ukuran payload.
+   - Menerapkan validator tersebut pada [`permohonan/permohonan.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/permohonan.js) (`addCutiLog` — mengganti `.split('.').pop()` mentah), [`permohonan/wfh/wfh.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/wfh/wfh.js), [`kinerja/kinerja.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/kinerja/kinerja.js), [`sk/sk.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sk/sk.js), dan [`sop/sop.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sop/sop.js).
+2. **Rotasi Token Magic Link Antar Tahap & TTL ([`permohonan/persetujuan.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/persetujuan.js))**:
+   - Di `processMagicLinkApproval` (Stage 1 -> Stage 2), menerbitkan `magic_token` baru (`Utilities.getUuid()`) saat meneruskan persetujuan dari Atasan Langsung ke Pejabat Berwenang sehingga Atasan tidak memegang token aktif milik Pejabat.
+   - Menambahkan metadata TTL (masa kedaluwarsa link) serta pembatasan percobaan token tidak valid.
+3. **Hardening Alur Lupa Password Tanpa Lockout DoS ([`code.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/code.js) & [`core/login.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/core/login.js))**:
+   - Menghentikan penimpaan langsung kolom password aktif user (`user_data` kolom 6) ketika `requestPasswordReset` dipanggil sebelum verifikasi agar pihak luar tidak bisa mengunci akun pegawai lain.
+   - Menggunakan token/sandi sementara ber-TTL terpisah di server (serta menyamarkan nomor WA pada pesan respons & menyamakan pesan sukses/gagal agar tidak membocorkan status terdaftarnya nomor WA).
+4. **Penutupan Celah Formula / CSV Injection pada Modul Pegawai ([`pegawai/manajemen_pegawai.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/pegawai/manajemen_pegawai.js))**:
+   - Menerapkan `sanitizeRowArray` / `sanitizeFormulaInput` pada `addUser`, `updateUser`, dan `importBulkUsers`.
+5. **Penutupan DOM XSS & Validasi URL `iframe` pada Frontend**:
+   - Menambahkan/memakai `escapeHtml` pada seluruh sink `innerHTML` dan `v-html` dinamis yang belum ter-escape: [`modules/referensi/referensi.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/referensi/referensi.js), [`modules/eoffice/rapat.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/rapat.js), [`modules/pdf_viewer/pdf_viewer.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/pdf_viewer/pdf_viewer.js) (termasuk validasi skema `https://` pada `iframe.src`), [`modules/permohonan/cuti.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/permohonan/cuti.js), [`modules/permohonan/persetujuan.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/permohonan/persetujuan.js), [`modules/pkp/cetak/cetak_pk.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/pkp/cetak/cetak_pk.js), [`modules/pkp/cetak/cetak_pck.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/pkp/cetak/cetak_pck.js), serta helper `showNotify`/`showCustomConfirm` di [`core/core.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/core/core.js).
+
+#### 2. Rencana Sub-Paket Fase 3B — Hardening Arsitektur & Infrastruktur (Memerlukan Koordinasi Konfigurasi)
+Item di bawah ini berisiko memutus layanan produksi (WAHA/n8n/Firestore/Drive/CDN) jika diterapkan tanpa kesiapan konfigurasi di luar kode:
+1. **Penghapusan Fallback Secret & Kredensial Terekspos**:
+   - Di kode GAS masih terdapat nilai fallback hardcoded (`TRANSKEP_WA_BOT_2026`, `WAHA_API_KEY` `'192167ce5e0147dcb4eaaaff7eccfc18'`, URL ngrok) pada [`code.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/code.js), [`permohonan/persetujuan.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/persetujuan.js), dan [`permohonan/st/st.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/st/st.js).
+   - File [`n8n_workflow_mysims_surat_keluar.json`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/n8n_workflow_mysims_surat_keluar.json) yang terlacak di Git masih memuat kredensial plaintext MYSIMS (`ketua`/`admin`, `wakilketua`/`admin`, `panitera`/`panitera`, `sekretaris`/`sekretaris`), IP LAN `192.168.188.10`, fallback key `'TRANSKEP_WA_BOT_2026'`, serta `allowUnauthorizedCerts: true`.
+   - *Syarat eksekusi*: Pastikan `ScriptProperties` GAS & variabel env n8n terisi nilai baru yang sudah dirotasi, barulah fallback dihapus dan file workflow sensitif dikeluarkan dari pelacakan Git.
+2. **Autentikasi Firebase & `firestore.rules` Terkontrol**:
+   - [`core/firebase.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/core/firebase.js) dan [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) saat ini mengakses koleksi Firestore tanpa `firebase-auth` (`request.auth == null`) serta tanpa file `firestore.rules` di repo (listener realtime bahkan sudah aktif sejak halaman login).
+   - *Opsi desain*: (a) GAS menerbitkan Firebase Custom Token (`signInWithCustomToken`) + `firestore.rules` via agent `firestore-rules-author`, atau (b) memindahkan operasi tulis Firestore melalui endpoint terotentikasi server.
+3. **Pembatasan PII `getBulkData` / `getBackgroundData` & Izin Share Drive (`ANYONE_WITH_LINK`)**:
+   - Memastikan scoping data pribadi pegawai (`no_hp`, `alamat`, riwayat cuti/IK/IP/WFH/kinerja) tidak mematahkan fitur dropdown/persetujuan/SmartRouting di frontend, serta mengevaluasi opsi Drive proxy jika izin publik `ANYONE_WITH_LINK` dicabut.
+4. **Audit SRI CDN (`xlsx`, `mammoth`, `chart.js`, `vue`) & Risiko CSP `index.html`**:
+   - Penambahan atribut `integrity` (SRI) pada CDN berversi pin aman; sedangkan penghapusan `'unsafe-eval'`/`'unsafe-inline'` tidak kompatibel dengan Tailwind CDN (`cdn.tailwindcss.com`) dan `vue.global.js` tanpa migrasi *build step* statis.

@@ -56,6 +56,15 @@ function saveSopData(payload, userNip, clientToken) {
     // ========================================================
     if (payload.fileBase64) {
        try {
+           const vSopFile = (typeof validateUploadedFile_ === 'function')
+             ? validateUploadedFile_(payload.fileBase64, (payload.judul_sop || 'SOP') + '.pdf', payload.fileMimeType || 'application/pdf', {
+                 allowPdf: true,
+                 allowImages: false,
+                 allowZip: false,
+                 maxBytes: 15 * 1024 * 1024
+               })
+             : { bytes: Utilities.base64Decode(payload.fileBase64), blobMimeType: 'application/pdf', ext: 'pdf' };
+
            // 1. Inisialisasi Root Folder Khusus SOP
            const rootFolderName = "TRANSKEP SOP";
            let rootFolder;
@@ -83,10 +92,9 @@ function saveSopData(payload, userNip, clientToken) {
            if (pjFolders.hasNext()) { pjFolder = pjFolders.next(); }
            else { pjFolder = yearFolder.createFolder(pjFolderStr); }
            
-           // 4. Decode File dan Rename sesuai Judul SOP (Bersihkan karakter ilegal)
-           const decodedData = Utilities.base64Decode(payload.fileBase64);
-           let safeFileName = String(payload.judul_sop).replace(/[\\/:*?"<>|]/g, "_") + ".pdf";
-           const blob = Utilities.newBlob(decodedData, "application/pdf", safeFileName);
+           // 4. Gunakan bytes tervalidasi dan Rename sesuai Judul SOP (Bersihkan karakter ilegal)
+           let safeFileName = String(payload.judul_sop).replace(/[\\/:*?"<>|]/g, "_") + "." + vSopFile.ext;
+           const blob = Utilities.newBlob(vSopFile.bytes, vSopFile.blobMimeType, safeFileName);
            
            // 5. Buat File & Set Izin Public (Agar Flipbook bisa baca)
            const file = pjFolder.createFile(blob);

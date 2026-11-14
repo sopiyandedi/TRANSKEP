@@ -54,11 +54,12 @@ function renderPrintTemplatePCK(data) {
           "<tr style='background-color: #f8f9fa;'><th class='font-bold'>(1)</th><th class='font-bold'>(2)</th><th class='font-bold'>(3)</th><th class='font-bold'>(4)</th><th class='font-bold'>(5)</th><th class='font-bold'>(6)</th><th class='font-bold'>(7)</th><th class='font-bold'>(8)</th><th class='font-bold'>(9)</th><th class='font-bold'>(10)</th></tr>" +
           "</thead><tbody>";
 
+        var esc = window.escHtml || function(v) { return String(v == null ? '' : v).replace(/[&<>"']/g, function(c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[c]); }); };
         for (var sasaran in groups) {
             var kgs = groups[sasaran];
             var hitungGrup = 0; var capaianGrup = 0;
             
-            html1 += "<div style='font-weight: bold; font-size: 9.5pt; margin-bottom: 5px; margin-top: 15px; text-transform: uppercase;'>INDIKATOR KINERJA : " + sasaran + "</div>";
+            html1 += "<div style='font-weight: bold; font-size: 9.5pt; margin-bottom: 5px; margin-top: 15px; text-transform: uppercase;'>INDIKATOR KINERJA : " + esc(sasaran) + "</div>";
             html1 += tableHeader;
             
             kgs.forEach(function(kg, idx) {
@@ -68,15 +69,15 @@ function renderPrintTemplatePCK(data) {
                 
                 html1 += "<tr>" +
                     "<td class='text-center'>" + (idx+1) + "</td>" +
-                    "<td>" + kg.indikator + "</td>" +
+                    "<td>" + esc(kg.indikator) + "</td>" +
                     "<td class='text-center'>0</td>" +
-                    "<td class='text-center'>" + kg.kuantitas + "</td>" +
-                    "<td class='text-center'>" + kg.mutu + "</td>" +
+                    "<td class='text-center'>" + esc(kg.kuantitas) + "</td>" +
+                    "<td class='text-center'>" + esc(kg.mutu) + "</td>" +
                     "<td class='text-center'>0</td>" +
-                    "<td class='text-center'>" + (kg.real_kuantitas || 0) + "</td>" +
-                    "<td class='text-center'>" + (kg.real_mutu || 0) + "</td>" +
-                    "<td class='text-center font-bold'>" + hitung + "</td>" +
-                    "<td class='text-center font-bold'>" + cap.toFixed(2) + "</td>" +
+                    "<td class='text-center'>" + esc(kg.real_kuantitas || 0) + "</td>" +
+                    "<td class='text-center'>" + esc(kg.real_mutu || 0) + "</td>" +
+                    "<td class='text-center font-bold'>" + esc(hitung) + "</td>" +
+                    "<td class='text-center font-bold'>" + esc(cap.toFixed(2)) + "</td>" +
                 "</tr>";
             });
             
@@ -89,7 +90,7 @@ function renderPrintTemplatePCK(data) {
             
             html2 += "<tr>" +
                 "<td class='text-center'>" + num + "</td>" +
-                "<td>" + sasaran + "</td>" +
+                "<td>" + esc(sasaran) + "</td>" +
                 "<td class='text-center font-bold'>" + avgHitung.toFixed(2) + "</td>" +
                 "<td class='text-center font-bold'>" + avgCap.toFixed(2) + "</td>" +
             "</tr>";
@@ -107,7 +108,7 @@ function renderPrintTemplatePCK(data) {
         else if (valAvg >= 51) predikatStr = "(Kurang)";
         else if (valAvg <= 50) predikatStr = "(Buruk)";
 
-        html2 += "<tr><td colspan='2' class='text-right font-bold' style='background:#f9fafb;'>Hasil Capaian Kinerja Bulan " + bulanStr + "</td><td class='text-center font-bold' style='background:#f9fafb;'>" + avgFinalHitung + "</td><td class='text-center font-bold' style='background:#f9fafb; font-size:11pt;'>" + avgFinalCap + " " + predikatStr + "</td></tr>";
+        html2 += "<tr><td colspan='2' class='text-right font-bold' style='background:#f9fafb;'>Hasil Capaian Kinerja Bulan " + esc(bulanStr) + "</td><td class='text-center font-bold' style='background:#f9fafb;'>" + esc(avgFinalHitung) + "</td><td class='text-center font-bold' style='background:#f9fafb; font-size:11pt;'>" + esc(avgFinalCap) + " " + predikatStr + "</td></tr>";
         
         if(containerTables) containerTables.innerHTML = html1;
         if(tbody2) tbody2.innerHTML = html2;

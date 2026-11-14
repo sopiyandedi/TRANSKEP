@@ -119,6 +119,12 @@ function updateCutiStatus(id, decision, notes, userNip, bypassMode, clientToken)
     else if (cAtasan === 'Perubahan' || cPejabat === 'Perubahan') finalStatus = 'Perubahan';
 
     sheetCuti.getRange(rowIndex, 8).setValue(finalStatus);
+    // Rotasi token jika masih berlanjut ke Stage 2, atau hapus jika sudah selesai/ditolak agar tautan lama tidak dapat diputar ulang
+    if (finalStatus === 'Menunggu') {
+      sheetCuti.getRange(rowIndex, 19).setValue(generateMagicCutiToken_(14));
+    } else if (finalStatus === 'Disetujui' || finalStatus === 'Ditolak' || finalStatus === 'Perubahan') {
+      sheetCuti.getRange(rowIndex, 19).setValue('');
+    }
 
     if (finalStatus === 'Disetujui') {
       // TRIGGER OTOMATIS: Integrasi n8n & MYSIMS Surat Keluar (Non-blocking & Aman)
@@ -191,11 +197,64 @@ function processBulkApproval(bulkItems, decision, notes, userNip, bypassMode, cl
 // ==========================================
 // KONTROLER MAGIC LINK PERSETUJUAN CUTI (WAHA BOT) - TRANSKEP v2.1
 // ==========================================
+var MAGIC_CUTI_TTL_DAYS_ = 14;
+var MAGIC_CUTI_LEGACY_MAX_DAYS_ = 30;
+
+function generateMagicCutiToken_(ttlDays) {
+  const days = Number(ttlDays) > 0 ? Number(ttlDays) : MAGIC_CUTI_TTL_DAYS_;
+  const expMs = new Date().getTime() + (days * 86400000);
+  return Utilities.getUuid() + '.' + String(expMs);
+}
+
+function isMagicCutiTokenExpired_(token, targetRow) {
+  const tokStr = String(token || '').trim();
+  if (!tokStr) return true;
+  const dotIdx = tokStr.lastIndexOf('.');
+  if (dotIdx !== -1) {
+    const expStr = tokStr.slice(dotIdx + 1);
+    if (/^\d{13,}$/.test(expStr)) {
+      return new Date().getTime() > Number(expStr);
+    }
+  }
+  // Fallback untuk token legacy tanpa suffix TTL: cek umur pengajuan dari tgl_pengajuan (dd/MM/yyyy atau yyyy-MM-dd)
+  if (targetRow && targetRow[1]) {
+    try {
+      const rawDate = String(targetRow[1]).trim();
+      let dt = null;
+      if (/^\d{2}\/\d{2}\/\d{4}$/.test(rawDate)) {
+        const p = rawDate.split('/');
+        dt = new Date(Number(p[2]), Number(p[1]) - 1, Number(p[0]));
+      } else {
+        dt = new Date(rawDate);
+      }
+      if (dt && !isNaN(dt.getTime())) {
+        return (new Date().getTime() - dt.getTime()) > (MAGIC_CUTI_LEGACY_MAX_DAYS_ * 86400000);
+      }
+    } catch (e) {}
+  }
+  return false;
+}
+
+function matchMagicTokenSafely_(rowToken, inputToken) {
+  const a = String(rowToken || '').trim();
+  const b = String(inputToken || '').trim();
+  if (!a || !b) return false;
+  if (typeof constantTimeEquals_ === 'function') {
+    return constantTimeEquals_(a, b);
+  }
+  return a === b;
+}
 
 function getCutiByToken(token) {
   try {
-    if (!token || String(token).trim() === '') {
+    const cleanToken = String(token || '').trim();
+    if (!cleanToken) {
       return { status: 'error', message: 'Token persetujuan tidak valid.' };
+    }
+
+    const rlKey = 'magic_tok_' + cleanToken.slice(0, 16);
+    if (typeof checkRateLimitBlocked_ === 'function' && (checkRateLimitBlocked_(rlKey, 15) || checkRateLimitBlocked_('magic_global', 120))) {
+      return { status: 'error', message: 'Terlalu banyak percobaan tautan tidak valid. Silakan coba lagi nanti.' };
     }
 
     const ss = getDB();
@@ -222,7 +281,7 @@ function getCutiByToken(token) {
     let rowIndex = -1;
     // Kolom 19 (indeks 18) adalah magic_token
     for (let i = 1; i < cutiData.length; i++) {
-      if (String(cutiData[i][18] || '').trim() === String(token).trim()) {
+      if (matchMagicTokenSafely_(cutiData[i][18], cleanToken)) {
         targetRow = cutiData[i];
         rowIndex = i + 1;
         break;
@@ -230,7 +289,17 @@ function getCutiByToken(token) {
     }
 
     if (!targetRow) {
+      if (typeof recordRateLimitHit_ === 'function') {
+        recordRateLimitHit_(rlKey, 15, 600, 600);
+        recordRateLimitHit_('magic_global', 120, 600, 300);
+      }
       return { status: 'error', message: 'Tautan persetujuan tidak ditemukan atau sudah kedaluwarsa.' };
+    }
+
+    if (typeof clearRateLimit_ === 'function') clearRateLimit_(rlKey);
+
+    if (isMagicCutiTokenExpired_(cleanToken, targetRow)) {
+      return { status: 'error', message: 'Masa berlaku tautan persetujuan ini telah habis. Silakan minta Admin mengirim ulang notifikasi atau proses melalui portal.' };
     }
 
     const pemohon = userMap[String(targetRow[2]).trim()] || { nama: 'Pegawai', jabatan: '-' };
@@ -289,9 +358,15 @@ function getCutiByToken(token) {
 
 function processMagicLinkApproval(token, decision, notes) {
   try {
-    if (!token) return { status: 'error', message: 'Token tidak valid.' };
+    const cleanToken = String(token || '').trim();
+    if (!cleanToken) return { status: 'error', message: 'Token tidak valid.' };
     if (decision !== 'Disetujui' && decision !== 'Ditolak') {
       return { status: 'error', message: 'Keputusan tidak valid.' };
+    }
+
+    const rlKey = 'magic_act_' + cleanToken.slice(0, 16);
+    if (typeof checkRateLimitBlocked_ === 'function' && (checkRateLimitBlocked_(rlKey, 10) || checkRateLimitBlocked_('magic_global', 120))) {
+      return { status: 'error', message: 'Terlalu banyak percobaan persetujuan tidak valid. Silakan coba lagi nanti.' };
     }
 
     const ss = getDB();
@@ -320,14 +395,26 @@ function processMagicLinkApproval(token, decision, notes) {
     let rowIndex = -1;
     let targetRow = null;
     for (let i = 1; i < cutiData.length; i++) {
-      if (String(cutiData[i][18] || '').trim() === String(token).trim()) {
+      if (matchMagicTokenSafely_(cutiData[i][18], cleanToken)) {
         rowIndex = i + 1;
         targetRow = cutiData[i];
         break;
       }
     }
 
-    if (rowIndex === -1) throw new Error("Berkas cuti tidak ditemukan.");
+    if (rowIndex === -1) {
+      if (typeof recordRateLimitHit_ === 'function') {
+        recordRateLimitHit_(rlKey, 10, 600, 600);
+        recordRateLimitHit_('magic_global', 120, 600, 300);
+      }
+      throw new Error("Berkas cuti tidak ditemukan atau tautan sudah tidak berlaku.");
+    }
+
+    if (typeof clearRateLimit_ === 'function') clearRateLimit_(rlKey);
+
+    if (isMagicCutiTokenExpired_(cleanToken, targetRow)) {
+      throw new Error("Masa berlaku tautan persetujuan telah berakhir. Silakan minta Admin mengirim ulang notifikasi atau proses melalui portal.");
+    }
 
     const pemohonNip = String(targetRow[2]).trim();
     const pemohon = userMap[pemohonNip] || { nama: 'Pegawai', no_wa: '' };
@@ -359,11 +446,14 @@ function processMagicLinkApproval(token, decision, notes) {
       if (catatanBersih) sheetCuti.getRange(rowIndex, 9).setValue(sf(catatanBersih)); // catatan atasan (col 9)
 
       if (decision === 'Disetujui') {
+        // Rotasi wajib magic_token baru untuk Stage 2 (Pejabat Berwenang) sehingga token Atasan langsung hangus
+        const nextStageToken = generateMagicCutiToken_(14);
+        sheetCuti.getRange(rowIndex, 19).setValue(nextStageToken);
         if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush();
 
         // Teruskan Magic Link ke Pejabat Berwenang via WAHA
         if (pejabat.no_wa && pejabat.no_wa.length > 8) {
-          const magicLink = "https://sso.pa-indramayu.go.id/?action=review_cuti&token=" + token;
+          const magicLink = "https://sso.pa-indramayu.go.id/?action=review_cuti&token=" + nextStageToken;
           const msgPejabat = "*TRANSKEP - PERSETUJUAN CUTI TINGKAT AKHIR* 🏛️\n\n" +
             "Yth. Bapak/Ibu *" + pejabat.nama + "* (Pejabat Berwenang),\n\n" +
             "Permohonan cuti pegawai telah *DISETUJUI* oleh Atasan Langsung (" + atasan.nama + ") dan kini menunggu persetujuan akhir Anda:\n\n" +
@@ -393,8 +483,9 @@ function processMagicLinkApproval(token, decision, notes) {
           message: 'Persetujuan Atasan Langsung berhasil disimpan. Notifikasi telah otomatis diteruskan ke Pejabat Berwenang.'
         };
       } else {
-        // Atasan menolak
+        // Atasan menolak — hanguskan magic_token
         sheetCuti.getRange(rowIndex, 8).setValue('Ditolak');
+        sheetCuti.getRange(rowIndex, 19).setValue('');
 
         // Kembalikan saldo cuti
         refundCutiSaldo_(sheetUser, pemohonNip, jenisCuti, targetRow[16]);
@@ -432,6 +523,7 @@ function processMagicLinkApproval(token, decision, notes) {
 
       if (decision === 'Disetujui') {
         sheetCuti.getRange(rowIndex, 8).setValue('Disetujui'); // Final status
+        sheetCuti.getRange(rowIndex, 19).setValue(''); // Hanguskan token setelah finalisasi
         if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush();
 
         // Pemicu Otomatis Webhook n8n untuk Surat Keluar MYSIMS (Non-Blocking & Aman)
@@ -466,8 +558,9 @@ function processMagicLinkApproval(token, decision, notes) {
           message: 'Persetujuan akhir Pejabat Berwenang berhasil disimpan. Status cuti resmi Disetujui dan notifikasi telah dikirimkan ke pegawai pemohon.'
         };
       } else {
-        // Pejabat menolak
+        // Pejabat menolak — hanguskan magic_token
         sheetCuti.getRange(rowIndex, 8).setValue('Ditolak');
+        sheetCuti.getRange(rowIndex, 19).setValue('');
         refundCutiSaldo_(sheetUser, pemohonNip, jenisCuti, targetRow[16]);
         if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush();
 
@@ -560,8 +653,8 @@ function resendCutiWhatsApp(cutiId, adminNip, clientToken) {
     if (rowIndex === -1) throw new Error("Data transaksi cuti tidak ditemukan.");
 
     let magicToken = String(targetRow[18] || '').trim();
-    if (!magicToken) {
-      magicToken = Utilities.getUuid();
+    if (!magicToken || isMagicCutiTokenExpired_(magicToken, targetRow)) {
+      magicToken = generateMagicCutiToken_(14);
       sheetCuti.getRange(rowIndex, 19).setValue(magicToken);
       if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush();
     }

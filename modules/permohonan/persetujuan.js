@@ -136,9 +136,10 @@
                       let displayJenis = log.jenis;
                       let displayAlasan = log.alasan;
                       let displayDurasi = "";
+                      const esc = window.escHtml || (v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[c])));
 
                       if (log.z_type === 'Cuti') {
-                          displayDurasi = `<div>${log.tgl_mulai}</div><div class="text-slate-500 text-[10px] mt-0.5">s.d ${log.tgl_selesai}</div>`;
+                          displayDurasi = `<div>${esc(log.tgl_mulai)}</div><div class="text-slate-500 text-[10px] mt-0.5">s.d ${esc(log.tgl_selesai)}</div>`;
                           if (log.status === 'Menunggu Pembatalan') {
                               actionRole = "Pejabat (Batal)";
                               btnColor = "bg-purple-600 hover:bg-purple-500 shadow-purple-600/20 text-white";
@@ -152,21 +153,21 @@
                       } 
                       else if (log.z_type === 'IK') {
                           displayJenis = "Izin Keluar Kantor";
-                          displayDurasi = `<div>${log.tanggal}</div><div class="text-slate-500 text-[10px] mt-0.5">${log.jam_keluar || "-"} - ${log.jam_kembali || "-"}</div>`;
+                          displayDurasi = `<div>${esc(log.tanggal)}</div><div class="text-slate-500 text-[10px] mt-0.5">${esc(log.jam_keluar || "-")} - ${esc(log.jam_kembali || "-")}</div>`;
                           actionRole = this.isAdmin ? "Bypass Atasan" : "Atasan Langsung";
                           btnColor = "bg-sky-600 hover:bg-sky-500 text-white";
                       } 
                       else if (log.z_type === 'IP') {
                           displayJenis = "Izin Pribadi";
                           let tglMurniIP = log.tanggal || log.tgl_mulai || "-";
-                          displayDurasi = `<div>${tglMurniIP}</div>`;
+                          displayDurasi = `<div>${esc(tglMurniIP)}</div>`;
                           actionRole = this.isAdmin ? "Bypass Atasan" : "Atasan Langsung";
                           btnColor = "bg-emerald-600 hover:bg-emerald-500 text-white";
                       }
                       else if (log.z_type === 'WFH') {
                           displayJenis = `WFH (${log.wfh_stage})`;
                           displayAlasan = log.wfh_stage === 'Rencana' ? "Target Pekerjaan WFH" : "Laporan Realisasi WFH";
-                          displayDurasi = `<div>${log.tanggal}</div><div class="text-slate-500 text-[10px] mt-0.5">Remote</div>`;
+                          displayDurasi = `<div>${esc(log.tanggal)}</div><div class="text-slate-500 text-[10px] mt-0.5">Remote</div>`;
                           actionRole = this.isAdmin ? "Bypass Atasan" : "Atasan Langsung";
                           btnColor = "bg-amber-600 hover:bg-amber-500 text-white shadow-amber-600/20";
                       }

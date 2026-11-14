@@ -199,11 +199,12 @@
         deletePegawaiRecord(user) {
           const token = localStorage.getItem('transkep_session_token');
           if(window.showCustomConfirm) {
-             window.showCustomConfirm("Hapus Data Pegawai", `Hapus permanen akun PNS atas nama ${user.nama} (NIP: ${user.nip})? Tindakan ini tidak dapat dibatalkan.`, async () => {
+             const esc = window.escHtml || (v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[c])));
+             window.showCustomConfirm("Hapus Data Pegawai", `Hapus permanen akun PNS atas nama ${esc(user.nama)} (NIP: ${esc(user.nip)})? Tindakan ini tidak dapat dibatalkan.`, async () => {
                 // OPTIMISTIC DELETE TAHAP 4 (0ms)
                 const backupUsers = [...this.usersList];
                 this.usersList = this.usersList.filter(u => String(u.nip) !== String(user.nip));
-                if(window.showNotify) window.showNotify("Pegawai Dihapus ⚡", "Akun atas nama " + user.nama + " telah dihapus (0ms).", "info");
+                if(window.showNotify) window.showNotify("Pegawai Dihapus ⚡", "Akun atas nama " + esc(user.nama) + " telah dihapus (0ms).", "info");
 
                 const adminNip = (this.currentUser && this.currentUser.nip) || localStorage.getItem('transkep_active_nip');
                 try {
