@@ -618,6 +618,10 @@ document.addEventListener("DOMContentLoaded", () => {
       if (typeof switchMenu === 'function') {
         switchMenu(lastMenu);
       }
+      // Pulihkan Firebase Custom Token Auth sebelum sync listener Realtime aktif
+      if (typeof restoreFirebaseAuthSession_ === 'function') {
+        restoreFirebaseAuthSession_(activeNip, sessionToken);
+      }
       // Zero-Flicker Refresh: Langsung render dari cache lokal, background revalidation tanpa blocking spinner
       syncAllServerData(true);
     } else {
@@ -1257,6 +1261,12 @@ function handleLogin(event) {
 
         window.vueState.user = response.data;
         if (typeof state !== 'undefined') state.user = response.data;
+        if (typeof window.TranskepFirebase !== 'undefined' && typeof window.TranskepFirebase.authenticateWithCustomToken === 'function') {
+          window.TranskepFirebase.authenticateWithCustomToken(response.firebase_custom_token || null, {
+            nip: response.data.nip,
+            role: response.data.role || ''
+          });
+        }
         if (typeof renderGlobalHeader === 'function') {
           renderGlobalHeader();
         }
@@ -1411,6 +1421,10 @@ function handleLogout() {
     localStorage.removeItem('transkep_force_change_password');
     localStorage.removeItem('transkep_session_sig');
     localStorage.removeItem('transkep_last_active_time');
+  }
+
+  if (typeof window.TranskepFirebase !== 'undefined' && typeof window.TranskepFirebase.signOutFirebase === 'function') {
+    window.TranskepFirebase.signOutFirebase();
   }
 
   window.vueState.currentMenu = 'dashboard';
@@ -2710,4 +2724,176 @@ window.updateMobileProfileUI = function () {
   if (typeof updateThemeIcon === 'function') {
     updateThemeIcon();
   }
+};
+
+// =========================================================================
+// FASE 3B: RESTORE FIREBASE CUSTOM AUTH & AUTHENTICATED DRIVE FILE PROXY
+// =========================================================================
+
+function restoreFirebaseAuthSession_(activeNip, sessionToken) {
+  if (typeof window.TranskepFirebase === 'undefined' || typeof window.TranskepFirebase.authenticateWithCustomToken !== 'function') {
+    return;
+  }
+  const cleanNip = String(activeNip || '').replace(/['"\s]/g, '').trim();
+  const savedRole = (typeof localStorage !== 'undefined' ? (localStorage.getItem('transkep_user_role') || '') : '');
+  const fbAuth = (typeof firebase !== 'undefined' && typeof firebase.auth === 'function') ? firebase.auth() : null;
+
+  if (fbAuth && fbAuth.currentUser && String(fbAuth.currentUser.uid || '').trim() === cleanNip && cleanNip) {
+    fbAuth.currentUser.getIdTokenResult()
+      .then((tokRes) => {
+        const claimRole = (tokRes && tokRes.claims && tokRes.claims.role) ? String(tokRes.claims.role) : savedRole;
+        window.TranskepFirebase._authNip = cleanNip;
+        window.TranskepFirebase._authRole = claimRole;
+        window.TranskepFirebase._authReady = true;
+        window.TranskepFirebase._authResolved = true;
+        window.TranskepFirebase._flushAuthQueue();
+      })
+      .catch(() => {
+        window.TranskepFirebase.authenticateWithCustomToken(null, { nip: cleanNip, role: savedRole });
+      });
+    return;
+  }
+
+  if (cleanNip && sessionToken) {
+    invokeBackendRpc_('getFirebaseCustomToken', activeNip, sessionToken)
+      .then((res) => {
+        const cTok = (res && res.status === 'success' && res.customToken) ? res.customToken : null;
+        window.TranskepFirebase.authenticateWithCustomToken(cTok, { nip: cleanNip, role: savedRole });
+      })
+      .catch(() => {
+        window.TranskepFirebase.authenticateWithCustomToken(null, { nip: cleanNip, role: savedRole });
+      });
+  } else {
+    window.TranskepFirebase.authenticateWithCustomToken(null, { nip: cleanNip, role: savedRole });
+  }
+}
+
+function invokeBackendRpc_(methodName, ...args) {
+  if (typeof window !== 'undefined' && window.TranskepAPI && typeof window.TranskepAPI.call === 'function') {
+    return window.TranskepAPI.call(methodName, ...args);
+  }
+  return new Promise((resolve, reject) => {
+    if (typeof google === 'undefined' || !google.script || !google.script.run || typeof google.script.run[methodName] !== 'function') {
+      return reject(new Error('Layanan server backend tidak tersedia.'));
+    }
+    const runner = google.script.run
+      .withSuccessHandler(resolve)
+      .withFailureHandler((err) => {
+        reject(new Error((err && err.message) ? err.message : String(err || 'Gagal menghubungi server.')));
+      });
+    runner[methodName].apply(runner, args);
+  });
+}
+
+function resolveDriveBlobResponse_(rpcPromise, defaultFileName, defaultErrMsg) {
+  return rpcPromise.then((res) => {
+    if (res && res.status === 'success' && res.base64) {
+      try {
+        const blobUrl = window.base64ToBlobUrl(res.base64, res.mimeType || 'application/pdf');
+        return {
+          blobUrl,
+          mimeType: res.mimeType || 'application/pdf',
+          fileName: res.fileName || defaultFileName
+        };
+      } catch (eConv) {
+        throw new Error('Gagal mendekode berkas Drive: ' + (eConv.message || eConv));
+      }
+    }
+    throw new Error((res && res.message) ? res.message : defaultErrMsg);
+  });
+}
+
+window.base64ToBlobUrl = function (base64, mimeType) {
+  const cleanB64 = String(base64 || '').replace(/^data:[^;]+;base64,/, '').replace(/\s+/g, '');
+  const binStr = atob(cleanB64);
+  const len = binStr.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binStr.charCodeAt(i);
+  }
+  const blob = new Blob([bytes], { type: mimeType || 'application/pdf' });
+  return URL.createObjectURL(blob);
+};
+
+window.fetchSecureDriveBlobUrl = function (urlOrId) {
+  const cleanUrl = String(urlOrId || '').trim();
+  if (!cleanUrl || cleanUrl === '-' || cleanUrl === '#') {
+    return Promise.reject(new Error('Tautan berkas tidak tersedia.'));
+  }
+  const nip = localStorage.getItem('transkep_active_nip') || '';
+  const token = localStorage.getItem('transkep_session_token') || '';
+  if (!nip || !token) {
+    return Promise.reject(new Error('Sesi tidak valid. Silakan login kembali.'));
+  }
+  return resolveDriveBlobResponse_(
+    invokeBackendRpc_('getDriveFileBlob', cleanUrl, nip, token),
+    'dokumen.pdf',
+    'Gagal memuat berkas dari Google Drive.'
+  );
+};
+
+function renderBlobTabOrDownload_(fetcherPromise, title) {
+  const safeTitle = String(title || 'Dokumen TRANSKEP').replace(/[<>"'&]/g, '');
+  const newTab = window.open('about:blank', '_blank');
+  if (newTab) {
+    newTab.document.write(
+      '<!DOCTYPE html><html><head><title>' + safeTitle + '</title></head>' +
+      '<body style="background:#020617;color:#cbd5e1;font-family:sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;margin:0;gap:12px;">' +
+      '<div style="font-size:15px;font-weight:700;">Memuat Dokumen Aman TRANSKEP...</div>' +
+      '<div style="font-size:12px;color:#64748b;">Mengunduh melalui Proxy Drive terautentikasi...</div>' +
+      '</body></html>'
+    );
+    newTab.document.close();
+  }
+
+  return fetcherPromise
+    .then((res) => {
+      if (newTab && !newTab.closed) {
+        newTab.location.replace(res.blobUrl);
+      } else {
+        const a = document.createElement('a');
+        a.href = res.blobUrl;
+        a.target = '_blank';
+        a.rel = 'noopener noreferrer';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      }
+      setTimeout(() => { try { URL.revokeObjectURL(res.blobUrl); } catch (e) {} }, 300000);
+      return res;
+    })
+    .catch((err) => {
+      const msg = (err && err.message) ? err.message : String(err);
+      if (newTab && !newTab.closed) {
+        newTab.document.body.innerHTML =
+          '<div style="text-align:center;max-width:440px;padding:24px;background:#0f172a;border:1px solid #334155;border-radius:14px;">' +
+          '<div style="color:#f87171;font-weight:700;font-size:15px;margin-bottom:8px;">Gagal Membuka Berkas</div>' +
+          '<div style="color:#94a3b8;font-size:13px;">' + msg.replace(/[<>"'&]/g, '') + '</div></div>';
+      }
+      if (typeof window.showNotify === 'function') {
+        window.showNotify('Gagal Membuka Berkas', msg, 'error');
+      }
+      throw err;
+    });
+}
+
+window.openSecureDriveFile = function (urlOrId, title) {
+  return renderBlobTabOrDownload_(window.fetchSecureDriveBlobUrl(urlOrId), title || 'Dokumen Drive');
+};
+
+window.openMagicDriveFile = function (magicToken, title) {
+  const cleanTok = String(magicToken || '').trim();
+  if (!cleanTok) {
+    const err = new Error('Token Magic Link tidak valid.');
+    if (typeof window.showNotify === 'function') {
+      window.showNotify('Gagal Membuka Berkas', err.message, 'error');
+    }
+    return Promise.reject(err);
+  }
+  const promise = resolveDriveBlobResponse_(
+    invokeBackendRpc_('getMagicFilePreview', cleanTok),
+    'lampiran_cuti.pdf',
+    'Gagal memuat lampiran cuti.'
+  );
+  return renderBlobTabOrDownload_(promise, title || 'Lampiran Cuti');
 };

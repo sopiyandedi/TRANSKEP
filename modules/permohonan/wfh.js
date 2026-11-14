@@ -272,6 +272,11 @@ document.addEventListener("DOMContentLoaded", () => {
                 this.isLaporanOpen = true;
                 setTimeout(() => { this.isLaporanScaled = true; }, 10);
             },
+            openSecureFile(url, title) {
+                if (typeof window.openSecureDriveFile === 'function') {
+                    window.openSecureDriveFile(url, title);
+                }
+            },
             hapusEvidenLama(index) {
                 this.formLaporan.evidenLama.splice(index, 1);
             },

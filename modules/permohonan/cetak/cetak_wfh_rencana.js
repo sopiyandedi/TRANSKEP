@@ -62,7 +62,11 @@
                     
                     if (res.status === 'success') {
                         showNotify("Berhasil", "Rencana PDF berhasil dibuat!", "success");
-                        window.open(res.url, '_blank');
+                        if (typeof window.openSecureDriveFile === 'function') {
+                            window.openSecureDriveFile(res.url, 'Rencana WFH');
+                        } else {
+                            window.open(res.url, '_blank');
+                        }
                     } else {
                         showNotify("Gagal Mencetak", res.message, "error");
                     }

@@ -120,6 +120,19 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       },
 
+      openMagicEvidence() {
+        if (!this.token) {
+          if (window.showNotify) window.showNotify("Gagal", "Token Magic Link tidak ditemukan.", "error");
+          return;
+        }
+        const docTitle = "Lampiran Cuti - " + ((this.cutiData && this.cutiData.nama) ? this.cutiData.nama : "Pegawai");
+        if (typeof window.openMagicDriveFile === 'function') {
+          window.openMagicDriveFile(this.token, docTitle);
+        } else if (window.showNotify) {
+          window.showNotify("Gagal", "Fungsi pratinjau aman tidak tersedia.", "error");
+        }
+      },
+
       closeModal() {
         this.isOpen = false;
         // Bersihkan parameter URL tanpa refresh halaman agar URL kembali bersih

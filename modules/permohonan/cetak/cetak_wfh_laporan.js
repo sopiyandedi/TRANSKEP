@@ -46,8 +46,11 @@
                     
                     if (res.status === 'success') {
                         showNotify("Berhasil", "Laporan PDF berhasil dibuat!", "success");
-                        // Membuka PDF asli dari Google Drive di tab baru
-                        window.open(res.url, '_blank');
+                        if (typeof window.openSecureDriveFile === 'function') {
+                            window.openSecureDriveFile(res.url, 'Laporan WFH');
+                        } else {
+                            window.open(res.url, '_blank');
+                        }
                     } else {
                         showNotify("Gagal Mencetak", res.message, "error");
                     }

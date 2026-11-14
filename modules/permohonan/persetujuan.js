@@ -217,6 +217,11 @@
                   }
                   return log.showAlasan;
               },
+              openSecureFile(url, title) {
+                  if (typeof window.openSecureDriveFile === 'function') {
+                      window.openSecureDriveFile(url, title);
+                  }
+              },
               getWfhBuktiUrls(log) {
                   if (!log || !log.bukti_url) return [];
                   try {

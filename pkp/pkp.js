@@ -404,7 +404,12 @@ function generatePdfPK(idPkp, userNip, clientToken) {
     while (existingFiles.hasNext()) existingFiles.next().setTrashed(true);
     
     const finalPdf = outputFolder.createFile(pdfBlob);
-    finalPdf.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    if (typeof setPrivateDriveSharing_ === 'function') setPrivateDriveSharing_(finalPdf);
+    if (typeof registerDriveFileAcl_ === 'function') {
+      const s = (typeof getActiveSession_ === 'function') ? getActiveSession_() : null;
+      const aNip = (typeof atasan !== 'undefined' && atasan) ? atasan.nip : '';
+      registerDriveFileAcl_(finalPdf.getId(), [s ? s.nip : '', pegawai ? pegawai.nip : '', penilai ? penilai.nip : '', aNip]);
+    }
 
     // Bersihkan file Google Doc sementara
     if (tempFile) { tempFile.setTrashed(true); tempFile = null; }
@@ -694,7 +699,12 @@ function generatePdfPCK(idPck, userNip, clientToken) {
     while (existingFiles.hasNext()) existingFiles.next().setTrashed(true);
     
     const finalPdf = outputFolder.createFile(pdfBlob);
-    finalPdf.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    if (typeof setPrivateDriveSharing_ === 'function') setPrivateDriveSharing_(finalPdf);
+    if (typeof registerDriveFileAcl_ === 'function') {
+      const s = (typeof getActiveSession_ === 'function') ? getActiveSession_() : null;
+      const aNip = (typeof atasan !== 'undefined' && atasan) ? atasan.nip : '';
+      registerDriveFileAcl_(finalPdf.getId(), [s ? s.nip : '', pegawai ? pegawai.nip : '', penilai ? penilai.nip : '', aNip]);
+    }
 
     if (tempFile) { tempFile.setTrashed(true); tempFile = null; }
 

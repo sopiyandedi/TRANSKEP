@@ -74,21 +74,37 @@
       var isHttpScheme = /^https:\/\//i.test(rawUrlStr);
       var hasAnyScheme = /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(rawUrlStr);
       var idMatch = (!hasAnyScheme || isHttpScheme) ? rawUrlStr.match(/[-\w]{25,}/) : null;
-      var safeDirectUrl = isHttpScheme
-        ? rawUrlStr
-        : (idMatch && idMatch[0] ? ("https://drive.google.com/file/d/" + idMatch[0] + "/view") : "#");
+      var isDriveTarget = Boolean(idMatch && idMatch[0] && (!hasAnyScheme || /drive\.google\.com|docs\.google\.com/i.test(rawUrlStr)));
+
+      window._flipbookLoadSeq = (window._flipbookLoadSeq || 0) + 1;
+      var currentLoadSeq = window._flipbookLoadSeq;
+      if (window._activeFlipbookBlobUrl) {
+        try { URL.revokeObjectURL(window._activeFlipbookBlobUrl); } catch (eRev) {}
+        window._activeFlipbookBlobUrl = null;
+      }
 
       var titleEl = document.getElementById('fbModalTitle');
       if (titleEl) titleEl.innerText = judulDokumen || "Dokumen PDF";
 
       var btnDl = document.getElementById('fbBtnDownloadDirect');
-      if (btnDl) btnDl.href = safeDirectUrl;
+      if (btnDl) {
+        btnDl.href = isDriveTarget ? '#' : (isHttpScheme ? rawUrlStr : '#');
+        if (typeof btnDl.removeAttribute === 'function') btnDl.removeAttribute('download');
+        btnDl.onclick = isDriveTarget ? function(e) {
+          if (e) e.preventDefault();
+          if (typeof window.openSecureDriveFile === 'function') {
+            window.openSecureDriveFile(rawUrlStr, judulDokumen || "Dokumen PDF");
+          }
+          return false;
+        } : null;
+      }
 
       if (loader) {
         loader.classList.remove('hidden');
         loader.classList.remove('opacity-0');
       }
       iframe.classList.add('opacity-0');
+      if (typeof iframe.removeAttribute === 'function') iframe.removeAttribute('srcdoc');
 
       var noSkEl = document.getElementById('fbNoSk');
       var tglSkEl = document.getElementById('fbTglSk');
@@ -201,52 +217,96 @@
         }
       }
 
-      if (idMatch && idMatch[0]) {
-        var fileId = idMatch[0];
-        iframe.src = "https://drive.google.com/file/d/" + fileId + "/preview";
-      } else if (isHttpScheme) {
-        iframe.src = rawUrlStr;
-      } else {
-        iframe.src = "about:blank";
-      }
+      var bindIframeOnload_ = function() {
+        iframe.onload = function() {
+          window.hidePdfLoader();
 
-      iframe.onload = function() {
-        window.hidePdfLoader();
-        
-        // --- TRANSKEP: AUTO-ACKNOWLEDGE TIMER (6 DETIK - SILENT) ---
-        if (window.autoAckTimer) clearTimeout(window.autoAckTimer);
-        
-        window.autoAckTimer = setTimeout(function() {
-            var currentUser = (window.vueState && window.vueState.user) ? window.vueState.user : ((typeof state !== 'undefined' && state.user) ? state.user : null);
-            if (!currentUser) return;
-            var currNip = currentUser.nip;
+          // --- TRANSKEP: AUTO-ACKNOWLEDGE TIMER (6 DETIK - SILENT) ---
+          if (window.autoAckTimer) clearTimeout(window.autoAckTimer);
 
-            // Jika dokumen yang dibuka adalah SK
-            if (targetSk && window.vmSkApp) {
-                if (!window.vmSkApp.isSkAcknowledged(targetSk.id, currNip)) {
-                    var isMember = (typeof cekKeterlibatanPegawai === 'function') 
-                        ? cekKeterlibatanPegawai(targetSk.members, currNip).terlibat 
-                        : targetSk.members.some(function(m) { return String(m.nip) === String(currNip); });
-                    
-                    if (isMember) window.vmSkApp.doAcknowledgeSk(targetSk.id, currNip, true); // true = eksekusi diam-diam tanpa notif
-                }
-            } 
-            // Jika dokumen yang dibuka adalah SOP
-            else if (targetSop && window.vmSopApp) {
-                if (!window.vmSopApp.isSopAcknowledged(targetSop.id, currNip)) {
-                    var pelaksanaArr = [];
-                    try { pelaksanaArr = JSON.parse(targetSop.pelaksana_json || '[]'); } catch(e) {}
-                    
-                    var isSopMember = (typeof cekKeterlibatanPegawai === 'function')
-                        ? cekKeterlibatanPegawai(pelaksanaArr, currNip).terlibat
-                        : pelaksanaArr.some(function(m) { return String(m.nip) === String(currNip); });
-                    
-                    if (isSopMember) window.vmSopApp.doAcknowledgeSop(targetSop.id, currNip, true); // true = silent tanpa notif
-                }
-            }
-        }, 6000); // 6000 ms = 6 detik membaca otomatis tertandai hening
-        // --------------------------------------------------
+          window.autoAckTimer = setTimeout(function() {
+              var currentUser = (window.vueState && window.vueState.user) ? window.vueState.user : ((typeof state !== 'undefined' && state.user) ? state.user : null);
+              if (!currentUser) return;
+              var currNip = currentUser.nip;
+
+              // Jika dokumen yang dibuka adalah SK
+              if (targetSk && window.vmSkApp) {
+                  if (!window.vmSkApp.isSkAcknowledged(targetSk.id, currNip)) {
+                      var isMember = (typeof cekKeterlibatanPegawai === 'function')
+                          ? cekKeterlibatanPegawai(targetSk.members, currNip).terlibat
+                          : targetSk.members.some(function(m) { return String(m.nip) === String(currNip); });
+
+                      if (isMember) window.vmSkApp.doAcknowledgeSk(targetSk.id, currNip, true); // true = eksekusi diam-diam tanpa notif
+                  }
+              }
+              // Jika dokumen yang dibuka adalah SOP
+              else if (targetSop && window.vmSopApp) {
+                  if (!window.vmSopApp.isSopAcknowledged(targetSop.id, currNip)) {
+                      var pelaksanaArr = [];
+                      try { pelaksanaArr = JSON.parse(targetSop.pelaksana_json || '[]'); } catch(e) {}
+
+                      var isSopMember = (typeof cekKeterlibatanPegawai === 'function')
+                          ? cekKeterlibatanPegawai(pelaksanaArr, currNip).terlibat
+                          : pelaksanaArr.some(function(m) { return String(m.nip) === String(currNip); });
+
+                      if (isSopMember) window.vmSopApp.doAcknowledgeSop(targetSop.id, currNip, true); // true = silent tanpa notif
+                  }
+              }
+          }, 6000); // 6000 ms = 6 detik membaca otomatis tertandai hening
+          // --------------------------------------------------
+        };
       };
+
+      if (isDriveTarget && typeof window.fetchSecureDriveBlobUrl === 'function') {
+        iframe.onload = null;
+        iframe.src = "about:blank";
+        window.fetchSecureDriveBlobUrl(rawUrlStr)
+          .then(function(res) {
+            if (currentLoadSeq !== window._flipbookLoadSeq) {
+              try { URL.revokeObjectURL(res.blobUrl); } catch (eRev) {}
+              return;
+            }
+            window._activeFlipbookBlobUrl = res.blobUrl;
+            var dlEl = document.getElementById('fbBtnDownloadDirect');
+            if (dlEl) {
+              dlEl.href = res.blobUrl;
+              dlEl.download = res.fileName || 'dokumen.pdf';
+              dlEl.onclick = null;
+            }
+            if (typeof iframe.removeAttribute === 'function') iframe.removeAttribute('srcdoc');
+            bindIframeOnload_();
+            iframe.src = res.blobUrl;
+          })
+          .catch(function(err) {
+            if (currentLoadSeq !== window._flipbookLoadSeq) return;
+            var errMsg = (err && err.message) ? err.message : String(err || 'Gagal memuat dokumen dari Drive Proxy.');
+            var safeErrMsg = errMsg.replace(/[<>"'&]/g, '');
+            iframe.onload = null;
+            iframe.srcdoc =
+              '<!DOCTYPE html><html><body style="margin:0;height:100vh;display:flex;align-items:center;justify-content:center;background:#020617;color:#cbd5e1;font-family:sans-serif;padding:24px;">' +
+              '<div style="max-width:440px;text-align:center;background:#0f172a;border:1px solid #334155;border-radius:16px;padding:24px;">' +
+              '<div style="color:#f87171;font-weight:700;font-size:15px;margin-bottom:8px;">Gagal Memuat Pratinjau Aman</div>' +
+              '<div style="color:#94a3b8;font-size:13px;line-height:1.5;">' + safeErrMsg + '</div></div></body></html>';
+            if (loader) {
+              loader.classList.add('opacity-0');
+              loader.classList.add('hidden');
+            }
+            iframe.classList.remove('opacity-0');
+            if (typeof window.showNotify === 'function') {
+              window.showNotify('Gagal Memuat Dokumen', errMsg, 'error');
+            }
+          });
+      } else {
+        bindIframeOnload_();
+        if (idMatch && idMatch[0]) {
+          var fileId = idMatch[0];
+          iframe.src = "https://drive.google.com/file/d/" + fileId + "/preview";
+        } else if (isHttpScheme) {
+          iframe.src = rawUrlStr;
+        } else {
+          iframe.src = "about:blank";
+        }
+      }
 
       modal.classList.remove('hidden');
       setTimeout(function() {
@@ -262,6 +322,7 @@
 
   window.closeFlipbookModal = function() {
     try {
+      window._flipbookLoadSeq = (window._flipbookLoadSeq || 0) + 1;
       // --- TRANSKEP: BERSIHKAN TIMER JIKA MODAL DITUTUP SEBELUM 10 DETIK ---
       if (window.autoAckTimer) {
           clearTimeout(window.autoAckTimer);
@@ -279,7 +340,21 @@
       setTimeout(function() {
         modal.classList.add('hidden');
         var iframe = document.getElementById('pdfIframe');
-        if (iframe) iframe.src = '';
+        if (iframe) {
+          iframe.onload = null;
+          iframe.src = '';
+          if (typeof iframe.removeAttribute === 'function') iframe.removeAttribute('srcdoc');
+        }
+        var btnDl = document.getElementById('fbBtnDownloadDirect');
+        if (btnDl) {
+          btnDl.href = '#';
+          if (typeof btnDl.removeAttribute === 'function') btnDl.removeAttribute('download');
+          btnDl.onclick = null;
+        }
+        if (window._activeFlipbookBlobUrl) {
+          try { URL.revokeObjectURL(window._activeFlipbookBlobUrl); } catch (eRev) {}
+          window._activeFlipbookBlobUrl = null;
+        }
       }, 250);
     } catch (e) {
       console.error("closeFlipbookModal error:", e);

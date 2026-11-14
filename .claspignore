@@ -5,7 +5,14 @@
 # ikut terunggah ke Google Apps Script saat 'clasp push'
 
 .git/**
+.gitignore
+firestore.rules
 *.md
+*.example.json
+n8n_workflow_*.json
+*service-account*.json
+*firebase-adminsdk*.json
+.env*
 CNAME
 .nojekyll
 core/**

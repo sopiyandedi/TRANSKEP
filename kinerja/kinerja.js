@@ -48,12 +48,14 @@ function addKinerjaLog(payload, clientToken) {
     // 1. Upload File Penilaian
     const blobPenilaian = Utilities.newBlob(vPen.bytes, vPen.blobMimeType, `Penilaian_${safeFileBase}.${vPen.ext}`);
     const filePen = folder.createFile(blobPenilaian);
-    filePen.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    if (typeof setPrivateDriveSharing_ === 'function') setPrivateDriveSharing_(filePen);
+    if (typeof registerDriveFileAcl_ === 'function') registerDriveFileAcl_(filePen.getId(), [payload.nip, payload.pejabat_nip]);
     
     // 2. Upload File Evaluasi
     const blobEvaluasi = Utilities.newBlob(vEva.bytes, vEva.blobMimeType, `Evaluasi_${safeFileBase}.${vEva.ext}`);
     const fileEva = folder.createFile(blobEvaluasi);
-    fileEva.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    if (typeof setPrivateDriveSharing_ === 'function') setPrivateDriveSharing_(fileEva);
+    if (typeof registerDriveFileAcl_ === 'function') registerDriveFileAcl_(fileEva.getId(), [payload.nip, payload.pejabat_nip]);
 
     const newId = "SKP-" + new Date().getTime();
     const tglInput = new Date().toLocaleDateString('id-ID');
@@ -166,7 +168,8 @@ function approveKinerja(id, userNip, clientToken) {
     let folder = folders.hasNext() ? folders.next() : DriveApp.createFolder(folderName);
     
     const fileTte = folder.createFile(pdfBlob);
-    fileTte.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    if (typeof setPrivateDriveSharing_ === 'function') setPrivateDriveSharing_(fileTte);
+    if (typeof registerDriveFileAcl_ === 'function') registerDriveFileAcl_(fileTte.getId(), [record[1], record[2]]);
 
     // =========================================================================
     // TRANSKEP OPTIMIZATION 2: BATCH UPDATE

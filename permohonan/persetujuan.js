@@ -356,6 +356,60 @@ function getCutiByToken(token) {
   }
 }
 
+function getMagicFilePreview(magicToken) {
+  try {
+    const cleanToken = String(magicToken || '').trim();
+    if (!cleanToken) {
+      return { status: 'error', message: 'Token persetujuan tidak valid.' };
+    }
+
+    const rlKey = 'magic_file_' + cleanToken.slice(0, 16);
+    if (typeof checkRateLimitBlocked_ === 'function' && (checkRateLimitBlocked_(rlKey, 15) || checkRateLimitBlocked_('magic_global', 120))) {
+      return { status: 'error', message: 'Terlalu banyak percobaan pratinjau lampiran. Silakan coba lagi nanti.' };
+    }
+
+    const ss = getDB();
+    ensureAnnualCutiRollover_(ss);
+    const sheetCuti = ss.getSheetByName('cuti_log');
+    if (!sheetCuti) throw new Error("Basis data cuti belum siap.");
+
+    const cutiData = readCutiSheetDecrypted_(sheetCuti);
+    let targetRow = null;
+    for (let i = 1; i < cutiData.length; i++) {
+      if (matchMagicTokenSafely_(cutiData[i][18], cleanToken)) {
+        targetRow = cutiData[i];
+        break;
+      }
+    }
+
+    if (!targetRow) {
+      if (typeof recordRateLimitHit_ === 'function') {
+        recordRateLimitHit_(rlKey, 15, 600, 600);
+        recordRateLimitHit_('magic_global', 120, 600, 300);
+      }
+      return { status: 'error', message: 'Tautan persetujuan tidak ditemukan atau sudah kedaluwarsa.' };
+    }
+
+    if (typeof clearRateLimit_ === 'function') clearRateLimit_(rlKey);
+
+    if (isMagicCutiTokenExpired_(cleanToken, targetRow)) {
+      return { status: 'error', message: 'Masa berlaku tautan persetujuan ini telah habis.' };
+    }
+
+    const fileId = typeof extractDriveFileId_ === 'function' ? extractDriveFileId_(targetRow[17] || '') : '';
+    if (!fileId) {
+      return { status: 'error', message: 'Permohonan ini tidak memiliki berkas lampiran Drive yang valid.' };
+    }
+
+    const file = DriveApp.getFileById(fileId);
+    return (typeof fetchDriveFileAsBase64_ === 'function')
+      ? fetchDriveFileAsBase64_(file)
+      : { status: 'error', message: 'Helper proxy Drive belum tersedia.' };
+  } catch (err) {
+    return { status: 'error', message: err.toString() };
+  }
+}
+
 function processMagicLinkApproval(token, decision, notes) {
   try {
     const cleanToken = String(token || '').trim();

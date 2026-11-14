@@ -162,14 +162,32 @@
   // ==========================================
   // MODAL SUKSES HASIL 3 DOKUMEN RAPAT
   // ==========================================
+  function bindRapatSecureDocLink_(elId, url, title) {
+    var el = document.getElementById(elId);
+    if (!el) return;
+    el.href = '#';
+    if (typeof el.removeAttribute === 'function') el.removeAttribute('target');
+    el.onclick = function(e) {
+      if (e) e.preventDefault();
+      if (!url || url === '#') {
+        if (typeof showNotify === 'function') showNotify('Dokumen Belum Tersedia', title + ' tidak ditemukan.', 'warning');
+        return false;
+      }
+      if (typeof window.openSecureDriveFile === 'function') {
+        window.openSecureDriveFile(url, title);
+      }
+      return false;
+    };
+  }
+
   function showRapatSuccessResultModal(agenda, docUndangan, docAbsen, docNotulen) {
     var modal = document.getElementById('modalRapatSuccessResult');
     if (!modal) return;
 
     document.getElementById('rapatSuccessAgendaTitle').innerText = agenda || 'Agenda Rapat Dinas';
-    document.getElementById('rapatLinkDocUndangan').href = docUndangan || '#';
-    document.getElementById('rapatLinkDocAbsen').href = docAbsen || '#';
-    document.getElementById('rapatLinkDocNotulen').href = docNotulen || '#';
+    bindRapatSecureDocLink_('rapatLinkDocUndangan', docUndangan, 'Undangan Rapat');
+    bindRapatSecureDocLink_('rapatLinkDocAbsen', docAbsen, 'Daftar Hadir Rapat');
+    bindRapatSecureDocLink_('rapatLinkDocNotulen', docNotulen, 'Notulen Rapat');
 
     modal.classList.remove('hidden');
     setTimeout(function() {

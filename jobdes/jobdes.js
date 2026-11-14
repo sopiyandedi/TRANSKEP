@@ -6,7 +6,7 @@
 function otorisasiSistem_() {
   const folderTemp = DriveApp.createFolder("TEST_TRANSKEP_TEMP");
   const fileTemp = folderTemp.createFile("test.txt", "TRANSKEP Test");
-  fileTemp.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  if (typeof setPrivateDriveSharing_ === 'function') setPrivateDriveSharing_(fileTemp);
   
   fileTemp.setTrashed(true);
   folderTemp.setTrashed(true);
@@ -102,7 +102,11 @@ function createPdfJobdes(htmlContent, fileName, userNip, clientToken) {
     let folder = folders.hasNext() ? folders.next() : DriveApp.createFolder(folderName);
     
     const file = folder.createFile(pdfBlob);
-    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    if (typeof setPrivateDriveSharing_ === 'function') setPrivateDriveSharing_(file);
+    if (typeof registerDriveFileAcl_ === 'function') {
+      const s = (typeof getActiveSession_ === 'function') ? getActiveSession_() : null;
+      registerDriveFileAcl_(file.getId(), [s ? s.nip : '']);
+    }
     
     return { status: 'success', url: file.getUrl() };
   } catch (e) {

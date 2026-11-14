@@ -1557,7 +1557,8 @@ function verifyLogin(nip, pass) {
               cache.put("force_reset_" + cleanUserNip, "1", SESSION_CACHE_TTL_SEC_);
             } catch(e) {}
           }
-          return { status: 'success', data: user, token: sess.token, must_change_password: isTempPass };
+          const fbToken = (typeof mintFirebaseCustomToken_ === 'function') ? mintFirebaseCustomToken_(user.nip, user.role) : null;
+          return { status: 'success', data: user, token: sess.token, must_change_password: isTempPass, firebase_custom_token: fbToken };
         }
       }
     }
@@ -1620,6 +1621,12 @@ function invalidateServerCache_() {
   try {
     const cache = CacheService.getScriptCache();
     cache.remove('TRANSKEP_BG_DATA_COUNT');
+    const props = PropertiesService.getScriptProperties();
+    const curVer = props.getProperty('TRANSKEP_DATA_VERSION');
+    if (curVer) {
+      cache.remove('TRANSKEP_BG_RAW_' + curVer + '_COUNT');
+      cache.remove('TRANSKEP_BG_DATA_' + curVer + '_COUNT');
+    }
   } catch(e) {}
 }
 
@@ -1682,9 +1689,11 @@ function normalizeDateDB(dateStr) {
 function getBulkData(nip, clientToken, clientVersion) {
   try {
     // === VALIDASI KEAMANAN TERPUSAT ===
-    if (!cekOtorisasi(nip, clientToken)) {
+    const sess = resolveCallerSession_(nip, clientToken);
+    if (!sess) {
         return { status: 'error', message: 'Akses Ditolak: Sesi kedaluwarsa atau manipulasi terdeteksi. Silakan login ulang.' };
     }
+    const cleanReqNip = normalizeNipKey_(sess.nip || nip);
 
     // Memanggil koneksi database terpusat, auto-rollover tahun baru, & self-healing enkripsi sebelum short-circuit versi
     const ss = getDB();
@@ -1701,7 +1710,6 @@ function getBulkData(nip, clientToken, clientVersion) {
     }
 
     let cachedTempFlag = null;
-    const cleanReqNip = normalizeNipKey_(nip);
     try {
       cachedTempFlag = CacheService.getScriptCache().get("force_reset_" + cleanReqNip) ||
         CacheService.getScriptCache().get("force_reset_" + nip);
@@ -1716,15 +1724,6 @@ function getBulkData(nip, clientToken, clientVersion) {
     };
 
     if(sheetUser && uData.length > 0) {
-
-       let isRequesterAdmin = false;
-       for (let i = 1; i < uData.length; i++) {
-          const rLower = String(uData[i][3] || '').toLowerCase().trim();
-          if (normalizeNipKey_(uData[i][0]) === cleanReqNip && (rLower === 'admin' || rLower === 'operator')) {
-             isRequesterAdmin = true;
-             break;
-          }
-       }
 
        const uHeaders = uData[0].map(h => String(h || '').trim().toLowerCase().replace(/[^a-z0-9]/g, ''));
        const findColIdx = (name, fallback) => {
@@ -1752,22 +1751,33 @@ function getBulkData(nip, clientToken, clientVersion) {
        const colTglPensiun = findColIdx('Tgl_Selesai_Pensiun', 24);
        const colJenisJab = findColIdx('Jenis_Jabatan', 25);
 
+       let isRequesterAdmin = isAdminRole_(sess && sess.role);
+       if (!isRequesterAdmin) {
+         for (let i = 1; i < uData.length; i++) {
+            if (normalizeNipKey_(uData[i][colNip]) === cleanReqNip && isAdminRole_(uData[i][colRole])) {
+               isRequesterAdmin = true;
+               break;
+            }
+         }
+       }
+
        for(let i=1; i<uData.length; i++) {
           const isCurrentUser = (normalizeNipKey_(uData[i][colNip]) === cleanReqNip);
+          const includePrivate = (isRequesterAdmin || isCurrentUser);
           const hasStoredPass = Boolean(String(uData[i][colPass] || '').trim());
-          const userPassword = ((isRequesterAdmin || isCurrentUser) && hasStoredPass) ? '[Telah Dienkripsi]' : '';
+          const userPassword = (includePrivate && hasStoredPass) ? '[Telah Dienkripsi]' : '';
 
           const u = {
             nip: uData[i][colNip], nama: uData[i][colNama], jabatan: uData[i][colJab], role: uData[i][colRole],
-            no_hp: uData[i][colHp], pass: userPassword,
-            s_tahunan_2024: uData[i][6], s_tahunan_2025: uData[i][7], s_tahunan_2026: uData[i][8],
-            s_sakit: uData[i][9], s_penting: uData[i][10], s_besar: uData[i][11], s_melahirkan: uData[i][12], s_cltn: uData[i][13],
-            pangkat: uData[i][colPangkat], alamat: uData[i][colAlamat], 
-            tmt_kgb: normalizeDateDB(uData[i][colTmtKgb]),
-            tmt_knp: normalizeDateDB(uData[i][colTmtKnp]),
-            bup: uData[i][colBup], status_kgb: uData[i][colStatusKgb] || '', tgl_selesai_kgb: uData[i][colTglKgb] || '',
-            status_knp: uData[i][colStatusKnp] || '', tgl_selesai_knp: uData[i][colTglKnp] || '',
-            status_pensiun: uData[i][colStatusPensiun] || '', tgl_selesai_pensiun: uData[i][colTglPensiun] || '',
+            no_hp: includePrivate ? uData[i][colHp] : '', pass: userPassword,
+            s_tahunan_2024: includePrivate ? uData[i][6] : '', s_tahunan_2025: includePrivate ? uData[i][7] : '', s_tahunan_2026: includePrivate ? uData[i][8] : '',
+            s_sakit: includePrivate ? uData[i][9] : '', s_penting: includePrivate ? uData[i][10] : '', s_besar: includePrivate ? uData[i][11] : '', s_melahirkan: includePrivate ? uData[i][12] : '', s_cltn: includePrivate ? uData[i][13] : '',
+            pangkat: uData[i][colPangkat], alamat: includePrivate ? uData[i][colAlamat] : '', 
+            tmt_kgb: includePrivate ? normalizeDateDB(uData[i][colTmtKgb]) : '',
+            tmt_knp: includePrivate ? normalizeDateDB(uData[i][colTmtKnp]) : '',
+            bup: includePrivate ? uData[i][colBup] : '', status_kgb: includePrivate ? (uData[i][colStatusKgb] || '') : '', tgl_selesai_kgb: includePrivate ? (uData[i][colTglKgb] || '') : '',
+            status_knp: includePrivate ? (uData[i][colStatusKnp] || '') : '', tgl_selesai_knp: includePrivate ? (uData[i][colTglKnp] || '') : '',
+            status_pensiun: includePrivate ? (uData[i][colStatusPensiun] || '') : '', tgl_selesai_pensiun: includePrivate ? (uData[i][colTglPensiun] || '') : '',
             jenis_jabatan: uData[i][colJenisJab] || 'Fungsional Umum',
             cuti_years: cutiYears
           };
@@ -1821,9 +1831,12 @@ function getBulkData(nip, clientToken, clientVersion) {
 function getBackgroundData(nip, clientToken, clientVersion) {
   try {
     // === VALIDASI KEAMANAN TERPUSAT ===
-    if (!cekOtorisasi(nip, clientToken)) {
+    const sess = resolveCallerSession_(nip, clientToken);
+    if (!sess) {
         return { status: 'error', message: 'Sesi kedaluwarsa atau tidak valid.' };
     }
+    const cleanReqNip = normalizeNipKey_(sess.nip);
+    const isRequesterAdmin = isAdminRole_(sess.role);
     
     // Memanggil koneksi database terpusat & menghitung sidik jari baris real-time
     const ss = getDB();
@@ -1834,10 +1847,10 @@ function getBackgroundData(nip, clientToken, clientVersion) {
       return { status: 'NOT_MODIFIED', version: serverVersion };
     }
 
-    // Cek Server-Side Cache (CacheService Chunked)
-    const cachedBg = getCacheChunked_('TRANSKEP_BG_DATA_' + serverVersion);
-    if (cachedBg) {
-      return { status: 'UPDATED', version: serverVersion, data: cachedBg };
+    // Cek Server-Side Raw Cache (CacheService Chunked), lalu proyeksikan sesuai peran & NIP pemanggil
+    let rawData = getCacheChunked_('TRANSKEP_BG_RAW_' + serverVersion);
+    if (rawData) {
+      return { status: 'UPDATED', version: serverVersion, data: scopeBackgroundDataForCaller_(rawData, cleanReqNip, isRequesterAdmin) };
     }
 
     const data = { cutiLogs: [], jobdesList: [], skList: [], skAckList: [], masterKinerjaList: [], ikLogs: [], ipLogs: [], wfhLogs: [], kinerjaList: [], stList: [], sopList: [], sopAckList: [] };
@@ -1917,7 +1930,7 @@ function getBackgroundData(nip, clientToken, clientVersion) {
     if(sheetIP) {
        const ipData = sheetIP.getDataRange().getDisplayValues();
        for(let i=1; i<ipData.length; i++) {
-          data.ipLogs.push({ id: ipData[i][0], tgl_pengajuan: ipData[i][1], nip: String(ipData[i][2] || '').trim().replace(/'/g, ''), tgl_mulai: ipData[i][3], tgl_selesai: ipData[i][4], alasan: ipData[i][5], atasan_nip: String(ipData[i][7] || '').trim().replace(/'/g, ''), status: ipData[i][7], catatan: ipData[i][8] });
+          data.ipLogs.push({ id: ipData[i][0], tgl_pengajuan: ipData[i][1], nip: String(ipData[i][2] || '').trim().replace(/'/g, ''), tgl_mulai: ipData[i][3], tgl_selesai: ipData[i][4], alasan: ipData[i][5], atasan_nip: String(ipData[i][6] || '').trim().replace(/'/g, ''), status: ipData[i][7], catatan: ipData[i][8], pejabat_nip: String(ipData[i][9] || '').trim().replace(/'/g, '') });
        }
     }
 
@@ -1949,10 +1962,10 @@ function getBackgroundData(nip, clientToken, clientVersion) {
        }
     }
 
-    // Simpan ke CacheService secara chunked
-    setCacheChunked_('TRANSKEP_BG_DATA_' + serverVersion, data, 21600);
+    // Simpan snapshot mentah server ke CacheService (hanya di server, tidak dikirim mentah ke non-Admin)
+    setCacheChunked_('TRANSKEP_BG_RAW_' + serverVersion, data, 21600);
 
-    return { status: 'UPDATED', version: serverVersion, data: data };
+    return { status: 'UPDATED', version: serverVersion, data: scopeBackgroundDataForCaller_(data, cleanReqNip, isRequesterAdmin) };
   } catch (e) { return { status: 'error', message: e.toString() }; }
 }
 
@@ -2322,4 +2335,437 @@ function handleWebhookST_(payload) {
     message: "Surat Tugas " + idST + " berhasil diterbitkan via WhatsApp.",
     id_st: idST
   });
+}
+
+// =========================================================================
+// FASE 3B: PRIVATE DRIVE SHARING, AUTH DRIVE PROXY, FIREBASE CUSTOM TOKEN,
+// PENCEGAHAN IDOR/PII LEAK & VALIDATOR KONFIGURASI INFRASTRUKTUR
+// =========================================================================
+
+function setPrivateDriveSharing_(file) {
+  if (!file) return;
+  try {
+    file.setSharing(DriveApp.Access.PRIVATE, DriveApp.Permission.NONE);
+  } catch (e) {}
+}
+
+function registerDriveFileAcl_(fileId, allowedNips) {
+  if (!fileId) return;
+  try {
+    const rawList = Array.isArray(allowedNips) ? allowedNips : [allowedNips];
+    const cleanList = [];
+    for (let i = 0; i < rawList.length; i++) {
+      const n = normalizeNipKey_(rawList[i]);
+      if (n && cleanList.indexOf(n) === -1) cleanList.push(n);
+    }
+    if (cleanList.length === 0) return;
+    CacheService.getScriptCache().put('drive_acl_' + String(fileId).trim(), JSON.stringify(cleanList), SESSION_CACHE_TTL_SEC_);
+  } catch (e) {}
+}
+
+function extractDriveFileId_(urlOrId) {
+  const raw = String(urlOrId || '').trim();
+  if (!raw || raw === '-' || raw === '#') return '';
+  if (/^[a-zA-Z0-9_-]{25,60}$/.test(raw)) return raw;
+  const mPath = raw.match(/\/(?:file\/d|document\/d|spreadsheets\/d|presentation\/d|d)\/([a-zA-Z0-9_-]{20,})/);
+  if (mPath && mPath[1]) return mPath[1];
+  const mQuery = raw.match(/[?&]id=([a-zA-Z0-9_-]{20,})/);
+  if (mQuery && mQuery[1]) return mQuery[1];
+  return '';
+}
+
+function base64UrlEncodeObj_(obj) {
+  return Utilities.base64EncodeWebSafe(JSON.stringify(obj)).replace(/=+$/, '');
+}
+
+function parseFirebaseServiceAccount_() {
+  try {
+    const raw = PropertiesService.getScriptProperties().getProperty('FIREBASE_SERVICE_ACCOUNT_JSON');
+    if (!raw || !String(raw).trim()) return null;
+    const sa = JSON.parse(String(raw).trim());
+    if (!sa || !sa.client_email || !sa.private_key) return null;
+    const pem = String(sa.private_key).replace(/\\n/g, '\n').trim();
+    if (pem.indexOf('BEGIN') === -1 || pem.indexOf('PRIVATE KEY') === -1) return null;
+    return { client_email: String(sa.client_email).trim(), private_key: pem, project_id: String(sa.project_id || '').trim() };
+  } catch (e) {
+    return null;
+  }
+}
+
+function mintFirebaseCustomToken_(nip, role) {
+  const cleanNip = normalizeNipKey_(nip);
+  if (!cleanNip) return null;
+  const sa = parseFirebaseServiceAccount_();
+  if (!sa) return null;
+  try {
+    const nowSec = Math.floor(Date.now() / 1000);
+    const headerB64 = base64UrlEncodeObj_({ alg: 'RS256', typ: 'JWT' });
+    const claimsObj = {
+      iss: sa.client_email,
+      sub: sa.client_email,
+      aud: 'https://identitytoolkit.googleapis.com/google.identity.identitytoolkit.v1.IdentityToolkit',
+      iat: nowSec,
+      exp: nowSec + 3600,
+      uid: cleanNip,
+      claims: {
+        nip: cleanNip,
+        role: String(role || 'Pegawai').trim() || 'Pegawai'
+      }
+    };
+    const payloadB64 = base64UrlEncodeObj_(claimsObj);
+    const signingInput = headerB64 + '.' + payloadB64;
+    const sigBytes = Utilities.computeRsaSha256Signature(signingInput, sa.private_key);
+    const sigB64 = Utilities.base64EncodeWebSafe(sigBytes).replace(/=+$/, '');
+    return signingInput + '.' + sigB64;
+  } catch (e) {
+    return null;
+  }
+}
+
+function getFirebaseCustomToken(nip, clientToken) {
+  try {
+    const sess = resolveCallerSession_(nip, clientToken);
+    if (!sess) return { status: 'error', message: 'Sesi kedaluwarsa atau tidak valid.' };
+    const customToken = mintFirebaseCustomToken_(sess.nip, sess.role);
+    return {
+      status: 'success',
+      customToken: customToken,
+      configured: Boolean(customToken)
+    };
+  } catch (e) {
+    return { status: 'error', message: e.toString() };
+  }
+}
+
+function checkInfraSecrets(adminNip, clientToken) {
+  try {
+    const sess = resolveCallerSession_(adminNip, clientToken);
+    if (!sess || !isAdminRole_(sess.role)) {
+      return { status: 'error', message: 'Akses Ditolak: Hanya Admin/Operator yang dapat memeriksa kesiapan secret.' };
+    }
+    const props = PropertiesService.getScriptProperties();
+    const hasProp = (k) => Boolean(String(props.getProperty(k) || '').trim());
+    const sa = parseFirebaseServiceAccount_();
+
+    const flags = {
+      TRANSKEP_DB_ID: hasProp('TRANSKEP_DB_ID'),
+      TRANSKEP_SESSION_SECRET: hasProp('TRANSKEP_SESSION_SECRET'),
+      TRANSKEP_ENC_SECRET: hasProp('TRANSKEP_ENC_SECRET'),
+      WAHA_API_KEY: hasProp('WAHA_API_KEY'),
+      N8N_WEBHOOK_URL: hasProp('N8N_WEBHOOK_URL') || hasProp('WAHA_BASE_URL'),
+      N8N_WEBHOOK_SURAT_KELUAR: hasProp('N8N_WEBHOOK_SURAT_KELUAR'),
+      TRANSKEP_WEBHOOK_KEY: hasProp('TRANSKEP_WEBHOOK_KEY'),
+      FIREBASE_SERVICE_ACCOUNT_JSON: Boolean(sa)
+    };
+
+    const keys = Object.keys(flags);
+    let configuredCount = 0;
+    for (let i = 0; i < keys.length; i++) {
+      if (flags[keys[i]]) configuredCount++;
+    }
+    return {
+      status: 'success',
+      data: {
+        flags: flags,
+        configuredCount: configuredCount,
+        totalCount: keys.length,
+        readyForStrictCutover: configuredCount === keys.length
+      }
+    };
+  } catch (e) {
+    return { status: 'error', message: e.toString() };
+  }
+}
+
+function scopeBackgroundDataForCaller_(rawData, cleanReqNip, isAdmin) {
+  if (!rawData) return rawData;
+  if (isAdmin) return rawData;
+
+  const isRelated = (row, fields) => {
+    for (let i = 0; i < fields.length; i++) {
+      if (normalizeNipKey_(row[fields[i]]) === cleanReqNip) return true;
+    }
+    return false;
+  };
+
+  const out = {
+    cutiLogs: [],
+    jobdesList: rawData.jobdesList || [],
+    skList: rawData.skList || [],
+    skAckList: rawData.skAckList || [],
+    masterKinerjaList: rawData.masterKinerjaList || [],
+    ikLogs: [],
+    ipLogs: [],
+    wfhLogs: [],
+    kinerjaList: [],
+    stList: rawData.stList || [],
+    sopList: rawData.sopList || [],
+    sopAckList: rawData.sopAckList || []
+  };
+
+  const srcCuti = rawData.cutiLogs || [];
+  for (let i = 0; i < srcCuti.length; i++) {
+    const r = srcCuti[i];
+    if (isRelated(r, ['nip', 'atasan_nip', 'pejabat_nip'])) {
+      out.cutiLogs.push(r);
+    } else if (String(r.status || '').trim().toUpperCase() === 'DISETUJUI') {
+      out.cutiLogs.push({ id: r.id, nip: r.nip, jenis: r.jenis, tgl_mulai: r.tgl_mulai, tgl_selesai: r.tgl_selesai, status: r.status, _redacted: true });
+    }
+  }
+
+  const srcIp = rawData.ipLogs || [];
+  for (let i = 0; i < srcIp.length; i++) {
+    const r = srcIp[i];
+    if (isRelated(r, ['nip', 'atasan_nip', 'pejabat_nip'])) {
+      out.ipLogs.push(r);
+    } else if (String(r.status || '').trim().toUpperCase() === 'DISETUJUI') {
+      out.ipLogs.push({ id: r.id, nip: r.nip, tgl_mulai: r.tgl_mulai, tgl_selesai: r.tgl_selesai, status: r.status, _redacted: true });
+    }
+  }
+
+  const srcIk = rawData.ikLogs || [];
+  for (let i = 0; i < srcIk.length; i++) {
+    const r = srcIk[i];
+    if (isRelated(r, ['nip', 'atasan_nip'])) {
+      out.ikLogs.push(r);
+    } else if (String(r.status || '').trim().toUpperCase() === 'DISETUJUI') {
+      out.ikLogs.push({ id: r.id, nip: r.nip, tanggal: r.tanggal, jam_keluar: r.jam_keluar, jam_kembali: r.jam_kembali, status: r.status, _redacted: true });
+    }
+  }
+
+  const srcWfh = rawData.wfhLogs || [];
+  for (let i = 0; i < srcWfh.length; i++) {
+    const r = srcWfh[i];
+    if (isRelated(r, ['nip', 'atasan_nip'])) {
+      out.wfhLogs.push(r);
+    } else if (String(r.status_rencana || '').trim().toUpperCase() === 'DISETUJUI') {
+      out.wfhLogs.push({ id: r.id, nip: r.nip, tanggal: r.tanggal, status_rencana: r.status_rencana, status_laporan: r.status_laporan, _redacted: true });
+    }
+  }
+
+  const srcKin = rawData.kinerjaList || [];
+  for (let i = 0; i < srcKin.length; i++) {
+    const r = srcKin[i];
+    if (isRelated(r, ['nip', 'pejabat_nip'])) {
+      out.kinerjaList.push(r);
+    }
+  }
+
+  return out;
+}
+
+function collectDriveAncestorMeta_(file, maxDepth) {
+  const names = [];
+  const ids = [];
+  try {
+    let queue = [];
+    const parents = file.getParents();
+    while (parents.hasNext()) {
+      queue.push({ folder: parents.next(), depth: 1 });
+    }
+    const visited = {};
+    while (queue.length > 0) {
+      const cur = queue.shift();
+      const fid = cur.folder.getId();
+      if (visited[fid]) continue;
+      visited[fid] = true;
+      ids.push(fid);
+      names.push(String(cur.folder.getName() || '').trim());
+      if (cur.depth < (maxDepth || 4)) {
+        const up = cur.folder.getParents();
+        while (up.hasNext()) {
+          queue.push({ folder: up.next(), depth: cur.depth + 1 });
+        }
+      }
+    }
+  } catch (e) {}
+  return { names: names, ids: ids };
+}
+
+function canUserAccessDriveFile_(file, fileId, callerSess, ss) {
+  if (!callerSess || !callerSess.nip) return false;
+  if (isAdminRole_(callerSess.role)) return true;
+
+  const cleanNip = normalizeNipKey_(callerSess.nip);
+  try {
+    const cachedAcl = CacheService.getScriptCache().get('drive_acl_' + fileId);
+    if (cachedAcl) {
+      const list = JSON.parse(cachedAcl);
+      if (Array.isArray(list) && list.indexOf(cleanNip) !== -1) return true;
+    }
+  } catch (e) {}
+
+  // 1. Cek sheet sensitif secara eksplisit (tidak boleh fallthrough ke folder)
+  if (ss) {
+    const sheetCuti = ss.getSheetByName('cuti_log');
+    if (sheetCuti) {
+      const cData = readCutiSheetDecrypted_(sheetCuti);
+      for (let i = 1; i < cData.length; i++) {
+        if (String(cData[i][17] || '').indexOf(fileId) !== -1) {
+          return normalizeNipKey_(cData[i][2]) === cleanNip ||
+                 normalizeNipKey_(cData[i][9]) === cleanNip ||
+                 normalizeNipKey_(cData[i][10]) === cleanNip;
+        }
+      }
+    }
+
+    const sheetWfh = ss.getSheetByName('wfh_log');
+    if (sheetWfh) {
+      const wData = sheetWfh.getDataRange().getDisplayValues();
+      for (let i = 1; i < wData.length; i++) {
+        if (wData[i].join('|').indexOf(fileId) !== -1) {
+          return normalizeNipKey_(wData[i][2]) === cleanNip ||
+                 normalizeNipKey_(wData[i][6]) === cleanNip;
+        }
+      }
+    }
+
+    const sheetKin = ss.getSheetByName('ekinerja_data');
+    if (sheetKin) {
+      const kData = sheetKin.getDataRange().getDisplayValues();
+      for (let i = 1; i < kData.length; i++) {
+        if ((String(kData[i][6] || '') + '|' + String(kData[i][7] || '') + '|' + String(kData[i][10] || '')).indexOf(fileId) !== -1) {
+          return normalizeNipKey_(kData[i][1]) === cleanNip ||
+                 normalizeNipKey_(kData[i][2]) === cleanNip;
+        }
+      }
+    }
+
+    // Rapat docs (dokumen dinas bersama internal)
+    const sheetRapat = ss.getSheetByName('EofficeRapat');
+    if (sheetRapat) {
+      const rData = sheetRapat.getDataRange().getDisplayValues();
+      for (let i = 1; i < rData.length; i++) {
+        if (rData[i].join('|').indexOf(fileId) !== -1) return true;
+      }
+    }
+
+    // KGB docs (hanya pemilik NIP / Admin)
+    const sheetKgb = ss.getSheetByName('EofficeKGB');
+    if (sheetKgb) {
+      const kgbData = sheetKgb.getDataRange().getDisplayValues();
+      for (let i = 1; i < kgbData.length; i++) {
+        if (kgbData[i].join('|').indexOf(fileId) !== -1) {
+          return normalizeNipKey_(kgbData[i][1]) === cleanNip;
+        }
+      }
+    }
+  }
+
+  // 2. Cek folder brankas/arsip & dokumen PDF terbitan
+  const meta = collectDriveAncestorMeta_(file, 4);
+  const publicInternalFolders = ['TRANSKEP SK', 'TRANSKEP SOP', 'Arsip SK TRANSKEP', 'Arsip SOP TRANSKEP', 'Arsip Dokumen Jobdes TRANSKEP'];
+  for (let i = 0; i < publicInternalFolders.length; i++) {
+    if (meta.names.indexOf(publicInternalFolders[i]) !== -1) return true;
+  }
+
+  // Folder output PKP, PCK, WFH: cek kecocokan nama/NIP pemanggil atau penilai PKP/PCK
+  const pkpFolderId = '1dpHLuhnsn8Q6OS3mCjyrgyEcnKebnpmG';
+  const pckFolderId = '1wVS9MVbOiATy7u9iap7aWLE_za4K-wNg';
+  const wfhFolderId = '1sl7QmtA-sOl02bO20ycxmNPaI83e164J';
+  const kgbFolderId = String(PropertiesService.getScriptProperties().getProperty('FOLDER_KGB_DRIVE_ID') || '1IwQ96D4dY6HrPCqoXY2opX8FHWaMjAHQ').trim();
+
+  const fileNameLower = String(file.getName() || '').toLowerCase();
+  let callerFirstName = '';
+  let callerFullName = '';
+  if (ss) {
+    const shUser = ss.getSheetByName('user_data');
+    if (shUser) {
+      const uData = readUserSheetDecrypted_(shUser);
+      for (let u = 1; u < uData.length; u++) {
+        if (normalizeNipKey_(uData[u][0]) === cleanNip) {
+          callerFullName = String(uData[u][1] || '').toLowerCase().trim();
+          callerFirstName = callerFullName.split(',')[0].trim();
+          break;
+        }
+      }
+    }
+  }
+
+  if (meta.ids.indexOf(pkpFolderId) !== -1 || meta.ids.indexOf(pckFolderId) !== -1) {
+    if (fileNameLower.indexOf(cleanNip) !== -1 || (callerFirstName && fileNameLower.indexOf(callerFirstName.replace(/\s+/g, '_')) !== -1)) {
+      return true;
+    }
+    if (ss) {
+      const shPkp = ss.getSheetByName('pkp_dokumen');
+      if (shPkp) {
+        const pData = shPkp.getDataRange().getDisplayValues();
+        for (let i = 1; i < pData.length; i++) {
+          if (normalizeNipKey_(pData[i][2]) === cleanNip || normalizeNipKey_(pData[i][7]) === cleanNip) {
+            return true;
+          }
+        }
+      }
+    }
+    return false;
+  }
+
+  if (meta.ids.indexOf(wfhFolderId) !== -1 || meta.ids.indexOf(kgbFolderId) !== -1) {
+    if (fileNameLower.indexOf(cleanNip) !== -1 || (callerFirstName && fileNameLower.indexOf(callerFirstName) !== -1)) {
+      return true;
+    }
+    return false;
+  }
+
+  return false;
+}
+
+function fetchDriveFileAsBase64_(file) {
+  if (!file) return { status: 'error', message: 'Berkas Drive tidak ditemukan.' };
+  const MAX_BYTES = 20 * 1024 * 1024;
+  const rawSize = Number(file.getSize() || 0);
+  if (rawSize > MAX_BYTES) {
+    return { status: 'error', message: 'Ukuran berkas melebihi batas maksimal 20 MB.' };
+  }
+
+  const origMime = String(file.getMimeType() || '').trim();
+  let blob;
+  if (origMime === 'application/vnd.google-apps.document' || origMime === 'application/vnd.google-apps.presentation') {
+    blob = file.getAs(MimeType.PDF);
+  } else if (origMime === 'application/vnd.google-apps.spreadsheet') {
+    blob = file.getAs(MimeType.MICROSOFT_EXCEL);
+  } else {
+    blob = file.getBlob();
+  }
+
+  const bytes = blob.getBytes();
+  if (bytes.length > MAX_BYTES) {
+    return { status: 'error', message: 'Ukuran berkas hasil konversi melebihi batas maksimal 20 MB.' };
+  }
+
+  return {
+    status: 'success',
+    base64: Utilities.base64Encode(bytes),
+    mimeType: String(blob.getContentType() || origMime || 'application/pdf'),
+    fileName: String(blob.getName() || file.getName() || 'dokumen.pdf')
+  };
+}
+
+function getDriveFileBlob(fileUrlOrId, nip, clientToken) {
+  try {
+    const sess = resolveCallerSession_(nip, clientToken);
+    if (!sess) {
+      return { status: 'error', message: 'Akses Ditolak: Sesi kedaluwarsa atau tidak valid.' };
+    }
+    const fileId = extractDriveFileId_(fileUrlOrId);
+    if (!fileId) {
+      return { status: 'error', message: 'ID atau URL berkas Google Drive tidak valid.' };
+    }
+
+    let file;
+    try {
+      file = DriveApp.getFileById(fileId);
+    } catch (eDrive) {
+      return { status: 'error', message: 'Berkas Google Drive tidak ditemukan atau tidak dapat diakses server.' };
+    }
+
+    const ss = getDB();
+    if (!canUserAccessDriveFile_(file, fileId, sess, ss)) {
+      return { status: 'error', message: 'Akses Ditolak: Anda tidak memiliki otorisasi untuk membuka berkas ini.' };
+    }
+
+    return fetchDriveFileAsBase64_(file);
+  } catch (e) {
+    return { status: 'error', message: 'Gagal mengunduh berkas Drive: ' + e.toString() };
+  }
 }

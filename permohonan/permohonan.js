@@ -50,7 +50,8 @@ function addCutiLog(payload, aktorNip, clientToken) {
 
       const blob = Utilities.newBlob(safeBytes, safeMime, generateName);
       const file = folder.createFile(blob);
-      file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+      if (typeof setPrivateDriveSharing_ === 'function') setPrivateDriveSharing_(file);
+      if (typeof registerDriveFileAcl_ === 'function') registerDriveFileAcl_(file.getId(), [payload.nip, payload.atasan_nip, payload.pejabat_nip]);
       fileUrl = file.getUrl();
     }
 
@@ -223,7 +224,8 @@ function updateCutiLog(payload, aktorNip, clientToken) {
       const generateName = "Bukti_" + safeJenisSlug + "_" + safeNipSlug + "_" + new Date().getTime() + "." + safeExt;
       const blob = Utilities.newBlob(safeBytes, safeMime, generateName);
       const file = folder.createFile(blob);
-      file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+      if (typeof setPrivateDriveSharing_ === 'function') setPrivateDriveSharing_(file);
+      if (typeof registerDriveFileAcl_ === 'function') registerDriveFileAcl_(file.getId(), [payload.nip, payload.atasan_nip, payload.pejabat_nip]);
       fileUrlUpdate = file.getUrl();
     }
 

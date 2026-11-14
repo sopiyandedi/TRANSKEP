@@ -105,13 +105,13 @@
                         </button>
                         <span v-else class="text-xs text-slate-500 italic">Diproses...</span>
                     </template>
-                    <a v-else :href="k.file_pengesahan" target="_blank" class="px-3 py-1.5 bg-indigo-500/10 hover:bg-indigo-500 text-indigo-400 hover:text-white border border-indigo-500/30 hover:border-indigo-500 rounded-lg text-xs font-bold transition flex items-center gap-1.5 shadow-sm whitespace-nowrap">
+                    <button type="button" v-else @click="openSecureFile(k.file_pengesahan, 'Pengesahan SKP - ' + (k.nama_pegawai || k.nip || ''))" class="px-3 py-1.5 bg-indigo-500/10 hover:bg-indigo-500 text-indigo-400 hover:text-white border border-indigo-500/30 hover:border-indigo-500 rounded-lg text-xs font-bold transition flex items-center gap-1.5 shadow-sm whitespace-nowrap cursor-pointer">
                         <i class="fa-solid fa-file-pdf"></i> Unduh Pengesahan
-                    </a>
+                    </button>
 
                     <div class="flex gap-2">
-                       <a :href="k.file_penilaian" target="_blank" title="Buka File Penilaian Asli" class="text-[10px] text-slate-400 hover:text-indigo-400 transition underline underline-offset-2"><i class="fa-solid fa-paperclip"></i> Penilaian</a>
-                       <a :href="k.file_evaluasi" target="_blank" title="Buka File Evaluasi Asli" class="text-[10px] text-slate-400 hover:text-indigo-400 transition underline underline-offset-2"><i class="fa-solid fa-paperclip"></i> Evaluasi</a>
+                       <button type="button" @click="openSecureFile(k.file_penilaian, 'Penilaian SKP - ' + (k.nama_pegawai || k.nip || ''))" title="Buka File Penilaian Asli" class="text-[10px] text-slate-400 hover:text-indigo-400 transition underline underline-offset-2 cursor-pointer"><i class="fa-solid fa-paperclip"></i> Penilaian</button>
+                       <button type="button" @click="openSecureFile(k.file_evaluasi, 'Evaluasi SKP - ' + (k.nama_pegawai || k.nip || ''))" title="Buka File Evaluasi Asli" class="text-[10px] text-slate-400 hover:text-indigo-400 transition underline underline-offset-2 cursor-pointer"><i class="fa-solid fa-paperclip"></i> Evaluasi</button>
                     </div>
                  </div>
               </td>

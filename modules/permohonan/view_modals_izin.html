@@ -322,9 +322,9 @@
               <!-- Wadah Ikon File Lama -->
               <div v-show="formLaporan.evidenLama.length > 0" class="flex flex-wrap gap-2 mb-3">
                   <div v-for="(url, idx) in formLaporan.evidenLama" :key="idx" class="flex items-center gap-2 px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/30 rounded-lg group transition">
-                      <a :href="url" target="_blank" class="text-emerald-400 hover:text-emerald-300 font-bold text-xs" title="Lihat Dokumen">
+                      <button type="button" @click="openSecureFile(url, 'Eviden WFH ' + (idx + 1))" class="text-emerald-400 hover:text-emerald-300 font-bold text-xs cursor-pointer" title="Lihat Dokumen">
                           <i class="fa-solid fa-file-pdf mr-1"></i> Eviden {{ idx + 1 }}
-                      </a>
+                      </button>
                       <button type="button" @click="hapusEvidenLama(idx)" class="text-slate-500 hover:text-rose-500 ml-1 transition" title="Hapus file ini">
                           <i class="fa-solid fa-xmark text-[10px]"></i>
                       </button>

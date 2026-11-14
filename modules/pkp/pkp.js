@@ -372,7 +372,10 @@ function cetakDokumen(jenis, id) {
                 window.isGlobalPrinting = false;
                 if (res && res.status === 'success') {
                     showNotify("Berhasil", "Dokumen PK berhasil dibuat!", "success");
-                    if (res.url && res.url !== '#') window.open(res.url, '_blank');
+                    if (res.url && res.url !== '#') {
+                        if (typeof window.openSecureDriveFile === 'function') window.openSecureDriveFile(res.url, 'Dokumen PKP');
+                        else window.open(res.url, '_blank');
+                    }
                     else showNotify("Info Dokumen", "[CANVAS MODE] PDF PK siap diunduh.", "info");
                 } else {
                     showNotify("Gagal Cetak", res ? res.message : "Gagal generate PDF", "error");
@@ -406,7 +409,10 @@ function cetakDokumen(jenis, id) {
                 window.isGlobalPrinting = false;
                 if (res && res.status === 'success') {
                     showNotify("Berhasil", "Laporan PCK berhasil dibuat!", "success");
-                    if (res.url && res.url !== '#') window.open(res.url, '_blank');
+                    if (res.url && res.url !== '#') {
+                        if (typeof window.openSecureDriveFile === 'function') window.openSecureDriveFile(res.url, 'Laporan PCK');
+                        else window.open(res.url, '_blank');
+                    }
                     else showNotify("Info Dokumen", "[CANVAS MODE] PDF PCK siap diunduh.", "info");
                 } else {
                     showNotify("Gagal Cetak", res ? res.message : "Gagal generate PDF", "error");

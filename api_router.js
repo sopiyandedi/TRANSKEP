@@ -177,8 +177,21 @@ function handleApiPost_(payload, e) {
       case 'getCutiByToken':
         return jsonResponse_(getCutiByToken(payload.token));
 
+      case 'getMagicFilePreview':
+        return jsonResponse_(getMagicFilePreview(payload.token));
+
       case 'processMagicLinkApproval':
         return jsonResponse_(processMagicLinkApproval(payload.token, payload.decision, payload.notes));
+
+      // Firebase Auth & Infra Secret Validator & Authenticated Drive Proxy (Fase 3B)
+      case 'getFirebaseCustomToken':
+        return jsonResponse_(getFirebaseCustomToken(payload.nip, payload.token));
+
+      case 'checkInfraSecrets':
+        return jsonResponse_(checkInfraSecrets(payload.nip, payload.token));
+
+      case 'getDriveFileBlob':
+        return jsonResponse_(getDriveFileBlob(payload.fileUrlOrId || payload.fileUrl || payload.url, payload.nip, payload.token));
 
       case 'resendCutiWhatsApp':
         return jsonResponse_(resendCutiWhatsApp(payload.id, payload.nip, payload.token));
@@ -216,12 +229,16 @@ var PUBLIC_RPC_METHODS_ = {
   logoutSession: true,
   requestPasswordReset: true,
   getCutiByToken: true,
+  getMagicFilePreview: true,
   processMagicLinkApproval: true
 };
 
 var AUTHENTICATED_RPC_METHODS_ = {
   getBulkData: true,
   getBackgroundData: true,
+  getFirebaseCustomToken: true,
+  checkInfraSecrets: true,
+  getDriveFileBlob: true,
   changeMyPassword: true,
   updateTmtStatus: true,
   forwardTmtDateByFrontend: true,

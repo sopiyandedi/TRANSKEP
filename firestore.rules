@@ -1,0 +1,868 @@
+rules_version = '2';
+
+// =============================================================================
+// TRANSKEP Cloud Firestore Security Rules
+// Project: transkep-314c0 (Firebase Compat SDK v10.14.1)
+// Auth Architecture: Custom Tokens minted via GAS (verifyLogin / getFirebaseCustomToken)
+//   - request.auth.uid        : Normalized employee NIP string (e.g. "199001012015031001")
+//   - request.auth.token.role : Lowercase normalized role ("admin", "super admin",
+//                               "administrator", "operator", "atasan langsung",
+//                               "pejabat berwenang", "pegawai")
+// =============================================================================
+
+// =============================================================================
+// Assumed Data Model
+// =============================================================================
+//
+// Collection: sk_documents
+// Document ID: {docId} (matches field `id`, e.g. "SK-2026-1234")
+// Fields:
+//   - id: string (required, 1..120, immutable)
+//   - judul_sk: string (required, 1..500)
+//   - no_sk: string (required, 1..150)
+//   - pj_sk: string (optional, <=150)
+//   - link_drive: string (optional, <=1000, URL or "-"/"")
+//   - tgl_sk: string (optional, <=50)
+//   - tgl_input: string (optional, <=50)
+//   - status: string (required, 1..50)
+//   - versi_aktif: number (optional, >=1 && <=1000)
+//   - members: list (optional, <=300)
+//   - naskah_utama: map or null (optional, map size <=30)
+//   - lampiran: list (optional, <=50)
+//   - template_gdoc_id: string (optional, <=200)
+//   - revisi_history: list (optional, <=100)
+//   - acknowledgments: list (optional, <=500, append-only for employees)
+//   - is_firebase: bool (optional)
+//   - updated_at: timestamp (required)
+//   - created_at: timestamp (optional, immutable if present)
+//
+// Collection: sop_documents
+// Document ID: {docId} (matches field `id`, e.g. "SOP-...")
+// Fields:
+//   - id: string (required, 1..120, immutable)
+//   - judul_sop: string (required, 1..500)
+//   - nomor_sop: string (required, 1..150)
+//   - kategori_pj: string (optional, <=150)
+//   - tanggal_pembuatan: string (optional, <=50)
+//   - tanggal_revisi: string (optional, <=50)
+//   - tanggal_efektif: string (optional, <=50)
+//   - link_drive: string (optional, <=1000, URL or "-"/"")
+//   - pelaksana: list (optional, <=300)
+//   - pelaksana_json: string (optional, <=50000)
+//   - acknowledgments: list (optional, <=500, append-only for employees)
+//   - is_firebase: bool (optional)
+//   - updated_at: timestamp (required)
+//   - created_at: timestamp (optional, immutable if present)
+//
+// Collection: jobdes_documents
+// Document ID: {docId} (employee NIP, matches field `nip`)
+// Fields:
+//   - nip: string (required, 1..30, immutable, == docId)
+//   - atasan_nip: string (optional, <=30)
+//   - dasar_lampiran: string (optional, <=500)
+//   - ikhtisar_jabatan: string (optional, <=5000)
+//   - tugas_pokok: string (optional, <=30000)
+//   - tugas_tambahan: string (optional, <=15000)
+//   - wewenang: string (optional, <=15000)
+//   - tanggung_jawab: string (optional, <=15000)
+//   - hasil_kerja: string (optional, <=15000)
+//   - bawahan_langsung: string (optional, <=10000)
+//   - updated_by: string (optional, <=150)
+//   - is_firebase: bool (optional)
+//   - updated_at: timestamp (required)
+//
+// Collection: jobdes_usulan
+// Document ID: {docId} (matches field `id`, e.g. "USUL-...")
+// Fields:
+//   - id: string (required, 1..120, immutable)
+//   - nip_pegawai: string (required, 1..30, immutable)
+//   - nama_pegawai: string (required, 1..150)
+//   - nama_pengusul: string (required, 1..150)
+//   - isi_usulan: string (required, 1..4000)
+//   - status: string (required, 'Menunggu' on create; 'Menunggu'|'Selesai' on admin update)
+//   - is_firebase: bool (optional)
+//   - created_at: timestamp (required, immutable)
+//   - completed_at: timestamp (optional)
+//
+// Collection: master_kinerja
+// Document ID: {docId} (matches field `id`, e.g. "TEMPL_jurusita")
+// Fields:
+//   - id: string (required, 1..120, immutable)
+//   - nama_jabatan: string (required, 1..150)
+//   - kategori: string (required, 1..100)
+//   - aliases: list (optional, <=50)
+//   - sasaran_list: list (optional, <=100)
+//   - is_firebase: bool (optional)
+//   - updated_at: timestamp (required)
+//   - updated_by: string (optional, <=150)
+//
+// Collection: pkp_documents
+// Document ID: {docId} (matches field `id_pkp`, e.g. "PKP_2026_1990...")
+// Fields:
+//   - id_pkp: string (required, 1..120, immutable)
+//   - nip_pegawai: string (required, 1..30, immutable for non-admin)
+//   - nip: string (optional, <=30)
+//   - nip_penilai: string (optional, <=30)
+//   - nip_atasan_pejabat: string (optional, <=30)
+//   - tahun: string (required, 1..10, immutable for non-admin)
+//   - status: string (required, in ['Draft', 'Menunggu Penilai', 'Menunggu Atasan Penilai', 'Dikirim', 'Disetujui', 'Final'])
+//   - nilai_akhir: string (optional, <=20)
+//   - items: list (optional, <=200)
+//   - last_action_by: string (optional, <=30)
+//   - is_firebase: bool (optional)
+//   - updated_at: timestamp (required)
+//   - created_at: timestamp (optional, immutable if present)
+//
+// Collection: pck_documents
+// Document ID: {docId} (matches field `id_pck`, e.g. "PCK_2026_Januari_1990...")
+// Fields:
+//   - id_pck: string (required, 1..120, immutable)
+//   - nip_pegawai: string (required, 1..30, immutable for non-admin)
+//   - nip: string (optional, <=30)
+//   - nip_penilai: string (optional, <=30)
+//   - nip_atasan_pejabat: string (optional, <=30)
+//   - bulan: string (required, 1..25, immutable for non-admin)
+//   - tahun: string (required, 1..10, immutable for non-admin)
+//   - total_rencana: int (optional, 0..500)
+//   - rencana: int (optional, 0..500)
+//   - progress: string (optional, <=30)
+//   - status: string (required, in ['Draft', 'Menunggu Penilai', 'Menunggu Atasan Penilai', 'Dikirim', 'Disetujui', 'Final'])
+//   - nilai_akhir: string (optional, <=20)
+//   - realisasi: list (optional, <=200)
+//   - last_action_by: string (optional, <=30)
+//   - is_firebase: bool (optional)
+//   - updated_at: timestamp (required)
+//   - created_at: timestamp (optional, immutable if present)
+//
+// Collection: pck_rekapitulasi
+// Document ID: {docId} (matches field `id_rekap`, e.g. "REKAP_2026_Januari")
+// Fields:
+//   - id_rekap: string (required, 1..120, immutable)
+//   - bulan: string (required, 1..25, immutable)
+//   - tahun: string (required, 1..10, immutable)
+//   - unit_kerja: string (required, 1..200)
+//   - status: string (required, 1..60)
+//   - pejabat_nama: string (required, 1..150)
+//   - pejabat_nip: string (required, 1..30)
+//   - tgl_pengesahan: string (required, 1..30)
+//   - total_pegawai: int (required, 0..5000)
+//   - rata_rata_satker: number (required, 0..1000)
+//   - daftar_nilai: list (required, <=500)
+//   - is_firebase: bool (optional)
+//   - updated_at: timestamp (required)
+//
+// Collection: eoffice_kgb
+// Document ID: {docId} (matches `id` / `id_kgb`, e.g. "DRAFT-..." or "KGB-...")
+// Fields:
+//   - id, id_kgb, nip, nama_pegawai, tanggal_lahir, pangkat, golongan, jabatan,
+//     unit_kerja, nomor_surat, tanggal_surat, tujuan_kppn, gaji_lama, pejabat_lama,
+//     nomor_sk_lama, tanggal_sk_lama, tmt_lama, mkg_lama, gaji_baru, terbilang_gaji,
+//     mkg_baru, tmt_baru, tmt_yad, nama_ketua, dasar_pp, status, file_doc_url,
+//     file_pdf_url, file_id, tanggal_input, is_from_dashboard, is_firebase,
+//     updated_at, created_at
+//
+// Collection: eoffice_rapat
+// Document ID: {docId} (matches `id` / `id_rapat`, e.g. "RPT-...")
+// Fields:
+//   - id, id_rapat, nomor_undangan, agenda, hari_tanggal, waktu_mulai, waktu_selesai,
+//     tempat, pemimpin, notulis, peserta_json, pembahasan, kesimpulan, status,
+//     doc_undangan_url, doc_absen_url, doc_notulen_url, folder_url, tanggal_input,
+//     is_firebase, updated_at, created_at
+//
+// Collection: surat_tugas_documents
+// Document ID: {docId} (matches field `id`, e.g. "ST-...")
+// Fields:
+//   - id: string (required, 1..120, immutable)
+//   - waktu, nomor, menimbang, dasar, tujuan, tempat, tgl_mulai, tgl_selesai, jam
+//   - peserta: string (<=50000) or list (<=200) (optional)
+//   - pejabat_ttd: string (optional, <=100)
+//   - status: string (required, 1..50)
+//   - data_ekstra: string (<=30000) or map (<=50) (optional)
+//   - created_by: string (optional, <=30)
+//   - is_firebase: bool (optional)
+//   - updated_at: timestamp (required)
+//   - created_at: timestamp (optional, immutable if present)
+//
+// Collection: security_incidents
+// Document ID: {docId} (auto-generated via .add())
+// Fields:
+//   - waktu: string (optional, <=100)
+//   - url: string (optional, <=500)
+//   - userAgent: string (optional, <=500)
+//   - jenis_pelanggaran: string (required, 1..100)
+//   - nip: string (optional, <=50)
+//   - detail: string (required, 1..1000)
+//   - timestamp: timestamp (required, == request.time)
+//
+// =============================================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // =========================================================================
+    // Helper Functions (Authentication, RBAC, Ownership & Type Validation)
+    // =========================================================================
+
+    function isAuthenticated() {
+      return request.auth != null && request.auth.uid != null;
+    }
+
+    function uid() {
+      return request.auth.uid;
+    }
+
+    function roleLower() {
+      return (isAuthenticated() &&
+              request.auth.token != null &&
+              request.auth.token.keys().hasAny(['role']) &&
+              request.auth.token.role is string)
+        ? request.auth.token.role.lower()
+        : '';
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && roleLower() in ['admin', 'super admin', 'administrator'];
+    }
+
+    function isAdminOrOperator() {
+      return isAuthenticated() && roleLower() in ['admin', 'super admin', 'administrator', 'operator'];
+    }
+
+    function isApprover() {
+      return isAuthenticated() && roleLower() in ['admin', 'super admin', 'administrator', 'operator', 'atasan langsung', 'pejabat berwenang'];
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && uid() == userId;
+    }
+
+    function isDocOwner() {
+      return isAuthenticated() && ('uid' in resource.data) && resource.data.uid == uid();
+    }
+
+    function uidUnchanged() {
+      return !('uid' in request.resource.data) || request.resource.data.uid == uid();
+    }
+
+    function uidNotModified() {
+      return !('uid' in request.resource.data) || request.resource.data.uid == resource.data.uid;
+    }
+
+    function isFieldOwner(data, field) {
+      return (field in data) && data[field] is string && data[field] == uid();
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function areImmutableFieldsUnchanged(fields) {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(fields);
+    }
+
+    function validStringLength(field, minLen, maxLen) {
+      return (field in request.resource.data) &&
+             request.resource.data[field] is string &&
+             request.resource.data[field].size() >= minLen &&
+             request.resource.data[field].size() <= maxLen;
+    }
+
+    function isValidOptionalString(data, field, minLen, maxLen) {
+      return !(field in data) ||
+             (data[field] is string &&
+              data[field].size() >= minLen &&
+              data[field].size() <= maxLen);
+    }
+
+    function isValidUrl(url) {
+      return url is string &&
+             (url.matches('^https://.*') || url.matches('^http://.*'));
+    }
+
+    function isValidOptionalUrlOrDash(data, field, maxLen) {
+      return !(field in data) ||
+             (data[field] is string &&
+              data[field].size() <= maxLen &&
+              (data[field] == '' || data[field] == '-' || isValidUrl(data[field])));
+    }
+
+    function isValidList(list, maxSize) {
+      return list is list && list.size() <= maxSize;
+    }
+
+    function isValidOptionalList(data, field, maxSize) {
+      return !(field in data) || isValidList(data[field], maxSize);
+    }
+
+    function isValidOptionalBool(data, field) {
+      return !(field in data) || data[field] is bool;
+    }
+
+    function isValidOptionalTimestamp(data, field) {
+      return !(field in data) || data[field] is timestamp;
+    }
+
+    function isValidCreatedAtOnUpdate(oldData, newData) {
+      return !('created_at' in oldData) ||
+             (('created_at' in newData) &&
+              (newData.created_at == oldData.created_at ||
+               newData.created_at == request.time));
+    }
+
+    function isValidAckAppend(oldData, newData) {
+      let oldSize = ('acknowledgments' in oldData && oldData.acknowledgments is list) ? oldData.acknowledgments.size() : 0;
+      let newSize = ('acknowledgments' in newData && newData.acknowledgments is list) ? newData.acknowledgments.size() : -1;
+      return newData.diff(oldData).affectedKeys().hasOnly(['acknowledgments', 'updated_at']) &&
+             ('acknowledgments' in newData) &&
+             newData.acknowledgments is list &&
+             newSize >= oldSize &&
+             newSize <= 500 &&
+             (!('acknowledgments' in oldData) || newData.acknowledgments.hasAll(oldData.acknowledgments)) &&
+             newSize <= oldSize + 1 &&
+             (newSize == oldSize ||
+              (newData.acknowledgments[newSize - 1] is map &&
+               newData.acknowledgments[newSize - 1].keys().hasOnly(['nip', 'tanggal_baca']) &&
+               newData.acknowledgments[newSize - 1].nip is string &&
+               newData.acknowledgments[newSize - 1].nip.size() <= 30 &&
+               newData.acknowledgments[newSize - 1].tanggal_baca is string &&
+               newData.acknowledgments[newSize - 1].tanggal_baca.size() <= 50)) &&
+             newData.updated_at is timestamp;
+    }
+
+    // =========================================================================
+    // Domain Validators (Used in BOTH create and update rules)
+    // =========================================================================
+
+    function isValidSkDocument(data, docId) {
+      let allowed = [
+        'id', 'judul_sk', 'no_sk', 'pj_sk', 'link_drive', 'tgl_sk', 'tgl_input',
+        'status', 'versi_aktif', 'members', 'naskah_utama', 'lampiran',
+        'template_gdoc_id', 'revisi_history', 'acknowledgments', 'is_firebase',
+        'updated_at', 'created_at'
+      ];
+      return hasRequiredFields(['id', 'judul_sk', 'no_sk', 'status', 'updated_at']) &&
+             hasOnlyAllowedFields(allowed) &&
+             data.id is string && data.id == docId && data.id.size() >= 1 && data.id.size() <= 120 &&
+             data.judul_sk is string && data.judul_sk.size() >= 1 && data.judul_sk.size() <= 500 &&
+             data.no_sk is string && data.no_sk.size() >= 1 && data.no_sk.size() <= 150 &&
+             isValidOptionalString(data, 'pj_sk', 0, 150) &&
+             isValidOptionalUrlOrDash(data, 'link_drive', 1000) &&
+             isValidOptionalString(data, 'tgl_sk', 0, 50) &&
+             isValidOptionalString(data, 'tgl_input', 0, 50) &&
+             data.status is string && data.status.size() >= 1 && data.status.size() <= 50 &&
+             (!('versi_aktif' in data) || (data.versi_aktif is number && data.versi_aktif >= 1 && data.versi_aktif <= 1000)) &&
+             isValidOptionalList(data, 'members', 300) &&
+             (!('naskah_utama' in data) || data.naskah_utama == null || (data.naskah_utama is map && data.naskah_utama.size() <= 30)) &&
+             isValidOptionalList(data, 'lampiran', 50) &&
+             isValidOptionalString(data, 'template_gdoc_id', 0, 200) &&
+             isValidOptionalList(data, 'revisi_history', 100) &&
+             isValidOptionalList(data, 'acknowledgments', 500) &&
+             isValidOptionalBool(data, 'is_firebase') &&
+             data.updated_at is timestamp &&
+             isValidOptionalTimestamp(data, 'created_at');
+    }
+
+    function isValidSopDocument(data, docId) {
+      let allowed = [
+        'id', 'judul_sop', 'nomor_sop', 'kategori_pj', 'tanggal_pembuatan',
+        'tanggal_revisi', 'tanggal_efektif', 'link_drive', 'pelaksana',
+        'pelaksana_json', 'acknowledgments', 'is_firebase', 'updated_at', 'created_at'
+      ];
+      return hasRequiredFields(['id', 'judul_sop', 'nomor_sop', 'updated_at']) &&
+             hasOnlyAllowedFields(allowed) &&
+             data.id is string && data.id == docId && data.id.size() >= 1 && data.id.size() <= 120 &&
+             data.judul_sop is string && data.judul_sop.size() >= 1 && data.judul_sop.size() <= 500 &&
+             data.nomor_sop is string && data.nomor_sop.size() >= 1 && data.nomor_sop.size() <= 150 &&
+             isValidOptionalString(data, 'kategori_pj', 0, 150) &&
+             isValidOptionalString(data, 'tanggal_pembuatan', 0, 50) &&
+             isValidOptionalString(data, 'tanggal_revisi', 0, 50) &&
+             isValidOptionalString(data, 'tanggal_efektif', 0, 50) &&
+             isValidOptionalUrlOrDash(data, 'link_drive', 1000) &&
+             isValidOptionalList(data, 'pelaksana', 300) &&
+             isValidOptionalString(data, 'pelaksana_json', 0, 50000) &&
+             isValidOptionalList(data, 'acknowledgments', 500) &&
+             isValidOptionalBool(data, 'is_firebase') &&
+             data.updated_at is timestamp &&
+             isValidOptionalTimestamp(data, 'created_at');
+    }
+
+    function isValidJobdesDocument(data, docId) {
+      let allowed = [
+        'nip', 'atasan_nip', 'dasar_lampiran', 'ikhtisar_jabatan', 'tugas_pokok',
+        'tugas_tambahan', 'wewenang', 'tanggung_jawab', 'hasil_kerja',
+        'bawahan_langsung', 'updated_by', 'is_firebase', 'updated_at'
+      ];
+      return hasRequiredFields(['nip', 'updated_at']) &&
+             hasOnlyAllowedFields(allowed) &&
+             data.nip is string && data.nip == docId && data.nip.size() >= 1 && data.nip.size() <= 30 &&
+             isValidOptionalString(data, 'atasan_nip', 0, 30) &&
+             isValidOptionalString(data, 'dasar_lampiran', 0, 500) &&
+             isValidOptionalString(data, 'ikhtisar_jabatan', 0, 5000) &&
+             isValidOptionalString(data, 'tugas_pokok', 0, 30000) &&
+             isValidOptionalString(data, 'tugas_tambahan', 0, 15000) &&
+             isValidOptionalString(data, 'wewenang', 0, 15000) &&
+             isValidOptionalString(data, 'tanggung_jawab', 0, 15000) &&
+             isValidOptionalString(data, 'hasil_kerja', 0, 15000) &&
+             isValidOptionalString(data, 'bawahan_langsung', 0, 10000) &&
+             isValidOptionalString(data, 'updated_by', 0, 150) &&
+             isValidOptionalBool(data, 'is_firebase') &&
+             data.updated_at is timestamp;
+    }
+
+    function isValidJobdesUsulan(data, docId) {
+      let allowed = [
+        'id', 'nip_pegawai', 'nama_pegawai', 'nama_pengusul', 'isi_usulan',
+        'status', 'is_firebase', 'created_at', 'completed_at'
+      ];
+      return hasRequiredFields(['id', 'nip_pegawai', 'nama_pegawai', 'nama_pengusul', 'isi_usulan', 'status', 'created_at']) &&
+             hasOnlyAllowedFields(allowed) &&
+             data.id is string && data.id == docId && data.id.size() >= 1 && data.id.size() <= 120 &&
+             data.nip_pegawai is string && data.nip_pegawai.size() >= 1 && data.nip_pegawai.size() <= 30 &&
+             data.nama_pegawai is string && data.nama_pegawai.size() >= 1 && data.nama_pegawai.size() <= 150 &&
+             data.nama_pengusul is string && data.nama_pengusul.size() >= 1 && data.nama_pengusul.size() <= 150 &&
+             data.isi_usulan is string && data.isi_usulan.size() > 0 && data.isi_usulan.size() <= 4000 &&
+             data.status in ['Menunggu', 'Selesai'] &&
+             isValidOptionalBool(data, 'is_firebase') &&
+             data.created_at is timestamp &&
+             isValidOptionalTimestamp(data, 'completed_at');
+    }
+
+    function isValidMasterKinerja(data, docId) {
+      let allowed = [
+        'id', 'nama_jabatan', 'kategori', 'aliases', 'sasaran_list',
+        'is_firebase', 'updated_at', 'updated_by'
+      ];
+      return hasRequiredFields(['id', 'nama_jabatan', 'kategori', 'updated_at']) &&
+             hasOnlyAllowedFields(allowed) &&
+             data.id is string && data.id == docId && data.id.size() >= 1 && data.id.size() <= 120 &&
+             data.nama_jabatan is string && data.nama_jabatan.size() >= 1 && data.nama_jabatan.size() <= 150 &&
+             data.kategori is string && data.kategori.size() >= 1 && data.kategori.size() <= 100 &&
+             isValidOptionalList(data, 'aliases', 50) &&
+             isValidOptionalList(data, 'sasaran_list', 100) &&
+             isValidOptionalBool(data, 'is_firebase') &&
+             data.updated_at is timestamp &&
+             isValidOptionalString(data, 'updated_by', 0, 150);
+    }
+
+    function isPkpParticipant(data) {
+      return isFieldOwner(data, 'nip_pegawai') ||
+             isFieldOwner(data, 'nip_penilai') ||
+             isFieldOwner(data, 'nip_atasan_pejabat');
+    }
+
+    function isValidPkpDocument(data, docId) {
+      let allowed = [
+        'id_pkp', 'nip_pegawai', 'nip', 'nip_penilai', 'nip_atasan_pejabat',
+        'tahun', 'status', 'nilai_akhir', 'items', 'last_action_by',
+        'is_firebase', 'updated_at', 'created_at'
+      ];
+      let validStatuses = ['Draft', 'Menunggu Penilai', 'Menunggu Atasan Penilai', 'Dikirim', 'Disetujui', 'Final'];
+      return hasRequiredFields(['id_pkp', 'nip_pegawai', 'tahun', 'status', 'updated_at']) &&
+             hasOnlyAllowedFields(allowed) &&
+             data.id_pkp is string && data.id_pkp == docId && data.id_pkp.size() >= 1 && data.id_pkp.size() <= 120 &&
+             data.nip_pegawai is string && data.nip_pegawai.size() >= 1 && data.nip_pegawai.size() <= 30 &&
+             isValidOptionalString(data, 'nip', 0, 30) &&
+             isValidOptionalString(data, 'nip_penilai', 0, 30) &&
+             isValidOptionalString(data, 'nip_atasan_pejabat', 0, 30) &&
+             data.tahun is string && data.tahun.size() >= 1 && data.tahun.size() <= 10 &&
+             data.status in validStatuses &&
+             isValidOptionalString(data, 'nilai_akhir', 0, 20) &&
+             isValidOptionalList(data, 'items', 200) &&
+             isValidOptionalString(data, 'last_action_by', 0, 30) &&
+             isValidOptionalBool(data, 'is_firebase') &&
+             data.updated_at is timestamp &&
+             isValidOptionalTimestamp(data, 'created_at');
+    }
+
+    function isValidPkpNonAdminUpdate(oldData, newData) {
+      return newData.nip_pegawai == oldData.nip_pegawai &&
+             (!('nip' in newData) || newData.nip == oldData.nip_pegawai) &&
+             areImmutableFieldsUnchanged(['id_pkp', 'nip_pegawai', 'tahun']) &&
+             isValidCreatedAtOnUpdate(oldData, newData) &&
+             (oldData.status == 'Draft' || areImmutableFieldsUnchanged(['nip_penilai', 'nip_atasan_pejabat'])) &&
+             (
+               (oldData.status == 'Draft' && isFieldOwner(oldData, 'nip_pegawai') && newData.status in ['Draft', 'Menunggu Penilai']) ||
+               (oldData.status == 'Menunggu Penilai' && isFieldOwner(oldData, 'nip_penilai') && newData.status in ['Menunggu Atasan Penilai', 'Draft']) ||
+               (oldData.status == 'Menunggu Atasan Penilai' && isFieldOwner(oldData, 'nip_atasan_pejabat') && newData.status in ['Disetujui', 'Draft'])
+             );
+    }
+
+    function isValidPckDocument(data, docId) {
+      let allowed = [
+        'id_pck', 'nip_pegawai', 'nip', 'nip_penilai', 'nip_atasan_pejabat',
+        'bulan', 'tahun', 'total_rencana', 'rencana', 'progress', 'status',
+        'nilai_akhir', 'realisasi', 'last_action_by', 'is_firebase',
+        'updated_at', 'created_at'
+      ];
+      let validStatuses = ['Draft', 'Menunggu Penilai', 'Menunggu Atasan Penilai', 'Dikirim', 'Disetujui', 'Final'];
+      return hasRequiredFields(['id_pck', 'nip_pegawai', 'bulan', 'tahun', 'status', 'updated_at']) &&
+             hasOnlyAllowedFields(allowed) &&
+             data.id_pck is string && data.id_pck == docId && data.id_pck.size() >= 1 && data.id_pck.size() <= 120 &&
+             data.nip_pegawai is string && data.nip_pegawai.size() >= 1 && data.nip_pegawai.size() <= 30 &&
+             isValidOptionalString(data, 'nip', 0, 30) &&
+             isValidOptionalString(data, 'nip_penilai', 0, 30) &&
+             isValidOptionalString(data, 'nip_atasan_pejabat', 0, 30) &&
+             data.bulan is string && data.bulan.size() >= 1 && data.bulan.size() <= 25 &&
+             data.tahun is string && data.tahun.size() >= 1 && data.tahun.size() <= 10 &&
+             (!('total_rencana' in data) || (data.total_rencana is int && data.total_rencana >= 0 && data.total_rencana <= 500)) &&
+             (!('rencana' in data) || (data.rencana is int && data.rencana >= 0 && data.rencana <= 500)) &&
+             isValidOptionalString(data, 'progress', 0, 30) &&
+             data.status in validStatuses &&
+             isValidOptionalString(data, 'nilai_akhir', 0, 20) &&
+             isValidOptionalList(data, 'realisasi', 200) &&
+             isValidOptionalString(data, 'last_action_by', 0, 30) &&
+             isValidOptionalBool(data, 'is_firebase') &&
+             data.updated_at is timestamp &&
+             isValidOptionalTimestamp(data, 'created_at');
+    }
+
+    function isValidPckNonAdminUpdate(oldData, newData) {
+      return newData.nip_pegawai == oldData.nip_pegawai &&
+             (!('nip' in newData) || newData.nip == oldData.nip_pegawai) &&
+             areImmutableFieldsUnchanged(['id_pck', 'nip_pegawai', 'bulan', 'tahun']) &&
+             isValidCreatedAtOnUpdate(oldData, newData) &&
+             (oldData.status == 'Draft' || areImmutableFieldsUnchanged(['nip_penilai', 'nip_atasan_pejabat'])) &&
+             (
+               (oldData.status == 'Draft' && isFieldOwner(oldData, 'nip_pegawai') && newData.status in ['Draft', 'Menunggu Penilai']) ||
+               (oldData.status == 'Menunggu Penilai' && (isFieldOwner(oldData, 'nip_penilai') || isFieldOwner(oldData, 'nip_atasan_pejabat')) && newData.status in ['Disetujui', 'Draft'])
+             );
+    }
+
+    function isValidPckRekapitulasi(data, docId) {
+      let allowed = [
+        'id_rekap', 'bulan', 'tahun', 'unit_kerja', 'status', 'pejabat_nama',
+        'pejabat_nip', 'tgl_pengesahan', 'total_pegawai', 'rata_rata_satker',
+        'daftar_nilai', 'is_firebase', 'updated_at'
+      ];
+      return hasRequiredFields(['id_rekap', 'bulan', 'tahun', 'unit_kerja', 'status', 'pejabat_nama', 'pejabat_nip', 'tgl_pengesahan', 'total_pegawai', 'rata_rata_satker', 'daftar_nilai', 'updated_at']) &&
+             hasOnlyAllowedFields(allowed) &&
+             data.id_rekap is string && data.id_rekap == docId && data.id_rekap.size() >= 1 && data.id_rekap.size() <= 120 &&
+             data.bulan is string && data.bulan.size() >= 1 && data.bulan.size() <= 25 &&
+             data.tahun is string && data.tahun.size() >= 1 && data.tahun.size() <= 10 &&
+             data.unit_kerja is string && data.unit_kerja.size() >= 1 && data.unit_kerja.size() <= 200 &&
+             data.status is string && data.status.size() >= 1 && data.status.size() <= 60 &&
+             data.pejabat_nama is string && data.pejabat_nama.size() >= 1 && data.pejabat_nama.size() <= 150 &&
+             data.pejabat_nip is string && data.pejabat_nip.size() >= 1 && data.pejabat_nip.size() <= 30 &&
+             data.tgl_pengesahan is string && data.tgl_pengesahan.size() >= 1 && data.tgl_pengesahan.size() <= 30 &&
+             data.total_pegawai is int && data.total_pegawai >= 0 && data.total_pegawai <= 5000 &&
+             data.rata_rata_satker is number && data.rata_rata_satker >= 0 && data.rata_rata_satker <= 1000 &&
+             isValidList(data.daftar_nilai, 500) &&
+             isValidOptionalBool(data, 'is_firebase') &&
+             data.updated_at is timestamp;
+    }
+
+    function isValidEofficeKgb(data, docId) {
+      let allowed = [
+        'id', 'id_kgb', 'nip', 'nama_pegawai', 'tanggal_lahir', 'pangkat', 'golongan',
+        'jabatan', 'unit_kerja', 'nomor_surat', 'tanggal_surat', 'tujuan_kppn',
+        'gaji_lama', 'pejabat_lama', 'nomor_sk_lama', 'tanggal_sk_lama', 'tmt_lama',
+        'mkg_lama', 'gaji_baru', 'terbilang_gaji', 'mkg_baru', 'tmt_baru', 'tmt_yad',
+        'nama_ketua', 'dasar_pp', 'status', 'file_doc_url', 'file_pdf_url', 'file_id',
+        'tanggal_input', 'is_from_dashboard', 'is_firebase', 'updated_at', 'created_at'
+      ];
+      return hasRequiredFields(['id', 'id_kgb', 'nip', 'status', 'updated_at']) &&
+             hasOnlyAllowedFields(allowed) &&
+             data.id is string && data.id == docId && data.id.size() >= 1 && data.id.size() <= 120 &&
+             data.id_kgb is string && data.id_kgb == docId && data.id_kgb.size() >= 1 && data.id_kgb.size() <= 120 &&
+             data.nip is string && data.nip.size() <= 30 &&
+             isValidOptionalString(data, 'nama_pegawai', 0, 150) &&
+             isValidOptionalString(data, 'tanggal_lahir', 0, 40) &&
+             isValidOptionalString(data, 'pangkat', 0, 100) &&
+             isValidOptionalString(data, 'golongan', 0, 50) &&
+             isValidOptionalString(data, 'jabatan', 0, 200) &&
+             isValidOptionalString(data, 'unit_kerja', 0, 200) &&
+             isValidOptionalString(data, 'nomor_surat', 0, 150) &&
+             isValidOptionalString(data, 'tanggal_surat', 0, 40) &&
+             isValidOptionalString(data, 'tujuan_kppn', 0, 200) &&
+             (!('gaji_lama' in data) || (data.gaji_lama is string && data.gaji_lama.size() <= 50) || (data.gaji_lama is number && data.gaji_lama >= 0)) &&
+             isValidOptionalString(data, 'pejabat_lama', 0, 200) &&
+             isValidOptionalString(data, 'nomor_sk_lama', 0, 150) &&
+             isValidOptionalString(data, 'tanggal_sk_lama', 0, 40) &&
+             isValidOptionalString(data, 'tmt_lama', 0, 40) &&
+             isValidOptionalString(data, 'mkg_lama', 0, 50) &&
+             (!('gaji_baru' in data) || (data.gaji_baru is string && data.gaji_baru.size() <= 50) || (data.gaji_baru is number && data.gaji_baru >= 0)) &&
+             isValidOptionalString(data, 'terbilang_gaji', 0, 300) &&
+             isValidOptionalString(data, 'mkg_baru', 0, 50) &&
+             isValidOptionalString(data, 'tmt_baru', 0, 40) &&
+             isValidOptionalString(data, 'tmt_yad', 0, 40) &&
+             isValidOptionalString(data, 'nama_ketua', 0, 150) &&
+             isValidOptionalString(data, 'dasar_pp', 0, 500) &&
+             data.status is string && data.status.size() >= 1 && data.status.size() <= 60 &&
+             isValidOptionalUrlOrDash(data, 'file_doc_url', 1000) &&
+             isValidOptionalUrlOrDash(data, 'file_pdf_url', 1000) &&
+             isValidOptionalString(data, 'file_id', 0, 200) &&
+             isValidOptionalString(data, 'tanggal_input', 0, 40) &&
+             isValidOptionalBool(data, 'is_from_dashboard') &&
+             isValidOptionalBool(data, 'is_firebase') &&
+             data.updated_at is timestamp &&
+             isValidOptionalTimestamp(data, 'created_at');
+    }
+
+    function isValidEofficeRapat(data, docId) {
+      let allowed = [
+        'id', 'id_rapat', 'nomor_undangan', 'agenda', 'hari_tanggal',
+        'waktu_mulai', 'waktu_selesai', 'tempat', 'pemimpin', 'notulis',
+        'peserta_json', 'pembahasan', 'kesimpulan', 'status', 'doc_undangan_url',
+        'doc_absen_url', 'doc_notulen_url', 'folder_url', 'tanggal_input',
+        'is_firebase', 'updated_at', 'created_at'
+      ];
+      return hasRequiredFields(['id', 'id_rapat', 'status', 'updated_at']) &&
+             hasOnlyAllowedFields(allowed) &&
+             data.id is string && data.id == docId && data.id.size() >= 1 && data.id.size() <= 120 &&
+             data.id_rapat is string && data.id_rapat == docId && data.id_rapat.size() >= 1 && data.id_rapat.size() <= 120 &&
+             isValidOptionalString(data, 'nomor_undangan', 0, 150) &&
+             isValidOptionalString(data, 'agenda', 0, 1000) &&
+             isValidOptionalString(data, 'hari_tanggal', 0, 60) &&
+             isValidOptionalString(data, 'waktu_mulai', 0, 30) &&
+             isValidOptionalString(data, 'waktu_selesai', 0, 30) &&
+             isValidOptionalString(data, 'tempat', 0, 200) &&
+             isValidOptionalString(data, 'pemimpin', 0, 150) &&
+             isValidOptionalString(data, 'notulis', 0, 150) &&
+             isValidOptionalString(data, 'peserta_json', 0, 50000) &&
+             isValidOptionalString(data, 'pembahasan', 0, 50000) &&
+             isValidOptionalString(data, 'kesimpulan', 0, 50000) &&
+             data.status is string && data.status.size() >= 1 && data.status.size() <= 50 &&
+             isValidOptionalUrlOrDash(data, 'doc_undangan_url', 1000) &&
+             isValidOptionalUrlOrDash(data, 'doc_absen_url', 1000) &&
+             isValidOptionalUrlOrDash(data, 'doc_notulen_url', 1000) &&
+             isValidOptionalUrlOrDash(data, 'folder_url', 1000) &&
+             isValidOptionalString(data, 'tanggal_input', 0, 40) &&
+             isValidOptionalBool(data, 'is_firebase') &&
+             data.updated_at is timestamp &&
+             isValidOptionalTimestamp(data, 'created_at');
+    }
+
+    function isValidSuratTugas(data, docId) {
+      let allowed = [
+        'id', 'waktu', 'nomor', 'menimbang', 'dasar', 'tujuan', 'tempat',
+        'tgl_mulai', 'tgl_selesai', 'jam', 'peserta', 'pejabat_ttd', 'status',
+        'data_ekstra', 'created_by', 'is_firebase', 'updated_at', 'created_at'
+      ];
+      return hasRequiredFields(['id', 'status', 'updated_at']) &&
+             hasOnlyAllowedFields(allowed) &&
+             data.id is string && data.id == docId && data.id.size() >= 1 && data.id.size() <= 120 &&
+             isValidOptionalString(data, 'waktu', 0, 50) &&
+             isValidOptionalString(data, 'nomor', 0, 150) &&
+             isValidOptionalString(data, 'menimbang', 0, 10000) &&
+             isValidOptionalString(data, 'dasar', 0, 10000) &&
+             isValidOptionalString(data, 'tujuan', 0, 3000) &&
+             isValidOptionalString(data, 'tempat', 0, 500) &&
+             isValidOptionalString(data, 'tgl_mulai', 0, 50) &&
+             isValidOptionalString(data, 'tgl_selesai', 0, 50) &&
+             isValidOptionalString(data, 'jam', 0, 50) &&
+             (!('peserta' in data) || (data.peserta is string && data.peserta.size() <= 50000) || (data.peserta is list && data.peserta.size() <= 200)) &&
+             isValidOptionalString(data, 'pejabat_ttd', 0, 100) &&
+             data.status is string && data.status.size() >= 1 && data.status.size() <= 50 &&
+             (!('data_ekstra' in data) || (data.data_ekstra is string && data.data_ekstra.size() <= 30000) || (data.data_ekstra is map && data.data_ekstra.size() <= 50)) &&
+             isValidOptionalString(data, 'created_by', 0, 30) &&
+             isValidOptionalBool(data, 'is_firebase') &&
+             data.updated_at is timestamp &&
+             isValidOptionalTimestamp(data, 'created_at');
+    }
+
+    function isValidSecurityIncident(data) {
+      let allowed = ['waktu', 'url', 'userAgent', 'jenis_pelanggaran', 'nip', 'detail', 'timestamp'];
+      return hasRequiredFields(['jenis_pelanggaran', 'detail', 'timestamp']) &&
+             hasOnlyAllowedFields(allowed) &&
+             isValidOptionalString(data, 'waktu', 0, 100) &&
+             (!('url' in data) || (data.url is string && data.url.size() <= 500)) &&
+             isValidOptionalString(data, 'userAgent', 0, 500) &&
+             data.jenis_pelanggaran is string && data.jenis_pelanggaran.size() >= 1 && data.jenis_pelanggaran.size() <= 100 &&
+             isValidOptionalString(data, 'nip', 0, 50) &&
+             data.detail is string && data.detail.size() >= 1 && data.detail.size() <= 1000 &&
+             data.timestamp is timestamp && data.timestamp == request.time;
+    }
+
+    // =========================================================================
+    // Collection Rules
+    // =========================================================================
+
+    // 1. Surat Keputusan (SK) - All employees read; Admin/Operator manage;
+    //    employees may append read acknowledgments only.
+    match /sk_documents/{docId} {
+      allow read: if isAuthenticated();
+      allow create: if isAdminOrOperator() &&
+                       isValidSkDocument(request.resource.data, docId);
+      allow update: if isValidSkDocument(request.resource.data, docId) &&
+                       areImmutableFieldsUnchanged(['id']) &&
+                       isValidCreatedAtOnUpdate(resource.data, request.resource.data) &&
+                       (isAdminOrOperator() || (isAuthenticated() && isValidAckAppend(resource.data, request.resource.data)));
+      allow delete: if isAdminOrOperator();
+    }
+
+    // 2. Standar Operasional Prosedur (SOP) - All employees read; Admin/Operator
+    //    manage; employees may append read acknowledgments only.
+    match /sop_documents/{docId} {
+      allow read: if isAuthenticated();
+      allow create: if isAdminOrOperator() &&
+                       isValidSopDocument(request.resource.data, docId);
+      allow update: if isValidSopDocument(request.resource.data, docId) &&
+                       areImmutableFieldsUnchanged(['id']) &&
+                       isValidCreatedAtOnUpdate(resource.data, request.resource.data) &&
+                       (isAdminOrOperator() || (isAuthenticated() && isValidAckAppend(resource.data, request.resource.data)));
+      allow delete: if isAdminOrOperator();
+    }
+
+    // 3. Uraian Tugas (Job Description) - Employees & supervisors read;
+    //    Admin/Operator create, update, and delete.
+    match /jobdes_documents/{docId} {
+      allow read: if isAuthenticated();
+      allow create: if isAdminOrOperator() &&
+                       isValidJobdesDocument(request.resource.data, docId);
+      allow update: if isAdminOrOperator() &&
+                       isValidJobdesDocument(request.resource.data, docId) &&
+                       areImmutableFieldsUnchanged(['nip']);
+      allow delete: if isAdminOrOperator();
+    }
+
+    // 4. Usulan Reposisi Jobdes - Employees read/submit their own 'Menunggu'
+    //    proposals; Admin/Operator manage and complete proposals.
+    match /jobdes_usulan/{docId} {
+      allow read: if isAdminOrOperator() ||
+                     (isAuthenticated() && isFieldOwner(resource.data, 'nip_pegawai'));
+      allow create: if isAuthenticated() &&
+                       isValidJobdesUsulan(request.resource.data, docId) &&
+                       (isAdminOrOperator() || isFieldOwner(request.resource.data, 'nip_pegawai')) &&
+                       request.resource.data.status == 'Menunggu' &&
+                       !('completed_at' in request.resource.data);
+      allow update: if isAdminOrOperator() &&
+                       isValidJobdesUsulan(request.resource.data, docId) &&
+                       areImmutableFieldsUnchanged(['id', 'nip_pegawai', 'created_at']) &&
+                       ((resource.data.status == 'Menunggu' && request.resource.data.status in ['Menunggu', 'Selesai']) ||
+                        resource.data.status == request.resource.data.status);
+      allow delete: if isAdminOrOperator();
+    }
+
+    // 5. Master Kamus Kinerja - All authenticated users read templates;
+    //    Admin/Operator manage.
+    match /master_kinerja/{docId} {
+      allow read: if isAuthenticated();
+      allow create: if isAdminOrOperator() &&
+                       isValidMasterKinerja(request.resource.data, docId);
+      allow update: if isAdminOrOperator() &&
+                       isValidMasterKinerja(request.resource.data, docId) &&
+                       areImmutableFieldsUnchanged(['id']);
+      allow delete: if isAdminOrOperator();
+    }
+
+    // 6. Perjanjian Kinerja (PKP) Tahunan - Scoped to employee, evaluator
+    //    (nip_penilai), supervisor (nip_atasan_pejabat), or Admin/Operator.
+    match /pkp_documents/{docId} {
+      allow read: if isAdminOrOperator() ||
+                     (isAuthenticated() && isPkpParticipant(resource.data));
+      allow create: if isAuthenticated() &&
+                       isValidPkpDocument(request.resource.data, docId) &&
+                       (isAdminOrOperator() ||
+                        (isFieldOwner(request.resource.data, 'nip_pegawai') &&
+                         (!('nip' in request.resource.data) || request.resource.data.nip == uid()) &&
+                         request.resource.data.status in ['Draft', 'Menunggu Penilai']));
+      allow update: if isAuthenticated() &&
+                       isValidPkpDocument(request.resource.data, docId) &&
+                       (isAdminOrOperator() ||
+                        (isPkpParticipant(resource.data) &&
+                         isValidPkpNonAdminUpdate(resource.data, request.resource.data)));
+      allow delete: if isAdminOrOperator() ||
+                       (isAuthenticated() &&
+                        isFieldOwner(resource.data, 'nip_pegawai') &&
+                        resource.data.status == 'Draft');
+    }
+
+    // 7. Penilaian Capaian Kinerja (PCK) Bulanan - Scoped to employee,
+    //    evaluator, supervisor, or Admin/Operator.
+    match /pck_documents/{docId} {
+      allow read: if isAdminOrOperator() ||
+                     (isAuthenticated() && isPkpParticipant(resource.data));
+      allow create: if isAuthenticated() &&
+                       isValidPckDocument(request.resource.data, docId) &&
+                       (isAdminOrOperator() ||
+                        (isFieldOwner(request.resource.data, 'nip_pegawai') &&
+                         (!('nip' in request.resource.data) || request.resource.data.nip == uid()) &&
+                         request.resource.data.status in ['Draft', 'Menunggu Penilai']));
+      allow update: if isAuthenticated() &&
+                       isValidPckDocument(request.resource.data, docId) &&
+                       (isAdminOrOperator() ||
+                        (isPkpParticipant(resource.data) &&
+                         isValidPckNonAdminUpdate(resource.data, request.resource.data)));
+      allow delete: if isAdminOrOperator() ||
+                       (isAuthenticated() &&
+                        isFieldOwner(resource.data, 'nip_pegawai') &&
+                        resource.data.status == 'Draft');
+    }
+
+    // 8. Rekapitulasi Bulanan PCK - Admin/Operator only.
+    match /pck_rekapitulasi/{docId} {
+      allow read: if isAdminOrOperator();
+      allow create: if isAdminOrOperator() &&
+                       isValidPckRekapitulasi(request.resource.data, docId);
+      allow update: if isAdminOrOperator() &&
+                       isValidPckRekapitulasi(request.resource.data, docId) &&
+                       areImmutableFieldsUnchanged(['id_rekap', 'bulan', 'tahun']);
+      allow delete: if isAdminOrOperator();
+    }
+
+    // 9. E-Office KGB (Kenaikan Gaji Berkala) - Sensitive HR/salary data,
+    //    strictly Admin/Operator only.
+    match /eoffice_kgb/{docId} {
+      allow read: if isAdminOrOperator();
+      allow create: if isAdminOrOperator() &&
+                       isValidEofficeKgb(request.resource.data, docId);
+      allow update: if isAdminOrOperator() &&
+                       isValidEofficeKgb(request.resource.data, docId) &&
+                       areImmutableFieldsUnchanged(['id', 'id_kgb']) &&
+                       isValidCreatedAtOnUpdate(resource.data, request.resource.data);
+      allow delete: if isAdminOrOperator();
+    }
+
+    // 10. E-Office Paket Rapat - Admin/Operator only.
+    match /eoffice_rapat/{docId} {
+      allow read: if isAdminOrOperator();
+      allow create: if isAdminOrOperator() &&
+                       isValidEofficeRapat(request.resource.data, docId);
+      allow update: if isAdminOrOperator() &&
+                       isValidEofficeRapat(request.resource.data, docId) &&
+                       areImmutableFieldsUnchanged(['id', 'id_rapat']) &&
+                       isValidCreatedAtOnUpdate(resource.data, request.resource.data);
+      allow delete: if isAdminOrOperator();
+    }
+
+    // 11. Surat Tugas, SPD & Plh - Authenticated users read (Dashboard & ST);
+    //     creator or Admin/Operator may create, update, and delete.
+    match /surat_tugas_documents/{docId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() &&
+                       isValidSuratTugas(request.resource.data, docId) &&
+                       (isAdminOrOperator() ||
+                        !('created_by' in request.resource.data) ||
+                        request.resource.data.created_by == '' ||
+                        request.resource.data.created_by == uid());
+      allow update: if isAuthenticated() &&
+                       isValidSuratTugas(request.resource.data, docId) &&
+                       areImmutableFieldsUnchanged(['id']) &&
+                       isValidCreatedAtOnUpdate(resource.data, request.resource.data) &&
+                       (isAdminOrOperator() ||
+                        ((!('created_by' in resource.data) || resource.data.created_by == '' || resource.data.created_by == uid()) &&
+                         (!('created_by' in request.resource.data) || request.resource.data.created_by == '' || request.resource.data.created_by == uid())));
+      allow delete: if isAdminOrOperator() ||
+                       (isAuthenticated() && isFieldOwner(resource.data, 'created_by'));
+    }
+
+    // 12. Security Incidents Audit Log - Allows strictly schema-bounded pre-auth
+    //     or post-tamper incident creation; Admin-only read; immutable (no update/delete).
+    match /security_incidents/{docId} {
+      allow read: if isAdmin();
+      allow create: if isValidSecurityIncident(request.resource.data);
+      allow update, delete: if false;
+    }
+
+    // =========================================================================
+    // Default Deny Catch-All
+    // =========================================================================
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -1,0 +1,24 @@
+# TRANSKEP Local & Secret Isolation (.gitignore)
+# Mencegah workflow n8n berisi kredensial, service account JSON, token CLI, dan file env terunggah ke Git
+
+# Workflow n8n lokal (berisi kredensial internal / webhook secret)
+n8n_workflow_mysims_surat_keluar.json
+n8n_workflow_*.local.json
+
+# Kredensial Firebase / Google Cloud / Service Account
+*service-account*.json
+*firebase-adminsdk*.json
+serviceAccountKey*.json
+
+# Token CLI Google Apps Script & Variabel Lingkungan
+.clasprc.json
+.env
+.env.*
+!.env.example
+
+# Dependensi & berkas build lokal
+node_modules/
+tmp/
+.DS_Store
+Thumbs.db
+

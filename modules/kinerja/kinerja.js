@@ -184,6 +184,11 @@ document.addEventListener("DOMContentLoaded", () => {
                if(window.showNotify) window.showNotify("Kendala Upload", err.message || err.toString(), "error");
            }
         },
+        openSecureFile(url, title) {
+           if (typeof window.openSecureDriveFile === 'function') {
+               window.openSecureDriveFile(url, title);
+           }
+        },
         sahkanKinerja(id) {
            if(window.showCustomConfirm) {
                window.showCustomConfirm("Sah & TTE Dokumen SKP", "Anda akan menandatangani dokumen ini secara elektronik. Sistem akan membuatkan Lembar Pengesahan ber-Barcode. Lanjutkan?", async () => {

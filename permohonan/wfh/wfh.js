@@ -124,7 +124,8 @@ function submitLaporanWFH(payload, clientToken) {
                 
                 const blob = Utilities.newBlob(vf.bytes, vf.blobMimeType, generateName);
                 const file = subFolder.createFile(blob);
-                file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+                if (typeof setPrivateDriveSharing_ === 'function') setPrivateDriveSharing_(file);
+                if (typeof registerDriveFileAcl_ === 'function') registerDriveFileAcl_(file.getId(), [payload.nip, payload.atasan_nip]);
                 finalUrls.push(file.getUrl()); 
             }
         } catch(e) {
@@ -443,7 +444,11 @@ function generatePdfLaporanWFH(id, userNip, clientToken) {
     
     // 3. Buat file PDF baru
     const finalPdf = outputFolder.createFile(pdfBlob);
-    finalPdf.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    if (typeof setPrivateDriveSharing_ === 'function') setPrivateDriveSharing_(finalPdf);
+    if (typeof registerDriveFileAcl_ === 'function') {
+      const s = (typeof getActiveSession_ === 'function') ? getActiveSession_() : null;
+      registerDriveFileAcl_(finalPdf.getId(), [s ? s.nip : '', pemohon ? pemohon.nip : '', atasan ? atasan.nip : '']);
+    }
 
     if (tempFile) {
         tempFile.setTrashed(true);
@@ -617,7 +622,11 @@ function generatePdfRencanaWFH(id, userNip, clientToken) {
     }
     
     const finalPdf = outputFolder.createFile(pdfBlob);
-    finalPdf.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    if (typeof setPrivateDriveSharing_ === 'function') setPrivateDriveSharing_(finalPdf);
+    if (typeof registerDriveFileAcl_ === 'function') {
+      const s = (typeof getActiveSession_ === 'function') ? getActiveSession_() : null;
+      registerDriveFileAcl_(finalPdf.getId(), [s ? s.nip : '', pemohon ? pemohon.nip : '', atasan ? atasan.nip : '']);
+    }
 
     if (tempFile) {
         tempFile.setTrashed(true);

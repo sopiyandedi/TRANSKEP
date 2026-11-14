@@ -170,7 +170,7 @@ function createPaketRapatDocs(payload, adminNip, clientToken) {
 
     docUndangan.saveAndClose();
     const fileUndangan = DriveApp.getFileById(docUndangan.getId());
-    try { fileUndangan.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW); } catch(e){}
+    if (typeof setPrivateDriveSharing_ === 'function') setPrivateDriveSharing_(fileUndangan);
 
     // ==========================================
     // 2. DOKUMEN 2: LEMBAR DAFTAR HADIR RAPAT
@@ -236,7 +236,7 @@ function createPaketRapatDocs(payload, adminNip, clientToken) {
 
     docAbsen.saveAndClose();
     const fileAbsen = DriveApp.getFileById(docAbsen.getId());
-    try { fileAbsen.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW); } catch(e){}
+    if (typeof setPrivateDriveSharing_ === 'function') setPrivateDriveSharing_(fileAbsen);
 
     // ==========================================
     // 3. DOKUMEN 3: NOTULEN RAPAT KEDINASAN
@@ -307,7 +307,7 @@ function createPaketRapatDocs(payload, adminNip, clientToken) {
 
     docNotulen.saveAndClose();
     const fileNotulen = DriveApp.getFileById(docNotulen.getId());
-    try { fileNotulen.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW); } catch(e){}
+    if (typeof setPrivateDriveSharing_ === 'function') setPrivateDriveSharing_(fileNotulen);
 
     // ==========================================
     // TAHAP 84: PEMUTUSAN PENULISAN BARIS KE SHEET EofficeRapat

@@ -1072,12 +1072,17 @@ const PkpDataService = {
         }
       });
 
-      // 3. Sinkronisasi Rekapitulasi Satker
-      TranskepFirebase.subscribeFirestoreRekapitulasi((list) => {
-        if (Array.isArray(list) && window.vmPkpApp) {
-          window.vmPkpApp.rekapSnapshots = list;
-        }
-      });
+      // 3. Sinkronisasi Rekapitulasi Satker (Khusus Admin / Operator)
+      const caller = (typeof TranskepFirebase.getCallerIdentity === 'function')
+        ? TranskepFirebase.getCallerIdentity()
+        : { isAdmin: false };
+      if (caller.isAdmin || typeof TranskepFirebase._whenAuthGatedSnapshot === 'function') {
+        TranskepFirebase.subscribeFirestoreRekapitulasi((list) => {
+          if (Array.isArray(list) && window.vmPkpApp) {
+            window.vmPkpApp.rekapSnapshots = list;
+          }
+        });
+      }
 
       console.log("🔥 [TRANSKEP PKP] Realtime Sync Aktif untuk PKP, PCK, & Rekapitulasi.");
     }

@@ -59,6 +59,12 @@ try {
 const TranskepFirebase = {
   config: FIREBASE_CONFIG,
   siteKey: TRANSKEP_RECAPTCHA_SITE_KEY,
+  _authReady: false,
+  _authResolved: false,
+  _authNip: '',
+  _authRole: '',
+  _authPendingQueue: [],
+  _activeUnsubs: [],
   getAppCheck() {
     return transkepAppCheck;
   },
@@ -77,6 +83,160 @@ const TranskepFirebase = {
   },
   isReady() {
     return !!this.getDb();
+  },
+  getCallerIdentity() {
+    const lsNip = (typeof localStorage !== 'undefined' ? (localStorage.getItem('transkep_active_nip') || '') : '');
+    const lsRole = (typeof localStorage !== 'undefined' ? (localStorage.getItem('transkep_user_role') || '') : '');
+    const nip = String(this._authNip || lsNip).replace(/['"\s]/g, '').trim();
+    const roleLower = String(this._authRole || lsRole).toLowerCase().trim();
+    const isAdmin = ['admin', 'super admin', 'administrator', 'operator'].includes(roleLower);
+    return { nip, role: roleLower, isAdmin };
+  },
+  _flushAuthQueue() {
+    const q = this._authPendingQueue.splice(0, this._authPendingQueue.length);
+    for (let i = 0; i < q.length; i++) {
+      try { q[i](); } catch (e) { console.warn('[TRANSKEP Firebase] Queue flush err:', e); }
+    }
+  },
+  _whenAuthGatedSnapshot(createUnsubFn) {
+    let cancelled = false;
+    let realUnsub = null;
+    const attach = () => {
+      if (cancelled) return;
+      try {
+        const res = createUnsubFn();
+        if (typeof res === 'function') {
+          realUnsub = res;
+          this._activeUnsubs.push(res);
+        }
+      } catch (e) {
+        console.warn('[TRANSKEP Firebase] Listener attach err:', e);
+      }
+    };
+    if (this._authResolved) {
+      attach();
+    } else {
+      this._authPendingQueue.push(attach);
+    }
+    return () => {
+      cancelled = true;
+      if (typeof realUnsub === 'function') {
+        try { realUnsub(); } catch (e) {}
+      }
+    };
+  },
+  async _queryMultiFieldParticipant(collectionName, keyField, fields, nip, extraFilters) {
+    const db = this.getDb();
+    if (!db || !nip) return [];
+    const map = {};
+    const promises = fields.map(async (f) => {
+      try {
+        let q = db.collection(collectionName).where(f, '==', nip);
+        if (Array.isArray(extraFilters)) {
+          extraFilters.forEach(([ef, op, val]) => { q = q.where(ef, op, val); });
+        }
+        const snap = await q.get();
+        snap.forEach(doc => {
+          const d = doc.data();
+          const k = String((d && d[keyField]) || doc.id || '').trim();
+          if (k) map[k] = d;
+        });
+      } catch (e) {
+        console.warn(`[TRANSKEP Firebase] Scoped query error on ${collectionName}.${f}:`, e && e.message ? e.message : e);
+      }
+    });
+    await Promise.all(promises);
+    return Object.values(map);
+  },
+  _subscribeMultiFieldParticipant(collectionName, keyField, fields, nip, callback) {
+    const db = this.getDb();
+    if (!db || !nip) return null;
+    const mergedByKey = {};
+    const fieldMaps = fields.map(() => ({}));
+    const emitMerged = () => {
+      const combined = {};
+      for (let i = 0; i < fieldMaps.length; i++) {
+        Object.assign(combined, fieldMaps[i]);
+      }
+      if (typeof callback === 'function') callback(Object.values(combined));
+    };
+    const unsubs = fields.map((f, idx) => {
+      return db.collection(collectionName).where(f, '==', nip).onSnapshot(
+        (snapshot) => {
+          const cur = {};
+          snapshot.forEach(doc => {
+            const d = doc.data();
+            const k = String((d && d[keyField]) || doc.id || '').trim();
+            if (k) { cur[k] = d; mergedByKey[k] = d; }
+          });
+          fieldMaps[idx] = cur;
+          emitMerged();
+        },
+        (error) => console.warn(`❌ [TRANSKEP Firebase] Scoped listener (${collectionName}.${f}) error:`, error && error.message ? error.message : error)
+      );
+    });
+    return () => {
+      unsubs.forEach(u => { if (typeof u === 'function') { try { u(); } catch (e) {} } });
+    };
+  },
+  async authenticateWithCustomToken(customToken, fallbackIdentity) {
+    try {
+      const fbAuth = (typeof firebase !== 'undefined' && typeof firebase.auth === 'function') ? firebase.auth() : null;
+      if (customToken && fbAuth) {
+        const cred = await fbAuth.signInWithCustomToken(String(customToken).trim());
+        const user = cred && cred.user;
+        if (user) {
+          let roleClaim = (fallbackIdentity && fallbackIdentity.role) || '';
+          try {
+            const tokRes = await user.getIdTokenResult();
+            if (tokRes && tokRes.claims && tokRes.claims.role) {
+              roleClaim = String(tokRes.claims.role);
+            }
+          } catch (eClaim) {}
+          this._authNip = String(user.uid || (fallbackIdentity && fallbackIdentity.nip) || '').replace(/['"\s]/g, '').trim();
+          this._authRole = String(roleClaim || '').trim();
+          this._authReady = true;
+          this._authResolved = true;
+          console.log('🔐 [TRANSKEP Firebase] Custom Token Auth terverifikasi untuk NIP:', this._authNip);
+          this._flushAuthQueue();
+          return true;
+        }
+      } else if (!customToken && fbAuth && fbAuth.currentUser && fallbackIdentity && fallbackIdentity.nip && String(fbAuth.currentUser.uid) === String(fallbackIdentity.nip).replace(/['"\s]/g, '').trim()) {
+        this._authNip = String(fbAuth.currentUser.uid).trim();
+        this._authRole = String(fallbackIdentity.role || '').trim();
+        this._authReady = true;
+        this._authResolved = true;
+        this._flushAuthQueue();
+        return true;
+      }
+    } catch (err) {
+      console.warn('⚠️ [TRANSKEP Firebase] Gagal signInWithCustomToken:', err && err.message ? err.message : err);
+    }
+    this._authNip = String((fallbackIdentity && fallbackIdentity.nip) || (typeof localStorage !== 'undefined' ? localStorage.getItem('transkep_active_nip') : '') || '').replace(/['"\s]/g, '').trim();
+    this._authRole = String((fallbackIdentity && fallbackIdentity.role) || (typeof localStorage !== 'undefined' ? localStorage.getItem('transkep_user_role') : '') || '').trim();
+    this._authReady = false;
+    this._authResolved = true;
+    console.warn('⚠️ [TRANSKEP Auth] Custom token belum tersedia (mode kompatibilitas pra-cutover aktif).');
+    this._flushAuthQueue();
+    return false;
+  },
+  async signOutFirebase() {
+    while (this._activeUnsubs.length > 0) {
+      const fn = this._activeUnsubs.pop();
+      if (typeof fn === 'function') {
+        try { fn(); } catch (e) {}
+      }
+    }
+    this._authPendingQueue = [];
+    this._authReady = false;
+    this._authResolved = false;
+    this._authNip = '';
+    this._authRole = '';
+    try {
+      if (typeof firebase !== 'undefined' && typeof firebase.auth === 'function' && firebase.auth().currentUser) {
+        await firebase.auth().signOut();
+      }
+    } catch (e) {}
   },
 
   // ==========================================
@@ -154,7 +314,7 @@ const TranskepFirebase = {
   subscribeFirestoreSks(callback) {
     const db = this.getDb();
     if (!db) return null;
-    return db.collection(this.SK_COLLECTION).onSnapshot(
+    return this._whenAuthGatedSnapshot(() => db.collection(this.SK_COLLECTION).onSnapshot(
       (snapshot) => {
         const list = [];
         snapshot.forEach(doc => {
@@ -165,7 +325,7 @@ const TranskepFirebase = {
       (error) => {
         console.error("❌ [TRANSKEP Firebase] Error listener Firestore SK:", error);
       }
-    );
+    ));
   },
 
   /**
@@ -323,7 +483,7 @@ const TranskepFirebase = {
   subscribeFirestoreJobdes(callback) {
     const db = this.getDb();
     if (!db) return null;
-    return db.collection(this.JOBDES_COLLECTION).onSnapshot(
+    return this._whenAuthGatedSnapshot(() => db.collection(this.JOBDES_COLLECTION).onSnapshot(
       (snapshot) => {
         const list = [];
         snapshot.forEach(doc => {
@@ -334,7 +494,7 @@ const TranskepFirebase = {
       (error) => {
         console.error("❌ [TRANSKEP Firebase] Error listener Firestore Jobdes:", error);
       }
-    );
+    ));
   },
 
   /**
@@ -366,18 +526,25 @@ const TranskepFirebase = {
   subscribeFirestoreUsulanJobdes(callback) {
     const db = this.getDb();
     if (!db) return null;
-    return db.collection(this.JOBDES_USULAN_COLLECTION).onSnapshot(
-      (snapshot) => {
-        const list = [];
-        snapshot.forEach(doc => {
-          list.push(doc.data());
-        });
-        if (typeof callback === 'function') callback(list);
-      },
-      (error) => {
-        console.error("❌ [TRANSKEP Firebase] Error listener Firestore Usulan Jobdes:", error);
-      }
-    );
+    return this._whenAuthGatedSnapshot(() => {
+      const caller = this.getCallerIdentity();
+      if (!caller.isAdmin && !caller.nip) return null;
+      const queryRef = caller.isAdmin
+        ? db.collection(this.JOBDES_USULAN_COLLECTION)
+        : db.collection(this.JOBDES_USULAN_COLLECTION).where('nip_pegawai', '==', caller.nip);
+      return queryRef.onSnapshot(
+        (snapshot) => {
+          const list = [];
+          snapshot.forEach(doc => {
+            list.push(doc.data());
+          });
+          if (typeof callback === 'function') callback(list);
+        },
+        (error) => {
+          console.error("❌ [TRANSKEP Firebase] Error listener Firestore Usulan Jobdes:", error);
+        }
+      );
+    });
   },
 
   /**
@@ -471,7 +638,7 @@ const TranskepFirebase = {
   subscribeFirestoreSops(callback) {
     const db = this.getDb();
     if (!db) return null;
-    return db.collection(this.SOP_COLLECTION).onSnapshot(
+    return this._whenAuthGatedSnapshot(() => db.collection(this.SOP_COLLECTION).onSnapshot(
       (snapshot) => {
         const list = [];
         snapshot.forEach(doc => {
@@ -482,7 +649,7 @@ const TranskepFirebase = {
       (error) => {
         console.error("❌ [TRANSKEP Firebase] Error listener Firestore SOP:", error);
       }
-    );
+    ));
   },
 
   /**
@@ -616,6 +783,13 @@ const TranskepFirebase = {
   async getFirestorePkps(filterNip, filterTahun) {
     const db = this.getDb();
     if (!db) return [];
+    const caller = this.getCallerIdentity();
+    if (!caller.isAdmin) {
+      if (!caller.nip) return [];
+      const extra = filterTahun ? [['tahun', '==', String(filterTahun).trim()]] : [];
+      const all = await this._queryMultiFieldParticipant(this.PKP_COLLECTION, 'id_pkp', ['nip_pegawai', 'nip_penilai', 'nip_atasan_pejabat'], caller.nip, extra);
+      return filterNip ? all.filter(d => String(d.nip_pegawai || '').trim() === String(filterNip).trim()) : all;
+    }
     let query = db.collection(this.PKP_COLLECTION);
     if (filterTahun) query = query.where('tahun', '==', String(filterTahun).trim());
     if (filterNip) query = query.where('nip_pegawai', '==', String(filterNip).trim());
@@ -632,14 +806,21 @@ const TranskepFirebase = {
   subscribeFirestorePkps(callback) {
     const db = this.getDb();
     if (!db) return null;
-    return db.collection(this.PKP_COLLECTION).onSnapshot(
-      (snapshot) => {
-        const list = [];
-        snapshot.forEach(doc => list.push(doc.data()));
-        if (typeof callback === 'function') callback(list);
-      },
-      (error) => console.error("❌ [TRANSKEP Firebase] Error listener Firestore PKP:", error)
-    );
+    return this._whenAuthGatedSnapshot(() => {
+      const caller = this.getCallerIdentity();
+      if (caller.isAdmin) {
+        return db.collection(this.PKP_COLLECTION).onSnapshot(
+          (snapshot) => {
+            const list = [];
+            snapshot.forEach(doc => list.push(doc.data()));
+            if (typeof callback === 'function') callback(list);
+          },
+          (error) => console.error("❌ [TRANSKEP Firebase] Error listener Firestore PKP:", error)
+        );
+      }
+      if (!caller.nip) return null;
+      return this._subscribeMultiFieldParticipant(this.PKP_COLLECTION, 'id_pkp', ['nip_pegawai', 'nip_penilai', 'nip_atasan_pejabat'], caller.nip, callback);
+    });
   },
 
   /**
@@ -668,10 +849,23 @@ const TranskepFirebase = {
     const docId = String(pckData.id_pck || ('PCK_' + tahun + '_' + bulan + '_' + nipPegawai)).trim();
     const itemsList = Array.isArray(pckData.realisasi || pckData.items) ? (pckData.realisasi || pckData.items) : [];
 
+    let nipPenilai = String(pckData.nip_penilai || '').trim();
+    let nipAtasan = String(pckData.nip_atasan_pejabat || '').trim();
+    if ((!nipPenilai || !nipAtasan) && typeof state !== 'undefined' && Array.isArray(state.pkpDokumen)) {
+      const pkpMatch = state.pkpDokumen.find(p => String(p.nip || p.nip_pegawai || '').trim() === nipPegawai && String(p.tahun || '').trim() === tahun)
+        || state.pkpDokumen.find(p => String(p.nip || p.nip_pegawai || '').trim() === nipPegawai);
+      if (pkpMatch) {
+        if (!nipPenilai) nipPenilai = String(pkpMatch.nip_penilai || '').trim();
+        if (!nipAtasan) nipAtasan = String(pkpMatch.nip_atasan_pejabat || '').trim();
+      }
+    }
+
     const payload = {
       id_pck: docId,
       nip_pegawai: nipPegawai,
       nip: nipPegawai,
+      nip_penilai: nipPenilai,
+      nip_atasan_pejabat: nipAtasan,
       bulan: bulan,
       tahun: tahun,
       total_rencana: parseInt(pckData.total_rencana || pckData.rencana || itemsList.length) || 0,
@@ -698,6 +892,15 @@ const TranskepFirebase = {
   async getFirestorePcks(filterNip, filterTahun, filterBulan) {
     const db = this.getDb();
     if (!db) return [];
+    const caller = this.getCallerIdentity();
+    if (!caller.isAdmin) {
+      if (!caller.nip) return [];
+      const extra = [];
+      if (filterTahun) extra.push(['tahun', '==', String(filterTahun).trim()]);
+      if (filterBulan) extra.push(['bulan', '==', String(filterBulan).trim()]);
+      const all = await this._queryMultiFieldParticipant(this.PCK_COLLECTION, 'id_pck', ['nip_pegawai', 'nip_penilai', 'nip_atasan_pejabat'], caller.nip, extra);
+      return filterNip ? all.filter(d => String(d.nip_pegawai || '').trim() === String(filterNip).trim()) : all;
+    }
     let query = db.collection(this.PCK_COLLECTION);
     if (filterTahun) query = query.where('tahun', '==', String(filterTahun).trim());
     if (filterBulan) query = query.where('bulan', '==', String(filterBulan).trim());
@@ -715,14 +918,21 @@ const TranskepFirebase = {
   subscribeFirestorePcks(callback) {
     const db = this.getDb();
     if (!db) return null;
-    return db.collection(this.PCK_COLLECTION).onSnapshot(
-      (snapshot) => {
-        const list = [];
-        snapshot.forEach(doc => list.push(doc.data()));
-        if (typeof callback === 'function') callback(list);
-      },
-      (error) => console.error("❌ [TRANSKEP Firebase] Error listener Firestore PCK:", error)
-    );
+    return this._whenAuthGatedSnapshot(() => {
+      const caller = this.getCallerIdentity();
+      if (caller.isAdmin) {
+        return db.collection(this.PCK_COLLECTION).onSnapshot(
+          (snapshot) => {
+            const list = [];
+            snapshot.forEach(doc => list.push(doc.data()));
+            if (typeof callback === 'function') callback(list);
+          },
+          (error) => console.error("❌ [TRANSKEP Firebase] Error listener Firestore PCK:", error)
+        );
+      }
+      if (!caller.nip) return null;
+      return this._subscribeMultiFieldParticipant(this.PCK_COLLECTION, 'id_pck', ['nip_pegawai', 'nip_penilai', 'nip_atasan_pejabat'], caller.nip, callback);
+    });
   },
 
   /**
@@ -796,14 +1006,17 @@ const TranskepFirebase = {
   subscribeFirestoreRekapitulasi(callback) {
     const db = this.getDb();
     if (!db) return null;
-    return db.collection(this.REKAP_COLLECTION).onSnapshot(
-      (snapshot) => {
-        const list = [];
-        snapshot.forEach(doc => list.push(doc.data()));
-        if (typeof callback === 'function') callback(list);
-      },
-      (error) => console.error("❌ [TRANSKEP Firebase] Error listener Firestore Rekapitulasi:", error)
-    );
+    return this._whenAuthGatedSnapshot(() => {
+      if (!this.getCallerIdentity().isAdmin) return null;
+      return db.collection(this.REKAP_COLLECTION).onSnapshot(
+        (snapshot) => {
+          const list = [];
+          snapshot.forEach(doc => list.push(doc.data()));
+          if (typeof callback === 'function') callback(list);
+        },
+        (error) => console.error("❌ [TRANSKEP Firebase] Error listener Firestore Rekapitulasi:", error)
+      );
+    });
   },
 
   /**
@@ -906,24 +1119,27 @@ const TranskepFirebase = {
   subscribeFirestoreKgbs(callback, errorCallback) {
     const db = this.getDb();
     if (!db) return null;
-    return db.collection(this.EOFFICE_KGB_COLLECTION).onSnapshot(
-      (snapshot) => {
-        const list = [];
-        snapshot.forEach(doc => {
-          list.push(doc.data());
-        });
-        if (typeof callback === 'function') callback(list);
-      },
-      (error) => {
-        const errMsg = String(error && (error.message || error));
-        if (errMsg.toLowerCase().includes('permission') || errMsg.toLowerCase().includes('insufficient')) {
-          console.warn("⚠️ [TRANSKEP Firebase] Firestore Security Rules memblokir koleksi 'eoffice_kgb'. Pastikan rules di Firebase Console sudah di-publish.", error);
-        } else {
-          console.error("❌ [TRANSKEP Firebase] Error listener Firestore KGB:", error);
+    return this._whenAuthGatedSnapshot(() => {
+      if (!this.getCallerIdentity().isAdmin) return null;
+      return db.collection(this.EOFFICE_KGB_COLLECTION).onSnapshot(
+        (snapshot) => {
+          const list = [];
+          snapshot.forEach(doc => {
+            list.push(doc.data());
+          });
+          if (typeof callback === 'function') callback(list);
+        },
+        (error) => {
+          const errMsg = String(error && (error.message || error));
+          if (errMsg.toLowerCase().includes('permission') || errMsg.toLowerCase().includes('insufficient')) {
+            console.warn("⚠️ [TRANSKEP Firebase] Firestore Security Rules memblokir koleksi 'eoffice_kgb'. Pastikan rules di Firebase Console sudah di-publish.", error);
+          } else {
+            console.error("❌ [TRANSKEP Firebase] Error listener Firestore KGB:", error);
+          }
+          if (typeof errorCallback === 'function') errorCallback(error);
         }
-        if (typeof errorCallback === 'function') errorCallback(error);
-      }
-    );
+      );
+    });
   },
 
   /**
@@ -998,18 +1214,21 @@ const TranskepFirebase = {
   subscribeFirestoreRapats(callback) {
     const db = this.getDb();
     if (!db) return null;
-    return db.collection(this.EOFFICE_RAPAT_COLLECTION).onSnapshot(
-      (snapshot) => {
-        const list = [];
-        snapshot.forEach(doc => {
-          list.push(doc.data());
-        });
-        if (typeof callback === 'function') callback(list);
-      },
-      (error) => {
-        console.error("❌ [TRANSKEP Firebase] Error listener Firestore Rapat:", error);
-      }
-    );
+    return this._whenAuthGatedSnapshot(() => {
+      if (!this.getCallerIdentity().isAdmin) return null;
+      return db.collection(this.EOFFICE_RAPAT_COLLECTION).onSnapshot(
+        (snapshot) => {
+          const list = [];
+          snapshot.forEach(doc => {
+            list.push(doc.data());
+          });
+          if (typeof callback === 'function') callback(list);
+        },
+        (error) => {
+          console.error("❌ [TRANSKEP Firebase] Error listener Firestore Rapat:", error);
+        }
+      );
+    });
   }
 ,
 
@@ -1030,6 +1249,7 @@ const TranskepFirebase = {
     const pad = n => String(n).padStart(2, '0');
     const nowStr = `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 
+    const caller = this.getCallerIdentity();
     const payload = {
       id: docId,
       waktu: stData.waktu || nowStr,
@@ -1045,6 +1265,7 @@ const TranskepFirebase = {
       pejabat_ttd: String(stData.pejabat_ttd || '').trim(),
       status: stData.status || 'DISETUJUI',
       data_ekstra: typeof stData.data_ekstra === 'string' ? stData.data_ekstra : (stData.data_ekstra_json || JSON.stringify(stData.data_ekstra || {})),
+      created_by: String(stData.created_by || caller.nip || '').trim(),
       is_firebase: true,
       updated_at: (typeof firebase !== 'undefined' && firebase.firestore && firebase.firestore.FieldValue) 
         ? firebase.firestore.FieldValue.serverTimestamp() 
@@ -1091,7 +1312,7 @@ const TranskepFirebase = {
   subscribeFirestoreSuratTugas(callback) {
     const db = this.getDb();
     if (!db) return null;
-    return db.collection(this.SURAT_TUGAS_COLLECTION).onSnapshot(
+    return this._whenAuthGatedSnapshot(() => db.collection(this.SURAT_TUGAS_COLLECTION).onSnapshot(
       (snapshot) => {
         const list = [];
         snapshot.forEach(doc => {
@@ -1102,7 +1323,7 @@ const TranskepFirebase = {
       (error) => {
         console.error("❌ [TRANSKEP Firebase] Error listener Firestore Surat Tugas:", error);
       }
-    );
+    ));
   },
 
   /**

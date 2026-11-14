@@ -498,18 +498,14 @@ function createKgbGoogleDoc_(p, idKgb) {
     doc.saveAndClose();
   }
 
-  try {
-    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-  } catch (e) {}
+  if (typeof setPrivateDriveSharing_ === 'function') setPrivateDriveSharing_(file);
 
   const docUrl = file.getUrl();
   const pdfBlob = file.getAs('application/pdf');
   const pdfFile = targetFolder
     ? targetFolder.createFile(pdfBlob).setName(fileName + ".pdf")
     : DriveApp.createFile(pdfBlob).setName(fileName + ".pdf");
-  try {
-    pdfFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-  } catch (e) {}
+  if (typeof setPrivateDriveSharing_ === 'function') setPrivateDriveSharing_(pdfFile);
 
   return {
     docUrl: docUrl,

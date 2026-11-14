@@ -323,7 +323,9 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!isSilent && this.rawKgbList.length === 0 && this.rawRapatList.length === 0) {
           this.isLoading = true;
         }
-        this.initRealtimeListeners();
+        if (this.isAdmin) {
+          this.initRealtimeListeners();
+        }
 
         try {
           const res = await window.EofficeDataService.getEofficeData(nip, token);
@@ -399,6 +401,12 @@ document.addEventListener("DOMContentLoaded", () => {
         this.filter.status = 'all';
         this.filter.start = '';
         this.filter.end = '';
+      },
+
+      openSecureFile(url, title) {
+        if (typeof window.openSecureDriveFile === 'function') {
+          window.openSecureDriveFile(url, title);
+        }
       },
 
       // ==========================================

@@ -97,9 +97,9 @@ function saveSk(payload, userNip, clientToken) {
            let safeFileName = String(payload.judul_sk).replace(/[\\/:*?"<>|]/g, "_") + "." + vSkFile.ext;
            const blob = Utilities.newBlob(vSkFile.bytes, vSkFile.blobMimeType, safeFileName);
            
-           // 5. Buat File & Set Izin Public (Agar Flipbook bisa baca)
+           // 5. Buat File & Set Izin Private (Diakses aman melalui Proxy Flipbook Terautentikasi)
            const file = pjFolder.createFile(blob);
-           file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+           if (typeof setPrivateDriveSharing_ === 'function') setPrivateDriveSharing_(file);
            
            // 6. Timpa payload Link Drive dengan URL asli file baru
            payload.link_drive = file.getUrl();
