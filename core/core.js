@@ -2758,6 +2758,7 @@ function restoreFirebaseAuthSession_(activeNip, sessionToken) {
     invokeBackendRpc_('getFirebaseCustomToken', activeNip, sessionToken)
       .then((res) => {
         const cTok = (res && res.status === 'success' && res.customToken) ? res.customToken : null;
+        if (!cTok && res && res.message) console.warn('⚠️ [TRANSKEP Auth] Respons getFirebaseCustomToken:', res.message);
         window.TranskepFirebase.authenticateWithCustomToken(cTok, { nip: cleanNip, role: savedRole });
       })
       .catch(() => {

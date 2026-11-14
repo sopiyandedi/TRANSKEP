@@ -228,26 +228,6 @@ service cloud.firestore {
       return isAuthenticated() && roleLower() in ['admin', 'super admin', 'administrator', 'operator'];
     }
 
-    function isApprover() {
-      return isAuthenticated() && roleLower() in ['admin', 'super admin', 'administrator', 'operator', 'atasan langsung', 'pejabat berwenang'];
-    }
-
-    function isOwner(userId) {
-      return isAuthenticated() && uid() == userId;
-    }
-
-    function isDocOwner() {
-      return isAuthenticated() && ('uid' in resource.data) && resource.data.uid == uid();
-    }
-
-    function uidUnchanged() {
-      return !('uid' in request.resource.data) || request.resource.data.uid == uid();
-    }
-
-    function uidNotModified() {
-      return !('uid' in request.resource.data) || request.resource.data.uid == resource.data.uid;
-    }
-
     function isFieldOwner(data, field) {
       return (field in data) && data[field] is string && data[field] == uid();
     }
@@ -262,13 +242,6 @@ service cloud.firestore {
 
     function areImmutableFieldsUnchanged(fields) {
       return !request.resource.data.diff(resource.data).affectedKeys().hasAny(fields);
-    }
-
-    function validStringLength(field, minLen, maxLen) {
-      return (field in request.resource.data) &&
-             request.resource.data[field] is string &&
-             request.resource.data[field].size() >= minLen &&
-             request.resource.data[field].size() <= maxLen;
     }
 
     function isValidOptionalString(data, field, minLen, maxLen) {

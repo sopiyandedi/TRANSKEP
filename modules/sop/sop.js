@@ -134,7 +134,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 userMapping = userMapping.filter(item => item.count > 0);
 
                 if (!this.isAdminOrOperator) {
-                    userMapping = userMapping.filter(item => String(item.user.nip) === String(this.globalState.user.nip));
+                    userMapping = userMapping.filter(item => Boolean(this.globalState && this.globalState.user && this.globalState.user.nip) && item && item.user && String(item.user.nip) === String(this.globalState.user.nip));
                 }
 
                 return userMapping.sort((a, b) => {
@@ -145,7 +145,7 @@ document.addEventListener("DOMContentLoaded", () => {
             filteredSopRekapData() {
                 if (!this.sopSearchQuery) return this.sopRekapData;
                 const q = this.sopSearchQuery.toLowerCase();
-                return this.sopRekapData.filter(item => item.user.nama.toLowerCase().includes(q) || item.user.nip.includes(q));
+                return this.sopRekapData.filter(item => item && item.user && (String(item.user.nama || '').toLowerCase().includes(q) || String(item.user.nip || '').includes(q)));
             }
         },
         methods: {

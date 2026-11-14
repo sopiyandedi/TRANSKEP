@@ -18,8 +18,9 @@ const FIREBASE_CONFIG = {
 let transkepDb = null;
 let transkepAppCheck = null;
 
-// Konfigurasi reCAPTCHA Enterprise / Fraud Defense App Check
+// Konfigurasi reCAPTCHA Enterprise / Fraud Defense App Check (Opt-In: aktifkan via window.TRANSKEP_ENABLE_APP_CHECK = true bila GCP Billing & App Check Enforce diaktifkan)
 const TRANSKEP_RECAPTCHA_SITE_KEY = '6LfkOv8tAAAAAPm0LLzS7uJmKRUcmNBIuYZymlRz';
+const TRANSKEP_ENABLE_APP_CHECK = (typeof window !== 'undefined' && window.TRANSKEP_ENABLE_APP_CHECK === true);
 
 try {
   if (typeof firebase !== 'undefined') {
@@ -27,9 +28,9 @@ try {
       firebase.initializeApp(FIREBASE_CONFIG);
     }
 
-    // Inisialisasi Firebase App Check (Fraud Defense / reCAPTCHA Enterprise)
+    // Inisialisasi Firebase App Check (Hanya dijalankan bila diaktifkan secara eksplisit agar tidak memicu /clr 400 pada paket Spark / mode Unenforced)
     try {
-      if (typeof firebase.appCheck === 'function') {
+      if (TRANSKEP_ENABLE_APP_CHECK && typeof firebase.appCheck === 'function' && TRANSKEP_RECAPTCHA_SITE_KEY) {
         let provider = null;
         if (typeof firebase.appCheck.ReCaptchaEnterpriseProvider === 'function') {
           provider = new firebase.appCheck.ReCaptchaEnterpriseProvider(TRANSKEP_RECAPTCHA_SITE_KEY);
@@ -42,6 +43,8 @@ try {
           transkepAppCheck.activate(provider, true); // isTokenAutoRefreshEnabled: true
           console.log("🛡️ [TRANSKEP Security] Firebase App Check (Fraud Defense / reCAPTCHA Enterprise) aktif.");
         }
+      } else {
+        console.log("🛡️ [TRANSKEP Security] Proteksi Zero-Trust aktif via Custom Token Auth (RS256) & Firestore Rules.");
       }
     } catch (acErr) {
       console.warn("⚠️ [TRANSKEP Security] Catatan inisialisasi App Check:", acErr.message || acErr);
@@ -180,9 +183,12 @@ const TranskepFirebase = {
     };
   },
   async authenticateWithCustomToken(customToken, fallbackIdentity) {
+    let signInAttempted = false;
+    let lastAuthErr = null;
     try {
       const fbAuth = (typeof firebase !== 'undefined' && typeof firebase.auth === 'function') ? firebase.auth() : null;
       if (customToken && fbAuth) {
+        signInAttempted = true;
         const cred = await fbAuth.signInWithCustomToken(String(customToken).trim());
         const user = cred && cred.user;
         if (user) {
@@ -210,13 +216,19 @@ const TranskepFirebase = {
         return true;
       }
     } catch (err) {
-      console.warn('⚠️ [TRANSKEP Firebase] Gagal signInWithCustomToken:', err && err.message ? err.message : err);
+      lastAuthErr = err;
+      const errCode = err && err.code ? '[' + err.code + '] ' : '';
+      console.warn('⚠️ [TRANSKEP Firebase] Gagal signInWithCustomToken:', errCode + (err && err.message ? err.message : err));
     }
     this._authNip = String((fallbackIdentity && fallbackIdentity.nip) || (typeof localStorage !== 'undefined' ? localStorage.getItem('transkep_active_nip') : '') || '').replace(/['"\s]/g, '').trim();
     this._authRole = String((fallbackIdentity && fallbackIdentity.role) || (typeof localStorage !== 'undefined' ? localStorage.getItem('transkep_user_role') : '') || '').trim();
     this._authReady = false;
     this._authResolved = true;
-    console.warn('⚠️ [TRANSKEP Auth] Custom token belum tersedia (mode kompatibilitas pra-cutover aktif).');
+    if (!signInAttempted) {
+      console.warn('⚠️ [TRANSKEP Auth] Custom token belum tersedia (mode kompatibilitas pra-cutover aktif).');
+    } else if (lastAuthErr && String((lastAuthErr.code || '') + ' ' + (lastAuthErr.message || '')).toLowerCase().includes('configuration')) {
+      console.warn('⚠️ [TRANSKEP Auth] Firebase Authentication Sign-in Method belum diaktifkan di Firebase Console (Authentication -> Set up sign-in method -> Enable Anonymous).');
+    }
     this._flushAuthQueue();
     return false;
   },
