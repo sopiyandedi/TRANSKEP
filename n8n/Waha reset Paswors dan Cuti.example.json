@@ -1,0 +1,317 @@
+{
+  "name": "Waha reset Paswors dan Cuti",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "transkep-gateway",
+        "options": {}
+      },
+      "id": "221e10e4-ada7-410e-bfe9-0fef03f9b7a6",
+      "name": "1. Webhook Gateway (OTP & Cuti)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        0,
+        240
+      ],
+      "webhookId": "transkep-waha-gateway"
+    },
+    {
+      "parameters": {
+        "jsCode": "const NL = String.fromCharCode(10); const body = $input.first().json.body || {}; const rawPhone = String(body.nomor_wa || body.nomor_wa_atasan || '').replace(/[^0-9]/g, ''); const normPhone = rawPhone.startsWith('0') ? ('62' + rawPhone.substring(1)) : rawPhone; const chatId = normPhone + '@c.us'; const jenis = String(body.jenis_pesan || 'direct'); const textReset = '*TRANSKEP - RESET SANDI SEMENTARA* 🏢' + NL + NL + 'Halo *' + (body.nama || 'Pegawai') + '*,' + NL + NL + 'Permintaan reset kata sandi akun TRANSKEP Anda berhasil diproses.' + NL + 'Berikut kredensial masuk sementara Anda:' + NL + NL + '👤 *NIP:* ' + (body.nip || '-') + NL + '🔑 *Sandi Sementara:* *' + (body.password_baru || '-') + '*' + NL + NL + '⚠️ *Perhatian:* Segera login ke portal dan perbarui kata sandi Anda di menu profil demi keamanan akun.' + NL + NL + '🔗 *Link Login Portal:* https://sso.pa-indramayu.go.id/'; const textUsulan = '*TRANSKEP - USULAN CUTI PEGAWAI* 📋' + NL + NL + 'Yth. Bapak/Ibu *' + (body.nama_tujuan || 'Atasan Langsung') + '*,' + NL + NL + 'Terdapat pengajuan cuti yang membutuhkan persetujuan Anda:' + NL + NL + '👤 *Pemohon:* ' + (body.nama_pemohon || '-') + NL + '🏷️ *Jenis:* Cuti ' + (body.jenis_cuti || '-') + NL + '📅 *Periode:* ' + (body.periode || '-') + ' (' + (body.durasi || '-') + ' hari)' + NL + '📝 *Alasan:* ' + (body.alasan || '-') + NL + NL + 'Silakan klik tautan di bawah ini untuk melihat detail dan memberikan persetujuan langsung:' + NL + '👉 ' + (body.magic_link || 'https://sso.pa-indramayu.go.id/'); const textKeputusan = '*TRANSKEP - STATUS USULAN CUTI* 📢' + NL + NL + 'Halo *' + (body.nama_pemohon || 'Pegawai') + '*,' + NL + NL + 'Status permohonan cuti Anda (Periode: ' + (body.periode || '-') + ') telah diperbarui:' + NL + NL + '📌 *Status:* *' + (body.status || '-') + '*' + NL + '👤 *Oleh:* ' + (body.oleh || '-') + NL + '📝 *Catatan:* ' + (body.catatan || '-') + NL + NL + '🔗 Silakan cek status lengkap di portal: https://sso.pa-indramayu.go.id/'; const textDirect = String(body.pesan || 'Notifikasi Sistem TRANSKEP'); return [{ json: { jenis_pesan: jenis, chatId, textReset, textUsulan, textKeputusan, textDirect } }];"
+      },
+      "id": "31757ecd-2ab2-4145-8635-997ca2a2bfc9",
+      "name": "Siapkan Format Pesan Gateway",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        256,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "dataType": "string",
+        "value1": "={{ $json.jenis_pesan }}",
+        "rules": {
+          "rules": [
+            {
+              "value2": "reset_password"
+            },
+            {
+              "value2": "cuti_usulan",
+              "output": 1
+            },
+            {
+              "value2": "cuti_keputusan",
+              "output": 2
+            },
+            {
+              "value2": "direct",
+              "output": 3
+            }
+          ]
+        },
+        "fallbackOutput": 3
+      },
+      "id": "e4450d98-a313-42bf-b7e4-f47139a57f2e",
+      "name": "Polisi Lalu Lintas (Switch)",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 1,
+      "position": [
+        528,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://waha:3000/api/sendText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Api-Key",
+              "value": "<GANTI_WAHA_API_KEY>"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "session",
+              "value": "default"
+            },
+            {
+              "name": "chatId",
+              "value": "={{ $json.chatId }}"
+            },
+            {
+              "name": "text",
+              "value": "={{ $json.textReset }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "b0aa7188-4a36-4f5b-81b9-9f4b0b36db46",
+      "name": "WA Reset Password",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        896,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://waha:3000/api/sendText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Api-Key",
+              "value": "<GANTI_WAHA_API_KEY>"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "session",
+              "value": "default"
+            },
+            {
+              "name": "chatId",
+              "value": "={{ $json.chatId }}"
+            },
+            {
+              "name": "text",
+              "value": "={{ $json.textUsulan }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "750567b0-d749-4352-9f0b-3425e183bbf9",
+      "name": "WA Usulan Cuti (Magic Link)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        896,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://waha:3000/api/sendText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Api-Key",
+              "value": "<GANTI_WAHA_API_KEY>"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "session",
+              "value": "default"
+            },
+            {
+              "name": "chatId",
+              "value": "={{ $json.chatId }}"
+            },
+            {
+              "name": "text",
+              "value": "={{ $json.textKeputusan }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "998e4049-3ca3-464e-97c9-e83803c9400f",
+      "name": "WA Keputusan Cuti",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        896,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://waha:3000/api/sendText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Api-Key",
+              "value": "<GANTI_WAHA_API_KEY>"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "session",
+              "value": "default"
+            },
+            {
+              "name": "chatId",
+              "value": "={{ $json.chatId }}"
+            },
+            {
+              "name": "text",
+              "value": "={{ $json.textDirect }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "fc4f0746-bb7d-4fd1-98dd-e1b5dea9026b",
+      "name": "WA Direct Message (Universal)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        896,
+        480
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "1. Webhook Gateway (OTP & Cuti)": {
+      "main": [
+        [
+          {
+            "node": "Siapkan Format Pesan Gateway",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Siapkan Format Pesan Gateway": {
+      "main": [
+        [
+          {
+            "node": "Polisi Lalu Lintas (Switch)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Polisi Lalu Lintas (Switch)": {
+      "main": [
+        [
+          {
+            "node": "WA Reset Password",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "WA Usulan Cuti (Magic Link)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "WA Keputusan Cuti",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "WA Direct Message (Universal)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "5ef73046-81b0-4fe6-a808-53450e47bd7d",
+  "meta": {
+    "instanceId": "<GANTI_N8N_INSTANCE_ID>"
+  },
+  "nodeGroups": [],
+  "id": "<GANTI_WORKFLOW_ID>",
+  "tags": []
+}

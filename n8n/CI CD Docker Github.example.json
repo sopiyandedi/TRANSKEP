@@ -1,0 +1,149 @@
+{
+  "name": "CI CD Docker Github",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "update-server",
+        "options": {}
+      },
+      "id": "a6226c33-08e4-4eb5-bef5-9db0886b80e5",
+      "name": "2. GitHub Webhook (Auto CI/CD)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        -192,
+        912
+      ],
+      "webhookId": "transkep-cicd-webhook-01"
+    },
+    {
+      "parameters": {
+        "command": "git config --global --add safe.directory * && (if exist <GANTI_DEPLOY_DIR_PRIMARY> (cd /d <GANTI_DEPLOY_DIR_PRIMARY>) else (cd /d <GANTI_DEPLOY_DIR_FALLBACK>)) && git remote set-url origin <GANTI_GIT_REPO_URL> && git fetch origin main && git reset --hard origin/main && docker compose up -d",
+        "cwd": "."
+      },
+      "id": "9d3d5f35-e7a7-4b73-99e6-5fbc57aa7fd7",
+      "name": "SSH Execute Git Pull & Docker",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        80,
+        912
+      ],
+      "credentials": {
+        "sshPassword": {
+          "id": "<GANTI_SSH_CREDENTIAL_ID>",
+          "name": "SSH Password account"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const NL = String.fromCharCode(10); const out = String($input.first().json.stdout || 'Already up to date.'); const err = String($input.first().json.stderr || 'Containers Running & Up-to-Date'); const text = '✅ *LAPORAN AUTO CI/CD TRANSKEP*' + NL + NL + 'Halo Bos! Server kantor baru saja menyelesaikan *Auto-Update* dari GitHub.' + NL + NL + '🤖 *Pengirim (WAHA):* <GANTI_NO_WA_BOT> (Session: default)' + NL + '📱 *Penerima:* <GANTI_NO_WA_ADMIN>' + NL + '📦 *Repository:* transkep-engine' + NL + '⚡ *Status Eksekusi:* BERHASIL' + NL + NL + '🖥️ *Log Git:*' + NL + out + NL + NL + '🐳 *Status Kontainer Docker:*' + NL + err; return [{ json: { chatId: '<GANTI_WA_ADMIN_CHAT_ID>', text } }];"
+      },
+      "id": "ffe12198-5035-4336-ba18-1a42b21df10a",
+      "name": "Format Laporan CI/CD",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        384,
+        912
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://waha:3000/api/sendText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Api-Key",
+              "value": "<GANTI_WAHA_API_KEY>"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "session",
+              "value": "default"
+            },
+            {
+              "name": "chatId",
+              "value": "={{ $json.chatId }}"
+            },
+            {
+              "name": "text",
+              "value": "={{ $json.text }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "0b9f1845-8483-4129-8184-5d7c3e7740e0",
+      "name": "WAHA Notif Admin CI/CD",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        704,
+        912
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "2. GitHub Webhook (Auto CI/CD)": {
+      "main": [
+        [
+          {
+            "node": "SSH Execute Git Pull & Docker",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SSH Execute Git Pull & Docker": {
+      "main": [
+        [
+          {
+            "node": "Format Laporan CI/CD",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Laporan CI/CD": {
+      "main": [
+        [
+          {
+            "node": "WAHA Notif Admin CI/CD",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "7a97c246-903b-47a4-a09d-1c97e22627d9",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "<GANTI_N8N_INSTANCE_ID>"
+  },
+  "nodeGroups": [],
+  "id": "<GANTI_WORKFLOW_ID>",
+  "tags": []
+}

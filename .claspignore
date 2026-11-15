@@ -9,6 +9,7 @@
 firestore.rules
 *.md
 *.example.json
+n8n/**
 n8n_workflow_*.json
 *service-account*.json
 *firebase-adminsdk*.json

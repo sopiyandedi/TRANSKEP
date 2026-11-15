@@ -1,7 +1,9 @@
 # TRANSKEP Local & Secret Isolation (.gitignore)
 # Mencegah workflow n8n berisi kredensial, service account JSON, token CLI, dan file env terunggah ke Git
 
-# Workflow n8n lokal (berisi kredensial internal / webhook secret)
+# Workflow n8n lokal (berisi kredensial internal / WAHA API key / nomor WA / webhook secret)
+n8n/*.json
+!n8n/*.example.json
 n8n_workflow_mysims_surat_keluar.json
 n8n_workflow_*.local.json
 

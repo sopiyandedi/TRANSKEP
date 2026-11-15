@@ -1,0 +1,552 @@
+{
+  "name": "transkep-ai-assistant",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "transkep-ai-assistant",
+        "options": {}
+      },
+      "id": "99cf9863-7472-4a8e-8ce2-36cd1099bb08",
+      "name": "3. WAHA Incoming Webhook (AI Chat)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        -736,
+        1072
+      ],
+      "webhookId": "transkep-waha-ai-assistant"
+    },
+    {
+      "parameters": {},
+      "id": "3e396e4e-e5f9-44ec-bc3d-7853f2156efc",
+      "name": "Tes Manual (Klik Execute di Editor)",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -736,
+        1280
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const NL = String.fromCharCode(10); const inputData = $input.first().json || {}; const isManualTest = Object.keys(inputData).length === 0 || (!inputData.body && !inputData.payload && !inputData.event); const root = inputData.body || inputData || {}; const payload = root.payload || root.data || root || {}; const fromMe = isManualTest ? false : Boolean(payload.fromMe); const rawFrom = isManualTest ? '<GANTI_WA_ADMIN_CHAT_ID>' : String(payload.from || payload.chatId || ''); const rawText = isManualTest ? 'Halo TRANSKEP AI! Konfirmasi singkat bahwa 3-in-1 Master Workflow TRANSKEP Pengadilan Agama Indramayu sudah aktif dan siap digunakan.' : String(payload.body || payload.text || (payload._data && payload._data.body) || '').trim(); const messageId = String(payload.id || ''); const rawJsonStr = JSON.stringify(root); const notifyName = String((payload._data && (payload._data.notifyName || payload._data.pushname)) || payload.notifyName || '').toLowerCase(); const isGroupOrBroadcast = rawFrom.includes('@g.us') || rawFrom.includes('status@broadcast') || rawFrom.includes('@newsletter'); const hasDediNumber = rawJsonStr.includes('<GANTI_NO_WA_ADMIN_TANPA_NOL>'); const hasDediName = notifyName.includes('dedi') || notifyName.includes('sopiyan'); const isLidPrivate = rawFrom.endsWith('@lid'); const isAuthorized = isManualTest || (!fromMe && !isGroupOrBroadcast && rawText.length > 0 && (hasDediNumber || hasDediName || isLidPrivate)); const replyChatId = '<GANTI_WA_ADMIN_CHAT_ID>'; const waktuWIB = new Intl.DateTimeFormat('id-ID', { timeZone: 'Asia/Jakarta', dateStyle: 'full', timeStyle: 'long' }).format(new Date()); const lowerText = rawText.toLowerCase(); let routeType = 'ai_chat'; let modeLabel = '🤖 TRANSKEP Executive AI'; let cleanPrompt = rawText; let systemPersona = ''; if (lowerText === '/server' || lowerText === '/status' || lowerText === '!server') { routeType = 'server_check'; modeLabel = '🖥️ TRANSKEP Server Monitor'; } else if (lowerText.startsWith('/sk ')) { cleanPrompt = rawText.substring(4).trim(); modeLabel = '📜 TRANSKEP - Pakar SK & Regulasi MA-RI'; systemPersona = 'Kamu adalah TRANSKEP AI, Pakar Hukum dan Administrasi Surat Keputusan (SK) Pengadilan Agama Indramayu (Mahkamah Agung RI). Tugasmu membantu Dedi Sopiyan, S.H. menyusun draf SK (Menimbang, Mengingat, Memutuskan, Menetapkan), menganalisis regulasi kepegawaian ASN/PPPK, KNP, KGB, dan mutasi dengan bahasa hukum tata naskah dinas MA-RI yang presisi.'; } else if (lowerText.startsWith('/sop ')) { cleanPrompt = rawText.substring(5).trim(); modeLabel = '📋 TRANSKEP - Pakar SOP Peradilan'; systemPersona = 'Kamu adalah TRANSKEP AI, Arsitek Standar Operasional Prosedur (SOP) Pengadilan Agama Indramayu. Tugasmu menyusun alur SOP Kepaniteraan, Kesekretariatan, PTSP, dan e-Court lengkap dengan Dasar Hukum, Kualifikasi Pelaksana, Keterkaitan, Peralatan, Waktu Penyelesaian, dan Output yang terukur.'; } else if (lowerText.startsWith('/notulen ')) { cleanPrompt = rawText.substring(9).trim(); modeLabel = '🎙️ TRANSKEP - Notulis Eksekutif PA Indramayu'; systemPersona = 'Kamu adalah TRANSKEP AI, Notulis Rapat Eksekutif Pengadilan Agama Indramayu. Tugasmu mengubah catatan rapat mentah dari Dedi Sopiyan, S.H. menjadi dokumen Notulen Rapat Resmi yang rapi, berisi: 1. Identitas/Agenda Rapat, 2. Pokok Pembahasan, 3. Kesimpulan/Keputusan, dan 4. Rencana Tindak Lanjut (Action Items & PIC).'; } else { modeLabel = '🤖 TRANSKEP Personal AI Partner'; systemPersona = 'Kamu adalah TRANSKEP AI, asisten pribadi AI tingkat tinggi dan Technical Partner khusus untuk Bos Dedi Sopiyan, S.H. (IT & Kepegawaian Pengadilan Agama Indramayu, pembuat ekosistem aplikasi TRANSKEP). Jawablah dengan cerdas, strategis, solutif, akrab (panggil Bro atau Bos Dedi), serta terstruktur rapi untuk dibaca di WhatsApp.'; } const fullSystemPrompt = systemPersona + NL + NL + '[INFORMASI WAKTU REAL-TIME: ' + waktuWIB + ']' + NL + 'ATURAN FORMAT WHATSAPP: Gunakan satu tanda bintang *teks* untuk huruf tebal (JANGAN gunakan dua bintang **teks**). Gunakan poin-poin dan emoji agar nyaman dibaca di HP.'; return [{ json: { isAuthorized, routeType, modeLabel, rawFrom, replyChatId, messageId, rawText, cleanPrompt, fullSystemPrompt, waktuWIB, sessionId: 'transkep_dedi_session_01' } }];"
+      },
+      "id": "4df54738-3a3c-4d3f-a049-61f0e3749082",
+      "name": "Context & Persona Engine (Code)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -464,
+        1152
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.isAuthorized }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "2a220fc9-0d00-4b4b-a919-f82dad26980b",
+      "name": "Whitelist Bos Dedi & Anti-Loop",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        -224,
+        1152
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://waha:3000/api/sendSeen",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Api-Key",
+              "value": "<GANTI_WAHA_API_KEY>"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "session",
+              "value": "default"
+            },
+            {
+              "name": "chatId",
+              "value": "={{ $('Context & Persona Engine (Code)').item.json.rawFrom }}"
+            },
+            {
+              "name": "messageId",
+              "value": "={{ $('Context & Persona Engine (Code)').item.json.messageId }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 5000
+        }
+      },
+      "id": "93ecd7bd-7063-447b-a056-75248a464e11",
+      "name": "WAHA Send Seen (Centang Biru)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        32,
+        1072
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://waha:3000/api/startTyping",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Api-Key",
+              "value": "<GANTI_WAHA_API_KEY>"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "session",
+              "value": "default"
+            },
+            {
+              "name": "chatId",
+              "value": "={{ $('Context & Persona Engine (Code)').item.json.replyChatId }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 5000
+        }
+      },
+      "id": "22e6697c-315a-4f1f-9cda-8f3562233c6d",
+      "name": "WAHA Start Typing (Efek Mengetik)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        240,
+        1072
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "dataType": "string",
+        "value1": "={{ $('Context & Persona Engine (Code)').item.json.routeType }}",
+        "rules": {
+          "rules": [
+            {
+              "value2": "ai_chat"
+            },
+            {
+              "value2": "server_check",
+              "output": 1
+            }
+          ]
+        }
+      },
+      "id": "b07276cf-b7f0-4cdd-b16c-d830f60eb585",
+      "name": "Router Perintah (AI vs Cek Server)",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 1,
+      "position": [
+        480,
+        1072
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $('Context & Persona Engine (Code)').item.json.cleanPrompt }}",
+        "options": {
+          "systemMessage": "={{ $('Context & Persona Engine (Code)').item.json.fullSystemPrompt }}"
+        }
+      },
+      "id": "ffea416f-302f-4015-9b4b-e1d91ce98002",
+      "name": "TRANSKEP AI Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.6,
+      "position": [
+        768,
+        928
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-4-hydrogen",
+        "options": {
+          "temperature": 0.4
+        }
+      },
+      "id": "3e233094-3ca3-446d-bf33-ea78a332e6bc",
+      "name": "Google Gemini Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        720,
+        1152
+      ],
+      "credentials": {
+        "googlePalmApi": {
+          "id": "<GANTI_GEMINI_CREDENTIAL_ID>",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('Context & Persona Engine (Code)').item.json.sessionId }}",
+        "contextWindowLength": 20
+      },
+      "id": "20595005-35c7-42e5-ac75-e7eadb9dc817",
+      "name": "Memori Percakapan (20 Chat)",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.2,
+      "position": [
+        912,
+        1152
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const NL = String.fromCharCode(10); const item = $input.first().json; const errText = item.error ? ('⏳ *Server Google AI Sedang Sibuk (503 High Demand):* ' + String(item.error.message || item.error) + NL + NL + '💡 *Tips Anti-Antre:* Buka node Google Gemini Chat Model di n8n lalu pilih model *Gemini 3.5 Flash-Lite* (models/gemini-3.5-flash-lite) yang bebas antrean!') : ''; const aiRaw = String(item.output || item.text || errText || 'Maaf Bos, TRANSKEP AI sedang tidak merespons.'); const meta = $('Context & Persona Engine (Code)').first().json; const formattedText = aiRaw.split('**').join('*').split('### ').join('📌 ').split('## ').join('🔷 '); const finalMessage = '*' + meta.modeLabel + '*' + NL + '────────────────────' + NL + formattedText + NL + NL + '_⚡ Dijawab otomatis oleh TRANSKEP AI Engine_'; return [{ json: { chatId: meta.replyChatId, replyText: finalMessage } }];"
+      },
+      "id": "fdf43611-c1f7-47cc-82d5-4ad643c0b3d4",
+      "name": "Format Markdown ke WhatsApp",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1152,
+        928
+      ]
+    },
+    {
+      "parameters": {
+        "command": "docker ps",
+        "cwd": "."
+      },
+      "id": "b46b3041-3c51-4bd0-b38b-c9291ca70a73",
+      "name": "SSH Cek Kontainer Server",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        768,
+        1328
+      ],
+      "credentials": {
+        "sshPassword": {
+          "id": "<GANTI_SSH_CREDENTIAL_ID>",
+          "name": "SSH Password account"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const NL = String.fromCharCode(10); const sshOut = String($input.first().json.stdout || $input.first().json.stderr || 'Tidak dapat mengambil status docker.'); const meta = $('Context & Persona Engine (Code)').first().json; const msg = '*🖥️ STATUS SERVER TRANSKEP REAL-TIME*' + NL + '────────────────────' + NL + '📅 *Waktu:* ' + meta.waktuWIB + NL + '🆔 *ID Pengirim WAHA:* ' + meta.rawFrom + NL + NL + '🐳 *Kontainer Aktif:*' + NL + sshOut + NL + NL + '💡 _Ketik /sk, /sop, /notulen, atau langsung tulis pertanyaan untuk berdiskusi dengan TRANSKEP AI._'; return [{ json: { chatId: meta.replyChatId, replyText: msg } }];"
+      },
+      "id": "b54a6250-3d42-41a9-8bfa-7717d9b6ca24",
+      "name": "Format Laporan Server",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1152,
+        1328
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://waha:3000/api/sendText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Api-Key",
+              "value": "<GANTI_WAHA_API_KEY>"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "session",
+              "value": "default"
+            },
+            {
+              "name": "chatId",
+              "value": "={{ $json.chatId }}"
+            },
+            {
+              "name": "text",
+              "value": "={{ $json.replyText }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "af3418f3-faa8-49aa-bad8-e6a3a9bff381",
+      "name": "WAHA Kirim Balasan ke Bos Dedi",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        1472,
+        1072
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://waha:3000/api/stopTyping",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Api-Key",
+              "value": "<GANTI_WAHA_API_KEY>"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "session",
+              "value": "default"
+            },
+            {
+              "name": "chatId",
+              "value": "<GANTI_WA_ADMIN_CHAT_ID>"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 5000
+        }
+      },
+      "id": "3aba45dd-bb9b-4309-9e34-8fce7e1f6dd9",
+      "name": "WAHA Stop Typing",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        1712,
+        1072
+      ],
+      "continueOnFail": true
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "3. WAHA Incoming Webhook (AI Chat)": {
+      "main": [
+        [
+          {
+            "node": "Context & Persona Engine (Code)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tes Manual (Klik Execute di Editor)": {
+      "main": [
+        [
+          {
+            "node": "Context & Persona Engine (Code)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Context & Persona Engine (Code)": {
+      "main": [
+        [
+          {
+            "node": "Whitelist Bos Dedi & Anti-Loop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Whitelist Bos Dedi & Anti-Loop": {
+      "main": [
+        [
+          {
+            "node": "WAHA Send Seen (Centang Biru)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WAHA Send Seen (Centang Biru)": {
+      "main": [
+        [
+          {
+            "node": "WAHA Start Typing (Efek Mengetik)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WAHA Start Typing (Efek Mengetik)": {
+      "main": [
+        [
+          {
+            "node": "Router Perintah (AI vs Cek Server)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Router Perintah (AI vs Cek Server)": {
+      "main": [
+        [
+          {
+            "node": "TRANSKEP AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "SSH Cek Kontainer Server",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "TRANSKEP AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Memori Percakapan (20 Chat)": {
+      "ai_memory": [
+        [
+          {
+            "node": "TRANSKEP AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TRANSKEP AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Format Markdown ke WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Markdown ke WhatsApp": {
+      "main": [
+        [
+          {
+            "node": "WAHA Kirim Balasan ke Bos Dedi",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SSH Cek Kontainer Server": {
+      "main": [
+        [
+          {
+            "node": "Format Laporan Server",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Laporan Server": {
+      "main": [
+        [
+          {
+            "node": "WAHA Kirim Balasan ke Bos Dedi",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WAHA Kirim Balasan ke Bos Dedi": {
+      "main": [
+        [
+          {
+            "node": "WAHA Stop Typing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "b275df82-5c9d-41e2-abff-12d9ed07d978",
+  "meta": {
+    "instanceId": "<GANTI_N8N_INSTANCE_ID>"
+  },
+  "nodeGroups": [],
+  "id": "<GANTI_WORKFLOW_ID>",
+  "tags": []
+}
