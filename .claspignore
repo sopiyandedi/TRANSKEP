@@ -5,11 +5,17 @@
 # ikut terunggah ke Google Apps Script saat 'clasp push'
 
 .git/**
+.github/**
+.firebase/**
 .gitignore
 firestore.rules
+firebase.json
+.firebaserc
 *.md
+SECURITY_CHECKLIST.md
 *.example.json
 n8n/**
+tests/**
 n8n_workflow_*.json
 *service-account*.json
 *firebase-adminsdk*.json

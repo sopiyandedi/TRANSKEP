@@ -3,6 +3,10 @@
   "version": "3.5.0",
   "description": "TRANSKEP - Transparansi Kepegawaian Pengadilan Agama Indramayu (Modular SPA & PWA)",
   "main": "index.html",
+  "scripts": {
+    "test": "node tests/run_all.js",
+    "deploy:rules": "npx -y firebase-tools@latest deploy --only firestore:rules"
+  },
   "keywords": [
     "transkep",
     "kepegawaian",

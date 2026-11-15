@@ -20,6 +20,7 @@ serviceAccountKey*.json
 
 # Dependensi & berkas build lokal
 node_modules/
+.firebase/
 tmp/
 .DS_Store
 Thumbs.db
