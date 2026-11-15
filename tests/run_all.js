@@ -7,7 +7,8 @@ const suites = [
   { name: 'Fase 2 - Session Hardening, Formula Injection & Module IDOR', file: 'tests/verify_fase2.js' },
   { name: 'Fase 3A - XSS Escaping, Drive Binary Proxy & URL Schemes', file: 'tests/verify_fase3a.js' },
   { name: 'Fase 3B - Zero-Trust Firestore Auth, CSP/SRI & Drive Access', file: 'tests/verify_fase3b.js' },
-  { name: 'Schema & Release Parity - Firestore Rules vs Client & PWA Version', file: 'tests/verify_firestore_schema.js' }
+  { name: 'Schema & Release Parity - Firestore Rules vs Client & PWA Version', file: 'tests/verify_firestore_schema.js' },
+  { name: 'n8n Workflow - Transkep AI Assistant (Docker + Direct Chat)', file: 'tests/verify_n8n_ai_assistant.js' }
 ];
 
 const startedAt = Date.now();

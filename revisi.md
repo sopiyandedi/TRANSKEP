@@ -6035,3 +6035,22 @@ Item di bawah ini berisiko memutus layanan produksi (WAHA/n8n/Firestore/Drive/CD
 4. **Isolasi Push Apps Script & Dokumentasi Inventarisasi `ScriptProperties`**:
    - Menambahkan `.github/**`, `.firebase/**`, `tests/**`, `firebase.json`, `.firebaserc`, dan [`SECURITY_CHECKLIST.md`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/SECURITY_CHECKLIST.md) ke [`.claspignore`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/.claspignore) serta `.firebase/` ke [`.gitignore`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/.gitignore).
    - Menulis [`SECURITY_CHECKLIST.md`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/SECURITY_CHECKLIST.md) berisi 6 aturan wajib Safe-Dev dan inventarisasi lengkap nama kunci `PropertiesService.getScriptProperties()` (termasuk `ST_DEFAULT_*` dan kunci rahasia sistem tanpa membocorkan nilainya).
+
+---
+
+## Tahap 117: Perbaikan Alur n8n Transkep AI Assistant (Laporan Kontainer Docker, Obrolan Langsung AI & Rebranding Penuh ke Transkep) (2026-11-15)
+**Tujuan:** Memperbaiki workflow AI Assistant n8n agar obrolan langsung AI berjalan stabil dengan model Gemini valid, laporan status kontainer Docker dapat dipanggil via perintah maupun bahasa alami secara akurat, serta membersihkan identitas ke brand **Transkep** tanpa mengubah runtime aplikasi PWA/GAS (`v3.8.50`).
+
+### Rincian Perubahan:
+1. **Perbaikan Model LLM, Ekspresi `.first().json` & Anti-Loop WAHA ([`n8n/transkep-ai-assistant.example.json`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/n8n/transkep-ai-assistant.example.json))**:
+   - Mengganti model LLM tidak valid `models/gemini-4-hydrogen` pada node `Google Gemini Chat Model` menjadi **`models/gemini-3.8-flash`** (dengan tips fallback `models/gemini-3.5-flash-lite` bila terjadi rate limit).
+   - Mengeliminasi referensi `.item.json` yang rapuh pasca HTTP `Send Seen` / `Start Typing` (`continueOnFail: true`) dengan node `Siapkan Input AI Langsung (Code)` + `.first().json`, serta mengganti chatId statis pada `WAHA Stop Typing` menjadi ekspresi dinamis `replyChatId`.
+   - Menambahkan filter event WAHA (`message` / `message.any`), anti self-reply nomor bot, dukungan multi-payload (WEBJS/NOWEB/GOWS), serta pengenalan perintah cepat `/menu` dan `/reset` (epoch memori via `$getWorkflowStaticData('global')`).
+2. **Monitoring Kontainer Docker Real-Time + Analisa AI Docker**:
+   - Menambahkan deteksi intent Docker alami (misalnya *"kontainer apa saja yang jalan di docker"*, `cek docker`, `docker ps`) dan perintah `/docker`, `/server`, `/status`, sementara pertanyaan konseptual tetap diarahkan ke obrolan AI langsung.
+   - Memperbarui perintah SSH node `SSH Cek Kontainer Docker` menjadi `docker ps -a --format "..."` + `docker stats --no-stream --format "..."` (aman di Windows `cmd.exe` maupun Linux `sh`) dengan node `Format Laporan Kontainer Docker (Code)` untuk menyusun laporan WA rapi (ringkasan running/stopped, CPU, RAM, port terdeduplikasi).
+   - Menambahkan cabang kondisional `Analisa Docker dengan AI? (IF)` -> `Gabung Data Docker & Prompt AI (Code)` -> `Transkep AI Agent` untuk permintaan `/analisa docker` atau pertanyaan troubleshooting Docker agar AI menjawab berdasarkan data SSH real-time.
+3. **Rebranding Penuh ke Transkep & Suite Regresi n8n ([`tests/verify_n8n_ai_assistant.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/tests/verify_n8n_ai_assistant.js))**:
+   - Mengganti nama workflow menjadi **`Transkep AI Assistant`**, menyelaraskan nama node/header/footer WhatsApp serta aturan identitas prompt AI ke **Transkep AI**.
+   - Menambahkan suite pengujian ke-6 [`tests/verify_n8n_ai_assistant.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/tests/verify_n8n_ai_assistant.js) di [`tests/run_all.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/tests/run_all.js) untuk memvalidasi topologi graf n8n, paritas `.json` vs `.example.json`, sanitasi rahasia, serta simulasi VM atas seluruh jalur routing & parser Docker.
+   - Memperbarui ringkasan workflow di [`n8n/README.md`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/n8n/README.md) dan [`prd.md`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/prd.md).

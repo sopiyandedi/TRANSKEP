@@ -7,7 +7,7 @@ Diabaikan otomatis oleh `.gitignore` (`n8n/*.json`) dan `.claspignore` (`n8n/**`
 - `n8n_workflow_mysims_surat_keluar.json` — Otomasi Surat Keluar Cuti & ST Terpadu ke MYSIMS.
 - `Waha reset Paswors dan Cuti.json` — Gateway notifikasi WhatsApp WAHA (Reset Password OTP, Usulan Cuti / Magic Link, Keputusan Cuti, & Direct Message).
 - `CI CD Docker Github.json` — Webhook Auto-Update CI/CD repository & Docker + laporan admin via WAHA.
-- `transkep-ai-assistant.json` — Asisten AI WhatsApp eksekutif (`/sk`, `/sop`, `/notulen`, `/server`).
+- `transkep-ai-assistant.json` — **Transkep AI Assistant** via WhatsApp/WAHA (`models/gemini-3.8-flash`): obrolan langsung AI, laporan status kontainer Docker real-time (`/docker`, `/server`, `/status`, atau pertanyaan alami *"kontainer apa saja yang jalan di docker"*), analisa Docker dengan AI (`/analisa docker`), mode spesialis (`/sk`, `/sop`, `/notulen`), serta kontrol sesi (`/menu`, `/reset`).
 
 ## 2. Blueprint Template Tersanitasi (Aman di GitHub)
 Seluruh API Key, ID Kredensial n8n, IP internal LAN, URL deployment, dan nomor WhatsApp pribadi telah disamarkan dengan placeholder `<GANTI_...>`:
@@ -17,3 +17,4 @@ Seluruh API Key, ID Kredensial n8n, IP internal LAN, URL deployment, dan nomor W
 - `transkep-ai-assistant.example.json`
 
 > **Aturan Tambahan:** Setiap menambah berkas workflow `.json` baru ke dalam folder `n8n/`, otomatis terisolasi oleh `.gitignore`. Jika ingin mem-backup struktur barunya ke GitHub, buat versi tersanitasi dengan akhiran `.example.json`.
+

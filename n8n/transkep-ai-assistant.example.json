@@ -1,5 +1,5 @@
 {
-  "name": "transkep-ai-assistant",
+  "name": "Transkep AI Assistant",
   "nodes": [
     {
       "parameters": {
@@ -12,8 +12,8 @@
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 1,
       "position": [
-        -736,
-        1072
+        -800,
+        960
       ],
       "webhookId": "transkep-waha-ai-assistant"
     },
@@ -24,21 +24,21 @@
       "type": "n8n-nodes-base.manualTrigger",
       "typeVersion": 1,
       "position": [
-        -736,
-        1280
+        -800,
+        1180
       ]
     },
     {
       "parameters": {
-        "jsCode": "const NL = String.fromCharCode(10); const inputData = $input.first().json || {}; const isManualTest = Object.keys(inputData).length === 0 || (!inputData.body && !inputData.payload && !inputData.event); const root = inputData.body || inputData || {}; const payload = root.payload || root.data || root || {}; const fromMe = isManualTest ? false : Boolean(payload.fromMe); const rawFrom = isManualTest ? '<GANTI_WA_ADMIN_CHAT_ID>' : String(payload.from || payload.chatId || ''); const rawText = isManualTest ? 'Halo TRANSKEP AI! Konfirmasi singkat bahwa 3-in-1 Master Workflow TRANSKEP Pengadilan Agama Indramayu sudah aktif dan siap digunakan.' : String(payload.body || payload.text || (payload._data && payload._data.body) || '').trim(); const messageId = String(payload.id || ''); const rawJsonStr = JSON.stringify(root); const notifyName = String((payload._data && (payload._data.notifyName || payload._data.pushname)) || payload.notifyName || '').toLowerCase(); const isGroupOrBroadcast = rawFrom.includes('@g.us') || rawFrom.includes('status@broadcast') || rawFrom.includes('@newsletter'); const hasDediNumber = rawJsonStr.includes('<GANTI_NO_WA_ADMIN_TANPA_NOL>'); const hasDediName = notifyName.includes('dedi') || notifyName.includes('sopiyan'); const isLidPrivate = rawFrom.endsWith('@lid'); const isAuthorized = isManualTest || (!fromMe && !isGroupOrBroadcast && rawText.length > 0 && (hasDediNumber || hasDediName || isLidPrivate)); const replyChatId = '<GANTI_WA_ADMIN_CHAT_ID>'; const waktuWIB = new Intl.DateTimeFormat('id-ID', { timeZone: 'Asia/Jakarta', dateStyle: 'full', timeStyle: 'long' }).format(new Date()); const lowerText = rawText.toLowerCase(); let routeType = 'ai_chat'; let modeLabel = '🤖 TRANSKEP Executive AI'; let cleanPrompt = rawText; let systemPersona = ''; if (lowerText === '/server' || lowerText === '/status' || lowerText === '!server') { routeType = 'server_check'; modeLabel = '🖥️ TRANSKEP Server Monitor'; } else if (lowerText.startsWith('/sk ')) { cleanPrompt = rawText.substring(4).trim(); modeLabel = '📜 TRANSKEP - Pakar SK & Regulasi MA-RI'; systemPersona = 'Kamu adalah TRANSKEP AI, Pakar Hukum dan Administrasi Surat Keputusan (SK) Pengadilan Agama Indramayu (Mahkamah Agung RI). Tugasmu membantu Dedi Sopiyan, S.H. menyusun draf SK (Menimbang, Mengingat, Memutuskan, Menetapkan), menganalisis regulasi kepegawaian ASN/PPPK, KNP, KGB, dan mutasi dengan bahasa hukum tata naskah dinas MA-RI yang presisi.'; } else if (lowerText.startsWith('/sop ')) { cleanPrompt = rawText.substring(5).trim(); modeLabel = '📋 TRANSKEP - Pakar SOP Peradilan'; systemPersona = 'Kamu adalah TRANSKEP AI, Arsitek Standar Operasional Prosedur (SOP) Pengadilan Agama Indramayu. Tugasmu menyusun alur SOP Kepaniteraan, Kesekretariatan, PTSP, dan e-Court lengkap dengan Dasar Hukum, Kualifikasi Pelaksana, Keterkaitan, Peralatan, Waktu Penyelesaian, dan Output yang terukur.'; } else if (lowerText.startsWith('/notulen ')) { cleanPrompt = rawText.substring(9).trim(); modeLabel = '🎙️ TRANSKEP - Notulis Eksekutif PA Indramayu'; systemPersona = 'Kamu adalah TRANSKEP AI, Notulis Rapat Eksekutif Pengadilan Agama Indramayu. Tugasmu mengubah catatan rapat mentah dari Dedi Sopiyan, S.H. menjadi dokumen Notulen Rapat Resmi yang rapi, berisi: 1. Identitas/Agenda Rapat, 2. Pokok Pembahasan, 3. Kesimpulan/Keputusan, dan 4. Rencana Tindak Lanjut (Action Items & PIC).'; } else { modeLabel = '🤖 TRANSKEP Personal AI Partner'; systemPersona = 'Kamu adalah TRANSKEP AI, asisten pribadi AI tingkat tinggi dan Technical Partner khusus untuk Bos Dedi Sopiyan, S.H. (IT & Kepegawaian Pengadilan Agama Indramayu, pembuat ekosistem aplikasi TRANSKEP). Jawablah dengan cerdas, strategis, solutif, akrab (panggil Bro atau Bos Dedi), serta terstruktur rapi untuk dibaca di WhatsApp.'; } const fullSystemPrompt = systemPersona + NL + NL + '[INFORMASI WAKTU REAL-TIME: ' + waktuWIB + ']' + NL + 'ATURAN FORMAT WHATSAPP: Gunakan satu tanda bintang *teks* untuk huruf tebal (JANGAN gunakan dua bintang **teks**). Gunakan poin-poin dan emoji agar nyaman dibaca di HP.'; return [{ json: { isAuthorized, routeType, modeLabel, rawFrom, replyChatId, messageId, rawText, cleanPrompt, fullSystemPrompt, waktuWIB, sessionId: 'transkep_dedi_session_01' } }];"
+        "jsCode": "const NL = String.fromCharCode(10);\nconst inputData = $input.first().json || {};\nconst isManualTest =\n  Object.keys(inputData).length === 0 ||\n  (!inputData.body && !inputData.payload && !inputData.event);\n\nconst root = inputData.body || inputData || {};\nconst payload = root.payload || root.data || root || {};\nconst eventName = String(root.event || '').toLowerCase();\nconst isAllowedEvent =\n  isManualTest || !eventName || eventName === 'message' || eventName === 'message.any';\n\nconst fromMe = isManualTest ? false : Boolean(payload.fromMe);\nconst rawFrom = isManualTest\n  ? '<GANTI_WA_ADMIN_CHAT_ID>'\n  : String(payload.from || payload.chatId || '');\n\nconst rawText = isManualTest\n  ? String(\n      inputData.testPrompt ||\n        'Halo Transkep AI! Konfirmasi singkat bahwa Workflow Transkep AI Assistant sudah aktif dan siap melayani.'\n    ).trim()\n  : String(\n      payload.body ||\n        payload.text ||\n        (payload.message &&\n          (payload.message.conversation ||\n            (payload.message.extendedTextMessage && payload.message.extendedTextMessage.text))) ||\n        (payload._data &&\n          (payload._data.body || (payload._data.Message && payload._data.Message.conversation))) ||\n        ''\n    ).trim();\n\nconst messageId = String(payload.id || '');\nconst rawJsonStr = JSON.stringify(root);\nconst notifyName = String(\n  (payload._data && (payload._data.notifyName || payload._data.pushname)) ||\n    payload.notifyName ||\n    ''\n).toLowerCase();\n\nconst isBotSelf = rawFrom.includes('<GANTI_NO_WA_BOT>');\nconst isGroupOrBroadcast =\n  rawFrom === '' ||\n  rawFrom.includes('@g.us') ||\n  rawFrom.includes('status@broadcast') ||\n  rawFrom.includes('@newsletter');\n\nconst hasAdminNumber = rawJsonStr.includes('<GANTI_NO_WA_ADMIN_TANPA_NOL>');\nconst hasAdminName = notifyName.includes('dedi') || notifyName.includes('sopiyan');\nconst isLidPrivate = rawFrom.endsWith('@lid');\n\nconst isAuthorized =\n  isManualTest ||\n  (isAllowedEvent &&\n    !fromMe &&\n    !isBotSelf &&\n    !isGroupOrBroadcast &&\n    rawText.length > 0 &&\n    (hasAdminNumber || hasAdminName || isLidPrivate));\n\nconst replyChatId = rawFrom.endsWith('@c.us') ? rawFrom : '<GANTI_WA_ADMIN_CHAT_ID>';\nconst waktuWIB = new Intl.DateTimeFormat('id-ID', {\n  timeZone: 'Asia/Jakarta',\n  dateStyle: 'full',\n  timeStyle: 'long',\n}).format(new Date());\n\nlet staticData = {};\ntry {\n  if (typeof $getWorkflowStaticData === 'function') {\n    staticData = $getWorkflowStaticData('global') || {};\n  }\n} catch (e) {\n  staticData = {};\n}\nlet chatEpoch = Number(staticData.chatEpoch || 1);\n\nconst lowerText = rawText.toLowerCase().trim();\nlet routeType = 'ai_chat';\nlet quickAction = '';\nlet wantsAiDockerAnalysis = false;\nlet modeLabel = '🤖 Transkep AI Partner';\nlet cleanPrompt = rawText;\nlet systemPersona = '';\n\nconst isResetCmd =\n  /^(?:\\/|!)?(?:reset|clear|hapusmemori|reset chat|reset memori|clear chat)$/i.test(lowerText);\nconst isMenuCmd =\n  /^(?:\\/|!)?(?:menu|help|bantuan|perintah|panduan)$/i.test(lowerText);\n\nconst hasDockerSlash =\n  /^\\/(?:server|status|docker|kontainer|ps)\\b|^!(?:server|status|docker|kontainer|ps)\\b|^\\/(?:analisa|analisis|diagnosa)\\s+docker\\b/i.test(\n    lowerText\n  );\nconst mentionsDockerTarget = /\\b(?:docker|kontainer|container)\\b/i.test(lowerText);\nconst hasDockerQueryVerb =\n  /\\b(?:jalan|berjalan|running|aktif|nyala|hidup|mati|stop|stopped|exited|down|status|cek|lihat|daftar|list|apa saja|apa aja|laporan|info|pantau|kondisi|kesehatan|health|sehat|crash|restart|error|masalah|bermasalah|kenapa|analisa|analisis|diagnosa|ram|cpu|memori|memory|resource|uptime|port|ps|stats)\\b/i.test(\n    lowerText\n  );\nconst isConceptualDockerQuestion =\n  !hasDockerSlash &&\n  /\\b(?:pengertian|definisi|kelebihan|kekurangan|fungsi|sejarah|tutorial|cara install|belajar|contoh dockerfile|perbedaan)\\b/i.test(\n    lowerText\n  );\nconst isDockerIntent =\n  hasDockerSlash || (!isConceptualDockerQuestion && mentionsDockerTarget && hasDockerQueryVerb);\n\nconst skMatch = rawText.match(/^\\/sk(?:\\s+([\\s\\S]+))?$/i);\nconst sopMatch = rawText.match(/^\\/sop(?:\\s+([\\s\\S]+))?$/i);\nconst notulenMatch = rawText.match(/^\\/notulen(?:\\s+([\\s\\S]+))?$/i);\n\nif (isAuthorized && isResetCmd) {\n  chatEpoch += 1;\n  staticData.chatEpoch = chatEpoch;\n  routeType = 'quick_reply';\n  quickAction = 'reset';\n  modeLabel = '🔄 Transkep AI Memory Reset';\n} else if (isMenuCmd) {\n  routeType = 'quick_reply';\n  quickAction = 'menu';\n  modeLabel = '🧭 Panduan Transkep AI Assistant';\n} else if (isDockerIntent) {\n  routeType = 'docker';\n  const hasSlashWithArgs =\n    /^\\/(?:server|status|docker|kontainer|ps)\\s+\\S+/i.test(lowerText) ||\n    /^!(?:server|status|docker|kontainer|ps)\\s+\\S+/i.test(lowerText);\n  const hasAiAnalysisCue =\n    /^\\/(?:analisa|analisis|diagnosa)\\b/i.test(lowerText) ||\n    /\\b(?:analisa|analisis|diagnosa|kenapa|mengapa|penyebab|solusi|rekomendasi|saran|jelaskan|evaluasi|troubleshooting|troubleshoot|perbaiki)\\b/i.test(\n      lowerText\n    );\n  wantsAiDockerAnalysis = hasSlashWithArgs || hasAiAnalysisCue;\n  modeLabel = wantsAiDockerAnalysis\n    ? '🐳🔬 Transkep AI — Analisa Docker Server'\n    : '🐳 Status Kontainer Docker Transkep';\n} else if (skMatch) {\n  cleanPrompt =\n    (skMatch[1] && skMatch[1].trim()) ||\n    'Jelaskan cara menggunakan perintah /sk beserta contoh draf Surat Keputusan (SK) resmi.';\n  modeLabel = '📜 Transkep AI — Pakar SK & Regulasi MA-RI';\n  systemPersona =\n    'Kamu adalah Transkep AI (asisten resmi ekosistem TRANSKEP), Pakar Hukum dan Administrasi Surat Keputusan (SK) Pengadilan Agama Indramayu (Mahkamah Agung RI). Tugasmu membantu Admin Transkep menyusun draf SK (Menimbang, Mengingat, Memutuskan, Menetapkan), menganalisis regulasi kepegawaian ASN/PPPK, KNP, KGB, dan mutasi dengan bahasa hukum tata naskah dinas MA-RI yang presisi.';\n} else if (sopMatch) {\n  cleanPrompt =\n    (sopMatch[1] && sopMatch[1].trim()) ||\n    'Jelaskan cara menggunakan perintah /sop beserta struktur Standar Operasional Prosedur (SOP) peradilan.';\n  modeLabel = '📋 Transkep AI — Pakar SOP Peradilan';\n  systemPersona =\n    'Kamu adalah Transkep AI (asisten resmi ekosistem TRANSKEP), Arsitek Standar Operasional Prosedur (SOP) Pengadilan Agama Indramayu. Tugasmu menyusun alur SOP Kepaniteraan, Kesekretariatan, PTSP, dan e-Court lengkap dengan Dasar Hukum, Kualifikasi Pelaksana, Keterkaitan, Peralatan, Waktu Penyelesaian, dan Output yang terukur.';\n} else if (notulenMatch) {\n  cleanPrompt =\n    (notulenMatch[1] && notulenMatch[1].trim()) ||\n    'Jelaskan cara menggunakan perintah /notulen untuk merapikan catatan rapat menjadi notulen resmi.';\n  modeLabel = '🎙️ Transkep AI — Notulis Eksekutif PA Indramayu';\n  systemPersona =\n    'Kamu adalah Transkep AI (asisten resmi ekosistem TRANSKEP), Notulis Rapat Eksekutif Pengadilan Agama Indramayu. Tugasmu mengubah catatan rapat mentah menjadi dokumen Notulen Rapat Resmi yang rapi, berisi: 1. Identitas/Agenda Rapat, 2. Pokok Pembahasan, 3. Kesimpulan/Keputusan, dan 4. Rencana Tindak Lanjut (Action Items & PIC).';\n} else {\n  modeLabel = '🤖 Transkep AI Partner';\n  systemPersona =\n    'Kamu adalah Transkep AI, asisten pribadi AI resmi ekosistem TRANSKEP dan Technical Partner khusus untuk Admin Transkep (IT & Kepegawaian Pengadilan Agama Indramayu). IDENTITAS WAJIB: selalu perkenalkan dan sebut dirimu hanya sebagai Transkep AI (jangan gunakan nama asisten lain selain Transkep AI). Jawablah dengan cerdas, strategis, solutif, akrab (sapa Bro), serta terstruktur rapi untuk dibaca di WhatsApp. Catatan kemampuan: jika pengguna menanyakan daftar/status kontainer Docker real-time, arahkan mereka memakai /docker atau langsung menanyakan kontainer apa saja yang berjalan di Docker karena obrolan umum tidak mengeksekusi SSH secara langsung.';\n}\n\nconst fullSystemPrompt =\n  systemPersona +\n  NL +\n  NL +\n  '[INFORMASI WAKTU REAL-TIME: ' +\n  waktuWIB +\n  ']' +\n  NL +\n  'ATURAN IDENTITAS: Namamu adalah Transkep AI. Gunakan brand Transkep pada setiap identitas jawaban.' +\n  NL +\n  'ATURAN FORMAT WHATSAPP: Gunakan satu tanda bintang *teks* untuk huruf tebal (JANGAN gunakan dua bintang **teks**). Gunakan poin-poin rapi dan emoji secukupnya agar nyaman dibaca di HP.';\n\nconst sessionId = 'transkep_ai_session_e' + chatEpoch;\n\nreturn [\n  {\n    json: {\n      isAuthorized,\n      routeType,\n      quickAction,\n      wantsAiDockerAnalysis,\n      modeLabel,\n      rawFrom,\n      replyChatId,\n      messageId,\n      rawText,\n      cleanPrompt,\n      fullSystemPrompt,\n      waktuWIB,\n      sessionId,\n      chatEpoch,\n    },\n  },\n];"
       },
       "id": "4df54738-3a3c-4d3f-a049-61f0e3749082",
-      "name": "Context & Persona Engine (Code)",
+      "name": "Context & Router Transkep (Code)",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -464,
-        1152
+        -540,
+        1060
       ]
     },
     {
@@ -53,12 +53,12 @@
         }
       },
       "id": "2a220fc9-0d00-4b4b-a919-f82dad26980b",
-      "name": "Whitelist Bos Dedi & Anti-Loop",
+      "name": "Whitelist Admin Transkep & Anti-Loop",
       "type": "n8n-nodes-base.if",
       "typeVersion": 1,
       "position": [
-        -224,
-        1152
+        -280,
+        1060
       ]
     },
     {
@@ -87,11 +87,11 @@
             },
             {
               "name": "chatId",
-              "value": "={{ $('Context & Persona Engine (Code)').item.json.rawFrom }}"
+              "value": "={{ $('Context & Router Transkep (Code)').first().json.rawFrom }}"
             },
             {
               "name": "messageId",
-              "value": "={{ $('Context & Persona Engine (Code)').item.json.messageId }}"
+              "value": "={{ $('Context & Router Transkep (Code)').first().json.messageId }}"
             }
           ]
         },
@@ -104,8 +104,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
       "position": [
-        32,
-        1072
+        -20,
+        1060
       ],
       "continueOnFail": true
     },
@@ -135,7 +135,7 @@
             },
             {
               "name": "chatId",
-              "value": "={{ $('Context & Persona Engine (Code)').item.json.replyChatId }}"
+              "value": "={{ $('Context & Router Transkep (Code)').first().json.replyChatId }}"
             }
           ]
         },
@@ -148,119 +148,67 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
       "position": [
-        240,
-        1072
+        220,
+        1060
       ],
       "continueOnFail": true
     },
     {
       "parameters": {
         "dataType": "string",
-        "value1": "={{ $('Context & Persona Engine (Code)').item.json.routeType }}",
+        "value1": "={{ $('Context & Router Transkep (Code)').first().json.routeType }}",
         "rules": {
           "rules": [
             {
-              "value2": "ai_chat"
+              "value2": "ai_chat",
+              "output": 0
             },
             {
-              "value2": "server_check",
+              "value2": "docker",
               "output": 1
+            },
+            {
+              "value2": "quick_reply",
+              "output": 2
             }
           ]
-        }
+        },
+        "fallbackOutput": 0
       },
       "id": "b07276cf-b7f0-4cdd-b16c-d830f60eb585",
-      "name": "Router Perintah (AI vs Cek Server)",
+      "name": "Router Perintah (AI vs Docker vs Menu)",
       "type": "n8n-nodes-base.switch",
       "typeVersion": 1,
       "position": [
-        480,
-        1072
+        460,
+        1060
       ]
     },
     {
       "parameters": {
-        "promptType": "define",
-        "text": "={{ $('Context & Persona Engine (Code)').item.json.cleanPrompt }}",
-        "options": {
-          "systemMessage": "={{ $('Context & Persona Engine (Code)').item.json.fullSystemPrompt }}"
-        }
+        "jsCode": "const meta = $('Context & Router Transkep (Code)').first().json || {};\nreturn [\n  {\n    json: {\n      cleanPrompt: String(meta.cleanPrompt || meta.rawText || ''),\n      fullSystemPrompt: String(meta.fullSystemPrompt || ''),\n      sessionId: String(meta.sessionId || 'transkep_ai_session_e1'),\n      modeLabel: String(meta.modeLabel || '🤖 Transkep AI Partner'),\n      replyChatId: String(meta.replyChatId || ''),\n    },\n  },\n];"
       },
-      "id": "ffea416f-302f-4015-9b4b-e1d91ce98002",
-      "name": "TRANSKEP AI Agent",
-      "type": "@n8n/n8n-nodes-langchain.agent",
-      "typeVersion": 1.6,
-      "position": [
-        768,
-        928
-      ],
-      "retryOnFail": true,
-      "maxTries": 3,
-      "waitBetweenTries": 3000,
-      "continueOnFail": true
-    },
-    {
-      "parameters": {
-        "modelName": "models/gemini-4-hydrogen",
-        "options": {
-          "temperature": 0.4
-        }
-      },
-      "id": "3e233094-3ca3-446d-bf33-ea78a332e6bc",
-      "name": "Google Gemini Chat Model",
-      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
-      "typeVersion": 1,
-      "position": [
-        720,
-        1152
-      ],
-      "credentials": {
-        "googlePalmApi": {
-          "id": "<GANTI_GEMINI_CREDENTIAL_ID>",
-          "name": "Google Gemini(PaLM) Api account"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "sessionIdType": "customKey",
-        "sessionKey": "={{ $('Context & Persona Engine (Code)').item.json.sessionId }}",
-        "contextWindowLength": 20
-      },
-      "id": "20595005-35c7-42e5-ac75-e7eadb9dc817",
-      "name": "Memori Percakapan (20 Chat)",
-      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
-      "typeVersion": 1.2,
-      "position": [
-        912,
-        1152
-      ]
-    },
-    {
-      "parameters": {
-        "jsCode": "const NL = String.fromCharCode(10); const item = $input.first().json; const errText = item.error ? ('⏳ *Server Google AI Sedang Sibuk (503 High Demand):* ' + String(item.error.message || item.error) + NL + NL + '💡 *Tips Anti-Antre:* Buka node Google Gemini Chat Model di n8n lalu pilih model *Gemini 3.5 Flash-Lite* (models/gemini-3.5-flash-lite) yang bebas antrean!') : ''; const aiRaw = String(item.output || item.text || errText || 'Maaf Bos, TRANSKEP AI sedang tidak merespons.'); const meta = $('Context & Persona Engine (Code)').first().json; const formattedText = aiRaw.split('**').join('*').split('### ').join('📌 ').split('## ').join('🔷 '); const finalMessage = '*' + meta.modeLabel + '*' + NL + '────────────────────' + NL + formattedText + NL + NL + '_⚡ Dijawab otomatis oleh TRANSKEP AI Engine_'; return [{ json: { chatId: meta.replyChatId, replyText: finalMessage } }];"
-      },
-      "id": "fdf43611-c1f7-47cc-82d5-4ad643c0b3d4",
-      "name": "Format Markdown ke WhatsApp",
+      "id": "c8f11e34-6c52-415e-89aa-91b741b8a101",
+      "name": "Siapkan Input AI Langsung (Code)",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1152,
-        928
+        740,
+        820
       ]
     },
     {
       "parameters": {
-        "command": "docker ps",
+        "command": "docker ps -a --format \"{{.Names}}|{{.State}}|{{.Status}}|{{.Image}}|{{.Ports}}\" && echo ---STATS--- && (docker stats --no-stream --format \"{{.Name}}|{{.CPUPerc}}|{{.MemUsage}}\" || echo NO_STATS)",
         "cwd": "."
       },
       "id": "b46b3041-3c51-4bd0-b38b-c9291ca70a73",
-      "name": "SSH Cek Kontainer Server",
+      "name": "SSH Cek Kontainer Docker",
       "type": "n8n-nodes-base.ssh",
       "typeVersion": 1,
       "position": [
-        768,
-        1328
+        740,
+        1140
       ],
       "credentials": {
         "sshPassword": {
@@ -272,15 +220,132 @@
     },
     {
       "parameters": {
-        "jsCode": "const NL = String.fromCharCode(10); const sshOut = String($input.first().json.stdout || $input.first().json.stderr || 'Tidak dapat mengambil status docker.'); const meta = $('Context & Persona Engine (Code)').first().json; const msg = '*🖥️ STATUS SERVER TRANSKEP REAL-TIME*' + NL + '────────────────────' + NL + '📅 *Waktu:* ' + meta.waktuWIB + NL + '🆔 *ID Pengirim WAHA:* ' + meta.rawFrom + NL + NL + '🐳 *Kontainer Aktif:*' + NL + sshOut + NL + NL + '💡 _Ketik /sk, /sop, /notulen, atau langsung tulis pertanyaan untuk berdiskusi dengan TRANSKEP AI._'; return [{ json: { chatId: meta.replyChatId, replyText: msg } }];"
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $('Context & Router Transkep (Code)').first().json.wantsAiDockerAnalysis }}",
+              "value2": true
+            }
+          ]
+        }
       },
-      "id": "b54a6250-3d42-41a9-8bfa-7717d9b6ca24",
-      "name": "Format Laporan Server",
+      "id": "d7a913b4-78ce-473f-9d18-2e4074d83b11",
+      "name": "Analisa Docker dengan AI? (IF)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        980,
+        1140
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const NL = String.fromCharCode(10);\nconst sshItem = $input.first().json || {};\nconst meta = $('Context & Router Transkep (Code)').first().json || {};\n\nfunction cleanLine(s) {\n  return String(s || '').trim().replace(/^\"+|\"+$/g, '').trim();\n}\n\nfunction compactPorts(rawPorts) {\n  const txt = cleanLine(rawPorts);\n  if (!txt) return '-';\n  const parts = txt.split(',').map((p) => p.trim()).filter(Boolean);\n  const uniq = [];\n  for (const p of parts) {\n    const normalized = p.replace(/^\\[::\\]:/, '').replace(/^0\\.0\\.0\\.0:/, '');\n    if (!uniq.includes(normalized)) uniq.push(normalized);\n  }\n  return uniq.slice(0, 4).join(', ') + (uniq.length > 4 ? ' (+' + (uniq.length - 4) + ' lainnya)' : '');\n}\n\nfunction parseDockerOutput(item) {\n  const errObj = item.error;\n  const errMsg = errObj ? String(errObj.message || errObj) : (item.message ? String(item.message) : '');\n  const exitCode = item.code !== undefined && item.code !== null ? Number(item.code) : 0;\n  const stdout = String(item.stdout || '').trim();\n  const stderr = String(item.stderr || '').trim();\n\n  if (!stdout && (errMsg || stderr || exitCode !== 0)) {\n    return {\n      ok: false,\n      errorText: errMsg || stderr || ('SSH exit code ' + exitCode),\n      running: [],\n      stopped: [],\n      rawFallback: '',\n    };\n  }\n\n  const lines = stdout.split(/\\r?\\n/).map(cleanLine).filter(Boolean);\n  const markerIdx = lines.findIndex((l) => l === '---STATS---');\n  const psLines = markerIdx >= 0 ? lines.slice(0, markerIdx) : lines;\n  const statsLines = markerIdx >= 0 ? lines.slice(markerIdx + 1) : [];\n\n  const statsMap = {};\n  for (const sl of statsLines) {\n    if (!sl || sl === 'NO_STATS') continue;\n    const cols = sl.split('|');\n    if (cols.length >= 3) {\n      const name = cleanLine(cols[0]);\n      statsMap[name] = { cpu: cleanLine(cols[1]) || '-', mem: cleanLine(cols[2]) || '-' };\n    }\n  }\n\n  const running = [];\n  const stopped = [];\n  let parsedPipeCount = 0;\n\n  for (const pl of psLines) {\n    const cols = pl.split('|');\n    if (cols.length >= 4) {\n      parsedPipeCount += 1;\n      const name = cleanLine(cols[0]);\n      const state = cleanLine(cols[1]).toLowerCase();\n      const status = cleanLine(cols[2]);\n      const image = cleanLine(cols[3]);\n      const ports = compactPorts(cols.slice(4).join('|'));\n      const stat = statsMap[name] || { cpu: '-', mem: '-' };\n      const entry = { name, state, status, image, ports, cpu: stat.cpu, mem: stat.mem };\n      if (state === 'running') running.push(entry);\n      else stopped.push(entry);\n    }\n  }\n\n  if (parsedPipeCount === 0 && psLines.length > 0) {\n    return { ok: true, running: [], stopped: [], rawFallback: psLines.join(NL) };\n  }\n\n  return { ok: true, errorText: '', running, stopped, rawFallback: '' };\n}\n\nfunction buildDockerSummary(parsed) {\n  if (!parsed.ok) {\n    return (\n      '⚠️ *Gagal mengambil data Docker via SSH.*' + NL +\n      'Detail: ' + parsed.errorText + NL +\n      'Pastikan Docker Desktop / Docker Engine aktif dan service SSH di server berjalan normal.'\n    );\n  }\n  if (parsed.rawFallback) {\n    return '🐳 *Output Docker Mentah:*' + NL + parsed.rawFallback;\n  }\n\n  const total = parsed.running.length + parsed.stopped.length;\n  const out = [];\n  out.push(\n    '📊 *Ringkasan:* ✅ Berjalan: *' + parsed.running.length + '* | 🔴 Berhenti/Lainnya: *' + parsed.stopped.length + '* | 📦 Total: *' + total + '*'\n  );\n\n  if (total === 0) {\n    out.push('', 'ℹ️ Tidak ada kontainer Docker yang terdaftar saat ini.');\n    return out.join(NL);\n  }\n\n  if (parsed.running.length > 0) {\n    out.push('', '🟢 *KONTAINER BERJALAN (' + parsed.running.length + '):*');\n    for (const c of parsed.running) {\n      out.push('• *' + c.name + '* (' + c.status + ')');\n      out.push('  ↳ CPU: ' + c.cpu + ' | RAM: ' + c.mem + ' | Image: ' + c.image);\n      if (c.ports && c.ports !== '-') {\n        out.push('  ↳ Port: ' + c.ports);\n      }\n    }\n  } else {\n    out.push('', '🔴 *Tidak ada kontainer Docker yang sedang berjalan!*');\n  }\n\n  if (parsed.stopped.length > 0) {\n    out.push('', '🔴 *KONTAINER BERHENTI / MASALAH (' + parsed.stopped.length + '):*');\n    for (const c of parsed.stopped) {\n      out.push('• *' + c.name + '* [' + c.state + '] — ' + c.status + ' (Image: ' + c.image + ')');\n    }\n  }\n\n  return out.join(NL);\n}\n\nconst parsed = parseDockerOutput(sshItem);\nconst summary = buildDockerSummary(parsed);\n\nconst cleanPrompt =\n  'Permintaan Admin Transkep: \"' +\n  String(meta.rawText || '/analisa docker') +\n  '\"' +\n  NL +\n  NL +\n  '=== DATA REAL-TIME KONTAINER DOCKER TRANSKEP (' +\n  String(meta.waktuWIB || '-') +\n  ') ===' +\n  NL +\n  summary +\n  NL +\n  '==============================================================' +\n  NL +\n  NL +\n  'Analisislah data kontainer Docker real-time di atas untuk menjawab permintaan Admin Transkep secara akurat, ringkas, dan solutif. Jangan mengarang kontainer atau angka di luar data SSH di atas.';\n\nconst fullSystemPrompt =\n  'Kamu adalah Transkep AI, asisten DevOps & Infrastruktur Docker resmi ekosistem TRANSKEP.' +\n  NL +\n  'Tugasmu menganalisa laporan kontainer Docker real-time (container running, stopped/exited, port, CPU, RAM) dan memberikan insight serta langkah perbaikan praktis dalam Bahasa Indonesia yang akrab (sapa Bro).' +\n  NL +\n  'ATURAN IDENTITAS: Namamu adalah Transkep AI (jangan gunakan nama asisten lain selain Transkep AI).' +\n  NL +\n  'ATURAN FORMAT WHATSAPP: Gunakan satu tanda bintang *teks* untuk tebal (JANGAN gunakan **teks**).';\n\nreturn [\n  {\n    json: {\n      cleanPrompt,\n      fullSystemPrompt,\n      sessionId: String(meta.sessionId || 'transkep_ai_session_e1'),\n      modeLabel: String(meta.modeLabel || '🐳🔬 Transkep AI — Analisa Docker Server'),\n      replyChatId: String(meta.replyChatId || ''),\n    },\n  },\n];"
+      },
+      "id": "a90e21f7-29bc-48b0-8c34-63fd1b04e202",
+      "name": "Gabung Data Docker & Prompt AI (Code)",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1152,
-        1328
+        1220,
+        1020
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const NL = String.fromCharCode(10);\nconst sshItem = $input.first().json || {};\nconst meta = $('Context & Router Transkep (Code)').first().json || {};\n\nfunction cleanLine(s) {\n  return String(s || '').trim().replace(/^\"+|\"+$/g, '').trim();\n}\n\nfunction compactPorts(rawPorts) {\n  const txt = cleanLine(rawPorts);\n  if (!txt) return '-';\n  const parts = txt.split(',').map((p) => p.trim()).filter(Boolean);\n  const uniq = [];\n  for (const p of parts) {\n    const normalized = p.replace(/^\\[::\\]:/, '').replace(/^0\\.0\\.0\\.0:/, '');\n    if (!uniq.includes(normalized)) uniq.push(normalized);\n  }\n  return uniq.slice(0, 4).join(', ') + (uniq.length > 4 ? ' (+' + (uniq.length - 4) + ' lainnya)' : '');\n}\n\nfunction parseDockerOutput(item) {\n  const errObj = item.error;\n  const errMsg = errObj ? String(errObj.message || errObj) : (item.message ? String(item.message) : '');\n  const exitCode = item.code !== undefined && item.code !== null ? Number(item.code) : 0;\n  const stdout = String(item.stdout || '').trim();\n  const stderr = String(item.stderr || '').trim();\n\n  if (!stdout && (errMsg || stderr || exitCode !== 0)) {\n    return {\n      ok: false,\n      errorText: errMsg || stderr || ('SSH exit code ' + exitCode),\n      running: [],\n      stopped: [],\n      rawFallback: '',\n    };\n  }\n\n  const lines = stdout.split(/\\r?\\n/).map(cleanLine).filter(Boolean);\n  const markerIdx = lines.findIndex((l) => l === '---STATS---');\n  const psLines = markerIdx >= 0 ? lines.slice(0, markerIdx) : lines;\n  const statsLines = markerIdx >= 0 ? lines.slice(markerIdx + 1) : [];\n\n  const statsMap = {};\n  for (const sl of statsLines) {\n    if (!sl || sl === 'NO_STATS') continue;\n    const cols = sl.split('|');\n    if (cols.length >= 3) {\n      const name = cleanLine(cols[0]);\n      statsMap[name] = { cpu: cleanLine(cols[1]) || '-', mem: cleanLine(cols[2]) || '-' };\n    }\n  }\n\n  const running = [];\n  const stopped = [];\n  let parsedPipeCount = 0;\n\n  for (const pl of psLines) {\n    const cols = pl.split('|');\n    if (cols.length >= 4) {\n      parsedPipeCount += 1;\n      const name = cleanLine(cols[0]);\n      const state = cleanLine(cols[1]).toLowerCase();\n      const status = cleanLine(cols[2]);\n      const image = cleanLine(cols[3]);\n      const ports = compactPorts(cols.slice(4).join('|'));\n      const stat = statsMap[name] || { cpu: '-', mem: '-' };\n      const entry = { name, state, status, image, ports, cpu: stat.cpu, mem: stat.mem };\n      if (state === 'running') running.push(entry);\n      else stopped.push(entry);\n    }\n  }\n\n  if (parsedPipeCount === 0 && psLines.length > 0) {\n    return { ok: true, running: [], stopped: [], rawFallback: psLines.join(NL) };\n  }\n\n  return { ok: true, errorText: '', running, stopped, rawFallback: '' };\n}\n\nfunction buildDockerSummary(parsed) {\n  if (!parsed.ok) {\n    return (\n      '⚠️ *Gagal mengambil data Docker via SSH.*' + NL +\n      'Detail: ' + parsed.errorText + NL +\n      'Pastikan Docker Desktop / Docker Engine aktif dan service SSH di server berjalan normal.'\n    );\n  }\n  if (parsed.rawFallback) {\n    return '🐳 *Output Docker Mentah:*' + NL + parsed.rawFallback;\n  }\n\n  const total = parsed.running.length + parsed.stopped.length;\n  const out = [];\n  out.push(\n    '📊 *Ringkasan:* ✅ Berjalan: *' + parsed.running.length + '* | 🔴 Berhenti/Lainnya: *' + parsed.stopped.length + '* | 📦 Total: *' + total + '*'\n  );\n\n  if (total === 0) {\n    out.push('', 'ℹ️ Tidak ada kontainer Docker yang terdaftar saat ini.');\n    return out.join(NL);\n  }\n\n  if (parsed.running.length > 0) {\n    out.push('', '🟢 *KONTAINER BERJALAN (' + parsed.running.length + '):*');\n    for (const c of parsed.running) {\n      out.push('• *' + c.name + '* (' + c.status + ')');\n      out.push('  ↳ CPU: ' + c.cpu + ' | RAM: ' + c.mem + ' | Image: ' + c.image);\n      if (c.ports && c.ports !== '-') {\n        out.push('  ↳ Port: ' + c.ports);\n      }\n    }\n  } else {\n    out.push('', '🔴 *Tidak ada kontainer Docker yang sedang berjalan!*');\n  }\n\n  if (parsed.stopped.length > 0) {\n    out.push('', '🔴 *KONTAINER BERHENTI / MASALAH (' + parsed.stopped.length + '):*');\n    for (const c of parsed.stopped) {\n      out.push('• *' + c.name + '* [' + c.state + '] — ' + c.status + ' (Image: ' + c.image + ')');\n    }\n  }\n\n  return out.join(NL);\n}\n\nconst parsed = parseDockerOutput(sshItem);\nconst summary = buildDockerSummary(parsed);\n\nconst msg =\n  '*🐳 LAPORAN KONTAINER DOCKER TRANSKEP*' +\n  NL +\n  '────────────────────' +\n  NL +\n  '📅 *Waktu:* ' +\n  String(meta.waktuWIB || '-') +\n  NL +\n  NL +\n  summary +\n  NL +\n  NL +\n  '_💡 Ketik /analisa docker untuk analisa AI, /menu untuk daftar perintah, atau chat langsung dengan Transkep AI._';\n\nreturn [{ json: { chatId: String(meta.replyChatId || ''), replyText: msg } }];"
+      },
+      "id": "b54a6250-3d42-41a9-8bfa-7717d9b6ca24",
+      "name": "Format Laporan Kontainer Docker (Code)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1220,
+        1260
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const NL = String.fromCharCode(10);\nconst meta = $('Context & Router Transkep (Code)').first().json || {};\nlet msg = '';\n\nif (meta.quickAction === 'reset') {\n  msg =\n    '*🔄 MEMORI PERCAKAPAN TRANSKEP AI DIRESET*' +\n    NL +\n    '────────────────────' +\n    NL +\n    '✅ Sesi obrolan baru telah aktif (*' +\n    String(meta.sessionId || 'transkep_ai_session_e1') +\n    '*).' +\n    NL +\n    'Konteks percakapan sebelumnya sudah dibersihkan. Silakan mulai topik baru dengan *Transkep AI*!';\n} else {\n  msg =\n    '*🧭 PANDUAN TRANSKEP AI ASSISTANT*' +\n    NL +\n    '────────────────────' +\n    NL +\n    '💬 *Obrolan Langsung AI:*' +\n    NL +\n    'Kirim pertanyaan atau diskusi apa saja secara langsung (tanpa prefix).' +\n    NL +\n    NL +\n    '🐳 *Monitoring Kontainer Docker:*' +\n    NL +\n    '• `/docker`, `/server`, `/status` atau tanya *\"kontainer apa saja yang jalan di docker\"* → Laporan real-time kontainer (Status, CPU, RAM, Port)' +\n    NL +\n    '• `/analisa docker` atau `/docker <pertanyaan>` → Analisa kondisi kontainer langsung oleh Transkep AI' +\n    NL +\n    NL +\n    '📑 *Mode Spesialis Transkep:*' +\n    NL +\n    '• `/sk <keperluan>` → Pakar Draf SK & Regulasi MA-RI' +\n    NL +\n    '• `/sop <judul>` → Arsitek SOP Peradilan' +\n    NL +\n    '• `/notulen <catatan>` → Notulis Rapat Eksekutif' +\n    NL +\n    NL +\n    '⚙️ *Kontrol Sesi:*' +\n    NL +\n    '• `/reset` → Bersihkan memori 20 chat & mulai sesi baru' +\n    NL +\n    '• `/menu` → Tampilkan panduan ini' +\n    NL +\n    NL +\n    '_⚡ Transkep AI Assistant_';\n}\n\nreturn [{ json: { chatId: String(meta.replyChatId || ''), replyText: msg } }];"
+      },
+      "id": "f64b13c9-5d22-40d4-a19b-8ce012e21c03",
+      "name": "Siapkan Balasan Cepat (Code)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        740,
+        1420
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.cleanPrompt }}",
+        "options": {
+          "systemMessage": "={{ $json.fullSystemPrompt }}"
+        }
+      },
+      "id": "ffea416f-302f-4015-9b4b-e1d91ce98002",
+      "name": "Transkep AI Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.6,
+      "position": [
+        1500,
+        880
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-3.8-flash",
+        "options": {
+          "temperature": 0.4
+        }
+      },
+      "id": "3e233094-3ca3-446d-bf33-ea78a332e6bc",
+      "name": "Google Gemini Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        1420,
+        1100
+      ],
+      "credentials": {
+        "googlePalmApi": {
+          "id": "<GANTI_GEMINI_CREDENTIAL_ID>",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('Context & Router Transkep (Code)').first().json.sessionId }}",
+        "contextWindowLength": 20
+      },
+      "id": "20595005-35c7-42e5-ac75-e7eadb9dc817",
+      "name": "Memori Percakapan (20 Chat)",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.2,
+      "position": [
+        1620,
+        1100
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const NL = String.fromCharCode(10);\nconst item = $input.first().json || {};\nconst errRaw = item.error ? String(item.error.message || item.error) : '';\nconst errText = errRaw\n  ? '⏳ *Kendala Koneksi Google AI:* ' +\n    errRaw +\n    NL +\n    NL +\n    '💡 *Tips:* Cek kuota/ketersediaan model di node *Google Gemini Chat Model* (default `models/gemini-3.8-flash`; fallback ringan `models/gemini-3.5-flash-lite`).'\n  : '';\n\nconst aiRaw = String(\n  item.output || item.text || errText || 'Maaf Bro, Transkep AI belum menerima balasan dari model AI.'\n);\nconst meta = $('Context & Router Transkep (Code)').first().json || {};\n\nconst formattedText = aiRaw\n  .split('**')\n  .join('*')\n  .split('#### ')\n  .join('🔹 ')\n  .split('### ')\n  .join('📌 ')\n  .split('## ')\n  .join('🔷 ')\n  .split('# ')\n  .join('🏷️ ');\n\nconst finalMessage =\n  '*' +\n  String(meta.modeLabel || '🤖 Transkep AI Partner') +\n  '*' +\n  NL +\n  '────────────────────' +\n  NL +\n  formattedText +\n  NL +\n  NL +\n  '_⚡ Dijawab oleh Transkep AI Assistant_';\n\nreturn [{ json: { chatId: String(meta.replyChatId || ''), replyText: finalMessage } }];"
+      },
+      "id": "fdf43611-c1f7-47cc-82d5-4ad643c0b3d4",
+      "name": "Format Balasan Transkep AI (Code)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1820,
+        880
       ]
     },
     {
@@ -320,12 +385,12 @@
         "options": {}
       },
       "id": "af3418f3-faa8-49aa-bad8-e6a3a9bff381",
-      "name": "WAHA Kirim Balasan ke Bos Dedi",
+      "name": "WAHA Kirim Balasan Transkep",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
       "position": [
-        1472,
-        1072
+        2120,
+        1140
       ]
     },
     {
@@ -354,7 +419,7 @@
             },
             {
               "name": "chatId",
-              "value": "<GANTI_WA_ADMIN_CHAT_ID>"
+              "value": "={{ $('Context & Router Transkep (Code)').first().json.replyChatId }}"
             }
           ]
         },
@@ -367,8 +432,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
       "position": [
-        1712,
-        1072
+        2380,
+        1140
       ],
       "continueOnFail": true
     }
@@ -379,7 +444,7 @@
       "main": [
         [
           {
-            "node": "Context & Persona Engine (Code)",
+            "node": "Context & Router Transkep (Code)",
             "type": "main",
             "index": 0
           }
@@ -390,25 +455,25 @@
       "main": [
         [
           {
-            "node": "Context & Persona Engine (Code)",
+            "node": "Context & Router Transkep (Code)",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Context & Persona Engine (Code)": {
+    "Context & Router Transkep (Code)": {
       "main": [
         [
           {
-            "node": "Whitelist Bos Dedi & Anti-Loop",
+            "node": "Whitelist Admin Transkep & Anti-Loop",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Whitelist Bos Dedi & Anti-Loop": {
+    "Whitelist Admin Transkep & Anti-Loop": {
       "main": [
         [
           {
@@ -434,25 +499,105 @@
       "main": [
         [
           {
-            "node": "Router Perintah (AI vs Cek Server)",
+            "node": "Router Perintah (AI vs Docker vs Menu)",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Router Perintah (AI vs Cek Server)": {
+    "Router Perintah (AI vs Docker vs Menu)": {
       "main": [
         [
           {
-            "node": "TRANSKEP AI Agent",
+            "node": "Siapkan Input AI Langsung (Code)",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "SSH Cek Kontainer Server",
+            "node": "SSH Cek Kontainer Docker",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Siapkan Balasan Cepat (Code)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Siapkan Input AI Langsung (Code)": {
+      "main": [
+        [
+          {
+            "node": "Transkep AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SSH Cek Kontainer Docker": {
+      "main": [
+        [
+          {
+            "node": "Analisa Docker dengan AI? (IF)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analisa Docker dengan AI? (IF)": {
+      "main": [
+        [
+          {
+            "node": "Gabung Data Docker & Prompt AI (Code)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Format Laporan Kontainer Docker (Code)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gabung Data Docker & Prompt AI (Code)": {
+      "main": [
+        [
+          {
+            "node": "Transkep AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Laporan Kontainer Docker (Code)": {
+      "main": [
+        [
+          {
+            "node": "WAHA Kirim Balasan Transkep",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Siapkan Balasan Cepat (Code)": {
+      "main": [
+        [
+          {
+            "node": "WAHA Kirim Balasan Transkep",
             "type": "main",
             "index": 0
           }
@@ -463,7 +608,7 @@
       "ai_languageModel": [
         [
           {
-            "node": "TRANSKEP AI Agent",
+            "node": "Transkep AI Agent",
             "type": "ai_languageModel",
             "index": 0
           }
@@ -474,58 +619,36 @@
       "ai_memory": [
         [
           {
-            "node": "TRANSKEP AI Agent",
+            "node": "Transkep AI Agent",
             "type": "ai_memory",
             "index": 0
           }
         ]
       ]
     },
-    "TRANSKEP AI Agent": {
+    "Transkep AI Agent": {
       "main": [
         [
           {
-            "node": "Format Markdown ke WhatsApp",
+            "node": "Format Balasan Transkep AI (Code)",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Format Markdown ke WhatsApp": {
+    "Format Balasan Transkep AI (Code)": {
       "main": [
         [
           {
-            "node": "WAHA Kirim Balasan ke Bos Dedi",
+            "node": "WAHA Kirim Balasan Transkep",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "SSH Cek Kontainer Server": {
-      "main": [
-        [
-          {
-            "node": "Format Laporan Server",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Format Laporan Server": {
-      "main": [
-        [
-          {
-            "node": "WAHA Kirim Balasan ke Bos Dedi",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "WAHA Kirim Balasan ke Bos Dedi": {
+    "WAHA Kirim Balasan Transkep": {
       "main": [
         [
           {
