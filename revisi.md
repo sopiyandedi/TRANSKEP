@@ -6222,5 +6222,35 @@ Item di bawah ini berisiko memutus layanan produksi (WAHA/n8n/Firestore/Drive/CD
 - **Dampak UI/Database:** Nihil perubahan backend/Firestore. Tetap 1 halaman penuh Legal (hemat tambahan `12px` vertikal di bawah).
 - **Risiko Kecil:** Pastikan margin printer di browser saat cetak tetap `Default/None` agar kanan `10mm` (`1 cm`) tercetak utuh sesuai aturan `@page { margin: 0mm !important; }`.
 
+---
+
+## Tahap 125 [SELESAI & AKTIF]: Perlebar Margin Kanan Page Sesuai Garis Kuning (`padding-right: 16mm`) & Jaga Posisi Tanda Tangan `Zulkifli` (`v3.8.59`)
+*STATUS: DISETUJUI PENGGUNA ("oke terapkan bro") & SUDAH DITERAPKAN (`v3.8.59`) ✅*
+
+### 1. Analisis Pengukuran Tangkapan Layar (`415 x 680` — `v3.8.58`)
+1. **Posisi Garis Kuning Margin Page Kanan:**
+   - Pada tangkapan layar terbaru, `KopLineEndX` (`10mm` dari tepi kanan kertas) berada di koordinat `394/415`, dan `LeftEdgeX` (`20mm` dari kiri) di `39/415` (skala `~1,9086 px/mm`).
+   - Garis vertikal kuning pengguna berada tepat di **`380–387/415`** (tengah `~383,5`), yaitu sekitar **`5,5–6 mm` lebih ke dalam** dari batas `10mm` saat ini → setara dengan **`padding-right: 16mm` (`1,6 cm`)**.
+   - Dengan `padding-right: 16mm`, batas kanan teks (`16 November 2026`, garis kop, serta paragraf pembuka & penutup) akan mundur masuk tepat sejajar garis kuning di `~382,5/415`.
+2. **Keamanan Baris `1. Nama/Tanggal lahir` (`.../09-07-1986`):**
+   - Pada tangkapan layar saat ini, ujung teks `1986` berakhir di **`378/415`**, artinya masih berada **`~4,5 px` (~`2,4 mm`) di sebelah KIRI** batas `16mm` (`382,5/415`), sehingga baris `1. Nama/Tanggal lahir` **masih muat 1 baris utuh**.
+3. **Kompensasi Posisi Tanda Tangan `Ketua,` / `Zulkifli`:**
+   - Saat ini `Zulkifli` mulai di **`294/415`** (`padding-right: 10mm` + `.kgb-ttd-box { width: 200px; }`).
+   - Jika `padding-right` ditambah `10mm -> 16mm` (`+6mm` ke kiri) tanpa menyesuaikan lebar `.kgb-ttd-box`, posisi `Ketua,` / `Zulkifli` otomatis ikut tergeser ke kiri sebesar `~23px` (ke `~282/415`).
+   - Dengan mengecilkan `.kgb-ttd-box` `width` dari `200px` → **`175px`**, `Ketua,` / `Zulkifli` tetap terkunci di posisi **`~294/415`** yang sudah disetujui pengguna (`"sudah mantaps bro"`).
+
+### 2. Rencana Perubahan File & Parameter (Sebelum vs Sesudah)
+1. **[`modules/eoffice/cetak/cetak_kgb.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/cetak/cetak_kgb.html)**:
+   - Ubah `.kgb-print-wrapper` `padding` dari `9mm 10mm 10mm 20mm` -> **`9mm 16mm 10mm 20mm`** (tambah margin kanan page dari `10mm` → **`16mm`**, tepat di tengah garis vertikal kuning; sinkronkan juga komentar header & `TAG 1`).
+   - Ubah `.kgb-ttd-box` `width` dari `200px` -> **`175px`** sebagai kompensasi agar `Ketua,` & `Zulkifli` tidak bergeser balik ke kiri saat margin kanan ditambah `+6mm`.
+2. **[`modules/eoffice/cetak/js_cetak_kgb.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/cetak/js_cetak_kgb.js)**:
+   - Selaraskan `KGB_PRINT_CONFIG` & komentar header (`wrapperPadding: "9mm 16mm 10mm 20mm"`, `marginRight: "16mm"`).
+3. **PWA Cache Bust (`v3.8.59`) & Rilis (`index.html`, `sw.js`, `prd.md`, `revisi.md`)**:
+   - Bump 3 titik `v3.8.58` -> **`v3.8.59`**, jalankan `npm test`, lalu commit & push ke `origin/main` dan `prod/main`.
+
+### 3. Estimasi Dampak & Risiko
+- **Dampak UI/Database:** Nihil perubahan database/backend.
+- **Risiko Kecil:** Margin `16mm` meninggalkan sisa horizontal sekitar `~2,4 mm` setelah `.../09-07-1986`, cukup untuk 1 baris pada nama sepanjang `Raden Anantama Havid Ismail, A.Md./09-07-1986`, namun bila ada pegawai dengan nama lebih panjang >3–4 huruf tentu dapat terlipat ke baris kedua (itu sebabnya `16mm` lebih aman dibanding `18–20mm`). Paragraf pembuka/penutup juga masih aman muat dalam **1 halaman Legal (`356mm`)**.
+
 
 
