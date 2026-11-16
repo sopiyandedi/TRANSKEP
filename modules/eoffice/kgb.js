@@ -125,6 +125,29 @@ function parseIndoDateToIsoKgb(str) {
   return '';
 }
 
+function extractBirthIsoFromNipLocal(nip) {
+  if (window.KgbPrintHelper && typeof window.KgbPrintHelper.extractBirthIsoFromNipKgb === 'function') {
+    return window.KgbPrintHelper.extractBirthIsoFromNipKgb(nip);
+  }
+  if (!nip) return '';
+  var digits = String(nip).replace(/[^0-9]/g, '');
+  if (digits.length < 8) return '';
+  var y = parseInt(digits.substring(0, 4), 10);
+  var m = parseInt(digits.substring(4, 6), 10);
+  var d = parseInt(digits.substring(6, 8), 10);
+  if (y < 1940 || y > 2010 || m < 1 || m > 12 || d < 1 || d > 31) return '';
+  var probe = new Date(y, m - 1, d);
+  if (probe.getFullYear() !== y || probe.getMonth() !== (m - 1) || probe.getDate() !== d) return '';
+  return y + '-' + ('0' + m).slice(-2) + '-' + ('0' + d).slice(-2);
+}
+
+function abbreviatePangkatKgbLocal(pangkatStr) {
+  if (window.KgbPrintHelper && typeof window.KgbPrintHelper.abbreviatePangkatKgb === 'function') {
+    return window.KgbPrintHelper.abbreviatePangkatKgb(pangkatStr);
+  }
+  return pangkatStr ? String(pangkatStr).replace(/\bTingkat\s+I\b(?!\w)/gi, 'Tk. I').trim() : '';
+}
+
 function updateKgbDatePreview(fieldId, previewId) {
   var elField = document.getElementById(fieldId);
   var elPrev = document.getElementById(previewId);
@@ -396,20 +419,16 @@ window.openKgbModalForm = function(kgbData) {
   // Identitas Pegawai
   document.getElementById('kgbDisplayNip').value = nip;
   document.getElementById('kgbFieldNama').value = working.nama_pegawai || (userObj ? userObj.nama : '');
-  
-  var elTempatLahir = document.getElementById('kgbFieldTempatLahir');
-  if (elTempatLahir) {
-    elTempatLahir.value = working.tempat_lahir || (userObj ? (userObj.tempat_lahir || userObj.tmpt_lahir || '') : '');
-  }
 
   var rawTglLahir = working.tanggal_lahir || (userObj ? (userObj.tgl_lahir || userObj.tanggal_lahir || '') : '');
+  var autoNipIso = extractBirthIsoFromNipLocal(nip);
   var elTglLahir = document.getElementById('kgbFieldTglLahir');
   if (elTglLahir) {
-    elTglLahir.value = parseIndoDateToIsoKgb(rawTglLahir);
+    elTglLahir.value = autoNipIso || parseIndoDateToIsoKgb(rawTglLahir);
     updateKgbDatePreview('kgbFieldTglLahir', 'kgbPreviewTglLahir');
   }
 
-  document.getElementById('kgbFieldPangkat').value = rawPangkat;
+  document.getElementById('kgbFieldPangkat').value = abbreviatePangkatKgbLocal(rawPangkat);
   document.getElementById('kgbFieldGolongan').value = rawGolongan;
   document.getElementById('kgbFieldJabatan').value = working.jabatan || (userObj ? userObj.jabatan : '');
   document.getElementById('kgbFieldUnitKerja').value = working.unit_kerja || 'Pengadilan Agama Indramayu Kelas 1.A.';
@@ -584,7 +603,6 @@ function collectKgbFormPayload_() {
   var elBlnLama = document.getElementById('kgbFieldBulanLama');
   var elThnBaru = document.getElementById('kgbFieldTahunBaru');
   var elBlnBaru = document.getElementById('kgbFieldBulanBaru');
-  var elTempatLahir = document.getElementById('kgbFieldTempatLahir');
   var elTglLahir = document.getElementById('kgbFieldTglLahir');
   var elGolLama = document.getElementById('kgbFieldGolonganLama');
   var elTglSkLama = document.getElementById('kgbFieldTanggalSkLama');
@@ -596,10 +614,12 @@ function collectKgbFormPayload_() {
 
   var finalGolBaru = (elGolBaru && elGolBaru.value) ? elGolBaru.value.trim() : (elGolIdentitas ? elGolIdentitas.value.trim() : '');
   var finalGolLama = (elGolLama && elGolLama.value) ? elGolLama.value.trim() : (elGolIdentitas ? elGolIdentitas.value.trim() : '');
+  var nipVal = document.getElementById('kgbFieldNip').value;
+  var tglLahirIso = (elTglLahir && elTglLahir.value) ? elTglLahir.value : extractBirthIsoFromNipLocal(nipVal);
 
   return {
     id_kgb: document.getElementById('kgbFieldIdKgb').value,
-    nip: document.getElementById('kgbFieldNip').value,
+    nip: nipVal,
     status: elStatus ? elStatus.value : 'Sedang Diproses',
     file_doc_url: elDocUrl ? elDocUrl.value : '',
     file_pdf_url: elPdfUrl ? elPdfUrl.value : '',
@@ -610,9 +630,9 @@ function collectKgbFormPayload_() {
     tanggal_surat: tglSuratFormatted,
     tujuan_kppn: document.getElementById('kgbFieldTujuanKppn').value,
     nama_pegawai: document.getElementById('kgbFieldNama').value,
-    tempat_lahir: elTempatLahir ? elTempatLahir.value.trim() : '',
-    tanggal_lahir: formatTanggalIndoKgb(elTglLahir ? elTglLahir.value : ''),
-    pangkat: document.getElementById('kgbFieldPangkat').value,
+    tempat_lahir: '',
+    tanggal_lahir: formatTanggalIndoKgb(tglLahirIso),
+    pangkat: abbreviatePangkatKgbLocal(document.getElementById('kgbFieldPangkat').value),
     golongan: finalGolBaru,
     golongan_lama: finalGolLama,
     golongan_baru: finalGolBaru,

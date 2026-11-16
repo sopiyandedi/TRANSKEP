@@ -1019,6 +1019,47 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
     await browserSandbox.TranskepFirebase.saveJobdesToFirestore({ nip: '199002022015012002', tugas_pokok: '1. Mengetik putusan' });
     assert(jobdesSelfHeal && !('legacy_col' in jobdesSelfHeal) && jobdesSelfHeal.created_at === 'TS',
       'Legacy doc with string created_at must trigger non-merge self-heal rewrite');
+
+    // 7. Tahap 126 KGB regressions: auto birthdate from NIP, Tingkat I -> Tk. I, and modal without kgbFieldTempatLahir
+    const eofficeHtml = fs.readFileSync('modules/eoffice/view_eoffice.html', 'utf8');
+    assert(!eofficeHtml.includes('id="kgbFieldTempatLahir"'), 'view_eoffice.html must remove kgbFieldTempatLahir');
+    assert(eofficeHtml.includes('id="kgbFieldTglLahir"') && eofficeHtml.includes('md:col-span-5') && eofficeHtml.includes('md:col-span-4'),
+      'view_eoffice.html must preserve kgbFieldTglLahir and widen NIP grid column');
+
+    const kgbDom = {};
+    const getKgbEl = (id) => {
+      if (id === 'kgbFieldTempatLahir') return null;
+      if (!kgbDom[id]) kgbDom[id] = { id, value: '', textContent: '', innerText: '', className: '', dataset: {}, classList: { add() {}, remove() {} }, firstElementChild: { classList: { add() {}, remove() {} } } };
+      return kgbDom[id];
+    };
+    const kgbVm = {
+      console,
+      localStorage: { getItem: () => null, setItem: () => {} },
+      document: { getElementById: getKgbEl, activeElement: null },
+      vueState: { usersList: [{ nip: '197507062014051001', nama: 'Ade Badrujaman, S.H.I.', tgl_lahir: '1 Januari 2025', pangkat: 'Penata Tingkat I (III/d)' }] },
+      setTimeout: (fn) => fn()
+    };
+    kgbVm.window = kgbVm;
+    vm.createContext(kgbVm);
+    vm.runInContext(fs.readFileSync('modules/eoffice/cetak/js_cetak_kgb.js', 'utf8'), kgbVm, { filename: 'modules/eoffice/cetak/js_cetak_kgb.js' });
+    vm.runInContext(fs.readFileSync('modules/eoffice/kgb.js', 'utf8'), kgbVm, { filename: 'modules/eoffice/kgb.js' });
+
+    assert.strictEqual(kgbVm.KgbPrintHelper.extractBirthIsoFromNipKgb('197507062014051001'), '1975-07-06');
+    assert.strictEqual(kgbVm.KgbPrintHelper.extractBirthIsoFromNipKgb('198602312020121004'), '', 'Invalid calendar date in NIP must be rejected');
+    assert.strictEqual(kgbVm.KgbPrintHelper.formatTglAngkaKgb('1 Januari 2025', '197507062014051001'), '06-07-1975', 'Print birthdate must prefer valid NIP over stale stored date');
+    assert.strictEqual(kgbVm.KgbPrintHelper.abbreviatePangkatKgb('Penata Tingkat I (III/d)'), 'Penata Tk. I (III/d)');
+    assert.strictEqual(kgbVm.KgbPrintHelper.stripGolonganRuangKgb('Pengatur Tingkat I (II/d)'), 'Pengatur Tk. I');
+
+    kgbVm.openKgbModalForm({ nip: '197507062014051001', nama_pegawai: 'Ade Badrujaman, S.H.I.', tanggal_lahir: '1 Januari 2025', pangkat: 'Penata Tingkat I (III/d)' });
+    assert.strictEqual(kgbDom.kgbFieldTglLahir.value, '1975-07-06', 'Modal Tanggal Lahir must auto-fill from NIP');
+    assert.strictEqual(kgbDom.kgbPreviewTglLahir.textContent, '6 Juli 1975');
+    assert.strictEqual(kgbDom.kgbFieldPangkat.value, 'Penata Tk. I (III/d)', 'Modal Pangkat must shorten Tingkat I to Tk. I');
+
+    let collectedKgbPayload = null;
+    kgbVm.printSuratKgb = (p) => { collectedKgbPayload = p; };
+    kgbVm.printKgbFromModal();
+    assert(collectedKgbPayload && collectedKgbPayload.tempat_lahir === '' && collectedKgbPayload.tanggal_lahir === '6 Juli 1975' && collectedKgbPayload.pangkat === 'Penata Tk. I (III/d)',
+      'collectKgbFormPayload_ must emit empty tempat_lahir, NIP birthdate, and Tk. I rank');
   } finally {
     browserSandbox.TranskepAPI.call = origApiCall;
     browserSandbox.TranskepFirebase.getDb = origGetDb;

@@ -6252,5 +6252,42 @@ Item di bawah ini berisiko memutus layanan produksi (WAHA/n8n/Firestore/Drive/CD
 - **Dampak UI/Database:** Nihil perubahan database/backend.
 - **Risiko Kecil:** Margin `16mm` meninggalkan sisa horizontal sekitar `~2,4 mm` setelah `.../09-07-1986`, cukup untuk 1 baris pada nama sepanjang `Raden Anantama Havid Ismail, A.Md./09-07-1986`, namun bila ada pegawai dengan nama lebih panjang >3–4 huruf tentu dapat terlipat ke baris kedua (itu sebabnya `16mm` lebih aman dibanding `18–20mm`). Paragraf pembuka/penutup juga masih aman muat dalam **1 halaman Legal (`356mm`)**.
 
+---
+
+## Tahap 126 [SELESAI & AKTIF]: Otomatisasi Tanggal Lahir dari NIP, Penyingkatan Pangkat `Tingkat I` -> `Tk. I` & Penghapusan Field `Tempat Lahir` di Modal KGB (`v3.8.60`)
+*STATUS: DISETUJUI PENGGUNA ("oke terapkan bro") & SUDAH DITERAPKAN (`v3.8.60`) ✅*
+
+### 1. Akar Masalah & Analisis Lintas-Modul
+1. **Tanggal Lahir di Modal KGB Mengambil Nilai Lama/Keliru (`01-Jan-2025` untuk NIP `197507062014051001`):**
+   - Di [`modules/eoffice/kgb.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/kgb.js) (`openKgbModalForm`), `kgbFieldTglLahir` hanya membaca `working.tanggal_lahir || userObj.tgl_lahir` tanpa mengekstrak 8 digit awal NIP (`YYYYMMDD`), padahal NIP `197507062014051001` secara deterministik menunjukkan lahir `1975-07-06` (`6 Juli 1975`).
+   - Pada [`modules/eoffice/cetak/js_cetak_kgb.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/cetak/js_cetak_kgb.js) (`formatTglAngkaKgb`), NIP baru dipakai sebagai fallback paling akhir sehingga bila dokumen lama terlanjur menyimpan tanggal tidak valid (mis. `2025-01-01`), hasil cetak langsung dari tabel berisiko ikut mencetak `01-01-2025`.
+2. **Penulisan Pangkat Masih Panjang (`Tingkat I` belum disingkat `Tk. I`):**
+   - `stripGolonganRuangKgb()` di [`modules/eoffice/cetak/js_cetak_kgb.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/cetak/js_cetak_kgb.js) baru menghapus `(II/d)`/`(III/d)`, sehingga hasil cetak baris 3 masih menampilkan `Pengatur Tingkat I` dan form modal `Penata Tingkat I (III/d)`.
+   - Regex aman `\bTingkat\s+I\b(?!\w)` mengubah `Tingkat I` -> **`Tk. I`** (tanpa merusak kata lain) pada input pangkat KGB maupun cetakan surat KGB.
+3. **Field `Tempat Lahir` Masih Muncul & Kolom NIP Sempit di Form Pop-up:**
+   - Pada [`modules/eoffice/view_eoffice.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/view_eoffice.html) Seksi 2, input `Tempat Lahir` (`md:col-span-3`) tidak dibutuhkan dan menyempitkan kolom `NIP` (`md:col-span-2`, menyebabkan digit akhir NIP `197507062014051...` terpotong secara visual di kotak input).
+4. **Temuan Lintas-Modul (Belum Diubah Tanpa Izin):**
+   - Backend Apps Script [`eoffice/kgb.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/kgb.js) (`createKgbGoogleDoc_` Google Docs/PDF Drive) juga merender `p.pangkat` dan `p.tanggal_lahir`. Jika diizinkan, dapat diselaraskan sekalian (catatan: membutuhkan `clasp push` ke Google Apps Script); sedangkan master pegawai [`modules/pegawai/view_pegawai.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/pegawai/view_pegawai.html) sengaja dipertahankan menggunakan nama pangkat baku BKN (`Tingkat I`).
+
+### 2. Rencana Perubahan File & Parameter (Sebelum vs Sesudah)
+1. **[`modules/eoffice/view_eoffice.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/view_eoffice.html)** (Modal Penyusunan SK KGB — Seksi 2 `Identitas Pegawai`):
+   - **Poin 3:** Hapus elemen input **`Tempat Lahir`** (`#kgbFieldTempatLahir`).
+   - **Poin 4 & Proporsi Grid:** Pertahankan kolom **`Tanggal Lahir`** (`#kgbFieldTglLahir` + pratinjau `#kgbPreviewTglLahir`), atur ulang grid baris 1 menjadi **`Nama Lengkap (5 col)` + `NIP (4 col)` + `Tanggal Lahir (3 col)`** (`5+4+3 = 12 kolom`) agar NIP 18 digit tampil utuh.
+2. **[`modules/eoffice/cetak/js_cetak_kgb.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/cetak/js_cetak_kgb.js)**:
+   - **Poin 1 & 4:** Tambahkan helper kalender-tervalidasi **`extractBirthIsoFromNipKgb(nip)`** (`YYYYMMDD` -> `YYYY-MM-DD`, validasi rentang tahun lahir PNS `1940–2010` & tanggal kalender valid termasuk tahun kabisat) dan ekspor via `KgbPrintHelper.extractBirthIsoFromNipKgb`; prioritaskan tanggal lahir dari NIP di `formatTglAngkaKgb(val, nip)` (prioritas utama dari NIP yang valid agar tanggal keliru seperti `01-Jan-2025` tidak pernah tercetak).
+   - **Poin 2:** Tambahkan helper **`abbreviatePangkatKgb(pangkatStr)`** (`\bTingkat\s+I\b(?!\w)` -> `Tk. I`) dan integrasikan di `stripGolonganRuangKgb` + ekspor lewat `KgbPrintHelper.abbreviatePangkatKgb` (mis. `Pengatur Tingkat I (II/d)` -> cetak `Pengatur Tk. I`).
+3. **[`modules/eoffice/kgb.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/kgb.js)**:
+   - **Poin 1 & 4:** Di `openKgbModalForm`, isi `#kgbFieldTglLahir` secara otomatis dari `extractBirthIsoFromNipKgb(nip)` terlebih dahulu (fallback ke `parseIndoDateToIsoKgb(rawTglLahir)` hanya jika NIP < 8 digit / tidak valid), lalu perbarui `#kgbPreviewTglLahir` (mis. `"6 Juli 1975"`).
+   - **Poin 2:** Di `openKgbModalForm` & `collectKgbFormPayload_`, singkat otomatis kata `"Tingkat I"` -> **`"Tk. I"`** pada `#kgbFieldPangkat` (contoh `Penata Tingkat I (III/d)` -> `Penata Tk. I (III/d)`).
+   - **Poin 3:** Pertahankan `tempat_lahir: ''` (aman untuk schema Firestore `eoffice_kgb` & `isValidEofficeKgb`).
+4. *(Opsional Menunggu Konfirmasi)* **[`eoffice/kgb.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/kgb.js)** (Backend Google Docs/PDF Drive):
+   - Menyelaraskan ekstrak tanggal lahir dari NIP & penyingkatan `Tingkat I` -> `Tk. I` jika Bos juga ingin output Google Docs ikut berubah *(memerlukan `clasp push`)*.
+5. **PWA Cache Bust (`v3.8.60`) & Rilis ([`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html), [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js), [`prd.md`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/prd.md), [`revisi.md`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/revisi.md))**:
+   - Bump 3 titik `v3.8.59` -> **`v3.8.60`**, tambah/jalankan uji di [`tests/verify_fase3b.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/tests/verify_fase3b.js) + `npm test`, lalu commit & push ke `origin/main` dan `prod/main`.
+
+### 3. Estimasi Dampak & Risiko
+- **Dampak UI/Database:** Menghilangkan field `Tempat Lahir` dari pop-up KGB tidak merusak Firestore (`tempat_lahir` bertipe opsional string `''`). Kolom NIP kini lebih lebar sehingga 18 digit tampak penuh.
+- **Catatan Risiko Kecil:** Karena prioritas tanggal lahir mengambil langsung dari 8 digit awal NIP (`YYYYMMDD`), pastikan tidak ada pegawai ASN yang NIP-nya memiliki salah ketik tanggal lahir pada digit BKN-nya — kolom `Tanggal Lahir` tetap tersedia & dapat dilihat langsung di form pop-up untuk verifikasi cepat.
+
 
 

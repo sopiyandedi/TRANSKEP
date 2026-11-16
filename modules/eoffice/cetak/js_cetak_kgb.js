@@ -5,7 +5,7 @@
 // MARGIN RESMI: Atas 0.9 cm | Bawah 1.0 cm | Kiri 2.0 cm | Kanan 1.6 cm
 // ==========================================
 
-(function(global) {
+(function (global) {
   'use strict';
 
   // ==========================================
@@ -54,7 +54,16 @@
   }
 
   /**
-   * Helper: Menghapus golongan & ruang dari nama pangkat (contoh: "Penata Tingkat I (III/d)" -> "Penata Tingkat I")
+   * Helper: Menyingkat kata "Tingkat I" pada penulisan pangkat menjadi "Tk. I"
+   */
+  function abbreviatePangkatKgb(pangkatStr) {
+    if (!pangkatStr) return '';
+    return String(pangkatStr).replace(/\bTingkat\s+I\b(?!\w)/gi, 'Tk. I').trim();
+  }
+
+  /**
+   * Helper: Menghapus golongan & ruang dari nama pangkat serta menyingkat "Tingkat I" -> "Tk. I"
+   * (contoh: "Penata Tingkat I (III/d)" -> "Penata Tk. I")
    */
   function stripGolonganRuangKgb(pangkatStr) {
     if (!pangkatStr || pangkatStr === '-') return '-';
@@ -65,6 +74,7 @@
     s = s.replace(/(?:[\s,\-\/]+)?\b(?:I{1,3}|IV|V)\s*\/\s*[a-eA-E]\b/gi, '');
     // Hapus sisa tanda baca di akhir string
     s = s.replace(/[\s,\-\/\(\[\{]+$/, '').trim();
+    s = abbreviatePangkatKgb(s);
     return s || '-';
   }
 
@@ -76,11 +86,36 @@
   var BULAN_ROMAWI_KGB = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
 
   /**
-   * Format tanggal lahir murni angka dengan strip: DD-MM-YYYY (contoh: "24-12-2026")
-   * Jika nilai tanggal kosong, otomatis mencoba mengekstrak 8 digit pertama NIP (YYYYMMDD -> DD-MM-YYYY)
+   * Mengekstrak tanggal lahir ISO (YYYY-MM-DD) dari 8 digit awal NIP PNS (YYYYMMDD)
+   */
+  function extractBirthIsoFromNipKgb(nip) {
+    if (!nip) return '';
+    var digits = String(nip).replace(/[^0-9]/g, '');
+    if (digits.length < 8) return '';
+    var nY = parseInt(digits.substring(0, 4), 10);
+    var nM = parseInt(digits.substring(4, 6), 10);
+    var nD = parseInt(digits.substring(6, 8), 10);
+    if (nY < 1940 || nY > 2010 || nM < 1 || nM > 12 || nD < 1 || nD > 31) return '';
+    var probe = new Date(nY, nM - 1, nD);
+    if (probe.getFullYear() !== nY || probe.getMonth() !== (nM - 1) || probe.getDate() !== nD) {
+      return '';
+    }
+    var pad = function (n) { return (n < 10 ? '0' : '') + n; };
+    return nY + '-' + pad(nM) + '-' + pad(nD);
+  }
+
+  /**
+   * Format tanggal lahir murni angka dengan strip: DD-MM-YYYY (contoh: "06-07-1975")
+   * Prioritas utama mengekstrak 8 digit pertama NIP (YYYYMMDD -> DD-MM-YYYY) agar konsisten & bebas data usang
    */
   function formatTglAngkaKgb(val, nip) {
-    var pad = function(n) { return (n < 10 ? '0' : '') + n; };
+    var pad = function (n) { return (n < 10 ? '0' : '') + n; };
+    var nipIso = extractBirthIsoFromNipKgb(nip);
+    if (nipIso) {
+      var nipParts = nipIso.split('-');
+      return nipParts[2] + '-' + nipParts[1] + '-' + nipParts[0];
+    }
+
     var str = val ? String(val).trim() : '';
 
     // Jika sudah format DD-MM-YYYY murni angka
@@ -134,19 +169,6 @@
       var parsed = new Date(str);
       if (!isNaN(parsed.getTime())) {
         return pad(parsed.getDate()) + '-' + pad(parsed.getMonth() + 1) + '-' + parsed.getFullYear();
-      }
-    }
-
-    // Fallback otomatis: Jika tanggal kosong, ekstrak dari 8 digit pertama NIP pegawai (YYYYMMDD -> DD-MM-YYYY)
-    if (nip) {
-      var digits = String(nip).replace(/[^0-9]/g, '');
-      if (digits.length >= 8) {
-        var nY = parseInt(digits.substring(0, 4), 10);
-        var nM = parseInt(digits.substring(4, 6), 10);
-        var nD = parseInt(digits.substring(6, 8), 10);
-        if (nY >= 1940 && nY <= 2099 && nM >= 1 && nM <= 12 && nD >= 1 && nD <= 31) {
-          return pad(nD) + '-' + pad(nM) + '-' + nY;
-        }
       }
     }
 
@@ -329,10 +351,10 @@
       ? global.vueState.usersList
       : (typeof state !== 'undefined' && state.usersList ? state.usersList : []);
     var userRef = Array.isArray(uList)
-      ? uList.find(function(u) { return String(u.nip) === String(kgbObj.nip); })
+      ? uList.find(function (u) { return String(u.nip) === String(kgbObj.nip); })
       : null;
     var ketuaRef = Array.isArray(uList)
-      ? uList.find(function(u) { return u.jabatan && u.jabatan.toLowerCase().indexOf('ketua') !== -1 && u.jabatan.toLowerCase().indexOf('wakil') === -1; })
+      ? uList.find(function (u) { return u.jabatan && u.jabatan.toLowerCase().indexOf('ketua') !== -1 && u.jabatan.toLowerCase().indexOf('wakil') === -1; })
       : null;
 
     var defaultKetua = ketuaRef ? String(ketuaRef.nama || '').trim() : '-';
@@ -448,11 +470,11 @@
     doc.write(finalHTML);
     doc.close();
 
-    setTimeout(function() {
+    setTimeout(function () {
       if (typeof hideLoading === 'function') hideLoading();
       iframe.contentWindow.focus();
       iframe.contentWindow.print();
-      setTimeout(function() {
+      setTimeout(function () {
         if (document.body.contains(iframe)) {
           document.body.removeChild(iframe);
         }
@@ -465,6 +487,10 @@
   global.printSuratKgb = printSuratKgb;
   global.KgbPrintHelper = {
     formatTglCetakKgb: formatTglCetakKgb,
+    formatTglAngkaKgb: formatTglAngkaKgb,
+    extractBirthIsoFromNipKgb: extractBirthIsoFromNipKgb,
+    abbreviatePangkatKgb: abbreviatePangkatKgb,
+    stripGolonganRuangKgb: stripGolonganRuangKgb,
     formatNominalGajiKgb: formatNominalGajiKgb,
     extractBulanTahunDariTanggalKgb: extractBulanTahunDariTanggalKgb,
     resolveNomorSuratKgb: resolveNomorSuratKgb,
