@@ -118,11 +118,24 @@ function validateWorkflowTopology(wf, rawText, label) {
     '={{ "" }}',
     `${label}: SSH cwd must evaluate to empty string so node-ssh does not prepend Unix 'cd . ;' onto Windows cmd.exe`
   );
-  assert(
-    sshNode.parameters.command.includes('docker ps -a --format "{{.Names}}|{{.State}}|{{.Status}}|{{.Image}}|{{.Ports}}"'),
-    `${label}: SSH command must use double-quoted Go template compatible with Windows CMD & Linux sh`
+  assert.strictEqual(
+    sshNode.parameters.command,
+    'docker ps -a --format json',
+    `${label}: SSH ps command must avoid quotes/pipes/operators for clean Windows OpenSSH execution`
   );
-  assert(sshNode.parameters.command.includes('NO_STATS'), `${label}: SSH command must include NO_STATS fallback`);
+
+  const sshOkIf = byName.get('SSH Berhasil? (IF)');
+  assert(sshOkIf && sshOkIf.type === 'n8n-nodes-base.if', `${label}: missing SSH Berhasil? (IF)`);
+  assert.strictEqual(wf.connections['SSH Berhasil? (IF)'].main.length, 2, `${label}: SSH Berhasil? IF must have true & false branches`);
+
+  const sshStatsNode = byName.get('SSH Cek Resource Docker');
+  assert(sshStatsNode && sshStatsNode.continueOnFail === true, `${label}: SSH stats node must have continueOnFail: true`);
+  assert.strictEqual(sshStatsNode.parameters.cwd, '={{ "" }}', `${label}: SSH stats cwd must evaluate to empty string`);
+  assert.strictEqual(
+    sshStatsNode.parameters.command,
+    'docker stats --no-stream --format json',
+    `${label}: SSH stats command must use zero-quote --format json`
+  );
 
   const agentNode = byName.get('Transkep AI Agent');
   assert(agentNode && agentNode.type === '@n8n/n8n-nodes-langchain.agent', `${label}: missing Transkep AI Agent`);
@@ -247,39 +260,67 @@ function runBehaviorSuite(wf, opts) {
     assert.strictEqual(ctx.wantsAiDockerAnalysis, false, `${label}: '${dockerMsg}' should use direct report without AI`);
   }
 
-  // Test D: SSH Output Parsing (Running + Exited + Duplicate IPv6/IPv4 Ports + NO_STATS + Error Fallback)
+  // Test D: SSH Output Parsing (NDJSON from docker --format json, Legacy Pipe Fallback, Missing Stats, & SSH Win32 Error Hint)
   {
     const dockerCtx = runCodeNode(wf, 'Context & Router Transkep (Code)', {
       inputJson: makeWebhookEvent({ body: 'kontainer apa saja yang jalan di docker' }),
     })[0].json;
 
-    const mockStdout = [
-      '"transkep-n8n|running|Up 3 days|n8nio/n8n:latest|0.0.0.0:5678->5678/tcp, [::]:5678->5678/tcp"',
-      '"transkep-waha|running|Up 3 days (healthy)|devlikeapro/waha:latest|0.0.0.0:3000->3000/tcp"',
-      '"transkep-temp-job|exited|Exited (1) 2 hours ago|alpine:3.19|"',
-      '---STATS--- ',
-      '"transkep-n8n|2.15%|210MiB / 8GiB"',
-      '"transkep-waha|1.04%|180MiB / 8GiB"',
+    const psNdjson = [
+      JSON.stringify({
+        Names: 'transkep-n8n',
+        State: 'running',
+        Status: 'Up 3 days',
+        Image: 'n8nio/n8n:latest',
+        Ports: '0.0.0.0:5678->5678/tcp, [::]:5678->5678/tcp',
+      }),
+      JSON.stringify({
+        Names: 'transkep-waha',
+        State: 'running',
+        Status: 'Up 3 days (healthy)',
+        Image: 'devlikeapro/waha:latest',
+        Ports: '0.0.0.0:3000->3000/tcp',
+      }),
+      JSON.stringify({
+        Names: 'transkep-temp-job',
+        State: 'exited',
+        Status: 'Exited (1) 2 hours ago',
+        Image: 'alpine:3.19',
+        Ports: '',
+      }),
+    ].join('\r\n');
+
+    const statsNdjson = [
+      JSON.stringify({ Name: 'transkep-n8n', CPUPerc: '2.15%', MemUsage: '210MiB / 8GiB' }),
+      JSON.stringify({ Name: 'transkep-waha', CPUPerc: '1.04%', MemUsage: '180MiB / 8GiB' }),
     ].join('\r\n');
 
     const reportOut = runCodeNode(wf, 'Format Laporan Kontainer Docker (Code)', {
-      inputJson: { stdout: mockStdout, stderr: '', code: 0 },
-      nodeMap: { 'Context & Router Transkep (Code)': dockerCtx },
+      inputJson: { stdout: statsNdjson, stderr: '', code: 0 },
+      nodeMap: {
+        'Context & Router Transkep (Code)': dockerCtx,
+        'SSH Cek Kontainer Docker': { stdout: psNdjson, stderr: '', code: 0 },
+        'SSH Cek Resource Docker': { stdout: statsNdjson, stderr: '', code: 0 },
+      },
     })[0].json;
 
     assert(reportOut.replyText.includes('Berjalan: *2*'), `${label}: must count 2 running containers`);
     assert(reportOut.replyText.includes('Berhenti/Lainnya: *1*'), `${label}: must count 1 stopped container`);
     assert(reportOut.replyText.includes('Total: *3*'), `${label}: must count 3 total containers`);
     assert(reportOut.replyText.includes('*transkep-n8n*'), `${label}: must list transkep-n8n`);
-    assert(reportOut.replyText.includes('CPU: 2.15% | RAM: 210MiB / 8GiB'), `${label}: must include stats`);
+    assert(reportOut.replyText.includes('CPU: 2.15% | RAM: 210MiB / 8GiB'), `${label}: must include NDJSON stats`);
     assert(reportOut.replyText.includes('Port: 5678->5678/tcp') && !reportOut.replyText.includes('[::]:5678'), `${label}: must deduplicate IPv6/IPv4 ports`);
     assert(reportOut.replyText.includes('*transkep-temp-job* [exited]'), `${label}: must highlight exited container`);
 
     const errOut = runCodeNode(wf, 'Format Laporan Kontainer Docker (Code)', {
-      inputJson: { error: { message: 'SSH Connection refused' } },
-      nodeMap: { 'Context & Router Transkep (Code)': dockerCtx },
+      inputJson: { stderr: 'The filename, directory name, or volume label syntax is incorrect.', code: 1 },
+      nodeMap: {
+        'Context & Router Transkep (Code)': dockerCtx,
+        'SSH Cek Kontainer Docker': { stderr: 'The filename, directory name, or volume label syntax is incorrect.', code: 1 },
+      },
     })[0].json;
     assert(errOut.replyText.includes('Gagal mengambil data Docker via SSH'), `${label}: SSH error must render diagnostic message`);
+    assert(errOut.replyText.includes('Diagnosa Windows OpenSSH'), `${label}: Win32 Error 123 must include targeted Windows OpenSSH hint`);
 
     const noStatsOut = runCodeNode(wf, 'Format Laporan Kontainer Docker (Code)', {
       inputJson: {
@@ -289,7 +330,7 @@ function runBehaviorSuite(wf, opts) {
       },
       nodeMap: { 'Context & Router Transkep (Code)': dockerCtx },
     })[0].json;
-    assert(noStatsOut.replyText.includes('CPU: - | RAM: -'), `${label}: NO_STATS fallback must render '-' safely`);
+    assert(noStatsOut.replyText.includes('CPU: - | RAM: -'), `${label}: legacy NO_STATS fallback must render '-' safely`);
   }
 
   // Test E: Docker + AI Analysis Routing & SSH-to-AI Prompt Injection
@@ -301,8 +342,16 @@ function runBehaviorSuite(wf, opts) {
     assert.strictEqual(ctx.wantsAiDockerAnalysis, true, `${label}: '${aiDockerMsg}' must set wantsAiDockerAnalysis=true`);
 
     const merged = runCodeNode(wf, 'Gabung Data Docker & Prompt AI (Code)', {
-      inputJson: { stdout: 'transkep-n8n|running|Up 5 hours|n8nio/n8n|5678->5678/tcp\n---STATS---\ntranskep-n8n|5.0%|300MiB / 8GiB' },
-      nodeMap: { 'Context & Router Transkep (Code)': ctx },
+      inputJson: {},
+      nodeMap: {
+        'Context & Router Transkep (Code)': ctx,
+        'SSH Cek Kontainer Docker': {
+          stdout: JSON.stringify({ Names: 'transkep-n8n', State: 'running', Status: 'Up 5 hours', Image: 'n8nio/n8n', Ports: '5678->5678/tcp' }),
+        },
+        'SSH Cek Resource Docker': {
+          stdout: JSON.stringify({ Name: 'transkep-n8n', CPUPerc: '5.0%', MemUsage: '300MiB / 8GiB' }),
+        },
+      },
     })[0].json;
     assert(merged.cleanPrompt.includes('transkep-n8n') && merged.cleanPrompt.includes('300MiB / 8GiB'));
     assert(merged.fullSystemPrompt.includes('Transkep AI'));

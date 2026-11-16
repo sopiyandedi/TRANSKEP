@@ -193,13 +193,13 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        740,
+        960,
         820
       ]
     },
     {
       "parameters": {
-        "command": "docker ps -a --format \"{{.Names}}|{{.State}}|{{.Status}}|{{.Image}}|{{.Ports}}\" && echo ---STATS--- && (docker stats --no-stream --format \"{{.Name}}|{{.CPUPerc}}|{{.MemUsage}}\" || echo NO_STATS)",
+        "command": "docker ps -a --format json",
         "cwd": "={{ \"\" }}"
       },
       "id": "b46b3041-3c51-4bd0-b38b-c9291ca70a73",
@@ -207,8 +207,49 @@
       "type": "n8n-nodes-base.ssh",
       "typeVersion": 1,
       "position": [
-        740,
+        720,
         1140
+      ],
+      "credentials": {
+        "sshPassword": {
+          "id": "<GANTI_SSH_CREDENTIAL_ID>",
+          "name": "SSH Password account"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ !Boolean($json.error) && ($json.code === undefined || Number($json.code) === 0) }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "e3d19a4f-10c2-43bb-9a71-5e8b24c30f01",
+      "name": "SSH Berhasil? (IF)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        960,
+        1140
+      ]
+    },
+    {
+      "parameters": {
+        "command": "docker stats --no-stream --format json",
+        "cwd": "={{ \"\" }}"
+      },
+      "id": "f19c8e22-6a13-4b88-8c4a-91b4c2d07e12",
+      "name": "SSH Cek Resource Docker",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        1180,
+        1060
       ],
       "credentials": {
         "sshPassword": {
@@ -234,33 +275,33 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 1,
       "position": [
-        980,
+        1420,
         1140
       ]
     },
     {
       "parameters": {
-        "jsCode": "const NL = String.fromCharCode(10);\nconst sshItem = $input.first().json || {};\nconst meta = $('Context & Router Transkep (Code)').first().json || {};\n\nfunction cleanLine(s) {\n  return String(s || '').trim().replace(/^\"+|\"+$/g, '').trim();\n}\n\nfunction compactPorts(rawPorts) {\n  const txt = cleanLine(rawPorts);\n  if (!txt) return '-';\n  const parts = txt.split(',').map((p) => p.trim()).filter(Boolean);\n  const uniq = [];\n  for (const p of parts) {\n    const normalized = p.replace(/^\\[::\\]:/, '').replace(/^0\\.0\\.0\\.0:/, '');\n    if (!uniq.includes(normalized)) uniq.push(normalized);\n  }\n  return uniq.slice(0, 4).join(', ') + (uniq.length > 4 ? ' (+' + (uniq.length - 4) + ' lainnya)' : '');\n}\n\nfunction parseDockerOutput(item) {\n  const errObj = item.error;\n  const errMsg = errObj ? String(errObj.message || errObj) : (item.message ? String(item.message) : '');\n  const exitCode = item.code !== undefined && item.code !== null ? Number(item.code) : 0;\n  const stdout = String(item.stdout || '').trim();\n  const stderr = String(item.stderr || '').trim();\n\n  if (!stdout && (errMsg || stderr || exitCode !== 0)) {\n    return {\n      ok: false,\n      errorText: errMsg || stderr || ('SSH exit code ' + exitCode),\n      running: [],\n      stopped: [],\n      rawFallback: '',\n    };\n  }\n\n  const lines = stdout.split(/\\r?\\n/).map(cleanLine).filter(Boolean);\n  const markerIdx = lines.findIndex((l) => l === '---STATS---');\n  const psLines = markerIdx >= 0 ? lines.slice(0, markerIdx) : lines;\n  const statsLines = markerIdx >= 0 ? lines.slice(markerIdx + 1) : [];\n\n  const statsMap = {};\n  for (const sl of statsLines) {\n    if (!sl || sl === 'NO_STATS') continue;\n    const cols = sl.split('|');\n    if (cols.length >= 3) {\n      const name = cleanLine(cols[0]);\n      statsMap[name] = { cpu: cleanLine(cols[1]) || '-', mem: cleanLine(cols[2]) || '-' };\n    }\n  }\n\n  const running = [];\n  const stopped = [];\n  let parsedPipeCount = 0;\n\n  for (const pl of psLines) {\n    const cols = pl.split('|');\n    if (cols.length >= 4) {\n      parsedPipeCount += 1;\n      const name = cleanLine(cols[0]);\n      const state = cleanLine(cols[1]).toLowerCase();\n      const status = cleanLine(cols[2]);\n      const image = cleanLine(cols[3]);\n      const ports = compactPorts(cols.slice(4).join('|'));\n      const stat = statsMap[name] || { cpu: '-', mem: '-' };\n      const entry = { name, state, status, image, ports, cpu: stat.cpu, mem: stat.mem };\n      if (state === 'running') running.push(entry);\n      else stopped.push(entry);\n    }\n  }\n\n  if (parsedPipeCount === 0 && psLines.length > 0) {\n    return { ok: true, running: [], stopped: [], rawFallback: psLines.join(NL) };\n  }\n\n  return { ok: true, errorText: '', running, stopped, rawFallback: '' };\n}\n\nfunction buildDockerSummary(parsed) {\n  if (!parsed.ok) {\n    return (\n      '⚠️ *Gagal mengambil data Docker via SSH.*' + NL +\n      'Detail: ' + parsed.errorText + NL +\n      'Pastikan Docker Desktop / Docker Engine aktif dan service SSH di server berjalan normal.'\n    );\n  }\n  if (parsed.rawFallback) {\n    return '🐳 *Output Docker Mentah:*' + NL + parsed.rawFallback;\n  }\n\n  const total = parsed.running.length + parsed.stopped.length;\n  const out = [];\n  out.push(\n    '📊 *Ringkasan:* ✅ Berjalan: *' + parsed.running.length + '* | 🔴 Berhenti/Lainnya: *' + parsed.stopped.length + '* | 📦 Total: *' + total + '*'\n  );\n\n  if (total === 0) {\n    out.push('', 'ℹ️ Tidak ada kontainer Docker yang terdaftar saat ini.');\n    return out.join(NL);\n  }\n\n  if (parsed.running.length > 0) {\n    out.push('', '🟢 *KONTAINER BERJALAN (' + parsed.running.length + '):*');\n    for (const c of parsed.running) {\n      out.push('• *' + c.name + '* (' + c.status + ')');\n      out.push('  ↳ CPU: ' + c.cpu + ' | RAM: ' + c.mem + ' | Image: ' + c.image);\n      if (c.ports && c.ports !== '-') {\n        out.push('  ↳ Port: ' + c.ports);\n      }\n    }\n  } else {\n    out.push('', '🔴 *Tidak ada kontainer Docker yang sedang berjalan!*');\n  }\n\n  if (parsed.stopped.length > 0) {\n    out.push('', '🔴 *KONTAINER BERHENTI / MASALAH (' + parsed.stopped.length + '):*');\n    for (const c of parsed.stopped) {\n      out.push('• *' + c.name + '* [' + c.state + '] — ' + c.status + ' (Image: ' + c.image + ')');\n    }\n  }\n\n  return out.join(NL);\n}\n\nconst parsed = parseDockerOutput(sshItem);\nconst summary = buildDockerSummary(parsed);\n\nconst cleanPrompt =\n  'Permintaan Admin Transkep: \"' +\n  String(meta.rawText || '/analisa docker') +\n  '\"' +\n  NL +\n  NL +\n  '=== DATA REAL-TIME KONTAINER DOCKER TRANSKEP (' +\n  String(meta.waktuWIB || '-') +\n  ') ===' +\n  NL +\n  summary +\n  NL +\n  '==============================================================' +\n  NL +\n  NL +\n  'Analisislah data kontainer Docker real-time di atas untuk menjawab permintaan Admin Transkep secara akurat, ringkas, dan solutif. Jangan mengarang kontainer atau angka di luar data SSH di atas.';\n\nconst fullSystemPrompt =\n  'Kamu adalah Transkep AI, asisten DevOps & Infrastruktur Docker resmi ekosistem TRANSKEP.' +\n  NL +\n  'Tugasmu menganalisa laporan kontainer Docker real-time (container running, stopped/exited, port, CPU, RAM) dan memberikan insight serta langkah perbaikan praktis dalam Bahasa Indonesia yang akrab (sapa Bro).' +\n  NL +\n  'ATURAN IDENTITAS: Namamu adalah Transkep AI (jangan gunakan nama asisten lain selain Transkep AI).' +\n  NL +\n  'ATURAN FORMAT WHATSAPP: Gunakan satu tanda bintang *teks* untuk tebal (JANGAN gunakan **teks**).';\n\nreturn [\n  {\n    json: {\n      cleanPrompt,\n      fullSystemPrompt,\n      sessionId: String(meta.sessionId || 'transkep_ai_session_e1'),\n      modeLabel: String(meta.modeLabel || '🐳🔬 Transkep AI — Analisa Docker Server'),\n      replyChatId: String(meta.replyChatId || ''),\n    },\n  },\n];"
+        "jsCode": "const NL = String.fromCharCode(10);\nconst meta = $('Context & Router Transkep (Code)').first().json || {};\n\nlet psItem = {};\ntry {\n  psItem = $('SSH Cek Kontainer Docker').first().json || {};\n} catch (e) {\n  psItem = $input.first().json || {};\n}\nif (!psItem || (typeof psItem === 'object' && Object.keys(psItem).length === 0)) {\n  psItem = $input.first().json || {};\n}\n\nlet statsItem = {};\ntry {\n  statsItem = $('SSH Cek Resource Docker').first().json || {};\n} catch (e) {\n  statsItem = {};\n}\n\nfunction cleanLine(s) {\n  return String(s || '').trim().replace(/^\"+|\"+$/g, '').trim();\n}\n\nfunction compactPorts(rawPorts) {\n  const txt = cleanLine(rawPorts);\n  if (!txt) return '-';\n  const parts = txt.split(',').map((p) => p.trim()).filter(Boolean);\n  const uniq = [];\n  for (const p of parts) {\n    const normalized = p.replace(/^\\[::\\]:/, '').replace(/^0\\.0\\.0\\.0:/, '');\n    if (!uniq.includes(normalized)) uniq.push(normalized);\n  }\n  return uniq.slice(0, 4).join(', ') + (uniq.length > 4 ? ' (+' + (uniq.length - 4) + ' lainnya)' : '');\n}\n\nfunction parseJsonOrNdjson(raw) {\n  const txt = String(raw || '').trim();\n  if (!txt) return [];\n  if (txt.startsWith('[')) {\n    try {\n      const arr = JSON.parse(txt);\n      return Array.isArray(arr) ? arr : [];\n    } catch (e) {}\n  }\n  const objs = [];\n  for (const line of txt.split(/\\r?\\n/)) {\n    const t = line.trim();\n    if (t.startsWith('{') && t.endsWith('}')) {\n      try {\n        objs.push(JSON.parse(t));\n      } catch (e) {}\n    }\n  }\n  return objs;\n}\n\nfunction parseDockerOutput(item, statsData) {\n  const errObj = item.error;\n  const errMsg = errObj ? String(errObj.message || errObj) : (item.message ? String(item.message) : '');\n  const exitCode = item.code !== undefined && item.code !== null ? Number(item.code) : 0;\n  const stdout = String(item.stdout || '').trim();\n  const stderr = String(item.stderr || '').trim();\n\n  if (!stdout && (errMsg || stderr || exitCode !== 0)) {\n    return {\n      ok: false,\n      errorText: errMsg || stderr || ('SSH exit code ' + exitCode),\n      running: [],\n      stopped: [],\n      rawFallback: '',\n    };\n  }\n\n  const statsMap = {};\n  const statsStdout = String((statsData && statsData.stdout) || '').trim();\n  for (const obj of parseJsonOrNdjson(statsStdout)) {\n    const name = cleanLine(obj.Name || obj.Container || '').replace(/^\\//, '');\n    if (name) {\n      statsMap[name] = {\n        cpu: cleanLine(obj.CPUPerc || '-') || '-',\n        mem: cleanLine(obj.MemUsage || '-') || '-',\n      };\n    }\n  }\n\n  const lines = stdout.split(/\\r?\\n/).map((l) => l.trim()).filter(Boolean);\n  const markerIdx = lines.findIndex((l) => cleanLine(l) === '---STATS---');\n  const psLines = markerIdx >= 0 ? lines.slice(0, markerIdx) : lines;\n  const legacyStatsLines = markerIdx >= 0 ? lines.slice(markerIdx + 1) : [];\n\n  for (const sl of legacyStatsLines) {\n    const cleaned = cleanLine(sl);\n    if (!cleaned || cleaned === 'NO_STATS') continue;\n    const cols = cleaned.split('|');\n    if (cols.length >= 3) {\n      statsMap[cleanLine(cols[0]).replace(/^\\//, '')] = {\n        cpu: cleanLine(cols[1]) || '-',\n        mem: cleanLine(cols[2]) || '-',\n      };\n    }\n  }\n\n  const running = [];\n  const stopped = [];\n  const jsonContainers = parseJsonOrNdjson(psLines.join(NL));\n\n  if (jsonContainers.length > 0) {\n    for (const obj of jsonContainers) {\n      const name = cleanLine(obj.Names || obj.Name || obj.ID || '').replace(/^\\//, '');\n      const status = cleanLine(obj.Status || obj.State || '');\n      let state = cleanLine(obj.State || '').toLowerCase();\n      if (!state) {\n        state = /^up\\b/i.test(status) ? 'running' : 'exited';\n      }\n      const image = cleanLine(obj.Image || '-');\n      const ports = compactPorts(obj.Ports || '');\n      const stat = statsMap[name] || { cpu: '-', mem: '-' };\n      const entry = { name, state, status, image, ports, cpu: stat.cpu, mem: stat.mem };\n      if (state === 'running') running.push(entry);\n      else stopped.push(entry);\n    }\n    return { ok: true, errorText: '', running, stopped, rawFallback: '' };\n  }\n\n  let parsedPipeCount = 0;\n  for (const pl of psLines) {\n    const cols = cleanLine(pl).split('|');\n    if (cols.length >= 4) {\n      parsedPipeCount += 1;\n      const name = cleanLine(cols[0]).replace(/^\\//, '');\n      const state = cleanLine(cols[1]).toLowerCase();\n      const status = cleanLine(cols[2]);\n      const image = cleanLine(cols[3]);\n      const ports = compactPorts(cols.slice(4).join('|'));\n      const stat = statsMap[name] || { cpu: '-', mem: '-' };\n      const entry = { name, state, status, image, ports, cpu: stat.cpu, mem: stat.mem };\n      if (state === 'running') running.push(entry);\n      else stopped.push(entry);\n    }\n  }\n\n  if (parsedPipeCount === 0 && psLines.length > 0) {\n    return { ok: true, running: [], stopped: [], rawFallback: psLines.join(NL) };\n  }\n\n  return { ok: true, errorText: '', running, stopped, rawFallback: '' };\n}\n\nfunction buildDockerSummary(parsed) {\n  if (!parsed.ok) {\n    const isWinSyntax = /filename,\\s*directory name,\\s*or volume label syntax/i.test(parsed.errorText);\n    const extraHint = isWinSyntax\n      ? NL +\n        NL +\n        '💡 *Diagnosa Windows OpenSSH:* Error ini muncul jika shell SSH host memakai cmd.exe dan masih menerima awalan cd/kutipan.' +\n        NL +\n        '1. Pastikan workflow versi lama di n8n sudah dinonaktifkan/dihapus agar webhook tidak dobel.' +\n        NL +\n        '2. Pastikan Working Directory node SSH bernilai ekspresi `={{ \"\" }}`.' +\n        NL +\n        '3. Atau jalankan 1x di PowerShell Administrator host Windows:' +\n        NL +\n        '`Set-ItemProperty -Path HKLM:\\\\SOFTWARE\\\\OpenSSH -Name DefaultShell -Value \"C:\\\\Windows\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\"`' +\n        NL +\n        '`Restart-Service sshd`'\n      : '';\n    return (\n      '⚠️ *Gagal mengambil data Docker via SSH.*' + NL +\n      'Detail: ' + parsed.errorText + NL +\n      'Pastikan Docker Desktop / Docker Engine aktif dan service SSH di server berjalan normal.' +\n      extraHint\n    );\n  }\n  if (parsed.rawFallback) {\n    return '🐳 *Output Docker Mentah:*' + NL + parsed.rawFallback;\n  }\n\n  const total = parsed.running.length + parsed.stopped.length;\n  const out = [];\n  out.push(\n    '📊 *Ringkasan:* ✅ Berjalan: *' + parsed.running.length + '* | 🔴 Berhenti/Lainnya: *' + parsed.stopped.length + '* | 📦 Total: *' + total + '*'\n  );\n\n  if (total === 0) {\n    out.push('', 'ℹ️ Tidak ada kontainer Docker yang terdaftar saat ini.');\n    return out.join(NL);\n  }\n\n  if (parsed.running.length > 0) {\n    out.push('', '🟢 *KONTAINER BERJALAN (' + parsed.running.length + '):*');\n    for (const c of parsed.running) {\n      out.push('• *' + c.name + '* (' + c.status + ')');\n      out.push('  ↳ CPU: ' + c.cpu + ' | RAM: ' + c.mem + ' | Image: ' + c.image);\n      if (c.ports && c.ports !== '-') {\n        out.push('  ↳ Port: ' + c.ports);\n      }\n    }\n  } else {\n    out.push('', '🔴 *Tidak ada kontainer Docker yang sedang berjalan!*');\n  }\n\n  if (parsed.stopped.length > 0) {\n    out.push('', '🔴 *KONTAINER BERHENTI / MASALAH (' + parsed.stopped.length + '):*');\n    for (const c of parsed.stopped) {\n      out.push('• *' + c.name + '* [' + c.state + '] — ' + c.status + ' (Image: ' + c.image + ')');\n    }\n  }\n\n  return out.join(NL);\n}\n\nconst parsed = parseDockerOutput(psItem, statsItem);\nconst summary = buildDockerSummary(parsed);\n\nconst cleanPrompt =\n  'Permintaan Admin Transkep: \"' +\n  String(meta.rawText || '/analisa docker') +\n  '\"' +\n  NL +\n  NL +\n  '=== DATA REAL-TIME KONTAINER DOCKER TRANSKEP (' +\n  String(meta.waktuWIB || '-') +\n  ') ===' +\n  NL +\n  summary +\n  NL +\n  '==============================================================' +\n  NL +\n  NL +\n  'Analisislah data kontainer Docker real-time di atas untuk menjawab permintaan Admin Transkep secara akurat, ringkas, dan solutif. Jangan mengarang kontainer atau angka di luar data SSH di atas.';\n\nconst fullSystemPrompt =\n  'Kamu adalah Transkep AI, asisten DevOps & Infrastruktur Docker resmi ekosistem TRANSKEP.' +\n  NL +\n  'Tugasmu menganalisa laporan kontainer Docker real-time (container running, stopped/exited, port, CPU, RAM) dan memberikan insight serta langkah perbaikan praktis dalam Bahasa Indonesia yang akrab (sapa Bro).' +\n  NL +\n  'ATURAN IDENTITAS: Namamu adalah Transkep AI (jangan gunakan nama asisten lain selain Transkep AI).' +\n  NL +\n  'ATURAN FORMAT WHATSAPP: Gunakan satu tanda bintang *teks* untuk tebal (JANGAN gunakan **teks**).';\n\nreturn [\n  {\n    json: {\n      cleanPrompt,\n      fullSystemPrompt,\n      sessionId: String(meta.sessionId || 'transkep_ai_session_e1'),\n      modeLabel: String(meta.modeLabel || '🐳🔬 Transkep AI — Analisa Docker Server'),\n      replyChatId: String(meta.replyChatId || ''),\n    },\n  },\n];"
       },
       "id": "a90e21f7-29bc-48b0-8c34-63fd1b04e202",
       "name": "Gabung Data Docker & Prompt AI (Code)",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1220,
+        1660,
         1020
       ]
     },
     {
       "parameters": {
-        "jsCode": "const NL = String.fromCharCode(10);\nconst sshItem = $input.first().json || {};\nconst meta = $('Context & Router Transkep (Code)').first().json || {};\n\nfunction cleanLine(s) {\n  return String(s || '').trim().replace(/^\"+|\"+$/g, '').trim();\n}\n\nfunction compactPorts(rawPorts) {\n  const txt = cleanLine(rawPorts);\n  if (!txt) return '-';\n  const parts = txt.split(',').map((p) => p.trim()).filter(Boolean);\n  const uniq = [];\n  for (const p of parts) {\n    const normalized = p.replace(/^\\[::\\]:/, '').replace(/^0\\.0\\.0\\.0:/, '');\n    if (!uniq.includes(normalized)) uniq.push(normalized);\n  }\n  return uniq.slice(0, 4).join(', ') + (uniq.length > 4 ? ' (+' + (uniq.length - 4) + ' lainnya)' : '');\n}\n\nfunction parseDockerOutput(item) {\n  const errObj = item.error;\n  const errMsg = errObj ? String(errObj.message || errObj) : (item.message ? String(item.message) : '');\n  const exitCode = item.code !== undefined && item.code !== null ? Number(item.code) : 0;\n  const stdout = String(item.stdout || '').trim();\n  const stderr = String(item.stderr || '').trim();\n\n  if (!stdout && (errMsg || stderr || exitCode !== 0)) {\n    return {\n      ok: false,\n      errorText: errMsg || stderr || ('SSH exit code ' + exitCode),\n      running: [],\n      stopped: [],\n      rawFallback: '',\n    };\n  }\n\n  const lines = stdout.split(/\\r?\\n/).map(cleanLine).filter(Boolean);\n  const markerIdx = lines.findIndex((l) => l === '---STATS---');\n  const psLines = markerIdx >= 0 ? lines.slice(0, markerIdx) : lines;\n  const statsLines = markerIdx >= 0 ? lines.slice(markerIdx + 1) : [];\n\n  const statsMap = {};\n  for (const sl of statsLines) {\n    if (!sl || sl === 'NO_STATS') continue;\n    const cols = sl.split('|');\n    if (cols.length >= 3) {\n      const name = cleanLine(cols[0]);\n      statsMap[name] = { cpu: cleanLine(cols[1]) || '-', mem: cleanLine(cols[2]) || '-' };\n    }\n  }\n\n  const running = [];\n  const stopped = [];\n  let parsedPipeCount = 0;\n\n  for (const pl of psLines) {\n    const cols = pl.split('|');\n    if (cols.length >= 4) {\n      parsedPipeCount += 1;\n      const name = cleanLine(cols[0]);\n      const state = cleanLine(cols[1]).toLowerCase();\n      const status = cleanLine(cols[2]);\n      const image = cleanLine(cols[3]);\n      const ports = compactPorts(cols.slice(4).join('|'));\n      const stat = statsMap[name] || { cpu: '-', mem: '-' };\n      const entry = { name, state, status, image, ports, cpu: stat.cpu, mem: stat.mem };\n      if (state === 'running') running.push(entry);\n      else stopped.push(entry);\n    }\n  }\n\n  if (parsedPipeCount === 0 && psLines.length > 0) {\n    return { ok: true, running: [], stopped: [], rawFallback: psLines.join(NL) };\n  }\n\n  return { ok: true, errorText: '', running, stopped, rawFallback: '' };\n}\n\nfunction buildDockerSummary(parsed) {\n  if (!parsed.ok) {\n    return (\n      '⚠️ *Gagal mengambil data Docker via SSH.*' + NL +\n      'Detail: ' + parsed.errorText + NL +\n      'Pastikan Docker Desktop / Docker Engine aktif dan service SSH di server berjalan normal.'\n    );\n  }\n  if (parsed.rawFallback) {\n    return '🐳 *Output Docker Mentah:*' + NL + parsed.rawFallback;\n  }\n\n  const total = parsed.running.length + parsed.stopped.length;\n  const out = [];\n  out.push(\n    '📊 *Ringkasan:* ✅ Berjalan: *' + parsed.running.length + '* | 🔴 Berhenti/Lainnya: *' + parsed.stopped.length + '* | 📦 Total: *' + total + '*'\n  );\n\n  if (total === 0) {\n    out.push('', 'ℹ️ Tidak ada kontainer Docker yang terdaftar saat ini.');\n    return out.join(NL);\n  }\n\n  if (parsed.running.length > 0) {\n    out.push('', '🟢 *KONTAINER BERJALAN (' + parsed.running.length + '):*');\n    for (const c of parsed.running) {\n      out.push('• *' + c.name + '* (' + c.status + ')');\n      out.push('  ↳ CPU: ' + c.cpu + ' | RAM: ' + c.mem + ' | Image: ' + c.image);\n      if (c.ports && c.ports !== '-') {\n        out.push('  ↳ Port: ' + c.ports);\n      }\n    }\n  } else {\n    out.push('', '🔴 *Tidak ada kontainer Docker yang sedang berjalan!*');\n  }\n\n  if (parsed.stopped.length > 0) {\n    out.push('', '🔴 *KONTAINER BERHENTI / MASALAH (' + parsed.stopped.length + '):*');\n    for (const c of parsed.stopped) {\n      out.push('• *' + c.name + '* [' + c.state + '] — ' + c.status + ' (Image: ' + c.image + ')');\n    }\n  }\n\n  return out.join(NL);\n}\n\nconst parsed = parseDockerOutput(sshItem);\nconst summary = buildDockerSummary(parsed);\n\nconst msg =\n  '*🐳 LAPORAN KONTAINER DOCKER TRANSKEP*' +\n  NL +\n  '────────────────────' +\n  NL +\n  '📅 *Waktu:* ' +\n  String(meta.waktuWIB || '-') +\n  NL +\n  NL +\n  summary +\n  NL +\n  NL +\n  '_💡 Ketik /analisa docker untuk analisa AI, /menu untuk daftar perintah, atau chat langsung dengan Transkep AI._';\n\nreturn [{ json: { chatId: String(meta.replyChatId || ''), replyText: msg } }];"
+        "jsCode": "const NL = String.fromCharCode(10);\nconst meta = $('Context & Router Transkep (Code)').first().json || {};\n\nlet psItem = {};\ntry {\n  psItem = $('SSH Cek Kontainer Docker').first().json || {};\n} catch (e) {\n  psItem = $input.first().json || {};\n}\nif (!psItem || (typeof psItem === 'object' && Object.keys(psItem).length === 0)) {\n  psItem = $input.first().json || {};\n}\n\nlet statsItem = {};\ntry {\n  statsItem = $('SSH Cek Resource Docker').first().json || {};\n} catch (e) {\n  statsItem = {};\n}\n\nfunction cleanLine(s) {\n  return String(s || '').trim().replace(/^\"+|\"+$/g, '').trim();\n}\n\nfunction compactPorts(rawPorts) {\n  const txt = cleanLine(rawPorts);\n  if (!txt) return '-';\n  const parts = txt.split(',').map((p) => p.trim()).filter(Boolean);\n  const uniq = [];\n  for (const p of parts) {\n    const normalized = p.replace(/^\\[::\\]:/, '').replace(/^0\\.0\\.0\\.0:/, '');\n    if (!uniq.includes(normalized)) uniq.push(normalized);\n  }\n  return uniq.slice(0, 4).join(', ') + (uniq.length > 4 ? ' (+' + (uniq.length - 4) + ' lainnya)' : '');\n}\n\nfunction parseJsonOrNdjson(raw) {\n  const txt = String(raw || '').trim();\n  if (!txt) return [];\n  if (txt.startsWith('[')) {\n    try {\n      const arr = JSON.parse(txt);\n      return Array.isArray(arr) ? arr : [];\n    } catch (e) {}\n  }\n  const objs = [];\n  for (const line of txt.split(/\\r?\\n/)) {\n    const t = line.trim();\n    if (t.startsWith('{') && t.endsWith('}')) {\n      try {\n        objs.push(JSON.parse(t));\n      } catch (e) {}\n    }\n  }\n  return objs;\n}\n\nfunction parseDockerOutput(item, statsData) {\n  const errObj = item.error;\n  const errMsg = errObj ? String(errObj.message || errObj) : (item.message ? String(item.message) : '');\n  const exitCode = item.code !== undefined && item.code !== null ? Number(item.code) : 0;\n  const stdout = String(item.stdout || '').trim();\n  const stderr = String(item.stderr || '').trim();\n\n  if (!stdout && (errMsg || stderr || exitCode !== 0)) {\n    return {\n      ok: false,\n      errorText: errMsg || stderr || ('SSH exit code ' + exitCode),\n      running: [],\n      stopped: [],\n      rawFallback: '',\n    };\n  }\n\n  const statsMap = {};\n  const statsStdout = String((statsData && statsData.stdout) || '').trim();\n  for (const obj of parseJsonOrNdjson(statsStdout)) {\n    const name = cleanLine(obj.Name || obj.Container || '').replace(/^\\//, '');\n    if (name) {\n      statsMap[name] = {\n        cpu: cleanLine(obj.CPUPerc || '-') || '-',\n        mem: cleanLine(obj.MemUsage || '-') || '-',\n      };\n    }\n  }\n\n  const lines = stdout.split(/\\r?\\n/).map((l) => l.trim()).filter(Boolean);\n  const markerIdx = lines.findIndex((l) => cleanLine(l) === '---STATS---');\n  const psLines = markerIdx >= 0 ? lines.slice(0, markerIdx) : lines;\n  const legacyStatsLines = markerIdx >= 0 ? lines.slice(markerIdx + 1) : [];\n\n  for (const sl of legacyStatsLines) {\n    const cleaned = cleanLine(sl);\n    if (!cleaned || cleaned === 'NO_STATS') continue;\n    const cols = cleaned.split('|');\n    if (cols.length >= 3) {\n      statsMap[cleanLine(cols[0]).replace(/^\\//, '')] = {\n        cpu: cleanLine(cols[1]) || '-',\n        mem: cleanLine(cols[2]) || '-',\n      };\n    }\n  }\n\n  const running = [];\n  const stopped = [];\n  const jsonContainers = parseJsonOrNdjson(psLines.join(NL));\n\n  if (jsonContainers.length > 0) {\n    for (const obj of jsonContainers) {\n      const name = cleanLine(obj.Names || obj.Name || obj.ID || '').replace(/^\\//, '');\n      const status = cleanLine(obj.Status || obj.State || '');\n      let state = cleanLine(obj.State || '').toLowerCase();\n      if (!state) {\n        state = /^up\\b/i.test(status) ? 'running' : 'exited';\n      }\n      const image = cleanLine(obj.Image || '-');\n      const ports = compactPorts(obj.Ports || '');\n      const stat = statsMap[name] || { cpu: '-', mem: '-' };\n      const entry = { name, state, status, image, ports, cpu: stat.cpu, mem: stat.mem };\n      if (state === 'running') running.push(entry);\n      else stopped.push(entry);\n    }\n    return { ok: true, errorText: '', running, stopped, rawFallback: '' };\n  }\n\n  let parsedPipeCount = 0;\n  for (const pl of psLines) {\n    const cols = cleanLine(pl).split('|');\n    if (cols.length >= 4) {\n      parsedPipeCount += 1;\n      const name = cleanLine(cols[0]).replace(/^\\//, '');\n      const state = cleanLine(cols[1]).toLowerCase();\n      const status = cleanLine(cols[2]);\n      const image = cleanLine(cols[3]);\n      const ports = compactPorts(cols.slice(4).join('|'));\n      const stat = statsMap[name] || { cpu: '-', mem: '-' };\n      const entry = { name, state, status, image, ports, cpu: stat.cpu, mem: stat.mem };\n      if (state === 'running') running.push(entry);\n      else stopped.push(entry);\n    }\n  }\n\n  if (parsedPipeCount === 0 && psLines.length > 0) {\n    return { ok: true, running: [], stopped: [], rawFallback: psLines.join(NL) };\n  }\n\n  return { ok: true, errorText: '', running, stopped, rawFallback: '' };\n}\n\nfunction buildDockerSummary(parsed) {\n  if (!parsed.ok) {\n    const isWinSyntax = /filename,\\s*directory name,\\s*or volume label syntax/i.test(parsed.errorText);\n    const extraHint = isWinSyntax\n      ? NL +\n        NL +\n        '💡 *Diagnosa Windows OpenSSH:* Error ini muncul jika shell SSH host memakai cmd.exe dan masih menerima awalan cd/kutipan.' +\n        NL +\n        '1. Pastikan workflow versi lama di n8n sudah dinonaktifkan/dihapus agar webhook tidak dobel.' +\n        NL +\n        '2. Pastikan Working Directory node SSH bernilai ekspresi `={{ \"\" }}`.' +\n        NL +\n        '3. Atau jalankan 1x di PowerShell Administrator host Windows:' +\n        NL +\n        '`Set-ItemProperty -Path HKLM:\\\\SOFTWARE\\\\OpenSSH -Name DefaultShell -Value \"C:\\\\Windows\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\"`' +\n        NL +\n        '`Restart-Service sshd`'\n      : '';\n    return (\n      '⚠️ *Gagal mengambil data Docker via SSH.*' + NL +\n      'Detail: ' + parsed.errorText + NL +\n      'Pastikan Docker Desktop / Docker Engine aktif dan service SSH di server berjalan normal.' +\n      extraHint\n    );\n  }\n  if (parsed.rawFallback) {\n    return '🐳 *Output Docker Mentah:*' + NL + parsed.rawFallback;\n  }\n\n  const total = parsed.running.length + parsed.stopped.length;\n  const out = [];\n  out.push(\n    '📊 *Ringkasan:* ✅ Berjalan: *' + parsed.running.length + '* | 🔴 Berhenti/Lainnya: *' + parsed.stopped.length + '* | 📦 Total: *' + total + '*'\n  );\n\n  if (total === 0) {\n    out.push('', 'ℹ️ Tidak ada kontainer Docker yang terdaftar saat ini.');\n    return out.join(NL);\n  }\n\n  if (parsed.running.length > 0) {\n    out.push('', '🟢 *KONTAINER BERJALAN (' + parsed.running.length + '):*');\n    for (const c of parsed.running) {\n      out.push('• *' + c.name + '* (' + c.status + ')');\n      out.push('  ↳ CPU: ' + c.cpu + ' | RAM: ' + c.mem + ' | Image: ' + c.image);\n      if (c.ports && c.ports !== '-') {\n        out.push('  ↳ Port: ' + c.ports);\n      }\n    }\n  } else {\n    out.push('', '🔴 *Tidak ada kontainer Docker yang sedang berjalan!*');\n  }\n\n  if (parsed.stopped.length > 0) {\n    out.push('', '🔴 *KONTAINER BERHENTI / MASALAH (' + parsed.stopped.length + '):*');\n    for (const c of parsed.stopped) {\n      out.push('• *' + c.name + '* [' + c.state + '] — ' + c.status + ' (Image: ' + c.image + ')');\n    }\n  }\n\n  return out.join(NL);\n}\n\nconst parsed = parseDockerOutput(psItem, statsItem);\nconst summary = buildDockerSummary(parsed);\n\nconst msg =\n  '*🐳 LAPORAN KONTAINER DOCKER TRANSKEP*' +\n  NL +\n  '────────────────────' +\n  NL +\n  '📅 *Waktu:* ' +\n  String(meta.waktuWIB || '-') +\n  NL +\n  NL +\n  summary +\n  NL +\n  NL +\n  '_💡 Ketik /analisa docker untuk analisa AI, /menu untuk daftar perintah, atau chat langsung dengan Transkep AI._';\n\nreturn [{ json: { chatId: String(meta.replyChatId || ''), replyText: msg } }];"
       },
       "id": "b54a6250-3d42-41a9-8bfa-7717d9b6ca24",
       "name": "Format Laporan Kontainer Docker (Code)",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1220,
+        1660,
         1260
       ]
     },
@@ -273,7 +314,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        740,
+        960,
         1420
       ]
     },
@@ -290,7 +331,7 @@
       "type": "@n8n/n8n-nodes-langchain.agent",
       "typeVersion": 1.6,
       "position": [
-        1500,
+        1940,
         880
       ],
       "retryOnFail": true,
@@ -310,7 +351,7 @@
       "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
       "typeVersion": 1,
       "position": [
-        1420,
+        1860,
         1100
       ],
       "credentials": {
@@ -331,7 +372,7 @@
       "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
       "typeVersion": 1.2,
       "position": [
-        1620,
+        2060,
         1100
       ]
     },
@@ -344,7 +385,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1820,
+        2260,
         880
       ]
     },
@@ -389,7 +430,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
       "position": [
-        2120,
+        2560,
         1140
       ]
     },
@@ -432,7 +473,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
       "position": [
-        2380,
+        2820,
         1140
       ],
       "continueOnFail": true
@@ -543,6 +584,35 @@
       ]
     },
     "SSH Cek Kontainer Docker": {
+      "main": [
+        [
+          {
+            "node": "SSH Berhasil? (IF)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SSH Berhasil? (IF)": {
+      "main": [
+        [
+          {
+            "node": "SSH Cek Resource Docker",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Analisa Docker dengan AI? (IF)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SSH Cek Resource Docker": {
       "main": [
         [
           {
