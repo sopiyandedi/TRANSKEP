@@ -6054,3 +6054,22 @@ Item di bawah ini berisiko memutus layanan produksi (WAHA/n8n/Firestore/Drive/CD
    - Mengganti nama workflow menjadi **`Transkep AI Assistant`**, menyelaraskan nama node/header/footer WhatsApp serta aturan identitas prompt AI ke **Transkep AI**.
    - Menambahkan suite pengujian ke-6 [`tests/verify_n8n_ai_assistant.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/tests/verify_n8n_ai_assistant.js) di [`tests/run_all.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/tests/run_all.js) untuk memvalidasi topologi graf n8n, paritas `.json` vs `.example.json`, sanitasi rahasia, serta simulasi VM atas seluruh jalur routing & parser Docker.
    - Memperbarui ringkasan workflow di [`n8n/README.md`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/n8n/README.md) dan [`prd.md`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/prd.md).
+
+---
+
+## Tahap 118: Penyelarasan Schema E-Office KGB/Rapat pada Firestore Rules & Client Write Handler (`v3.8.51`) (2026-11-16)
+**Tujuan:** Mengatasi error `FirebaseError: [code=permission-denied]: Missing or insufficient permissions.` saat menyimpan/memperbarui draf form KGB di modul E-Office tanpa melemahkan proteksi Zero-Trust RBAC.
+
+### Rincian Perubahan:
+1. **Penyelarasan Validator `eoffice_kgb` & `eoffice_rapat` ([`firestore.rules`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/firestore.rules))**:
+   - Menambahkan helper `isValidOptionalStringOrNonNegNumber` dan `isValidOptionalStringOrTimestamp`.
+   - Memperluas `isValidEofficeKgb` (`allowed` 59 field) agar mengakomodasi field form KGB & TTE yang dikirim maupun hasil merge dokumen lama (`nokgb`, `bulan_surat`, `tahun_surat`, `tempat_lahir`, `golongan_lama`, `golongan_baru`, `tahun_lama`, `bulan_lama`, `tahun_baru`, `bulan_baru`, `created_by`, `updated_by`, `tgl_selesai`, `tte_status`, `tte_pejabat_nip`, `tte_pejabat_nama`, `tte_submitted_at`, `tte_signed_at`, `tte_signer`, `tte_qrcode`, `doc_url`, `pdf_url`, `doc_id`, `synced_at`, `nama`).
+   - Memperluas `isValidEofficeRapat` dengan field audit opsional (`created_by`, `updated_by`, `synced_at`).
+   - Memperbarui aturan `allow update` pada `match /eoffice_kgb/{docId}` dan `match /eoffice_rapat/{docId}` agar dokumen lama yang belum memiliki key `id` atau `id_kgb`/`id_rapat` dapat diisi ulang sesuai `docId` saat update sementara field yang sudah ada tetap immutable.
+2. **Pembaruan `saveKgbToFirestore` & `saveRapatToFirestore` ([`core/firebase.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/core/firebase.js))**:
+   - Menambahkan helper `_serverTimestamp()`, `_isFirestoreTimestamp()`, `_cleanOptionalUrl()`, dan `_waitAuthForWrite()`.
+   - Menyimpan seluruh field form KGB & TTE (`nokgb`, `tempat_lahir`, `golongan_lama`, `golongan_baru`, `tahun_lama`, `bulan_lama`, `tahun_baru`, `bulan_baru`, `created_by`, `updated_by`, `tgl_selesai`, `tte_*`), menormalisasi tipe string/URL secara aman, menunggu resolusi auth bila sesi tersimpan aktif, serta meng-upgrade `created_at` bertipe string lama menjadi `serverTimestamp()`.
+3. **Suite Regresi Schema & Sinkronisasi PWA `v3.8.51`**:
+   - Memperluas kasus uji `eoffice_kgb` di [`tests/verify_firestore_schema.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/tests/verify_firestore_schema.js) agar mencakup payload form KGB dan TTE penuh.
+   - Menyinkronkan versi build **`v3.8.51`** di [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) dan [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js).
+

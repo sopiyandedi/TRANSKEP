@@ -185,7 +185,33 @@ assert(TF && typeof TF === 'object', 'TranskepFirebase failed to load');
   await TF.savePkpToFirestore({ id_pkp: 'PKP_2026_199002022015012002', nip_pegawai: '199002022015012002', tahun: '2026', status: 'Draft', items: [] });
   await TF.savePckToFirestore({ id_pck: 'PCK_2026_November_199002022015012002', nip_pegawai: '199002022015012002', bulan: 'November', tahun: '2026', status: 'Draft', realisasi: [] });
   await TF.saveRekapitulasiToFirestore({ id_rekap: 'REKAP_2026_November', bulan: 'November', tahun: '2026', pejabat_nama: 'Ketua', pejabat_nip: '1970', daftar_nilai: [] });
-  await TF.saveKgbToFirestore({ id: 'KGB-1', nip: '199002022015012002', status: 'Draft' });
+  await TF.saveKgbToFirestore({
+    id: 'KGB-1',
+    id_kgb: 'KGB-1',
+    nip: '199002022015012002',
+    nama_pegawai: 'Pegawai Uji',
+    tempat_lahir: 'Indramayu',
+    tanggal_lahir: '10 Mei 1990',
+    golongan: 'III/d',
+    golongan_lama: 'III/d',
+    golongan_baru: 'III/d',
+    nokgb: '001',
+    bulan_surat: '11',
+    tahun_surat: '2026',
+    gaji_lama: '3.919.100',
+    gaji_baru: '4.042.500',
+    tahun_lama: '14',
+    bulan_lama: '0',
+    tahun_baru: '16',
+    bulan_baru: '0',
+    status: 'Menunggu TTE Pimpinan',
+    tgl_selesai: '2026-11-16',
+    tte_status: 'Menunggu TTE',
+    tte_pejabat_nip: '198001012005011001',
+    tte_pejabat_nama: 'Ketua PA Indramayu',
+    tte_submitted_at: '2026-11-16T09:00:00.000Z',
+    created_by: '198001012005011001'
+  });
   await TF.saveRapatToFirestore({ id: 'RPT-1', status: 'Selesai' });
   await TF.saveSuratTugasToFirestore({ id: 'ST-1', status: 'DISETUJUI', peserta: [] });
 

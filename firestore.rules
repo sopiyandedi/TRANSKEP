@@ -154,12 +154,17 @@ rules_version = '2';
 // Collection: eoffice_kgb
 // Document ID: {docId} (matches `id` / `id_kgb`, e.g. "DRAFT-..." or "KGB-...")
 // Fields:
-//   - id, id_kgb, nip, nama_pegawai, tanggal_lahir, pangkat, golongan, jabatan,
-//     unit_kerja, nomor_surat, tanggal_surat, tujuan_kppn, gaji_lama, pejabat_lama,
-//     nomor_sk_lama, tanggal_sk_lama, tmt_lama, mkg_lama, gaji_baru, terbilang_gaji,
-//     mkg_baru, tmt_baru, tmt_yad, nama_ketua, dasar_pp, status, file_doc_url,
-//     file_pdf_url, file_id, tanggal_input, is_from_dashboard, is_firebase,
-//     updated_at, created_at
+//   - id, id_kgb, nip, nama_pegawai, nama, tempat_lahir, tanggal_lahir,
+//     pangkat, golongan, golongan_lama, golongan_baru, jabatan, unit_kerja,
+//     nokgb, bulan_surat, tahun_surat, nomor_surat, tanggal_surat, tujuan_kppn,
+//     gaji_lama, pejabat_lama, nomor_sk_lama, tanggal_sk_lama, tmt_lama,
+//     tahun_lama, bulan_lama, mkg_lama, gaji_baru, terbilang_gaji,
+//     tahun_baru, bulan_baru, mkg_baru, tmt_baru, tmt_yad, nama_ketua,
+//     dasar_pp, status, file_doc_url, file_pdf_url, file_id, doc_url,
+//     pdf_url, doc_id, tanggal_input, tgl_selesai, tte_status,
+//     tte_pejabat_nip, tte_pejabat_nama, tte_submitted_at, tte_signed_at,
+//     tte_signer, tte_qrcode, created_by, updated_by, synced_at,
+//     is_from_dashboard, is_firebase, updated_at, created_at
 //
 // Collection: eoffice_rapat
 // Document ID: {docId} (matches `id` / `id_rapat`, e.g. "RPT-...")
@@ -167,7 +172,7 @@ rules_version = '2';
 //   - id, id_rapat, nomor_undangan, agenda, hari_tanggal, waktu_mulai, waktu_selesai,
 //     tempat, pemimpin, notulis, peserta_json, pembahasan, kesimpulan, status,
 //     doc_undangan_url, doc_absen_url, doc_notulen_url, folder_url, tanggal_input,
-//     is_firebase, updated_at, created_at
+//     created_by, updated_by, synced_at, is_firebase, updated_at, created_at
 //
 // Collection: surat_tugas_documents
 // Document ID: {docId} (matches field `id`, e.g. "ST-...")
@@ -277,6 +282,18 @@ service cloud.firestore {
 
     function isValidOptionalTimestamp(data, field) {
       return !(field in data) || data[field] is timestamp;
+    }
+
+    function isValidOptionalStringOrNonNegNumber(data, field, maxLen) {
+      return !(field in data) ||
+             (data[field] is string && data[field].size() <= maxLen) ||
+             (data[field] is number && data[field] >= 0);
+    }
+
+    function isValidOptionalStringOrTimestamp(data, field, maxLen) {
+      return !(field in data) ||
+             (data[field] is string && data[field].size() <= maxLen) ||
+             data[field] is timestamp;
     }
 
     function isValidCreatedAtOnUpdate(oldData, newData) {
@@ -530,12 +547,17 @@ service cloud.firestore {
 
     function isValidEofficeKgb(data, docId) {
       let allowed = [
-        'id', 'id_kgb', 'nip', 'nama_pegawai', 'tanggal_lahir', 'pangkat', 'golongan',
-        'jabatan', 'unit_kerja', 'nomor_surat', 'tanggal_surat', 'tujuan_kppn',
+        'id', 'id_kgb', 'nip', 'nama_pegawai', 'nama', 'tempat_lahir', 'tanggal_lahir',
+        'pangkat', 'golongan', 'golongan_lama', 'golongan_baru', 'jabatan', 'unit_kerja',
+        'nokgb', 'bulan_surat', 'tahun_surat', 'nomor_surat', 'tanggal_surat', 'tujuan_kppn',
         'gaji_lama', 'pejabat_lama', 'nomor_sk_lama', 'tanggal_sk_lama', 'tmt_lama',
-        'mkg_lama', 'gaji_baru', 'terbilang_gaji', 'mkg_baru', 'tmt_baru', 'tmt_yad',
+        'tahun_lama', 'bulan_lama', 'mkg_lama', 'gaji_baru', 'terbilang_gaji',
+        'tahun_baru', 'bulan_baru', 'mkg_baru', 'tmt_baru', 'tmt_yad',
         'nama_ketua', 'dasar_pp', 'status', 'file_doc_url', 'file_pdf_url', 'file_id',
-        'tanggal_input', 'is_from_dashboard', 'is_firebase', 'updated_at', 'created_at'
+        'doc_url', 'pdf_url', 'doc_id', 'tanggal_input', 'tgl_selesai',
+        'tte_status', 'tte_pejabat_nip', 'tte_pejabat_nama', 'tte_submitted_at',
+        'tte_signed_at', 'tte_signer', 'tte_qrcode', 'created_by', 'updated_by',
+        'synced_at', 'is_from_dashboard', 'is_firebase', 'updated_at', 'created_at'
       ];
       return hasRequiredFields(['id', 'id_kgb', 'nip', 'status', 'updated_at']) &&
              hasOnlyAllowedFields(allowed) &&
@@ -543,22 +565,33 @@ service cloud.firestore {
              data.id_kgb is string && data.id_kgb == docId && data.id_kgb.size() >= 1 && data.id_kgb.size() <= 120 &&
              data.nip is string && data.nip.size() <= 30 &&
              isValidOptionalString(data, 'nama_pegawai', 0, 150) &&
+             isValidOptionalString(data, 'nama', 0, 150) &&
+             isValidOptionalString(data, 'tempat_lahir', 0, 150) &&
              isValidOptionalString(data, 'tanggal_lahir', 0, 40) &&
              isValidOptionalString(data, 'pangkat', 0, 100) &&
              isValidOptionalString(data, 'golongan', 0, 50) &&
+             isValidOptionalString(data, 'golongan_lama', 0, 50) &&
+             isValidOptionalString(data, 'golongan_baru', 0, 50) &&
              isValidOptionalString(data, 'jabatan', 0, 200) &&
              isValidOptionalString(data, 'unit_kerja', 0, 200) &&
+             isValidOptionalStringOrNonNegNumber(data, 'nokgb', 50) &&
+             isValidOptionalStringOrNonNegNumber(data, 'bulan_surat', 50) &&
+             isValidOptionalStringOrNonNegNumber(data, 'tahun_surat', 50) &&
              isValidOptionalString(data, 'nomor_surat', 0, 150) &&
              isValidOptionalString(data, 'tanggal_surat', 0, 40) &&
              isValidOptionalString(data, 'tujuan_kppn', 0, 200) &&
-             (!('gaji_lama' in data) || (data.gaji_lama is string && data.gaji_lama.size() <= 50) || (data.gaji_lama is number && data.gaji_lama >= 0)) &&
+             isValidOptionalStringOrNonNegNumber(data, 'gaji_lama', 50) &&
              isValidOptionalString(data, 'pejabat_lama', 0, 200) &&
              isValidOptionalString(data, 'nomor_sk_lama', 0, 150) &&
              isValidOptionalString(data, 'tanggal_sk_lama', 0, 40) &&
              isValidOptionalString(data, 'tmt_lama', 0, 40) &&
+             isValidOptionalStringOrNonNegNumber(data, 'tahun_lama', 50) &&
+             isValidOptionalStringOrNonNegNumber(data, 'bulan_lama', 50) &&
              isValidOptionalString(data, 'mkg_lama', 0, 50) &&
-             (!('gaji_baru' in data) || (data.gaji_baru is string && data.gaji_baru.size() <= 50) || (data.gaji_baru is number && data.gaji_baru >= 0)) &&
+             isValidOptionalStringOrNonNegNumber(data, 'gaji_baru', 50) &&
              isValidOptionalString(data, 'terbilang_gaji', 0, 300) &&
+             isValidOptionalStringOrNonNegNumber(data, 'tahun_baru', 50) &&
+             isValidOptionalStringOrNonNegNumber(data, 'bulan_baru', 50) &&
              isValidOptionalString(data, 'mkg_baru', 0, 50) &&
              isValidOptionalString(data, 'tmt_baru', 0, 40) &&
              isValidOptionalString(data, 'tmt_yad', 0, 40) &&
@@ -568,7 +601,21 @@ service cloud.firestore {
              isValidOptionalUrlOrDash(data, 'file_doc_url', 1000) &&
              isValidOptionalUrlOrDash(data, 'file_pdf_url', 1000) &&
              isValidOptionalString(data, 'file_id', 0, 200) &&
+             isValidOptionalUrlOrDash(data, 'doc_url', 1000) &&
+             isValidOptionalUrlOrDash(data, 'pdf_url', 1000) &&
+             isValidOptionalString(data, 'doc_id', 0, 200) &&
              isValidOptionalString(data, 'tanggal_input', 0, 40) &&
+             isValidOptionalStringOrTimestamp(data, 'tgl_selesai', 60) &&
+             isValidOptionalString(data, 'tte_status', 0, 60) &&
+             isValidOptionalString(data, 'tte_pejabat_nip', 0, 30) &&
+             isValidOptionalString(data, 'tte_pejabat_nama', 0, 150) &&
+             isValidOptionalStringOrTimestamp(data, 'tte_submitted_at', 60) &&
+             isValidOptionalStringOrTimestamp(data, 'tte_signed_at', 60) &&
+             isValidOptionalString(data, 'tte_signer', 0, 200) &&
+             isValidOptionalString(data, 'tte_qrcode', 0, 50000) &&
+             isValidOptionalString(data, 'created_by', 0, 150) &&
+             isValidOptionalString(data, 'updated_by', 0, 150) &&
+             isValidOptionalStringOrTimestamp(data, 'synced_at', 60) &&
              isValidOptionalBool(data, 'is_from_dashboard') &&
              isValidOptionalBool(data, 'is_firebase') &&
              data.updated_at is timestamp &&
@@ -581,6 +628,7 @@ service cloud.firestore {
         'waktu_mulai', 'waktu_selesai', 'tempat', 'pemimpin', 'notulis',
         'peserta_json', 'pembahasan', 'kesimpulan', 'status', 'doc_undangan_url',
         'doc_absen_url', 'doc_notulen_url', 'folder_url', 'tanggal_input',
+        'created_by', 'updated_by', 'synced_at',
         'is_firebase', 'updated_at', 'created_at'
       ];
       return hasRequiredFields(['id', 'id_rapat', 'status', 'updated_at']) &&
@@ -604,6 +652,9 @@ service cloud.firestore {
              isValidOptionalUrlOrDash(data, 'doc_notulen_url', 1000) &&
              isValidOptionalUrlOrDash(data, 'folder_url', 1000) &&
              isValidOptionalString(data, 'tanggal_input', 0, 40) &&
+             isValidOptionalString(data, 'created_by', 0, 150) &&
+             isValidOptionalString(data, 'updated_by', 0, 150) &&
+             isValidOptionalStringOrTimestamp(data, 'synced_at', 60) &&
              isValidOptionalBool(data, 'is_firebase') &&
              data.updated_at is timestamp &&
              isValidOptionalTimestamp(data, 'created_at');
@@ -785,7 +836,8 @@ service cloud.firestore {
                        isValidEofficeKgb(request.resource.data, docId);
       allow update: if isAdminOrOperator() &&
                        isValidEofficeKgb(request.resource.data, docId) &&
-                       areImmutableFieldsUnchanged(['id', 'id_kgb']) &&
+                       (!('id' in resource.data) || request.resource.data.id == resource.data.id) &&
+                       (!('id_kgb' in resource.data) || request.resource.data.id_kgb == resource.data.id_kgb) &&
                        isValidCreatedAtOnUpdate(resource.data, request.resource.data);
       allow delete: if isAdminOrOperator();
     }
@@ -797,7 +849,8 @@ service cloud.firestore {
                        isValidEofficeRapat(request.resource.data, docId);
       allow update: if isAdminOrOperator() &&
                        isValidEofficeRapat(request.resource.data, docId) &&
-                       areImmutableFieldsUnchanged(['id', 'id_rapat']) &&
+                       (!('id' in resource.data) || request.resource.data.id == resource.data.id) &&
+                       (!('id_rapat' in resource.data) || request.resource.data.id_rapat == resource.data.id_rapat) &&
                        isValidCreatedAtOnUpdate(resource.data, request.resource.data);
       allow delete: if isAdminOrOperator();
     }

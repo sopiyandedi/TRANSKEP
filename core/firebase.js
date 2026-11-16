@@ -1077,6 +1077,31 @@ const TranskepFirebase = {
   EOFFICE_KGB_COLLECTION: 'eoffice_kgb',
   EOFFICE_RAPAT_COLLECTION: 'eoffice_rapat',
 
+  _serverTimestamp() {
+    return (typeof firebase !== 'undefined' && firebase.firestore && firebase.firestore.FieldValue)
+      ? firebase.firestore.FieldValue.serverTimestamp()
+      : new Date().toISOString();
+  },
+
+  _isFirestoreTimestamp(val) {
+    return Boolean(val && typeof val === 'object' && typeof val.toDate === 'function');
+  },
+
+  _cleanOptionalUrl(val) {
+    const s = (val === undefined || val === null) ? '' : String(val).trim();
+    return (!s || s === '-' || /^https?:\/\//i.test(s)) ? s : '';
+  },
+
+  async _waitAuthForWrite(contextName) {
+    if (!this._authResolved && this._hasStoredSession()) {
+      await this._ensureAuthForRead(false).catch(() => false);
+    }
+    const fbAuth = (typeof firebase !== 'undefined' && typeof firebase.auth === 'function') ? firebase.auth() : null;
+    if (fbAuth && !fbAuth.currentUser) {
+      console.warn(`⚠️ [TRANSKEP Firebase] ${contextName} dipanggil saat firebase.auth().currentUser kosong. Pastikan Custom Token Auth / FIREBASE_SERVICE_ACCOUNT aktif.`);
+    }
+  },
+
   /**
    * Menyimpan / Memperbarui Dokumen KGB ke Cloud Firestore
    */
@@ -1084,47 +1109,71 @@ const TranskepFirebase = {
     const db = this.getDb();
     if (!db) throw new Error("Cloud Firestore belum siap terhubung.");
 
+    await this._waitAuthForWrite('saveKgbToFirestore');
+
     const docId = String(kgbData.id_kgb || kgbData.id || ('KGB-' + Date.now())).trim();
     if (!docId) throw new Error("ID Dokumen KGB diperlukan.");
 
+    const asStr = (v, fb = '') => (v === undefined || v === null) ? fb : String(v).trim();
+    const serverTs = this._serverTimestamp();
+
+    const caller = this.getCallerIdentity();
     const payload = {
       id: docId,
       id_kgb: docId,
-      nip: String(kgbData.nip || '').trim(),
-      nama_pegawai: kgbData.nama_pegawai || kgbData.nama || '',
-      tanggal_lahir: kgbData.tanggal_lahir || '',
-      pangkat: kgbData.pangkat || '',
-      golongan: kgbData.golongan || '',
-      jabatan: kgbData.jabatan || '',
-      unit_kerja: kgbData.unit_kerja || 'Pengadilan Agama Indramayu',
-      nomor_surat: kgbData.nomor_surat || '',
-      tanggal_surat: kgbData.tanggal_surat || '',
-      tujuan_kppn: kgbData.tujuan_kppn || 'Kepala KPPN Cirebon',
-      gaji_lama: kgbData.gaji_lama || '',
-      pejabat_lama: kgbData.pejabat_lama || '',
-      nomor_sk_lama: kgbData.nomor_sk_lama || '',
-      tanggal_sk_lama: kgbData.tanggal_sk_lama || '',
-      tmt_lama: kgbData.tmt_lama || '',
-      mkg_lama: kgbData.mkg_lama || '',
-      gaji_baru: kgbData.gaji_baru || '',
-      terbilang_gaji: kgbData.terbilang_gaji || '',
-      mkg_baru: kgbData.mkg_baru || '',
-      tmt_baru: kgbData.tmt_baru || '',
-      tmt_yad: kgbData.tmt_yad || '',
-      nama_ketua: kgbData.nama_ketua || '',
-      dasar_pp: kgbData.dasar_pp || '',
-      status: kgbData.status || (kgbData.file_doc_url ? 'Selesai' : 'Sedang Diproses'),
-      file_doc_url: kgbData.file_doc_url || kgbData.doc_url || '',
-      file_pdf_url: kgbData.file_pdf_url || kgbData.pdf_url || '',
-      file_id: kgbData.file_id || kgbData.doc_id || '',
-      tanggal_input: kgbData.tanggal_input || new Date().toISOString().split('T')[0],
+      nip: asStr(kgbData.nip),
+      nama_pegawai: asStr(kgbData.nama_pegawai || kgbData.nama),
+      tanggal_lahir: asStr(kgbData.tanggal_lahir),
+      tempat_lahir: asStr(kgbData.tempat_lahir),
+      pangkat: asStr(kgbData.pangkat),
+      golongan: asStr(kgbData.golongan || kgbData.golongan_baru),
+      golongan_lama: asStr(kgbData.golongan_lama || kgbData.golongan),
+      golongan_baru: asStr(kgbData.golongan_baru || kgbData.golongan),
+      jabatan: asStr(kgbData.jabatan),
+      unit_kerja: asStr(kgbData.unit_kerja, 'Pengadilan Agama Indramayu'),
+      nokgb: asStr(kgbData.nokgb),
+      bulan_surat: asStr(kgbData.bulan_surat),
+      tahun_surat: asStr(kgbData.tahun_surat),
+      nomor_surat: asStr(kgbData.nomor_surat),
+      tanggal_surat: asStr(kgbData.tanggal_surat),
+      tujuan_kppn: asStr(kgbData.tujuan_kppn, 'Kepala KPPN Cirebon'),
+      gaji_lama: typeof kgbData.gaji_lama === 'number' ? kgbData.gaji_lama : asStr(kgbData.gaji_lama),
+      pejabat_lama: asStr(kgbData.pejabat_lama),
+      nomor_sk_lama: asStr(kgbData.nomor_sk_lama),
+      tanggal_sk_lama: asStr(kgbData.tanggal_sk_lama),
+      tmt_lama: asStr(kgbData.tmt_lama),
+      tahun_lama: asStr(kgbData.tahun_lama),
+      bulan_lama: asStr(kgbData.bulan_lama),
+      mkg_lama: asStr(kgbData.mkg_lama),
+      gaji_baru: typeof kgbData.gaji_baru === 'number' ? kgbData.gaji_baru : asStr(kgbData.gaji_baru),
+      terbilang_gaji: asStr(kgbData.terbilang_gaji),
+      tahun_baru: asStr(kgbData.tahun_baru),
+      bulan_baru: asStr(kgbData.bulan_baru),
+      mkg_baru: asStr(kgbData.mkg_baru),
+      tmt_baru: asStr(kgbData.tmt_baru),
+      tmt_yad: asStr(kgbData.tmt_yad),
+      nama_ketua: asStr(kgbData.nama_ketua),
+      dasar_pp: asStr(kgbData.dasar_pp),
+      status: asStr(kgbData.status) || (this._cleanOptionalUrl(kgbData.file_doc_url || kgbData.doc_url) ? 'Selesai' : 'Sedang Diproses'),
+      file_doc_url: this._cleanOptionalUrl(kgbData.file_doc_url || kgbData.doc_url),
+      file_pdf_url: this._cleanOptionalUrl(kgbData.file_pdf_url || kgbData.pdf_url),
+      file_id: asStr(kgbData.file_id || kgbData.doc_id),
+      tanggal_input: asStr(kgbData.tanggal_input, new Date().toISOString().split('T')[0]),
+      created_by: asStr(kgbData.created_by || caller.nip),
+      updated_by: asStr(caller.nip || kgbData.updated_by),
       is_from_dashboard: !!kgbData.is_from_dashboard,
       is_firebase: true,
-      updated_at: (typeof firebase !== 'undefined' && firebase.firestore && firebase.firestore.FieldValue) ? firebase.firestore.FieldValue.serverTimestamp() : new Date().toISOString()
+      updated_at: serverTs
     };
 
-    if (!kgbData.created_at) {
-      payload.created_at = (typeof firebase !== 'undefined' && firebase.firestore && firebase.firestore.FieldValue) ? firebase.firestore.FieldValue.serverTimestamp() : new Date().toISOString();
+    if (kgbData.tgl_selesai) payload.tgl_selesai = asStr(kgbData.tgl_selesai);
+    if (kgbData.tte_status) payload.tte_status = asStr(kgbData.tte_status);
+    if (kgbData.tte_pejabat_nip) payload.tte_pejabat_nip = asStr(kgbData.tte_pejabat_nip);
+    if (kgbData.tte_pejabat_nama) payload.tte_pejabat_nama = asStr(kgbData.tte_pejabat_nama);
+    if (kgbData.tte_submitted_at) payload.tte_submitted_at = asStr(kgbData.tte_submitted_at);
+
+    if (!this._isFirestoreTimestamp(kgbData.created_at)) {
+      payload.created_at = serverTs;
     }
 
     await db.collection(this.EOFFICE_KGB_COLLECTION).doc(docId).set(payload, { merge: true });
@@ -1191,35 +1240,41 @@ const TranskepFirebase = {
     const db = this.getDb();
     if (!db) throw new Error("Cloud Firestore belum siap terhubung.");
 
+    await this._waitAuthForWrite('saveRapatToFirestore');
+
     const docId = String(rapatData.id_rapat || rapatData.id || ('RPT-' + Date.now())).trim();
     if (!docId) throw new Error("ID Dokumen Rapat diperlukan.");
 
+    const serverTs = this._serverTimestamp();
+    const caller = this.getCallerIdentity();
     const payload = {
       id: docId,
       id_rapat: docId,
-      nomor_undangan: rapatData.nomor_undangan || '',
-      agenda: rapatData.agenda || '',
-      hari_tanggal: rapatData.hari_tanggal || '',
-      waktu_mulai: rapatData.waktu_mulai || '',
-      waktu_selesai: rapatData.waktu_selesai || '',
-      tempat: rapatData.tempat || 'Ruang Rapat',
-      pemimpin: rapatData.pemimpin || '',
-      notulis: rapatData.notulis || '',
+      nomor_undangan: String(rapatData.nomor_undangan || ''),
+      agenda: String(rapatData.agenda || ''),
+      hari_tanggal: String(rapatData.hari_tanggal || ''),
+      waktu_mulai: String(rapatData.waktu_mulai || ''),
+      waktu_selesai: String(rapatData.waktu_selesai || ''),
+      tempat: String(rapatData.tempat || 'Ruang Rapat'),
+      pemimpin: String(rapatData.pemimpin || ''),
+      notulis: String(rapatData.notulis || ''),
       peserta_json: typeof rapatData.peserta_json === 'string' ? rapatData.peserta_json : JSON.stringify(rapatData.peserta_json || []),
-      pembahasan: rapatData.pembahasan || '',
-      kesimpulan: rapatData.kesimpulan || '',
-      status: rapatData.status || 'Selesai',
-      doc_undangan_url: rapatData.doc_undangan_url || '',
-      doc_absen_url: rapatData.doc_absen_url || '',
-      doc_notulen_url: rapatData.doc_notulen_url || '',
-      folder_url: rapatData.folder_url || '',
-      tanggal_input: rapatData.tanggal_input || new Date().toISOString().split('T')[0],
+      pembahasan: String(rapatData.pembahasan || ''),
+      kesimpulan: String(rapatData.kesimpulan || ''),
+      status: String(rapatData.status || 'Selesai'),
+      doc_undangan_url: this._cleanOptionalUrl(rapatData.doc_undangan_url),
+      doc_absen_url: this._cleanOptionalUrl(rapatData.doc_absen_url),
+      doc_notulen_url: this._cleanOptionalUrl(rapatData.doc_notulen_url),
+      folder_url: this._cleanOptionalUrl(rapatData.folder_url),
+      tanggal_input: String(rapatData.tanggal_input || new Date().toISOString().split('T')[0]),
+      created_by: String(rapatData.created_by || caller.nip || ''),
+      updated_by: String(caller.nip || rapatData.updated_by || ''),
       is_firebase: true,
-      updated_at: (typeof firebase !== 'undefined' && firebase.firestore && firebase.firestore.FieldValue) ? firebase.firestore.FieldValue.serverTimestamp() : new Date().toISOString()
+      updated_at: serverTs
     };
 
-    if (!rapatData.created_at) {
-      payload.created_at = (typeof firebase !== 'undefined' && firebase.firestore && firebase.firestore.FieldValue) ? firebase.firestore.FieldValue.serverTimestamp() : new Date().toISOString();
+    if (!this._isFirestoreTimestamp(rapatData.created_at)) {
+      payload.created_at = serverTs;
     }
 
     await db.collection(this.EOFFICE_RAPAT_COLLECTION).doc(docId).set(payload, { merge: true });
