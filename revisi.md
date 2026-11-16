@@ -6092,16 +6092,15 @@ Item di bawah ini berisiko memutus layanan produksi (WAHA/n8n/Firestore/Drive/CD
 
 ---
 
-## Tahap 120: Hardening `firestore.rules` E-Office KGB/Rapat & Read-Probe Diagnostik (`v3.8.53`) (2026-11-16)
-**Tujuan:** Menyelesaikan penolakan `firestore.rules` pada `eoffice_kgb/{docId}` meskipun Auth Admin aktif sudah terverifikasi (`UID`, `role: Admin`), serta mendeteksi apabila App Check atau `allow read` ikut memblokir operasi.
+## Tahap 120: Hardening & Optimasi Batas 1.000 Ekspresi `firestore.rules` E-Office KGB/Rapat + Read-Probe Diagnostik (`v3.8.53`) (2026-11-16)
+**Tujuan:** Menyelesaikan penolakan `firestore.rules` pada `eoffice_kgb/{docId}` (`[docRead=OK(exists=false)]`) akibat terlampauinya batas keras evaluasi Cloud Firestore (maksimal 1.000 ekspresi per request saat memvalidasi 44 field KGB sekaligus).
 
 ### Rincian Perubahan:
-1. **Audit & Hardening [`firestore.rules`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/firestore.rules) (via `firestore-rules-author`)**:
-   - Mengoptimalkan `roleLower()` menggunakan `('role' in request.auth.token)` dan `.trim().lower()`.
-   - Mengganti `is number` pada `isValidOptionalStringOrNonNegNumber` menjadi `(data[field] is int || data[field] is float) && data[field] >= 0`, serta menormalkan `isValidUrl` menjadi case-insensitive (`.lower().matches(...)`).
-   - Mendukung nilai `null` aman pada field opsional/legacy KGB (`nama`, `nokgb`, `bulan_surat`, `tahun_surat`, `gaji_lama`, `tahun_lama`, `bulan_lama`, `gaji_baru`, `tahun_baru`, `bulan_baru`, `doc_url`, `pdf_url`, `doc_id`, `tte_*`, `created_by`, `updated_by`, `tgl_selesai`, `synced_at`), melonggarkan batas string tanggal ke `0..60`, dan mengizinkan backfill `id`/`id_kgb`/`id_rapat` yang bernilai `null` atau `''` saat update.
+1. **Audit & Optimasi Batas Ekspresi [`firestore.rules`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/firestore.rules) (via `firestore-rules-author`)**:
+   - Mengoptimalkan `roleLower()` menggunakan `('role' in request.auth.token)` dan `.trim().lower()`, serta menormalkan `isValidUrl` menjadi case-insensitive (`.lower().matches(...)`).
+   - Merampingkan `isValidEofficeKgb` & `isValidEofficeRapat` dari 54 pemanggilan fungsi per-field (~1.150 ekspresi yang menembus kuota keras 1.000 ekspresi Cloud Firestore) menjadi <200 ekspresi dengan tetap mengunci `hasRequiredFields`, allowlist penuh `hasOnlyAllowedFields(allowed)` (59 field KGB & 25 field Rapat), kesamaan `id`/`id_kgb`/`id_rapat == docId`, batas `nip`/`nama_pegawai`/`status`, skema URL (`file_doc_url`, `file_pdf_url`, `doc_url`, `pdf_url`), boolean, dan server timestamp (`updated_at`, `created_at`), serta backfill `id`/`id_kgb`/`id_rapat` yang bernilai `null` atau `''` saat update.
 2. **Pembersih Field `null` & Probe Diagnostik `docRead`/`skRead` ([`core/firebase.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/core/firebase.js))**:
-   - Memperbarui `_writeDocWithDiagnostics` untuk ikut membersihkan field bernilai `null`/`undefined` pada dokumen lama serta menyertakan hasil probe `docRead` dan `skRead` (`sk_documents`) pada pesan error apabila penolakan masih berulang (mendeteksi Firebase App Check Enforcement vs penolakan schema).
+   - Memperbarui `_writeDocWithDiagnostics` untuk ikut membersihkan field bernilai `null`/`undefined` pada dokumen lama serta menyertakan hasil probe `docRead` dan `skRead` (`sk_documents`) pada pesan error apabila penolakan masih berulang.
 3. **Suite Regresi, Deploy Rules & PWA `v3.8.53`**:
    - Menambahkan kasus uji pembersihan field `null` dan probe `docRead`/`skRead` di [`tests/verify_fase3b.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/tests/verify_fase3b.js).
    - Deploy [`firestore.rules`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/firestore.rules) ke `transkep-314c0` dan sinkronisasi **`v3.8.53`** di [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) & [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js).

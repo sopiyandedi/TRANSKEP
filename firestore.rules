@@ -268,14 +268,6 @@ service cloud.firestore {
               (data[field] == '' || data[field] == '-' || isValidUrl(data[field])));
     }
 
-    function isValidOptionalStringOrNull(data, field, minLen, maxLen) {
-      return !(field in data) ||
-             data[field] == null ||
-             (data[field] is string &&
-              data[field].size() >= minLen &&
-              data[field].size() <= maxLen);
-    }
-
     function isValidOptionalUrlOrDashOrNull(data, field, maxLen) {
       return !(field in data) ||
              data[field] == null ||
@@ -298,20 +290,6 @@ service cloud.firestore {
 
     function isValidOptionalTimestamp(data, field) {
       return !(field in data) || data[field] is timestamp;
-    }
-
-    function isValidOptionalStringOrNonNegNumber(data, field, maxLen) {
-      return !(field in data) ||
-             data[field] == null ||
-             (data[field] is string && data[field].size() <= maxLen) ||
-             ((data[field] is int || data[field] is float) && data[field] >= 0);
-    }
-
-    function isValidOptionalStringOrTimestamp(data, field, maxLen) {
-      return !(field in data) ||
-             data[field] == null ||
-             (data[field] is string && data[field].size() <= maxLen) ||
-             data[field] is timestamp;
     }
 
     function isValidCreatedAtOnUpdate(oldData, newData) {
@@ -581,59 +559,13 @@ service cloud.firestore {
              hasOnlyAllowedFields(allowed) &&
              data.id is string && data.id == docId && data.id.size() >= 1 && data.id.size() <= 120 &&
              data.id_kgb is string && data.id_kgb == docId && data.id_kgb.size() >= 1 && data.id_kgb.size() <= 120 &&
-             data.nip is string && data.nip.size() <= 30 &&
-             isValidOptionalString(data, 'nama_pegawai', 0, 150) &&
-             isValidOptionalStringOrNull(data, 'nama', 0, 150) &&
-             isValidOptionalString(data, 'tempat_lahir', 0, 150) &&
-             isValidOptionalString(data, 'tanggal_lahir', 0, 60) &&
-             isValidOptionalString(data, 'pangkat', 0, 100) &&
-             isValidOptionalString(data, 'golongan', 0, 50) &&
-             isValidOptionalString(data, 'golongan_lama', 0, 50) &&
-             isValidOptionalString(data, 'golongan_baru', 0, 50) &&
-             isValidOptionalString(data, 'jabatan', 0, 200) &&
-             isValidOptionalString(data, 'unit_kerja', 0, 200) &&
-             isValidOptionalStringOrNonNegNumber(data, 'nokgb', 50) &&
-             isValidOptionalStringOrNonNegNumber(data, 'bulan_surat', 50) &&
-             isValidOptionalStringOrNonNegNumber(data, 'tahun_surat', 50) &&
-             isValidOptionalString(data, 'nomor_surat', 0, 150) &&
-             isValidOptionalString(data, 'tanggal_surat', 0, 60) &&
-             isValidOptionalString(data, 'tujuan_kppn', 0, 200) &&
-             isValidOptionalStringOrNonNegNumber(data, 'gaji_lama', 50) &&
-             isValidOptionalString(data, 'pejabat_lama', 0, 200) &&
-             isValidOptionalString(data, 'nomor_sk_lama', 0, 150) &&
-             isValidOptionalString(data, 'tanggal_sk_lama', 0, 60) &&
-             isValidOptionalString(data, 'tmt_lama', 0, 60) &&
-             isValidOptionalStringOrNonNegNumber(data, 'tahun_lama', 50) &&
-             isValidOptionalStringOrNonNegNumber(data, 'bulan_lama', 50) &&
-             isValidOptionalString(data, 'mkg_lama', 0, 50) &&
-             isValidOptionalStringOrNonNegNumber(data, 'gaji_baru', 50) &&
-             isValidOptionalString(data, 'terbilang_gaji', 0, 300) &&
-             isValidOptionalStringOrNonNegNumber(data, 'tahun_baru', 50) &&
-             isValidOptionalStringOrNonNegNumber(data, 'bulan_baru', 50) &&
-             isValidOptionalString(data, 'mkg_baru', 0, 50) &&
-             isValidOptionalString(data, 'tmt_baru', 0, 60) &&
-             isValidOptionalString(data, 'tmt_yad', 0, 60) &&
-             isValidOptionalString(data, 'nama_ketua', 0, 150) &&
-             isValidOptionalString(data, 'dasar_pp', 0, 500) &&
+             data.nip is string && data.nip.size() >= 1 && data.nip.size() <= 30 &&
              data.status is string && data.status.size() >= 1 && data.status.size() <= 60 &&
+             isValidOptionalString(data, 'nama_pegawai', 0, 150) &&
              isValidOptionalUrlOrDash(data, 'file_doc_url', 1000) &&
              isValidOptionalUrlOrDash(data, 'file_pdf_url', 1000) &&
-             isValidOptionalString(data, 'file_id', 0, 200) &&
              isValidOptionalUrlOrDashOrNull(data, 'doc_url', 1000) &&
              isValidOptionalUrlOrDashOrNull(data, 'pdf_url', 1000) &&
-             isValidOptionalStringOrNull(data, 'doc_id', 0, 200) &&
-             isValidOptionalString(data, 'tanggal_input', 0, 60) &&
-             isValidOptionalStringOrTimestamp(data, 'tgl_selesai', 60) &&
-             isValidOptionalStringOrNull(data, 'tte_status', 0, 60) &&
-             isValidOptionalStringOrNull(data, 'tte_pejabat_nip', 0, 30) &&
-             isValidOptionalStringOrNull(data, 'tte_pejabat_nama', 0, 150) &&
-             isValidOptionalStringOrTimestamp(data, 'tte_submitted_at', 60) &&
-             isValidOptionalStringOrTimestamp(data, 'tte_signed_at', 60) &&
-             isValidOptionalStringOrNull(data, 'tte_signer', 0, 200) &&
-             isValidOptionalStringOrNull(data, 'tte_qrcode', 0, 50000) &&
-             isValidOptionalStringOrNull(data, 'created_by', 0, 150) &&
-             isValidOptionalStringOrNull(data, 'updated_by', 0, 150) &&
-             isValidOptionalStringOrTimestamp(data, 'synced_at', 60) &&
              isValidOptionalBool(data, 'is_from_dashboard') &&
              isValidOptionalBool(data, 'is_firebase') &&
              data.updated_at is timestamp &&
@@ -653,26 +585,11 @@ service cloud.firestore {
              hasOnlyAllowedFields(allowed) &&
              data.id is string && data.id == docId && data.id.size() >= 1 && data.id.size() <= 120 &&
              data.id_rapat is string && data.id_rapat == docId && data.id_rapat.size() >= 1 && data.id_rapat.size() <= 120 &&
-             isValidOptionalString(data, 'nomor_undangan', 0, 150) &&
-             isValidOptionalString(data, 'agenda', 0, 1000) &&
-             isValidOptionalString(data, 'hari_tanggal', 0, 60) &&
-             isValidOptionalString(data, 'waktu_mulai', 0, 30) &&
-             isValidOptionalString(data, 'waktu_selesai', 0, 30) &&
-             isValidOptionalString(data, 'tempat', 0, 200) &&
-             isValidOptionalString(data, 'pemimpin', 0, 150) &&
-             isValidOptionalString(data, 'notulis', 0, 150) &&
-             isValidOptionalString(data, 'peserta_json', 0, 50000) &&
-             isValidOptionalString(data, 'pembahasan', 0, 50000) &&
-             isValidOptionalString(data, 'kesimpulan', 0, 50000) &&
              data.status is string && data.status.size() >= 1 && data.status.size() <= 50 &&
              isValidOptionalUrlOrDash(data, 'doc_undangan_url', 1000) &&
              isValidOptionalUrlOrDash(data, 'doc_absen_url', 1000) &&
              isValidOptionalUrlOrDash(data, 'doc_notulen_url', 1000) &&
              isValidOptionalUrlOrDash(data, 'folder_url', 1000) &&
-             isValidOptionalString(data, 'tanggal_input', 0, 60) &&
-             isValidOptionalStringOrNull(data, 'created_by', 0, 150) &&
-             isValidOptionalStringOrNull(data, 'updated_by', 0, 150) &&
-             isValidOptionalStringOrTimestamp(data, 'synced_at', 60) &&
              isValidOptionalBool(data, 'is_firebase') &&
              data.updated_at is timestamp &&
              isValidOptionalTimestamp(data, 'created_at');
