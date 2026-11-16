@@ -100,17 +100,20 @@ const SopDataService = {
     // 2. Simpan dokumen lengkap 100% murni ke Cloud Firestore (sop_documents)
     if (typeof TranskepFirebase !== 'undefined' && TranskepFirebase.isReady()) {
       const docId = payload.id || ('SOP-' + Date.now());
+      const rawUrl = String(driveUrl || '').trim();
+      const safeUrl = (!rawUrl || rawUrl === '-' || rawUrl === '#') ? '-' : (/^https?:\/\//i.test(rawUrl) ? rawUrl : '-');
       const firestorePayload = {
         ...payload,
         id: docId,
-        link_drive: driveUrl,
+        link_drive: safeUrl,
         is_firebase: true
       };
       delete firestorePayload.fileBase64;
       delete firestorePayload.fileName;
+      delete firestorePayload.fileMimeType;
 
       await TranskepFirebase.saveSopToFirestore(firestorePayload);
-      return { status: 'success', id: docId, link_drive: driveUrl, message: 'Dokumen SOP berhasil disimpan ke Cloud Firestore.' };
+      return { status: 'success', id: docId, link_drive: safeUrl, message: 'Dokumen SOP berhasil disimpan ke Cloud Firestore.' };
     }
 
     return { status: 'success', message: 'Dokumen SOP berhasil disimpan.' };

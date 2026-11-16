@@ -271,16 +271,26 @@ function hapusDokumenPK(idPKP) {
     const token = localStorage.getItem('transkep_session_token');
     const userNip = state.user ? state.user.nip : '';
     showCustomConfirm("Hapus Dokumen PK", "Anda yakin ingin menghapus Permanen dokumen ini?", function() {
-        if (typeof PkpDataService !== 'undefined') {
-            PkpDataService.aksiDokumenPKP(idPKP, "Hapus", userNip, token).catch(e => console.warn(e));
-        } else if (typeof google !== 'undefined' && google.script) {
-            google.script.run.aksiDokumenPKP(idPKP, "Hapus", userNip, token);
-        }
-        state.pkpDokumen = (Array.isArray(state.pkpDokumen) ? state.pkpDokumen : []).filter(function(item) { return String(item.id_pkp) !== String(idPKP); });
+        const backupPk = Array.isArray(state.pkpDokumen) ? state.pkpDokumen.slice() : [];
+        state.pkpDokumen = backupPk.filter(function(item) { return String(item.id_pkp) !== String(idPKP); });
         if (window.vueState) window.vueState.pkpDokumen = state.pkpDokumen;
         if (window.vmPkpApp) window.vmPkpApp.syncData(state.pkpDokumen, state.pckDokumen);
         if(typeof renderListPK === 'function') renderListPK();
-        showNotify("Dihapus", "Dokumen PK berhasil dihapus.", "success");
+
+        if (typeof PkpDataService !== 'undefined') {
+            PkpDataService.aksiDokumenPKP(idPKP, "Hapus", userNip, token)
+                .then(function() { showNotify("Dihapus", "Dokumen PK berhasil dihapus.", "success"); })
+                .catch(function(e) {
+                    state.pkpDokumen = backupPk;
+                    if (window.vueState) window.vueState.pkpDokumen = state.pkpDokumen;
+                    if (window.vmPkpApp) window.vmPkpApp.syncData(state.pkpDokumen, state.pckDokumen);
+                    if(typeof renderListPK === 'function') renderListPK();
+                    showNotify("Gagal Hapus PK", (e && e.message) ? e.message : String(e), "error");
+                });
+        } else if (typeof google !== 'undefined' && google.script) {
+            google.script.run.aksiDokumenPKP(idPKP, "Hapus", userNip, token);
+            showNotify("Dihapus", "Dokumen PK berhasil dihapus.", "success");
+        }
     });
 }
 
@@ -288,16 +298,26 @@ function hapusDokumenPCK(idPCK) {
     const token = localStorage.getItem('transkep_session_token');
     const userNip = state.user ? state.user.nip : '';
     showCustomConfirm("Hapus Laporan PCK", "Anda yakin ingin menghapus Laporan bulan ini?", function() {
-        if (typeof PkpDataService !== 'undefined') {
-            PkpDataService.aksiDokumenPCK(idPCK, "Hapus", userNip, token).catch(e => console.warn(e));
-        } else if (typeof google !== 'undefined' && google.script) {
-            google.script.run.aksiDokumenPCK(idPCK, "Hapus", userNip, token);
-        }
-        state.pckDokumen = (Array.isArray(state.pckDokumen) ? state.pckDokumen : []).filter(function(item) { return String(item.id_pck) !== String(idPCK); });
+        const backupPck = Array.isArray(state.pckDokumen) ? state.pckDokumen.slice() : [];
+        state.pckDokumen = backupPck.filter(function(item) { return String(item.id_pck) !== String(idPCK); });
         if (window.vueState) window.vueState.pckDokumen = state.pckDokumen;
         if (window.vmPkpApp) window.vmPkpApp.syncData(state.pkpDokumen, state.pckDokumen);
         if(typeof renderListPCK === 'function') renderListPCK();
-        showNotify("Dihapus", "Laporan PCK berhasil dihapus.", "success");
+
+        if (typeof PkpDataService !== 'undefined') {
+            PkpDataService.aksiDokumenPCK(idPCK, "Hapus", userNip, token)
+                .then(function() { showNotify("Dihapus", "Laporan PCK berhasil dihapus.", "success"); })
+                .catch(function(e) {
+                    state.pckDokumen = backupPck;
+                    if (window.vueState) window.vueState.pckDokumen = state.pckDokumen;
+                    if (window.vmPkpApp) window.vmPkpApp.syncData(state.pkpDokumen, state.pckDokumen);
+                    if(typeof renderListPCK === 'function') renderListPCK();
+                    showNotify("Gagal Hapus PCK", (e && e.message) ? e.message : String(e), "error");
+                });
+        } else if (typeof google !== 'undefined' && google.script) {
+            google.script.run.aksiDokumenPCK(idPCK, "Hapus", userNip, token);
+            showNotify("Dihapus", "Laporan PCK berhasil dihapus.", "success");
+        }
     });
 }
 
@@ -305,18 +325,33 @@ function kirimDokumenPK(idPKP) {
     const token = localStorage.getItem('transkep_session_token');
     const userNip = state.user ? state.user.nip : '';
     showCustomConfirm("Kirim Dokumen PK", "Kirim ke Atasan Penilai? Setelah dikirim, Anda tidak bisa mengedit dokumen ini lagi.", function() {
-        if (typeof PkpDataService !== 'undefined') {
-            PkpDataService.aksiDokumenPKP(idPKP, "Kirim", userNip, token).catch(e => console.warn(e));
-        } else if (typeof google !== 'undefined' && google.script) {
-            google.script.run.aksiDokumenPKP(idPKP, "Kirim", userNip, token);
-        }
+        let prevStatus = "Draft";
         for(var i=0; i<state.pkpDokumen.length; i++) {
-            if(String(state.pkpDokumen[i].id_pkp) === String(idPKP)) state.pkpDokumen[i].status = "Menunggu Penilai";
+            if(String(state.pkpDokumen[i].id_pkp) === String(idPKP)) {
+                prevStatus = state.pkpDokumen[i].status || "Draft";
+                state.pkpDokumen[i].status = "Menunggu Penilai";
+            }
         }
         if (window.vueState) window.vueState.pkpDokumen = state.pkpDokumen;
         if (window.vmPkpApp) window.vmPkpApp.syncData(state.pkpDokumen, state.pckDokumen);
         if(typeof renderListPK === 'function') renderListPK();
-        showNotify("Terkirim", "Dokumen PK berhasil diserahkan ke Atasan Penilai.", "success");
+
+        if (typeof PkpDataService !== 'undefined') {
+            PkpDataService.aksiDokumenPKP(idPKP, "Kirim", userNip, token)
+                .then(function() { showNotify("Terkirim", "Dokumen PK berhasil diserahkan ke Atasan Penilai.", "success"); })
+                .catch(function(e) {
+                    for(var j=0; j<state.pkpDokumen.length; j++) {
+                        if(String(state.pkpDokumen[j].id_pkp) === String(idPKP)) state.pkpDokumen[j].status = prevStatus;
+                    }
+                    if (window.vueState) window.vueState.pkpDokumen = state.pkpDokumen;
+                    if (window.vmPkpApp) window.vmPkpApp.syncData(state.pkpDokumen, state.pckDokumen);
+                    if(typeof renderListPK === 'function') renderListPK();
+                    showNotify("Gagal Kirim PK", (e && e.message) ? e.message : String(e), "error");
+                });
+        } else if (typeof google !== 'undefined' && google.script) {
+            google.script.run.aksiDokumenPKP(idPKP, "Kirim", userNip, token);
+            showNotify("Terkirim", "Dokumen PK berhasil diserahkan ke Atasan Penilai.", "success");
+        }
     });
 }
 
@@ -324,18 +359,33 @@ function kirimDokumenPCK(idPCK) {
     const token = localStorage.getItem('transkep_session_token');
     const userNip = state.user ? state.user.nip : '';
     showCustomConfirm("Kirim Laporan PCK", "Kirim laporan ini ke Atasan? Data akan terkunci.", function() {
-        if (typeof PkpDataService !== 'undefined') {
-            PkpDataService.aksiDokumenPCK(idPCK, "Kirim", userNip, token).catch(e => console.warn(e));
-        } else if (typeof google !== 'undefined' && google.script) {
-            google.script.run.aksiDokumenPCK(idPCK, "Kirim", userNip, token);
-        }
+        let prevStatus = "Draft";
         for(var i=0; i<state.pckDokumen.length; i++) {
-            if(String(state.pckDokumen[i].id_pck) === String(idPCK)) state.pckDokumen[i].status = "Menunggu Penilai";
+            if(String(state.pckDokumen[i].id_pck) === String(idPCK)) {
+                prevStatus = state.pckDokumen[i].status || "Draft";
+                state.pckDokumen[i].status = "Menunggu Penilai";
+            }
         }
         if (window.vueState) window.vueState.pckDokumen = state.pckDokumen;
         if (window.vmPkpApp) window.vmPkpApp.syncData(state.pkpDokumen, state.pckDokumen);
         if(typeof renderListPCK === 'function') renderListPCK();
-        showNotify("Terkirim", "Laporan PCK bulan ini telah diserahkan.", "success");
+
+        if (typeof PkpDataService !== 'undefined') {
+            PkpDataService.aksiDokumenPCK(idPCK, "Kirim", userNip, token)
+                .then(function() { showNotify("Terkirim", "Laporan PCK bulan ini telah diserahkan.", "success"); })
+                .catch(function(e) {
+                    for(var j=0; j<state.pckDokumen.length; j++) {
+                        if(String(state.pckDokumen[j].id_pck) === String(idPCK)) state.pckDokumen[j].status = prevStatus;
+                    }
+                    if (window.vueState) window.vueState.pckDokumen = state.pckDokumen;
+                    if (window.vmPkpApp) window.vmPkpApp.syncData(state.pkpDokumen, state.pckDokumen);
+                    if(typeof renderListPCK === 'function') renderListPCK();
+                    showNotify("Gagal Kirim PCK", (e && e.message) ? e.message : String(e), "error");
+                });
+        } else if (typeof google !== 'undefined' && google.script) {
+            google.script.run.aksiDokumenPCK(idPCK, "Kirim", userNip, token);
+            showNotify("Terkirim", "Laporan PCK bulan ini telah diserahkan.", "success");
+        }
     });
 }
 
@@ -518,7 +568,7 @@ function mountPkpApp() {
             },
             canLockRekap() {
                 const role = this.currentUser ? (this.currentUser.role || '') : '';
-                return ['Admin', 'Atasan Langsung', 'Pejabat Berwenang'].includes(role) || this.isAdmin;
+                return ['Admin', 'Operator'].includes(role) || this.isAdmin;
             },
             currentRekapSnapshot() {
                 const yr = String(this.selectedYear).trim();
@@ -1031,9 +1081,13 @@ function mountPkpApp() {
                             if (res && res.success) {
                                 this.formPK.tahun = res.header.tahun;
                                 let namaPenilai = "", namaAtasanPejabat = "";
+                                const normNip = (v) => String(v || '').replace(/['"\s]/g, '').trim();
+                                const headerPenilai = normNip(res.header.penilai);
+                                const headerAtasan = normNip(res.header.atasan_pejabat);
                                 (this.usersList || []).forEach(u => {
-                                    if (u.nip === res.header.penilai) namaPenilai = u.jabatan + " - " + u.nama;
-                                    if (u.nip === res.header.atasan_pejabat) namaAtasanPejabat = u.jabatan + " - " + u.nama;
+                                    const uNip = normNip(u.nip);
+                                    if (headerPenilai && uNip === headerPenilai) namaPenilai = u.jabatan + " - " + u.nama;
+                                    if (headerAtasan && uNip === headerAtasan) namaAtasanPejabat = u.jabatan + " - " + u.nama;
                                 });
                                 this.formPK.penilaiText = namaPenilai;
                                 this.formPK.atasanPejabatText = namaAtasanPejabat;
@@ -1230,6 +1284,7 @@ function mountPkpApp() {
                     const inputText = this.formPK.penilaiText;
                     const inputAtasanPejabatText = this.formPK.atasanPejabatText;
 
+                    const normNip = (v) => String(v || '').replace(/['"\s]/g, '').trim();
                     let inputNipPenilai = "";
                     let inputNipAtasanPejabat = "";
 
@@ -1237,8 +1292,8 @@ function mountPkpApp() {
                         for (let i = 0; i < this.usersList.length; i++) {
                             const u = this.usersList[i];
                             const expectedText = u.jabatan + " - " + u.nama;
-                            if (expectedText === inputText) inputNipPenilai = u.nip;
-                            if (expectedText === inputAtasanPejabatText) inputNipAtasanPejabat = u.nip;
+                            if (expectedText === inputText) inputNipPenilai = normNip(u.nip);
+                            if (expectedText === inputAtasanPejabatText) inputNipAtasanPejabat = normNip(u.nip);
                         }
                     }
 
@@ -1285,7 +1340,7 @@ function mountPkpApp() {
                         }
                     }
 
-                    const nipPegawai = this.isVerifikasiPK ? this.modalPKNipTarget : (this.currentUser ? this.currentUser.nip : "NIP");
+                    const nipPegawai = String(this.isVerifikasiPK ? this.modalPKNipTarget : (this.currentUser ? this.currentUser.nip : "NIP")).replace(/['"\s]/g, '').trim();
 
                     let finalStatus = "Draft";
                     if (this.isVerifikasiPK) {
@@ -1563,14 +1618,26 @@ function mountPkpApp() {
 
                     const finalCapaianVal = this.finalPCKCapaian;
                     const nilaiAkhir = (finalCapaianVal !== '-' && !isNaN(parseFloat(finalCapaianVal))) ? finalCapaianVal : "0";
-                    const nipTarget = this.modalPCKNipTarget || (this.currentUser ? this.currentUser.nip : '');
+                    const normNip = (v) => String(v || '').replace(/['"\s]/g, '').trim();
+                    const nipTarget = normNip(this.modalPCKNipTarget || (this.currentUser ? this.currentUser.nip : ''));
                     const finalStatus = this.isVerifikasiPCK ? "Disetujui" : "Draft";
                     const docId = 'PCK_' + thn + '_' + blnText + '_' + nipTarget;
+
+                    const matchingPkp = this.safePkpList.find(p => normNip(p.nip) === nipTarget && String(p.tahun || '').trim() === String(thn).trim())
+                        || this.safePkpList.find(p => normNip(p.nip) === nipTarget);
+                    const existingPck = this.safePckList.find(p => String(p.id_pck) === docId)
+                        || this.safePckList.find(p => normNip(p.nip) === nipTarget && String(p.tahun || '').trim() === String(thn).trim() && String(p.bulan || '').trim().toLowerCase() === String(blnText).trim().toLowerCase());
+                    const resolvedPenilai = normNip((matchingPkp && (matchingPkp.nip_penilai || matchingPkp.penilai)) || (existingPck && (existingPck.nip_penilai || existingPck.penilai)) || '');
+                    const resolvedAtasan = normNip((matchingPkp && (matchingPkp.nip_atasan_pejabat || matchingPkp.atasan_pejabat)) || (existingPck && (existingPck.nip_atasan_pejabat || existingPck.atasan_pejabat)) || '');
 
                     const payload = {
                         id_pck: docId,
                         nipPegawai: nipTarget,
                         nip: nipTarget,
+                        penilai: resolvedPenilai,
+                        nip_penilai: resolvedPenilai,
+                        atasan_pejabat: resolvedAtasan,
+                        nip_atasan_pejabat: resolvedAtasan,
                         bulan: blnText,
                         tahun: thn,
                         rencana: items.length,

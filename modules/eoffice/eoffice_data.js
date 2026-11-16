@@ -219,7 +219,8 @@ const EofficeDataService = {
     let savedAny = false;
     if (Array.isArray(kgbList)) {
       for (const k of kgbList) {
-        if (k && (k.id_kgb || k.nip)) {
+        const cleanNip = String((k && k.nip) || '').replace(/['"\s]/g, '').trim();
+        if (k && cleanNip) {
           try {
             await TranskepFirebase.saveKgbToFirestore(k);
             savedAny = true;
@@ -539,7 +540,8 @@ const EofficeDataService = {
 
     const allKgbs = this.mergeDashboardQueue((sheetData && Array.isArray(sheetData.kgb)) ? sheetData.kgb : []);
     for (const k of allKgbs) {
-      if (k && (k.id_kgb || k.nip)) {
+      const cleanNip = String((k && k.nip) || '').replace(/['"\s]/g, '').trim();
+      if (k && cleanNip) {
         try {
           await TranskepFirebase.saveKgbToFirestore(k);
           kgbCount++;

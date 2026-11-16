@@ -320,37 +320,41 @@ const TranskepFirebase = {
   async saveSkToFirestore(skData) {
     const db = this.getDb();
     if (!db) throw new Error("Cloud Firestore belum siap terhubung.");
-    
+
+    await this._waitAuthForWrite('saveSkToFirestore');
+
     const docId = String(skData.id || ('SK-' + Date.now())).trim();
+    const serverTs = this._serverTimestamp();
+    const cleanLink = this._cleanOptionalUrl(skData.link_drive);
     const payload = {
       id: docId,
-      judul_sk: skData.judul_sk || '-',
-      no_sk: skData.no_sk || '-',
-      pj_sk: skData.pj_sk || 'PJ. Kesekretariatan',
-      link_drive: skData.link_drive || '-',
-      tgl_sk: skData.tgl_sk || '',
-      tgl_input: skData.tgl_input || new Date().toISOString().split('T')[0],
-      status: skData.status || 'Aktif',
-      versi_aktif: skData.versi_aktif || 1,
+      judul_sk: String(skData.judul_sk || '-'),
+      no_sk: String(skData.no_sk || '-'),
+      pj_sk: String(skData.pj_sk || 'PJ. Kesekretariatan'),
+      link_drive: cleanLink || '-',
+      tgl_sk: String(skData.tgl_sk || ''),
+      tgl_input: String(skData.tgl_input || new Date().toISOString().split('T')[0]),
+      status: String(skData.status || 'Aktif'),
+      versi_aktif: Number(skData.versi_aktif) || 1,
       members: Array.isArray(skData.members) ? skData.members : [],
       naskah_utama: skData.naskah_utama || null,
       lampiran: Array.isArray(skData.lampiran) ? skData.lampiran : [],
-      template_gdoc_id: skData.template_gdoc_id || '',
+      template_gdoc_id: String(skData.template_gdoc_id || ''),
       revisi_history: Array.isArray(skData.revisi_history) ? skData.revisi_history : [{
-        versi: 1,
+        versi: Number(skData.versi_aktif) || 1,
         tgl_revisi: skData.tgl_input || new Date().toISOString().split('T')[0],
         catatan: "Inisiasi awal dokumen SK",
         oleh: (typeof state !== 'undefined' && state.user) ? state.user.nama : 'Admin'
       }],
       is_firebase: true,
-      updated_at: firebase.firestore.FieldValue.serverTimestamp()
+      updated_at: serverTs
     };
 
-    if (!skData.created_at) {
-      payload.created_at = firebase.firestore.FieldValue.serverTimestamp();
+    if (!this._isFirestoreTimestamp(skData.created_at)) {
+      payload.created_at = serverTs;
     }
 
-    await db.collection(this.SK_COLLECTION).doc(docId).set(payload, { merge: true });
+    await this._writeDocWithDiagnostics(db, this.SK_COLLECTION, docId, payload, this.SK_ALLOWED_FIELDS);
     return { status: 'success', id: docId, data: payload };
   },
 
@@ -360,6 +364,7 @@ const TranskepFirebase = {
   async deleteSkFromFirestore(docId) {
     const db = this.getDb();
     if (!db) throw new Error("Cloud Firestore belum siap terhubung.");
+    await this._waitAuthForWrite('deleteSkFromFirestore');
     await db.collection(this.SK_COLLECTION).doc(String(docId).trim()).delete();
     return { status: 'success', message: 'Dokumen SK berhasil dihapus dari Cloud Firestore.' };
   },
@@ -406,8 +411,11 @@ const TranskepFirebase = {
     const db = this.getDb();
     if (!db) throw new Error("Cloud Firestore belum siap terhubung.");
 
-    const cleanSkId = String(skId).replace(/'/g, "").trim().split('-').slice(0, 2).join('-');
-    const cleanNip = String(nip).trim();
+    await this._waitAuthForWrite('acknowledgeSkInFirestore');
+
+    const rawSkId = String(skId || '').replace(/['"\s]/g, '').trim();
+    const cleanSkId = /^(SK-\d{10,})-\d{1,3}$/.test(rawSkId) ? rawSkId.replace(/-\d{1,3}$/, '') : rawSkId;
+    const cleanNip = this._normNip(nip || this.getCallerIdentity().nip);
     let tgl = tanggalBaca;
     if (!tgl) {
       const d = new Date();
@@ -418,7 +426,7 @@ const TranskepFirebase = {
 
     await db.collection(this.SK_COLLECTION).doc(cleanSkId).update({
       acknowledgments: firebase.firestore.FieldValue.arrayUnion(ackItem),
-      updated_at: firebase.firestore.FieldValue.serverTimestamp()
+      updated_at: this._serverTimestamp()
     });
 
     return { status: 'success', sk_id: cleanSkId, nip: cleanNip, tanggal_baca: tgl, message: 'Acknowledgment SK berhasil dicatat di Cloud Firestore.' };
@@ -436,30 +444,33 @@ const TranskepFirebase = {
   async saveJobdesToFirestore(jobdesData) {
     const db = this.getDb();
     if (!db) throw new Error("Cloud Firestore belum siap terhubung.");
-    
-    const docId = String(jobdesData.nip || '').trim();
+
+    await this._waitAuthForWrite('saveJobdesToFirestore');
+
+    const docId = this._normNip(jobdesData.nip);
     if (!docId) throw new Error("NIP pegawai diperlukan untuk menyimpan dokumen Jobdes.");
 
+    const asStr = (v, fb = '') => (v === undefined || v === null) ? fb : String(v);
     const payload = {
       nip: docId,
-      atasan_nip: String(jobdesData.atasan_nip || '').trim(),
-      dasar_lampiran: jobdesData.dasar_lampiran || '-',
-      ikhtisar_jabatan: jobdesData.ikhtisar_jabatan || '',
-      tugas_pokok: jobdesData.tugas_pokok || '',
-      tugas_tambahan: jobdesData.tugas_tambahan || '',
-      wewenang: jobdesData.wewenang !== undefined ? jobdesData.wewenang : '-',
-      tanggung_jawab: jobdesData.tanggung_jawab || '',
-      hasil_kerja: jobdesData.hasil_kerja || '',
-      bawahan_langsung: jobdesData.bawahan_langsung !== undefined ? jobdesData.bawahan_langsung : '-',
+      atasan_nip: this._normNip(jobdesData.atasan_nip),
+      dasar_lampiran: asStr(jobdesData.dasar_lampiran, '-') || '-',
+      ikhtisar_jabatan: asStr(jobdesData.ikhtisar_jabatan, ''),
+      tugas_pokok: asStr(jobdesData.tugas_pokok, ''),
+      tugas_tambahan: asStr(jobdesData.tugas_tambahan, ''),
+      wewenang: (jobdesData.wewenang !== undefined && jobdesData.wewenang !== null) ? String(jobdesData.wewenang) : '-',
+      tanggung_jawab: asStr(jobdesData.tanggung_jawab, ''),
+      hasil_kerja: asStr(jobdesData.hasil_kerja, ''),
+      bawahan_langsung: (jobdesData.bawahan_langsung !== undefined && jobdesData.bawahan_langsung !== null) ? String(jobdesData.bawahan_langsung) : '-',
       is_firebase: true,
-      updated_at: firebase.firestore.FieldValue.serverTimestamp()
+      updated_at: this._serverTimestamp()
     };
 
     if (jobdesData.updated_by) {
-      payload.updated_by = jobdesData.updated_by;
+      payload.updated_by = String(jobdesData.updated_by).slice(0, 150);
     }
 
-    await db.collection(this.JOBDES_COLLECTION).doc(docId).set(payload, { merge: true });
+    await this._writeDocWithDiagnostics(db, this.JOBDES_COLLECTION, docId, payload, this.JOBDES_ALLOWED_FIELDS);
     return { status: 'success', nip: docId, data: payload, message: 'Uraian tugas berhasil disimpan di Cloud Firestore.' };
   },
 
@@ -474,56 +485,73 @@ const TranskepFirebase = {
       return { status: 'success', count: 0, message: 'Tidak ada data untuk disimpan.' };
     }
 
+    await this._waitAuthForWrite('bulkSaveJobdesBatchToFirestore');
+
     const CHUNK_SIZE = 450;
     let savedCount = 0;
+    const asStr = (v, fb = '') => (v === undefined || v === null) ? fb : String(v);
 
     for (let i = 0; i < jobdesList.length; i += CHUNK_SIZE) {
       const chunk = jobdesList.slice(i, i + CHUNK_SIZE);
       const batch = db.batch();
+      const validItems = [];
 
       chunk.forEach(item => {
-        const docId = String(item.nip || '').trim();
+        const docId = this._normNip(item && item.nip);
         if (!docId) return;
 
         const docRef = db.collection(this.JOBDES_COLLECTION).doc(docId);
         const payload = {
           nip: docId,
-          dasar_lampiran: item.dasar_lampiran || '-',
-          tugas_pokok: item.tugas_pokok || '',
+          dasar_lampiran: asStr(item.dasar_lampiran, '-') || '-',
+          tugas_pokok: asStr(item.tugas_pokok, ''),
           is_firebase: true,
-          updated_at: firebase.firestore.FieldValue.serverTimestamp()
+          updated_at: this._serverTimestamp()
         };
 
-        if (item.atasan_nip) {
-          payload.atasan_nip = String(item.atasan_nip).trim();
+        if (item.atasan_nip !== undefined && item.atasan_nip !== null) {
+          payload.atasan_nip = this._normNip(item.atasan_nip);
         }
-        if (item.ikhtisar_jabatan !== undefined) {
-          payload.ikhtisar_jabatan = item.ikhtisar_jabatan;
+        if (item.ikhtisar_jabatan !== undefined && item.ikhtisar_jabatan !== null) {
+          payload.ikhtisar_jabatan = String(item.ikhtisar_jabatan);
         }
-        if (item.tugas_tambahan !== undefined) {
-          payload.tugas_tambahan = item.tugas_tambahan;
+        if (item.tugas_tambahan !== undefined && item.tugas_tambahan !== null) {
+          payload.tugas_tambahan = String(item.tugas_tambahan);
         }
-        if (item.wewenang !== undefined) {
-          payload.wewenang = item.wewenang;
+        if (item.wewenang !== undefined && item.wewenang !== null) {
+          payload.wewenang = String(item.wewenang);
         }
-        if (item.tanggung_jawab !== undefined) {
-          payload.tanggung_jawab = item.tanggung_jawab;
+        if (item.tanggung_jawab !== undefined && item.tanggung_jawab !== null) {
+          payload.tanggung_jawab = String(item.tanggung_jawab);
         }
-        if (item.hasil_kerja !== undefined) {
-          payload.hasil_kerja = item.hasil_kerja;
+        if (item.hasil_kerja !== undefined && item.hasil_kerja !== null) {
+          payload.hasil_kerja = String(item.hasil_kerja);
         }
-        if (item.bawahan_langsung !== undefined) {
-          payload.bawahan_langsung = item.bawahan_langsung;
+        if (item.bawahan_langsung !== undefined && item.bawahan_langsung !== null) {
+          payload.bawahan_langsung = String(item.bawahan_langsung);
         }
         if (updatedByNip) {
-          payload.updated_by = updatedByNip;
+          payload.updated_by = String(updatedByNip).slice(0, 150);
         }
 
         batch.set(docRef, payload, { merge: true });
-        savedCount++;
+        validItems.push(item);
       });
 
-      await batch.commit();
+      try {
+        await batch.commit();
+        savedCount += validItems.length;
+      } catch (batchErr) {
+        const msg = String((batchErr && (batchErr.code || batchErr.message)) || batchErr || '').toLowerCase();
+        if (!msg.includes('permission') && !msg.includes('insufficient')) {
+          throw batchErr;
+        }
+        // Fallback per-item dengan self-healing legacy fields bila ada dokumen lama yang menolak merge
+        for (const item of validItems) {
+          await this.saveJobdesToFirestore({ ...item, updated_by: updatedByNip || item.updated_by });
+          savedCount++;
+        }
+      }
     }
 
     return {
@@ -573,20 +601,26 @@ const TranskepFirebase = {
   async saveUsulanJobdesToFirestore(usulanData) {
     const db = this.getDb();
     if (!db) throw new Error("Cloud Firestore belum siap terhubung.");
-    
+
+    await this._waitAuthForWrite('saveUsulanJobdesToFirestore');
+
+    const caller = this.getCallerIdentity();
     const usulanId = String(usulanData.id || ('USUL-' + Date.now())).trim();
     const payload = {
       id: usulanId,
-      nip_pegawai: String(usulanData.nip_pegawai || '').trim(),
-      nama_pegawai: usulanData.nama_pegawai || '-',
-      nama_pengusul: usulanData.nama_pengusul || '-',
-      isi_usulan: usulanData.isi_usulan || '-',
+      nip_pegawai: this._normNip(usulanData.nip_pegawai),
+      pengusul_nip: this._normNip(usulanData.pengusul_nip || caller.nip),
+      nama_pegawai: String(usulanData.nama_pegawai || '-').slice(0, 150),
+      nama_pengusul: String(usulanData.nama_pengusul || '-').slice(0, 150),
+      isi_usulan: String(usulanData.isi_usulan || '-').slice(0, 4000),
       status: usulanData.status || 'Menunggu',
-      is_firebase: true,
-      created_at: firebase.firestore.FieldValue.serverTimestamp()
+      is_firebase: true
     };
+    if (!usulanData.id || !this._isFirestoreTimestamp(usulanData.created_at)) {
+      payload.created_at = this._serverTimestamp();
+    }
 
-    await db.collection(this.JOBDES_USULAN_COLLECTION).doc(usulanId).set(payload, { merge: true });
+    await this._writeDocWithDiagnostics(db, this.JOBDES_USULAN_COLLECTION, usulanId, payload, this.JOBDES_USULAN_ALLOWED_FIELDS, { adminOnly: false });
     return { status: 'success', id: usulanId, data: payload, message: 'Usulan reposisi berhasil dikirim ke Cloud Firestore.' };
   },
 
@@ -623,10 +657,25 @@ const TranskepFirebase = {
   async tandaiUsulanSelesaiInFirestore(usulanId) {
     const db = this.getDb();
     if (!db) throw new Error("Cloud Firestore belum siap terhubung.");
-    await db.collection(this.JOBDES_USULAN_COLLECTION).doc(String(usulanId).trim()).update({
-      status: 'Selesai',
-      completed_at: firebase.firestore.FieldValue.serverTimestamp()
-    });
+    await this._waitAuthForWrite('tandaiUsulanSelesaiInFirestore');
+    const cleanId = String(usulanId || '').trim();
+    const serverTs = this._serverTimestamp();
+    try {
+      await db.collection(this.JOBDES_USULAN_COLLECTION).doc(cleanId).update({
+        status: 'Selesai',
+        completed_at: serverTs
+      });
+    } catch (updErr) {
+      const msg = String((updErr && (updErr.code || updErr.message)) || updErr || '').toLowerCase();
+      if (!msg.includes('permission') && !msg.includes('insufficient')) {
+        throw updErr;
+      }
+      await this._writeDocWithDiagnostics(db, this.JOBDES_USULAN_COLLECTION, cleanId, {
+        id: cleanId,
+        status: 'Selesai',
+        completed_at: serverTs
+      }, this.JOBDES_USULAN_ALLOWED_FIELDS);
+    }
     return { status: 'success', message: 'Usulan ditandai selesai di Cloud Firestore.' };
   },
 
@@ -642,7 +691,10 @@ const TranskepFirebase = {
     const db = this.getDb();
     if (!db) throw new Error("Cloud Firestore belum siap terhubung.");
 
+    await this._waitAuthForWrite('saveSopToFirestore');
+
     const docId = String(sopData.id || ('SOP-' + Date.now())).trim();
+    const serverTs = this._serverTimestamp();
     let pelaksanaArr = [];
     if (Array.isArray(sopData.pelaksana)) {
       pelaksanaArr = sopData.pelaksana;
@@ -650,30 +702,31 @@ const TranskepFirebase = {
       try { pelaksanaArr = JSON.parse(sopData.pelaksana_json); } catch(e) { pelaksanaArr = []; }
     }
 
+    const cleanLink = this._cleanOptionalUrl(sopData.link_drive);
     const payload = {
       id: docId,
-      judul_sop: sopData.judul_sop || '-',
-      nomor_sop: sopData.nomor_sop || '-',
-      kategori_pj: sopData.kategori_pj || 'PJ. Kesekretariatan',
-      tanggal_pembuatan: sopData.tanggal_pembuatan || '',
-      tanggal_revisi: sopData.tanggal_revisi || '-',
-      tanggal_efektif: sopData.tanggal_efektif || '',
-      link_drive: sopData.link_drive || '-',
+      judul_sop: String(sopData.judul_sop || '-'),
+      nomor_sop: String(sopData.nomor_sop || '-'),
+      kategori_pj: String(sopData.kategori_pj || 'PJ. Kesekretariatan'),
+      tanggal_pembuatan: String(sopData.tanggal_pembuatan || ''),
+      tanggal_revisi: String(sopData.tanggal_revisi || '-'),
+      tanggal_efektif: String(sopData.tanggal_efektif || ''),
+      link_drive: cleanLink || '-',
       pelaksana: pelaksanaArr,
       pelaksana_json: JSON.stringify(pelaksanaArr),
       is_firebase: true,
-      updated_at: firebase.firestore.FieldValue.serverTimestamp()
+      updated_at: serverTs
     };
 
     if (Array.isArray(sopData.acknowledgments)) {
       payload.acknowledgments = sopData.acknowledgments;
     }
 
-    if (!sopData.created_at) {
-      payload.created_at = firebase.firestore.FieldValue.serverTimestamp();
+    if (!this._isFirestoreTimestamp(sopData.created_at)) {
+      payload.created_at = serverTs;
     }
 
-    await db.collection(this.SOP_COLLECTION).doc(docId).set(payload, { merge: true });
+    await this._writeDocWithDiagnostics(db, this.SOP_COLLECTION, docId, payload, this.SOP_ALLOWED_FIELDS);
     return { status: 'success', id: docId, data: payload, message: 'Dokumen SOP berhasil disimpan di Cloud Firestore.' };
   },
 
@@ -683,6 +736,7 @@ const TranskepFirebase = {
   async deleteSopFromFirestore(docId) {
     const db = this.getDb();
     if (!db) throw new Error("Cloud Firestore belum siap terhubung.");
+    await this._waitAuthForWrite('deleteSopFromFirestore');
     const cleanId = String(docId).trim();
     await db.collection(this.SOP_COLLECTION).doc(cleanId).delete();
     return { status: 'success', message: 'Dokumen SOP berhasil dihapus dari Cloud Firestore.' };
@@ -730,8 +784,10 @@ const TranskepFirebase = {
     const db = this.getDb();
     if (!db) throw new Error("Cloud Firestore belum siap terhubung.");
 
-    const cleanSopId = String(sopId).trim();
-    const cleanNip = String(nip).trim();
+    await this._waitAuthForWrite('acknowledgeSopInFirestore');
+
+    const cleanSopId = String(sopId || '').replace(/['"\s]/g, '').trim();
+    const cleanNip = this._normNip(nip || this.getCallerIdentity().nip);
     let tgl = tanggalBaca;
     if (!tgl) {
       const d = new Date();
@@ -742,7 +798,7 @@ const TranskepFirebase = {
 
     await db.collection(this.SOP_COLLECTION).doc(cleanSopId).update({
       acknowledgments: firebase.firestore.FieldValue.arrayUnion(ackItem),
-      updated_at: firebase.firestore.FieldValue.serverTimestamp()
+      updated_at: this._serverTimestamp()
     });
 
     return { status: 'success', sop_id: cleanSopId, nip: cleanNip, tanggal_baca: tgl, message: 'Acknowledgment SOP berhasil dicatat di Cloud Firestore.' };
@@ -764,6 +820,8 @@ const TranskepFirebase = {
     const db = this.getDb();
     if (!db) throw new Error("Cloud Firestore belum siap terhubung.");
 
+    await this._waitAuthForWrite('saveMasterKinerjaToFirestore');
+
     const rawJabatan = String(templateData.nama_jabatan || templateData.jabatan || '').trim();
     if (!rawJabatan) throw new Error("Nama jabatan wajib disertakan.");
     
@@ -778,15 +836,15 @@ const TranskepFirebase = {
     const payload = {
       id: docId,
       nama_jabatan: rawJabatan,
-      kategori: templateData.kategori || 'Kepaniteraan',
+      kategori: String(templateData.kategori || 'Kepaniteraan'),
       aliases: aliases,
       sasaran_list: Array.isArray(templateData.sasaran_list) ? templateData.sasaran_list : [],
       is_firebase: true,
-      updated_at: firebase.firestore.FieldValue.serverTimestamp(),
-      updated_by: templateData.updated_by || ((typeof state !== 'undefined' && state.user) ? state.user.nama : 'Admin')
+      updated_at: this._serverTimestamp(),
+      updated_by: String(templateData.updated_by || ((typeof state !== 'undefined' && state.user) ? state.user.nama : 'Admin')).slice(0, 150)
     };
 
-    await db.collection(this.MASTER_KINERJA_COLLECTION).doc(docId).set(payload, { merge: true });
+    await this._writeDocWithDiagnostics(db, this.MASTER_KINERJA_COLLECTION, docId, payload, this.MASTER_KINERJA_ALLOWED_FIELDS);
     return { status: 'success', id: docId, data: payload, message: 'Template jabatan berhasil disimpan di Cloud Firestore.' };
   },
 
@@ -808,6 +866,7 @@ const TranskepFirebase = {
   async deleteMasterKinerjaFromFirestore(docId) {
     const db = this.getDb();
     if (!db) throw new Error("Cloud Firestore belum siap terhubung.");
+    await this._waitAuthForWrite('deleteMasterKinerjaFromFirestore');
     await db.collection(this.MASTER_KINERJA_COLLECTION).doc(String(docId).trim()).delete();
     return { status: 'success', message: 'Template jabatan berhasil dihapus dari Cloud Firestore.' };
   },
@@ -820,31 +879,64 @@ const TranskepFirebase = {
     const db = this.getDb();
     if (!db) throw new Error("Cloud Firestore belum siap terhubung.");
 
-    const nipPegawai = String(pkpData.nip_pegawai || pkpData.nip || '').trim();
+    await this._waitAuthForWrite('savePkpToFirestore');
+
+    const nipPegawai = this._normNip(pkpData.nip_pegawai || pkpData.nip || pkpData.nipPegawai);
     const tahun = String(pkpData.tahun || new Date().getFullYear()).trim();
     if (!nipPegawai) throw new Error("NIP pegawai diperlukan untuk menyimpan dokumen PK.");
 
     const docId = String(pkpData.id_pkp || ('PKP_' + tahun + '_' + nipPegawai)).trim();
+    const serverTs = this._serverTimestamp();
 
     const payload = {
       id_pkp: docId,
       nip_pegawai: nipPegawai,
-      nip_penilai: String(pkpData.nip_penilai || pkpData.penilai || '').trim(),
-      nip_atasan_pejabat: String(pkpData.nip_atasan_pejabat || pkpData.atasan_pejabat || '').trim(),
+      nip: nipPegawai,
+      nip_penilai: this._normNip(pkpData.nip_penilai || pkpData.penilai),
+      nip_atasan_pejabat: this._normNip(pkpData.nip_atasan_pejabat || pkpData.atasan_pejabat),
       tahun: tahun,
-      status: pkpData.status || 'Draft',
+      status: String(pkpData.status || 'Draft'),
       nilai_akhir: String(pkpData.nilai_akhir || pkpData.nilai || '0'),
       items: Array.isArray(pkpData.items) ? pkpData.items : [],
       is_firebase: true,
-      updated_at: firebase.firestore.FieldValue.serverTimestamp()
+      updated_at: serverTs
     };
 
-    if (!pkpData.created_at) {
-      payload.created_at = firebase.firestore.FieldValue.serverTimestamp();
+    if (!this._isFirestoreTimestamp(pkpData.created_at)) {
+      payload.created_at = serverTs;
     }
 
-    await db.collection(this.PKP_COLLECTION).doc(docId).set(payload, { merge: true });
+    await this._writeDocWithDiagnostics(db, this.PKP_COLLECTION, docId, payload, this.PKP_ALLOWED_FIELDS, { adminOnly: false });
     return { status: 'success', id: docId, id_pkp: docId, data: payload, message: 'Dokumen PK berhasil disimpan di Cloud Firestore.' };
+  },
+
+  /**
+   * Memperbarui Status Dokumen PK Secara Aman (Kirim / Setujui / Tolak)
+   */
+  async updatePkpStatusInFirestore(idPkp, newStatus, actorNip) {
+    const db = this.getDb();
+    if (!db) throw new Error("Cloud Firestore belum siap terhubung.");
+    await this._waitAuthForWrite('updatePkpStatusInFirestore');
+
+    const cleanId = String(idPkp || '').trim();
+    const cleanActor = this._normNip(actorNip || this.getCallerIdentity().nip);
+    const updatePayload = {
+      status: String(newStatus || 'Draft'),
+      updated_at: this._serverTimestamp(),
+      last_action_by: cleanActor
+    };
+    try {
+      await db.collection(this.PKP_COLLECTION).doc(cleanId).update(updatePayload);
+    } catch (updErr) {
+      const msg = String((updErr && (updErr.code || updErr.message)) || updErr || '').toLowerCase();
+      if (!msg.includes('permission') && !msg.includes('insufficient')) throw updErr;
+      if (this.getCallerIdentity().isAdmin) {
+        await this._writeDocWithDiagnostics(db, this.PKP_COLLECTION, cleanId, updatePayload, this.PKP_ALLOWED_FIELDS, { adminOnly: false });
+      } else {
+        throw updErr;
+      }
+    }
+    return { status: 'success', id: cleanId, data: updatePayload };
   },
 
   /**
@@ -899,6 +991,7 @@ const TranskepFirebase = {
   async deletePkpFromFirestore(idPkp) {
     const db = this.getDb();
     if (!db) throw new Error("Cloud Firestore belum siap terhubung.");
+    await this._waitAuthForWrite('deletePkpFromFirestore');
     await db.collection(this.PKP_COLLECTION).doc(String(idPkp).trim()).delete();
     return { status: 'success', message: 'Dokumen PK berhasil dihapus dari Cloud Firestore.' };
   },
@@ -911,23 +1004,55 @@ const TranskepFirebase = {
     const db = this.getDb();
     if (!db) throw new Error("Cloud Firestore belum siap terhubung.");
 
-    const nipPegawai = String(pckData.nip_pegawai || pckData.nip || pckData.nipPegawai || '').trim();
+    await this._waitAuthForWrite('savePckToFirestore');
+
+    const nipPegawai = this._normNip(pckData.nip_pegawai || pckData.nip || pckData.nipPegawai);
     const bulan = String(pckData.bulan || '').trim();
     const tahun = String(pckData.tahun || new Date().getFullYear()).trim();
     if (!nipPegawai || !bulan) throw new Error("NIP pegawai dan bulan diperlukan untuk menyimpan dokumen PCK.");
 
     const docId = String(pckData.id_pck || ('PCK_' + tahun + '_' + bulan + '_' + nipPegawai)).trim();
     const itemsList = Array.isArray(pckData.realisasi || pckData.items) ? (pckData.realisasi || pckData.items) : [];
+    const serverTs = this._serverTimestamp();
 
-    let nipPenilai = String(pckData.nip_penilai || '').trim();
-    let nipAtasan = String(pckData.nip_atasan_pejabat || '').trim();
-    if ((!nipPenilai || !nipAtasan) && typeof state !== 'undefined' && Array.isArray(state.pkpDokumen)) {
-      const pkpMatch = state.pkpDokumen.find(p => String(p.nip || p.nip_pegawai || '').trim() === nipPegawai && String(p.tahun || '').trim() === tahun)
-        || state.pkpDokumen.find(p => String(p.nip || p.nip_pegawai || '').trim() === nipPegawai);
+    let nipPenilai = this._normNip(pckData.nip_penilai || pckData.penilai);
+    let nipAtasan = this._normNip(pckData.nip_atasan_pejabat || pckData.atasan_pejabat);
+    if (!nipPenilai || !nipAtasan) {
+      const pkpPool = [
+        ...((typeof window !== 'undefined' && window.vueState && Array.isArray(window.vueState.pkpDokumen)) ? window.vueState.pkpDokumen : []),
+        ...((typeof state !== 'undefined' && Array.isArray(state.pkpDokumen)) ? state.pkpDokumen : [])
+      ];
+      const pkpMatch = pkpPool.find(p => this._normNip(p.nip || p.nip_pegawai) === nipPegawai && String(p.tahun || '').trim() === tahun)
+        || pkpPool.find(p => this._normNip(p.nip || p.nip_pegawai) === nipPegawai);
       if (pkpMatch) {
-        if (!nipPenilai) nipPenilai = String(pkpMatch.nip_penilai || '').trim();
-        if (!nipAtasan) nipAtasan = String(pkpMatch.nip_atasan_pejabat || '').trim();
+        if (!nipPenilai) nipPenilai = this._normNip(pkpMatch.nip_penilai || pkpMatch.penilai);
+        if (!nipAtasan) nipAtasan = this._normNip(pkpMatch.nip_atasan_pejabat || pkpMatch.atasan_pejabat);
       }
+    }
+    if (!nipPenilai || !nipAtasan) {
+      const pckPool = [
+        ...((typeof window !== 'undefined' && window.vueState && Array.isArray(window.vueState.pckDokumen)) ? window.vueState.pckDokumen : []),
+        ...((typeof state !== 'undefined' && Array.isArray(state.pckDokumen)) ? state.pckDokumen : [])
+      ];
+      const pckMatch = pckPool.find(p => String(p.id_pck) === docId)
+        || pckPool.find(p => this._normNip(p.nip || p.nip_pegawai) === nipPegawai && String(p.tahun || '').trim() === tahun && String(p.bulan || '').trim().toLowerCase() === bulan.toLowerCase());
+      if (pckMatch) {
+        if (!nipPenilai) nipPenilai = this._normNip(pckMatch.nip_penilai || pckMatch.penilai);
+        if (!nipAtasan) nipAtasan = this._normNip(pckMatch.nip_atasan_pejabat || pckMatch.atasan_pejabat);
+      }
+    }
+    if ((!nipPenilai || !nipAtasan) && typeof db.collection === 'function') {
+      try {
+        const existingRef = db.collection(this.PCK_COLLECTION).doc(docId);
+        if (existingRef && typeof existingRef.get === 'function') {
+          const existingSnap = await existingRef.get();
+          if (existingSnap && existingSnap.exists && typeof existingSnap.data === 'function') {
+            const ex = existingSnap.data() || {};
+            if (!nipPenilai) nipPenilai = this._normNip(ex.nip_penilai || ex.penilai);
+            if (!nipAtasan) nipAtasan = this._normNip(ex.nip_atasan_pejabat || ex.atasan_pejabat);
+          }
+        }
+      } catch (eLookup) {}
     }
 
     const payload = {
@@ -940,20 +1065,49 @@ const TranskepFirebase = {
       tahun: tahun,
       total_rencana: parseInt(pckData.total_rencana || pckData.rencana || itemsList.length) || 0,
       rencana: parseInt(pckData.rencana || pckData.total_rencana || itemsList.length) || 0,
-      progress: pckData.progress || '100%',
-      status: pckData.status || 'Draft',
+      progress: String(pckData.progress || '100%'),
+      status: String(pckData.status || 'Draft'),
       nilai_akhir: String(pckData.nilai_akhir || '0'),
       realisasi: itemsList,
       is_firebase: true,
-      updated_at: firebase.firestore.FieldValue.serverTimestamp()
+      updated_at: serverTs
     };
 
-    if (!pckData.created_at) {
-      payload.created_at = firebase.firestore.FieldValue.serverTimestamp();
+    if (!this._isFirestoreTimestamp(pckData.created_at)) {
+      payload.created_at = serverTs;
     }
 
-    await db.collection(this.PCK_COLLECTION).doc(docId).set(payload, { merge: true });
+    await this._writeDocWithDiagnostics(db, this.PCK_COLLECTION, docId, payload, this.PCK_ALLOWED_FIELDS, { adminOnly: false });
     return { status: 'success', id: docId, id_pck: docId, data: payload, message: 'Dokumen PCK berhasil disimpan di Cloud Firestore.' };
+  },
+
+  /**
+   * Memperbarui Status Dokumen PCK Secara Aman (Kirim / Setujui / Tolak)
+   */
+  async updatePckStatusInFirestore(idPck, newStatus, actorNip) {
+    const db = this.getDb();
+    if (!db) throw new Error("Cloud Firestore belum siap terhubung.");
+    await this._waitAuthForWrite('updatePckStatusInFirestore');
+
+    const cleanId = String(idPck || '').trim();
+    const cleanActor = this._normNip(actorNip || this.getCallerIdentity().nip);
+    const updatePayload = {
+      status: String(newStatus || 'Draft'),
+      updated_at: this._serverTimestamp(),
+      last_action_by: cleanActor
+    };
+    try {
+      await db.collection(this.PCK_COLLECTION).doc(cleanId).update(updatePayload);
+    } catch (updErr) {
+      const msg = String((updErr && (updErr.code || updErr.message)) || updErr || '').toLowerCase();
+      if (!msg.includes('permission') && !msg.includes('insufficient')) throw updErr;
+      if (this.getCallerIdentity().isAdmin) {
+        await this._writeDocWithDiagnostics(db, this.PCK_COLLECTION, cleanId, updatePayload, this.PCK_ALLOWED_FIELDS, { adminOnly: false });
+      } else {
+        throw updErr;
+      }
+    }
+    return { status: 'success', id: cleanId, data: updatePayload };
   },
 
   /**
@@ -1011,6 +1165,7 @@ const TranskepFirebase = {
   async deletePckFromFirestore(idPck) {
     const db = this.getDb();
     if (!db) throw new Error("Cloud Firestore belum siap terhubung.");
+    await this._waitAuthForWrite('deletePckFromFirestore');
     await db.collection(this.PCK_COLLECTION).doc(String(idPck).trim()).delete();
     return { status: 'success', message: 'Dokumen PCK berhasil dihapus dari Cloud Firestore.' };
   },
@@ -1023,29 +1178,32 @@ const TranskepFirebase = {
     const db = this.getDb();
     if (!db) throw new Error("Cloud Firestore belum siap terhubung.");
 
+    await this._waitAuthForWrite('saveRekapitulasiToFirestore');
+
     const bulan = String(rekapData.bulan || '').trim();
     const tahun = String(rekapData.tahun || new Date().getFullYear()).trim();
     if (!bulan || !tahun) throw new Error("Bulan dan tahun diperlukan untuk menyimpan rekapitulasi.");
 
     const docId = String(rekapData.id_rekap || ('REKAP_' + tahun + '_' + bulan)).trim();
+    const rawNipPejabat = this._normNip(rekapData.pejabat_nip) || '-';
 
     const payload = {
       id_rekap: docId,
       bulan: bulan,
       tahun: tahun,
-      unit_kerja: rekapData.unit_kerja || 'Pengadilan Agama Indramayu',
-      status: rekapData.status || 'Terkunci / Disahkan',
-      pejabat_nama: rekapData.pejabat_nama || '-',
-      pejabat_nip: rekapData.pejabat_nip || '-',
-      tgl_pengesahan: rekapData.tgl_pengesahan || new Date().toISOString().split('T')[0],
+      unit_kerja: String(rekapData.unit_kerja || 'Pengadilan Agama Indramayu'),
+      status: String(rekapData.status || 'Terkunci / Disahkan'),
+      pejabat_nama: String(rekapData.pejabat_nama || '-'),
+      pejabat_nip: rawNipPejabat,
+      tgl_pengesahan: String(rekapData.tgl_pengesahan || new Date().toISOString().split('T')[0]).slice(0, 30),
       total_pegawai: parseInt(rekapData.total_pegawai || 0) || 0,
       rata_rata_satker: parseFloat(rekapData.rata_rata_satker || 0) || 0,
       daftar_nilai: Array.isArray(rekapData.daftar_nilai) ? rekapData.daftar_nilai : [],
       is_firebase: true,
-      updated_at: firebase.firestore.FieldValue.serverTimestamp()
+      updated_at: this._serverTimestamp()
     };
 
-    await db.collection(this.REKAP_COLLECTION).doc(docId).set(payload, { merge: true });
+    await this._writeDocWithDiagnostics(db, this.REKAP_COLLECTION, docId, payload, this.REKAP_ALLOWED_FIELDS);
     return { status: 'success', id: docId, data: payload, message: 'Dokumen rekapitulasi berhasil disahkan dan disimpan di Cloud Firestore.' };
   },
 
@@ -1098,6 +1256,7 @@ const TranskepFirebase = {
   async deleteRekapitulasiFromFirestore(idRekap) {
     const db = this.getDb();
     if (!db) throw new Error("Cloud Firestore belum siap terhubung.");
+    await this._waitAuthForWrite('deleteRekapitulasiFromFirestore');
     await db.collection(this.REKAP_COLLECTION).doc(String(idRekap).trim()).delete();
     return { status: 'success', message: 'Dokumen rekapitulasi berhasil dihapus / dibuka kuncinya dari Cloud Firestore.' };
   },
@@ -1107,6 +1266,10 @@ const TranskepFirebase = {
   // ==========================================
   EOFFICE_KGB_COLLECTION: 'eoffice_kgb',
   EOFFICE_RAPAT_COLLECTION: 'eoffice_rapat',
+
+  _normNip(val) {
+    return (val === undefined || val === null) ? '' : String(val).replace(/['"\s]/g, '').trim();
+  },
 
   _serverTimestamp() {
     return (typeof firebase !== 'undefined' && firebase.firestore && firebase.firestore.FieldValue)
@@ -1122,6 +1285,60 @@ const TranskepFirebase = {
     const s = (val === undefined || val === null) ? '' : String(val).trim();
     return (!s || s === '-' || /^https?:\/\//i.test(s)) ? s : '';
   },
+
+  SK_ALLOWED_FIELDS: [
+    'id', 'judul_sk', 'no_sk', 'pj_sk', 'link_drive', 'tgl_sk', 'tgl_input',
+    'status', 'versi_aktif', 'members', 'naskah_utama', 'lampiran',
+    'template_gdoc_id', 'revisi_history', 'acknowledgments', 'is_firebase',
+    'updated_at', 'created_at'
+  ],
+
+  SOP_ALLOWED_FIELDS: [
+    'id', 'judul_sop', 'nomor_sop', 'kategori_pj', 'tanggal_pembuatan',
+    'tanggal_revisi', 'tanggal_efektif', 'link_drive', 'pelaksana',
+    'pelaksana_json', 'acknowledgments', 'is_firebase', 'updated_at', 'created_at'
+  ],
+
+  JOBDES_ALLOWED_FIELDS: [
+    'nip', 'atasan_nip', 'dasar_lampiran', 'ikhtisar_jabatan', 'tugas_pokok',
+    'tugas_tambahan', 'wewenang', 'tanggung_jawab', 'hasil_kerja',
+    'bawahan_langsung', 'updated_by', 'is_firebase', 'updated_at', 'created_at'
+  ],
+
+  JOBDES_USULAN_ALLOWED_FIELDS: [
+    'id', 'nip_pegawai', 'pengusul_nip', 'nama_pegawai', 'nama_pengusul',
+    'isi_usulan', 'status', 'is_firebase', 'created_at', 'completed_at'
+  ],
+
+  MASTER_KINERJA_ALLOWED_FIELDS: [
+    'id', 'nama_jabatan', 'kategori', 'aliases', 'sasaran_list',
+    'is_firebase', 'updated_at', 'updated_by'
+  ],
+
+  PKP_ALLOWED_FIELDS: [
+    'id_pkp', 'nip_pegawai', 'nip', 'nip_penilai', 'nip_atasan_pejabat',
+    'tahun', 'status', 'nilai_akhir', 'items', 'last_action_by',
+    'is_firebase', 'updated_at', 'created_at'
+  ],
+
+  PCK_ALLOWED_FIELDS: [
+    'id_pck', 'nip_pegawai', 'nip', 'nip_penilai', 'nip_atasan_pejabat',
+    'bulan', 'tahun', 'total_rencana', 'rencana', 'progress', 'status',
+    'nilai_akhir', 'realisasi', 'last_action_by', 'is_firebase',
+    'updated_at', 'created_at'
+  ],
+
+  REKAP_ALLOWED_FIELDS: [
+    'id_rekap', 'bulan', 'tahun', 'unit_kerja', 'status', 'pejabat_nama',
+    'pejabat_nip', 'tgl_pengesahan', 'total_pegawai', 'rata_rata_satker',
+    'daftar_nilai', 'is_firebase', 'updated_at'
+  ],
+
+  SURAT_TUGAS_ALLOWED_FIELDS: [
+    'id', 'waktu', 'nomor', 'menimbang', 'dasar', 'tujuan', 'tempat',
+    'tgl_mulai', 'tgl_selesai', 'jam', 'peserta', 'pejabat_ttd', 'status',
+    'data_ekstra', 'created_by', 'is_firebase', 'updated_at', 'created_at'
+  ],
 
   EOFFICE_KGB_ALLOWED_FIELDS: [
     'id', 'id_kgb', 'nip', 'nama_pegawai', 'nama', 'tempat_lahir', 'tanggal_lahir',
@@ -1190,7 +1407,8 @@ const TranskepFirebase = {
     }
   },
 
-  async _writeDocWithDiagnostics(db, colName, docId, payload, allowedSchemaFields) {
+  async _writeDocWithDiagnostics(db, colName, docId, payload, allowedSchemaFields, options) {
+    const adminOnly = !options || options.adminOnly !== false;
     const docRef = db.collection(colName).doc(docId);
     try {
       await docRef.set(payload, { merge: true });
@@ -1209,11 +1427,14 @@ const TranskepFirebase = {
       const claimRole = await this._getUserRoleClaim(fbAuth.currentUser);
       const roleLow = String(claimRole || '').toLowerCase().trim();
       const allowedRoles = ['admin', 'super admin', 'administrator', 'operator'];
-      if (!roleLow || !allowedRoles.includes(roleLow)) {
+      if (adminOnly && (!roleLow || !allowedRoles.includes(roleLow))) {
         throw new Error(`FirebaseError: [code=permission-denied]: Akun Firebase aktif (UID: ${fbAuth.currentUser.uid}), namun claim role="${claimRole || 'kosong'}" bukan Admin/Operator di firestore.rules.`);
       }
+      if (!roleLow) {
+        throw new Error(`FirebaseError: [code=permission-denied]: Akun Firebase aktif (UID: ${fbAuth.currentUser.uid}), namun claim role kosong di firestore.rules.`);
+      }
 
-      // Auth & Admin role valid: inspeksi dokumen lama & jalur read untuk diagnosa presisi
+      // Auth & role valid: inspeksi dokumen lama & jalur read untuk diagnosa presisi serta self-healing field legacy
       let diagInfo = '';
       if (Array.isArray(allowedSchemaFields) && allowedSchemaFields.length > 0 && typeof docRef.get === 'function') {
         try {
@@ -1222,10 +1443,18 @@ const TranskepFirebase = {
             const existing = snap.data() || {};
             const extraKeys = Object.keys(existing).filter(k => !allowedSchemaFields.includes(k));
             const nullKeys = Object.keys(existing).filter(k => allowedSchemaFields.includes(k) && (existing[k] === null || existing[k] === undefined));
+            const badCreatedAt = allowedSchemaFields.includes('created_at') &&
+              Object.prototype.hasOwnProperty.call(existing, 'created_at') &&
+              existing.created_at !== null &&
+              existing.created_at !== undefined &&
+              !this._isFirestoreTimestamp(existing.created_at);
             const idOk = (!existing.id || existing.id === docId) &&
                          (!existing.id_kgb || existing.id_kgb === docId) &&
-                         (!existing.id_rapat || existing.id_rapat === docId);
-            if ((extraKeys.length > 0 || nullKeys.length > 0) && idOk) {
+                         (!existing.id_rapat || existing.id_rapat === docId) &&
+                         (!existing.id_pkp || existing.id_pkp === docId) &&
+                         (!existing.id_pck || existing.id_pck === docId) &&
+                         (!existing.id_rekap || existing.id_rekap === docId);
+            if ((extraKeys.length > 0 || nullKeys.length > 0 || badCreatedAt) && idOk) {
               const sanitized = {};
               for (const k of allowedSchemaFields) {
                 if (Object.prototype.hasOwnProperty.call(existing, k) && existing[k] !== undefined && existing[k] !== null) {
@@ -1236,11 +1465,13 @@ const TranskepFirebase = {
               Object.assign(sanitized, payload);
               if (this._isFirestoreTimestamp(existing.created_at)) {
                 sanitized.created_at = existing.created_at;
+              } else if (allowedSchemaFields.includes('created_at') && !this._isFirestoreTimestamp(sanitized.created_at)) {
+                sanitized.created_at = this._serverTimestamp();
               }
               await docRef.set(sanitized);
               return;
             }
-            diagInfo = `docRead=OK(exists=true, keys=${Object.keys(existing).length}, idOk=${idOk}${extraKeys.length ? ', extra=' + extraKeys.join(',') : ''}${nullKeys.length ? ', nulls=' + nullKeys.join(',') : ''})`;
+            diagInfo = `docRead=OK(exists=true, keys=${Object.keys(existing).length}, idOk=${idOk}${extraKeys.length ? ', extra=' + extraKeys.join(',') : ''}${nullKeys.length ? ', nulls=' + nullKeys.join(',') : ''}${badCreatedAt ? ', badCreatedAt=true' : ''})`;
           } else {
             diagInfo = 'docRead=OK(exists=false)';
           }
@@ -1263,7 +1494,8 @@ const TranskepFirebase = {
 
       const rawMsg = (writeErr && writeErr.message) ? writeErr.message : String(writeErr);
       const diagSuffix = diagInfo ? ` [${diagInfo}]` : '';
-      throw new Error(`FirebaseError: [code=permission-denied]: Auth Admin aktif (UID: ${fbAuth.currentUser.uid}, role: ${claimRole}), namun Firestore Rules menolak ${colName}/${docId}.${diagSuffix} Detail: ${rawMsg}`);
+      const rolePrefix = adminOnly ? `Auth Admin aktif` : `Auth aktif`;
+      throw new Error(`FirebaseError: [code=permission-denied]: ${rolePrefix} (UID: ${fbAuth.currentUser.uid}, role: ${claimRole}), namun Firestore Rules menolak ${colName}/${docId}.${diagSuffix} Detail: ${rawMsg}`);
     }
   },
 
@@ -1358,6 +1590,7 @@ const TranskepFirebase = {
   async deleteKgbFromFirestore(docId) {
     const db = this.getDb();
     if (!db) throw new Error("Cloud Firestore belum siap terhubung.");
+    await this._waitAuthForWrite('deleteKgbFromFirestore');
     await db.collection(this.EOFFICE_KGB_COLLECTION).doc(String(docId).trim()).delete();
     return { status: 'success', message: 'Data KGB berhasil dihapus dari Cloud Firestore.' };
   },
@@ -1459,6 +1692,7 @@ const TranskepFirebase = {
   async deleteRapatFromFirestore(docId) {
     const db = this.getDb();
     if (!db) throw new Error("Cloud Firestore belum siap terhubung.");
+    await this._waitAuthForWrite('deleteRapatFromFirestore');
     await db.collection(this.EOFFICE_RAPAT_COLLECTION).doc(String(docId).trim()).delete();
     return { status: 'success', message: 'Data Rapat berhasil dihapus dari Cloud Firestore.' };
   },
@@ -1512,42 +1746,43 @@ const TranskepFirebase = {
   async saveSuratTugasToFirestore(stData) {
     const db = this.getDb();
     if (!db) throw new Error("Cloud Firestore belum siap terhubung.");
+
+    await this._waitAuthForWrite('saveSuratTugasToFirestore');
+
     const docId = String(stData.id || stData.id_st || ('ST-' + Date.now() + Math.floor(Math.random() * 1000))).trim();
 
     const d = new Date();
     const pad = n => String(n).padStart(2, '0');
     const nowStr = `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 
+    const asStr = (v, fb = '') => (v === undefined || v === null) ? fb : String(v);
+    const serverTs = this._serverTimestamp();
     const caller = this.getCallerIdentity();
     const payload = {
       id: docId,
-      waktu: stData.waktu || nowStr,
-      nomor: stData.nomor || stData.nomor_surat || '',
-      menimbang: stData.menimbang || '',
-      dasar: stData.dasar || '',
-      tujuan: stData.tujuan || '',
-      tempat: stData.tempat || '',
-      tgl_mulai: stData.tgl_mulai || '',
-      tgl_selesai: stData.tgl_selesai || '',
-      jam: stData.jam || '',
+      waktu: asStr(stData.waktu, nowStr) || nowStr,
+      nomor: asStr(stData.nomor !== undefined ? stData.nomor : stData.nomor_surat),
+      menimbang: asStr(stData.menimbang),
+      dasar: asStr(stData.dasar),
+      tujuan: asStr(stData.tujuan),
+      tempat: asStr(stData.tempat),
+      tgl_mulai: asStr(stData.tgl_mulai),
+      tgl_selesai: asStr(stData.tgl_selesai),
+      jam: asStr(stData.jam),
       peserta: typeof stData.peserta === 'string' ? stData.peserta : (stData.peserta_json || JSON.stringify(stData.peserta || [])),
-      pejabat_ttd: String(stData.pejabat_ttd || '').trim(),
-      status: stData.status || 'DISETUJUI',
+      pejabat_ttd: this._normNip(stData.pejabat_ttd),
+      status: asStr(stData.status, 'DISETUJUI') || 'DISETUJUI',
       data_ekstra: typeof stData.data_ekstra === 'string' ? stData.data_ekstra : (stData.data_ekstra_json || JSON.stringify(stData.data_ekstra || {})),
-      created_by: String(stData.created_by || caller.nip || '').trim(),
+      created_by: this._normNip(stData.created_by || caller.nip),
       is_firebase: true,
-      updated_at: (typeof firebase !== 'undefined' && firebase.firestore && firebase.firestore.FieldValue) 
-        ? firebase.firestore.FieldValue.serverTimestamp() 
-        : new Date().toISOString()
+      updated_at: serverTs
     };
 
-    if (!stData.created_at) {
-      payload.created_at = (typeof firebase !== 'undefined' && firebase.firestore && firebase.firestore.FieldValue) 
-        ? firebase.firestore.FieldValue.serverTimestamp() 
-        : new Date().toISOString();
+    if (!this._isFirestoreTimestamp(stData.created_at)) {
+      payload.created_at = serverTs;
     }
 
-    await db.collection(this.SURAT_TUGAS_COLLECTION).doc(docId).set(payload, { merge: true });
+    await this._writeDocWithDiagnostics(db, this.SURAT_TUGAS_COLLECTION, docId, payload, this.SURAT_TUGAS_ALLOWED_FIELDS, { adminOnly: false });
     return { status: 'success', id: docId, data: payload, message: 'Surat Tugas berhasil disimpan di Cloud Firestore.' };
   },
 
@@ -1557,6 +1792,7 @@ const TranskepFirebase = {
   async deleteSuratTugasFromFirestore(docId) {
     const db = this.getDb();
     if (!db) throw new Error("Cloud Firestore belum siap terhubung.");
+    await this._waitAuthForWrite('deleteSuratTugasFromFirestore');
     await db.collection(this.SURAT_TUGAS_COLLECTION).doc(String(docId).trim()).delete();
     return { status: 'success', message: 'Surat Tugas berhasil dihapus dari Cloud Firestore.' };
   },

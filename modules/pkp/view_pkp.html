@@ -413,14 +413,14 @@
                         <div class="flex-1 relative z-10">
                             <label class="block text-[10px] font-bold text-indigo-400 uppercase tracking-wider mb-2">Pejabat Penilai</label>
                             <div class="flex gap-2">
-                                <input type="text" id="pkAtasanFullText" list="listAtasanFull" v-model="formPK.penilaiText" :readonly="isReadOnlyPK" placeholder="Ketik Jabatan (Cth: Panitera)..." autocomplete="off" class="w-full p-3 bg-slate-950 border border-slate-700 rounded-xl text-sm text-white focus:border-indigo-500 outline-none transition shadow-inner">
+                                <input type="text" id="pkAtasanFullText" list="listAtasanFull" v-model="formPK.penilaiText" :readonly="isReadOnlyPK || isVerifikasiPK" placeholder="Ketik Jabatan (Cth: Panitera)..." autocomplete="off" class="w-full p-3 bg-slate-950 border border-slate-700 rounded-xl text-sm text-white focus:border-indigo-500 outline-none transition shadow-inner">
                                 <button type="button" class="w-12 h-[46px] shrink-0 flex items-center justify-center bg-slate-800 hover:bg-indigo-600 text-slate-400 hover:text-white rounded-xl border border-slate-700 hover:border-indigo-500 transition-all shadow-md"><i class="fa-solid fa-gear"></i></button>
                             </div>
                         </div>
                         <div class="flex-1 relative z-10">
                             <label class="block text-[10px] font-bold text-indigo-400 uppercase tracking-wider mb-2">Atasan Pejabat Penilai</label>
                             <div class="flex gap-2">
-                                <input type="text" id="pkAtasanPejabatFullText" list="listAtasanFull" v-model="formPK.atasanPejabatText" :readonly="isReadOnlyPK" placeholder="Ketik Jabatan (Cth: Ketua)..." autocomplete="off" class="w-full p-3 bg-slate-950 border border-slate-700 rounded-xl text-sm text-white focus:border-indigo-500 outline-none transition shadow-inner">
+                                <input type="text" id="pkAtasanPejabatFullText" list="listAtasanFull" v-model="formPK.atasanPejabatText" :readonly="isReadOnlyPK || isVerifikasiPK" placeholder="Ketik Jabatan (Cth: Ketua)..." autocomplete="off" class="w-full p-3 bg-slate-950 border border-slate-700 rounded-xl text-sm text-white focus:border-indigo-500 outline-none transition shadow-inner">
                                 <button type="button" class="w-12 h-[46px] shrink-0 flex items-center justify-center bg-slate-800 hover:bg-indigo-600 text-slate-400 hover:text-white rounded-xl border border-slate-700 hover:border-indigo-500 transition-all shadow-md"><i class="fa-solid fa-gear"></i></button>
                             </div>
                             <datalist id="listAtasanFull">

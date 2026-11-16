@@ -103,7 +103,14 @@ for (const col of ['sk_documents', 'sop_documents', 'jobdes_documents', 'jobdes_
   assert(rulesSrc.includes(`match /${col}`), `firestore.rules missing match /${col}`);
 }
 assert(/match \/\{document=\*\*\}[\s\S]*allow read, write: if false;/.test(rulesSrc), 'firestore.rules missing catch-all deny');
-console.log('[PASS] A2 firestore.rules structure & catch-all deny checks passed.');
+assert(/function isValidAckAppend[\s\S]*?newData\.acknowledgments\[newSize - 1\]\.nip == uid\(\)/.test(rulesSrc), 'isValidAckAppend must bind new Ack nip to uid()');
+assert(/match \/surat_tugas_documents\/\{docId\}[\s\S]*?isFieldOwner\(request\.resource\.data, 'created_by'\) &&[\s\S]*?request\.resource\.data\.created_by\.size\(\) >= 1/.test(rulesSrc), 'surat_tugas_documents must forbid unowned created_by create');
+assert(/function isValidJobdesUsulan[\s\S]*?'pengusul_nip'/.test(rulesSrc) && /match \/jobdes_usulan\/\{docId\}[\s\S]*?isApproverRole\(\)/.test(rulesSrc), 'jobdes_usulan must support approver / pengusul_nip proposals');
+assert(/function isValidSecurityIncident[\s\S]*?isValidOptionalString\(data, 'url', 0, 2000\)/.test(rulesSrc), 'security_incidents must allow URLs up to 2000 chars');
+assert(fs.readFileSync('modules/sop/sop.js', 'utf8').includes('canManageSop() {\r\n                return this.isAdminOrOperator;') || fs.readFileSync('modules/sop/sop.js', 'utf8').includes('canManageSop() {\n                return this.isAdminOrOperator;'), 'sop.js canManageSop must match Admin/Operator rules');
+assert(fs.readFileSync('modules/pkp/view_pkp.html', 'utf8').includes(':readonly="isReadOnlyPK || isVerifikasiPK"'), 'view_pkp.html must lock penilai/atasan inputs during verifikasi');
+assert(fs.readFileSync('core/core.js', 'utf8').includes('.slice(0, 1500)') && fs.readFileSync('core/core.js', 'utf8').includes('.slice(0, 480)'), 'core.js security_incidents must clamp long url/userAgent');
+console.log('[PASS] A2 firestore.rules structure, catch-all deny & multi-menu hardening checks passed.');
 
 // A3 static Drive sharing & frontend link routing checks
 for (const f of jsFiles) {
@@ -593,6 +600,7 @@ const mockFirestore = {
         return { exists: false, data: () => null };
       },
       set: async (data) => { recordedFirestoreOps.push({ type: 'set', colName, docId, data }); },
+      update: async (data) => { recordedFirestoreOps.push({ type: 'update', colName, docId, data }); },
       delete: async () => { recordedFirestoreOps.push({ type: 'delete', colName, docId }); }
     }),
     where: (f, op, v) => makeMockQuery(colName, [{ f, op, v }]),
@@ -693,7 +701,12 @@ const browserSandbox = {
         mockFirebaseUser = null;
       }
     }),
-    firestore: Object.assign(() => mockFirestore, { FieldValue: { serverTimestamp: () => 'TS' } })
+    firestore: Object.assign(() => mockFirestore, {
+      FieldValue: {
+        serverTimestamp: () => 'TS',
+        arrayUnion: (...args) => ({ _arrayUnion: args })
+      }
+    })
   },
   TranskepAPI: {
     call: async (method, ...args) => {
@@ -957,6 +970,55 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
     }
     assert(probeErr && probeErr.message.includes('docRead=ERR(') && probeErr.message.includes('skRead=ERR('),
       `Expected docRead & skRead diagnostics, got: ${probeErr && probeErr.message}`);
+
+    // 6. Tahap 121 multi-menu regressions: Builder SK ack ID preservation, PCK penilai alias lookup, Jobdes Usulan & legacy created_at string self-heal
+    browserSandbox.TranskepAPI.call = origApiCall;
+    browserSandbox.TranskepFirebase.getDb = origGetDb;
+    await browserSandbox.TranskepFirebase.authenticateWithCustomToken('jwt-123', { nip: '199002022015012002', role: 'Pegawai' });
+    recordedFirestoreOps.length = 0;
+    await browserSandbox.TranskepFirebase.acknowledgeSkInFirestore('SK-2026-4812', "'199002022015012002", '16/11/2026 10:00:00');
+    const skAckOp = recordedFirestoreOps.find(o => o.colName === 'sk_documents' && o.type === 'update');
+    assert(skAckOp && skAckOp.docId === 'SK-2026-4812', `acknowledgeSkInFirestore must preserve Builder ID SK-2026-4812, got: ${skAckOp && skAckOp.docId}`);
+    assert.strictEqual(skAckOp.data.acknowledgments._arrayUnion[0].nip, '199002022015012002');
+
+    browserSandbox.vueState = {
+      pkpDokumen: [{ id_pkp: 'PKP_2026_199002022015012002', nip: '199002022015012002', tahun: '2026', penilai: "'197901012003011008", atasan_pejabat: '198001012005011001' }],
+      pckDokumen: []
+    };
+    recordedFirestoreOps.length = 0;
+    await browserSandbox.TranskepFirebase.savePckToFirestore({ id_pck: 'PCK_2026_November_199002022015012002', nip: '199002022015012002', bulan: 'November', tahun: '2026' });
+    const pckBackfillOp = recordedFirestoreOps.find(o => o.colName === 'pck_documents' && o.type === 'set');
+    assert(pckBackfillOp && pckBackfillOp.data.nip_penilai === '197901012003011008' && pckBackfillOp.data.nip_atasan_pejabat === '198001012005011001',
+      'savePckToFirestore must backfill normalized nip_penilai & nip_atasan_pejabat from penilai/atasan_pejabat aliases');
+
+    await browserSandbox.TranskepFirebase.saveUsulanJobdesToFirestore({ nip_pegawai: "'197901012003011008", nama_pegawai: 'Pegawai Target', nama_pengusul: 'Atasan', isi_usulan: 'Tambah tugas' });
+    const usulanOp = recordedFirestoreOps.find(o => o.colName === 'jobdes_usulan' && o.type === 'set');
+    assert(usulanOp && usulanOp.data.nip_pegawai === '197901012003011008' && usulanOp.data.pengusul_nip === '199002022015012002',
+      'saveUsulanJobdesToFirestore must normalize nip_pegawai and attach caller pengusul_nip');
+
+    await browserSandbox.TranskepFirebase.authenticateWithCustomToken('jwt-adm', { nip: '198001012005011001', role: 'Admin' });
+    let jobdesSelfHeal = null;
+    browserSandbox.TranskepFirebase.getDb = () => ({
+      collection: () => ({
+        doc: () => ({
+          get: async () => ({
+            exists: true,
+            data: () => ({ nip: '199002022015012002', created_at: '2026-01-01', legacy_col: 'sheet' })
+          }),
+          set: async (data, opts) => {
+            if (opts && opts.merge === true) {
+              const err = new Error('Missing or insufficient permissions.');
+              err.code = 'permission-denied';
+              throw err;
+            }
+            jobdesSelfHeal = data;
+          }
+        })
+      })
+    });
+    await browserSandbox.TranskepFirebase.saveJobdesToFirestore({ nip: '199002022015012002', tugas_pokok: '1. Mengetik putusan' });
+    assert(jobdesSelfHeal && !('legacy_col' in jobdesSelfHeal) && jobdesSelfHeal.created_at === 'TS',
+      'Legacy doc with string created_at must trigger non-merge self-heal rewrite');
   } finally {
     browserSandbox.TranskepAPI.call = origApiCall;
     browserSandbox.TranskepFirebase.getDb = origGetDb;

@@ -66,43 +66,49 @@ const PkpDataService = {
   async aksiDokumenPKP(idPKP, aksi, nip, token) {
     const cleanId = String(idPKP || '').trim();
     const cleanAksi = String(aksi || '').trim();
-    const userNip = nip || (typeof state !== 'undefined' && state.user ? state.user.nip : '') || '';
+    const userNip = String(nip || (typeof state !== 'undefined' && state.user ? state.user.nip : '') || '').replace(/['"\s]/g, '').trim();
     const authToken = token || (typeof localStorage !== 'undefined' ? localStorage.getItem('transkep_session_token') : '') || '';
 
     if (typeof TranskepFirebase !== 'undefined' && TranskepFirebase.isReady()) {
-      try {
-        const db = TranskepFirebase.getDb();
-        if (cleanAksi === 'Hapus') {
-          await TranskepFirebase.deletePkpFromFirestore(cleanId);
-        } else {
-          let newStatus = 'Draft';
-          if (cleanAksi === 'Kirim') {
-            newStatus = 'Menunggu Penilai';
-          } else if (cleanAksi === 'Setujui') {
-            const docSnap = await db.collection(TranskepFirebase.PKP_COLLECTION).doc(cleanId).get();
-            const curData = docSnap.exists ? docSnap.data() : {};
-            if (curData.status === 'Menunggu Penilai') {
-              newStatus = 'Menunggu Atasan Penilai';
-            } else {
-              newStatus = 'Disetujui';
-            }
-          } else if (cleanAksi === 'Tolak') {
-            newStatus = 'Draft';
+      const db = TranskepFirebase.getDb();
+      if (cleanAksi === 'Hapus') {
+        await TranskepFirebase.deletePkpFromFirestore(cleanId);
+      } else {
+        let newStatus = 'Draft';
+        if (cleanAksi === 'Kirim') {
+          newStatus = 'Menunggu Penilai';
+        } else if (cleanAksi === 'Setujui') {
+          let curStatus = '';
+          const localList = (typeof state !== 'undefined' && Array.isArray(state.pkpDokumen)) ? state.pkpDokumen : [];
+          const localDoc = localList.find(p => String(p.id_pkp) === cleanId);
+          if (localDoc && localDoc.status) curStatus = String(localDoc.status);
+          if (!curStatus && db) {
+            try {
+              const docSnap = await db.collection(TranskepFirebase.PKP_COLLECTION).doc(cleanId).get();
+              if (docSnap.exists) curStatus = String((docSnap.data() || {}).status || '');
+            } catch (eRead) {}
           }
+          if (curStatus === 'Menunggu Penilai' || curStatus === 'Dikirim') {
+            newStatus = 'Menunggu Atasan Penilai';
+          } else {
+            newStatus = 'Disetujui';
+          }
+        } else if (cleanAksi === 'Tolak') {
+          newStatus = 'Draft';
+        }
 
-          await db.collection(TranskepFirebase.PKP_COLLECTION).doc(cleanId).set({
+        if (typeof TranskepFirebase.updatePkpStatusInFirestore === 'function') {
+          await TranskepFirebase.updatePkpStatusInFirestore(cleanId, newStatus, userNip);
+        } else {
+          await db.collection(TranskepFirebase.PKP_COLLECTION).doc(cleanId).update({
             status: newStatus,
             updated_at: firebase.firestore.FieldValue.serverTimestamp(),
             last_action_by: userNip
-          }, { merge: true });
+          });
         }
-
-        // TAHAP 83: Penulisan ke Google Sheets diputus total. Data murni tersimpan di Cloud Firestore.
-
-        return { success: true, message: `Aksi ${cleanAksi} dokumen PK berhasil diproses di Cloud Firestore.` };
-      } catch (err) {
-        console.warn("⚠️ [PkpDataService] Gagal memproses aksi PK di Firestore, fallback ke Apps Script:", err);
       }
+
+      return { success: true, message: `Aksi ${cleanAksi} dokumen PK berhasil diproses di Cloud Firestore.` };
     }
 
     // Fallback ke Google Script
@@ -129,37 +135,35 @@ const PkpDataService = {
   async aksiDokumenPCK(idPCK, aksi, nip, token) {
     const cleanId = String(idPCK || '').trim();
     const cleanAksi = String(aksi || '').trim();
-    const userNip = nip || (typeof state !== 'undefined' && state.user ? state.user.nip : '') || '';
+    const userNip = String(nip || (typeof state !== 'undefined' && state.user ? state.user.nip : '') || '').replace(/['"\s]/g, '').trim();
     const authToken = token || (typeof localStorage !== 'undefined' ? localStorage.getItem('transkep_session_token') : '') || '';
 
     if (typeof TranskepFirebase !== 'undefined' && TranskepFirebase.isReady()) {
-      try {
-        const db = TranskepFirebase.getDb();
-        if (cleanAksi === 'Hapus') {
-          await TranskepFirebase.deletePckFromFirestore(cleanId);
-        } else {
-          let newStatus = 'Draft';
-          if (cleanAksi === 'Kirim') {
-            newStatus = 'Menunggu Penilai';
-          } else if (cleanAksi === 'Setujui') {
-            newStatus = 'Disetujui';
-          } else if (cleanAksi === 'Tolak') {
-            newStatus = 'Draft';
-          }
+      const db = TranskepFirebase.getDb();
+      if (cleanAksi === 'Hapus') {
+        await TranskepFirebase.deletePckFromFirestore(cleanId);
+      } else {
+        let newStatus = 'Draft';
+        if (cleanAksi === 'Kirim') {
+          newStatus = 'Menunggu Penilai';
+        } else if (cleanAksi === 'Setujui') {
+          newStatus = 'Disetujui';
+        } else if (cleanAksi === 'Tolak') {
+          newStatus = 'Draft';
+        }
 
-          await db.collection(TranskepFirebase.PCK_COLLECTION).doc(cleanId).set({
+        if (typeof TranskepFirebase.updatePckStatusInFirestore === 'function') {
+          await TranskepFirebase.updatePckStatusInFirestore(cleanId, newStatus, userNip);
+        } else {
+          await db.collection(TranskepFirebase.PCK_COLLECTION).doc(cleanId).update({
             status: newStatus,
             updated_at: firebase.firestore.FieldValue.serverTimestamp(),
             last_action_by: userNip
-          }, { merge: true });
+          });
         }
-
-        // TAHAP 83: Penulisan ke Google Sheets diputus total. Data murni tersimpan di Cloud Firestore.
-
-        return { success: true, message: `Aksi ${cleanAksi} laporan PCK berhasil diproses di Cloud Firestore.` };
-      } catch (err) {
-        console.warn("⚠️ [PkpDataService] Gagal memproses aksi PCK di Firestore, fallback ke Apps Script:", err);
       }
+
+      return { success: true, message: `Aksi ${cleanAksi} laporan PCK berhasil diproses di Cloud Firestore.` };
     }
 
     // Fallback ke Google Script
@@ -241,21 +245,15 @@ const PkpDataService = {
 
     // 1. Simpan langsung ke Cloud Firestore jika siap
     if (typeof TranskepFirebase !== 'undefined' && TranskepFirebase.isReady()) {
-      try {
-        const firestoreRes = await TranskepFirebase.savePkpToFirestore(payload);
-        const docId = firestoreRes.id_pkp || firestoreRes.id;
+      const firestoreRes = await TranskepFirebase.savePkpToFirestore(payload);
+      const docId = firestoreRes.id_pkp || firestoreRes.id;
 
-        // TAHAP 83: Penulisan baris ke sheet pkp_dokumen & pkp_rencana diputus total. 100% mandiri di Cloud Firestore.
-
-        return {
-          success: true,
-          status: 'success',
-          id_pkp: docId,
-          message: 'Dokumen Perjanjian Kinerja (PK) berhasil diamankan di Cloud Firestore.'
-        };
-      } catch (err) {
-        console.warn("⚠️ [PkpDataService] Gagal simpan PK ke Firestore, fallback ke Apps Script:", err);
-      }
+      return {
+        success: true,
+        status: 'success',
+        id_pkp: docId,
+        message: 'Dokumen Perjanjian Kinerja (PK) berhasil diamankan di Cloud Firestore.'
+      };
     }
 
     // 2. Fallback ke Google Script jika Firestore tidak aktif
@@ -287,7 +285,7 @@ const PkpDataService = {
    * @returns {Promise<Object>} Respon detail { success, targets, message }
    */
   async getDetailLengkapPCK(nipTarget, blnText, thn, currentNip, token) {
-    const cleanNip = String(nipTarget || currentNip || '').replace(/'/g, '').trim();
+    const cleanNip = String(nipTarget || currentNip || '').replace(/['"\s]/g, '').trim();
     const tahunStr = String(thn || new Date().getFullYear()).trim();
     const bulanStr = String(blnText || '').trim();
 
@@ -295,66 +293,112 @@ const PkpDataService = {
     if (typeof TranskepFirebase !== 'undefined' && TranskepFirebase.isReady()) {
       try {
         const db = TranskepFirebase.getDb();
+        const caller = (typeof TranskepFirebase.getCallerIdentity === 'function')
+          ? TranskepFirebase.getCallerIdentity()
+          : { nip: String(currentNip || '').replace(/['"\s]/g, '').trim(), isAdmin: false };
+        const norm = (v) => String(v || '').replace(/['"\s]/g, '').trim();
+
+        const findLocalPkp = () => {
+          const pool = [
+            ...((typeof window !== 'undefined' && window.vueState && Array.isArray(window.vueState.pkpDokumen)) ? window.vueState.pkpDokumen : []),
+            ...((typeof state !== 'undefined' && Array.isArray(state.pkpDokumen)) ? state.pkpDokumen : [])
+          ];
+          return pool.find(p => norm(p.nip || p.nip_pegawai) === cleanNip && String(p.tahun || '').trim() === tahunStr)
+            || pool.find(p => norm(p.nip || p.nip_pegawai) === cleanNip)
+            || null;
+        };
+        const findLocalPck = () => {
+          const pool = [
+            ...((typeof window !== 'undefined' && window.vueState && Array.isArray(window.vueState.pckDokumen)) ? window.vueState.pckDokumen : []),
+            ...((typeof state !== 'undefined' && Array.isArray(state.pckDokumen)) ? state.pckDokumen : [])
+          ];
+          return pool.find(p => norm(p.nip || p.nip_pegawai) === cleanNip && String(p.tahun || '').trim() === tahunStr && String(p.bulan || '').trim().toLowerCase() === bulanStr.toLowerCase())
+            || null;
+        };
+
+        let pkData = null;
         if (db) {
-          // Cari dokumen PK tahunan untuk mendapatkan target dan sasaran dasar
           const idPkp = 'PKP_' + tahunStr + '_' + cleanNip;
-          let pkDocSnap = await db.collection(TranskepFirebase.PKP_COLLECTION).doc(idPkp).get();
-          let pkData = pkDocSnap.exists ? pkDocSnap.data() : null;
+          try {
+            const pkDocSnap = await db.collection(TranskepFirebase.PKP_COLLECTION).doc(idPkp).get();
+            if (pkDocSnap.exists) pkData = pkDocSnap.data();
+          } catch (ePkDoc) {}
+
+          if (!pkData) pkData = findLocalPkp();
 
           if (!pkData) {
-            const pkQuery = await db.collection(TranskepFirebase.PKP_COLLECTION)
-              .where('tahun', '==', tahunStr)
-              .where('nip_pegawai', '==', cleanNip)
-              .limit(1)
-              .get();
-            if (!pkQuery.empty) {
-              pkData = pkQuery.docs[0].data();
-            }
+            try {
+              let pkQueryRef = db.collection(TranskepFirebase.PKP_COLLECTION)
+                .where('tahun', '==', tahunStr)
+                .where('nip_pegawai', '==', cleanNip);
+              if (!caller.isAdmin && caller.nip && caller.nip !== cleanNip) {
+                pkQueryRef = pkQueryRef.where('nip_penilai', '==', caller.nip);
+              }
+              const pkQuery = await pkQueryRef.limit(1).get();
+              if (!pkQuery.empty) {
+                pkData = pkQuery.docs[0].data();
+              }
+            } catch (ePkQ) {}
           }
+        } else {
+          pkData = findLocalPkp();
+        }
 
-          if (pkData && Array.isArray(pkData.items) && pkData.items.length > 0) {
-            const targets = pkData.items.map((it, idx) => ({
-              id_item: it.id_item || ('ITM_' + (idx + 1)),
-              sasaran: it.sasaran || '-',
-              indikator: it.indikator || '-',
-              kuantitas: it.kuantitas || 1,
-              satuan: it.satuan || 'Dokumen',
-              mutu: it.mutu || 100,
-              real_kuantitas: '',
-              real_mutu: '',
-              capaian: '-'
-            }));
+        if (pkData && Array.isArray(pkData.items) && pkData.items.length > 0) {
+          const targets = pkData.items.map((it, idx) => ({
+            id_item: it.id_item || ('ITM_' + (idx + 1)),
+            sasaran: it.sasaran || '-',
+            indikator: it.indikator || '-',
+            kuantitas: it.kuantitas || 1,
+            satuan: it.satuan || 'Dokumen',
+            mutu: it.mutu || 100,
+            real_kuantitas: '',
+            real_mutu: '',
+            capaian: '-'
+          }));
 
-            // Cari dokumen PCK bulanan yang tersimpan untuk pegawai & bulan ini
+          // Cari dokumen PCK bulanan yang tersimpan untuk pegawai & bulan ini
+          let pckData = null;
+          if (db) {
             const idPck = 'PCK_' + tahunStr + '_' + bulanStr + '_' + cleanNip;
-            let pckDocSnap = await db.collection(TranskepFirebase.PCK_COLLECTION).doc(idPck).get();
-            let pckData = pckDocSnap.exists ? pckDocSnap.data() : null;
+            try {
+              const pckDocSnap = await db.collection(TranskepFirebase.PCK_COLLECTION).doc(idPck).get();
+              if (pckDocSnap.exists) pckData = pckDocSnap.data();
+            } catch (ePckDoc) {}
+
+            if (!pckData) pckData = findLocalPck();
 
             if (!pckData) {
-              const pckQuery = await db.collection(TranskepFirebase.PCK_COLLECTION)
-                .where('tahun', '==', tahunStr)
-                .where('bulan', '==', bulanStr)
-                .where('nip_pegawai', '==', cleanNip)
-                .limit(1)
-                .get();
-              if (!pckQuery.empty) {
-                pckData = pckQuery.docs[0].data();
-              }
-            }
-
-            if (pckData && Array.isArray(pckData.realisasi)) {
-              targets.forEach(t => {
-                const match = pckData.realisasi.find(r => String(r.id_item_pk) === String(t.id_item));
-                if (match) {
-                  t.real_kuantitas = match.real_kuantitas !== undefined ? match.real_kuantitas : '';
-                  t.real_mutu = match.real_mutu !== undefined ? match.real_mutu : '';
-                  t.capaian = match.capaian || '-';
+              try {
+                let pckQueryRef = db.collection(TranskepFirebase.PCK_COLLECTION)
+                  .where('tahun', '==', tahunStr)
+                  .where('bulan', '==', bulanStr)
+                  .where('nip_pegawai', '==', cleanNip);
+                if (!caller.isAdmin && caller.nip && caller.nip !== cleanNip) {
+                  pckQueryRef = pckQueryRef.where('nip_penilai', '==', caller.nip);
                 }
-              });
+                const pckQuery = await pckQueryRef.limit(1).get();
+                if (!pckQuery.empty) {
+                  pckData = pckQuery.docs[0].data();
+                }
+              } catch (ePckQ) {}
             }
-
-            return { success: true, targets: targets };
+          } else {
+            pckData = findLocalPck();
           }
+
+          if (pckData && Array.isArray(pckData.realisasi)) {
+            targets.forEach(t => {
+              const match = pckData.realisasi.find(r => String(r.id_item_pk) === String(t.id_item));
+              if (match) {
+                t.real_kuantitas = match.real_kuantitas !== undefined ? match.real_kuantitas : '';
+                t.real_mutu = match.real_mutu !== undefined ? match.real_mutu : '';
+                t.capaian = match.capaian || '-';
+              }
+            });
+          }
+
+          return { success: true, targets: targets };
         }
       } catch (err) {
         console.warn("⚠️ [PkpDataService] Gagal fetch detail PCK dari Firestore:", err);
@@ -388,21 +432,15 @@ const PkpDataService = {
 
     // 1. Simpan langsung ke Cloud Firestore jika siap
     if (typeof TranskepFirebase !== 'undefined' && TranskepFirebase.isReady()) {
-      try {
-        const firestoreRes = await TranskepFirebase.savePckToFirestore(payload);
-        const docId = firestoreRes.id_pck || firestoreRes.id;
+      const firestoreRes = await TranskepFirebase.savePckToFirestore(payload);
+      const docId = firestoreRes.id_pck || firestoreRes.id;
 
-        // TAHAP 83: Penulisan baris ke sheet pck_dokumen & pck_realisasi diputus total. 100% mandiri di Cloud Firestore.
-
-        return {
-          success: true,
-          status: 'success',
-          id_pck: docId,
-          message: 'Laporan Capaian Kinerja (PCK) berhasil diamankan di Cloud Firestore.'
-        };
-      } catch (err) {
-        console.warn("⚠️ [PkpDataService] Gagal simpan PCK ke Firestore, fallback ke Apps Script:", err);
-      }
+      return {
+        success: true,
+        status: 'success',
+        id_pck: docId,
+        message: 'Laporan Capaian Kinerja (PCK) berhasil diamankan di Cloud Firestore.'
+      };
     }
 
     // 2. Fallback ke Google Script jika Firestore tidak aktif

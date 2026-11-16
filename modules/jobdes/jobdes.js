@@ -97,8 +97,8 @@ function escapeHtml(str) {
           return (this.importDocx.filesQueue || []).filter(f => !f.matched || !f.nip).length;
         },
         hasAdminAccess() {
-          const role = (this.globalState.user?.role || "").toLowerCase();
-          return role === "" || role.includes('admin') || role.includes('operator') || role.includes('super');
+          const role = (this.globalState.user?.role || "").toLowerCase().trim();
+          return role.includes('admin') || role.includes('operator') || role.includes('super');
         },
         hasAtasanAccess() {
           const role = (this.globalState.user?.role || "").toLowerCase();

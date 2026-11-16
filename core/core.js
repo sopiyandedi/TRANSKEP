@@ -353,11 +353,11 @@ const SessionIntegrityGuard = {
       if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length > 0) {
         firebase.firestore().collection('security_incidents').add({
           waktu: new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }),
-          url: window.location.href,
-          userAgent: navigator.userAgent,
+          url: String(window.location.href || '').slice(0, 1500),
+          userAgent: String(navigator.userAgent || '').slice(0, 480),
           jenis_pelanggaran: 'LOCALSTORAGE_TAMPERING_DETECTED',
           nip: 'SECURITY_SYSTEM',
-          detail: detail,
+          detail: String(detail || '').slice(0, 950),
           timestamp: firebase.firestore.FieldValue.serverTimestamp()
         }).catch(() => {});
       }
@@ -1059,8 +1059,8 @@ const LoginRateLimiter = {
         if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length > 0) {
           firebase.firestore().collection('security_incidents').add({
             waktu: new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }),
-            url: window.location.href,
-            userAgent: navigator.userAgent,
+            url: String(window.location.href || '').slice(0, 1500),
+            userAgent: String(navigator.userAgent || '').slice(0, 480),
             jenis_pelanggaran: 'RATE_LIMIT_LOCKOUT',
             nip: 'SECURITY_SYSTEM',
             detail: 'Login gagal 3 kali. Cooldown 60 detik.',

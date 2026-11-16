@@ -70,18 +70,20 @@ rules_version = '2';
 //   - updated_by: string (optional, <=150)
 //   - is_firebase: bool (optional)
 //   - updated_at: timestamp (required)
+//   - created_at: timestamp (optional, immutable if present)
 //
 // Collection: jobdes_usulan
 // Document ID: {docId} (matches field `id`, e.g. "USUL-...")
 // Fields:
 //   - id: string (required, 1..120, immutable)
 //   - nip_pegawai: string (required, 1..30, immutable)
+//   - pengusul_nip: string (optional, <=30)
 //   - nama_pegawai: string (required, 1..150)
 //   - nama_pengusul: string (required, 1..150)
 //   - isi_usulan: string (required, 1..4000)
 //   - status: string (required, 'Menunggu' on create; 'Menunggu'|'Selesai' on admin update)
 //   - is_firebase: bool (optional)
-//   - created_at: timestamp (required, immutable)
+//   - created_at: timestamp (required on create, immutable on update if timestamp)
 //   - completed_at: timestamp (optional)
 //
 // Collection: master_kinerja
@@ -183,7 +185,7 @@ rules_version = '2';
 //   - pejabat_ttd: string (optional, <=100)
 //   - status: string (required, 1..50)
 //   - data_ekstra: string (<=30000) or map (<=50) (optional)
-//   - created_by: string (optional, <=30)
+//   - created_by: string (optional for Admin/Operator, required == uid() non-empty for non-admin, <=30)
 //   - is_firebase: bool (optional)
 //   - updated_at: timestamp (required)
 //   - created_at: timestamp (optional, immutable if present)
@@ -192,7 +194,7 @@ rules_version = '2';
 // Document ID: {docId} (auto-generated via .add())
 // Fields:
 //   - waktu: string (optional, <=100)
-//   - url: string (optional, <=500)
+//   - url: string (optional, <=2000)
 //   - userAgent: string (optional, <=500)
 //   - jenis_pelanggaran: string (required, 1..100)
 //   - nip: string (optional, <=50)
@@ -231,6 +233,10 @@ service cloud.firestore {
 
     function isAdminOrOperator() {
       return isAuthenticated() && roleLower() in ['admin', 'super admin', 'administrator', 'operator'];
+    }
+
+    function isApproverRole() {
+      return isAuthenticated() && roleLower() in ['atasan langsung', 'pejabat berwenang', 'ketua'];
     }
 
     function isFieldOwner(data, field) {
@@ -288,8 +294,12 @@ service cloud.firestore {
       return !(field in data) || data[field] is bool;
     }
 
+    function isValidTimestamp(val) {
+      return val is timestamp;
+    }
+
     function isValidOptionalTimestamp(data, field) {
-      return !(field in data) || data[field] is timestamp;
+      return !(field in data) || isValidTimestamp(data[field]);
     }
 
     function isValidCreatedAtOnUpdate(oldData, newData) {
@@ -307,16 +317,19 @@ service cloud.firestore {
              newData.acknowledgments is list &&
              newSize >= oldSize &&
              newSize <= 500 &&
-             (!('acknowledgments' in oldData) || newData.acknowledgments.hasAll(oldData.acknowledgments)) &&
+             (!('acknowledgments' in oldData && oldData.acknowledgments is list) || newData.acknowledgments.hasAll(oldData.acknowledgments)) &&
              newSize <= oldSize + 1 &&
              (newSize == oldSize ||
               (newData.acknowledgments[newSize - 1] is map &&
+               newData.acknowledgments[newSize - 1].keys().hasAll(['nip', 'tanggal_baca']) &&
                newData.acknowledgments[newSize - 1].keys().hasOnly(['nip', 'tanggal_baca']) &&
                newData.acknowledgments[newSize - 1].nip is string &&
+               newData.acknowledgments[newSize - 1].nip.size() >= 1 &&
                newData.acknowledgments[newSize - 1].nip.size() <= 30 &&
+               newData.acknowledgments[newSize - 1].nip == uid() &&
                newData.acknowledgments[newSize - 1].tanggal_baca is string &&
                newData.acknowledgments[newSize - 1].tanggal_baca.size() <= 50)) &&
-             newData.updated_at is timestamp;
+             isValidTimestamp(newData.updated_at);
     }
 
     // =========================================================================
@@ -380,7 +393,7 @@ service cloud.firestore {
       let allowed = [
         'nip', 'atasan_nip', 'dasar_lampiran', 'ikhtisar_jabatan', 'tugas_pokok',
         'tugas_tambahan', 'wewenang', 'tanggung_jawab', 'hasil_kerja',
-        'bawahan_langsung', 'updated_by', 'is_firebase', 'updated_at'
+        'bawahan_langsung', 'updated_by', 'is_firebase', 'updated_at', 'created_at'
       ];
       return hasRequiredFields(['nip', 'updated_at']) &&
              hasOnlyAllowedFields(allowed) &&
@@ -396,24 +409,26 @@ service cloud.firestore {
              isValidOptionalString(data, 'bawahan_langsung', 0, 10000) &&
              isValidOptionalString(data, 'updated_by', 0, 150) &&
              isValidOptionalBool(data, 'is_firebase') &&
-             data.updated_at is timestamp;
+             isValidTimestamp(data.updated_at) &&
+             isValidOptionalTimestamp(data, 'created_at');
     }
 
     function isValidJobdesUsulan(data, docId) {
       let allowed = [
-        'id', 'nip_pegawai', 'nama_pegawai', 'nama_pengusul', 'isi_usulan',
+        'id', 'nip_pegawai', 'pengusul_nip', 'nama_pegawai', 'nama_pengusul', 'isi_usulan',
         'status', 'is_firebase', 'created_at', 'completed_at'
       ];
-      return hasRequiredFields(['id', 'nip_pegawai', 'nama_pegawai', 'nama_pengusul', 'isi_usulan', 'status', 'created_at']) &&
+      return hasRequiredFields(['id', 'nip_pegawai', 'nama_pegawai', 'nama_pengusul', 'isi_usulan', 'status']) &&
              hasOnlyAllowedFields(allowed) &&
              data.id is string && data.id == docId && data.id.size() >= 1 && data.id.size() <= 120 &&
              data.nip_pegawai is string && data.nip_pegawai.size() >= 1 && data.nip_pegawai.size() <= 30 &&
+             isValidOptionalString(data, 'pengusul_nip', 0, 30) &&
              data.nama_pegawai is string && data.nama_pegawai.size() >= 1 && data.nama_pegawai.size() <= 150 &&
              data.nama_pengusul is string && data.nama_pengusul.size() >= 1 && data.nama_pengusul.size() <= 150 &&
              data.isi_usulan is string && data.isi_usulan.size() > 0 && data.isi_usulan.size() <= 4000 &&
              data.status in ['Menunggu', 'Selesai'] &&
              isValidOptionalBool(data, 'is_firebase') &&
-             data.created_at is timestamp &&
+             (!('created_at' in data) || isValidTimestamp(data.created_at) || (data.created_at is string && data.created_at.size() <= 50)) &&
              isValidOptionalTimestamp(data, 'completed_at');
     }
 
@@ -464,17 +479,38 @@ service cloud.firestore {
              isValidOptionalTimestamp(data, 'created_at');
     }
 
-    function isValidPkpNonAdminUpdate(oldData, newData) {
-      return newData.nip_pegawai == oldData.nip_pegawai &&
-             (!('nip' in newData) || newData.nip == oldData.nip_pegawai) &&
-             areImmutableFieldsUnchanged(['id_pkp', 'nip_pegawai', 'tahun']) &&
-             isValidCreatedAtOnUpdate(oldData, newData) &&
-             (oldData.status == 'Draft' || areImmutableFieldsUnchanged(['nip_penilai', 'nip_atasan_pejabat'])) &&
+    function isValidPkpStatusTransition(oldData, newData) {
+      return ('status' in oldData) &&
              (
                (oldData.status == 'Draft' && isFieldOwner(oldData, 'nip_pegawai') && newData.status in ['Draft', 'Menunggu Penilai']) ||
                (oldData.status == 'Menunggu Penilai' && isFieldOwner(oldData, 'nip_penilai') && newData.status in ['Menunggu Atasan Penilai', 'Draft']) ||
-               (oldData.status == 'Menunggu Atasan Penilai' && isFieldOwner(oldData, 'nip_atasan_pejabat') && newData.status in ['Disetujui', 'Draft'])
+               (oldData.status == 'Dikirim' && isFieldOwner(oldData, 'nip_penilai') && newData.status in ['Menunggu Atasan Penilai', 'Disetujui', 'Draft']) ||
+               (oldData.status in ['Menunggu Atasan Penilai', 'Dikirim'] && isFieldOwner(oldData, 'nip_atasan_pejabat') && newData.status in ['Disetujui', 'Draft'])
              );
+    }
+
+    function isValidPkpStatusOnlyUpdate(oldData, newData) {
+      let validStatuses = ['Draft', 'Menunggu Penilai', 'Menunggu Atasan Penilai', 'Dikirim', 'Disetujui', 'Final'];
+      let changed = newData.diff(oldData).affectedKeys();
+      return changed.hasOnly(['status', 'updated_at', 'last_action_by']) &&
+             ('status' in newData) &&
+             newData.status in validStatuses &&
+             ('updated_at' in newData) &&
+             isValidTimestamp(newData.updated_at) &&
+             (!changed.hasAny(['last_action_by']) ||
+              (isValidOptionalString(newData, 'last_action_by', 0, 30) &&
+               (isAdminOrOperator() || !('last_action_by' in newData) || newData.last_action_by == '' || newData.last_action_by == uid()))) &&
+             (isAdminOrOperator() ||
+              (isPkpParticipant(oldData) && isValidPkpStatusTransition(oldData, newData)));
+    }
+
+    function isValidPkpNonAdminUpdate(oldData, newData) {
+      return newData.nip_pegawai == oldData.nip_pegawai &&
+             (!('nip' in newData) || newData.nip == oldData.nip_pegawai || !newData.diff(oldData).affectedKeys().hasAny(['nip'])) &&
+             areImmutableFieldsUnchanged(['id_pkp', 'nip_pegawai', 'tahun']) &&
+             isValidCreatedAtOnUpdate(oldData, newData) &&
+             (oldData.status == 'Draft' || areImmutableFieldsUnchanged(['nip_penilai', 'nip_atasan_pejabat'])) &&
+             isValidPkpStatusTransition(oldData, newData);
     }
 
     function isValidPckDocument(data, docId) {
@@ -506,16 +542,38 @@ service cloud.firestore {
              isValidOptionalTimestamp(data, 'created_at');
     }
 
+    function isValidPckStatusTransition(oldData, newData) {
+      return ('status' in oldData) &&
+             (
+               (oldData.status == 'Draft' && isFieldOwner(oldData, 'nip_pegawai') && newData.status in ['Draft', 'Menunggu Penilai']) ||
+               (oldData.status in ['Menunggu Penilai', 'Dikirim'] &&
+                (isFieldOwner(oldData, 'nip_penilai') || isFieldOwner(oldData, 'nip_atasan_pejabat')) &&
+                newData.status in ['Disetujui', 'Draft'])
+             );
+    }
+
+    function isValidPckStatusOnlyUpdate(oldData, newData) {
+      let validStatuses = ['Draft', 'Menunggu Penilai', 'Menunggu Atasan Penilai', 'Dikirim', 'Disetujui', 'Final'];
+      let changed = newData.diff(oldData).affectedKeys();
+      return changed.hasOnly(['status', 'updated_at', 'last_action_by']) &&
+             ('status' in newData) &&
+             newData.status in validStatuses &&
+             ('updated_at' in newData) &&
+             isValidTimestamp(newData.updated_at) &&
+             (!changed.hasAny(['last_action_by']) ||
+              (isValidOptionalString(newData, 'last_action_by', 0, 30) &&
+               (isAdminOrOperator() || !('last_action_by' in newData) || newData.last_action_by == '' || newData.last_action_by == uid()))) &&
+             (isAdminOrOperator() ||
+              (isPkpParticipant(oldData) && isValidPckStatusTransition(oldData, newData)));
+    }
+
     function isValidPckNonAdminUpdate(oldData, newData) {
       return newData.nip_pegawai == oldData.nip_pegawai &&
-             (!('nip' in newData) || newData.nip == oldData.nip_pegawai) &&
+             (!('nip' in newData) || newData.nip == oldData.nip_pegawai || !newData.diff(oldData).affectedKeys().hasAny(['nip'])) &&
              areImmutableFieldsUnchanged(['id_pck', 'nip_pegawai', 'bulan', 'tahun']) &&
              isValidCreatedAtOnUpdate(oldData, newData) &&
              (oldData.status == 'Draft' || areImmutableFieldsUnchanged(['nip_penilai', 'nip_atasan_pejabat'])) &&
-             (
-               (oldData.status == 'Draft' && isFieldOwner(oldData, 'nip_pegawai') && newData.status in ['Draft', 'Menunggu Penilai']) ||
-               (oldData.status == 'Menunggu Penilai' && (isFieldOwner(oldData, 'nip_penilai') || isFieldOwner(oldData, 'nip_atasan_pejabat')) && newData.status in ['Disetujui', 'Draft'])
-             );
+             isValidPckStatusTransition(oldData, newData);
     }
 
     function isValidPckRekapitulasi(data, docId) {
@@ -628,7 +686,7 @@ service cloud.firestore {
       return hasRequiredFields(['jenis_pelanggaran', 'detail', 'timestamp']) &&
              hasOnlyAllowedFields(allowed) &&
              isValidOptionalString(data, 'waktu', 0, 100) &&
-             (!('url' in data) || (data.url is string && data.url.size() <= 500)) &&
+             isValidOptionalString(data, 'url', 0, 2000) &&
              isValidOptionalString(data, 'userAgent', 0, 500) &&
              data.jenis_pelanggaran is string && data.jenis_pelanggaran.size() >= 1 && data.jenis_pelanggaran.size() <= 100 &&
              isValidOptionalString(data, 'nip', 0, 50) &&
@@ -641,28 +699,30 @@ service cloud.firestore {
     // =========================================================================
 
     // 1. Surat Keputusan (SK) - All employees read; Admin/Operator manage;
-    //    employees may append read acknowledgments only.
+    //    employees may append read acknowledgments only (bypasses legacy schema on ack-only updates).
     match /sk_documents/{docId} {
       allow read: if isAuthenticated();
       allow create: if isAdminOrOperator() &&
                        isValidSkDocument(request.resource.data, docId);
-      allow update: if isValidSkDocument(request.resource.data, docId) &&
-                       areImmutableFieldsUnchanged(['id']) &&
-                       isValidCreatedAtOnUpdate(resource.data, request.resource.data) &&
-                       (isAdminOrOperator() || (isAuthenticated() && isValidAckAppend(resource.data, request.resource.data)));
+      allow update: if (isAuthenticated() && isValidAckAppend(resource.data, request.resource.data)) ||
+                       (isAdminOrOperator() &&
+                        isValidSkDocument(request.resource.data, docId) &&
+                        areImmutableFieldsUnchanged(['id']) &&
+                        isValidCreatedAtOnUpdate(resource.data, request.resource.data));
       allow delete: if isAdminOrOperator();
     }
 
     // 2. Standar Operasional Prosedur (SOP) - All employees read; Admin/Operator
-    //    manage; employees may append read acknowledgments only.
+    //    manage; employees may append read acknowledgments only (bypasses legacy schema on ack-only updates).
     match /sop_documents/{docId} {
       allow read: if isAuthenticated();
       allow create: if isAdminOrOperator() &&
                        isValidSopDocument(request.resource.data, docId);
-      allow update: if isValidSopDocument(request.resource.data, docId) &&
-                       areImmutableFieldsUnchanged(['id']) &&
-                       isValidCreatedAtOnUpdate(resource.data, request.resource.data) &&
-                       (isAdminOrOperator() || (isAuthenticated() && isValidAckAppend(resource.data, request.resource.data)));
+      allow update: if (isAuthenticated() && isValidAckAppend(resource.data, request.resource.data)) ||
+                       (isAdminOrOperator() &&
+                        isValidSopDocument(request.resource.data, docId) &&
+                        areImmutableFieldsUnchanged(['id']) &&
+                        isValidCreatedAtOnUpdate(resource.data, request.resource.data));
       allow delete: if isAdminOrOperator();
     }
 
@@ -674,23 +734,40 @@ service cloud.firestore {
                        isValidJobdesDocument(request.resource.data, docId);
       allow update: if isAdminOrOperator() &&
                        isValidJobdesDocument(request.resource.data, docId) &&
-                       areImmutableFieldsUnchanged(['nip']);
+                       areImmutableFieldsUnchanged(['nip']) &&
+                       isValidCreatedAtOnUpdate(resource.data, request.resource.data);
       allow delete: if isAdminOrOperator();
     }
 
-    // 4. Usulan Reposisi Jobdes - Employees read/submit their own 'Menunggu'
-    //    proposals; Admin/Operator manage and complete proposals.
+    // 4. Usulan Reposisi Jobdes - Employees/Approvers submit 'Menunggu' proposals;
+    //    target employee, proposer, or Admin/Operator may read; Admin/Operator manage and complete proposals.
     match /jobdes_usulan/{docId} {
       allow read: if isAdminOrOperator() ||
-                     (isAuthenticated() && isFieldOwner(resource.data, 'nip_pegawai'));
+                     (isAuthenticated() &&
+                      (isFieldOwner(resource.data, 'nip_pegawai') ||
+                       isFieldOwner(resource.data, 'pengusul_nip')));
       allow create: if isAuthenticated() &&
                        isValidJobdesUsulan(request.resource.data, docId) &&
-                       (isAdminOrOperator() || isFieldOwner(request.resource.data, 'nip_pegawai')) &&
+                       (isAdminOrOperator() ||
+                        (
+                          (!('pengusul_nip' in request.resource.data) ||
+                           request.resource.data.pengusul_nip == '' ||
+                           isFieldOwner(request.resource.data, 'pengusul_nip')) &&
+                          (isApproverRole() ||
+                           isFieldOwner(request.resource.data, 'nip_pegawai') ||
+                           isFieldOwner(request.resource.data, 'pengusul_nip'))
+                        )) &&
                        request.resource.data.status == 'Menunggu' &&
+                       ('created_at' in request.resource.data) &&
+                       isValidTimestamp(request.resource.data.created_at) &&
                        !('completed_at' in request.resource.data);
       allow update: if isAdminOrOperator() &&
                        isValidJobdesUsulan(request.resource.data, docId) &&
-                       areImmutableFieldsUnchanged(['id', 'nip_pegawai', 'created_at']) &&
+                       (!('id' in resource.data) || resource.data.id == null || resource.data.id == '' || request.resource.data.id == resource.data.id) &&
+                       areImmutableFieldsUnchanged(['nip_pegawai']) &&
+                       (!('created_at' in resource.data) ||
+                        !(resource.data.created_at is timestamp) ||
+                        request.resource.data.created_at == resource.data.created_at) &&
                        ((resource.data.status == 'Menunggu' && request.resource.data.status in ['Menunggu', 'Selesai']) ||
                         resource.data.status == request.resource.data.status);
       allow delete: if isAdminOrOperator();
@@ -720,10 +797,13 @@ service cloud.firestore {
                          (!('nip' in request.resource.data) || request.resource.data.nip == uid()) &&
                          request.resource.data.status in ['Draft', 'Menunggu Penilai']));
       allow update: if isAuthenticated() &&
-                       isValidPkpDocument(request.resource.data, docId) &&
-                       (isAdminOrOperator() ||
-                        (isPkpParticipant(resource.data) &&
-                         isValidPkpNonAdminUpdate(resource.data, request.resource.data)));
+                       (
+                         isValidPkpStatusOnlyUpdate(resource.data, request.resource.data) ||
+                         (isValidPkpDocument(request.resource.data, docId) &&
+                          (isAdminOrOperator() ||
+                           (isPkpParticipant(resource.data) &&
+                            isValidPkpNonAdminUpdate(resource.data, request.resource.data))))
+                       );
       allow delete: if isAdminOrOperator() ||
                        (isAuthenticated() &&
                         isFieldOwner(resource.data, 'nip_pegawai') &&
@@ -742,10 +822,13 @@ service cloud.firestore {
                          (!('nip' in request.resource.data) || request.resource.data.nip == uid()) &&
                          request.resource.data.status in ['Draft', 'Menunggu Penilai']));
       allow update: if isAuthenticated() &&
-                       isValidPckDocument(request.resource.data, docId) &&
-                       (isAdminOrOperator() ||
-                        (isPkpParticipant(resource.data) &&
-                         isValidPckNonAdminUpdate(resource.data, request.resource.data)));
+                       (
+                         isValidPckStatusOnlyUpdate(resource.data, request.resource.data) ||
+                         (isValidPckDocument(request.resource.data, docId) &&
+                          (isAdminOrOperator() ||
+                           (isPkpParticipant(resource.data) &&
+                            isValidPckNonAdminUpdate(resource.data, request.resource.data))))
+                       );
       allow delete: if isAdminOrOperator() ||
                        (isAuthenticated() &&
                         isFieldOwner(resource.data, 'nip_pegawai') &&
@@ -791,24 +874,26 @@ service cloud.firestore {
     }
 
     // 11. Surat Tugas, SPD & Plh - Authenticated users read (Dashboard & ST);
-    //     creator or Admin/Operator may create, update, and delete.
+    //     non-empty creator or Admin/Operator may create, update, and delete.
     match /surat_tugas_documents/{docId} {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated() &&
                        isValidSuratTugas(request.resource.data, docId) &&
                        (isAdminOrOperator() ||
-                        !('created_by' in request.resource.data) ||
-                        request.resource.data.created_by == '' ||
-                        request.resource.data.created_by == uid());
+                        (isFieldOwner(request.resource.data, 'created_by') &&
+                         request.resource.data.created_by.size() >= 1));
       allow update: if isAuthenticated() &&
                        isValidSuratTugas(request.resource.data, docId) &&
                        areImmutableFieldsUnchanged(['id']) &&
                        isValidCreatedAtOnUpdate(resource.data, request.resource.data) &&
                        (isAdminOrOperator() ||
-                        ((!('created_by' in resource.data) || resource.data.created_by == '' || resource.data.created_by == uid()) &&
-                         (!('created_by' in request.resource.data) || request.resource.data.created_by == '' || request.resource.data.created_by == uid())));
+                        (isFieldOwner(resource.data, 'created_by') &&
+                         resource.data.created_by.size() >= 1 &&
+                         areImmutableFieldsUnchanged(['created_by'])));
       allow delete: if isAdminOrOperator() ||
-                       (isAuthenticated() && isFieldOwner(resource.data, 'created_by'));
+                       (isAuthenticated() &&
+                        isFieldOwner(resource.data, 'created_by') &&
+                        resource.data.created_by.size() >= 1);
     }
 
     // 12. Security Incidents Audit Log - Allows strictly schema-bounded pre-auth

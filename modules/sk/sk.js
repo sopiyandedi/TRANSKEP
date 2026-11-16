@@ -489,33 +489,43 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
                 
                 try {
-                    let res = null;
-                    if (typeof TranskepFirebase !== 'undefined' && TranskepFirebase.isReady()) {
-                        const firestorePayload = {
-                            id: payload.id || ('SK-' + Date.now()),
-                            no_sk: payload.no_sk,
-                            judul_sk: payload.judul_sk,
-                            pj_sk: payload.pj_sk,
-                            tgl_sk: payload.tgl_sk,
-                            tgl_input: payload.tgl_input || new Date().toISOString().split('T')[0],
-                            link_drive: payload.link_drive || '',
-                            status: "Aktif",
-                            versi_aktif: 1,
-                            members: this.tempMembers || [],
-                            revisi_history: [{
-                                versi: 1,
-                                tgl_revisi: payload.tgl_sk || new Date().toISOString().split('T')[0],
-                                catatan: "Pendaftaran SK Baru via Form Input",
-                                oleh: (this.globalState.user ? this.globalState.user.nama : "Admin")
-                            }]
-                        };
-                        await TranskepFirebase.saveSkToFirestore(firestorePayload);
-                    }
+                    const isEdit = (this.modalSkMode === 'edit' && !!payload.id);
+                    const existingSk = isEdit ? (this.groupedSkData || []).find(s => String(s.id) === String(payload.id)) : null;
+                    const docId = isEdit ? String(payload.id).trim() : ('SK-' + Date.now());
+                    const rawLink = String(payload.link_drive || '').trim();
+                    const cleanLink = (rawLink === '#') ? '-' : rawLink;
+                    const actorName = (this.globalState.user ? this.globalState.user.nama : "Admin");
+                    const revHistory = (existingSk && Array.isArray(existingSk.revisi_history) && existingSk.revisi_history.length > 0)
+                        ? existingSk.revisi_history
+                        : [{
+                            versi: (existingSk && Number(existingSk.versi_aktif)) || 1,
+                            tgl_revisi: payload.tgl_sk || new Date().toISOString().split('T')[0],
+                            catatan: isEdit ? "Pembaruan SK via Form Input" : "Pendaftaran SK Baru via Form Input",
+                            oleh: actorName
+                        }];
 
-                    if (typeof google !== 'undefined' && google.script && google.script.run) {
-                        res = await window.SkDataService.saveSk(payload, this.globalState.user.nip, token);
+                    const canonicalPayload = {
+                        ...payload,
+                        id: docId,
+                        tgl_input: payload.tgl_input || new Date().toISOString().split('T')[0],
+                        link_drive: cleanLink,
+                        status: (existingSk && existingSk.status) || "Aktif",
+                        versi_aktif: (existingSk && Number(existingSk.versi_aktif)) || 1,
+                        naskah_utama: (existingSk && existingSk.naskah_utama) ? existingSk.naskah_utama : null,
+                        lampiran: (existingSk && Array.isArray(existingSk.lampiran)) ? existingSk.lampiran : [],
+                        template_gdoc_id: (existingSk && existingSk.template_gdoc_id) || '',
+                        members: this.tempMembers || [],
+                        revisi_history: revHistory
+                    };
+
+                    let res = null;
+                    if (window.SkDataService && typeof window.SkDataService.saveSk === 'function') {
+                        res = await window.SkDataService.saveSk(canonicalPayload, this.globalState.user.nip, token);
+                    } else if (typeof TranskepFirebase !== 'undefined' && TranskepFirebase.isReady()) {
+                        await TranskepFirebase.saveSkToFirestore(canonicalPayload);
+                        res = { status: 'success', id: docId, message: 'Data SK berhasil disimpan ke Cloud Firestore.' };
                     } else {
-                        res = { status: 'success', message: 'Data SK berhasil disimpan ke Cloud Firestore.' };
+                        throw new Error("Layanan penyimpanan SK belum siap.");
                     }
 
                     this.isUploading = false;
@@ -569,24 +579,33 @@ document.addEventListener("DOMContentLoaded", () => {
             },
             isSkAcknowledged(skId, nip) {
                 if(!this.globalState.skAckList) return false;
-                const cleanSkId = String(skId).replace(/'/g, "").trim().split('-').slice(0, 2).join('-');
-                const cleanNip = String(nip).replace(/'/g, "").trim();
-                return this.globalState.skAckList.some(a => {
-                    const aSkId = String(a.sk_id).replace(/'/g, "").trim().split('-').slice(0, 2).join('-');
-                    const aNip = String(a.nip).replace(/'/g, "").trim();
-                    return aSkId === cleanSkId && aNip === cleanNip;
-                });
+                const normSk = (v) => {
+                    const c = String(v || '').replace(/['"\s]/g, '').trim();
+                    return /^(SK-\d{10,})-\d{1,3}$/.test(c) ? c.replace(/-\d{1,3}$/, '') : c;
+                };
+                const cleanSkId = normSk(skId);
+                const cleanNip = String(nip || '').replace(/['"\s]/g, '').trim();
+                const fromAckList = this.globalState.skAckList.some(a => normSk(a.sk_id) === cleanSkId && String(a.nip || '').replace(/['"\s]/g, '').trim() === cleanNip);
+                if (fromAckList) return true;
+                const fSk = (this.firestoreSks || []).find(s => normSk(s.id) === cleanSkId);
+                return !!(fSk && Array.isArray(fSk.acknowledgments) && fSk.acknowledgments.some(a => String(a.nip || '').replace(/['"\s]/g, '').trim() === cleanNip));
             },
             getSkAckDate(skId, nip) {
                 if(!this.globalState.skAckList) return '';
-                const cleanSkId = String(skId).replace(/'/g, "").trim().split('-').slice(0, 2).join('-');
-                const cleanNip = String(nip).replace(/'/g, "").trim();
-                const ack = this.globalState.skAckList.find(a => {
-                    const aSkId = String(a.sk_id).replace(/'/g, "").trim().split('-').slice(0, 2).join('-');
-                    const aNip = String(a.nip).replace(/'/g, "").trim();
-                    return aSkId === cleanSkId && aNip === cleanNip;
-                });
-                return ack ? ack.tanggal_baca.split(' ')[0] : '';
+                const normSk = (v) => {
+                    const c = String(v || '').replace(/['"\s]/g, '').trim();
+                    return /^(SK-\d{10,})-\d{1,3}$/.test(c) ? c.replace(/-\d{1,3}$/, '') : c;
+                };
+                const cleanSkId = normSk(skId);
+                const cleanNip = String(nip || '').replace(/['"\s]/g, '').trim();
+                let ack = this.globalState.skAckList.find(a => normSk(a.sk_id) === cleanSkId && String(a.nip || '').replace(/['"\s]/g, '').trim() === cleanNip);
+                if (!ack) {
+                    const fSk = (this.firestoreSks || []).find(s => normSk(s.id) === cleanSkId);
+                    if (fSk && Array.isArray(fSk.acknowledgments)) {
+                        ack = fSk.acknowledgments.find(a => String(a.nip || '').replace(/['"\s]/g, '').trim() === cleanNip);
+                    }
+                }
+                return ack && ack.tanggal_baca ? String(ack.tanggal_baca).split(' ')[0] : '';
             },
             doAcknowledgeSk(skId, nip, isAuto = false) {
                 const token = localStorage.getItem('transkep_session_token');

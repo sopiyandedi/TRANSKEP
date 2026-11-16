@@ -95,6 +95,8 @@ const SkDataService = {
     // 2. Simpan dokumen lengkap 100% murni ke Cloud Firestore (sk_documents)
     if (typeof TranskepFirebase !== 'undefined' && TranskepFirebase.isReady()) {
       const docId = payload.id || ('SK-' + Date.now());
+      const rawLink = String(payload.link_drive || '').trim();
+      const safeLink = (!rawLink || rawLink === '#') ? '-' : rawLink;
       const firestorePayload = {
         id: docId,
         no_sk: payload.no_sk || '-',
@@ -102,12 +104,15 @@ const SkDataService = {
         pj_sk: payload.pj_sk || 'PJ. Kesekretariatan',
         tgl_sk: payload.tgl_sk || '',
         tgl_input: payload.tgl_input || new Date().toISOString().split('T')[0],
-        link_drive: payload.link_drive || '-',
-        status: "Aktif",
-        versi_aktif: 1,
+        link_drive: safeLink,
+        status: payload.status || "Aktif",
+        versi_aktif: Number(payload.versi_aktif) || 1,
         members: Array.isArray(payload.members) ? payload.members : [],
-        revisi_history: [{
-          versi: 1,
+        naskah_utama: payload.naskah_utama !== undefined ? payload.naskah_utama : null,
+        lampiran: Array.isArray(payload.lampiran) ? payload.lampiran : [],
+        template_gdoc_id: payload.template_gdoc_id || '',
+        revisi_history: (Array.isArray(payload.revisi_history) && payload.revisi_history.length > 0) ? payload.revisi_history : [{
+          versi: Number(payload.versi_aktif) || 1,
           tgl_revisi: payload.tgl_sk || new Date().toISOString().split('T')[0],
           catatan: "Pendaftaran SK via Form Input",
           oleh: (typeof state !== 'undefined' && state.user) ? state.user.nama : 'Admin'
@@ -115,7 +120,7 @@ const SkDataService = {
         is_firebase: true
       };
       await TranskepFirebase.saveSkToFirestore(firestorePayload);
-      return { status: 'success', id: docId, link_drive: payload.link_drive, message: 'Data SK berhasil disimpan ke Cloud Firestore.' };
+      return { status: 'success', id: docId, link_drive: safeLink, message: 'Data SK berhasil disimpan ke Cloud Firestore.' };
     }
 
     return { status: 'success', message: 'Data SK berhasil disimpan.' };

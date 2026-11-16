@@ -195,8 +195,9 @@ const StDataService = {
 
         const currentList = (typeof state !== 'undefined' && state.stList) || (window.vueState && window.vueState.stList) || [];
         
-        // Auto-migrasi data Sheets ke Firestore jika Firestore masih kosong (berjalan di background tanpa tombol)
-        if (list.length === 0 && currentList.length > 0) {
+        // Auto-migrasi data Sheets ke Firestore jika Firestore masih kosong (hanya dijalankan Admin/Operator terautentikasi)
+        const caller = (typeof TranskepFirebase.getCallerIdentity === 'function') ? TranskepFirebase.getCallerIdentity() : { isAdmin: false };
+        if (list.length === 0 && currentList.length > 0 && TranskepFirebase._authReady && caller.isAdmin) {
           TranskepFirebase.syncLegacySuratTugasToFirestore(currentList);
           return;
         }

@@ -68,9 +68,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 return role.includes('admin') || role.includes('operator');
             },
             canManageSop() {
-                if(!this.globalState.user) return false;
-                const role = this.globalState.user.role;
-                return this.isAdminOrOperator || role === 'Admin' || role === 'Atasan Langsung' || role === 'Pejabat Berwenang';
+                return this.isAdminOrOperator;
             },
             groupTagsOptions() {
                 return typeof GROUP_TAGS !== 'undefined' ? GROUP_TAGS : {};
@@ -649,12 +647,15 @@ document.addEventListener("DOMContentLoaded", () => {
                             for (const item of list) {
                                 if (!item.id) continue;
                                 const relatedAcks = acks.filter(a => String(a.sop_id) === String(item.id)).map(a => ({
-                                    nip: a.nip,
-                                    tanggal_baca: a.tanggal_baca
-                                }));
+                                    nip: String(a.nip || '').replace(/['"\s]/g, '').trim(),
+                                    tanggal_baca: a.tanggal_baca || '-'
+                                })).filter(a => a.nip);
 
                                 let pelaksanaArr = [];
                                 try { pelaksanaArr = JSON.parse(item.pelaksana_json || '[]'); } catch(e) { pelaksanaArr = []; }
+
+                                const rawLink = String(item.link_drive || '').trim();
+                                const safeLink = (!rawLink || rawLink === '-' || rawLink === '#') ? '-' : (/^https?:\/\//i.test(rawLink) ? rawLink : '-');
 
                                 await TranskepFirebase.saveSopToFirestore({
                                     id: item.id,
@@ -664,7 +665,7 @@ document.addEventListener("DOMContentLoaded", () => {
                                     tanggal_pembuatan: item.tanggal_pembuatan || '',
                                     tanggal_revisi: item.tanggal_revisi || '-',
                                     tanggal_efektif: item.tanggal_efektif || '',
-                                    link_drive: item.link_drive || '-',
+                                    link_drive: safeLink,
                                     pelaksana: pelaksanaArr,
                                     pelaksana_json: item.pelaksana_json || '[]',
                                     acknowledgments: relatedAcks
