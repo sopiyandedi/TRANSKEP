@@ -6122,4 +6122,41 @@ Item di bawah ini berisiko memutus layanan produksi (WAHA/n8n/Firestore/Drive/CD
 3. **Suite Uji Regresi, Deploy Rules & PWA `v3.8.55`**:
    - Menambahkan kasus uji regresi multi-menu di [`tests/verify_fase3b.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/tests/verify_fase3b.js), deploy [`firestore.rules`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/firestore.rules) ke `transkep-314c0`, dan sinkronisasi build **`v3.8.55`** (+ perubahan cetak KGB `bff1aef`) ke `origin/main` dan `prod/main`.
 
+---
+
+## Tahap 122 [SELESAI & AKTIF]: Penyempurnaan Jarak Vertikal Kotak Pink, Posisi Titik Dua (:) Garis Kuning & Pergeseran Margin Kiri Form Cetak KGB (`v3.8.56`)
+*STATUS: DISETUJUI PENGGUNA ("ok terapkan bro") & SUDAH DITERAPKAN (`v3.8.56`) ✅*
+
+### 1. Akar Masalah (Berdasarkan Tangkapan Layar Pengguna)
+1. **Jarak Vertikal Sekitar Kotak Pink Atas & Bawah Terlalu Longgar**:
+   - Di sekitar kotak pink atas (blok `Nomor / Lampiran / Perihal`), `.kgb-kop-container` memberi `margin-bottom: 14px` (atasnya), lalu `.kgb-meta-table` memberi `margin-bottom: 15px` dan `.kgb-tujuan-box` memberi `margin-top: 14px` (bawahnya).
+   - Di sekitar kotak pink bawah (blok `Tembusan`), `.kgb-ttd-area` memberi `margin-top: 24px` dan `.kgb-tembusan` memberi `margin-top: 28px`, sehingga jarak antara `Zulkifli` dan `Tembusan :` tampak renggang dan mendorong blok tembusan terlalu dekat ke tepi bawah halaman.
+2. **Posisi Titik Dua (`:`) Terlalu Jauh ke Kanan (Melampaui Garis Kuning)**:
+   - Pada `.kgb-detail-table`, `.kgb-col-no` (`26px`) + `.kgb-col-label` (`180px`) + `.kgb-col-colon` (`14px`) menghabiskan `220px`, padahal label terpanjang (`Masa kerja golongan` dalam Bookman Old Style 12pt) hanya selebar ~`162–165px`. Sisa ruang kosong ~`15–20px` memundurkan titik dua ke kanan garis kuning sehingga nilai `1. Nama/Tanggal lahir` (`.../09-07-1986`) terpotong turun (`1986`).
+3. **Margin Kiri Kertas & Indentasi Terlalu Lebar (Ruang Kanan Sempit)**:
+   - `.kgb-print-wrapper` memakai `padding-left: 20mm` (`2 cm`) dan seluruh isi utama memakai `margin-left: 92px` (`~24,3 mm`), sehingga total jarak dari tepi kiri kertas mencapai **`44,3 mm`**, menyisakan lebar kolom nilai hanya `~372px` pada kertas Legal `216mm`. Akibatnya nama panjang (`Raden Anantama Havid Ismail, A.Md./09-07-1986`) terlipat ke baris kedua.
+
+### 2. Rencana Perubahan File & Parameter (Sebelum vs Sesudah)
+1. **[`modules/eoffice/cetak/cetak_kgb.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/cetak/cetak_kgb.html)**:
+   - **Geser batas kertas ke kiri (Poin 3):** Ubah `.kgb-print-wrapper` `padding` dari `10mm 15mm 15mm 20mm` -> **`9mm 12mm 13mm 14mm`** (margin kiri digeser ke kiri dari `20mm` -> `14mm`, margin kanan `15mm` -> `12mm`).
+   - **Selaraskan indentasi lurus di bawah `:` header (Poin 3):** Kolom label header `Nomor / Lampiran / Perihal` diubah dari `82px` + colon `14px` -> **`74px`** + colon **`12px`**, dan seluruh elemen sejajar (`kgb-tujuan-box`, `kgb-paragraf`, `kgb-detail-table`, `kgb-subnote`, `kgb-section-banner`, `kgb-tembusan`) digeser presisi dari `margin-left: 92px` -> **`82px`** (`width: calc(100% - 82px)` pada `.kgb-detail-table`).
+   - **Dekatkan jarak atas & bawah kotak pink atas & bawah (Poin 1):**
+     - `.kgb-kop-container` `margin-bottom`: `14px` -> **`8px`** (atas kotak pink atas).
+     - `.kgb-meta-table` `margin-bottom`: `15px` -> **`6px`**, dan `.kgb-tujuan-box` `margin-top`: `14px` -> **`6px`** (bawah kotak pink atas -> `Kepada`).
+     - `.kgb-ttd-area` `margin-top`: `24px` -> **`18px`**; `.kgb-tembusan` `margin-top`: `28px` -> **`14px`** (atas kotak pink bawah dari `Zulkifli`); `.kgb-tembusan-table` `margin-top`: `4px` -> **`2px`**.
+   - **Majukan titik dua (`:`) ke garis kuning (Poin 2):**
+     - `.kgb-col-no`: `26px` -> **`22px`**
+     - `.kgb-col-label`: `180px` -> **`163px`** (dengan `white-space: nowrap;` agar `"Masa kerja golongan"` tetap 1 baris bersih tanpa terlipat)
+     - `.kgb-col-colon`: `14px` -> **`10px`**
+     - Dampak gabungan Poin 2 + Poin 3 menambah ruang kolom nilai (`.kgb-col-val`) sebesar **`~70px`** (`~372px` -> **`~442px`**) agar nama & tanggal lahir (`Raden Anantama Havid Ismail, A.Md./09-07-1986`) cukup dalam 1 baris.
+2. **[`modules/eoffice/cetak/js_cetak_kgb.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/cetak/js_cetak_kgb.js)**:
+   - Selaraskan konstanta dokumentasi `KGB_PRINT_CONFIG` (`wrapperPadding`, `marginTop`, `marginRight`, `marginBottom`, `marginLeft`) dengan `cetak_kgb.html`.
+3. **PWA Cache Bust (`v3.8.56`) & Rilis (`index.html`, `sw.js`, `prd.md`, `revisi.md`) [SELESAI & AKTIF] ✅**:
+   - Bump `v3.8.55` -> **`v3.8.56`** di 3 titik ([`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) & [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js)), terverifikasi via `npm test`, serta siap rilis ke `origin/main` dan `prod/main`.
+
+### 3. Estimasi Dampak & Risiko
+- **Dampak UI/Database:** Nihil perubahan skema database/Firestore; murni penyempurnaan CSS/layout template cetak KGB ([`modules/eoffice/cetak/cetak_kgb.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/cetak/cetak_kgb.html)).
+- **Catatan Risiko Kecil:** Karena `padding-left` berkurang `6mm` (`20mm -> 14mm`), pastikan margin fisik printer di browser saat cetak tetap `Default/None` (aturan `@page { margin: 0mm !important; }` sudah aktif) agar tidak terpotong batas cetak hardware.
+
+
 

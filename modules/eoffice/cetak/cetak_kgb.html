@@ -4,7 +4,7 @@
      SESUAI FORMAT DOKUMEN RESMI PENGADILAN AGAMA INDRAMAYU (PP NO. 05 TAHUN 2024)
      INSTANSI: Pengadilan Agama Indramayu Kelas 1.A.
      STANDAR: 1 Orang = 1 Dokumen Presisi Legal (21,6 cm x 35,6 cm)
-     MARGIN RESMI: Atas 1 cm | Bawah 1.5 cm | Kiri 2 cm | Kanan 1.5 cm
+     MARGIN RESMI: Atas 0.9 cm | Bawah 1.3 cm | Kiri 1.4 cm | Kanan 1.2 cm
      STANDAR TIPOGRAFI: Isi KGB 12pt Bookman Old Style (Lurus Presisi)
      ========================================== -->
 <div id="template-cetak-kgb-container" style="display: none;" class="hidden no-print">
@@ -44,8 +44,8 @@
       max-width: 216mm;
       min-height: 356mm;
       margin: 0 auto;
-      /* ⬇️ TAG 1: PADDING MARGIN KERTAS LEGAL (Atas 10mm / 1cm, Kanan 15mm / 1.5cm, Bawah 15mm / 1.5cm, Kiri 20mm / 2cm) ⬇️ */
-      padding: 10mm 15mm 15mm 20mm;
+      /* ⬇️ TAG 1: PADDING MARGIN KERTAS LEGAL (Atas 9mm / 0.9cm, Kanan 12mm / 1.2cm, Bawah 13mm / 1.3cm, Kiri 14mm / 1.4cm) ⬇️ */
+      padding: 9mm 12mm 13mm 14mm;
       box-sizing: border-box;
       font-family: 'Bookman Old Style', 'Times New Roman', serif;
       font-size: 12pt;
@@ -63,7 +63,7 @@
       /* ⬇️ TAG 2B: Ketebalan garis hitam pembatas kop surat ⬇️ */
       border-bottom: 2px solid black;
       /* ⬇️ TAG 2C: Jarak garis kop surat ke tabel nomor surat ⬇️ */
-      margin-bottom: 14px;
+      margin-bottom: 8px;
     }
 
     .kgb-kop-logo {
@@ -104,7 +104,7 @@
       width: 100%;
       border-collapse: collapse;
       /* ⬇️ TAG 3A: Jarak tabel Nomor/Perihal ke blok tujuan Kepada KPPN Cirebon ⬇️ */
-      margin-bottom: 15px;
+      margin-bottom: 6px;
       font-size: 12pt;
     }
 
@@ -117,11 +117,11 @@
     /* ⬇️ TAG 4: BLOK TUJUAN KEPADA KPPN CIREBON (12pt) ⬇️ */
     .kgb-tujuan-box {
       /* ⬇️ TAG 4A: Indentasi kiri tujuan KPPN - sejajar lurus dengan titik dua (:) header di atasnya ⬇️ */
-      margin-left: 92px;
+      margin-left: 82px;
       /* ⬇️ TAG 4B: Jarak atas blok Kepada dari Perihal ⬇️ */
-      margin-top: 14px;
+      margin-top: 6px;
       /* ⬇️ TAG 4C: Jarak bawah blok Kepada ke paragraf pembuka ⬇️ */
-      margin-bottom: 14px;
+      margin-bottom: 12px;
       font-size: 12pt;
       line-height: 1.38;
     }
@@ -130,13 +130,13 @@
     .kgb-paragraf {
       text-align: justify;
       /* ⬇️ TAG 5A: Batas margin kiri paragraf (lurus sejajar titik dua dan Kepada) ⬇️ */
-      margin-left: 92px;
+      margin-left: 82px;
       /* ⬇️ TAG 5B: Indentasi menjorok ke dalam pada baris pertama paragraf ⬇️ */
       text-indent: 32px;
       /* ⬇️ TAG 5C: Jarak atas paragraf ⬇️ */
-      margin-top: 14px;
+      margin-top: 12px;
       /* ⬇️ TAG 5D: Jarak bawah paragraf ke tabel rincian ⬇️ */
-      margin-bottom: 12px;
+      margin-bottom: 10px;
       font-size: 12pt;
       /* ⬇️ TAG 5E: Spasi kerenggangan antar-baris paragraf ⬇️ */
       line-height: 1.4;
@@ -144,9 +144,9 @@
 
     /* ⬇️ TAG 6: TABEL RINCIAN POIN PEGAWAI (Poin 1-5, a-c, 6-10: 12pt) ⬇️ */
     .kgb-detail-table {
-      width: calc(100% - 92px);
-      /* ⬇️ TAG 6A: Margin kiri tabel rincian (lurus sejajar 92px dengan titik dua header) ⬇️ */
-      margin-left: 92px;
+      width: calc(100% - 82px);
+      /* ⬇️ TAG 6A: Margin kiri tabel rincian (lurus sejajar 82px dengan titik dua header) ⬇️ */
+      margin-left: 82px;
       border-collapse: collapse;
       font-size: 12pt;
     }
@@ -159,18 +159,20 @@
 
     .kgb-col-no {
       /* ⬇️ TAG 6C: Lebar kolom nomor/huruf poin (1., 2., a., b., 6., dsb) ⬇️ */
-      width: 26px;
+      width: 22px;
       text-align: left;
     }
 
     .kgb-col-label {
-      /* ⬇️ TAG 6D: Lebar kolom nama atribut/label (Nama, NIP, Pangkat/Jabatan, dsb) ⬇️ */
-      width: 180px;
+      /* ⬇️ TAG 6D: Lebar kolom nama atribut/label (dimajukan sejajar garis kuning agar kolom nilai lebih lega) ⬇️ */
+      width: 163px;
+      white-space: nowrap;
+      padding-right: 2px;
     }
 
     .kgb-col-colon {
       /* ⬇️ TAG 6E: Lebar kolom titik dua (:) ⬇️ */
-      width: 14px;
+      width: 10px;
       text-align: center;
     }
 
@@ -180,8 +182,8 @@
 
     /* ⬇️ TAG 7: CATATAN DASAR SKP LAMA DI BAWAH POIN 5 ⬇️ */
     .kgb-subnote {
-      /* ⬇️ TAG 7A: Margin kiri catatan SKP lama (lurus sejajar 92px) ⬇️ */
-      margin-left: 92px;
+      /* ⬇️ TAG 7A: Margin kiri catatan SKP lama (lurus sejajar 82px) ⬇️ */
+      margin-left: 82px;
       /* ⬇️ TAG 7B: Jarak atas catatan dari Poin 5 ⬇️ */
       margin-top: 6px;
       /* ⬇️ TAG 7C: Jarak bawah catatan ke Poin a ⬇️ */
@@ -191,8 +193,8 @@
 
     /* ⬇️ TAG 8: BARIS BANNER PENETAPAN GAJI BARU (TIDAK BOLD) ⬇️ */
     .kgb-section-banner {
-      /* ⬇️ TAG 8A: Jarak atas & bawah teks 'DIBERIKAN KENAIKAN GAJI BERKALA...' (Atas: 14px, Bawah: 12px, Kiri: 92px) ⬇️ */
-      margin: 14px 0 12px 92px;
+      /* ⬇️ TAG 8A: Jarak atas & bawah teks 'DIBERIKAN KENAIKAN GAJI BERKALA...' (Atas: 12px, Bawah: 10px, Kiri: 82px) ⬇️ */
+      margin: 12px 0 10px 82px;
       text-align: left;
       font-size: 12pt;
       font-weight: normal !important;
@@ -203,7 +205,7 @@
     .kgb-ttd-area {
       width: 100%;
       /* ⬇️ TAG 9A: Jarak dari paragraf penutup ke blok tanda tangan ⬇️ */
-      margin-top: 24px;
+      margin-top: 18px;
     }
 
     .kgb-ttd-box {
@@ -217,10 +219,10 @@
     /* ⬇️ TAG 10: BLOK TEMBUSAN SURAT (12pt) ⬇️ */
     .kgb-tembusan {
       clear: both;
-      /* ⬇️ TAG 10A: Margin kiri blok tembusan (lurus sejajar 92px) ⬇️ */
-      margin-left: 92px;
+      /* ⬇️ TAG 10A: Margin kiri blok tembusan (lurus sejajar 82px) ⬇️ */
+      margin-left: 82px;
       /* ⬇️ TAG 10B: Jarak dari blok tanda tangan Ketua ke kata 'Tembusan :' ⬇️ */
-      margin-top: 28px;
+      margin-top: 14px;
       font-size: 12pt;
       line-height: 1.38;
     }
@@ -229,7 +231,7 @@
       width: 100%;
       border-collapse: collapse;
       /* ⬇️ TAG 10C: Jarak dari kata 'Tembusan :' ke daftar nomor tembusan ⬇️ */
-      margin-top: 4px;
+      margin-top: 2px;
       font-size: 12pt;
     }
 
@@ -261,8 +263,8 @@
     <!-- 2. NOMOR, LAMPIRAN, PERIHAL & TANGGAL (12pt) -->
     <table class="kgb-meta-table">
       <tr>
-        <td style="width: 82px;">Nomor</td>
-        <td style="width: 14px; text-align: center;">:</td>
+        <td style="width: 74px; white-space: nowrap;">Nomor</td>
+        <td style="width: 12px; text-align: center;">:</td>
         <td>{{nokgb}}/KPA.W10-A2/KP2.1.2/{{bulan}}/{{tahun}}</td>
         <td style="text-align: right; white-space: nowrap; padding-left: 10px;">{{tanggal}}</td>
       </tr>
@@ -409,8 +411,8 @@
       </tr>
     </table>
 
-    <!-- 7. PENUTUP (12pt, BASE MARGIN 92px, FIRST LINE INDENT 32px, LINE 2 & 3 RATA 92px) -->
-    <p class="kgb-paragraf" style="margin-top: 14px;">
+    <!-- 7. PENUTUP (12pt, BASE MARGIN 82px, FIRST LINE INDENT 32px, LINE 2 & 3 RATA 82px) -->
+    <p class="kgb-paragraf" style="margin-top: 12px;">
       Kami harap sesuai dengan {{dasar_pp}}, kepada Pegawai tersebut agar dibayarkan penghasilannya berdasarkan gaji
       pokoknya yang baru.
     </p>

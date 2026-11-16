@@ -2,7 +2,7 @@
 // FILE: js_cetak_kgb.js (Modular Print Engine KGB)
 // DESKRIPSI: Mesin Render & Cetak Instan (0ms) Formulir SK KGB PA Indramayu
 // STANDAR: 1 Orang = 1 Dokumen Presisi Legal (21,6 cm x 35,6 cm)
-// MARGIN RESMI: Atas 1 cm | Bawah 1.5 cm | Kiri 2 cm | Kanan 1.5 cm
+// MARGIN RESMI: Atas 0.9 cm | Bawah 1.3 cm | Kiri 1.4 cm | Kanan 1.2 cm
 // ==========================================
 
 (function(global) {
@@ -18,11 +18,11 @@
     paperSize: "Legal (21,6 cm x 35,6 cm)",
     pageSizeCss: "216mm 356mm",
     pageMargin: "0mm",
-    wrapperPadding: "10mm 15mm 15mm 20mm", // Atas: 1cm (10mm), Kanan: 1.5cm (15mm), Bawah: 1.5cm (15mm), Kiri: 2cm (20mm)
-    marginTop: "10mm",
-    marginBottom: "15mm",
-    marginLeft: "20mm",
-    marginRight: "15mm",
+    wrapperPadding: "9mm 12mm 13mm 14mm", // Atas: 0.9cm (9mm), Kanan: 1.2cm (12mm), Bawah: 1.3cm (13mm), Kiri: 1.4cm (14mm)
+    marginTop: "9mm",
+    marginBottom: "13mm",
+    marginLeft: "14mm",
+    marginRight: "12mm",
     jarakTtd: "64px",
     kopBorderBottom: "2px solid #000000"
   };
