@@ -113,6 +113,11 @@ function validateWorkflowTopology(wf, rawText, label) {
 
   const sshNode = byName.get('SSH Cek Kontainer Docker');
   assert(sshNode && sshNode.continueOnFail === true, `${label}: SSH node must have continueOnFail: true`);
+  assert.strictEqual(
+    sshNode.parameters.cwd,
+    '={{ "" }}',
+    `${label}: SSH cwd must evaluate to empty string so node-ssh does not prepend Unix 'cd . ;' onto Windows cmd.exe`
+  );
   assert(
     sshNode.parameters.command.includes('docker ps -a --format "{{.Names}}|{{.State}}|{{.Status}}|{{.Image}}|{{.Ports}}"'),
     `${label}: SSH command must use double-quoted Go template compatible with Windows CMD & Linux sh`

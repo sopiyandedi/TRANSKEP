@@ -200,7 +200,7 @@
     {
       "parameters": {
         "command": "docker ps -a --format \"{{.Names}}|{{.State}}|{{.Status}}|{{.Image}}|{{.Ports}}\" && echo ---STATS--- && (docker stats --no-stream --format \"{{.Name}}|{{.CPUPerc}}|{{.MemUsage}}\" || echo NO_STATS)",
-        "cwd": "."
+        "cwd": "={{ \"\" }}"
       },
       "id": "b46b3041-3c51-4bd0-b38b-c9291ca70a73",
       "name": "SSH Cek Kontainer Docker",
