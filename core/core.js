@@ -1264,7 +1264,8 @@ function handleLogin(event) {
         if (typeof window.TranskepFirebase !== 'undefined' && typeof window.TranskepFirebase.authenticateWithCustomToken === 'function') {
           window.TranskepFirebase.authenticateWithCustomToken(response.firebase_custom_token || null, {
             nip: response.data.nip,
-            role: response.data.role || ''
+            role: response.data.role || '',
+            authError: response.firebase_custom_token ? '' : 'Server verifyLogin tidak mengembalikan firebase_custom_token (periksa FIREBASE_SERVICE_ACCOUNT_JSON & versi deploy Apps Script).'
           });
         }
         if (typeof renderGlobalHeader === 'function') {
@@ -1753,7 +1754,21 @@ function syncAllServerData(silent, forceRefresh) {
         showNotify("Gagal Sinkronisasi", response ? response.message : "Data bermasalah", "error");
         handleLogout();
       } else {
-        if (response && (response.message === 'Invalid session' || response.status === 'unauthorized' || response.code === 401)) {
+        const errMsgLow = String((response && response.message) || '').toLowerCase();
+        const isExpiredSess = Boolean(
+          response && (
+            response.message === 'Invalid session' ||
+            response.status === 'unauthorized' ||
+            response.code === 401 ||
+            errMsgLow.includes('sesi kedaluwarsa') ||
+            errMsgLow.includes('sesi tidak valid') ||
+            errMsgLow.includes('silakan login ulang')
+          )
+        );
+        if (isExpiredSess) {
+          if (typeof showNotify === 'function') {
+            showNotify("Sesi Berakhir", response.message || "Sesi login Anda telah kedaluwarsa. Silakan login ulang.", "warning");
+          }
           handleLogout();
         }
       }
@@ -2738,35 +2753,64 @@ function restoreFirebaseAuthSession_(activeNip, sessionToken) {
   const savedRole = (typeof localStorage !== 'undefined' ? (localStorage.getItem('transkep_user_role') || '') : '');
   const fbAuth = (typeof firebase !== 'undefined' && typeof firebase.auth === 'function') ? firebase.auth() : null;
 
+  const fetchAndSignInCustomToken = () => {
+    if (cleanNip && sessionToken) {
+      invokeBackendRpc_('getFirebaseCustomToken', activeNip, sessionToken)
+        .then((res) => {
+          const cTok = (res && res.status === 'success' && res.customToken) ? res.customToken : null;
+          let errReason = '';
+          if (!cTok) {
+            errReason = (res && res.message)
+              ? String(res.message)
+              : 'Server getFirebaseCustomToken mengembalikan token kosong (periksa FIREBASE_SERVICE_ACCOUNT_JSON & versi deploy GAS).';
+            console.warn('⚠️ [TRANSKEP Auth] Respons getFirebaseCustomToken:', errReason);
+          }
+          window.TranskepFirebase.authenticateWithCustomToken(cTok, {
+            nip: cleanNip,
+            role: savedRole,
+            authError: errReason
+          });
+        })
+        .catch((err) => {
+          const errReason = (err && err.message) ? String(err.message) : 'Gagal memanggil getFirebaseCustomToken di Apps Script.';
+          window.TranskepFirebase.authenticateWithCustomToken(null, {
+            nip: cleanNip,
+            role: savedRole,
+            authError: errReason
+          });
+        });
+    } else {
+      window.TranskepFirebase.authenticateWithCustomToken(null, {
+        nip: cleanNip,
+        role: savedRole,
+        authError: 'Sesi login lokal tidak lengkap (NIP/Token kosong).'
+      });
+    }
+  };
+
   if (fbAuth && fbAuth.currentUser && String(fbAuth.currentUser.uid || '').trim() === cleanNip && cleanNip) {
     fbAuth.currentUser.getIdTokenResult()
       .then((tokRes) => {
-        const claimRole = (tokRes && tokRes.claims && tokRes.claims.role) ? String(tokRes.claims.role) : savedRole;
-        window.TranskepFirebase._authNip = cleanNip;
-        window.TranskepFirebase._authRole = claimRole;
-        window.TranskepFirebase._authReady = true;
-        window.TranskepFirebase._authResolved = true;
-        window.TranskepFirebase._flushAuthQueue();
+        const claimRole = (tokRes && tokRes.claims && tokRes.claims.role) ? String(tokRes.claims.role).trim() : '';
+        const roleMatch = Boolean(claimRole) && (!savedRole || claimRole.toLowerCase() === savedRole.trim().toLowerCase());
+        if (roleMatch) {
+          window.TranskepFirebase._authNip = cleanNip;
+          window.TranskepFirebase._authRole = claimRole;
+          window.TranskepFirebase._lastAuthError = '';
+          window.TranskepFirebase._authReady = true;
+          window.TranskepFirebase._authResolved = true;
+          window.TranskepFirebase._flushAuthQueue();
+        } else {
+          fetchAndSignInCustomToken();
+        }
       })
       .catch(() => {
-        window.TranskepFirebase.authenticateWithCustomToken(null, { nip: cleanNip, role: savedRole });
+        fetchAndSignInCustomToken();
       });
     return;
   }
 
-  if (cleanNip && sessionToken) {
-    invokeBackendRpc_('getFirebaseCustomToken', activeNip, sessionToken)
-      .then((res) => {
-        const cTok = (res && res.status === 'success' && res.customToken) ? res.customToken : null;
-        if (!cTok && res && res.message) console.warn('⚠️ [TRANSKEP Auth] Respons getFirebaseCustomToken:', res.message);
-        window.TranskepFirebase.authenticateWithCustomToken(cTok, { nip: cleanNip, role: savedRole });
-      })
-      .catch(() => {
-        window.TranskepFirebase.authenticateWithCustomToken(null, { nip: cleanNip, role: savedRole });
-      });
-  } else {
-    window.TranskepFirebase.authenticateWithCustomToken(null, { nip: cleanNip, role: savedRole });
-  }
+  fetchAndSignInCustomToken();
 }
 
 function invokeBackendRpc_(methodName, ...args) {

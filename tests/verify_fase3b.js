@@ -834,6 +834,99 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
   await new Promise(r => setTimeout(r, 300));
   assert(revokedBlobs.length >= 1, 'closeFlipbookModal must revoke blob URL');
 
+  // Recovery & diagnostics tests (Tahap 119 - v3.8.52)
+  const origApiCall = browserSandbox.TranskepAPI.call;
+  const origGetDb = browserSandbox.TranskepFirebase.getDb;
+  try {
+    // 1. Stale currentUser lacking claims.role triggers refresh via getFirebaseCustomToken
+    browserLS.setItem('transkep_active_nip', '198001012005011001');
+    browserLS.setItem('transkep_session_token', 'tok-adm');
+    browserLS.setItem('transkep_user_role', 'Admin');
+    mockFirebaseUser = {
+      uid: '198001012005011001',
+      getIdTokenResult: async () => ({ claims: {} })
+    };
+    rpcCalls.length = 0;
+    recordedAuthActions.length = 0;
+    browserSandbox.TranskepAPI.call = async (method, ...args) => {
+      rpcCalls.push({ method, args });
+      if (method === 'getFirebaseCustomToken') return { status: 'success', customToken: 'jwt-adm' };
+      return origApiCall(method, ...args);
+    };
+    browserSandbox.restoreFirebaseAuthSession_('198001012005011001', 'tok-adm');
+    await new Promise(r => setTimeout(r, 20));
+    if (browserSandbox.TranskepFirebase._authPromise) await browserSandbox.TranskepFirebase._authPromise;
+    assert(rpcCalls.some(c => c.method === 'getFirebaseCustomToken'), 'Stale currentUser without role claim must trigger getFirebaseCustomToken');
+    assert(recordedAuthActions.some(a => a.type === 'signInWithCustomToken' && a.tok === 'jwt-adm'), 'Fresh jwt-adm must re-authenticate');
+    assert.strictEqual(browserSandbox.TranskepFirebase._authRole, 'Admin');
+
+    // 2. _waitAuthForWrite recovers Firebase Auth on-demand before saveKgbToFirestore when currentUser is null
+    await browserSandbox.TranskepFirebase.signOutFirebase();
+    rpcCalls.length = 0;
+    await browserSandbox.TranskepFirebase.saveKgbToFirestore({ id_kgb: 'KGB-REC-1', nip: '199002022015012002', status: 'Sedang Diproses' });
+    assert(rpcCalls.some(c => c.method === 'getFirebaseCustomToken'), '_waitAuthForWrite must recover auth via getFirebaseCustomToken');
+    assert(mockFirebaseUser && mockFirebaseUser.uid === '198001012005011001', 'Recovered user must match Admin UID');
+
+    // 3. Unauthenticated permission-denied write surfaces exact GAS auth root cause
+    await browserSandbox.TranskepFirebase.signOutFirebase();
+    browserSandbox.TranskepAPI.call = async (method) => {
+      if (method === 'getFirebaseCustomToken') return { status: 'error', message: 'Akses Ditolak: Sesi kedaluwarsa' };
+      return { status: 'error' };
+    };
+    browserSandbox.TranskepFirebase.getDb = () => ({
+      collection: () => ({
+        doc: () => ({
+          set: async () => {
+            const err = new Error('Missing or insufficient permissions.');
+            err.code = 'permission-denied';
+            throw err;
+          }
+        })
+      })
+    });
+    let diagErr = null;
+    try {
+      await browserSandbox.TranskepFirebase.saveKgbToFirestore({ id_kgb: 'KGB-FAIL-1', nip: '199002022015012002', status: 'Sedang Diproses' });
+    } catch (e) {
+      diagErr = e;
+    }
+    assert(diagErr && diagErr.message.includes('Firebase Auth belum aktif') && diagErr.message.includes('Akses Ditolak: Sesi kedaluwarsa'),
+      `Expected enriched auth failure message, got: ${diagErr && diagErr.message}`);
+
+    // 4. Legacy non-schema field cleanup on existing eoffice_kgb doc when Admin is authenticated
+    await browserSandbox.TranskepFirebase.authenticateWithCustomToken('jwt-adm', { nip: '198001012005011001', role: 'Admin' });
+    let writtenNonMerge = null;
+    browserSandbox.TranskepFirebase.getDb = () => ({
+      collection: () => ({
+        doc: () => ({
+          get: async () => ({
+            exists: true,
+            data: () => ({
+              id_kgb: 'KGB-LEG-1',
+              legacy_extra: 'stale-sheet-field',
+              doc_url: 'https://docs.google.com/document/d/legacy123/edit'
+            })
+          }),
+          set: async (data, opts) => {
+            if (opts && opts.merge === true) {
+              const err = new Error('Missing or insufficient permissions.');
+              err.code = 'permission-denied';
+              throw err;
+            }
+            writtenNonMerge = data;
+          }
+        })
+      })
+    });
+    await browserSandbox.TranskepFirebase.saveKgbToFirestore({ id_kgb: 'KGB-LEG-1', nip: '199002022015012002', status: 'Sedang Diproses' });
+    assert(writtenNonMerge && writtenNonMerge.id_kgb === 'KGB-LEG-1', 'Legacy doc must retry non-merge write');
+    assert(!('legacy_extra' in writtenNonMerge), 'Legacy unknown fields must be stripped on overwrite');
+    assert.strictEqual(writtenNonMerge.doc_url, 'https://docs.google.com/document/d/legacy123/edit', 'Allowed legacy fields like doc_url must be preserved');
+  } finally {
+    browserSandbox.TranskepAPI.call = origApiCall;
+    browserSandbox.TranskepFirebase.getDb = origGetDb;
+  }
+
   console.log('[PASS] Browser Firebase Custom Auth, scoped queries, Drive proxy bridge & PDF Flipbook verified.');
   console.log('\n[PASS] ALL Fase 3B verification tests passed (0 failures).');
   process.exit(0);

@@ -6073,3 +6073,21 @@ Item di bawah ini berisiko memutus layanan produksi (WAHA/n8n/Firestore/Drive/CD
    - Memperluas kasus uji `eoffice_kgb` di [`tests/verify_firestore_schema.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/tests/verify_firestore_schema.js) agar mencakup payload form KGB dan TTE penuh.
    - Menyinkronkan versi build **`v3.8.51`** di [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) dan [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js).
 
+---
+
+## Tahap 119: Pemulihan Otomatis Custom Token Firebase Auth & Diagnostik Penulisan E-Office (`v3.8.52`) (2026-11-16)
+**Tujuan:** Mengatasi error `permission-denied` yang masih muncul akibat sesi Firebase Auth kosong/usang (token sesi GAS >8 jam yang tidak memicu re-login, `currentUser` tanpa claim `role`, atau kegagalan silent pada `signInWithCustomToken`) serta mencegah dokumen lama dengan field di luar schema gagal di-update.
+
+### Rincian Perubahan:
+1. **Validasi Claim `role` & Deteksi Sesi Kedaluwarsa ([`core/core.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/core/core.js))**:
+   - Memperbaiki `syncAllServerData(true)` agar mengenali respons kedaluwarsa sesi GAS berbahasa Indonesia (`sesi kedaluwarsa`, `sesi tidak valid`, `silakan login ulang`) dan memicu logout bersih sehingga pengguna mendapat session token & Firebase Custom Token baru.
+   - Memperbarui `restoreFirebaseAuthSession_` agar hanya mempercayai `firebase.auth().currentUser` tersimpan bila memiliki claim `role` yang cocok; jika kosong/usang, otomatis meminta refresh melalui `getFirebaseCustomToken` dan meneruskan alasan kegagalan ke `authenticateWithCustomToken`.
+2. **Pemulihan Token On-Demand & Diagnostik Write ([`core/firebase.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/core/firebase.js))**:
+   - Melacak `_lastAuthError` dan `_authPromise` pada `authenticateWithCustomToken` serta mewajibkan claim `role` sebelum memakai `currentUser` yang sudah ada.
+   - Mengupgrade `_waitAuthForWrite` agar melakukan pemulihan token on-demand via `TranskepAPI.call('getFirebaseCustomToken', ...)` bila `currentUser` kosong atau belum memiliki claim `role`.
+   - Menambahkan `_writeDocWithDiagnostics` pada `saveKgbToFirestore` & `saveRapatToFirestore`: bila `permission-denied` tetap terjadi, menginspeksi apakah penyebabnya `currentUser` kosong, claim `role` tidak valid, atau dokumen lama mengandung field non-schema (dan otomatis membersihkan field legacy saat overwrite non-merge dengan mempertahankan field sah seperti `doc_url`/`tte_*`).
+3. **Suite Regresi Auth Recovery & Sinkronisasi PWA `v3.8.52`**:
+   - Menambahkan 4 kasus uji pemulihan auth, diagnostik `permission-denied`, refresh claim kosong, dan pembersihan field legacy KGB di [`tests/verify_fase3b.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/tests/verify_fase3b.js).
+   - Menaikkan versi build 3 titik **`v3.8.52`** di [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) dan [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js).
+
+

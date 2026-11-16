@@ -66,6 +66,8 @@ const TranskepFirebase = {
   _authResolved: false,
   _authNip: '',
   _authRole: '',
+  _lastAuthError: '',
+  _authPromise: null,
   _authPendingQueue: [],
   _activeUnsubs: [],
   getAppCheck() {
@@ -209,55 +211,82 @@ const TranskepFirebase = {
       unsubs.forEach(u => { if (typeof u === 'function') { try { u(); } catch (e) {} } });
     };
   },
-  async authenticateWithCustomToken(customToken, fallbackIdentity) {
-    let signInAttempted = false;
-    let lastAuthErr = null;
+  async _getUserRoleClaim(user) {
+    if (!user) return '';
     try {
-      const fbAuth = (typeof firebase !== 'undefined' && typeof firebase.auth === 'function') ? firebase.auth() : null;
-      if (customToken && fbAuth) {
-        signInAttempted = true;
-        const cred = await fbAuth.signInWithCustomToken(String(customToken).trim());
-        const user = cred && cred.user;
-        if (user) {
-          let roleClaim = (fallbackIdentity && fallbackIdentity.role) || '';
-          try {
-            const tokRes = await user.getIdTokenResult();
-            if (tokRes && tokRes.claims && tokRes.claims.role) {
-              roleClaim = String(tokRes.claims.role);
-            }
-          } catch (eClaim) {}
-          this._authNip = String(user.uid || (fallbackIdentity && fallbackIdentity.nip) || '').replace(/['"\s]/g, '').trim();
-          this._authRole = String(roleClaim || '').trim();
-          this._authReady = true;
-          this._authResolved = true;
-          console.log('🔐 [TRANSKEP Firebase] Custom Token Auth terverifikasi untuk NIP:', this._authNip);
-          this._flushAuthQueue();
-          return true;
+      if (typeof user.getIdTokenResult === 'function') {
+        const tokRes = await user.getIdTokenResult();
+        if (tokRes && tokRes.claims && tokRes.claims.role) {
+          return String(tokRes.claims.role).trim();
         }
-      } else if (!customToken && fbAuth && fbAuth.currentUser && fallbackIdentity && fallbackIdentity.nip && String(fbAuth.currentUser.uid) === String(fallbackIdentity.nip).replace(/['"\s]/g, '').trim()) {
-        this._authNip = String(fbAuth.currentUser.uid).trim();
-        this._authRole = String(fallbackIdentity.role || '').trim();
-        this._authReady = true;
-        this._authResolved = true;
-        this._flushAuthQueue();
-        return true;
       }
-    } catch (err) {
-      lastAuthErr = err;
-      const errCode = err && err.code ? '[' + err.code + '] ' : '';
-      console.warn('⚠️ [TRANSKEP Firebase] Gagal signInWithCustomToken:', errCode + (err && err.message ? err.message : err));
-    }
-    this._authNip = String((fallbackIdentity && fallbackIdentity.nip) || (typeof localStorage !== 'undefined' ? localStorage.getItem('transkep_active_nip') : '') || '').replace(/['"\s]/g, '').trim();
-    this._authRole = String((fallbackIdentity && fallbackIdentity.role) || (typeof localStorage !== 'undefined' ? localStorage.getItem('transkep_user_role') : '') || '').trim();
-    this._authReady = false;
-    this._authResolved = true;
-    if (!signInAttempted) {
-      console.warn('⚠️ [TRANSKEP Auth] Custom token belum tersedia (mode kompatibilitas pra-cutover aktif).');
-    } else if (lastAuthErr && String((lastAuthErr.code || '') + ' ' + (lastAuthErr.message || '')).toLowerCase().includes('configuration')) {
-      console.warn('⚠️ [TRANSKEP Auth] Firebase Authentication Sign-in Method belum diaktifkan di Firebase Console (Authentication -> Set up sign-in method -> Enable Anonymous).');
-    }
-    this._flushAuthQueue();
-    return false;
+    } catch (e) {}
+    return '';
+  },
+  async authenticateWithCustomToken(customToken, fallbackIdentity) {
+    const runAuth = async () => {
+      let signInAttempted = false;
+      let lastAuthErr = null;
+      const expectedNip = String((fallbackIdentity && fallbackIdentity.nip) || '').replace(/['"\s]/g, '').trim();
+      const expectedRole = String((fallbackIdentity && fallbackIdentity.role) || '').trim();
+      try {
+        const fbAuth = (typeof firebase !== 'undefined' && typeof firebase.auth === 'function') ? firebase.auth() : null;
+        if (customToken && fbAuth) {
+          signInAttempted = true;
+          const cred = await fbAuth.signInWithCustomToken(String(customToken).trim());
+          const user = cred && cred.user;
+          if (user) {
+            const claimRole = await this._getUserRoleClaim(user);
+            const roleClaim = claimRole || expectedRole;
+            this._authNip = String(user.uid || expectedNip || '').replace(/['"\s]/g, '').trim();
+            this._authRole = String(roleClaim || '').trim();
+            this._lastAuthError = '';
+            this._authReady = true;
+            this._authResolved = true;
+            console.log('🔐 [TRANSKEP Firebase] Custom Token Auth terverifikasi untuk NIP:', this._authNip, 'Role:', this._authRole);
+            this._flushAuthQueue();
+            return true;
+          }
+        } else if (!customToken && fbAuth && fbAuth.currentUser && expectedNip && String(fbAuth.currentUser.uid || '').trim() === expectedNip) {
+          const claimRole = await this._getUserRoleClaim(fbAuth.currentUser);
+          const roleOk = Boolean(claimRole) && (!expectedRole || claimRole.toLowerCase() === expectedRole.toLowerCase());
+          if (roleOk || typeof fbAuth.currentUser.getIdTokenResult !== 'function') {
+            this._authNip = String(fbAuth.currentUser.uid).trim();
+            this._authRole = String(claimRole || expectedRole || '').trim();
+            this._lastAuthError = '';
+            this._authReady = true;
+            this._authResolved = true;
+            this._flushAuthQueue();
+            return true;
+          }
+          this._lastAuthError = `Sesi Firebase tersimpan untuk NIP ${expectedNip} tidak memiliki claim role (${claimRole || 'kosong'}). Memerlukan refresh token.`;
+        }
+      } catch (err) {
+        lastAuthErr = err;
+        const errCode = err && err.code ? '[' + err.code + '] ' : '';
+        this._lastAuthError = errCode + (err && err.message ? err.message : String(err));
+        console.warn('⚠️ [TRANSKEP Firebase] Gagal signInWithCustomToken:', this._lastAuthError);
+      }
+      this._authNip = String(expectedNip || (typeof localStorage !== 'undefined' ? localStorage.getItem('transkep_active_nip') : '') || '').replace(/['"\s]/g, '').trim();
+      this._authRole = String(expectedRole || (typeof localStorage !== 'undefined' ? localStorage.getItem('transkep_user_role') : '') || '').trim();
+      this._authReady = false;
+      this._authResolved = true;
+      if (!signInAttempted) {
+        const fbMsg = fallbackIdentity && fallbackIdentity.authError ? String(fallbackIdentity.authError) : '';
+        this._lastAuthError = fbMsg || this._lastAuthError || 'Custom token Firebase belum tersedia dari server Apps Script (periksa FIREBASE_SERVICE_ACCOUNT_JSON atau login ulang).';
+        console.warn('⚠️ [TRANSKEP Auth]', this._lastAuthError);
+      } else if (lastAuthErr && String((lastAuthErr.code || '') + ' ' + (lastAuthErr.message || '')).toLowerCase().includes('configuration')) {
+        console.warn('⚠️ [TRANSKEP Auth] Firebase Authentication Sign-in Method belum diaktifkan di Firebase Console.');
+      }
+      this._flushAuthQueue();
+      return false;
+    };
+
+    const p = runAuth().finally(() => {
+      if (this._authPromise === p) this._authPromise = null;
+    });
+    this._authPromise = p;
+    return p;
   },
   async signOutFirebase() {
     while (this._activeUnsubs.length > 0) {
@@ -267,10 +296,12 @@ const TranskepFirebase = {
       }
     }
     this._authPendingQueue = [];
+    this._authPromise = null;
     this._authReady = false;
     this._authResolved = false;
     this._authNip = '';
     this._authRole = '';
+    this._lastAuthError = '';
     try {
       if (typeof firebase !== 'undefined' && typeof firebase.auth === 'function' && firebase.auth().currentUser) {
         await firebase.auth().signOut();
@@ -1092,13 +1123,126 @@ const TranskepFirebase = {
     return (!s || s === '-' || /^https?:\/\//i.test(s)) ? s : '';
   },
 
+  EOFFICE_KGB_ALLOWED_FIELDS: [
+    'id', 'id_kgb', 'nip', 'nama_pegawai', 'nama', 'tempat_lahir', 'tanggal_lahir',
+    'pangkat', 'golongan', 'golongan_lama', 'golongan_baru', 'jabatan', 'unit_kerja',
+    'nokgb', 'bulan_surat', 'tahun_surat', 'nomor_surat', 'tanggal_surat', 'tujuan_kppn',
+    'gaji_lama', 'pejabat_lama', 'nomor_sk_lama', 'tanggal_sk_lama', 'tmt_lama',
+    'tahun_lama', 'bulan_lama', 'mkg_lama', 'gaji_baru', 'terbilang_gaji',
+    'tahun_baru', 'bulan_baru', 'mkg_baru', 'tmt_baru', 'tmt_yad',
+    'nama_ketua', 'dasar_pp', 'status', 'file_doc_url', 'file_pdf_url', 'file_id',
+    'doc_url', 'pdf_url', 'doc_id', 'tanggal_input', 'tgl_selesai',
+    'tte_status', 'tte_pejabat_nip', 'tte_pejabat_nama', 'tte_submitted_at',
+    'tte_signed_at', 'tte_signer', 'tte_qrcode', 'created_by', 'updated_by',
+    'synced_at', 'is_from_dashboard', 'is_firebase', 'updated_at', 'created_at'
+  ],
+
+  EOFFICE_RAPAT_ALLOWED_FIELDS: [
+    'id', 'id_rapat', 'nomor_undangan', 'agenda', 'hari_tanggal', 'waktu_mulai',
+    'waktu_selesai', 'tempat', 'pemimpin', 'notulis', 'peserta_json', 'pembahasan',
+    'kesimpulan', 'status', 'doc_undangan_url', 'doc_absen_url', 'doc_notulen_url',
+    'folder_url', 'tanggal_input', 'created_by', 'updated_by', 'synced_at',
+    'is_firebase', 'updated_at', 'created_at'
+  ],
+
   async _waitAuthForWrite(contextName) {
-    if (!this._authResolved && this._hasStoredSession()) {
+    if (this._authPromise) {
+      await this._authPromise.catch(() => false);
+    } else if (!this._authResolved && this._hasStoredSession()) {
       await this._ensureAuthForRead(false).catch(() => false);
     }
     const fbAuth = (typeof firebase !== 'undefined' && typeof firebase.auth === 'function') ? firebase.auth() : null;
-    if (fbAuth && !fbAuth.currentUser) {
-      console.warn(`⚠️ [TRANSKEP Firebase] ${contextName} dipanggil saat firebase.auth().currentUser kosong. Pastikan Custom Token Auth / FIREBASE_SERVICE_ACCOUNT aktif.`);
+    if (!fbAuth) return;
+
+    const storedNip = (typeof localStorage !== 'undefined' ? (localStorage.getItem('transkep_active_nip') || '') : '').replace(/['"\s]/g, '').trim();
+    const storedTok = (typeof localStorage !== 'undefined' ? (localStorage.getItem('transkep_session_token') || '') : '').trim();
+    const storedRole = (typeof localStorage !== 'undefined' ? (localStorage.getItem('transkep_user_role') || '') : '').trim();
+
+    let needsRecovery = !fbAuth.currentUser;
+    if (!needsRecovery && fbAuth.currentUser) {
+      if (storedNip && String(fbAuth.currentUser.uid || '').trim() !== storedNip) {
+        needsRecovery = true;
+      } else if (typeof fbAuth.currentUser.getIdTokenResult === 'function') {
+        const claimRole = await this._getUserRoleClaim(fbAuth.currentUser);
+        if (!claimRole) {
+          needsRecovery = true;
+        }
+      }
+    }
+
+    if (needsRecovery && storedNip && storedTok && typeof window !== 'undefined' && window.TranskepAPI && typeof window.TranskepAPI.call === 'function') {
+      try {
+        const tokRes = await window.TranskepAPI.call('getFirebaseCustomToken', storedNip, storedTok);
+        if (tokRes && tokRes.status === 'success' && tokRes.customToken) {
+          await this.authenticateWithCustomToken(tokRes.customToken, { nip: storedNip, role: storedRole });
+        } else if (tokRes && tokRes.message) {
+          this._lastAuthError = String(tokRes.message);
+        } else if (tokRes && !tokRes.customToken) {
+          this._lastAuthError = 'Backend Apps Script belum menerbitkan Firebase Custom Token (FIREBASE_SERVICE_ACCOUNT_JSON gagal diparsing/sign di GAS).';
+        }
+      } catch (eRec) {
+        this._lastAuthError = (eRec && eRec.message) ? String(eRec.message) : String(eRec);
+      }
+    }
+
+    if (!fbAuth.currentUser) {
+      console.warn(`⚠️ [TRANSKEP Firebase] ${contextName} dipanggil saat firebase.auth().currentUser kosong. Detail: ${this._lastAuthError || 'Belum terautentikasi'}`);
+    }
+  },
+
+  async _writeDocWithDiagnostics(db, colName, docId, payload, allowedSchemaFields) {
+    const docRef = db.collection(colName).doc(docId);
+    try {
+      await docRef.set(payload, { merge: true });
+    } catch (writeErr) {
+      const errTxt = String((writeErr && (writeErr.code || writeErr.message)) || writeErr || '').toLowerCase();
+      if (!errTxt.includes('permission') && !errTxt.includes('insufficient')) {
+        throw writeErr;
+      }
+
+      const fbAuth = (typeof firebase !== 'undefined' && typeof firebase.auth === 'function') ? firebase.auth() : null;
+      if (!fbAuth || !fbAuth.currentUser) {
+        const reason = this._lastAuthError || 'Token autentikasi sesi Firebase belum diterima.';
+        throw new Error(`FirebaseError: [code=permission-denied]: Firebase Auth belum aktif (currentUser kosong). Penyebab: ${reason} Silakan Logout lalu Login ulang.`);
+      }
+
+      const claimRole = await this._getUserRoleClaim(fbAuth.currentUser);
+      const roleLow = String(claimRole || '').toLowerCase().trim();
+      const allowedRoles = ['admin', 'super admin', 'administrator', 'operator'];
+      if (!roleLow || !allowedRoles.includes(roleLow)) {
+        throw new Error(`FirebaseError: [code=permission-denied]: Akun Firebase aktif (UID: ${fbAuth.currentUser.uid}), namun claim role="${claimRole || 'kosong'}" bukan Admin/Operator di firestore.rules.`);
+      }
+
+      // Auth & Admin role valid: periksa apakah dokumen lama di Firestore mengandung field usang di luar schema
+      if (Array.isArray(allowedSchemaFields) && allowedSchemaFields.length > 0 && typeof docRef.get === 'function') {
+        try {
+          const snap = await docRef.get();
+          if (snap && snap.exists && typeof snap.data === 'function') {
+            const existing = snap.data() || {};
+            const extraKeys = Object.keys(existing).filter(k => !allowedSchemaFields.includes(k));
+            if (extraKeys.length > 0) {
+              const sanitized = {};
+              for (const k of allowedSchemaFields) {
+                if (Object.prototype.hasOwnProperty.call(existing, k) && existing[k] !== undefined && existing[k] !== null) {
+                  if (k === 'created_at' && !this._isFirestoreTimestamp(existing[k])) continue;
+                  sanitized[k] = existing[k];
+                }
+              }
+              Object.assign(sanitized, payload);
+              if (this._isFirestoreTimestamp(existing.created_at)) {
+                sanitized.created_at = existing.created_at;
+              }
+              await docRef.set(sanitized);
+              return;
+            }
+          }
+        } catch (diagErr) {
+          console.warn(`⚠️ [TRANSKEP Firebase] Gagal inspeksi dokumen lama ${colName}/${docId}:`, diagErr);
+        }
+      }
+
+      const rawMsg = (writeErr && writeErr.message) ? writeErr.message : String(writeErr);
+      throw new Error(`FirebaseError: [code=permission-denied]: Auth Admin aktif (UID: ${fbAuth.currentUser.uid}, role: ${claimRole}), namun Firestore Rules menolak ${colName}/${docId}. Detail: ${rawMsg}`);
     }
   },
 
@@ -1171,12 +1315,19 @@ const TranskepFirebase = {
     if (kgbData.tte_pejabat_nip) payload.tte_pejabat_nip = asStr(kgbData.tte_pejabat_nip);
     if (kgbData.tte_pejabat_nama) payload.tte_pejabat_nama = asStr(kgbData.tte_pejabat_nama);
     if (kgbData.tte_submitted_at) payload.tte_submitted_at = asStr(kgbData.tte_submitted_at);
+    if (kgbData.tte_signed_at) payload.tte_signed_at = asStr(kgbData.tte_signed_at);
+    if (kgbData.tte_signer) payload.tte_signer = asStr(kgbData.tte_signer);
+    if (kgbData.tte_qrcode) payload.tte_qrcode = asStr(kgbData.tte_qrcode);
+    if (kgbData.doc_url) payload.doc_url = this._cleanOptionalUrl(kgbData.doc_url);
+    if (kgbData.pdf_url) payload.pdf_url = this._cleanOptionalUrl(kgbData.pdf_url);
+    if (kgbData.doc_id) payload.doc_id = asStr(kgbData.doc_id);
+    if (kgbData.synced_at) payload.synced_at = asStr(kgbData.synced_at);
 
     if (!this._isFirestoreTimestamp(kgbData.created_at)) {
       payload.created_at = serverTs;
     }
 
-    await db.collection(this.EOFFICE_KGB_COLLECTION).doc(docId).set(payload, { merge: true });
+    await this._writeDocWithDiagnostics(db, this.EOFFICE_KGB_COLLECTION, docId, payload, this.EOFFICE_KGB_ALLOWED_FIELDS);
     return { status: 'success', id: docId, data: payload };
   },
 
@@ -1277,7 +1428,7 @@ const TranskepFirebase = {
       payload.created_at = serverTs;
     }
 
-    await db.collection(this.EOFFICE_RAPAT_COLLECTION).doc(docId).set(payload, { merge: true });
+    await this._writeDocWithDiagnostics(db, this.EOFFICE_RAPAT_COLLECTION, docId, payload, this.EOFFICE_RAPAT_ALLOWED_FIELDS);
     return { status: 'success', id: docId, data: payload };
   },
 
