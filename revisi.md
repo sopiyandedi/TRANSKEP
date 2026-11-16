@@ -6192,5 +6192,35 @@ Item di bawah ini berisiko memutus layanan produksi (WAHA/n8n/Firestore/Drive/CD
 - **Dampak UI/Database:** Nihil perubahan backend GAS maupun Firestore. Murni tata letak cetak KGB ([`modules/eoffice/cetak/cetak_kgb.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/cetak/cetak_kgb.html)).
 - **Risiko Kecil:** Perubahan total tinggi vertikal `+45px` (`~11.9 mm`) tetap aman di dalam sisa margin bawah `~28.5 mm` pada kertas Legal `356mm`. Bila ada data pegawai yang sangat panjang di poin 1/3/6 (membungkus baris ekstra) dan hampir menyentuh dasar halaman, jarak `.kgb-tembusan` (`30px`) atau `margin-top` `Ketua,` (`28px`) masih bisa dikurangi beberapa piksel tanpa mengubah struktur.
 
+---
+
+## Tahap 124 [SELESAI & AKTIF]: Penyempurnaan Ruang Kanan Kertas (`padding-right`), Jarak Tembusan ke `Zulkifli` & Pergeseran Tanda Tangan Ketua ke Garis Kuning (`v3.8.58`)
+*STATUS: DISETUJUI PENGGUNA ("ok terapkan") & SUDAH DITERAPKAN (`v3.8.58`) ✅*
+
+### 1. Analisis Pengukuran Tangkapan Layar (`412 x 682` — `v3.8.57`)
+1. **Poin 1 (Sisi Kanan `09-07-1986` Mepet, Kurangi Padding Kanan):**
+   - Pada tangkapan layar terbaru, ujung `09-07-1986` berada di koordinat `377/412`, sementara batas kanan konten (`padding-right: 14mm`) di `385/412` — hanya tersisa `8px` layar (~`4mm` / `~16 CSS px`). Garis stabilo kuning berada di area kanan (`377–410`) menandakan kebutuhan ruang napas lebih lega di sisi kanan tanpa membiarkan nama/tanggal terlipat ke baris kedua.
+   - Dengan mengurangi `padding-right` ("page sebelah kanan") dari **`14mm` → `10mm`** (`padding: 9mm 10mm 10mm 20mm;`), ruang tulis baris `1. Nama/Tanggal lahir` di sisi kanan bertambah **`+4 mm` (`~15 CSS px`)** lebih lega. *(Sebaliknya, bila `padding-right` diperbesar >`14mm`, teks `1986` akan langsung terlipat ke baris kedua).*
+2. **Poin 2 (Dekatkan Sedikit Jarak `Tembusan :` ke `Zulkifli`):**
+   - Saat ini `.kgb-tembusan` memakai `margin-top: 30px` setelah `.kgb-ttd-area` (`display: flow-root`). Menurunkannya dari `30px` → **`18px`** (`-12px`) membuat jaraknya terasa proporsional (lebih dekat ke `Zulkifli`, tetap jelas terpisah, sekaligus menambah ruang aman `~3 mm` di bawah halaman Legal).
+3. **Poin 3 (Geser Tanda Tangan `Ketua,` / `Zulkifli` ke Kanan Menuju Garis Kuning):**
+   - Saat ini `.kgb-ttd-box` (`float: right`) memiliki `width: 260px` (`68.8mm`), sehingga tepi kiri `Ketua,` dan `Zulkifli` jatuh di koordinat `255/412` (`Zulkifli` berakhir di `283`).
+   - Garis vertikal kuning pengguna berada tepat di **`287–293/412`** (`~290`).
+   - Setelah `padding-right` diubah ke `10mm` (tepi konten kanan pindah ke `~392.9/412`), mengubah `.kgb-ttd-box` `width` dari `260px` → **`200px`** (`52.9mm`) akan menempatkan tepi kiri `Ketua,` & `Zulkifli` tepat di `~292/412` (**presisi di tanda garis kuning**) sambil tetap menyediakan ruang lebar `200px` untuk slot QR TTE (`58px`) maupun nama Ketua.
+
+### 2. Rencana Perubahan File & Parameter (Sebelum vs Sesudah)
+1. **[`modules/eoffice/cetak/cetak_kgb.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/cetak/cetak_kgb.html)**:
+   - **Poin 1:** Ubah `.kgb-print-wrapper` `padding` dari `9mm 14mm 10mm 20mm` -> **`9mm 10mm 10mm 20mm`** (dan perbarui komentar header & `TAG 1`: `Kanan 10mm / 1.0cm`).
+   - **Poin 2:** Ubah `.kgb-tembusan` `margin-top` dari `30px` -> **`18px`** (`-12px` mendekat ke `Zulkifli`).
+   - **Poin 3:** Ubah `.kgb-ttd-box` `width` dari `260px` -> **`200px`** (menggeser `Ketua,` & `Zulkifli` ke kanan `~60px` dari tepi kanan baru / presisi pada tanda garis kuning `~292/412`).
+2. **[`modules/eoffice/cetak/js_cetak_kgb.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/cetak/js_cetak_kgb.js)**:
+   - Selaraskan `KGB_PRINT_CONFIG` & komentar header (`wrapperPadding: "9mm 10mm 10mm 20mm"`, `marginRight: "10mm"`).
+3. **PWA Cache Bust (`v3.8.58`) & Rilis (`index.html`, `sw.js`, `prd.md`, `revisi.md`)**:
+   - Bump 3 titik `v3.8.57` -> **`v3.8.58`**, jalankan `npm test`, lalu commit & push ke `origin/main` dan `prod/main`.
+
+### 3. Estimasi Dampak & Risiko
+- **Dampak UI/Database:** Nihil perubahan backend/Firestore. Tetap 1 halaman penuh Legal (hemat tambahan `12px` vertikal di bawah).
+- **Risiko Kecil:** Pastikan margin printer di browser saat cetak tetap `Default/None` agar kanan `10mm` (`1 cm`) tercetak utuh sesuai aturan `@page { margin: 0mm !important; }`.
+
 
 
