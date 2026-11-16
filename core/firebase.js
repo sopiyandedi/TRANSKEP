@@ -1213,14 +1213,19 @@ const TranskepFirebase = {
         throw new Error(`FirebaseError: [code=permission-denied]: Akun Firebase aktif (UID: ${fbAuth.currentUser.uid}), namun claim role="${claimRole || 'kosong'}" bukan Admin/Operator di firestore.rules.`);
       }
 
-      // Auth & Admin role valid: periksa apakah dokumen lama di Firestore mengandung field usang di luar schema
+      // Auth & Admin role valid: inspeksi dokumen lama & jalur read untuk diagnosa presisi
+      let diagInfo = '';
       if (Array.isArray(allowedSchemaFields) && allowedSchemaFields.length > 0 && typeof docRef.get === 'function') {
         try {
           const snap = await docRef.get();
           if (snap && snap.exists && typeof snap.data === 'function') {
             const existing = snap.data() || {};
             const extraKeys = Object.keys(existing).filter(k => !allowedSchemaFields.includes(k));
-            if (extraKeys.length > 0) {
+            const nullKeys = Object.keys(existing).filter(k => allowedSchemaFields.includes(k) && (existing[k] === null || existing[k] === undefined));
+            const idOk = (!existing.id || existing.id === docId) &&
+                         (!existing.id_kgb || existing.id_kgb === docId) &&
+                         (!existing.id_rapat || existing.id_rapat === docId);
+            if ((extraKeys.length > 0 || nullKeys.length > 0) && idOk) {
               const sanitized = {};
               for (const k of allowedSchemaFields) {
                 if (Object.prototype.hasOwnProperty.call(existing, k) && existing[k] !== undefined && existing[k] !== null) {
@@ -1235,14 +1240,30 @@ const TranskepFirebase = {
               await docRef.set(sanitized);
               return;
             }
+            diagInfo = `docRead=OK(exists=true, keys=${Object.keys(existing).length}, idOk=${idOk}${extraKeys.length ? ', extra=' + extraKeys.join(',') : ''}${nullKeys.length ? ', nulls=' + nullKeys.join(',') : ''})`;
+          } else {
+            diagInfo = 'docRead=OK(exists=false)';
           }
         } catch (diagErr) {
+          const dCode = (diagErr && (diagErr.code || diagErr.message)) || String(diagErr);
+          diagInfo = `docRead=ERR(${dCode})`;
           console.warn(`⚠️ [TRANSKEP Firebase] Gagal inspeksi dokumen lama ${colName}/${docId}:`, diagErr);
+          try {
+            const skCol = typeof db.collection === 'function' ? db.collection(this.SK_COLLECTION || 'sk_documents') : null;
+            if (skCol && typeof skCol.limit === 'function') {
+              await skCol.limit(1).get();
+              diagInfo += '; skRead=OK';
+            }
+          } catch (skErr) {
+            const sCode = (skErr && (skErr.code || skErr.message)) || String(skErr);
+            diagInfo += `; skRead=ERR(${sCode}) [Cek Firebase App Check Enforcement]`;
+          }
         }
       }
 
       const rawMsg = (writeErr && writeErr.message) ? writeErr.message : String(writeErr);
-      throw new Error(`FirebaseError: [code=permission-denied]: Auth Admin aktif (UID: ${fbAuth.currentUser.uid}, role: ${claimRole}), namun Firestore Rules menolak ${colName}/${docId}. Detail: ${rawMsg}`);
+      const diagSuffix = diagInfo ? ` [${diagInfo}]` : '';
+      throw new Error(`FirebaseError: [code=permission-denied]: Auth Admin aktif (UID: ${fbAuth.currentUser.uid}, role: ${claimRole}), namun Firestore Rules menolak ${colName}/${docId}.${diagSuffix} Detail: ${rawMsg}`);
     }
   },
 

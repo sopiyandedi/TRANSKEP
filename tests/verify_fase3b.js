@@ -904,6 +904,7 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
             data: () => ({
               id_kgb: 'KGB-LEG-1',
               legacy_extra: 'stale-sheet-field',
+              tte_status: null,
               doc_url: 'https://docs.google.com/document/d/legacy123/edit'
             })
           }),
@@ -921,7 +922,41 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
     await browserSandbox.TranskepFirebase.saveKgbToFirestore({ id_kgb: 'KGB-LEG-1', nip: '199002022015012002', status: 'Sedang Diproses' });
     assert(writtenNonMerge && writtenNonMerge.id_kgb === 'KGB-LEG-1', 'Legacy doc must retry non-merge write');
     assert(!('legacy_extra' in writtenNonMerge), 'Legacy unknown fields must be stripped on overwrite');
+    assert(!('tte_status' in writtenNonMerge), 'Null legacy fields must be stripped on overwrite');
     assert.strictEqual(writtenNonMerge.doc_url, 'https://docs.google.com/document/d/legacy123/edit', 'Allowed legacy fields like doc_url must be preserved');
+
+    // 5. Read-probe diagnostic surfaces docRead & skRead status when Firestore read is also blocked
+    browserSandbox.TranskepFirebase.getDb = () => ({
+      collection: () => ({
+        doc: () => ({
+          get: async () => {
+            const err = new Error('Missing or insufficient permissions.');
+            err.code = 'permission-denied';
+            throw err;
+          },
+          set: async () => {
+            const err = new Error('Missing or insufficient permissions.');
+            err.code = 'permission-denied';
+            throw err;
+          }
+        }),
+        limit: () => ({
+          get: async () => {
+            const err = new Error('Missing or insufficient permissions.');
+            err.code = 'permission-denied';
+            throw err;
+          }
+        })
+      })
+    });
+    let probeErr = null;
+    try {
+      await browserSandbox.TranskepFirebase.saveKgbToFirestore({ id_kgb: 'KGB-PROBE-1', nip: '199002022015012002', status: 'Sedang Diproses' });
+    } catch (e) {
+      probeErr = e;
+    }
+    assert(probeErr && probeErr.message.includes('docRead=ERR(') && probeErr.message.includes('skRead=ERR('),
+      `Expected docRead & skRead diagnostics, got: ${probeErr && probeErr.message}`);
   } finally {
     browserSandbox.TranskepAPI.call = origApiCall;
     browserSandbox.TranskepFirebase.getDb = origGetDb;

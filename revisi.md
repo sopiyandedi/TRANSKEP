@@ -6090,4 +6090,20 @@ Item di bawah ini berisiko memutus layanan produksi (WAHA/n8n/Firestore/Drive/CD
    - Menambahkan 4 kasus uji pemulihan auth, diagnostik `permission-denied`, refresh claim kosong, dan pembersihan field legacy KGB di [`tests/verify_fase3b.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/tests/verify_fase3b.js).
    - Menaikkan versi build 3 titik **`v3.8.52`** di [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) dan [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js).
 
+---
+
+## Tahap 120: Hardening `firestore.rules` E-Office KGB/Rapat & Read-Probe Diagnostik (`v3.8.53`) (2026-11-16)
+**Tujuan:** Menyelesaikan penolakan `firestore.rules` pada `eoffice_kgb/{docId}` meskipun Auth Admin aktif sudah terverifikasi (`UID`, `role: Admin`), serta mendeteksi apabila App Check atau `allow read` ikut memblokir operasi.
+
+### Rincian Perubahan:
+1. **Audit & Hardening [`firestore.rules`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/firestore.rules) (via `firestore-rules-author`)**:
+   - Mengoptimalkan `roleLower()` menggunakan `('role' in request.auth.token)` dan `.trim().lower()`.
+   - Mengganti `is number` pada `isValidOptionalStringOrNonNegNumber` menjadi `(data[field] is int || data[field] is float) && data[field] >= 0`, serta menormalkan `isValidUrl` menjadi case-insensitive (`.lower().matches(...)`).
+   - Mendukung nilai `null` aman pada field opsional/legacy KGB (`nama`, `nokgb`, `bulan_surat`, `tahun_surat`, `gaji_lama`, `tahun_lama`, `bulan_lama`, `gaji_baru`, `tahun_baru`, `bulan_baru`, `doc_url`, `pdf_url`, `doc_id`, `tte_*`, `created_by`, `updated_by`, `tgl_selesai`, `synced_at`), melonggarkan batas string tanggal ke `0..60`, dan mengizinkan backfill `id`/`id_kgb`/`id_rapat` yang bernilai `null` atau `''` saat update.
+2. **Pembersih Field `null` & Probe Diagnostik `docRead`/`skRead` ([`core/firebase.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/core/firebase.js))**:
+   - Memperbarui `_writeDocWithDiagnostics` untuk ikut membersihkan field bernilai `null`/`undefined` pada dokumen lama serta menyertakan hasil probe `docRead` dan `skRead` (`sk_documents`) pada pesan error apabila penolakan masih berulang (mendeteksi Firebase App Check Enforcement vs penolakan schema).
+3. **Suite Regresi, Deploy Rules & PWA `v3.8.53`**:
+   - Menambahkan kasus uji pembersihan field `null` dan probe `docRead`/`skRead` di [`tests/verify_fase3b.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/tests/verify_fase3b.js).
+   - Deploy [`firestore.rules`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/firestore.rules) ke `transkep-314c0` dan sinkronisasi **`v3.8.53`** di [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) & [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js).
+
 

@@ -219,9 +219,9 @@ service cloud.firestore {
     function roleLower() {
       return (isAuthenticated() &&
               request.auth.token != null &&
-              request.auth.token.keys().hasAny(['role']) &&
+              ('role' in request.auth.token) &&
               request.auth.token.role is string)
-        ? request.auth.token.role.lower()
+        ? request.auth.token.role.trim().lower()
         : '';
     }
 
@@ -258,11 +258,27 @@ service cloud.firestore {
 
     function isValidUrl(url) {
       return url is string &&
-             (url.matches('^https://.*') || url.matches('^http://.*'));
+             (url.lower().matches('^https://.*') || url.lower().matches('^http://.*'));
     }
 
     function isValidOptionalUrlOrDash(data, field, maxLen) {
       return !(field in data) ||
+             (data[field] is string &&
+              data[field].size() <= maxLen &&
+              (data[field] == '' || data[field] == '-' || isValidUrl(data[field])));
+    }
+
+    function isValidOptionalStringOrNull(data, field, minLen, maxLen) {
+      return !(field in data) ||
+             data[field] == null ||
+             (data[field] is string &&
+              data[field].size() >= minLen &&
+              data[field].size() <= maxLen);
+    }
+
+    function isValidOptionalUrlOrDashOrNull(data, field, maxLen) {
+      return !(field in data) ||
+             data[field] == null ||
              (data[field] is string &&
               data[field].size() <= maxLen &&
               (data[field] == '' || data[field] == '-' || isValidUrl(data[field])));
@@ -286,12 +302,14 @@ service cloud.firestore {
 
     function isValidOptionalStringOrNonNegNumber(data, field, maxLen) {
       return !(field in data) ||
+             data[field] == null ||
              (data[field] is string && data[field].size() <= maxLen) ||
-             (data[field] is number && data[field] >= 0);
+             ((data[field] is int || data[field] is float) && data[field] >= 0);
     }
 
     function isValidOptionalStringOrTimestamp(data, field, maxLen) {
       return !(field in data) ||
+             data[field] == null ||
              (data[field] is string && data[field].size() <= maxLen) ||
              data[field] is timestamp;
     }
@@ -565,9 +583,9 @@ service cloud.firestore {
              data.id_kgb is string && data.id_kgb == docId && data.id_kgb.size() >= 1 && data.id_kgb.size() <= 120 &&
              data.nip is string && data.nip.size() <= 30 &&
              isValidOptionalString(data, 'nama_pegawai', 0, 150) &&
-             isValidOptionalString(data, 'nama', 0, 150) &&
+             isValidOptionalStringOrNull(data, 'nama', 0, 150) &&
              isValidOptionalString(data, 'tempat_lahir', 0, 150) &&
-             isValidOptionalString(data, 'tanggal_lahir', 0, 40) &&
+             isValidOptionalString(data, 'tanggal_lahir', 0, 60) &&
              isValidOptionalString(data, 'pangkat', 0, 100) &&
              isValidOptionalString(data, 'golongan', 0, 50) &&
              isValidOptionalString(data, 'golongan_lama', 0, 50) &&
@@ -578,13 +596,13 @@ service cloud.firestore {
              isValidOptionalStringOrNonNegNumber(data, 'bulan_surat', 50) &&
              isValidOptionalStringOrNonNegNumber(data, 'tahun_surat', 50) &&
              isValidOptionalString(data, 'nomor_surat', 0, 150) &&
-             isValidOptionalString(data, 'tanggal_surat', 0, 40) &&
+             isValidOptionalString(data, 'tanggal_surat', 0, 60) &&
              isValidOptionalString(data, 'tujuan_kppn', 0, 200) &&
              isValidOptionalStringOrNonNegNumber(data, 'gaji_lama', 50) &&
              isValidOptionalString(data, 'pejabat_lama', 0, 200) &&
              isValidOptionalString(data, 'nomor_sk_lama', 0, 150) &&
-             isValidOptionalString(data, 'tanggal_sk_lama', 0, 40) &&
-             isValidOptionalString(data, 'tmt_lama', 0, 40) &&
+             isValidOptionalString(data, 'tanggal_sk_lama', 0, 60) &&
+             isValidOptionalString(data, 'tmt_lama', 0, 60) &&
              isValidOptionalStringOrNonNegNumber(data, 'tahun_lama', 50) &&
              isValidOptionalStringOrNonNegNumber(data, 'bulan_lama', 50) &&
              isValidOptionalString(data, 'mkg_lama', 0, 50) &&
@@ -593,28 +611,28 @@ service cloud.firestore {
              isValidOptionalStringOrNonNegNumber(data, 'tahun_baru', 50) &&
              isValidOptionalStringOrNonNegNumber(data, 'bulan_baru', 50) &&
              isValidOptionalString(data, 'mkg_baru', 0, 50) &&
-             isValidOptionalString(data, 'tmt_baru', 0, 40) &&
-             isValidOptionalString(data, 'tmt_yad', 0, 40) &&
+             isValidOptionalString(data, 'tmt_baru', 0, 60) &&
+             isValidOptionalString(data, 'tmt_yad', 0, 60) &&
              isValidOptionalString(data, 'nama_ketua', 0, 150) &&
              isValidOptionalString(data, 'dasar_pp', 0, 500) &&
              data.status is string && data.status.size() >= 1 && data.status.size() <= 60 &&
              isValidOptionalUrlOrDash(data, 'file_doc_url', 1000) &&
              isValidOptionalUrlOrDash(data, 'file_pdf_url', 1000) &&
              isValidOptionalString(data, 'file_id', 0, 200) &&
-             isValidOptionalUrlOrDash(data, 'doc_url', 1000) &&
-             isValidOptionalUrlOrDash(data, 'pdf_url', 1000) &&
-             isValidOptionalString(data, 'doc_id', 0, 200) &&
-             isValidOptionalString(data, 'tanggal_input', 0, 40) &&
+             isValidOptionalUrlOrDashOrNull(data, 'doc_url', 1000) &&
+             isValidOptionalUrlOrDashOrNull(data, 'pdf_url', 1000) &&
+             isValidOptionalStringOrNull(data, 'doc_id', 0, 200) &&
+             isValidOptionalString(data, 'tanggal_input', 0, 60) &&
              isValidOptionalStringOrTimestamp(data, 'tgl_selesai', 60) &&
-             isValidOptionalString(data, 'tte_status', 0, 60) &&
-             isValidOptionalString(data, 'tte_pejabat_nip', 0, 30) &&
-             isValidOptionalString(data, 'tte_pejabat_nama', 0, 150) &&
+             isValidOptionalStringOrNull(data, 'tte_status', 0, 60) &&
+             isValidOptionalStringOrNull(data, 'tte_pejabat_nip', 0, 30) &&
+             isValidOptionalStringOrNull(data, 'tte_pejabat_nama', 0, 150) &&
              isValidOptionalStringOrTimestamp(data, 'tte_submitted_at', 60) &&
              isValidOptionalStringOrTimestamp(data, 'tte_signed_at', 60) &&
-             isValidOptionalString(data, 'tte_signer', 0, 200) &&
-             isValidOptionalString(data, 'tte_qrcode', 0, 50000) &&
-             isValidOptionalString(data, 'created_by', 0, 150) &&
-             isValidOptionalString(data, 'updated_by', 0, 150) &&
+             isValidOptionalStringOrNull(data, 'tte_signer', 0, 200) &&
+             isValidOptionalStringOrNull(data, 'tte_qrcode', 0, 50000) &&
+             isValidOptionalStringOrNull(data, 'created_by', 0, 150) &&
+             isValidOptionalStringOrNull(data, 'updated_by', 0, 150) &&
              isValidOptionalStringOrTimestamp(data, 'synced_at', 60) &&
              isValidOptionalBool(data, 'is_from_dashboard') &&
              isValidOptionalBool(data, 'is_firebase') &&
@@ -651,9 +669,9 @@ service cloud.firestore {
              isValidOptionalUrlOrDash(data, 'doc_absen_url', 1000) &&
              isValidOptionalUrlOrDash(data, 'doc_notulen_url', 1000) &&
              isValidOptionalUrlOrDash(data, 'folder_url', 1000) &&
-             isValidOptionalString(data, 'tanggal_input', 0, 40) &&
-             isValidOptionalString(data, 'created_by', 0, 150) &&
-             isValidOptionalString(data, 'updated_by', 0, 150) &&
+             isValidOptionalString(data, 'tanggal_input', 0, 60) &&
+             isValidOptionalStringOrNull(data, 'created_by', 0, 150) &&
+             isValidOptionalStringOrNull(data, 'updated_by', 0, 150) &&
              isValidOptionalStringOrTimestamp(data, 'synced_at', 60) &&
              isValidOptionalBool(data, 'is_firebase') &&
              data.updated_at is timestamp &&
@@ -836,8 +854,8 @@ service cloud.firestore {
                        isValidEofficeKgb(request.resource.data, docId);
       allow update: if isAdminOrOperator() &&
                        isValidEofficeKgb(request.resource.data, docId) &&
-                       (!('id' in resource.data) || request.resource.data.id == resource.data.id) &&
-                       (!('id_kgb' in resource.data) || request.resource.data.id_kgb == resource.data.id_kgb) &&
+                       (!('id' in resource.data) || resource.data.id == null || resource.data.id == '' || request.resource.data.id == resource.data.id) &&
+                       (!('id_kgb' in resource.data) || resource.data.id_kgb == null || resource.data.id_kgb == '' || request.resource.data.id_kgb == resource.data.id_kgb) &&
                        isValidCreatedAtOnUpdate(resource.data, request.resource.data);
       allow delete: if isAdminOrOperator();
     }
@@ -849,8 +867,8 @@ service cloud.firestore {
                        isValidEofficeRapat(request.resource.data, docId);
       allow update: if isAdminOrOperator() &&
                        isValidEofficeRapat(request.resource.data, docId) &&
-                       (!('id' in resource.data) || request.resource.data.id == resource.data.id) &&
-                       (!('id_rapat' in resource.data) || request.resource.data.id_rapat == resource.data.id_rapat) &&
+                       (!('id' in resource.data) || resource.data.id == null || resource.data.id == '' || request.resource.data.id == resource.data.id) &&
+                       (!('id_rapat' in resource.data) || resource.data.id_rapat == null || resource.data.id_rapat == '' || request.resource.data.id_rapat == resource.data.id_rapat) &&
                        isValidCreatedAtOnUpdate(resource.data, request.resource.data);
       allow delete: if isAdminOrOperator();
     }
