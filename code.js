@@ -2437,6 +2437,135 @@ function getFirebaseCustomToken(nip, clientToken) {
   }
 }
 
+/**
+ * Helper: Mendapatkan Google OAuth 2.0 Service Account Bearer Token (scope datastore)
+ * Menggunakan FIREBASE_SERVICE_ACCOUNT_JSON untuk panggilan Firestore REST terotentikasi dari server GAS
+ */
+function getFirebaseServiceAccessToken_() {
+  try {
+    const cache = CacheService.getScriptCache();
+    const cached = cache.get('transkep_fs_sa_token_v1');
+    if (cached) return cached;
+
+    const sa = parseFirebaseServiceAccount_();
+    if (!sa) return null;
+
+    const nowSec = Math.floor(Date.now() / 1000);
+    const headerB64 = base64UrlEncodeObj_({ alg: 'RS256', typ: 'JWT' });
+    const claimsObj = {
+      iss: sa.client_email,
+      sub: sa.client_email,
+      scope: 'https://www.googleapis.com/auth/datastore',
+      aud: 'https://oauth2.googleapis.com/token',
+      iat: nowSec,
+      exp: nowSec + 3600
+    };
+    const signingInput = headerB64 + '.' + base64UrlEncodeObj_(claimsObj);
+    const sigBytes = Utilities.computeRsaSha256Signature(signingInput, sa.private_key);
+    const jwtAssertion = signingInput + '.' + Utilities.base64EncodeWebSafe(sigBytes).replace(/=+$/, '');
+
+    const resp = UrlFetchApp.fetch('https://oauth2.googleapis.com/token', {
+      method: 'post',
+      contentType: 'application/x-www-form-urlencoded',
+      payload: 'grant_type=' + encodeURIComponent('urn:ietf:params:oauth:grant-type:jwt-bearer') + '&assertion=' + encodeURIComponent(jwtAssertion),
+      muteHttpExceptions: true
+    });
+    if (resp.getResponseCode() !== 200) return null;
+    const tokenJson = JSON.parse(resp.getContentText() || '{}');
+    if (tokenJson && tokenJson.access_token) {
+      cache.put('transkep_fs_sa_token_v1', String(tokenJson.access_token), 3000);
+      return String(tokenJson.access_token);
+    }
+    return null;
+  } catch (e) {
+    Logger.log('⚠️ [getFirebaseServiceAccessToken_] ' + e.toString());
+    return null;
+  }
+}
+
+function firestoreRestDocUrl_(collectionName, docId) {
+  const sa = parseFirebaseServiceAccount_();
+  const projectId = (sa && sa.project_id) || 'transkep-314c0';
+  return 'https://firestore.googleapis.com/v1/projects/' + encodeURIComponent(projectId) +
+    '/databases/(default)/documents/' + encodeURIComponent(String(collectionName)) + '/' + encodeURIComponent(String(docId || '').trim());
+}
+
+function firestoreFieldsToJs_(fields) {
+  const out = {};
+  if (!fields || typeof fields !== 'object') return out;
+  const keys = Object.keys(fields);
+  for (let i = 0; i < keys.length; i++) {
+    const k = keys[i];
+    const v = fields[k];
+    if (!v || typeof v !== 'object') continue;
+    if (v.stringValue !== undefined) out[k] = String(v.stringValue);
+    else if (v.booleanValue !== undefined) out[k] = Boolean(v.booleanValue);
+    else if (v.integerValue !== undefined) out[k] = Number(v.integerValue);
+    else if (v.doubleValue !== undefined) out[k] = Number(v.doubleValue);
+    else if (v.timestampValue !== undefined) out[k] = String(v.timestampValue);
+    else if (v.nullValue !== undefined) out[k] = null;
+  }
+  return out;
+}
+
+function firestoreRestGet_(collectionName, docId) {
+  try {
+    const url = firestoreRestDocUrl_(collectionName, docId);
+    const token = getFirebaseServiceAccessToken_();
+    const opts = { method: 'get', muteHttpExceptions: true };
+    if (token) opts.headers = { Authorization: 'Bearer ' + token };
+    const resp = UrlFetchApp.fetch(url, opts);
+    if (resp.getResponseCode() !== 200) return null;
+    const doc = JSON.parse(resp.getContentText() || '{}');
+    return firestoreFieldsToJs_(doc.fields || {});
+  } catch (e) {
+    return null;
+  }
+}
+
+function firestoreRestPatch_(collectionName, docId, fieldMap) {
+  try {
+    if (!fieldMap || typeof fieldMap !== 'object') return { ok: false, statusCode: 0 };
+    const keys = Object.keys(fieldMap);
+    const masks = [];
+    const fields = {};
+    for (let i = 0; i < keys.length; i++) {
+      const k = keys[i];
+      const val = fieldMap[k];
+      if (val === undefined) continue;
+      masks.push('updateMask.fieldPaths=' + encodeURIComponent(k));
+      if (val && typeof val === 'object' && val.__timestamp === true) {
+        fields[k] = { timestampValue: new Date().toISOString() };
+      } else if (typeof val === 'boolean') {
+        fields[k] = { booleanValue: val };
+      } else if (typeof val === 'number' && !isNaN(val)) {
+        fields[k] = Number.isInteger(val) ? { integerValue: String(val) } : { doubleValue: val };
+      } else if (val === null) {
+        fields[k] = { nullValue: null };
+      } else {
+        fields[k] = { stringValue: String(val) };
+      }
+    }
+    if (masks.length === 0) return { ok: true, statusCode: 200 };
+
+    const patchUrl = firestoreRestDocUrl_(collectionName, docId) + '?' + masks.join('&');
+    const token = getFirebaseServiceAccessToken_();
+    const opts = {
+      method: 'patch',
+      contentType: 'application/json',
+      payload: JSON.stringify({ fields: fields }),
+      muteHttpExceptions: true
+    };
+    if (token) opts.headers = { Authorization: 'Bearer ' + token };
+    const resp = UrlFetchApp.fetch(patchUrl, opts);
+    const code = resp.getResponseCode();
+    return { ok: code >= 200 && code < 300, statusCode: code };
+  } catch (e) {
+    Logger.log('⚠️ [firestoreRestPatch_] ' + e.toString());
+    return { ok: false, statusCode: 0, error: e.toString() };
+  }
+}
+
 function checkInfraSecrets(adminNip, clientToken) {
   try {
     const sess = resolveCallerSession_(adminNip, clientToken);

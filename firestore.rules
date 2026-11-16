@@ -165,7 +165,8 @@ rules_version = '2';
 //     dasar_pp, status, file_doc_url, file_pdf_url, file_id, doc_url,
 //     pdf_url, doc_id, tanggal_input, tgl_selesai, tte_status,
 //     tte_pejabat_nip, tte_pejabat_nama, tte_submitted_at, tte_signed_at,
-//     tte_signer, tte_qrcode, created_by, updated_by, synced_at,
+//     tte_signer, tte_qrcode, mysims_requested, mysims_status, mysims_idp,
+//     mysims_requested_at, created_by, updated_by, synced_at,
 //     is_from_dashboard, is_firebase, updated_at, created_at
 //
 // Collection: eoffice_rapat
@@ -610,7 +611,9 @@ service cloud.firestore {
         'nama_ketua', 'dasar_pp', 'status', 'file_doc_url', 'file_pdf_url', 'file_id',
         'doc_url', 'pdf_url', 'doc_id', 'tanggal_input', 'tgl_selesai',
         'tte_status', 'tte_pejabat_nip', 'tte_pejabat_nama', 'tte_submitted_at',
-        'tte_signed_at', 'tte_signer', 'tte_qrcode', 'created_by', 'updated_by',
+        'tte_signed_at', 'tte_signer', 'tte_qrcode',
+        'mysims_requested', 'mysims_status', 'mysims_idp', 'mysims_requested_at',
+        'created_by', 'updated_by',
         'synced_at', 'is_from_dashboard', 'is_firebase', 'updated_at', 'created_at'
       ];
       return hasRequiredFields(['id', 'id_kgb', 'nip', 'status', 'updated_at']) &&
@@ -624,6 +627,10 @@ service cloud.firestore {
              isValidOptionalUrlOrDash(data, 'file_pdf_url', 1000) &&
              isValidOptionalUrlOrDashOrNull(data, 'doc_url', 1000) &&
              isValidOptionalUrlOrDashOrNull(data, 'pdf_url', 1000) &&
+             isValidOptionalBool(data, 'mysims_requested') &&
+             isValidOptionalString(data, 'mysims_status', 0, 100) &&
+             isValidOptionalString(data, 'mysims_idp', 0, 60) &&
+             isValidOptionalString(data, 'mysims_requested_at', 0, 60) &&
              isValidOptionalBool(data, 'is_from_dashboard') &&
              isValidOptionalBool(data, 'is_firebase') &&
              data.updated_at is timestamp &&

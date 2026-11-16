@@ -70,6 +70,11 @@ function handleApiGet_(e) {
       return jsonResponse_(updateNomorSuratTugasFromExternal_(params));
     }
 
+    // 7. Update Nomor Surat Keluar KGB MYSIMS (GET fallback)
+    if (action === 'updateNomorSuratKgb') {
+      return jsonResponse_(updateNomorSuratKgbFromExternal_(params));
+    }
+
     return jsonResponse_({
       status: 'error',
       message: "Aksi GET '" + action + "' tidak dikenali atau memerlukan metode POST."
@@ -170,6 +175,9 @@ function handleApiPost_(payload, e) {
       case 'saveOrGenerateKgbDoc':
         return jsonResponse_(saveOrGenerateKgbDoc(payload.data, payload.actionType, payload.nip, payload.token));
 
+      case 'requestKgbSuratKeluar':
+        return jsonResponse_(requestKgbSuratKeluar(payload.data, payload.nip, payload.token));
+
       case 'deleteKgbDocRecord':
         return jsonResponse_(deleteKgbDocRecord(payload.id_kgb || payload.idKgb, payload.targetNip, payload.resetUserStatus, payload.nip, payload.token));
 
@@ -205,6 +213,9 @@ function handleApiPost_(payload, e) {
 
       case 'updateNomorSuratTugas':
         return jsonResponse_(updateNomorSuratTugasFromExternal_(payload));
+
+      case 'updateNomorSuratKgb':
+        return jsonResponse_(updateNomorSuratKgbFromExternal_(payload));
 
       // Fallback: Hanya izinkan method dalam whitelist RPC resmi
       default:
@@ -244,6 +255,7 @@ var AUTHENTICATED_RPC_METHODS_ = {
   forwardTmtDateByFrontend: true,
   getEofficeData: true,
   saveOrGenerateKgbDoc: true,
+  requestKgbSuratKeluar: true,
   deleteKgbDocRecord: true,
   createPaketRapatDocs: true,
   saveJobdes: true,

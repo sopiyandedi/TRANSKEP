@@ -314,32 +314,47 @@ function triggerN8nSuratTugas_(idST, payload) {
  */
 function syncFirestoreSuratTugasNumbers_(idST, nomorST, ekstra, pesertaList) {
   try {
+    const updates = {};
+    if (nomorST && String(nomorST).trim() !== '') {
+      updates.nomor = String(nomorST).trim();
+    }
+    if (ekstra) {
+      updates.data_ekstra = typeof ekstra === 'string' ? ekstra : JSON.stringify(ekstra);
+    }
+    if (pesertaList) {
+      updates.peserta = typeof pesertaList === 'string' ? pesertaList : JSON.stringify(pesertaList);
+    }
+    if (Object.keys(updates).length === 0) return;
+
+    if (typeof firestoreRestPatch_ === 'function') {
+      firestoreRestPatch_('surat_tugas_documents', idST, updates);
+      return;
+    }
+
     const baseUrl = 'https://firestore.googleapis.com/v1/projects/transkep-314c0/databases/(default)/documents/surat_tugas_documents/' + encodeURIComponent(String(idST).trim());
     const masks = [];
     const fields = {};
-
-    if (nomorST && String(nomorST).trim() !== '') {
+    if (updates.nomor !== undefined) {
       masks.push('updateMask.fieldPaths=nomor');
-      fields.nomor = { stringValue: String(nomorST).trim() };
+      fields.nomor = { stringValue: updates.nomor };
     }
-    if (ekstra) {
+    if (updates.data_ekstra !== undefined) {
       masks.push('updateMask.fieldPaths=data_ekstra');
-      fields.data_ekstra = { stringValue: typeof ekstra === 'string' ? ekstra : JSON.stringify(ekstra) };
+      fields.data_ekstra = { stringValue: updates.data_ekstra };
     }
-    if (pesertaList) {
+    if (updates.peserta !== undefined) {
       masks.push('updateMask.fieldPaths=peserta');
-      fields.peserta = { stringValue: typeof pesertaList === 'string' ? pesertaList : JSON.stringify(pesertaList) };
+      fields.peserta = { stringValue: updates.peserta };
     }
-
-    if (masks.length === 0) return;
-
-    const patchUrl = baseUrl + '?' + masks.join('&');
-    UrlFetchApp.fetch(patchUrl, {
+    const token = (typeof getFirebaseServiceAccessToken_ === 'function') ? getFirebaseServiceAccessToken_() : null;
+    const opts = {
       method: 'patch',
       contentType: 'application/json',
       payload: JSON.stringify({ fields: fields }),
       muteHttpExceptions: true
-    });
+    };
+    if (token) opts.headers = { Authorization: 'Bearer ' + token };
+    UrlFetchApp.fetch(baseUrl + '?' + masks.join('&'), opts);
   } catch (errFs) {
     Logger.log("⚠️ [Firestore ST Sync Warning] " + errFs.toString());
   }
@@ -350,12 +365,22 @@ function syncFirestoreSuratTugasNumbers_(idST, nomorST, ekstra, pesertaList) {
  */
 function fetchFirestoreSuratTugasRow_(idST) {
   try {
-    const url = 'https://firestore.googleapis.com/v1/projects/transkep-314c0/databases/(default)/documents/surat_tugas_documents/' + encodeURIComponent(String(idST).trim());
-    const resp = UrlFetchApp.fetch(url, { method: 'get', muteHttpExceptions: true });
-    if (resp.getResponseCode() !== 200) return null;
-    const doc = JSON.parse(resp.getContentText());
-    const f = doc.fields || {};
-    const s = function(k) { return (f[k] && f[k].stringValue !== undefined) ? String(f[k].stringValue) : ''; };
+    let rec = (typeof firestoreRestGet_ === 'function') ? firestoreRestGet_('surat_tugas_documents', idST) : null;
+    if (!rec) {
+      const url = 'https://firestore.googleapis.com/v1/projects/transkep-314c0/databases/(default)/documents/surat_tugas_documents/' + encodeURIComponent(String(idST).trim());
+      const token = (typeof getFirebaseServiceAccessToken_ === 'function') ? getFirebaseServiceAccessToken_() : null;
+      const opts = { method: 'get', muteHttpExceptions: true };
+      if (token) opts.headers = { Authorization: 'Bearer ' + token };
+      const resp = UrlFetchApp.fetch(url, opts);
+      if (resp.getResponseCode() !== 200) return null;
+      const doc = JSON.parse(resp.getContentText());
+      const f = doc.fields || {};
+      rec = {};
+      Object.keys(f).forEach(function(k) {
+        if (f[k] && f[k].stringValue !== undefined) rec[k] = String(f[k].stringValue);
+      });
+    }
+    const s = function(k) { return (rec[k] !== undefined && rec[k] !== null) ? String(rec[k]) : ''; };
     return [
       s('id') || String(idST),
       s('waktu') || Utilities.formatDate(new Date(), 'Asia/Jakarta', 'dd/MM/yyyy HH:mm:ss'),

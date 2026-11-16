@@ -512,3 +512,290 @@ function createKgbGoogleDoc_(p, idKgb) {
     pdfUrl: pdfFile.getUrl()
   };
 }
+
+// =========================================================================
+// INTEGRASI SURAT KELUAR MYSIMS KGB VIA N8N (1 NOMOR KETUA PA - KPA.W10-A2)
+// =========================================================================
+
+/**
+ * Helper: Konversi tanggal Indonesia/ISO/slash ke YYYY-MM-DD untuk form date MYSIMS
+ */
+function resolveIsoDateForMysimsKgb_(rawVal) {
+  const todayIso = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'yyyy-MM-dd');
+  if (!rawVal) return todayIso;
+  const s = String(rawVal).trim();
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+
+  const blnMap = {
+    'januari': '01', 'jan': '01', 'februari': '02', 'feb': '02', 'maret': '03', 'mar': '03',
+    'april': '04', 'apr': '04', 'mei': '05', 'may': '05', 'juni': '06', 'jun': '06',
+    'juli': '07', 'jul': '07', 'agustus': '08', 'agu': '08', 'agt': '08',
+    'september': '09', 'sep': '09', 'oktober': '10', 'okt': '10', 'oct': '10',
+    'november': '11', 'nov': '11', 'desember': '12', 'des': '12', 'dec': '12'
+  };
+  const m = s.match(/(\d{1,2})\s+([a-zA-Z]+)\s+(\d{4})/);
+  if (m) {
+    const mon = blnMap[m[2].toLowerCase()] || '01';
+    return m[3] + '-' + mon + '-' + ('0' + m[1]).slice(-2);
+  }
+  const sl = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  if (sl) {
+    return sl[3] + '-' + ('0' + sl[2]).slice(-2) + '-' + ('0' + sl[1]).slice(-2);
+  }
+  return todayIso;
+}
+
+function hasAssignedKgbNumber_(rec) {
+  if (!rec) return false;
+  const no = String(rec.nokgb || '').trim();
+  const full = String(rec.nomor_surat || '').trim();
+  if (no && no !== '...' && no !== '......' && no !== '-') return true;
+  if (full && /^\d+\//.test(full)) return true;
+  return false;
+}
+
+/**
+ * RPC Admin Terotorisasi: Meminta Nomor Surat Keluar Ketua MYSIMS (sekali saja saat simpan pertama)
+ */
+function requestKgbSuratKeluar(payload, adminNip, clientToken) {
+  let lock = null;
+  try {
+    if (Array.isArray(payload)) {
+      adminNip = adminNip || payload[1];
+      clientToken = clientToken || payload[2];
+      payload = payload[0] || {};
+    }
+    if (!cekOtorisasiAdmin(adminNip, clientToken)) {
+      return { status: 'error', message: 'Akses Ditolak: Permintaan nomor surat keluar KGB hanya untuk Admin/Operator.' };
+    }
+    if (!payload || !payload.id_kgb || !payload.nip) {
+      return { status: 'error', message: "Parameter 'id_kgb' dan 'nip' wajib disertakan." };
+    }
+
+    const idKgb = String(payload.id_kgb).trim();
+    if (hasAssignedKgbNumber_(payload) || payload.mysims_requested === true) {
+      return {
+        status: 'already_exists',
+        message: 'Berkas KGB ini sudah memiliki atau sedang memproses nomor surat MYSIMS.',
+        id_kgb: idKgb,
+        nokgb: payload.nokgb || '',
+        nomor_surat: payload.nomor_surat || ''
+      };
+    }
+
+    try {
+      lock = LockService.getScriptLock();
+      lock.waitLock(5000);
+    } catch (eLock) {}
+
+    const cache = CacheService.getScriptCache();
+    const guardKey = 'kgb_sk_req_' + idKgb;
+    if (cache.get(guardKey)) {
+      return {
+        status: 'already_exists',
+        message: 'Permintaan nomor surat keluar KGB sedang diproses. Edit ke-2 tidak meminta nomor ulang.',
+        id_kgb: idKgb
+      };
+    }
+
+    // Cek langsung ke Cloud Firestore jika tersedia untuk memastikan edit ke-2 tidak meminta nomor ulang
+    if (typeof firestoreRestGet_ === 'function') {
+      const existingFs = firestoreRestGet_('eoffice_kgb', idKgb);
+      if (existingFs && hasAssignedKgbNumber_(existingFs)) {
+        return {
+          status: 'already_exists',
+          message: 'Nomor surat keluar KGB sudah tercatat di Firestore.',
+          id_kgb: idKgb,
+          nokgb: existingFs.nokgb || '',
+          nomor_surat: existingFs.nomor_surat || ''
+        };
+      }
+    }
+
+    // Simpan snapshot sementara & kunci anti-double trigger (600 detik, aman sesuai limit CacheService)
+    cache.put(guardKey, '1', 600);
+    try {
+      cache.put('kgb_snap_' + idKgb, JSON.stringify(payload), 1800);
+    } catch (eSnap) {}
+
+    const sendRes = triggerN8nSuratKeluarKgb_(idKgb, payload);
+    if (!sendRes.ok) {
+      cache.remove(guardKey);
+      if (typeof firestoreRestPatch_ === 'function') {
+        firestoreRestPatch_('eoffice_kgb', idKgb, {
+          mysims_requested: false,
+          mysims_status: 'Gagal Menghubungi MYSIMS'
+        });
+      }
+      return { status: 'error', message: sendRes.message || 'Gagal menghubungi webhook n8n MYSIMS.' };
+    }
+
+    return {
+      status: 'success',
+      message: 'Permintaan nomor surat keluar Ketua (KPA.W10-A2/KP2.1.2) berhasil dikirim ke MYSIMS.',
+      id_kgb: idKgb
+    };
+  } catch (err) {
+    Logger.log('⚠️ [requestKgbSuratKeluar Error] ' + err.toString());
+    return { status: 'error', message: err.toString() };
+  } finally {
+    if (lock) {
+      try { lock.releaseLock(); } catch (eRel) {}
+    }
+  }
+}
+
+/**
+ * Mengirim Event KGB_SURAT_KELUAR ke n8n (Selalu 1 Nomor Ketua PA Indramayu)
+ */
+function triggerN8nSuratKeluarKgb_(idKgb, payload) {
+  try {
+    const props = PropertiesService.getScriptProperties();
+    const webhookUrl = props.getProperty('N8N_WEBHOOK_SURAT_KELUAR') ||
+      'https://supernova-endpoint-unsubtly.ngrok-free.dev/webhook/generate-surat-keluar';
+    const verifiedExecUrl = props.getProperty('TRANSKEP_EXEC_URL') ||
+      'https://script.google.com/macros/s/AKfycbzFrbQTqmVzMio7mderK-S9ntFVjXiWYFgnXfy9fW_SUKOcIxfPywP2He1flhaK_AZ0ZA/exec';
+
+    const namaPegawai = String(payload.nama_pegawai || payload.nama || 'Pegawai').trim();
+    const tglSuratIso = resolveIsoDateForMysimsKgb_(payload.tanggal_surat);
+
+    const payloadN8n = {
+      event: 'KGB_SURAT_KELUAR',
+      id_kgb: String(idKgb),
+      nip: String(payload.nip || '').trim(),
+      nama_pegawai: namaPegawai,
+      tanggal_surat: tglSuratIso,
+      callback_url: verifiedExecUrl,
+      secret_key: props.getProperty('TRANSKEP_WEBHOOK_KEY') || 'TRANSKEP_WA_BOT_2026',
+      kgb_snapshot: payload,
+      task: {
+        tipe: 'KGB',
+        jabatan_penandatangan: 'Ketua',
+        kode_klasifikasi: 'KP2.1.2',
+        kepada: 'Kepala KPPN Cirebon (a.n. ' + namaPegawai + ')',
+        uraian: 'Pemberitahuan Kenaikan Gaji Berkala a.n. ' + namaPegawai,
+        ket: 'KGB ' + namaPegawai,
+        tgl_surat: tglSuratIso
+      },
+      timestamp: new Date().toISOString()
+    };
+
+    const resp = UrlFetchApp.fetch(webhookUrl, {
+      method: 'post',
+      contentType: 'application/json',
+      payload: JSON.stringify(payloadN8n),
+      muteHttpExceptions: true
+    });
+    const code = Number(resp.getResponseCode() || 0);
+    Logger.log('✅ [n8n KGB Trigger] Webhook KGB_SURAT_KELUAR terkirim (' + idKgb + '). Code: ' + code);
+    if (code >= 200 && code < 400) {
+      return { ok: true, code: code };
+    }
+    return { ok: false, code: code, message: 'Webhook n8n merespon HTTP ' + code };
+  } catch (err) {
+    Logger.log('⚠️ [triggerN8nSuratKeluarKgb_ Error] ' + err.toString());
+    return { ok: false, code: 0, message: err.toString() };
+  }
+}
+
+/**
+ * Callback Resmi dari n8n:
+ * 1. Verifikasi constant-time TRANSKEP_WEBHOOK_KEY
+ * 2. Update nokgb & nomor_surat MYSIMS ke Cloud Firestore eoffice_kgb (via OAuth2 Bearer)
+ * 3. Kompilasi PDF KGB bernomor resmi via kgb_pdf_compiler.js -> kembalikan ke n8n untuk upload ke MYSIMS
+ */
+function updateNomorSuratKgbFromExternal_(payload) {
+  try {
+    const idKgb = payload ? String(payload.id_kgb || payload.id || '').trim() : '';
+    const nomorRaw = payload ? String(payload.nomor_surat || payload.no_surat || '').trim() : '';
+    if (!payload || !idKgb || !nomorRaw) {
+      return { status: 'error', message: "Parameter 'id_kgb' dan 'nomor_surat' wajib disertakan." };
+    }
+
+    const scriptProps = PropertiesService.getScriptProperties();
+    const configuredKey = String(scriptProps.getProperty('TRANSKEP_WEBHOOK_KEY') || 'TRANSKEP_WA_BOT_2026').trim();
+    const incomingKey = String(payload.secret_key || '').trim();
+    const isKeyMatch = (typeof constantTimeEquals_ === 'function')
+      ? constantTimeEquals_(incomingKey, configuredKey)
+      : (incomingKey !== '' && incomingKey === configuredKey);
+    if (!incomingKey || !isKeyMatch) {
+      return { status: 'error', message: 'Akses ditolak: Secret Key tidak valid.' };
+    }
+
+    if (nomorRaw.indexOf('NOMOR_MYSIMS_TERCATAT') !== -1 || nomorRaw.indexOf('...') !== -1) {
+      return { status: 'error', message: 'Nomor surat KGB tidak valid.' };
+    }
+
+    const segs = nomorRaw.split('/');
+    const nokgb = String(segs[0] || '').trim();
+    const bulanSurat = (segs.length >= 5 && segs[3]) ? String(segs[3]).trim() : '';
+    const tahunSurat = (segs.length >= 5 && segs[4]) ? String(segs[4]).trim() : '';
+
+    // Susun data KGB terlengkap: Cache Snapshot + Payload Snapshot + Cloud Firestore
+    let snapCached = {};
+    try {
+      const rawSnap = CacheService.getScriptCache().get('kgb_snap_' + idKgb);
+      if (rawSnap) snapCached = JSON.parse(rawSnap);
+    } catch (eSnap) {}
+
+    let snapPayload = {};
+    if (payload.kgb_snapshot) {
+      try {
+        snapPayload = (typeof payload.kgb_snapshot === 'string')
+          ? JSON.parse(payload.kgb_snapshot)
+          : payload.kgb_snapshot;
+      } catch (ePs) {}
+    }
+
+    let fsRecord = null;
+    if (typeof firestoreRestGet_ === 'function') {
+      fsRecord = firestoreRestGet_('eoffice_kgb', idKgb);
+    }
+
+    const mergedRecord = Object.assign({}, snapCached, snapPayload, fsRecord || {}, {
+      id: idKgb,
+      id_kgb: idKgb,
+      nokgb: nokgb,
+      nomor_surat: nomorRaw
+    });
+    if (bulanSurat) mergedRecord.bulan_surat = bulanSurat;
+    if (tahunSurat) mergedRecord.tahun_surat = tahunSurat;
+
+    // Sinkronkan nomor MYSIMS balik ke Cloud Firestore agar UI E-Office Browser langsung update (<1s)
+    let firestoreSynced = false;
+    if (typeof firestoreRestPatch_ === 'function') {
+      const patchFields = {
+        nokgb: nokgb,
+        nomor_surat: nomorRaw,
+        mysims_requested: true,
+        mysims_status: 'Nomor Terbit MYSIMS',
+        mysims_idp: String(payload.idp || ''),
+        updated_at: { __timestamp: true }
+      };
+      if (bulanSurat) patchFields.bulan_surat = bulanSurat;
+      if (tahunSurat) patchFields.tahun_surat = tahunSurat;
+      const patchRes = firestoreRestPatch_('eoffice_kgb', idKgb, patchFields);
+      firestoreSynced = Boolean(patchRes && patchRes.ok);
+    }
+
+    // Kompilasi PDF KGB resmi bernomor surat keluar Ketua untuk disuntikkan balik ke MYSIMS
+    let pdfKgb = { pdf_base64: '', pdf_filename: 'sk_kgb.pdf' };
+    if (typeof generateKgbPdfBase64_ === 'function') {
+      pdfKgb = generateKgbPdfBase64_(mergedRecord, nomorRaw);
+    }
+
+    Logger.log('✅ [n8n KGB Callback] ID ' + idKgb + ' -> ' + nomorRaw + ' (Firestore=' + firestoreSynced + ', PDF=' + (pdfKgb.pdf_base64 ? 'OK' : 'NO') + ')');
+    return {
+      status: 'success',
+      message: 'Nomor surat keluar KGB berhasil diperbarui & PDF siap diunggah ke MYSIMS.',
+      id_kgb: idKgb,
+      nokgb: nokgb,
+      nomor_surat: nomorRaw,
+      firestore_synced: firestoreSynced,
+      pdf_kgb: pdfKgb
+    };
+  } catch (err) {
+    Logger.log('❌ [updateNomorSuratKgbFromExternal_ Error] ' + err.toString());
+    return { status: 'error', message: err.toString() };
+  }
+}

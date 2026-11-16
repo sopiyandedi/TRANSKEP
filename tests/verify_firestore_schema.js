@@ -210,6 +210,10 @@ assert(TF && typeof TF === 'object', 'TranskepFirebase failed to load');
     tte_pejabat_nip: '198001012005011001',
     tte_pejabat_nama: 'Ketua PA Indramayu',
     tte_submitted_at: '2026-11-16T09:00:00.000Z',
+    mysims_requested: true,
+    mysims_status: 'Nomor Terbit MYSIMS',
+    mysims_idp: '1088',
+    mysims_requested_at: '2026-11-16T08:59:00.000Z',
     created_by: '198001012005011001'
   });
   await TF.saveRapatToFirestore({ id: 'RPT-1', status: 'Selesai' });

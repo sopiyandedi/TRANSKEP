@@ -1060,6 +1060,103 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
     kgbVm.printKgbFromModal();
     assert(collectedKgbPayload && collectedKgbPayload.tempat_lahir === '' && collectedKgbPayload.tanggal_lahir === '6 Juli 1975' && collectedKgbPayload.pangkat === 'Penata Tk. I (III/d)',
       'collectKgbFormPayload_ must emit empty tempat_lahir, NIP birthdate, and Tk. I rank');
+
+    // 8. Tahap 127 regressions: 1st-save MYSIMS auto-request vs 2nd-edit no re-request + n8n KGB routing
+    const eofficeDataSrc = fs.readFileSync('modules/eoffice/eoffice_data.js', 'utf8');
+    const savedKgbDocs = [];
+    const requestedKgbCalls = [];
+    let mockRequestKgbResp = { status: 'success', id_kgb: 'KGB-19750706-2026' };
+    const eofficeDataVm = {
+      console,
+      localStorage: { getItem: () => '', setItem: () => {} },
+      TranskepFirebase: {
+        isReady: () => true,
+        saveKgbToFirestore: async (doc) => { savedKgbDocs.push(JSON.parse(JSON.stringify(doc))); return doc; },
+        deleteKgbFromFirestore: async () => true
+      },
+      TranskepAPI: {
+        call: async (method, ...args) => {
+          if (method === 'requestKgbSuratKeluar') {
+            requestedKgbCalls.push(args[0]);
+            return mockRequestKgbResp;
+          }
+          return { status: 'success' };
+        }
+      }
+    };
+    eofficeDataVm.window = eofficeDataVm;
+    vm.createContext(eofficeDataVm);
+    vm.runInContext(eofficeDataSrc, eofficeDataVm, { filename: 'modules/eoffice/eoffice_data.js' });
+
+    const firstSaveRes = await eofficeDataVm.EofficeDataService.saveOrGenerateKgb({
+      id_kgb: 'DRAFT-197507062014051001',
+      nip: '197507062014051001',
+      nama_pegawai: 'Ade Badrujaman, S.H.I.',
+      tmt_baru: '1 Januari 2027',
+      nokgb: '',
+      nomor_surat: '....../KPA.W10-A2/KP2.1.2/I/2027',
+      mysims_requested: false
+    }, 'draft', '198001012005011001', 'tok-adm');
+    assert.strictEqual(firstSaveRes.status, 'success');
+    assert.strictEqual(firstSaveRes.mysims_requested_now, true);
+    assert.strictEqual(requestedKgbCalls.length, 1, '1st KGB draft save without number must trigger requestKgbSuratKeluar once');
+    assert.strictEqual(savedKgbDocs[0].mysims_requested, true, '1st KGB save must persist mysims_requested: true');
+
+    // Edit ke-2 (masih belum dapat nomor callback, tapi mysims_requested sudah true)
+    const secondEditNoNumRes = await eofficeDataVm.EofficeDataService.saveOrGenerateKgb({
+      id_kgb: firstSaveRes.id_kgb,
+      nip: '197507062014051001',
+      nama_pegawai: 'Ade Badrujaman, S.H.I.',
+      tmt_baru: '1 Januari 2027',
+      nokgb: '',
+      nomor_surat: '....../KPA.W10-A2/KP2.1.2/I/2027',
+      mysims_requested: true,
+      mysims_status: 'Meminta Nomor MYSIMS'
+    }, 'draft', '198001012005011001', 'tok-adm');
+    assert.strictEqual(secondEditNoNumRes.mysims_requested_now, false);
+    assert.strictEqual(requestedKgbCalls.length, 1, '2nd KGB edit when mysims_requested=true must NOT request MYSIMS again');
+
+    // Edit ke-3 (nomor MYSIMS sudah terisi)
+    const thirdEditWithNumRes = await eofficeDataVm.EofficeDataService.saveOrGenerateKgb({
+      id_kgb: firstSaveRes.id_kgb,
+      nip: '197507062014051001',
+      nama_pegawai: 'Ade Badrujaman, S.H.I.',
+      tmt_baru: '1 Januari 2027',
+      nokgb: '777',
+      nomor_surat: '777/KPA.W10-A2/KP2.1.2/I/2027',
+      mysims_requested: true
+    }, 'draft', '198001012005011001', 'tok-adm');
+    assert.strictEqual(thirdEditWithNumRes.mysims_requested_now, false);
+    assert.strictEqual(requestedKgbCalls.length, 1, 'KGB edit with existing nomor must NOT request MYSIMS again');
+
+    // Rollback flag when MYSIMS request fails
+    savedKgbDocs.length = 0;
+    mockRequestKgbResp = { status: 'error', message: 'n8n offline' };
+    const failRetrySaveRes = await eofficeDataVm.EofficeDataService.saveOrGenerateKgb({
+      id_kgb: 'KGB-RETRY-1',
+      nip: '197507062014051001',
+      nama_pegawai: 'Pegawai Retry',
+      nokgb: '',
+      nomor_surat: '',
+      mysims_requested: false
+    }, 'draft', '198001012005011001', 'tok-adm');
+    assert.strictEqual(failRetrySaveRes.mysims_res.status, 'error');
+    assert.strictEqual(savedKgbDocs[savedKgbDocs.length - 1].mysims_requested, false, 'Failed MYSIMS trigger must reset mysims_requested=false for safe retry');
+
+    // n8n Workflow Routing Verification (ST index 0, KGB index 1, Cuti fallback index 2)
+    const n8nWf = JSON.parse(fs.readFileSync('n8n/n8n_workflow_mysims_surat_keluar.example.json', 'utf8'));
+    const switchNode = n8nWf.nodes.find(n => n.id === 'switch-router');
+    assert(switchNode && switchNode.parameters.rules.values.length === 2, 'Router Event Surat Keluar must have 2 rules (ST_TERPADU + KGB_SURAT_KELUAR)');
+    assert.strictEqual(switchNode.parameters.rules.values[0].conditions.conditions[0].rightValue, 'ST_TERPADU');
+    assert.strictEqual(switchNode.parameters.rules.values[1].conditions.conditions[0].rightValue, 'KGB_SURAT_KELUAR');
+    const routerConns = n8nWf.connections['Router Event Surat Keluar'].main;
+    assert.strictEqual(routerConns.length, 3, 'Router must keep 3 outputs (ST=0, KGB=1, Cuti fallback=2)');
+    assert.strictEqual(routerConns[0][0].node, 'Mesin Otomasi ST Terpadu');
+    assert.strictEqual(routerConns[1][0].node, 'Mesin Otomasi KGB MYSIMS');
+    assert.strictEqual(routerConns[2][0].node, 'Mesin Otomasi MYSIMS & Callback');
+    const kgbCodeNode = n8nWf.nodes.find(n => n.name === 'Mesin Otomasi KGB MYSIMS');
+    assert(kgbCodeNode && kgbCodeNode.parameters.jsCode.includes('KPA.W10-A2') && kgbCodeNode.parameters.jsCode.includes('KP2.1.2') && kgbCodeNode.parameters.jsCode.includes('updateNomorSuratKgb'),
+      'Mesin Otomasi KGB MYSIMS must target KPA.W10-A2 / KP2.1.2 and updateNomorSuratKgb callback');
   } finally {
     browserSandbox.TranskepAPI.call = origApiCall;
     browserSandbox.TranskepFirebase.getDb = origGetDb;

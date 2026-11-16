@@ -640,11 +640,25 @@ const EofficeDataService = {
         targetStatus = payload.status;
       }
 
+      const rawNoKgb = String(payload.nokgb || '').trim();
+      const rawNoSurat = String(payload.nomor_surat || '').trim();
+      const hasCleanNomor = (rawNoKgb !== '' && rawNoKgb !== '...' && rawNoKgb !== '......' && rawNoKgb !== '-') ||
+        /^\d+\//.test(rawNoSurat);
+      const alreadyRequestedMysims = Boolean(payload.mysims_requested);
+      const shouldRequestMysims = (actionType === 'draft' && !alreadyRequestedMysims && !hasCleanNomor);
+
+      const resolvedMysimsStatus = payload.mysims_status ||
+        (shouldRequestMysims ? 'Meminta Nomor MYSIMS' : (hasCleanNomor ? 'Nomor Terbit MYSIMS' : ''));
+
       const kgbData = {
         ...payload,
         id_kgb: docId,
         status: targetStatus,
         is_from_dashboard: false,
+        mysims_requested: shouldRequestMysims ? true : alreadyRequestedMysims,
+        mysims_status: resolvedMysimsStatus,
+        mysims_idp: String(payload.mysims_idp || ''),
+        mysims_requested_at: payload.mysims_requested_at || (shouldRequestMysims ? new Date().toISOString() : ''),
         created_by: creatorNip,
         tanggal_input: payload.tanggal_input || new Date().toISOString().split('T')[0],
         updated_at: new Date().toISOString()
@@ -667,14 +681,47 @@ const EofficeDataService = {
         }
       }
 
+      // 2. Jika simpan pertama kali tanpa nomor -> otomatis minta nomor surat keluar Ketua di MYSIMS (sekali saja!)
+      let mysimsRes = null;
+      if (shouldRequestMysims) {
+        try {
+          mysimsRes = await this.requestKgbSuratKeluar(kgbData, creatorNip, authToken);
+          if (mysimsRes && mysimsRes.status === 'error') {
+            kgbData.mysims_requested = false;
+            kgbData.mysims_status = 'Gagal Minta Nomor MYSIMS';
+            if (typeof TranskepFirebase !== 'undefined' && TranskepFirebase.isReady && TranskepFirebase.isReady()) {
+              await TranskepFirebase.saveKgbToFirestore(kgbData).catch(() => { });
+            }
+          } else if (mysimsRes && mysimsRes.status === 'already_exists' && mysimsRes.nomor_surat) {
+            kgbData.nokgb = mysimsRes.nokgb || kgbData.nokgb;
+            kgbData.nomor_surat = mysimsRes.nomor_surat;
+            kgbData.mysims_status = 'Nomor Terbit MYSIMS';
+          }
+        } catch (mErr) {
+          console.warn("⚠️ [E-Office] Gagal panggil MYSIMS KGB:", mErr);
+          mysimsRes = { status: 'error', message: mErr.toString() };
+          kgbData.mysims_requested = false;
+          kgbData.mysims_status = 'Gagal Minta Nomor MYSIMS';
+          if (typeof TranskepFirebase !== 'undefined' && TranskepFirebase.isReady && TranskepFirebase.isReady()) {
+            await TranskepFirebase.saveKgbToFirestore(kgbData).catch(() => { });
+          }
+        }
+      }
+
       // Catatan: Database KGB telah 100% pindah ke Cloud Firestore. Inputan baru tidak dimasukkan lagi ke Google Sheets.
 
       return {
         status: 'success',
         message: actionType === 'tte'
           ? 'Berkas KGB berhasil dikirim ke antrean persiapan TTE Pimpinan!'
-          : 'Data KGB berhasil disimpan ke Cloud Firestore.',
+          : (shouldRequestMysims
+            ? ((mysimsRes && mysimsRes.status === 'error')
+              ? 'Data KGB disimpan, namun gagal meminta nomor MYSIMS: ' + (mysimsRes.message || 'Cek koneksi')
+              : 'Data KGB disimpan & permintaan nomor surat keluar Ketua MYSIMS telah dikirim!')
+            : 'Data KGB berhasil disimpan ke Cloud Firestore.'),
         id_kgb: docId,
+        mysims_requested_now: shouldRequestMysims,
+        mysims_res: mysimsRes,
         data: kgbData
       };
     }
@@ -751,6 +798,27 @@ const EofficeDataService = {
         .withFailureHandler((err) => reject(err))
         .saveOrGenerateKgbDoc(payload, actionType, creatorNip, authToken);
     });
+  },
+
+  /**
+   * Memicu permintaan nomor surat keluar Ketua MYSIMS & upload PDF otomatis via GAS -> n8n
+   */
+  async requestKgbSuratKeluar(kgbPayload, adminNip, token) {
+    const authToken = token || (typeof localStorage !== 'undefined' ? localStorage.getItem('transkep_session_token') : '') || '';
+    const creatorNip = adminNip || (typeof localStorage !== 'undefined' ? localStorage.getItem('transkep_active_nip') : '') || '';
+
+    if (typeof window !== 'undefined' && window.TranskepAPI && typeof window.TranskepAPI.call === 'function') {
+      return await window.TranskepAPI.call('requestKgbSuratKeluar', kgbPayload, creatorNip, authToken);
+    }
+    if (typeof google !== 'undefined' && google.script && google.script.run) {
+      return await new Promise((resolve, reject) => {
+        google.script.run
+          .withSuccessHandler((res) => resolve(res))
+          .withFailureHandler((err) => reject(err))
+          .requestKgbSuratKeluar(kgbPayload, creatorNip, authToken);
+      });
+    }
+    return { status: 'error', message: 'Koneksi API backend Apps Script tidak tersedia.' };
   },
 
   /**

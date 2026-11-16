@@ -1351,7 +1351,8 @@ const TranskepFirebase = {
     'doc_url', 'pdf_url', 'doc_id', 'tanggal_input', 'tgl_selesai',
     'tte_status', 'tte_pejabat_nip', 'tte_pejabat_nama', 'tte_submitted_at',
     'tte_signed_at', 'tte_signer', 'tte_qrcode', 'created_by', 'updated_by',
-    'synced_at', 'is_from_dashboard', 'is_firebase', 'updated_at', 'created_at'
+    'synced_at', 'is_from_dashboard', 'is_firebase', 'mysims_requested', 'mysims_status',
+    'mysims_idp', 'mysims_requested_at', 'updated_at', 'created_at'
   ],
 
   EOFFICE_RAPAT_ALLOWED_FIELDS: [
@@ -1560,6 +1561,10 @@ const TranskepFirebase = {
       updated_by: asStr(caller.nip || kgbData.updated_by),
       is_from_dashboard: !!kgbData.is_from_dashboard,
       is_firebase: true,
+      mysims_requested: Boolean(kgbData.mysims_requested),
+      mysims_status: asStr(kgbData.mysims_status),
+      mysims_idp: asStr(kgbData.mysims_idp),
+      mysims_requested_at: asStr(kgbData.mysims_requested_at),
       updated_at: serverTs
     };
 

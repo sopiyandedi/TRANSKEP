@@ -1,5 +1,5 @@
 {
-  "name": "TRANSKEP - MYSIMS Auto Surat Keluar (Cuti & ST Terpadu)",
+  "name": "TRANSKEP - MYSIMS Auto Surat Keluar (Cuti, ST Terpadu & KGB)",
   "nodes": [
     {
       "parameters": {
@@ -35,6 +35,27 @@
                   {
                     "leftValue": "={{ $json.body.event || $json.event }}",
                     "rightValue": "ST_TERPADU",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.body.event || $json.event }}",
+                    "rightValue": "KGB_SURAT_KELUAR",
                     "operator": {
                       "type": "string",
                       "operation": "equals"
@@ -276,6 +297,115 @@
         1020,
         420
       ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// =========================================================================\n// MESIN OTOMASI SURAT KELUAR KGB MYSIMS - TAHAP 127\n// 1. Selalu Login dengan Akun Ketua Pengadilan (1 Nomor: KPA.W10-A2/KP2.1.2)\n// 2. Cek Agenda Tertinggi Sebelum Submit (maxAgendaBefore)\n// 3. Submit Surat Keluar Baru (act_add) -> Ambil Nomor & Link Edit (/edt/<idp>)\n// 4. Scrape Form Edit Eksisting (/edt/<idp>) untuk Field Nilai Asli & Sifat Biasa\n// 5. Callback ke TRANSKEP (updateNomorSuratKgb) -> Sync Firestore & Terima PDF Base64\n// 6. Siapkan Binary File Native (file_surat) untuk Disuntikkan ke MYSIMS (/act_edt)\n// =========================================================================\n\nconst VERIFIED_GAS_URL = 'https://script.google.com/macros/s/<GANTI_GAS_DEPLOYMENT_ID>/exec';\nconst UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) TRANSKEP-Bot/2.0';\nconst KETUA_ACC = { user: '<GANTI_MYSIMS_USERNAME>', pass: '<GANTI_MYSIMS_PASSWORD>', satker: 'KPA.W10-A2' };\n\nconst webhookData = $('Webhook Trigger').first().json.body || $('Webhook Trigger').first().json || {};\nconst idKgb = String(webhookData.id_kgb || webhookData.id || '').trim();\nconst namaPegawai = String(webhookData.nama_pegawai || 'Pegawai').trim();\nconst task = webhookData.task || {};\nconst callbackUrl = String(webhookData.callback_url || VERIFIED_GAS_URL).trim() || VERIFIED_GAS_URL;\nconst secretKey = String(webhookData.secret_key || '<GANTI_TRANSKEP_WEBHOOK_KEY>').trim();\n\nconst prefixNoSurat = KETUA_ACC.satker + '/';\nconst cleanKode = String(task.kode_klasifikasi || 'KP2.1.2').replace(/^ST\\./i, '').trim() || 'KP2.1.2';\nconst dari = String(task.kepada || ('Kepala KPPN Cirebon (a.n. ' + namaPegawai + ')')).trim();\nconst uraian = String(task.uraian || ('Pemberitahuan Kenaikan Gaji Berkala a.n. ' + namaPegawai)).trim();\nconst ket = String(task.ket || ('KGB ' + namaPegawai)).trim();\nconst tglSurat = String(task.tgl_surat || webhookData.tanggal_surat || new Date().toISOString().slice(0, 10)).trim();\n\nconst decodeHtmlEntities = (s) => String(s || '')\n  .replace(/&amp;/g, '&')\n  .replace(/&lt;/g, '<')\n  .replace(/&gt;/g, '>')\n  .replace(/&quot;/g, '\"')\n  .replace(/&#0*39;/g, \"'\");\n\nconst resolveMysimsUrl = (u) => {\n  if (!u) return '';\n  const clean = decodeHtmlEntities(u).trim();\n  if (/^https?:\\/\\//i.test(clean)) return clean;\n  if (clean.startsWith('/')) return 'http://<GANTI_MYSIMS_HOST_IP>' + clean;\n  if (clean.startsWith('index.php')) return 'http://<GANTI_MYSIMS_HOST_IP>/mysim/' + clean;\n  return 'http://<GANTI_MYSIMS_HOST_IP>/mysim/index.php/admin/' + clean.replace(/^admin\\//i, '');\n};\n\nconst parseSuratKeluarRows = (html) => {\n  const rows = [];\n  const trRegex = /<tr\\b[^>]*>([\\s\\S]*?)<\\/tr>/gi;\n  let trM;\n  while ((trM = trRegex.exec(html)) !== null) {\n    const rowHtml = trM[1];\n    const noMatch = rowHtml.match(/(\\d+)\\/([A-Za-z0-9.-]+\\/[A-Za-z0-9.-]+\\/[IVXLCDM]+\\/\\d{4})/i);\n    if (!noMatch) continue;\n    const agendaNum = parseInt(noMatch[1], 10);\n    const fullNomor = noMatch[1] + '/' + noMatch[2];\n\n    let editHref = '';\n    let rowIdp = '';\n    const edtMatch = rowHtml.match(/href=[\"']([^\"']*(?:surat_keluar\\/)?edt\\/([^\"'/?#]+)[^\"']*)[\"']/i);\n    if (edtMatch) {\n      editHref = edtMatch[1].trim();\n      rowIdp = edtMatch[2].trim();\n    }\n    const plainText = decodeHtmlEntities(rowHtml.replace(/<[^>]*>/g, ' ')).replace(/\\s+/g, ' ').trim();\n    rows.push({\n      agendaNum: isNaN(agendaNum) ? 0 : agendaNum,\n      agendaStr: noMatch[1],\n      nomorSurat: fullNomor,\n      editHref: editHref,\n      idp: rowIdp,\n      plainText: plainText\n    });\n  }\n  return rows;\n};\n\nconst parseCbBody = (raw) => {\n  if (!raw) return null;\n  if (typeof raw === 'object') return raw;\n  try { return JSON.parse(String(raw)); } catch (e) { return null; }\n};\n\nconst debugLog = [];\nconst cookieJar = {};\n\nconst updateCookies = (headers) => {\n  if (!headers) return;\n  const raw = headers['set-cookie'] || headers['Set-Cookie'] || [];\n  const list = Array.isArray(raw) ? raw : (raw ? [raw] : []);\n  for (const item of list) {\n    const pair = String(item).split(';')[0].trim();\n    const eqIdx = pair.indexOf('=');\n    if (eqIdx > 0) {\n      const k = pair.slice(0, eqIdx).trim();\n      const v = pair.slice(eqIdx + 1).trim();\n      if (v && v.toLowerCase() !== 'deleted') cookieJar[k] = v;\n    }\n  }\n};\nconst getCookieHeader = () => Object.keys(cookieJar).map(k => k + '=' + cookieJar[k]).join('; ');\n\n// -------------------------------------------------------------------------\n// 1. LOGIN AKUN KETUA MYSIMS\n// -------------------------------------------------------------------------\ntry {\n  const loginBody = 'u=' + encodeURIComponent(KETUA_ACC.user) + '&p=' + encodeURIComponent(KETUA_ACC.pass) + '&ta=' + encodeURIComponent('2026');\n  const loginResp = await this.helpers.httpRequest({\n    method: 'POST',\n    url: 'http://<GANTI_MYSIMS_HOST_IP>/mysim/index.php/admin/do_login',\n    headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': UA },\n    body: loginBody,\n    disableFollowRedirect: true,\n    returnFullResponse: true,\n    ignoreHttpStatusErrors: true,\n    timeout: 8000\n  });\n  updateCookies(loginResp.headers);\n  debugLog.push('1.LoginKetua:' + (getCookieHeader() ? 'OK' : 'NO_COOKIE'));\n} catch (errL) {\n  debugLog.push('1.LoginErr:' + errL.message);\n}\n\n// -------------------------------------------------------------------------\n// 2. CEK MAX AGENDA BEFORE\n// -------------------------------------------------------------------------\nlet maxAgendaBefore = 0;\ntry {\n  const initResp = await this.helpers.httpRequest({\n    method: 'GET',\n    url: 'http://<GANTI_MYSIMS_HOST_IP>/mysim/index.php/admin/surat_keluar',\n    headers: { 'Cookie': getCookieHeader(), 'User-Agent': UA },\n    returnFullResponse: true,\n    ignoreHttpStatusErrors: true,\n    timeout: 8000\n  });\n  updateCookies(initResp.headers);\n  const initRows = parseSuratKeluarRows(String(initResp.body || initResp.data || ''));\n  for (const r of initRows) {\n    if (r.agendaNum > maxAgendaBefore) maxAgendaBefore = r.agendaNum;\n  }\n  debugLog.push('2.MaxBefore:' + maxAgendaBefore);\n} catch (errI) {\n  debugLog.push('2.InitErr:' + errI.message);\n}\n\n// -------------------------------------------------------------------------\n// 3. SUBMIT SURAT KELUAR KGB BARU (act_add -> selalu KPA.W10-A2 / KP2.1.2)\n// -------------------------------------------------------------------------\ntry {\n  const addParams = {\n    idp: '',\n    no_agenda: '',\n    dari: dari,\n    no_surat: prefixNoSurat,\n    uraian: uraian,\n    kode: cleanKode,\n    tgl_surat: tglSurat,\n    sifat: 'Biasa',\n    ket: ket,\n    submit: 'Simpan'\n  };\n  const addBody = Object.keys(addParams)\n    .map(k => encodeURIComponent(k) + '=' + encodeURIComponent(addParams[k]))\n    .join('&');\n\n  const addResp = await this.helpers.httpRequest({\n    method: 'POST',\n    url: 'http://<GANTI_MYSIMS_HOST_IP>/mysim/index.php/admin/surat_keluar/act_add',\n    headers: {\n      'Cookie': getCookieHeader(),\n      'Content-Type': 'application/x-www-form-urlencoded',\n      'User-Agent': UA\n    },\n    body: addBody,\n    disableFollowRedirect: true,\n    returnFullResponse: true,\n    ignoreHttpStatusErrors: true,\n    timeout: 8000\n  });\n  updateCookies(addResp.headers);\n  debugLog.push('3.AddStatus:' + (addResp.statusCode || addResp.status));\n} catch (errA) {\n  debugLog.push('3.AddErr:' + errA.message);\n}\n\n// -------------------------------------------------------------------------\n// 4. SCRAPE NOMOR SURAT BARU & IDP\n// -------------------------------------------------------------------------\nlet nomorTerbit = '';\nlet targetRow = null;\ntry {\n  const afterResp = await this.helpers.httpRequest({\n    method: 'GET',\n    url: 'http://<GANTI_MYSIMS_HOST_IP>/mysim/index.php/admin/surat_keluar',\n    headers: { 'Cookie': getCookieHeader(), 'User-Agent': UA },\n    returnFullResponse: true,\n    ignoreHttpStatusErrors: true,\n    timeout: 8000\n  });\n  updateCookies(afterResp.headers);\n  const afterRows = parseSuratKeluarRows(String(afterResp.body || afterResp.data || ''));\n  const namaTokens = namaPegawai.replace(/[^a-zA-Z0-9]/g, ' ').trim().split(/\\s+/).filter(w => w.length >= 3);\n  const namaKey = (namaTokens[0] || '').toLowerCase();\n  targetRow = (namaKey ? afterRows.find(r => r.agendaNum > maxAgendaBefore && r.plainText.toLowerCase().includes(namaKey)) : null)\n    || afterRows.find(r => r.agendaNum > maxAgendaBefore && r.nomorSurat.toUpperCase().includes('/' + cleanKode.toUpperCase() + '/'))\n    || afterRows.find(r => r.agendaNum > maxAgendaBefore)\n    || (maxAgendaBefore === 0 && afterRows.length > 0 ? afterRows[0] : null);\n\n  if (targetRow) {\n    nomorTerbit = targetRow.nomorSurat;\n    debugLog.push('4.Nomor:' + nomorTerbit + '(idp=' + (targetRow.idp || '?') + ')');\n  } else {\n    debugLog.push('4.NotFound(rows=' + afterRows.length + ')');\n  }\n} catch (errSc) {\n  debugLog.push('4.ScrapeErr:' + errSc.message);\n}\n\n// -------------------------------------------------------------------------\n// 5. SCRAPE HALAMAN EDIT (/edt/<idp>) UNTUK AMBIL ACTION & FIELD ASLI\n// -------------------------------------------------------------------------\nlet editPageUrl = (targetRow && targetRow.editHref)\n  ? resolveMysimsUrl(targetRow.editHref)\n  : (targetRow && targetRow.idp ? ('http://<GANTI_MYSIMS_HOST_IP>/mysim/index.php/admin/surat_keluar/edt/' + targetRow.idp) : '');\nlet editActionUrl = 'http://<GANTI_MYSIMS_HOST_IP>/mysim/index.php/admin/surat_keluar/act_edt';\nlet fileFieldName = 'file_surat';\nlet sifatFieldName = 'sifat';\nlet sifatVal = 'Biasa';\nconst scrapedInputs = {};\n\nif (editPageUrl) {\n  try {\n    const edtResp = await this.helpers.httpRequest({\n      method: 'GET',\n      url: editPageUrl,\n      headers: { 'Cookie': getCookieHeader(), 'User-Agent': UA },\n      returnFullResponse: true,\n      ignoreHttpStatusErrors: true,\n      timeout: 5000\n    });\n    updateCookies(edtResp.headers);\n    const edtHtml = String(edtResp.body || edtResp.data || '');\n\n    let targetFormHtml = edtHtml;\n    const formRegex = /<form\\b([^>]*)>([\\s\\S]*?)<\\/form>/gi;\n    let fMatch;\n    while ((fMatch = formRegex.exec(edtHtml)) !== null) {\n      const fAttrs = fMatch[1] || '';\n      const fBody = fMatch[2] || '';\n      if (/act_edt|multipart\\/form-data/i.test(fAttrs) || /name=[\"'](dari|uraian|file_surat)[\"']/i.test(fBody)) {\n        targetFormHtml = fBody;\n        const actM = fAttrs.match(/\\baction=[\"']([^\"']+)[\"']/i);\n        if (actM && actM[1]) editActionUrl = resolveMysimsUrl(actM[1]);\n        break;\n      }\n    }\n\n    const inputRegex = /<input\\b([^>]*)>/gi;\n    let inpM;\n    while ((inpM = inputRegex.exec(targetFormHtml)) !== null) {\n      const attrs = inpM[1] || '';\n      const typeM = attrs.match(/\\btype=[\"']([^\"']+)[\"']/i);\n      const inpType = (typeM ? typeM[1] : 'text').toLowerCase().trim();\n      const nameM = attrs.match(/\\bname=[\"']([^\"']+)[\"']/i);\n      if (!nameM) continue;\n      const inpName = nameM[1].trim();\n      if (inpType === 'file') {\n        fileFieldName = inpName;\n        continue;\n      }\n      if (inpType === 'submit' || inpType === 'button' || inpType === 'reset' || inpType === 'image') continue;\n      const valM = attrs.match(/\\bvalue=[\"']([^\"']*)[\"']/i);\n      scrapedInputs[inpName] = valM ? decodeHtmlEntities(valM[1]) : '';\n    }\n\n    const taRegex = /<textarea\\b([^>]*)>([\\s\\S]*?)<\\/textarea>/gi;\n    let taM;\n    while ((taM = taRegex.exec(targetFormHtml)) !== null) {\n      const nameM = (taM[1] || '').match(/\\bname=[\"']([^\"']+)[\"']/i);\n      if (!nameM) continue;\n      scrapedInputs[nameM[1].trim()] = decodeHtmlEntities(taM[2] || '').trim();\n    }\n\n    const selectRegex = /<select\\b([^>]*)>([\\s\\S]*?)<\\/select>/gi;\n    let selM;\n    while ((selM = selectRegex.exec(targetFormHtml)) !== null) {\n      const attrs = selM[1] || '';\n      const inner = selM[2] || '';\n      const nameM = attrs.match(/\\bname=[\"']([^\"']+)[\"']/i);\n      if (!nameM) continue;\n      const selName = nameM[1].trim();\n      if (/sifat/i.test(selName) || /biasa/i.test(inner)) {\n        sifatFieldName = selName;\n        const optRegex = /<option\\b([^>]*)>([\\s\\S]*?)<\\/option>/gi;\n        let optM;\n        while ((optM = optRegex.exec(inner)) !== null) {\n          const optAttrs = optM[1] || '';\n          const optText = decodeHtmlEntities(String(optM[2] || '').replace(/<[^>]*>/g, '')).trim();\n          const valM = optAttrs.match(/\\bvalue=[\"']([^\"']*)[\"']/i);\n          const optVal = valM ? decodeHtmlEntities(valM[1]).trim() : optText;\n          if (/^biasa$/i.test(optText) || /^biasa$/i.test(optVal)) {\n            sifatVal = optVal || 'Biasa';\n            break;\n          }\n        }\n      }\n    }\n    debugLog.push('5.EditForm:OK');\n  } catch (errEdt) {\n    debugLog.push('5.EdtErr:' + errEdt.message);\n  }\n}\n\n// -------------------------------------------------------------------------\n// 6. CALLBACK KE TRANSKEP -> UPDATE FIRESTORE & TERIMA PDF KGB (BASE64)\n// -------------------------------------------------------------------------\nlet callbackOk = false;\nlet pdfBase64 = '';\nlet pdfFileName = '';\nconst resolvedIdp = String(scrapedInputs.idp || (targetRow && targetRow.idp) || '').trim();\n\nif (idKgb && nomorTerbit) {\n  const cbPayload = {\n    action: 'updateNomorSuratKgb',\n    id_kgb: idKgb,\n    nomor_surat: nomorTerbit,\n    idp: resolvedIdp,\n    kgb_snapshot: webhookData.kgb_snapshot || null,\n    secret_key: secretKey\n  };\n\n  try {\n    const cbPost = await this.helpers.httpRequest({\n      method: 'POST',\n      url: callbackUrl,\n      headers: { 'Content-Type': 'application/json', 'User-Agent': UA },\n      body: JSON.stringify(cbPayload),\n      disableFollowRedirect: true,\n      returnFullResponse: true,\n      ignoreHttpStatusErrors: true,\n      timeout: 30000\n    });\n\n    const stCode = Number(cbPost.statusCode || cbPost.status || 0);\n    const locUrl = cbPost.headers ? (cbPost.headers.location || cbPost.headers.Location) : '';\n    let cbJson = null;\n\n    if ((stCode === 301 || stCode === 302 || stCode === 303 || stCode === 307 || stCode === 308) && locUrl) {\n      const echoResp = await this.helpers.httpRequest({\n        method: 'GET',\n        url: locUrl,\n        headers: { 'User-Agent': UA },\n        disableFollowRedirect: false,\n        returnFullResponse: true,\n        ignoreHttpStatusErrors: true,\n        timeout: 30000\n      });\n      cbJson = parseCbBody(echoResp.body || echoResp.data);\n    } else {\n      cbJson = parseCbBody(cbPost.body || cbPost.data);\n    }\n\n    if (cbJson && cbJson.status === 'success') {\n      callbackOk = true;\n      if (cbJson.pdf_kgb) {\n        pdfBase64 = String(cbJson.pdf_kgb.pdf_base64 || '');\n        pdfFileName = String(cbJson.pdf_kgb.pdf_filename || '');\n      }\n      debugLog.push('6.CallbackPOST:OK(b64=' + pdfBase64.length + ')');\n    } else {\n      debugLog.push('6.CallbackPOST:NON_SUCCESS');\n    }\n  } catch (errCb) {\n    debugLog.push('6.CallbackPOSTErr:' + errCb.message);\n  }\n\n  if (!callbackOk || !pdfBase64 || pdfBase64.length < 50) {\n    try {\n      const sep = callbackUrl.includes('?') ? '&' : '?';\n      const getUrl = callbackUrl + sep +\n        'api=true&action=updateNomorSuratKgb' +\n        '&id_kgb=' + encodeURIComponent(idKgb) +\n        '&nomor_surat=' + encodeURIComponent(nomorTerbit) +\n        '&idp=' + encodeURIComponent(resolvedIdp) +\n        '&secret_key=' + encodeURIComponent(secretKey);\n\n      const cbGet = await this.helpers.httpRequest({\n        method: 'GET',\n        url: getUrl,\n        headers: { 'User-Agent': UA },\n        disableFollowRedirect: false,\n        returnFullResponse: true,\n        ignoreHttpStatusErrors: true,\n        timeout: 30000\n      });\n      const cbGetJson = parseCbBody(cbGet.body || cbGet.data);\n      if (cbGetJson && cbGetJson.status === 'success') {\n        callbackOk = true;\n        if (cbGetJson.pdf_kgb) {\n          pdfBase64 = String(cbGetJson.pdf_kgb.pdf_base64 || '');\n          pdfFileName = String(cbGetJson.pdf_kgb.pdf_filename || '');\n        }\n        debugLog.push('6B.CallbackGET:OK(b64=' + pdfBase64.length + ')');\n      }\n    } catch (errCbGet) {\n      debugLog.push('6B.CallbackGETErr:' + errCbGet.message);\n    }\n  }\n}\n\n// -------------------------------------------------------------------------\n// 7. SIAPKAN BINARY FILE NATIVE UNTUK SUNTIK PDF KE MYSIMS\n// -------------------------------------------------------------------------\nif (!pdfBase64 || pdfBase64.length < 50 || !resolvedIdp) {\n  return [{\n    json: {\n      event: 'KGB_SURAT_KELUAR_DONE',\n      id_kgb: idKgb,\n      nomor_surat: nomorTerbit,\n      idp: resolvedIdp,\n      callback_ok: callbackOk,\n      pdf_skipped: true,\n      debug_log: debugLog.join(' | ')\n    }\n  }];\n}\n\nconst finalNoAgenda = String(scrapedInputs.no_agenda || (targetRow && targetRow.agendaStr) || '').trim();\nconst finalNoSurat = (scrapedInputs.no_surat !== undefined && String(scrapedInputs.no_surat).trim() !== '')\n  ? String(scrapedInputs.no_surat).trim()\n  : nomorTerbit;\nconst finalName = pdfFileName || ('KGB_' + resolvedIdp + '.pdf');\n\nconst formFields = {\n  idp: resolvedIdp,\n  no_agenda: finalNoAgenda,\n  dari: scrapedInputs.dari || dari,\n  no_surat: finalNoSurat,\n  uraian: scrapedInputs.uraian || uraian,\n  kode: scrapedInputs.kode || cleanKode,\n  tgl_surat: scrapedInputs.tgl_surat || tglSurat,\n  sifat: sifatVal || 'Biasa',\n  ket: scrapedInputs.ket || ket,\n  submit: 'Simpan'\n};\n\nconst pdfBuffer = Buffer.from(pdfBase64, 'base64');\nconst binaryFile = await this.helpers.prepareBinaryData(pdfBuffer, finalName, 'application/pdf');\ndebugLog.push('7.BinaryReady:' + finalName + '(' + pdfBuffer.length + 'B)');\n\nreturn [{\n  json: {\n    event: 'KGB_SURAT_KELUAR_ITEM',\n    id_kgb: idKgb,\n    nomor_surat: nomorTerbit,\n    idp: resolvedIdp,\n    editPageUrl: editPageUrl || ('http://<GANTI_MYSIMS_HOST_IP>/mysim/index.php/admin/surat_keluar/edt/' + resolvedIdp),\n    editActionUrl: editActionUrl || 'http://<GANTI_MYSIMS_HOST_IP>/mysim/index.php/admin/surat_keluar/act_edt',\n    sessionCookie: getCookieHeader(),\n    fileFieldName: fileFieldName || 'file_surat',\n    sifatFieldName: sifatFieldName || 'sifat',\n    formFields: formFields,\n    pdf_filename: finalName,\n    pdf_size_bytes: pdfBuffer.length,\n    callback_ok: callbackOk,\n    debug_log: debugLog.join(' | ')\n  },\n  binary: {\n    file_surat: binaryFile\n  }\n}];"
+      },
+      "id": "code-engine-kgb-mysims",
+      "name": "Mesin Otomasi KGB MYSIMS",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        740,
+        620
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.editActionUrl }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Cookie",
+              "value": "={{ $json.sessionCookie }}"
+            },
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) TRANSKEP-Bot/2.0"
+            },
+            {
+              "name": "Referer",
+              "value": "={{ $json.editPageUrl }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "idp",
+              "value": "={{ $json.formFields.idp }}"
+            },
+            {
+              "name": "no_agenda",
+              "value": "={{ $json.formFields.no_agenda }}"
+            },
+            {
+              "name": "dari",
+              "value": "={{ $json.formFields.dari }}"
+            },
+            {
+              "name": "no_surat",
+              "value": "={{ $json.formFields.no_surat }}"
+            },
+            {
+              "name": "uraian",
+              "value": "={{ $json.formFields.uraian }}"
+            },
+            {
+              "name": "kode",
+              "value": "={{ $json.formFields.kode }}"
+            },
+            {
+              "name": "tgl_surat",
+              "value": "={{ $json.formFields.tgl_surat }}"
+            },
+            {
+              "name": "={{ $json.sifatFieldName }}",
+              "value": "={{ $json.formFields.sifat }}"
+            },
+            {
+              "name": "ket",
+              "value": "={{ $json.formFields.ket }}"
+            },
+            {
+              "name": "submit",
+              "value": "Simpan"
+            },
+            {
+              "parameterType": "formBinaryData",
+              "name": "={{ $json.fileFieldName }}",
+              "inputDataFieldName": "file_surat"
+            }
+          ]
+        },
+        "options": {
+          "allowUnauthorizedCerts": true,
+          "redirect": {
+            "redirect": {
+              "followRedirect": false
+            }
+          },
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "http-inject-pdf-kgb-mysims",
+      "name": "Suntik PDF KGB ke MYSIMS",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1020,
+        620
+      ]
     }
   ],
   "connections": {
@@ -295,6 +425,13 @@
         [
           {
             "node": "Mesin Otomasi ST Terpadu",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mesin Otomasi KGB MYSIMS",
             "type": "main",
             "index": 0
           }
@@ -324,6 +461,17 @@
         [
           {
             "node": "Suntik PDF & Sifat Biasa ke MYSIMS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mesin Otomasi KGB MYSIMS": {
+      "main": [
+        [
+          {
+            "node": "Suntik PDF KGB ke MYSIMS",
             "type": "main",
             "index": 0
           }

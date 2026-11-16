@@ -454,6 +454,30 @@ window.openKgbModalForm = function(kgbData) {
   document.getElementById('kgbFieldNomorSurat').value = working.nomor_surat || generateNomorKgbOtomatis(noKgbVal, rawTglSurat);
   document.getElementById('kgbFieldTujuanKppn').value = working.tujuan_kppn || 'Kepala Kantor Pelayanan Perbendaharaan Negara Cirebon di- CIREBON';
 
+  var hasCleanNoKgb = (noKgbVal !== '' && noKgbVal !== '...' && noKgbVal !== '......' && noKgbVal !== '-');
+  var isMysimsReq = Boolean(working.mysims_requested);
+  var elMysimsReq = document.getElementById('kgbFieldMysimsRequested');
+  if (elMysimsReq) elMysimsReq.value = isMysimsReq ? 'true' : 'false';
+  var elMysimsStatus = document.getElementById('kgbFieldMysimsStatus');
+  if (elMysimsStatus) elMysimsStatus.value = working.mysims_status || '';
+  var elMysimsIdp = document.getElementById('kgbFieldMysimsIdp');
+  if (elMysimsIdp) elMysimsIdp.value = working.mysims_idp || '';
+  var elMysimsReqAt = document.getElementById('kgbFieldMysimsRequestedAt');
+  if (elMysimsReqAt) elMysimsReqAt.value = working.mysims_requested_at || '';
+  var elMysimsBadge = document.getElementById('kgbMysimsBadge');
+  if (elMysimsBadge) {
+    if (hasCleanNoKgb) {
+      elMysimsBadge.textContent = 'No. MYSIMS Aktif (' + noKgbVal + ')';
+      elMysimsBadge.className = 'text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30';
+    } else if (isMysimsReq) {
+      elMysimsBadge.textContent = 'MYSIMS Sudah Diminta (' + (working.mysims_status || 'Menunggu') + ')';
+      elMysimsBadge.className = 'text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30';
+    } else {
+      elMysimsBadge.textContent = 'Otomatis minta No. Ketua MYSIMS';
+      elMysimsBadge.className = 'text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-indigo-500/15 text-indigo-300 border border-indigo-500/30';
+    }
+  }
+
   // Data SK Lama
   var elGolLama = document.getElementById('kgbFieldGolonganLama');
   if (elGolLama) {
@@ -599,6 +623,10 @@ function collectKgbFormPayload_() {
   var elStatus = document.getElementById('kgbFieldStatus');
   var elDocUrl = document.getElementById('kgbFieldFileDocUrl');
   var elPdfUrl = document.getElementById('kgbFieldFilePdfUrl');
+  var elMysimsReq = document.getElementById('kgbFieldMysimsRequested');
+  var elMysimsStatus = document.getElementById('kgbFieldMysimsStatus');
+  var elMysimsIdp = document.getElementById('kgbFieldMysimsIdp');
+  var elMysimsReqAt = document.getElementById('kgbFieldMysimsRequestedAt');
   var elThnLama = document.getElementById('kgbFieldTahunLama');
   var elBlnLama = document.getElementById('kgbFieldBulanLama');
   var elThnBaru = document.getElementById('kgbFieldTahunBaru');
@@ -654,7 +682,11 @@ function collectKgbFormPayload_() {
     tmt_baru: formatTanggalIndoKgb(elTmtBaru ? elTmtBaru.value : ''),
     tmt_yad: formatTanggalIndoKgb(elTmtYad ? elTmtYad.value : ''),
     nama_ketua: document.getElementById('kgbFieldNamaKetua').value,
-    dasar_pp: document.getElementById('kgbFieldDasarPp').value
+    dasar_pp: document.getElementById('kgbFieldDasarPp').value,
+    mysims_requested: (elMysimsReq && elMysimsReq.value === 'true'),
+    mysims_status: elMysimsStatus ? elMysimsStatus.value : '',
+    mysims_idp: elMysimsIdp ? elMysimsIdp.value : '',
+    mysims_requested_at: elMysimsReqAt ? elMysimsReqAt.value : ''
   };
 }
 
@@ -705,10 +737,11 @@ async function submitKgbForm(actionType) {
     if (res && res.status === 'success') {
       closeKgbModalForm();
       if (typeof showNotify === 'function') {
+        var isMysimsWarn = Boolean(res.mysims_res && res.mysims_res.status === 'error');
         showNotify(
-          "Sukses",
-          actionType === 'generate' ? "SK KGB berhasil diterbitkan ke Folder Google Drive!" : "Data KGB berhasil disimpan.",
-          "success"
+          isMysimsWarn ? "Data Disimpan (MYSIMS Gagal)" : "Sukses",
+          res.message || (actionType === 'generate' ? "SK KGB berhasil diterbitkan ke Folder Google Drive!" : "Data KGB berhasil disimpan."),
+          isMysimsWarn ? "warning" : "success"
         );
       }
       if (typeof window.refreshEofficeData === 'function') {
