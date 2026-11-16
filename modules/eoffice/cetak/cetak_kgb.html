@@ -4,7 +4,7 @@
      SESUAI FORMAT DOKUMEN RESMI PENGADILAN AGAMA INDRAMAYU (PP NO. 05 TAHUN 2024)
      INSTANSI: Pengadilan Agama Indramayu Kelas 1.A.
      STANDAR: 1 Orang = 1 Dokumen Presisi Legal (21,6 cm x 35,6 cm)
-     MARGIN RESMI: Atas 0.9 cm | Bawah 1.3 cm | Kiri 1.4 cm | Kanan 1.2 cm
+     MARGIN RESMI: Atas 0.9 cm | Bawah 1.0 cm | Kiri 2.0 cm | Kanan 1.4 cm
      STANDAR TIPOGRAFI: Isi KGB 12pt Bookman Old Style (Lurus Presisi)
      ========================================== -->
 <div id="template-cetak-kgb-container" style="display: none;" class="hidden no-print">
@@ -44,8 +44,8 @@
       max-width: 216mm;
       min-height: 356mm;
       margin: 0 auto;
-      /* ⬇️ TAG 1: PADDING MARGIN KERTAS LEGAL (Atas 9mm / 0.9cm, Kanan 12mm / 1.2cm, Bawah 13mm / 1.3cm, Kiri 14mm / 1.4cm) ⬇️ */
-      padding: 9mm 16mm 11mm 18mm;
+      /* ⬇️ TAG 1: PADDING MARGIN KERTAS LEGAL (Atas 9mm / 0.9cm, Kanan 14mm / 1.4cm, Bawah 10mm / 1.0cm, Kiri 20mm / 2.0cm) ⬇️ */
+      padding: 9mm 14mm 10mm 20mm;
       box-sizing: border-box;
       font-family: 'Bookman Old Style', 'Times New Roman', serif;
       font-size: 12pt;
@@ -103,8 +103,8 @@
     .kgb-meta-table {
       width: 100%;
       border-collapse: collapse;
-      /* ⬇️ TAG 3A: Jarak tabel Nomor/Perihal ke blok tujuan Kepada KPPN Cirebon ⬇️ */
-      margin-bottom: 18px;
+      /* ⬇️ TAG 3A: Dinolkan agar jarak ke blok Kepada dikontrol penuh oleh TAG 4B (anti margin-collapse) ⬇️ */
+      margin-bottom: 0px;
       font-size: 12pt;
     }
 
@@ -119,9 +119,9 @@
       /* ⬇️ TAG 4A: Indentasi kiri tujuan KPPN - sejajar lurus dengan titik dua (:) header di atasnya ⬇️ */
       margin-left: 82px;
       /* ⬇️ TAG 4B: Jarak atas blok Kepada dari Perihal ⬇️ */
-      margin-top: 10px;
-      /* ⬇️ TAG 4C: Jarak bawah blok Kepada ke paragraf pembuka ⬇️ */
-      margin-bottom: 25px;
+      margin-top: 24px;
+      /* ⬇️ TAG 4C: Jarak bawah blok Kepada (dari Cirebon) ke paragraf pembuka ⬇️ */
+      margin-bottom: 32px;
       font-size: 12pt;
       line-height: 1.38;
     }
@@ -133,8 +133,8 @@
       margin-left: 82px;
       /* ⬇️ TAG 5B: Indentasi menjorok ke dalam pada baris pertama paragraf ⬇️ */
       text-indent: 32px;
-      /* ⬇️ TAG 5C: Jarak atas paragraf ⬇️ */
-      margin-top: 12px;
+      /* ⬇️ TAG 5C: Dinolkan agar jarak dari Cirebon dikontrol penuh oleh TAG 4C; paragraf penutup memakai inline style di baris bawah ⬇️ */
+      margin-top: 0px;
       /* ⬇️ TAG 5D: Jarak bawah paragraf ke tabel rincian ⬇️ */
       margin-bottom: 10px;
       font-size: 12pt;
@@ -204,8 +204,10 @@
     /* ⬇️ TAG 9: BLOK TANDA TANGAN KETUA (12pt) ⬇️ */
     .kgb-ttd-area {
       width: 100%;
-      /* ⬇️ TAG 9A: Jarak dari paragraf penutup ke blok tanda tangan ⬇️ */
-      margin-top: 20px;
+      /* display: flow-root mengurung float: right agar TAG 10B diukur murni dari bawah Zulkifli */
+      display: flow-root;
+      /* ⬇️ TAG 9A: Jarak dari paragraf penutup ke blok tanda tangan Ketua ⬇️ */
+      margin-top: 28px;
     }
 
     .kgb-ttd-box {
@@ -221,8 +223,8 @@
       clear: both;
       /* ⬇️ TAG 10A: Margin kiri blok tembusan (lurus sejajar 82px) ⬇️ */
       margin-left: 82px;
-      /* ⬇️ TAG 10B: Jarak dari blok tanda tangan Ketua ke kata 'Tembusan :' ⬇️ */
-      margin-top: 25px;
+      /* ⬇️ TAG 10B: Jarak dari blok tanda tangan Zulkifli ke kata 'Tembusan :' ⬇️ */
+      margin-top: 30px;
       font-size: 12pt;
       line-height: 1.38;
     }
@@ -412,7 +414,7 @@
     </table>
 
     <!-- 7. PENUTUP (12pt, BASE MARGIN 82px, FIRST LINE INDENT 32px, LINE 2 & 3 RATA 82px) -->
-    <p class="kgb-paragraf" style="margin-top: 12px;">
+    <p class="kgb-paragraf" style="margin-top: 6px;">
       Kami harap sesuai dengan {{dasar_pp}}, kepada Pegawai tersebut agar dibayarkan penghasilannya berdasarkan gaji
       pokoknya yang baru.
     </p>

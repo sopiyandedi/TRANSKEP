@@ -6158,5 +6158,39 @@ Item di bawah ini berisiko memutus layanan produksi (WAHA/n8n/Firestore/Drive/CD
 - **Dampak UI/Database:** Nihil perubahan skema database/Firestore; murni penyempurnaan CSS/layout template cetak KGB ([`modules/eoffice/cetak/cetak_kgb.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/cetak/cetak_kgb.html)).
 - **Catatan Risiko Kecil:** Karena `padding-left` berkurang `6mm` (`20mm -> 14mm`), pastikan margin fisik printer di browser saat cetak tetap `Default/None` (aturan `@page { margin: 0mm !important; }` sudah aktif) agar tidak terpotong batas cetak hardware.
 
+---
+
+## Tahap 123 [SELESAI & AKTIF]: Penyesuaian 6 Titik Jarak Proporsional & Perbaikan `display: flow-root` Tembusan Form Cetak KGB (`v3.8.57`)
+*STATUS: DISETUJUI PENGGUNA ("ok terapkan") & SUDAH DITERAPKAN (`v3.8.57`) ✅*
+
+### 1. Analisis & Akar Masalah (Kondisi Saat Ini di Commit `43a2911`)
+1. **Poin 1 (Jarak Page Kiri):** Saat ini `.kgb-print-wrapper` memakai `padding: 9mm 16mm 11mm 18mm;` (kiri `18mm`, kanan `16mm`). Pada baris `1. Nama/Tanggal lahir`, teks panjang (`Raden Anantama Havid Ismail, A.Md./09-07-1986`) berhenti di `90.7%` lebar kertas, sehingga sisa ruang kanan hanya `~1.9%` (`~4.1 mm` / `~15 px`). Jika margin kiri ditambah `+2mm` (`18mm -> 20mm`) tanpa menyeimbangkan margin kanan, teks baris 1 berisiko mepet/terlipat.
+2. **Poin 2, 3, 4, 5 (*Margin Collapse* Antarblok):**
+   - Celah `Perihal -> Kepada`: `.kgb-meta-table` (`margin-bottom: 18px`) dan `.kgb-tujuan-box` (`margin-top: 10px`) mengalami *margin collapse* sehingga jarak efektif saat ini `18px`.
+   - Celah `Cirebon -> Paragraf 1`: `.kgb-tujuan-box` (`margin-bottom: 25px`) dan `.kgb-paragraf` (`margin-top: 12px`) mengalami *margin collapse* sehingga jarak efektif saat ini `25px`.
+   - Celah `Poin 10 -> Paragraf Kami harap`: `<p class="kgb-paragraf" style="margin-top: 12px;">` memakai `12px` (+ `2px` padding bawah sel tabel). Karena `.kgb-paragraf` digunakan bersama di paragraf pembuka dan penutup, kontrolnya perlu dipisahkan agar bersih.
+   - Celah `Paragraf Terakhir -> Ketua,`: `.kgb-paragraf` (`margin-bottom: 10px`) dan `.kgb-ttd-area` (`margin-top: 20px`) mengalami *margin collapse* sehingga jarak efektif saat ini `20px`.
+3. **Poin 6 (Bug `float: right` + `clear: both` pada `Tembusan :`):**
+   - `.kgb-ttd-area` tidak memiliki `display: flow-root`, sehingga `.kgb-ttd-box` (`float: right`) membuat tinggi `.kgb-ttd-area` `0px`. Akibatnya `.kgb-tembusan` (`margin-top: 25px`) terbaca dari bawah paragraf penutup, bukan dari bawah `Zulkifli` (`0px` jarak efektif dari `Zulkifli`).
+4. **Kalkulasi Keamanan 1 Halaman Legal (`356mm`):**
+   - Pengukuran tangkapan layar saat ini menunjukkan baris terbawah berhenti di `632/687` tinggi halaman (tersisa `~8%` / `~28.5 mm` di bagian bawah, atau `~17.5 mm` di atas `padding-bottom: 11mm`). Total penambahan ketinggian bersih rencana ini hanya **`+45px` (`~11.9 mm`)**, sehingga masih menyisakan ruang aman `~6.6 mm` di atas batas bawah `10mm` (`~16.6 mm` dari tepi bawah kertas) dan tetap muat **1 halaman penuh Legal**.
+
+### 2. Rencana Perubahan File & Parameter (Sebelum vs Sesudah)
+1. **[`modules/eoffice/cetak/cetak_kgb.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/cetak/cetak_kgb.html)**:
+   - **Poin 1 (Jarak page kiri + penyeimbang kanan/bawah):** Ubah `.kgb-print-wrapper` `padding` dari `9mm 16mm 11mm 18mm` -> **`9mm 14mm 10mm 20mm`** (kiri `18mm -> 20mm`, kanan `16mm -> 14mm` agar baris 1 tetap 1 baris bersih, bawah `11mm -> 10mm`), plus sinkronisasi komentar `TAG 1`.
+   - **Poin 2 (Jarak atas `Kepada`):** Nol-kan `.kgb-meta-table` `margin-bottom` (`18px -> 0px`) dan atur `.kgb-tujuan-box` `margin-top` dari `10px` (efektif `18px`) -> **`24px`** (`+6px` murni, bebas *margin collapse*).
+   - **Poin 3 (Jarak `Cirebon -> Paragraf pertama`):** Ubah `.kgb-tujuan-box` `margin-bottom` dari `25px` -> **`32px`** (`+7px` murni) dan set `.kgb-paragraf` base `margin-top: 0px;` (menghilangkan *margin collapse* dengan paragraf pertama).
+   - **Poin 4 (Dekatkan jarak atas paragraf `Kami harap` ke poin 10):** Ubah inline style paragraf penutup (`line 415`) dari `style="margin-top: 12px;"` -> **`style="margin-top: 6px;"`** (`-6px`, bersih dari poin 10).
+   - **Poin 5 (Jarak `Ketua,` dari paragraf terakhir):** Ubah `.kgb-ttd-area` `margin-top` dari `20px` -> **`28px`** (`+8px`, `.kgb-paragraf` penutup sudah `margin-bottom: 10px` sehingga efektif naik dari `20px -> 28px`, atau `margin-bottom: 0px` jika perlu — untuk keamanan base `.kgb-paragraf` atas `.kgb-detail-table` tetap `10px`, dan `28px` menang murni atas `10px`).
+   - **Poin 6 (Jarak agak banyak `Zulkifli -> Tembusan :`):** Tambahkan **`display: flow-root;`** pada `.kgb-ttd-area` agar `float: right` `.kgb-ttd-box` terkurung rapi, lalu ubah `.kgb-tembusan` `margin-top` dari `25px` (efektif `0px` mati) -> **`30px`** (efektif **`30px`** nyata di bawah `Zulkifli`).
+2. **[`modules/eoffice/cetak/js_cetak_kgb.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/cetak/js_cetak_kgb.js)**:
+   - Selaraskan header komentar & `KGB_PRINT_CONFIG` (`wrapperPadding: "9mm 14mm 10mm 20mm"`, `marginBottom: "10mm"`, `marginLeft: "20mm"`, `marginRight: "14mm"`).
+3. **PWA Cache Bust (`v3.8.57`) & Rilis (`index.html`, `sw.js`, `prd.md`, `revisi.md`)**:
+   - Bump `v3.8.56` -> **`v3.8.57`** secara seragam di 3 titik ([`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) & [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js)), jalankan `npm test`, lalu commit & push ke `origin/main` dan `prod/main`.
+
+### 3. Estimasi Dampak & Risiko
+- **Dampak UI/Database:** Nihil perubahan backend GAS maupun Firestore. Murni tata letak cetak KGB ([`modules/eoffice/cetak/cetak_kgb.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/cetak/cetak_kgb.html)).
+- **Risiko Kecil:** Perubahan total tinggi vertikal `+45px` (`~11.9 mm`) tetap aman di dalam sisa margin bawah `~28.5 mm` pada kertas Legal `356mm`. Bila ada data pegawai yang sangat panjang di poin 1/3/6 (membungkus baris ekstra) dan hampir menyentuh dasar halaman, jarak `.kgb-tembusan` (`30px`) atau `margin-top` `Ketua,` (`28px`) masih bisa dikurangi beberapa piksel tanpa mengubah struktur.
+
 
 
