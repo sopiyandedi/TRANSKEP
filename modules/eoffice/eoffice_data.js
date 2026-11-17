@@ -701,9 +701,15 @@ const EofficeDataService = {
             kgbData.nomor_surat = mysimsRes.nomor_surat;
             kgbData.mysims_requested = true;
             kgbData.mysims_status = 'Nomor Terbit MYSIMS';
-            if (typeof TranskepFirebase !== 'undefined' && TranskepFirebase.isReady && TranskepFirebase.isReady()) {
-              await TranskepFirebase.saveKgbToFirestore(kgbData).catch(() => { });
-            }
+            await this.applyMysimsResultToLocalState(docId, payload.nip, {
+              id_kgb: docId,
+              nip: payload.nip,
+              nokgb: kgbData.nokgb,
+              nomor_surat: kgbData.nomor_surat,
+              mysims_status: 'Nomor Terbit MYSIMS'
+            });
+          } else if (mysimsRes && mysimsRes.status === 'success') {
+            this.syncKgbMysimsNumberInBackground(docId, payload.nip, creatorNip, authToken);
           } else if (!mysimsRes || (mysimsRes.status !== 'success' && mysimsRes.status !== 'already_exists')) {
             mysimsRes = mysimsRes || { status: 'error', message: 'Backend GAS tidak merespons permintaan nomor MYSIMS.' };
             kgbData.mysims_requested = false;
@@ -836,6 +842,167 @@ const EofficeDataService = {
       });
     }
     return { status: 'error', message: 'Koneksi API backend Apps Script tidak tersedia.' };
+  },
+
+  /**
+   * Mengecek apakah record KGB sudah memiliki nomor urut bersih (bukan placeholder '...' / '......')
+   */
+  hasValidKgbNumber(rec) {
+    if (!rec || typeof rec !== 'object') return false;
+    const no = String(rec.nokgb || '').trim();
+    if (no && no !== '...' && no !== '......' && no !== '-') return true;
+    const full = String(rec.nomor_surat || '').trim();
+    if (full && /^\d+[^/]*\//.test(full) && full.indexOf('...') === -1) return true;
+    return false;
+  },
+
+  /**
+   * Menerapkan nomor MYSIMS terbit ke daftar E-Office, local cache, DOM modal aktif, dan Cloud Firestore
+   */
+  async applyMysimsResultToLocalState(docId, targetNip, issued) {
+    if (!issued || !this.hasValidKgbNumber(issued)) return null;
+    const cleanId = String(docId || issued.id_kgb || '').trim();
+    const cleanNip = String(targetNip || issued.nip || '').replace(/['"\s]/g, '').trim();
+    const issuedNo = String(issued.nokgb || '').trim();
+    const issuedFull = String(issued.nomor_surat || '').trim();
+    const firstSeg = (issuedFull && issuedFull.indexOf('/') !== -1) ? issuedFull.split('/')[0].trim() : '';
+    const finalNoKgb = (issuedNo && issuedNo !== '...' && issuedNo !== '......' && issuedNo !== '-') ? issuedNo : firstSeg;
+
+    const patchData = {
+      nokgb: finalNoKgb,
+      nomor_surat: issuedFull,
+      mysims_requested: true,
+      mysims_status: String(issued.mysims_status || 'Nomor Terbit MYSIMS').trim(),
+      mysims_idp: String(issued.mysims_idp || '').trim(),
+      updated_at: new Date().toISOString()
+    };
+    if (issued.bulan_surat) patchData.bulan_surat = String(issued.bulan_surat).trim();
+    if (issued.tahun_surat) patchData.tahun_surat = String(issued.tahun_surat).trim();
+
+    let updatedDoc = null;
+    if (typeof window !== 'undefined' && window.vmEoffice && Array.isArray(window.vmEoffice.rawKgbList)) {
+      const idx = window.vmEoffice.rawKgbList.findIndex(k =>
+        (cleanId && String(k.id_kgb || '').trim() === cleanId) ||
+        (cleanNip && String(k.nip || '').replace(/['"\s]/g, '') === cleanNip && String(k.status || '').toLowerCase() !== 'selesai')
+      );
+      if (idx !== -1) {
+        updatedDoc = { ...window.vmEoffice.rawKgbList[idx], ...patchData };
+        window.vmEoffice.rawKgbList.splice(idx, 1, updatedDoc);
+        this.setLocalCache({ kgb: window.vmEoffice.rawKgbList, rapat: window.vmEoffice.rawRapatList || [] });
+      }
+    }
+
+    // Jika modal detail KGB sedang terbuka untuk berkas ini, sinkronkan input & badge langsung
+    if (typeof document !== 'undefined') {
+      const elId = document.getElementById('kgbFieldIdKgb');
+      const elNip = document.getElementById('kgbFieldNip');
+      const openId = elId ? String(elId.value || '').trim() : '';
+      const openNip = elNip ? String(elNip.value || '').replace(/['"\s]/g, '').trim() : '';
+      if ((cleanId && openId === cleanId) || (cleanNip && openNip === cleanNip)) {
+        const elNo = document.getElementById('kgbFieldNoKgb');
+        const elFull = document.getElementById('kgbFieldNomorSurat');
+        const elReq = document.getElementById('kgbFieldMysimsRequested');
+        const elStat = document.getElementById('kgbFieldMysimsStatus');
+        const elIdp = document.getElementById('kgbFieldMysimsIdp');
+        const elBadge = document.getElementById('kgbMysimsBadge');
+        if (elNo && finalNoKgb) elNo.value = finalNoKgb;
+        if (elFull && issuedFull) elFull.value = issuedFull;
+        if (elReq) elReq.value = 'true';
+        if (elStat) elStat.value = patchData.mysims_status;
+        if (elIdp && patchData.mysims_idp) elIdp.value = patchData.mysims_idp;
+        if (elBadge && finalNoKgb) {
+          elBadge.textContent = 'No. MYSIMS Aktif (' + finalNoKgb + ')';
+          elBadge.className = 'text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30';
+        }
+      }
+    }
+
+    // Pastikan Cloud Firestore ikut tersinkron meski REST patch server sempat gagal/terlambat
+    if (typeof TranskepFirebase !== 'undefined' && TranskepFirebase.isReady && TranskepFirebase.isReady()) {
+      const firestorePayload = updatedDoc
+        ? { ...updatedDoc }
+        : {
+            id_kgb: cleanId || ('DRAFT-' + cleanNip),
+            nip: cleanNip,
+            status: 'Sedang Diproses',
+            ...patchData
+          };
+      if (firestorePayload.id_kgb && firestorePayload.nip) {
+        await TranskepFirebase.saveKgbToFirestore(firestorePayload).catch(() => {});
+      }
+    }
+
+    return { ...patchData, id_kgb: cleanId, nip: cleanNip };
+  },
+
+  /**
+   * Mengambil status nomor MYSIMS KGB terbaru dari Cache/Firestore backend GAS (1x cek instan)
+   */
+  async fetchLatestKgbMysimsNumber(idKgb, targetNip, adminNip, token) {
+    const authToken = token || (typeof localStorage !== 'undefined' ? localStorage.getItem('transkep_session_token') : '') || '';
+    const creatorNip = adminNip || (typeof localStorage !== 'undefined' ? localStorage.getItem('transkep_active_nip') : '') || '';
+    const cleanId = String(idKgb || '').trim();
+    const cleanNip = String(targetNip || '').replace(/['"\s]/g, '').trim();
+    if (!cleanId && !cleanNip) return null;
+
+    let res = null;
+    try {
+      if (typeof window !== 'undefined' && window.TranskepAPI && typeof window.TranskepAPI.call === 'function') {
+        res = await window.TranskepAPI.call('getKgbMysimsStatus', cleanId, cleanNip, creatorNip, authToken);
+      } else if (typeof google !== 'undefined' && google.script && google.script.run) {
+        res = await new Promise((resolve) => {
+          google.script.run
+            .withSuccessHandler((r) => resolve(r))
+            .withFailureHandler(() => resolve(null))
+            .getKgbMysimsStatus(cleanId, cleanNip, creatorNip, authToken);
+        });
+      }
+    } catch (e) {
+      return null;
+    }
+
+    if (res && res.status === 'success' && res.data && this.hasValidKgbNumber(res.data)) {
+      return await this.applyMysimsResultToLocalState(cleanId, cleanNip, res.data);
+    }
+    return null;
+  },
+
+  /**
+   * Polling latar belakang setelah 1st-save agar nomor MYSIMS otomatis masuk ke Firestore, UI & Form Cetak KGB
+   */
+  syncKgbMysimsNumberInBackground(docId, targetNip, adminNip, token) {
+    if (typeof setTimeout !== 'function') return;
+    const cleanId = String(docId || '').trim();
+    if (!cleanId) return;
+    if (!this._activeMysimsPolls) this._activeMysimsPolls = {};
+    if (this._activeMysimsPolls[cleanId]) return;
+    this._activeMysimsPolls[cleanId] = true;
+
+    const maxAttempts = 10;
+    const pollDelayMs = 2000;
+    let attempt = 0;
+
+    const runStep = async () => {
+      attempt += 1;
+      try {
+        const applied = await this.fetchLatestKgbMysimsNumber(cleanId, targetNip, adminNip, token);
+        if (applied && this.hasValidKgbNumber(applied)) {
+          delete this._activeMysimsPolls[cleanId];
+          if (typeof showNotify === 'function') {
+            showNotify('Nomor MYSIMS Terbit', 'Nomor surat keluar KGB (' + (applied.nomor_surat || applied.nokgb) + ') siap dicetak.', 'success');
+          }
+          return;
+        }
+      } catch (e) {}
+
+      if (attempt < maxAttempts) {
+        setTimeout(runStep, pollDelayMs);
+      } else {
+        delete this._activeMysimsPolls[cleanId];
+      }
+    };
+
+    setTimeout(runStep, pollDelayMs);
   },
 
   /**

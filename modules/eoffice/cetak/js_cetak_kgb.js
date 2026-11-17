@@ -257,20 +257,57 @@
     return { bulan: romawi, tahun: tahun };
   }
 
+  function sanitizeNoKgbPlaceholder(val) {
+    var s = String(val || '').trim();
+    return (s === '...' || s === '......' || s === '-') ? '' : s;
+  }
+
+  function hasCleanKgbNumber(rec) {
+    if (!rec || typeof rec !== 'object') return false;
+    if (sanitizeNoKgbPlaceholder(rec.nokgb)) return true;
+    var full = String(rec.nomor_surat || '').trim();
+    if (full && /^\d+[^/]*\//.test(full) && full.indexOf('...') === -1) return true;
+    return false;
+  }
+
+  function findLiveKgbFromVm(kgbObj) {
+    if (!kgbObj || !global.vmEoffice || !Array.isArray(global.vmEoffice.rawKgbList)) return null;
+    var targetId = String(kgbObj.id_kgb || kgbObj.id || '').trim();
+    var targetNip = String(kgbObj.nip || '').replace(/['"\s]/g, '').trim();
+    var list = global.vmEoffice.rawKgbList;
+    for (var i = 0; i < list.length; i++) {
+      var item = list[i];
+      if (!item || !hasCleanKgbNumber(item)) continue;
+      if (targetId && String(item.id_kgb || item.id || '').trim() === targetId) return item;
+    }
+    if (targetNip) {
+      for (var j = 0; j < list.length; j++) {
+        var row = list[j];
+        if (!row || !hasCleanKgbNumber(row)) continue;
+        if (String(row.nip || '').replace(/['"\s]/g, '').trim() === targetNip &&
+            String(row.status || '').toLowerCase() !== 'selesai') {
+          return row;
+        }
+      }
+    }
+    return null;
+  }
+
   /**
    * Memecah komponen Nomor Surat KGB menjadi { nokgb, bulan, tahun, full }
    */
   function resolveNomorSuratKgb(kgbData) {
     var bt = extractBulanTahunDariTanggalKgb(kgbData.tanggal_surat || kgbData.tanggal);
-    var nokgb = String(kgbData.nokgb || '').trim();
+    var nokgb = sanitizeNoKgbPlaceholder(kgbData.nokgb);
     var bulan = String(kgbData.bulan_surat || kgbData.bulan || '').trim() || bt.bulan;
     var tahun = String(kgbData.tahun_surat || kgbData.tahun || '').trim() || bt.tahun;
     var full = String(kgbData.nomor_surat || '').trim();
 
     if (full && full.indexOf('/') !== -1) {
       var segs = full.split('/');
-      if (!nokgb && segs[0] && segs[0] !== '...' && segs[0] !== '......' && segs[0] !== '-') {
-        nokgb = segs[0].trim();
+      var firstSeg = sanitizeNoKgbPlaceholder(segs[0]);
+      if (!nokgb && firstSeg) {
+        nokgb = firstSeg;
       }
       if (segs.length >= 5) {
         if (!kgbData.bulan_surat && segs[3]) bulan = segs[3].trim();
@@ -336,6 +373,18 @@
     if (!kgbObj || typeof kgbObj !== 'object') {
       if (typeof showNotify === 'function') showNotify('Gagal Cetak', 'Data KGB tidak ditemukan.', 'error');
       return;
+    }
+
+    if (!hasCleanKgbNumber(kgbObj)) {
+      var liveMatch = findLiveKgbFromVm(kgbObj);
+      if (liveMatch) {
+        kgbObj = Object.assign({}, kgbObj, {
+          nokgb: liveMatch.nokgb || kgbObj.nokgb || '',
+          nomor_surat: liveMatch.nomor_surat || kgbObj.nomor_surat || '',
+          bulan_surat: liveMatch.bulan_surat || kgbObj.bulan_surat || '',
+          tahun_surat: liveMatch.tahun_surat || kgbObj.tahun_surat || ''
+        });
+      }
     }
 
     var template = document.getElementById('template-cetak-kgb-container');

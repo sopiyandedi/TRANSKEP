@@ -317,6 +317,82 @@ function handleTmtBaruChange(val) {
 }
 
 // ==========================================
+// HELPER RESOLUSI & SINKRONISASI NOMOR MYSIMS DI MODAL KGB
+// ==========================================
+function sanitizeNoKgbPlaceholder_(val) {
+  var s = String(val || '').trim();
+  return (s === '...' || s === '......' || s === '-') ? '' : s;
+}
+
+function hasCleanKgbNumberLocal_(rec) {
+  if (!rec || typeof rec !== 'object') return false;
+  if (sanitizeNoKgbPlaceholder_(rec.nokgb)) return true;
+  var full = String(rec.nomor_surat || '').trim();
+  return Boolean(full && /^\d+[^/]*\//.test(full) && full.indexOf('...') === -1);
+}
+
+function findLiveKgbMatchFromVm_(targetObj) {
+  if (!targetObj || !window.vmEoffice || !Array.isArray(window.vmEoffice.rawKgbList)) return null;
+  var targetId = String(targetObj.id_kgb || targetObj.id || '').trim();
+  var targetNip = String(targetObj.nip || '').replace(/['"\s]/g, '').trim();
+  var list = window.vmEoffice.rawKgbList;
+  for (var i = 0; i < list.length; i++) {
+    var item = list[i];
+    if (!item || !hasCleanKgbNumberLocal_(item)) continue;
+    if (targetId && String(item.id_kgb || item.id || '').trim() === targetId) return item;
+  }
+  if (targetNip) {
+    for (var j = 0; j < list.length; j++) {
+      var row = list[j];
+      if (!row || !hasCleanKgbNumberLocal_(row)) continue;
+      if (String(row.nip || '').replace(/['"\s]/g, '').trim() === targetNip &&
+          String(row.status || '').toLowerCase() !== 'selesai') {
+        return row;
+      }
+    }
+  }
+  return null;
+}
+
+function applyKgbMysimsModalDom_(noKgbVal, nomorSuratVal, isMysimsReq, isMysimsRetryEligible, mysimsStat, mysimsIdp) {
+  var cleanNo = sanitizeNoKgbPlaceholder_(noKgbVal);
+  if (!cleanNo && nomorSuratVal && String(nomorSuratVal).indexOf('/') !== -1) {
+    cleanNo = sanitizeNoKgbPlaceholder_(String(nomorSuratVal).split('/')[0]);
+  }
+  var hasCleanNo = Boolean(cleanNo);
+
+  var elNoKgb = document.getElementById('kgbFieldNoKgb');
+  if (elNoKgb && (hasCleanNo || elNoKgb.value === '...' || elNoKgb.value === '......')) {
+    elNoKgb.value = cleanNo;
+  }
+  var elNomorSurat = document.getElementById('kgbFieldNomorSurat');
+  if (elNomorSurat && nomorSuratVal && (hasCleanNo || !elNomorSurat.value)) {
+    elNomorSurat.value = nomorSuratVal;
+  }
+  var elMysimsReq = document.getElementById('kgbFieldMysimsRequested');
+  if (elMysimsReq) elMysimsReq.value = (isMysimsReq && !isMysimsRetryEligible) ? 'true' : 'false';
+  var elMysimsStatus = document.getElementById('kgbFieldMysimsStatus');
+  if (elMysimsStatus) elMysimsStatus.value = hasCleanNo ? (mysimsStat || 'Nomor Terbit MYSIMS') : (mysimsStat || '');
+  var elMysimsIdp = document.getElementById('kgbFieldMysimsIdp');
+  if (elMysimsIdp && mysimsIdp !== undefined) elMysimsIdp.value = mysimsIdp || '';
+
+  var elMysimsBadge = document.getElementById('kgbMysimsBadge');
+  if (elMysimsBadge) {
+    if (hasCleanNo) {
+      elMysimsBadge.textContent = 'No. MYSIMS Aktif (' + cleanNo + ')';
+      elMysimsBadge.className = 'text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30';
+    } else if (isMysimsReq && !isMysimsRetryEligible) {
+      elMysimsBadge.textContent = 'MYSIMS Terkirim (' + (mysimsStat || 'Menunggu') + ')';
+      elMysimsBadge.className = 'text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30';
+    } else {
+      elMysimsBadge.textContent = 'Otomatis minta No. Ketua MYSIMS';
+      elMysimsBadge.className = 'text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-indigo-500/15 text-indigo-300 border border-indigo-500/30';
+    }
+  }
+  return cleanNo;
+}
+
+// ==========================================
 // BUKA & TUTUP MODAL DETAIL KGB
 // ==========================================
 window.openKgbModalForm = function(kgbData) {
@@ -324,6 +400,16 @@ window.openKgbModalForm = function(kgbData) {
   if (!modal) return;
 
   var working = Object.assign({}, kgbData || {});
+  if (!hasCleanKgbNumberLocal_(working)) {
+    var liveMatch = findLiveKgbMatchFromVm_(working);
+    if (liveMatch) {
+      working.nokgb = liveMatch.nokgb || working.nokgb || '';
+      working.nomor_surat = liveMatch.nomor_surat || working.nomor_surat || '';
+      working.mysims_requested = Boolean(liveMatch.mysims_requested || working.mysims_requested);
+      working.mysims_status = liveMatch.mysims_status || working.mysims_status || '';
+      working.mysims_idp = liveMatch.mysims_idp || working.mysims_idp || '';
+    }
+  }
   var nip = String(working.nip || '').trim();
 
   // Cari data pegawai dari state global
@@ -442,43 +528,22 @@ window.openKgbModalForm = function(kgbData) {
     updateKgbDatePreview('kgbFieldTanggalSurat', 'kgbPreviewTanggalSurat');
   }
 
-  var noKgbVal = String(working.nokgb || '').trim();
+  var noKgbVal = sanitizeNoKgbPlaceholder_(working.nokgb);
   if (!noKgbVal && working.nomor_surat && String(working.nomor_surat).indexOf('/') !== -1) {
-    var firstSeg = String(working.nomor_surat).split('/')[0].trim();
-    if (firstSeg && firstSeg !== '...' && firstSeg !== '......') {
-      noKgbVal = firstSeg;
-    }
+    noKgbVal = sanitizeNoKgbPlaceholder_(String(working.nomor_surat).split('/')[0]);
   }
   var elNoKgb = document.getElementById('kgbFieldNoKgb');
   if (elNoKgb) elNoKgb.value = noKgbVal;
-  document.getElementById('kgbFieldNomorSurat').value = working.nomor_surat || generateNomorKgbOtomatis(noKgbVal, rawTglSurat);
+  var resolvedNomorFull = working.nomor_surat || generateNomorKgbOtomatis(noKgbVal, rawTglSurat);
+  document.getElementById('kgbFieldNomorSurat').value = resolvedNomorFull;
   document.getElementById('kgbFieldTujuanKppn').value = working.tujuan_kppn || 'Kepala Kantor Pelayanan Perbendaharaan Negara Cirebon di- CIREBON';
 
-  var hasCleanNoKgb = (noKgbVal !== '' && noKgbVal !== '...' && noKgbVal !== '......' && noKgbVal !== '-');
   var isMysimsReq = Boolean(working.mysims_requested);
   var prevMysimsStat = String(working.mysims_status || '').trim();
   var isMysimsRetryEligible = (prevMysimsStat === 'Meminta Nomor MYSIMS' || prevMysimsStat.indexOf('Gagal') === 0);
-  var elMysimsReq = document.getElementById('kgbFieldMysimsRequested');
-  if (elMysimsReq) elMysimsReq.value = (isMysimsReq && !isMysimsRetryEligible) ? 'true' : 'false';
-  var elMysimsStatus = document.getElementById('kgbFieldMysimsStatus');
-  if (elMysimsStatus) elMysimsStatus.value = working.mysims_status || '';
-  var elMysimsIdp = document.getElementById('kgbFieldMysimsIdp');
-  if (elMysimsIdp) elMysimsIdp.value = working.mysims_idp || '';
   var elMysimsReqAt = document.getElementById('kgbFieldMysimsRequestedAt');
   if (elMysimsReqAt) elMysimsReqAt.value = working.mysims_requested_at || '';
-  var elMysimsBadge = document.getElementById('kgbMysimsBadge');
-  if (elMysimsBadge) {
-    if (hasCleanNoKgb) {
-      elMysimsBadge.textContent = 'No. MYSIMS Aktif (' + noKgbVal + ')';
-      elMysimsBadge.className = 'text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30';
-    } else if (isMysimsReq && !isMysimsRetryEligible) {
-      elMysimsBadge.textContent = 'MYSIMS Terkirim (' + (prevMysimsStat || 'Menunggu') + ')';
-      elMysimsBadge.className = 'text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30';
-    } else {
-      elMysimsBadge.textContent = 'Otomatis minta No. Ketua MYSIMS';
-      elMysimsBadge.className = 'text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-indigo-500/15 text-indigo-300 border border-indigo-500/30';
-    }
-  }
+  applyKgbMysimsModalDom_(noKgbVal, resolvedNomorFull, isMysimsReq, isMysimsRetryEligible, prevMysimsStat, working.mysims_idp || '');
 
   // Data SK Lama
   var elGolLama = document.getElementById('kgbFieldGolonganLama');
@@ -616,10 +681,9 @@ function collectKgbFormPayload_() {
   var bt = extractBulanTahunKgbLocal(tglSuratFormatted);
   var elNoKgb = document.getElementById('kgbFieldNoKgb');
   var noSurat = document.getElementById('kgbFieldNomorSurat').value;
-  var noKgb = elNoKgb ? elNoKgb.value.trim() : '';
+  var noKgb = sanitizeNoKgbPlaceholder_(elNoKgb ? elNoKgb.value : '');
   if (!noKgb && noSurat && noSurat.indexOf('/') !== -1) {
-    var seg0 = noSurat.split('/')[0].trim();
-    if (seg0 && seg0 !== '...' && seg0 !== '......' && seg0 !== '-') noKgb = seg0;
+    noKgb = sanitizeNoKgbPlaceholder_(noSurat.split('/')[0]);
   }
 
   var elStatus = document.getElementById('kgbFieldStatus');
@@ -694,11 +758,52 @@ function collectKgbFormPayload_() {
 
 function printKgbFromModal() {
   var payload = collectKgbFormPayload_();
-  if (typeof window.printSuratKgb === 'function') {
-    window.printSuratKgb(payload);
-  } else if (typeof showNotify === 'function') {
-    showNotify("Modul Cetak KGB", "Komponen cetak SK KGB belum siap dimuat.", "warning");
+  payload.nokgb = sanitizeNoKgbPlaceholder_(payload.nokgb);
+
+  // Sinkronkan terlebih dahulu dengan live record di vmEoffice.rawKgbList
+  if (!hasCleanKgbNumberLocal_(payload)) {
+    var liveMatch = findLiveKgbMatchFromVm_(payload);
+    if (liveMatch) {
+      payload.nokgb = sanitizeNoKgbPlaceholder_(liveMatch.nokgb) || payload.nokgb;
+      payload.nomor_surat = liveMatch.nomor_surat || payload.nomor_surat;
+      payload.mysims_requested = true;
+      payload.mysims_status = liveMatch.mysims_status || 'Nomor Terbit MYSIMS';
+      payload.mysims_idp = liveMatch.mysims_idp || payload.mysims_idp;
+      applyKgbMysimsModalDom_(payload.nokgb, payload.nomor_surat, true, false, payload.mysims_status, payload.mysims_idp);
+    }
   }
+
+  var dispatchPrint = function(finalPayload) {
+    if (typeof window.printSuratKgb === 'function') {
+      window.printSuratKgb(finalPayload);
+    } else if (typeof showNotify === 'function') {
+      showNotify("Modul Cetak KGB", "Komponen cetak SK KGB belum siap dimuat.", "warning");
+    }
+  };
+
+  var isCandidateRemoteSync = Boolean(payload.mysims_requested || (payload.id_kgb && String(payload.id_kgb).indexOf('DRAFT-') !== 0));
+  if (!hasCleanKgbNumberLocal_(payload) && isCandidateRemoteSync &&
+      window.EofficeDataService && typeof window.EofficeDataService.fetchLatestKgbMysimsNumber === 'function') {
+    if (typeof showLoading === 'function') showLoading("Memeriksa nomor surat MYSIMS terbaru...");
+    return window.EofficeDataService.fetchLatestKgbMysimsNumber(payload.id_kgb, payload.nip)
+      .then(function(issued) {
+        if (typeof hideLoading === 'function') hideLoading();
+        if (issued && hasCleanKgbNumberLocal_(issued)) {
+          payload.nokgb = issued.nokgb || payload.nokgb;
+          payload.nomor_surat = issued.nomor_surat || payload.nomor_surat;
+          payload.bulan_surat = issued.bulan_surat || payload.bulan_surat;
+          payload.tahun_surat = issued.tahun_surat || payload.tahun_surat;
+          applyKgbMysimsModalDom_(payload.nokgb, payload.nomor_surat, true, false, issued.mysims_status, issued.mysims_idp);
+        }
+        dispatchPrint(payload);
+      })
+      .catch(function() {
+        if (typeof hideLoading === 'function') hideLoading();
+        dispatchPrint(payload);
+      });
+  }
+
+  dispatchPrint(payload);
 }
 
 // ==========================================

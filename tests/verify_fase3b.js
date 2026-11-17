@@ -1050,6 +1050,77 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
     assert.strictEqual(kgbVm.KgbPrintHelper.abbreviatePangkatKgb('Penata Tingkat I (III/d)'), 'Penata Tk. I (III/d)');
     assert.strictEqual(kgbVm.KgbPrintHelper.stripGolonganRuangKgb('Pengatur Tingkat I (II/d)'), 'Pengatur Tk. I');
 
+    const resolvedSanitized = kgbVm.KgbPrintHelper.resolveNomorSuratKgb({
+      nokgb: '......',
+      nomor_surat: '1099/KPA.W10-A2/KP2.1.2/XI/2026',
+      tanggal_surat: '17 November 2026'
+    });
+    assert.strictEqual(resolvedSanitized.nokgb, '1099', 'resolveNomorSuratKgb must sanitize ...... placeholder before falling back to nomor_surat');
+    assert.strictEqual(resolvedSanitized.full, '1099/KPA.W10-A2/KP2.1.2/XI/2026');
+
+    let writtenPrintHtml = '';
+    const origPrintSuratKgbFn = kgbVm.printSuratKgb;
+    kgbVm.document.getElementById = (id) => {
+      if (id === 'template-cetak-kgb-container') {
+        return { innerHTML: '<div>Nomor : {{nokgb}}/KPA.W10-A2/KP2.1.2/{{bulan}}/{{tahun}}</div>' };
+      }
+      return getKgbEl(id);
+    };
+    kgbVm.document.body = { contains: () => false, appendChild: () => {}, removeChild: () => {} };
+    kgbVm.document.createElement = () => ({
+      style: {},
+      contentWindow: {
+        document: {
+          open: () => {},
+          write: (html) => { writtenPrintHtml = String(html || ''); },
+          close: () => {}
+        },
+        focus: () => {},
+        print: () => {}
+      }
+    });
+    kgbVm.vmEoffice = {
+      rawKgbList: [{
+        id_kgb: 'KGB-LIVE-TOHA',
+        nip: '198306072011011009',
+        nokgb: '1099',
+        nomor_surat: '1099/KPA.W10-A2/KP2.1.2/XI/2026',
+        status: 'Sedang Diproses',
+        mysims_requested: true,
+        mysims_status: 'Nomor Terbit MYSIMS'
+      }]
+    };
+    origPrintSuratKgbFn({
+      id_kgb: 'KGB-LIVE-TOHA',
+      nip: '198306072011011009',
+      nama_pegawai: 'Dr. Tohayudin, S.H.I., M.H.I.',
+      nokgb: '......',
+      nomor_surat: '....../KPA.W10-A2/KP2.1.2/XI/2026',
+      tanggal_surat: '17 November 2026'
+    });
+    assert(writtenPrintHtml.includes('1099/KPA.W10-A2/KP2.1.2/XI/2026'),
+      'printSuratKgb must automatically merge issued MYSIMS number from vmEoffice.rawKgbList into Form Cetak KGB');
+    kgbVm.document.getElementById = getKgbEl;
+
+    // modal open & printKgbFromModal auto-merge from vmEoffice.rawKgbList
+    kgbVm.openKgbModalForm({
+      id_kgb: 'KGB-LIVE-TOHA',
+      nip: '198306072011011009',
+      nama_pegawai: 'Dr. Tohayudin, S.H.I., M.H.I.',
+      nokgb: '......',
+      nomor_surat: '....../KPA.W10-A2/KP2.1.2/XI/2026',
+      tanggal_surat: '17 November 2026'
+    });
+    assert.strictEqual(kgbDom.kgbFieldNoKgb.value, '1099', 'openKgbModalForm must hydrate No. Urut KGB from vmEoffice.rawKgbList');
+    let printedFromModalPayload = null;
+    kgbVm.printSuratKgb = (p) => { printedFromModalPayload = p; };
+    kgbDom.kgbFieldNoKgb.value = '......';
+    kgbDom.kgbFieldNomorSurat.value = '....../KPA.W10-A2/KP2.1.2/XI/2026';
+    kgbVm.printKgbFromModal();
+    assert.strictEqual(printedFromModalPayload && printedFromModalPayload.nokgb, '1099',
+      'printKgbFromModal must re-sync issued MYSIMS number from vmEoffice.rawKgbList & strip ...... before printing');
+    assert.strictEqual(kgbDom.kgbFieldNoKgb.value, '1099', 'printKgbFromModal must sync modal No. Urut input');
+
     kgbVm.openKgbModalForm({ nip: '197507062014051001', nama_pegawai: 'Ade Badrujaman, S.H.I.', tanggal_lahir: '1 Januari 2025', pangkat: 'Penata Tingkat I (III/d)' });
     assert.strictEqual(kgbDom.kgbFieldTglLahir.value, '1975-07-06', 'Modal Tanggal Lahir must auto-fill from NIP');
     assert.strictEqual(kgbDom.kgbPreviewTglLahir.textContent, '6 Juli 1975');
@@ -1157,6 +1228,74 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
     }, 'draft', '198001012005011001', 'tok-adm');
     assert.strictEqual(failRetrySaveRes.mysims_res.status, 'error');
     assert.strictEqual(savedKgbDocs[savedKgbDocs.length - 1].mysims_requested, false, 'Failed MYSIMS trigger must reset mysims_requested=false for safe retry');
+
+    // Tahap 129: Background Poller & Pre-Print MYSIMS Sync (syncKgbMysimsNumberInBackground + fetchLatestKgbMysimsNumber)
+    const scheduledTimers = [];
+    const pollSavedDocs = [];
+    const pollToasts = [];
+    let pollAttemptCount = 0;
+    const pollVm = {
+      console,
+      localStorage: { getItem: () => '', setItem: () => {} },
+      setTimeout: (fn) => { scheduledTimers.push(fn); },
+      showNotify: (title, msg, type) => pollToasts.push({ title, msg, type }),
+      vmEoffice: {
+        rawKgbList: [{
+          id_kgb: 'KGB-POLL-1',
+          nip: '198607092020121004',
+          nama_pegawai: 'Raden Anantama Havid Ismail, A.Md.',
+          nokgb: '',
+          nomor_surat: '....../KPA.W10-A2/KP2.1.2/XI/2026',
+          status: 'Sedang Diproses',
+          mysims_requested: true,
+          mysims_status: 'Permintaan Terkirim ke MYSIMS'
+        }],
+        rawRapatList: []
+      },
+      TranskepFirebase: {
+        isReady: () => true,
+        saveKgbToFirestore: async (doc) => { pollSavedDocs.push(JSON.parse(JSON.stringify(doc))); return doc; },
+        deleteKgbFromFirestore: async () => true
+      },
+      TranskepAPI: {
+        call: async (method) => {
+          if (method === 'getKgbMysimsStatus') {
+            pollAttemptCount += 1;
+            if (pollAttemptCount === 1) return { status: 'pending', source: 'none', data: null };
+            return {
+              status: 'success',
+              source: 'cache',
+              data: {
+                id_kgb: 'KGB-POLL-1',
+                nip: '198607092020121004',
+                nokgb: '1105',
+                nomor_surat: '1105/KPA.W10-A2/KP2.1.2/XI/2026',
+                bulan_surat: 'XI',
+                tahun_surat: '2026',
+                mysims_idp: '1300',
+                mysims_status: 'Nomor Terbit MYSIMS'
+              }
+            };
+          }
+          return { status: 'success' };
+        }
+      }
+    };
+    pollVm.window = pollVm;
+    vm.createContext(pollVm);
+    vm.runInContext(eofficeDataSrc, pollVm, { filename: 'modules/eoffice/eoffice_data.js' });
+
+    pollVm.EofficeDataService.syncKgbMysimsNumberInBackground('KGB-POLL-1', '198607092020121004', '198001012005011001', 'tok-adm');
+    assert.strictEqual(scheduledTimers.length, 1, 'syncKgbMysimsNumberInBackground must schedule 1st poll');
+    await scheduledTimers.shift()(); // Attempt 1 -> pending -> schedules attempt 2
+    assert.strictEqual(scheduledTimers.length, 1, 'Pending getKgbMysimsStatus must schedule retry poll');
+    await scheduledTimers.shift()(); // Attempt 2 -> success -> syncs & stops
+    assert.strictEqual(scheduledTimers.length, 0, 'Issued MYSIMS number must stop polling');
+    assert.strictEqual(pollVm.vmEoffice.rawKgbList[0].nokgb, '1105', 'Background poller must hydrate vmEoffice.rawKgbList');
+    assert.strictEqual(pollSavedDocs[pollSavedDocs.length - 1].nomor_surat, '1105/KPA.W10-A2/KP2.1.2/XI/2026',
+      'Background poller must persist MYSIMS number into Firestore even if server REST patch missed it');
+    assert(pollToasts.some(t => t.type === 'success' && t.msg.includes('1105/KPA.W10-A2/KP2.1.2/XI/2026')),
+      'Background poller must notify admin when MYSIMS number arrives');
 
     // n8n Workflow Routing Verification (ST index 0, KGB index 1, Cuti fallback index 2)
     const n8nWf = JSON.parse(fs.readFileSync('n8n/n8n_workflow_mysims_surat_keluar.example.json', 'utf8'));

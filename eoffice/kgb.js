@@ -88,13 +88,15 @@ function parseNomorKgbBackend_(p) {
   }
 
   let nokgb = String(p.nokgb || '').trim();
+  if (nokgb === '...' || nokgb === '......' || nokgb === '-') nokgb = '';
   if (p.bulan_surat || p.bulan) bulan = String(p.bulan_surat || p.bulan).trim();
   if (p.tahun_surat || p.tahun) tahun = String(p.tahun_surat || p.tahun).trim();
 
   const full = String(p.nomor_surat || '').trim();
   if (full && full.indexOf('/') !== -1) {
     const segs = full.split('/');
-    if (!nokgb && segs[0] && segs[0] !== '...' && segs[0] !== '......' && segs[0] !== '-') nokgb = segs[0].trim();
+    const firstSeg = String(segs[0] || '').trim();
+    if (!nokgb && firstSeg && firstSeg !== '...' && firstSeg !== '......' && firstSeg !== '-') nokgb = firstSeg;
     if (segs.length >= 5) {
       if (!p.bulan_surat && segs[3]) bulan = segs[3].trim();
       if (!p.tahun_surat && segs[4]) tahun = segs[4].trim();
@@ -780,6 +782,26 @@ function updateNomorSuratKgbFromExternal_(payload) {
     if (bulanSurat) mergedRecord.bulan_surat = bulanSurat;
     if (tahunSurat) mergedRecord.tahun_surat = tahunSurat;
 
+    // Simpan ringkasan nomor terbit ke ScriptCache (TTL 6 jam) agar client poller & pre-print fallback selalu bisa tarik nomornya meski REST tertunda
+    const cleanNip = String(mergedRecord.nip || payload.nip || '').replace(/['"\s]/g, '').trim();
+    const cachedResultObj = {
+      id_kgb: idKgb,
+      nip: cleanNip,
+      nokgb: nokgb,
+      nomor_surat: nomorRaw,
+      bulan_surat: bulanSurat,
+      tahun_surat: tahunSurat,
+      mysims_idp: String(payload.idp || ''),
+      mysims_status: 'Nomor Terbit MYSIMS',
+      updated_at: new Date().toISOString()
+    };
+    try {
+      const resJson = JSON.stringify(cachedResultObj);
+      const scriptCache = CacheService.getScriptCache();
+      scriptCache.put('kgb_res_' + idKgb, resJson, 21600);
+      if (cleanNip) scriptCache.put('kgb_res_nip_' + cleanNip, resJson, 21600);
+    } catch (eCache) {}
+
     // Sinkronkan nomor MYSIMS balik ke Cloud Firestore agar UI E-Office Browser langsung update (<1s)
     let firestoreSynced = false;
     let firestoreStatusCode = 0;
@@ -818,6 +840,80 @@ function updateNomorSuratKgbFromExternal_(payload) {
     };
   } catch (err) {
     Logger.log('❌ [updateNomorSuratKgbFromExternal_ Error] ' + err.toString());
+    return { status: 'error', message: err.toString() };
+  }
+}
+
+/**
+ * RPC Admin Terotorisasi: Mengecek hasil nomor surat MYSIMS KGB terbaru dari Cache GAS / Cloud Firestore
+ */
+function getKgbMysimsStatus(idKgb, targetNip, adminNip, clientToken) {
+  try {
+    if (idKgb && typeof idKgb === 'object' && !Array.isArray(idKgb)) {
+      const p = idKgb;
+      adminNip = adminNip || p.adminNip || p.nip;
+      clientToken = clientToken || p.token;
+      targetNip = p.targetNip || p.target_nip || '';
+      idKgb = p.id_kgb || p.idKgb || p.id || '';
+    }
+    if (!cekOtorisasiAdmin(adminNip, clientToken)) {
+      return { status: 'error', message: 'Akses Ditolak: Hanya Admin/Operator yang dapat memeriksa status MYSIMS KGB.' };
+    }
+
+    const cleanId = String(idKgb || '').trim();
+    const cleanNip = String(targetNip || '').replace(/['"\s]/g, '').trim();
+    if (!cleanId && !cleanNip) {
+      return { status: 'error', message: "Parameter 'id_kgb' atau 'targetNip' wajib diisi." };
+    }
+
+    // 1. Cek ScriptCache terlebih dahulu (cepat & kebal jika REST Firestore tertunda)
+    try {
+      const cache = CacheService.getScriptCache();
+      let rawCached = cleanId ? cache.get('kgb_res_' + cleanId) : null;
+      if (!rawCached && cleanNip) rawCached = cache.get('kgb_res_nip_' + cleanNip);
+      if (rawCached) {
+        const parsed = JSON.parse(rawCached);
+        if (parsed && hasAssignedKgbNumber_(parsed)) {
+          return {
+            status: 'success',
+            source: 'cache',
+            data: parsed
+          };
+        }
+      }
+    } catch (eCache) {}
+
+    // 2. Fallback ke pembacaan langsung Cloud Firestore (Dual-Auth REST)
+    if (cleanId && typeof firestoreRestGet_ === 'function') {
+      const fsDoc = firestoreRestGet_('eoffice_kgb', cleanId);
+      if (fsDoc && hasAssignedKgbNumber_(fsDoc)) {
+        const parsedNo = parseNomorKgbBackend_(fsDoc);
+        return {
+          status: 'success',
+          source: 'firestore',
+          data: {
+            id_kgb: cleanId,
+            nip: String(fsDoc.nip || cleanNip || '').replace(/['"\s]/g, '').trim(),
+            nokgb: parsedNo.nokgb !== '......' ? parsedNo.nokgb : String(fsDoc.nokgb || '').trim(),
+            nomor_surat: String(fsDoc.nomor_surat || parsedNo.full || '').trim(),
+            bulan_surat: String(fsDoc.bulan_surat || parsedNo.bulan || '').trim(),
+            tahun_surat: String(fsDoc.tahun_surat || parsedNo.tahun || '').trim(),
+            mysims_idp: String(fsDoc.mysims_idp || '').trim(),
+            mysims_status: String(fsDoc.mysims_status || 'Nomor Terbit MYSIMS').trim(),
+            updated_at: String(fsDoc.updated_at || '')
+          }
+        };
+      }
+    }
+
+    return {
+      status: 'pending',
+      source: 'none',
+      data: null,
+      message: 'Nomor surat MYSIMS KGB belum diterbitkan.'
+    };
+  } catch (err) {
+    Logger.log('⚠️ [getKgbMysimsStatus] ' + err.toString());
     return { status: 'error', message: err.toString() };
   }
 }

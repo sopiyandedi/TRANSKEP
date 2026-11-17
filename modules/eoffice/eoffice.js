@@ -420,10 +420,45 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       },
 
-      triggerPrintKgb(item) {
-        const raw = (item && item.rawData) ? item.rawData : item;
+      async triggerPrintKgb(item) {
+        const baseRaw = (item && item.rawData) ? { ...item.rawData } : { ...(item || {}) };
+        let merged = baseRaw;
+        const hasValidFn = (window.EofficeDataService && typeof window.EofficeDataService.hasValidKgbNumber === 'function')
+          ? (rec) => window.EofficeDataService.hasValidKgbNumber(rec)
+          : (rec) => {
+              const n = String((rec && rec.nokgb) || '').trim();
+              if (n && n !== '...' && n !== '......' && n !== '-') return true;
+              const f = String((rec && rec.nomor_surat) || '').trim();
+              return Boolean(f && /^\d+[^/]*\//.test(f) && f.indexOf('...') === -1);
+            };
+
+        if (!hasValidFn(merged) && Array.isArray(this.rawKgbList)) {
+          const tId = String(merged.id_kgb || '').trim();
+          const tNip = String(merged.nip || '').replace(/['"\s]/g, '').trim();
+          const liveRec = this.rawKgbList.find(k =>
+            hasValidFn(k) && (
+              (tId && String(k.id_kgb || '').trim() === tId) ||
+              (tNip && String(k.nip || '').replace(/['"\s]/g, '').trim() === tNip && String(k.status || '').toLowerCase() !== 'selesai')
+            )
+          );
+          if (liveRec) merged = { ...merged, ...liveRec };
+        }
+
+        const isCandidateRemote = Boolean(merged.mysims_requested || (merged.id_kgb && String(merged.id_kgb).indexOf('DRAFT-') !== 0));
+        if (!hasValidFn(merged) && isCandidateRemote &&
+            window.EofficeDataService && typeof window.EofficeDataService.fetchLatestKgbMysimsNumber === 'function') {
+          if (typeof showLoading === 'function') showLoading("Memeriksa nomor surat MYSIMS terbaru...");
+          try {
+            const issued = await window.EofficeDataService.fetchLatestKgbMysimsNumber(merged.id_kgb, merged.nip);
+            if (issued && hasValidFn(issued)) {
+              merged = { ...merged, ...issued };
+            }
+          } catch (e) {}
+          if (typeof hideLoading === 'function') hideLoading();
+        }
+
         if (typeof window.printSuratKgb === 'function') {
-          window.printSuratKgb(raw);
+          window.printSuratKgb(merged);
         } else if (typeof showNotify === 'function') {
           showNotify("Modul Cetak KGB", "Komponen cetak SK KGB belum siap dimuat.", "warning");
         }

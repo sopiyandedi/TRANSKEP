@@ -178,6 +178,9 @@ function handleApiPost_(payload, e) {
       case 'requestKgbSuratKeluar':
         return jsonResponse_(requestKgbSuratKeluar(payload.data, payload.nip, payload.token));
 
+      case 'getKgbMysimsStatus':
+        return jsonResponse_(getKgbMysimsStatus(payload.id_kgb || payload.idKgb, payload.targetNip || payload.target_nip, payload.nip, payload.token));
+
       case 'deleteKgbDocRecord':
         return jsonResponse_(deleteKgbDocRecord(payload.id_kgb || payload.idKgb, payload.targetNip, payload.resetUserStatus, payload.nip, payload.token));
 
@@ -256,6 +259,7 @@ var AUTHENTICATED_RPC_METHODS_ = {
   getEofficeData: true,
   saveOrGenerateKgbDoc: true,
   requestKgbSuratKeluar: true,
+  getKgbMysimsStatus: true,
   deleteKgbDocRecord: true,
   createPaketRapatDocs: true,
   saveJobdes: true,

@@ -2508,15 +2508,108 @@ function firestoreFieldsToJs_(fields) {
   return out;
 }
 
+function getFirebaseWebApiKey_() {
+  try {
+    const prop = PropertiesService.getScriptProperties().getProperty('FIREBASE_WEB_API_KEY');
+    if (prop && String(prop).trim()) return String(prop).trim();
+  } catch (e) {}
+  return 'AIzaSyBS64rl8AAwofd-tLfNTu_ibcFwHydiAgE';
+}
+
+function getFirebaseAdminIdToken_(forceRefresh) {
+  try {
+    const cache = CacheService.getScriptCache();
+    const cacheKey = 'transkep_fs_admin_id_token_v1';
+    if (!forceRefresh) {
+      const cached = cache.get(cacheKey);
+      if (cached) return cached;
+    }
+
+    const customToken = mintFirebaseCustomToken_('GAS_SYSTEM_SYNC', 'Admin');
+    const apiKey = getFirebaseWebApiKey_();
+    if (!customToken || !apiKey) return null;
+
+    const exchangeUrl = 'https://identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=' + encodeURIComponent(apiKey);
+    const resp = UrlFetchApp.fetch(exchangeUrl, {
+      method: 'post',
+      contentType: 'application/json',
+      payload: JSON.stringify({ token: customToken, returnSecureToken: true }),
+      muteHttpExceptions: true
+    });
+    if (resp.getResponseCode() !== 200) return null;
+    const json = JSON.parse(resp.getContentText() || '{}');
+    if (json && json.idToken) {
+      const idTok = String(json.idToken);
+      cache.put(cacheKey, idTok, 3000);
+      return idTok;
+    }
+    return null;
+  } catch (e) {
+    Logger.log('⚠️ [getFirebaseAdminIdToken_] ' + e.toString());
+    return null;
+  }
+}
+
+function fetchFirestoreRestWithDualAuth_(url, baseOpts) {
+  const saToken = getFirebaseServiceAccessToken_();
+  let lastResp = null;
+  let lastCode = 0;
+  let authMode = 'none';
+
+  const doFetch = (bearerToken) => {
+    const opts = Object.assign({ muteHttpExceptions: true }, baseOpts || {});
+    if (bearerToken) {
+      opts.headers = Object.assign({}, opts.headers || {}, { Authorization: 'Bearer ' + bearerToken });
+    }
+    return UrlFetchApp.fetch(url, opts);
+  };
+
+  if (saToken) {
+    authMode = 'service_account';
+    lastResp = doFetch(saToken);
+    lastCode = lastResp ? lastResp.getResponseCode() : 0;
+    if (lastCode >= 200 && lastCode < 300) {
+      return { resp: lastResp, code: lastCode, authMode: authMode, error: '' };
+    }
+  }
+
+  // Fallback otomatis ke Firebase Admin ID Token (IdentityToolkit) jika token SA kosong atau ditolak IAM (401/403)
+  if (!saToken || lastCode === 401 || lastCode === 403) {
+    const adminIdToken = getFirebaseAdminIdToken_(false);
+    if (adminIdToken) {
+      authMode = 'admin_id_token';
+      lastResp = doFetch(adminIdToken);
+      lastCode = lastResp ? lastResp.getResponseCode() : 0;
+      if (lastCode === 401) {
+        const refreshed = getFirebaseAdminIdToken_(true);
+        if (refreshed && refreshed !== adminIdToken) {
+          lastResp = doFetch(refreshed);
+          lastCode = lastResp ? lastResp.getResponseCode() : 0;
+        }
+      }
+    }
+  }
+
+  if (!lastResp && authMode === 'none') {
+    lastResp = doFetch('');
+    lastCode = lastResp ? lastResp.getResponseCode() : 0;
+  }
+
+  let errText = '';
+  if (lastCode < 200 || lastCode >= 300) {
+    try {
+      errText = String((lastResp && lastResp.getContentText()) || '').slice(0, 300);
+    } catch (e) {}
+  }
+  return { resp: lastResp, code: lastCode, authMode: authMode, error: errText };
+}
+
 function firestoreRestGet_(collectionName, docId) {
   try {
     const url = firestoreRestDocUrl_(collectionName, docId);
-    const token = getFirebaseServiceAccessToken_();
-    const opts = { method: 'get', muteHttpExceptions: true };
-    if (token) opts.headers = { Authorization: 'Bearer ' + token };
-    const resp = UrlFetchApp.fetch(url, opts);
-    if (resp.getResponseCode() !== 200) return null;
-    const doc = JSON.parse(resp.getContentText() || '{}');
+    const res = fetchFirestoreRestWithDualAuth_(url, { method: 'get', muteHttpExceptions: true });
+    if (!res || res.code !== 200 || !res.resp) return null;
+    const doc = JSON.parse(res.resp.getContentText() || '{}');
     return firestoreFieldsToJs_(doc.fields || {});
   } catch (e) {
     return null;
@@ -2546,20 +2639,21 @@ function firestoreRestPatch_(collectionName, docId, fieldMap) {
         fields[k] = { stringValue: String(val) };
       }
     }
-    if (masks.length === 0) return { ok: true, statusCode: 200 };
+    if (masks.length === 0) return { ok: true, statusCode: 200, authMode: 'noop' };
 
     const patchUrl = firestoreRestDocUrl_(collectionName, docId) + '?' + masks.join('&');
-    const token = getFirebaseServiceAccessToken_();
-    const opts = {
+    const res = fetchFirestoreRestWithDualAuth_(patchUrl, {
       method: 'patch',
       contentType: 'application/json',
       payload: JSON.stringify({ fields: fields }),
       muteHttpExceptions: true
+    });
+    return {
+      ok: Boolean(res && res.code >= 200 && res.code < 300),
+      statusCode: Number((res && res.code) || 0),
+      authMode: (res && res.authMode) || 'none',
+      error: (res && res.error) || ''
     };
-    if (token) opts.headers = { Authorization: 'Bearer ' + token };
-    const resp = UrlFetchApp.fetch(patchUrl, opts);
-    const code = resp.getResponseCode();
-    return { ok: code >= 200 && code < 300, statusCode: code };
   } catch (e) {
     Logger.log('⚠️ [firestoreRestPatch_] ' + e.toString());
     return { ok: false, statusCode: 0, error: e.toString() };

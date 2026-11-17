@@ -610,6 +610,86 @@ const e2eSave1 = feSandbox.EofficeDataService.saveOrGenerateKgb({
   assert(stPatchCall && stPatchCall.opts.headers && stPatchCall.opts.headers.Authorization === 'Bearer mock-sa-bearer-tok',
     'ST Firestore REST PATCH must carry OAuth2 Service Account Bearer token');
 
+  // Tahap 129: Dual-Auth Firestore REST Fallback (403 SA -> Firebase Admin ID Token), parseNomorKgbBackend_ placeholder cleanup & getKgbMysimsStatus Cache/Firestore RPC
+  assert.strictEqual(
+    sandbox.parseNomorKgbBackend_({ nokgb: '......', nomor_surat: '1099/KPA.W10-A2/KP2.1.2/XI/2026' }).nokgb,
+    '1099',
+    'parseNomorKgbBackend_ must strip literal ...... placeholder in nokgb before reading nomor_surat'
+  );
+
+  sandbox.CacheService.getScriptCache().remove('transkep_fs_admin_id_token_v1');
+  mockFetchResponder = (url, opts) => {
+    if (url.includes('oauth2.googleapis.com/token')) {
+      return { getResponseCode: () => 200, getContentText: () => JSON.stringify({ access_token: 'mock-sa-no-iam', expires_in: 3600 }) };
+    }
+    if (url.includes('identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken')) {
+      return { getResponseCode: () => 200, getContentText: () => JSON.stringify({ idToken: 'mock-admin-id-tok', expiresIn: '3600' }) };
+    }
+    if (url.includes('firestore.googleapis.com')) {
+      const authHdr = (opts && opts.headers && opts.headers.Authorization) || '';
+      if (authHdr !== 'Bearer mock-admin-id-tok') {
+        return { getResponseCode: () => 403, getContentText: () => JSON.stringify({ error: { code: 403, message: 'PERMISSION_DENIED' } }) };
+      }
+      if (!opts.method || String(opts.method).toUpperCase() === 'GET') {
+        return { getResponseCode: () => 200, getContentText: () => JSON.stringify({ fields: { nokgb: { stringValue: '1099' }, nomor_surat: { stringValue: '1099/KPA.W10-A2/KP2.1.2/XI/2026' } } }) };
+      }
+      return { getResponseCode: () => 200, getContentText: () => JSON.stringify({ name: url, fields: {} }) };
+    }
+    return { getResponseCode: () => 200, getContentText: () => JSON.stringify({ ok: true }) };
+  };
+  sandbox.CacheService.getScriptCache().remove('transkep_fs_sa_token_v1');
+
+  const dualPatchRes = sandbox.firestoreRestPatch_('eoffice_kgb', 'KGB-DUAL-1', { nokgb: '1099', nomor_surat: '1099/KPA.W10-A2/KP2.1.2/XI/2026' });
+  assert.strictEqual(dualPatchRes.ok, true, 'firestoreRestPatch_ must recover on 403 via Firebase Admin ID Token');
+  assert.strictEqual(dualPatchRes.authMode, 'admin_id_token', 'Dual-Auth fallback must report admin_id_token');
+  const dualGetDoc = sandbox.firestoreRestGet_('eoffice_kgb', 'KGB-DUAL-1');
+  assert.strictEqual(dualGetDoc && dualGetDoc.nokgb, '1099', 'firestoreRestGet_ must also recover on 403 via Firebase Admin ID Token');
+
+  // Pegawai role blocked from getKgbMysimsStatus
+  const pegMysimsDeny = parseResp(sandbox.handleApiPost_({
+    action: 'call',
+    method: 'getKgbMysimsStatus',
+    args: ['KGB-CACHE-ONLY-1', '198306072011011009', '199002022015012002', pegLogin2.token],
+    nip: '199002022015012002',
+    token: pegLogin2.token
+  }));
+  assert.strictEqual(pegMysimsDeny.status, 'error', 'Pegawai must be rejected by getKgbMysimsStatus');
+  assert(String(pegMysimsDeny.message || '').includes('Hanya Admin/Operator'), 'Pegawai rejection must come from Admin RBAC guard');
+
+  // Even if Firestore REST completely fails (403 everywhere), callback caches number & getKgbMysimsStatus serves it to Admin
+  sandbox.CacheService.getScriptCache().remove('transkep_fs_admin_id_token_v1');
+  mockFetchResponder = (url) => {
+    if (url.includes('firestore.googleapis.com')) {
+      return { getResponseCode: () => 403, getContentText: () => '{"error":"blocked"}' };
+    }
+    if (url.includes('identitytoolkit.googleapis.com')) {
+      return { getResponseCode: () => 403, getContentText: () => '{"error":"blocked"}' };
+    }
+    return { getResponseCode: () => 200, getContentText: () => '{}' };
+  };
+  const cbCacheOnly = parseResp(sandbox.handleApiPost_({
+    action: 'updateNomorSuratKgb',
+    id_kgb: 'KGB-CACHE-ONLY-1',
+    nip: '198306072011011009',
+    nomor_surat: '1102/KPA.W10-A2/KP2.1.2/XI/2026',
+    idp: '1205',
+    secret_key: 'TEST_HOOK_KEY_127'
+  }));
+  assert.strictEqual(cbCacheOnly.status, 'success', 'KGB callback must still succeed & cache result even if Firestore REST fails');
+  assert.strictEqual(cbCacheOnly.firestore_synced, false);
+
+  const adminMysimsStatus = parseResp(sandbox.handleApiPost_({
+    action: 'call',
+    method: 'getKgbMysimsStatus',
+    args: ['KGB-CACHE-ONLY-1', '198306072011011009', '198001012005011001', admLogin.token],
+    nip: '198001012005011001',
+    token: admLogin.token
+  }));
+  assert.strictEqual(adminMysimsStatus.status, 'success', 'Admin must fetch issued KGB number via getKgbMysimsStatus cache fallback');
+  assert.strictEqual(adminMysimsStatus.source, 'cache');
+  assert.strictEqual(adminMysimsStatus.data.nokgb, '1102');
+  assert.strictEqual(adminMysimsStatus.data.nomor_surat, '1102/KPA.W10-A2/KP2.1.2/XI/2026');
+
   console.log('[PASS] ALL Fase 1 end-to-end functional & security tests passed (0 failures).');
 })().catch(err => {
   console.error(err);
