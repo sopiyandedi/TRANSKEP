@@ -447,7 +447,10 @@ assert(n8nKgbCall, '1st requestKgbSuratKeluar call must trigger n8n webhook');
 const n8nKgbBody = JSON.parse(n8nKgbCall.opts.payload);
 assert.strictEqual(n8nKgbBody.event, 'KGB_SURAT_KELUAR');
 assert.strictEqual(n8nKgbBody.task.jabatan_penandatangan, 'Ketua');
+assert.strictEqual(n8nKgbBody.task.satker_kode, 'KPA.W10-A2');
 assert.strictEqual(n8nKgbBody.task.kode_klasifikasi, 'KP2.1.2');
+assert.strictEqual(n8nKgbBody.task.sifat, 'Biasa');
+assert.strictEqual(n8nKgbBody.task.ket, 'Biasa');
 
 // Immediate 2nd call blocked by CacheService guard (no second webhook request!)
 const webhookCountBefore = recordedFetchCalls.filter(c => c.url.includes('webhook')).length;
@@ -461,31 +464,154 @@ const kgbSecondCall = parseResp(sandbox.handleApiPost_({
 assert.strictEqual(kgbSecondCall.status, 'already_exists', '2nd requestKgbSuratKeluar call must return already_exists');
 assert.strictEqual(recordedFetchCalls.filter(c => c.url.includes('webhook')).length, webhookCountBefore, '2nd requestKgbSuratKeluar must not call n8n again');
 
-// Callback with valid secret_key updates Firestore with OAuth2 Bearer & compiles KGB PDF
-const kgbCbOk = parseResp(sandbox.handleApiPost_({
-  action: 'updateNomorSuratKgb',
-  id_kgb: 'KGB-19750706-2026',
-  nomor_surat: '777/KPA.W10-A2/KP2.1.2/XI/2026',
-  idp: '1088',
-  secret_key: 'TEST_HOOK_KEY_127'
-}));
-assert.strictEqual(kgbCbOk.status, 'success', 'Valid KGB callback must succeed');
-assert.strictEqual(kgbCbOk.nokgb, '777');
-assert.strictEqual(kgbCbOk.firestore_synced, true);
-assert(kgbCbOk.pdf_kgb && kgbCbOk.pdf_kgb.pdf_base64.length > 100, 'KGB callback must return Base64 PDF');
-const decodedKgbPdfHtml = Buffer.from(kgbCbOk.pdf_kgb.pdf_base64, 'base64').toString('utf8');
-assert(decodedKgbPdfHtml.includes('777/KPA.W10-A2/KP2.1.2/XI/2026'), 'Compiled KGB PDF must embed official MYSIMS number');
-assert(decodedKgbPdfHtml.includes('06-07-1975'), 'Compiled KGB PDF must derive DD-MM-YYYY birthdate from NIP');
-assert(decodedKgbPdfHtml.includes('Penata Tk. I'), 'Compiled KGB PDF must abbreviate Tingkat I -> Tk. I');
+// Integrated Frontend -> Backend Flow (EofficeDataService.saveOrGenerateKgb -> handleApiPost_ -> triggerN8nSuratKeluarKgb_)
+const fakeFsKgbStore = {};
+mockFetchResponder = (url, opts) => {
+  if (url.includes('oauth2.googleapis.com/token')) {
+    return { getResponseCode: () => 200, getContentText: () => JSON.stringify({ access_token: 'mock-sa-bearer-tok', expires_in: 3600 }) };
+  }
+  if (url.includes('/eoffice_kgb/') && (!opts.method || String(opts.method).toUpperCase() === 'GET')) {
+    const idPart = decodeURIComponent(url.split('/eoffice_kgb/')[1].split('?')[0]);
+    const rec = fakeFsKgbStore[idPart];
+    if (!rec) return { getResponseCode: () => 404, getContentText: () => '{}' };
+    const fields = {};
+    Object.keys(rec).forEach(k => {
+      if (typeof rec[k] === 'boolean') fields[k] = { booleanValue: rec[k] };
+      else if (rec[k] !== undefined && rec[k] !== null) fields[k] = { stringValue: String(rec[k]) };
+    });
+    return { getResponseCode: () => 200, getContentText: () => JSON.stringify({ fields }) };
+  }
+  return { getResponseCode: () => 200, getContentText: () => JSON.stringify({ name: url, fields: {} }) };
+};
 
-const kgbPatchCall = recordedFetchCalls.find(c => c.url.includes('/eoffice_kgb/KGB-19750706-2026') && String(c.opts.method || '').toLowerCase() === 'patch');
-assert(kgbPatchCall && kgbPatchCall.opts.headers && kgbPatchCall.opts.headers.Authorization === 'Bearer mock-sa-bearer-tok',
-  'KGB Firestore REST PATCH must carry OAuth2 Service Account Bearer token');
+const feSandbox = {
+  console,
+  localStorage: { getItem: () => '', setItem: () => {} },
+  TranskepFirebase: {
+    isReady: () => true,
+    saveKgbToFirestore: async (doc) => { fakeFsKgbStore[doc.id_kgb] = Object.assign({}, doc); return doc; },
+    deleteKgbFromFirestore: async (id) => { delete fakeFsKgbStore[id]; return true; }
+  },
+  TranskepAPI: {
+    call: async (method, ...args) => parseResp(sandbox.handleApiPost_({
+      action: 'call',
+      method,
+      args,
+      nip: '198001012005011001',
+      token: admLogin.token
+    }))
+  }
+};
+feSandbox.window = feSandbox;
+vm.createContext(feSandbox);
+vm.runInContext(fs.readFileSync('modules/eoffice/eoffice_data.js', 'utf8'), feSandbox, { filename: 'modules/eoffice/eoffice_data.js' });
 
-// Approved Cross-Module Bearer Check: syncFirestoreSuratTugasNumbers_ in permohonan/st/st.js
-sandbox.syncFirestoreSuratTugasNumbers_('ST-1', '111/ST.HM3.1.1/XI/2026', '', '', []);
-const stPatchCall = recordedFetchCalls.find(c => c.url.includes('/surat_tugas_documents/ST-1') && String(c.opts.method || '').toLowerCase() === 'patch');
-assert(stPatchCall && stPatchCall.opts.headers && stPatchCall.opts.headers.Authorization === 'Bearer mock-sa-bearer-tok',
-  'ST Firestore REST PATCH must carry OAuth2 Service Account Bearer token');
+const webhookBeforeE2e = recordedFetchCalls.filter(c => c.url.includes('webhook')).length;
+const e2eSave1 = feSandbox.EofficeDataService.saveOrGenerateKgb({
+  id_kgb: 'DRAFT-198306072011011009',
+  nip: '198306072011011009',
+  nama_pegawai: 'Dr. Tohayudin, S.H.I., M.H.I.',
+  tmt_baru: '1 Januari 2027',
+  nokgb: '',
+  nomor_surat: '....../KPA.W10-A2/KP2.1.2/XI/2026',
+  mysims_requested: false
+}, 'draft', '198001012005011001', admLogin.token);
 
-console.log('[PASS] ALL Fase 1 end-to-end functional & security tests passed (0 failures).');
+// Resolve synchronous Promise via microtask flush + validate stuck Dr. Tohayudin recovery & 2nd edit block
+(async () => {
+  const res1 = await e2eSave1;
+  assert.strictEqual(res1.status, 'success');
+  assert.strictEqual(res1.mysims_res.status, 'success', 'Integrated 1st save MUST reach GAS triggerN8nSuratKeluarKgb_ (never self-block as already_exists): ' + (res1.mysims_res && res1.mysims_res.message));
+  assert.strictEqual(recordedFetchCalls.filter(c => c.url.includes('webhook')).length, webhookBeforeE2e + 1, 'Integrated 1st save must invoke n8n webhook exactly once');
+  assert.strictEqual(fakeFsKgbStore[res1.id_kgb].mysims_status, 'Permintaan Terkirim ke MYSIMS');
+
+  // Edit ke-2 (status sudah 'Permintaan Terkirim ke MYSIMS') -> TIDAK boleh panggil n8n lagi
+  const res2 = await feSandbox.EofficeDataService.saveOrGenerateKgb({
+    ...res1.data,
+    gaji_baru: '4.100.000'
+  }, 'draft', '198001012005011001', admLogin.token);
+  assert.strictEqual(res2.mysims_requested_now, false);
+  assert.strictEqual(recordedFetchCalls.filter(c => c.url.includes('webhook')).length, webhookBeforeE2e + 1, 'Integrated 2nd edit must NOT re-trigger n8n webhook');
+
+  // Pemulihan berkas nyangkut dari v3.8.61 (mysims_requested: true + status 'Meminta Nomor MYSIMS' + nokgb '')
+  const resStuck = await feSandbox.EofficeDataService.saveOrGenerateKgb({
+    id_kgb: 'KGB-STUCK-19830607-202701',
+    nip: '198306072011011009',
+    nama_pegawai: 'Dr. Tohayudin, S.H.I., M.H.I.',
+    tmt_baru: '1 Januari 2027',
+    nokgb: '',
+    nomor_surat: '....../KPA.W10-A2/KP2.1.2/XI/2026',
+    mysims_requested: true,
+    mysims_status: 'Meminta Nomor MYSIMS'
+  }, 'draft', '198001012005011001', admLogin.token);
+  assert.strictEqual(resStuck.mysims_res.status, 'success', 'Stuck Meminta Nomor MYSIMS record without number must recover and trigger n8n');
+  assert.strictEqual(recordedFetchCalls.filter(c => c.url.includes('webhook')).length, webhookBeforeE2e + 2, 'Recovery save must invoke n8n webhook once');
+
+  // Reset mockFetchResponder back for remaining tests (Restore default mock with fields)
+  mockFetchResponder = (url, opts) => {
+    if (url.includes('oauth2.googleapis.com/token')) {
+      return { getResponseCode: () => 200, getContentText: () => JSON.stringify({ access_token: 'mock-sa-bearer-tok', expires_in: 3600 }) };
+    }
+    if (url.includes('firestore.googleapis.com') && (!opts.method || String(opts.method).toUpperCase() === 'GET')) {
+      return {
+        getResponseCode: () => 200,
+        getContentText: () => JSON.stringify({
+          fields: {
+            id_kgb: { stringValue: 'KGB-19750706-2026' },
+            nip: { stringValue: '197507062014051001' },
+            nama_pegawai: { stringValue: 'Ade Badrujaman, S.H.I.' },
+            pangkat: { stringValue: 'Penata Tingkat I (III/d)' },
+            jabatan: { stringValue: 'Panitera Pengganti' }
+          }
+        })
+      };
+    }
+    return { getResponseCode: () => 200, getContentText: () => JSON.stringify({ name: url, fields: {} }) };
+  };
+
+  // Uji 2-Stage Resilient Fallback PDF Compiler ketika tag <img> eksternal gagal di HtmlService
+  const origCreateHtml = sandbox.HtmlService.createHtmlOutput;
+  sandbox.HtmlService.createHtmlOutput = (html) => {
+    if (String(html).includes('<img')) throw new Error('Simulated external logo fetch timeout');
+    return origCreateHtml(html);
+  };
+  const fallbackPdf = sandbox.generateKgbPdfBase64_({
+    nip: '198306072011011009',
+    nama_pegawai: 'Dr. Tohayudin, S.H.I., M.H.I.',
+    pangkat: 'Penata Tingkat I (III/d)'
+  }, '1097/KPA.W10-A2/KP2.1.2/XI/2026');
+  sandbox.HtmlService.createHtmlOutput = origCreateHtml;
+  assert(fallbackPdf && fallbackPdf.pdf_base64.length > 100, '2-Stage PDF fallback must produce valid Base64 PDF even when external <img> fails');
+
+  // Callback with valid secret_key updates Firestore with OAuth2 Bearer & compiles KGB PDF
+  const kgbCbOk = parseResp(sandbox.handleApiPost_({
+    action: 'updateNomorSuratKgb',
+    id_kgb: 'KGB-19750706-2026',
+    nomor_surat: '777/KPA.W10-A2/KP2.1.2/XI/2026',
+    idp: '1088',
+    secret_key: 'TEST_HOOK_KEY_127'
+  }));
+  assert.strictEqual(kgbCbOk.status, 'success', 'Valid KGB callback must succeed');
+  assert.strictEqual(kgbCbOk.nokgb, '777');
+  assert.strictEqual(kgbCbOk.firestore_synced, true);
+  assert(kgbCbOk.pdf_kgb && kgbCbOk.pdf_kgb.pdf_base64.length > 100, 'KGB callback must return Base64 PDF');
+  const decodedKgbPdfHtml = Buffer.from(kgbCbOk.pdf_kgb.pdf_base64, 'base64').toString('utf8');
+  assert(decodedKgbPdfHtml.includes('777/KPA.W10-A2/KP2.1.2/XI/2026'), 'Compiled KGB PDF must embed official MYSIMS number');
+  assert(decodedKgbPdfHtml.includes('06-07-1975'), 'Compiled KGB PDF must derive DD-MM-YYYY birthdate from NIP');
+  assert(decodedKgbPdfHtml.includes('Penata Tk. I'), 'Compiled KGB PDF must abbreviate Tingkat I -> Tk. I');
+
+  const kgbPatchCall = recordedFetchCalls.find(c => c.url.includes('/eoffice_kgb/KGB-19750706-2026') && String(c.opts.method || '').toLowerCase() === 'patch');
+  assert(kgbPatchCall && kgbPatchCall.opts.headers && kgbPatchCall.opts.headers.Authorization === 'Bearer mock-sa-bearer-tok',
+    'KGB Firestore REST PATCH must carry OAuth2 Service Account Bearer token');
+
+  // Approved Cross-Module Bearer Check: syncFirestoreSuratTugasNumbers_ in permohonan/st/st.js
+  sandbox.syncFirestoreSuratTugasNumbers_('ST-1', '111/ST.HM3.1.1/XI/2026', '', '', []);
+  const stPatchCall = recordedFetchCalls.find(c => c.url.includes('/surat_tugas_documents/ST-1') && String(c.opts.method || '').toLowerCase() === 'patch');
+  assert(stPatchCall && stPatchCall.opts.headers && stPatchCall.opts.headers.Authorization === 'Bearer mock-sa-bearer-tok',
+    'ST Firestore REST PATCH must carry OAuth2 Service Account Bearer token');
+
+  console.log('[PASS] ALL Fase 1 end-to-end functional & security tests passed (0 failures).');
+})().catch(err => {
+  console.error(err);
+  process.exit(1);
+});

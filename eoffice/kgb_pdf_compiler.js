@@ -321,10 +321,30 @@ function generateKgbPdfBase64_(kgbRecord, nomorSuratResmi) {
     const noTag = String(noInfo.nokgb || 'draft').replace(/[^a-zA-Z0-9.-]/g, '_');
     const pdfFileName = 'SK_KGB_' + cleanFirst + '_' + noTag + '.pdf';
 
-    const htmlOutput = HtmlService.createHtmlOutput(fullHtml);
-    const pdfBlob = htmlOutput.getAs('application/pdf').setName(pdfFileName);
+    // Percobaan 1: Render lengkap beserta gambar logo kop dari Google Drive
+    try {
+      const htmlOutput = HtmlService.createHtmlOutput(fullHtml);
+      const pdfBlob = htmlOutput.getAs('application/pdf').setName(pdfFileName);
+      const pdfBytes = pdfBlob.getBytes();
+      if (pdfBytes && pdfBytes.length > 200) {
+        return {
+          pdf_base64: Utilities.base64Encode(pdfBytes),
+          pdf_filename: pdfFileName
+        };
+      }
+    } catch (errPdf1) {
+      Logger.log('⚠️ [generateKgbPdfBase64_] Percobaan 1 gagal: ' + errPdf1.toString() + '. Beralih ke fallback teks bersih...');
+    }
+
+    // Percobaan 2 (Fallback Anti-Crash): Ganti tag <img> eksternal agar PDF tetap terbit & masuk lampiran MYSIMS
+    const fallbackHtml = fullHtml.replace(
+      /<img\b[^>]*class="kop-logo"[^>]*>/gi,
+      '<div style="width:74px;height:74px;border:1.5px solid #000;text-align:center;line-height:74px;font-size:10pt;font-weight:bold;">PA-IMY</div>'
+    );
+    const htmlOutputFallback = HtmlService.createHtmlOutput(fallbackHtml);
+    const pdfBlobFallback = htmlOutputFallback.getAs('application/pdf').setName(pdfFileName);
     return {
-      pdf_base64: Utilities.base64Encode(pdfBlob.getBytes()),
+      pdf_base64: Utilities.base64Encode(pdfBlobFallback.getBytes()),
       pdf_filename: pdfFileName
     };
   } catch (err) {

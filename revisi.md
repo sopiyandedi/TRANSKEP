@@ -6313,5 +6313,48 @@ Item di bawah ini berisiko memutus layanan produksi (WAHA/n8n/Firestore/Drive/CD
 - Jalankan `clasp push` & deploy versi GAS baru agar [`eoffice/kgb_pdf_compiler.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/kgb_pdf_compiler.js), [`eoffice/kgb.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/kgb.js), [`api_router.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/api_router.js), [`code.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/code.js), dan [`permohonan/st/st.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/st/st.js) aktif di Google Apps Script.
 - Import ulang [`n8n/n8n_workflow_mysims_surat_keluar.json`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/n8n/n8n_workflow_mysims_surat_keluar.json) ke n8n agar cabang `KGB_SURAT_KELUAR` aktif.
 
+---
+
+## Tahap 128: Perbaikan Alur End-to-End Permintaan Nomor Surat Keluar MYSIMS Ketua KGB (`KPA.W10-A2/KP2.1.2`), Sifat/Keterangan `Biasa` & Lampiran PDF Compiler (`v3.8.62`) [SELESAI & AKTIF]
+*Tanggal: 2026-11-17 | Commit target: rilis Tahap 128 — v3.8.62*
+
+### 1. Hasil Investigasi Akar Masalah (Root Cause Analysis)
+1. **Bug Fatal Self-Blocking di Simpan #1 (`modules/eoffice/eoffice_data.js` & `eoffice/kgb.js`):**
+   - Pada [`modules/eoffice/eoffice_data.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/eoffice_data.js) (`saveOrGenerateKgb`), objek `kgbData` menyetel **`mysims_requested: true`** dan `mysims_status: 'Meminta Nomor MYSIMS'` terlebih dahulu lalu meneruskan `kgbData` tersebut ke backend RPC `this.requestKgbSuratKeluar(kgbData, ...)`.
+   - Di backend [`eoffice/kgb.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/kgb.js) (`requestKgbSuratKeluar`), baris `if (hasAssignedKgbNumber_(payload) || payload.mysims_requested === true)` langsung menganggap simpan #1 sudah pernah meminta nomor dan mengembalikan `{ status: 'already_exists' }` **tanpa pernah memanggil webhook n8n/MYSIMS** sama sekali.
+   - Akibat lanjutan: `saveOrGenerateKgb` hanya memunculkan peringatan bila `mysimsRes.status === 'error'`, sehingga UI tetap menampilkan notifikasi seolah permintaan telah dikirim, sementara dokumen *Dr. Tohayudin* telanjur tersimpan di Firestore dengan status menggantung `mysims_requested: true` + `mysims_status: 'Meminta Nomor MYSIMS'` + nomor kosong (`......`).
+   - *(Audit silang Screenshot n8n & MYSIMS)*: Bar terbaru di MYSIMS masih berhenti di `1096/KP5.3` (`13 Nov 2026`) dan eksekusi hijau pada canvas n8n berasal dari payload Cuti (`Fallback`), bukan dari tombol Simpan KGB tanggal `17 Nov 2026`.
+2. **Kebutuhan Pemulihan Berkas Nyangkut & Guard Edit ke-2+ Anti-Race Condition:**
+   - Berkas yang telanjur menyimpan `mysims_requested: true` & `mysims_status: 'Meminta Nomor MYSIMS'` saat nomor MYSIMS masih kosong harus dapat dikirim ulang secara otomatis saat Admin klik `Simpan Data`, sedangkan berkas yang benar-benar sudah terkirim (`'Permintaan Terkirim ke MYSIMS'`) atau sudah bernomor (`'Nomor Terbit MYSIMS'` / `nokgb` terisi) **mutlak diblokir pada edit ke-2+**.
+3. **Kesesuaian Kode `KPA.W10-A2`, Kode `KP2.1.2`, Keterangan/Sifat `Biasa` & Jaminan Lampiran PDF Compiler:**
+   - Field `ket` pada payload `KGB_SURAT_KELUAR` disetel eksplisit menjadi `'Biasa'` bersama `sifat: 'Biasa'` agar sinkron di formulir `act_add` maupun `act_edt` MYSIMS (`ket: 'Biasa'`, dropdown `sifat: 'Biasa'`, kode klasifikasi `'KP2.1.2'`, satker `'KPA.W10-A2/'`).
+   - [`eoffice/kgb_pdf_compiler.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/kgb_pdf_compiler.js) perlu dilengkapi **2-Stage Resilient Fallback** saat merender PDF via `HtmlService` (jika konversi gagal akibat gambar kop eksternal lambat, otomatis fallback ke kop teks bersih agar `pdf_base64` tidak pernah kosong dan file PDF KGB selalu masuk kolom lampiran `file_surat` di MYSIMS).
+   - Ekspresi `Router Event Surat Keluar` di [`n8n/n8n_workflow_mysims_surat_keluar.json`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/n8n/n8n_workflow_mysims_surat_keluar.json) diperkuat menjadi *null-safe* tanpa mengganggu port `0` (`ST_TERPADU`) maupun port `2` (Cuti fallback).
+
+### 2. Rencana Perubahan File
+1. **[`modules/eoffice/eoffice_data.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/eoffice_data.js)**:
+   - Ubah `alreadySentToMysims` agar membedakan status pra-kirim/nyangkut (`'Meminta Nomor MYSIMS'` & `'Gagal...'`) dari status sukses terkirim (`'Permintaan Terkirim ke MYSIMS'` / `'Nomor Terbit MYSIMS'`).
+   - Simpan ke Firestore **1 kali** dengan `mysims_requested: true` dan `mysims_status: 'Permintaan Terkirim ke MYSIMS'` (mencegah race condition menimpa nomor callback), dan kirim payload pra-flag (`mysims_requested: alreadySentToMysims`) ke `requestKgbSuratKeluar`.
+   - Bila respons GAS `status !== 'success'` dan `status !== 'already_exists'` bernomor, tampilkan pesan warning akurat serta rollback flag `mysims_requested: false` bila gagal koneksi.
+2. **[`eoffice/kgb.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/kgb.js)**:
+   - Di `requestKgbSuratKeluar`: blokir duplikasi berdasarkan nomor terbit (`hasAssignedKgbNumber_`), `CacheService` lock (`kgb_sk_req_<idKgb>` `600s`), `firestoreRestGet_` (hanya jika `hasAssignedKgbNumber_` atau `mysims_status === 'Nomor Terbit MYSIMS'`), serta status `'Permintaan Terkirim ke MYSIMS'` — bukan menolak status transient `'Meminta Nomor MYSIMS'`.
+   - Di `triggerN8nSuratKeluarKgb_`: set `jabatan_penandatangan: 'Ketua'`, `kode_klasifikasi: 'KP2.1.2'`, `sifat: 'Biasa'`, dan `ket: 'Biasa'`.
+   - Di `parseNomorKgbBackend_` & `updateNomorSuratKgbFromExternal_`: abaikan placeholder `'......'` dan log status `firestoreRestPatch_`.
+3. **[`eoffice/kgb_pdf_compiler.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/kgb_pdf_compiler.js)**:
+   - Tambahkan **2-Stage Resilient Fallback** saat memanggil `HtmlService.createHtmlOutput(...).getAs('application/pdf')` agar `pdf_kgb.pdf_base64` terjamin selalu terbit meskipun fetch logo kop eksternal timeout.
+4. **[`modules/eoffice/cetak/js_cetak_kgb.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/cetak/js_cetak_kgb.js)** & **[`modules/eoffice/kgb.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/kgb.js)**:
+   - Abaikan placeholder `'......'` / `'-'` saat ekstraksi segmen awal nomor surat; tampilkan status `'Permintaan Terkirim ke MYSIMS'` secara jelas di badge `#kgbMysimsBadge`.
+5. **[`n8n/n8n_workflow_mysims_surat_keluar.json`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/n8n/n8n_workflow_mysims_surat_keluar.json)** & **[`n8n/n8n_workflow_mysims_surat_keluar.example.json`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/n8n/n8n_workflow_mysims_surat_keluar.example.json)**:
+   - Perkuat ekspresi *Switch* `Router Event Surat Keluar` (`($json.body && $json.body.event) ? String($json.body.event).trim() : String($json.event || '').trim()`) serta pastikan di node `Mesin Otomasi KGB MYSIMS` field `ket` dan `sifat` terkunci `'Biasa'`, `prefixNoSurat = 'KPA.W10-A2/'`, `cleanKode = 'KP2.1.2'`, dan `file_surat` terpasang ke `Suntik PDF KGB ke MYSIMS` (jalur ST & Cuti tidak diubah).
+6. **Uji Terintegrasi (`tests/verify_fase1.js`, `tests/verify_fase3b.js`) & Rilis (`v3.8.62`)**:
+   - Tambahkan uji integrasi langsung dari `EofficeDataService.saveOrGenerateKgb` -> GAS `requestKgbSuratKeluar` (memastikan simpan #1 benar-benar memicu `triggerN8nSuratKeluarKgb_`, kasus stuck `'Meminta Nomor MYSIMS'` pulih, dan edit #2 tidak memicu ulang), jalankan `npm test`, bump PWA `v3.8.62`, deploy GAS (`clasp push` + `clasp deploy`), dan push Git.
+
+### 3. Temuan Audit Lintas-Modul & Langkah Aktivasi Pasca-Eksekusi
+- **Audit Lintas-Modul (Cuti & ST):** Alur `ST` ([`permohonan/st/st.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/st/st.js)) dan `Cuti` ([`permohonan/persetujuan.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/persetujuan.js)) tidak memakai pra-flag `mysims_requested`, sehingga keduanya bebas dari bug self-blocking ini.
+- **Prasyarat di Sisi Pengguna Setelah Eksekusi:**
+  1. Import ulang [`n8n/n8n_workflow_mysims_surat_keluar.json`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/n8n/n8n_workflow_mysims_surat_keluar.json) ke n8n lalu **Save & Publish (Active)** agar webhook produksi memakai definisi Switch + node KGB terbaru.
+  2. Buka ulang data KGB *Dr. Tohayudin* (atau buat draft baru) dan klik **Simpan Data** 1 kali untuk memicu permintaan nomor Ketua MYSIMS.
+
+
 
 

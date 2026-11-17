@@ -456,8 +456,10 @@ window.openKgbModalForm = function(kgbData) {
 
   var hasCleanNoKgb = (noKgbVal !== '' && noKgbVal !== '...' && noKgbVal !== '......' && noKgbVal !== '-');
   var isMysimsReq = Boolean(working.mysims_requested);
+  var prevMysimsStat = String(working.mysims_status || '').trim();
+  var isMysimsRetryEligible = (prevMysimsStat === 'Meminta Nomor MYSIMS' || prevMysimsStat.indexOf('Gagal') === 0);
   var elMysimsReq = document.getElementById('kgbFieldMysimsRequested');
-  if (elMysimsReq) elMysimsReq.value = isMysimsReq ? 'true' : 'false';
+  if (elMysimsReq) elMysimsReq.value = (isMysimsReq && !isMysimsRetryEligible) ? 'true' : 'false';
   var elMysimsStatus = document.getElementById('kgbFieldMysimsStatus');
   if (elMysimsStatus) elMysimsStatus.value = working.mysims_status || '';
   var elMysimsIdp = document.getElementById('kgbFieldMysimsIdp');
@@ -469,8 +471,8 @@ window.openKgbModalForm = function(kgbData) {
     if (hasCleanNoKgb) {
       elMysimsBadge.textContent = 'No. MYSIMS Aktif (' + noKgbVal + ')';
       elMysimsBadge.className = 'text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30';
-    } else if (isMysimsReq) {
-      elMysimsBadge.textContent = 'MYSIMS Sudah Diminta (' + (working.mysims_status || 'Menunggu') + ')';
+    } else if (isMysimsReq && !isMysimsRetryEligible) {
+      elMysimsBadge.textContent = 'MYSIMS Terkirim (' + (prevMysimsStat || 'Menunggu') + ')';
       elMysimsBadge.className = 'text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30';
     } else {
       elMysimsBadge.textContent = 'Otomatis minta No. Ketua MYSIMS';
@@ -617,7 +619,7 @@ function collectKgbFormPayload_() {
   var noKgb = elNoKgb ? elNoKgb.value.trim() : '';
   if (!noKgb && noSurat && noSurat.indexOf('/') !== -1) {
     var seg0 = noSurat.split('/')[0].trim();
-    if (seg0 !== '...' && seg0 !== '......') noKgb = seg0;
+    if (seg0 && seg0 !== '...' && seg0 !== '......' && seg0 !== '-') noKgb = seg0;
   }
 
   var elStatus = document.getElementById('kgbFieldStatus');
@@ -737,11 +739,14 @@ async function submitKgbForm(actionType) {
     if (res && res.status === 'success') {
       closeKgbModalForm();
       if (typeof showNotify === 'function') {
-        var isMysimsWarn = Boolean(res.mysims_res && res.mysims_res.status === 'error');
+        var isMysimsError = Boolean(res.mysims_res && res.mysims_res.status === 'error');
+        var isMysimsSkipped = Boolean(res.mysims_requested_now && res.mysims_res && res.mysims_res.status !== 'success' && !res.mysims_res.nomor_surat);
+        var notifyTitle = isMysimsError ? "Data Disimpan (MYSIMS Gagal)" : (isMysimsSkipped ? "Perhatian MYSIMS" : "Sukses");
+        var notifyType = (isMysimsError || isMysimsSkipped) ? "warning" : "success";
         showNotify(
-          isMysimsWarn ? "Data Disimpan (MYSIMS Gagal)" : "Sukses",
+          notifyTitle,
           res.message || (actionType === 'generate' ? "SK KGB berhasil diterbitkan ke Folder Google Drive!" : "Data KGB berhasil disimpan."),
-          isMysimsWarn ? "warning" : "success"
+          notifyType
         );
       }
       if (typeof window.refreshEofficeData === 'function') {

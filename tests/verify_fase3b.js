@@ -1102,7 +1102,7 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
     assert.strictEqual(requestedKgbCalls.length, 1, '1st KGB draft save without number must trigger requestKgbSuratKeluar once');
     assert.strictEqual(savedKgbDocs[0].mysims_requested, true, '1st KGB save must persist mysims_requested: true');
 
-    // Edit ke-2 (masih belum dapat nomor callback, tapi mysims_requested sudah true)
+    // Edit ke-2 (status sudah 'Permintaan Terkirim ke MYSIMS', belum dapat nomor callback)
     const secondEditNoNumRes = await eofficeDataVm.EofficeDataService.saveOrGenerateKgb({
       id_kgb: firstSaveRes.id_kgb,
       nip: '197507062014051001',
@@ -1111,10 +1111,25 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
       nokgb: '',
       nomor_surat: '....../KPA.W10-A2/KP2.1.2/I/2027',
       mysims_requested: true,
-      mysims_status: 'Meminta Nomor MYSIMS'
+      mysims_status: 'Permintaan Terkirim ke MYSIMS'
     }, 'draft', '198001012005011001', 'tok-adm');
     assert.strictEqual(secondEditNoNumRes.mysims_requested_now, false);
-    assert.strictEqual(requestedKgbCalls.length, 1, '2nd KGB edit when mysims_requested=true must NOT request MYSIMS again');
+    assert.strictEqual(requestedKgbCalls.length, 1, '2nd KGB edit when status=Permintaan Terkirim ke MYSIMS must NOT request MYSIMS again');
+
+    // Recovery berkas nyangkut ('Meminta Nomor MYSIMS' dengan nokgb kosong) -> HARUS mengirim permintaan MYSIMS 1x
+    const stuckRetryRes = await eofficeDataVm.EofficeDataService.saveOrGenerateKgb({
+      id_kgb: 'KGB-198306072011011009-202701',
+      nip: '198306072011011009',
+      nama_pegawai: 'Dr. Tohayudin, S.H.I., M.H.I.',
+      tmt_baru: '1 Januari 2027',
+      nokgb: '',
+      nomor_surat: '....../KPA.W10-A2/KP2.1.2/XI/2026',
+      mysims_requested: true,
+      mysims_status: 'Meminta Nomor MYSIMS'
+    }, 'draft', '198001012005011001', 'tok-adm');
+    assert.strictEqual(stuckRetryRes.mysims_requested_now, true);
+    assert.strictEqual(requestedKgbCalls.length, 2, 'Stuck Meminta Nomor MYSIMS record without number must retry MYSIMS request');
+    assert.strictEqual(requestedKgbCalls[1].mysims_requested, false, 'Frontend must pass mysims_requested=false to GAS so GAS does not self-block');
 
     // Edit ke-3 (nomor MYSIMS sudah terisi)
     const thirdEditWithNumRes = await eofficeDataVm.EofficeDataService.saveOrGenerateKgb({
@@ -1127,7 +1142,7 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
       mysims_requested: true
     }, 'draft', '198001012005011001', 'tok-adm');
     assert.strictEqual(thirdEditWithNumRes.mysims_requested_now, false);
-    assert.strictEqual(requestedKgbCalls.length, 1, 'KGB edit with existing nomor must NOT request MYSIMS again');
+    assert.strictEqual(requestedKgbCalls.length, 2, 'KGB edit with existing nomor must NOT request MYSIMS again');
 
     // Rollback flag when MYSIMS request fails
     savedKgbDocs.length = 0;
@@ -1155,8 +1170,8 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
     assert.strictEqual(routerConns[1][0].node, 'Mesin Otomasi KGB MYSIMS');
     assert.strictEqual(routerConns[2][0].node, 'Mesin Otomasi MYSIMS & Callback');
     const kgbCodeNode = n8nWf.nodes.find(n => n.name === 'Mesin Otomasi KGB MYSIMS');
-    assert(kgbCodeNode && kgbCodeNode.parameters.jsCode.includes('KPA.W10-A2') && kgbCodeNode.parameters.jsCode.includes('KP2.1.2') && kgbCodeNode.parameters.jsCode.includes('updateNomorSuratKgb'),
-      'Mesin Otomasi KGB MYSIMS must target KPA.W10-A2 / KP2.1.2 and updateNomorSuratKgb callback');
+    assert(kgbCodeNode && kgbCodeNode.parameters.jsCode.includes('KPA.W10-A2') && kgbCodeNode.parameters.jsCode.includes('KP2.1.2') && kgbCodeNode.parameters.jsCode.includes("ket = 'Biasa'") && kgbCodeNode.parameters.jsCode.includes('updateNomorSuratKgb'),
+      'Mesin Otomasi KGB MYSIMS must target KPA.W10-A2 / KP2.1.2, Biasa ket/sifat, and updateNomorSuratKgb callback');
   } finally {
     browserSandbox.TranskepAPI.call = origApiCall;
     browserSandbox.TranskepFirebase.getDb = origGetDb;

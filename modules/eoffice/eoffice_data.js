@@ -644,18 +644,23 @@ const EofficeDataService = {
       const rawNoSurat = String(payload.nomor_surat || '').trim();
       const hasCleanNomor = (rawNoKgb !== '' && rawNoKgb !== '...' && rawNoKgb !== '......' && rawNoKgb !== '-') ||
         /^\d+\//.test(rawNoSurat);
-      const alreadyRequestedMysims = Boolean(payload.mysims_requested);
-      const shouldRequestMysims = (actionType === 'draft' && !alreadyRequestedMysims && !hasCleanNomor);
+      const prevMysimsStatus = String(payload.mysims_status || '').trim();
+      // Bedakan status pra-kirim / nyangkut ('Meminta Nomor MYSIMS' atau 'Gagal...') dari permintaan yang sudah terkirim/terbit
+      const alreadySentToMysims = Boolean(payload.mysims_requested) &&
+        prevMysimsStatus !== 'Meminta Nomor MYSIMS' &&
+        !prevMysimsStatus.startsWith('Gagal');
+      const shouldRequestMysims = (actionType === 'draft' && !alreadySentToMysims && !hasCleanNomor);
 
-      const resolvedMysimsStatus = payload.mysims_status ||
-        (shouldRequestMysims ? 'Meminta Nomor MYSIMS' : (hasCleanNomor ? 'Nomor Terbit MYSIMS' : ''));
+      const resolvedMysimsStatus = hasCleanNomor
+        ? 'Nomor Terbit MYSIMS'
+        : (shouldRequestMysims ? 'Permintaan Terkirim ke MYSIMS' : prevMysimsStatus);
 
       const kgbData = {
         ...payload,
         id_kgb: docId,
         status: targetStatus,
         is_from_dashboard: false,
-        mysims_requested: shouldRequestMysims ? true : alreadyRequestedMysims,
+        mysims_requested: shouldRequestMysims ? true : alreadySentToMysims,
         mysims_status: resolvedMysimsStatus,
         mysims_idp: String(payload.mysims_idp || ''),
         mysims_requested_at: payload.mysims_requested_at || (shouldRequestMysims ? new Date().toISOString() : ''),
@@ -664,7 +669,7 @@ const EofficeDataService = {
         updated_at: new Date().toISOString()
       };
 
-      // 1. Simpan langsung ke Cloud Firestore
+      // 1. Simpan langsung ke Cloud Firestore (1x sebelum trigger agar tidak menimpa callback MYSIMS)
       if (typeof TranskepFirebase !== 'undefined' && TranskepFirebase.isReady && TranskepFirebase.isReady()) {
         try {
           await TranskepFirebase.saveKgbToFirestore(kgbData);
@@ -681,21 +686,31 @@ const EofficeDataService = {
         }
       }
 
-      // 2. Jika simpan pertama kali tanpa nomor -> otomatis minta nomor surat keluar Ketua di MYSIMS (sekali saja!)
+      // 2. Jika simpan pertama kali tanpa nomor -> kirim ke GAS dengan status pra-flag agar GAS tidak memblokir dirinya sendiri
       let mysimsRes = null;
       if (shouldRequestMysims) {
+        const requestPayload = {
+          ...kgbData,
+          mysims_requested: false,
+          mysims_status: prevMysimsStatus
+        };
         try {
-          mysimsRes = await this.requestKgbSuratKeluar(kgbData, creatorNip, authToken);
-          if (mysimsRes && mysimsRes.status === 'error') {
+          mysimsRes = await this.requestKgbSuratKeluar(requestPayload, creatorNip, authToken);
+          if (mysimsRes && mysimsRes.status === 'already_exists' && mysimsRes.nomor_surat) {
+            kgbData.nokgb = mysimsRes.nokgb || kgbData.nokgb;
+            kgbData.nomor_surat = mysimsRes.nomor_surat;
+            kgbData.mysims_requested = true;
+            kgbData.mysims_status = 'Nomor Terbit MYSIMS';
+            if (typeof TranskepFirebase !== 'undefined' && TranskepFirebase.isReady && TranskepFirebase.isReady()) {
+              await TranskepFirebase.saveKgbToFirestore(kgbData).catch(() => { });
+            }
+          } else if (!mysimsRes || (mysimsRes.status !== 'success' && mysimsRes.status !== 'already_exists')) {
+            mysimsRes = mysimsRes || { status: 'error', message: 'Backend GAS tidak merespons permintaan nomor MYSIMS.' };
             kgbData.mysims_requested = false;
             kgbData.mysims_status = 'Gagal Minta Nomor MYSIMS';
             if (typeof TranskepFirebase !== 'undefined' && TranskepFirebase.isReady && TranskepFirebase.isReady()) {
               await TranskepFirebase.saveKgbToFirestore(kgbData).catch(() => { });
             }
-          } else if (mysimsRes && mysimsRes.status === 'already_exists' && mysimsRes.nomor_surat) {
-            kgbData.nokgb = mysimsRes.nokgb || kgbData.nokgb;
-            kgbData.nomor_surat = mysimsRes.nomor_surat;
-            kgbData.mysims_status = 'Nomor Terbit MYSIMS';
           }
         } catch (mErr) {
           console.warn("⚠️ [E-Office] Gagal panggil MYSIMS KGB:", mErr);
@@ -715,9 +730,11 @@ const EofficeDataService = {
         message: actionType === 'tte'
           ? 'Berkas KGB berhasil dikirim ke antrean persiapan TTE Pimpinan!'
           : (shouldRequestMysims
-            ? ((mysimsRes && mysimsRes.status === 'error')
-              ? 'Data KGB disimpan, namun gagal meminta nomor MYSIMS: ' + (mysimsRes.message || 'Cek koneksi')
-              : 'Data KGB disimpan & permintaan nomor surat keluar Ketua MYSIMS telah dikirim!')
+            ? ((mysimsRes && mysimsRes.status === 'success')
+              ? 'Data KGB disimpan & permintaan nomor surat keluar Ketua MYSIMS (KPA.W10-A2/KP2.1.2) telah dikirim!'
+              : ((mysimsRes && mysimsRes.status === 'already_exists')
+                ? (mysimsRes.message || 'Berkas KGB ini sudah memproses nomor MYSIMS.')
+                : 'Data KGB disimpan, namun gagal meminta nomor MYSIMS: ' + ((mysimsRes && mysimsRes.message) || 'Cek koneksi')))
             : 'Data KGB berhasil disimpan ke Cloud Firestore.'),
         id_kgb: docId,
         mysims_requested_now: shouldRequestMysims,

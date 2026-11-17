@@ -269,7 +269,7 @@
 
     if (full && full.indexOf('/') !== -1) {
       var segs = full.split('/');
-      if (!nokgb && segs[0] && segs[0] !== '...') {
+      if (!nokgb && segs[0] && segs[0] !== '...' && segs[0] !== '......' && segs[0] !== '-') {
         nokgb = segs[0].trim();
       }
       if (segs.length >= 5) {
@@ -285,7 +285,7 @@
       nokgb: nokgb,
       bulan: bulan,
       tahun: tahun,
-      full: (full && full.indexOf('KPA.W10-A2') === -1 && full !== '...') ? full : assembled
+      full: (full && full.indexOf('KPA.W10-A2') === -1 && full !== '...' && full !== '......') ? full : assembled
     };
   }
 

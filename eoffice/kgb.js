@@ -94,7 +94,7 @@ function parseNomorKgbBackend_(p) {
   const full = String(p.nomor_surat || '').trim();
   if (full && full.indexOf('/') !== -1) {
     const segs = full.split('/');
-    if (!nokgb && segs[0] && segs[0] !== '...') nokgb = segs[0].trim();
+    if (!nokgb && segs[0] && segs[0] !== '...' && segs[0] !== '......' && segs[0] !== '-') nokgb = segs[0].trim();
     if (segs.length >= 5) {
       if (!p.bulan_surat && segs[3]) bulan = segs[3].trim();
       if (!p.tahun_surat && segs[4]) tahun = segs[4].trim();
@@ -107,7 +107,7 @@ function parseNomorKgbBackend_(p) {
     nokgb: nokgb,
     bulan: bulan,
     tahun: tahun,
-    full: (full && full.indexOf('KPA.W10-A2') === -1 && full !== '...') ? full : assembled
+    full: (full && full.indexOf('KPA.W10-A2') === -1 && full !== '...' && full !== '......') ? full : assembled
   };
 }
 
@@ -573,10 +573,17 @@ function requestKgbSuratKeluar(payload, adminNip, clientToken) {
     }
 
     const idKgb = String(payload.id_kgb).trim();
-    if (hasAssignedKgbNumber_(payload) || payload.mysims_requested === true) {
+    const prevStatus = String(payload.mysims_status || '').trim();
+    const isPayloadAlreadySent = (
+      payload.mysims_requested === true &&
+      prevStatus !== 'Meminta Nomor MYSIMS' &&
+      prevStatus.indexOf('Gagal') !== 0
+    ) || prevStatus === 'Permintaan Terkirim ke MYSIMS' || prevStatus === 'Nomor Terbit MYSIMS';
+
+    if (hasAssignedKgbNumber_(payload) || isPayloadAlreadySent) {
       return {
         status: 'already_exists',
-        message: 'Berkas KGB ini sudah memiliki atau sedang memproses nomor surat MYSIMS.',
+        message: 'Berkas KGB ini sudah memiliki atau sudah mengirimkan permintaan nomor surat MYSIMS.',
         id_kgb: idKgb,
         nokgb: payload.nokgb || '',
         nomor_surat: payload.nomor_surat || ''
@@ -598,10 +605,10 @@ function requestKgbSuratKeluar(payload, adminNip, clientToken) {
       };
     }
 
-    // Cek langsung ke Cloud Firestore jika tersedia untuk memastikan edit ke-2 tidak meminta nomor ulang
+    // Cek Firestore hanya untuk nomor terbit / Nomor Terbit MYSIMS (karena frontend baru saja menulis pra-simpan)
     if (typeof firestoreRestGet_ === 'function') {
       const existingFs = firestoreRestGet_('eoffice_kgb', idKgb);
-      if (existingFs && hasAssignedKgbNumber_(existingFs)) {
+      if (existingFs && (hasAssignedKgbNumber_(existingFs) || String(existingFs.mysims_status || '').trim() === 'Nomor Terbit MYSIMS')) {
         return {
           status: 'already_exists',
           message: 'Nomor surat keluar KGB sudah tercatat di Firestore.',
@@ -671,10 +678,12 @@ function triggerN8nSuratKeluarKgb_(idKgb, payload) {
       task: {
         tipe: 'KGB',
         jabatan_penandatangan: 'Ketua',
+        satker_kode: 'KPA.W10-A2',
         kode_klasifikasi: 'KP2.1.2',
+        sifat: 'Biasa',
         kepada: 'Kepala KPPN Cirebon (a.n. ' + namaPegawai + ')',
         uraian: 'Pemberitahuan Kenaikan Gaji Berkala a.n. ' + namaPegawai,
-        ket: 'KGB ' + namaPegawai,
+        ket: 'Biasa',
         tgl_surat: tglSuratIso
       },
       timestamp: new Date().toISOString()
@@ -752,7 +761,17 @@ function updateNomorSuratKgbFromExternal_(payload) {
       fsRecord = firestoreRestGet_('eoffice_kgb', idKgb);
     }
 
-    const mergedRecord = Object.assign({}, snapCached, snapPayload, fsRecord || {}, {
+    const cleanFs = {};
+    if (fsRecord && typeof fsRecord === 'object') {
+      Object.keys(fsRecord).forEach(function(k) {
+        const val = fsRecord[k];
+        if (val !== undefined && val !== null && val !== '') {
+          cleanFs[k] = val;
+        }
+      });
+    }
+
+    const mergedRecord = Object.assign({}, snapCached, snapPayload, cleanFs, {
       id: idKgb,
       id_kgb: idKgb,
       nokgb: nokgb,
@@ -763,6 +782,7 @@ function updateNomorSuratKgbFromExternal_(payload) {
 
     // Sinkronkan nomor MYSIMS balik ke Cloud Firestore agar UI E-Office Browser langsung update (<1s)
     let firestoreSynced = false;
+    let firestoreStatusCode = 0;
     if (typeof firestoreRestPatch_ === 'function') {
       const patchFields = {
         nokgb: nokgb,
@@ -776,6 +796,7 @@ function updateNomorSuratKgbFromExternal_(payload) {
       if (tahunSurat) patchFields.tahun_surat = tahunSurat;
       const patchRes = firestoreRestPatch_('eoffice_kgb', idKgb, patchFields);
       firestoreSynced = Boolean(patchRes && patchRes.ok);
+      firestoreStatusCode = Number((patchRes && patchRes.statusCode) || 0);
     }
 
     // Kompilasi PDF KGB resmi bernomor surat keluar Ketua untuk disuntikkan balik ke MYSIMS
@@ -784,7 +805,7 @@ function updateNomorSuratKgbFromExternal_(payload) {
       pdfKgb = generateKgbPdfBase64_(mergedRecord, nomorRaw);
     }
 
-    Logger.log('✅ [n8n KGB Callback] ID ' + idKgb + ' -> ' + nomorRaw + ' (Firestore=' + firestoreSynced + ', PDF=' + (pdfKgb.pdf_base64 ? 'OK' : 'NO') + ')');
+    Logger.log('✅ [n8n KGB Callback] ID ' + idKgb + ' -> ' + nomorRaw + ' (Firestore=' + firestoreSynced + '/' + firestoreStatusCode + ', PDF=' + (pdfKgb.pdf_base64 ? 'OK' : 'NO') + ')');
     return {
       status: 'success',
       message: 'Nomor surat keluar KGB berhasil diperbarui & PDF siap diunggah ke MYSIMS.',
@@ -792,6 +813,7 @@ function updateNomorSuratKgbFromExternal_(payload) {
       nokgb: nokgb,
       nomor_surat: nomorRaw,
       firestore_synced: firestoreSynced,
+      firestore_status_code: firestoreStatusCode,
       pdf_kgb: pdfKgb
     };
   } catch (err) {
