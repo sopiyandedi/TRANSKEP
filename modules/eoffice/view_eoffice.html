@@ -409,33 +409,28 @@
           </div>
 
           <div class="grid grid-cols-1 md:grid-cols-12 gap-3">
-            <!-- No Urut KGB (nokgb) -->
-            <div class="md:col-span-2">
-              <label class="block text-[10px] font-bold text-indigo-300 uppercase tracking-wider mb-1">No. Urut
-                KGB</label>
-              <input type="text" id="kgbFieldNoKgb" oninput="syncNomorSuratKgbOtomatis()" placeholder="964.A"
-                class="w-full px-3 py-2 bg-slate-900 border border-indigo-500/40 rounded-xl text-white font-mono font-bold text-xs focus:ring-1 focus:ring-indigo-500 outline-none">
-            </div>
+            <!-- Hidden No Urut KGB agar tetap sinkron dengan Firestore, MYSIMS webhook & status badge -->
+            <input type="hidden" id="kgbFieldNoKgb" value="">
 
-            <!-- Nomor Surat Lengkap -->
-            <div class="md:col-span-4">
-              <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Nomor Surat
-                Lengkap</label>
-              <input type="text" id="kgbFieldNomorSurat" placeholder=".../KPA.W10-A2/KP2.1.2/X/2026"
-                class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-slate-200 font-mono text-xs focus:ring-1 focus:ring-indigo-500 outline-none">
+            <!-- Nomor Surat Lengkap (Satu-satunya kolom nomor yang tampil) -->
+            <div class="md:col-span-5">
+              <label class="block text-[10px] font-bold text-indigo-300 uppercase tracking-wider mb-1">Nomor Surat (KGB)</label>
+              <input type="text" id="kgbFieldNomorSurat" oninput="handleInputNomorSuratKgb(this.value)" onblur="formatNomorSuratKgbOnBlur(this)" placeholder=".../KPA.W10-A2/KP2.1.2/XI/2026"
+                class="w-full px-3 py-2 bg-slate-900 border border-indigo-500/40 rounded-xl text-white font-mono font-bold text-xs focus:ring-1 focus:ring-indigo-500 outline-none">
+              <span class="block text-[10px] text-slate-400 mt-1 font-mono">Format Baku: <strong class="text-indigo-400">.../KPA.W10-A2/KP2.1.2/{{bulan}}/{{tahun}}</strong></span>
             </div>
 
             <!-- Tanggal Surat -->
             <div class="md:col-span-3">
               <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Tanggal
                 Surat</label>
-              <input type="date" id="kgbFieldTanggalSurat" oninput="syncNomorSuratKgbOtomatis(); updateKgbDatePreview('kgbFieldTanggalSurat', 'kgbPreviewTanggalSurat')" onchange="syncNomorSuratKgbOtomatis(); updateKgbDatePreview('kgbFieldTanggalSurat', 'kgbPreviewTanggalSurat')"
+              <input type="date" id="kgbFieldTanggalSurat" oninput="syncTanggalSuratKgbOtomatis(); updateKgbDatePreview('kgbFieldTanggalSurat', 'kgbPreviewTanggalSurat')" onchange="syncTanggalSuratKgbOtomatis(); updateKgbDatePreview('kgbFieldTanggalSurat', 'kgbPreviewTanggalSurat')"
                 class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-slate-200 text-xs focus:ring-1 focus:ring-indigo-500 outline-none">
               <span id="kgbPreviewTanggalSurat" class="block text-[10px] text-slate-400 mt-1 font-medium"></span>
             </div>
 
             <!-- Tujuan Surat KPPN -->
-            <div class="md:col-span-3">
+            <div class="md:col-span-4">
               <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Tujuan
                 Surat</label>
               <input type="text" id="kgbFieldTujuanKppn" value="Kepala KPPN Cirebon di- CIREBON"

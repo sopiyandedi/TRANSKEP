@@ -1378,6 +1378,29 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
     assert.strictEqual(beRes.bulan, 'XI', 'parseNomorKgbBackend_ must sync Roman month to XI when tanggal_surat is November');
     assert.strictEqual(beRes.tahun, '2026', 'parseNomorKgbBackend_ must sync year to 2026');
     assert.strictEqual(beRes.full, '1102/KPA.W10-A2/KP2.1.2/XI/2026');
+
+    // =========================================================================
+    // Tahap 131 (v3.8.65): Single Visible Nomor Surat & Hidden No Urut KGB
+    // =========================================================================
+    const viewEofficeHtml = fs.readFileSync('modules/eoffice/view_eoffice.html', 'utf8');
+    assert(viewEofficeHtml.includes('<input type="hidden" id="kgbFieldNoKgb"'),
+      'view_eoffice.html must hide kgbFieldNoKgb as hidden input');
+    assert(viewEofficeHtml.includes('id="kgbFieldNomorSurat"'),
+      'view_eoffice.html must keep visible kgbFieldNomorSurat as the single letter number field');
+    assert(viewEofficeHtml.includes('handleInputNomorSuratKgb(this.value)'),
+      'view_eoffice.html must bind handleInputNomorSuratKgb on input');
+    assert(viewEofficeHtml.includes('syncTanggalSuratKgbOtomatis()'),
+      'view_eoffice.html must bind syncTanggalSuratKgbOtomatis on date change');
+
+    // Test resolveNomorSuratKgb when admin enters bare number e.g. "1102"
+    const resBareNum = printHelper.resolveNomorSuratKgb({
+      nomor_surat: '1102',
+      tanggal_surat: '17 November 2026'
+    }, '17 November 2026');
+    assert.strictEqual(resBareNum.nokgb, '1102', 'resolveNomorSuratKgb must recognize bare number as nokgb');
+    assert.strictEqual(resBareNum.bulan, 'XI');
+    assert.strictEqual(resBareNum.tahun, '2026');
+    assert.strictEqual(resBareNum.full, '1102/KPA.W10-A2/KP2.1.2/XI/2026');
   } finally {
     browserSandbox.TranskepAPI.call = origApiCall;
     browserSandbox.TranskepFirebase.getDb = origGetDb;

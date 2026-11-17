@@ -6427,6 +6427,46 @@ Berdasarkan hasil uji cetak terkini pengguna pada berkas *Raden Anantama Havid I
 - **Audit Lintas-Modul (Cuti, ST, & E-Office):** Tidak ada dampak negatif ke modul lain. Penomoran otomatis dan spasi hanya berlaku pada formulir cetak dan kompilator PDF KGB, menjaga kompatibilitas penuh dengan sistem backend dan n8n.
 - **Aktivasi Pengguna:** Hard refresh browser (`Ctrl + Shift + R`) untuk memuat PWA `v3.8.64`.
 
+---
+
+## Tahap 131 [SELESAI & AKTIF]: Penyederhanaan Form KGB Menjadi 1 Kolom Nomor Surat Resmi & Auto-Format Cerdas Bulan/Tahun (`v3.8.65`)
+
+### 1. Masalah & Solusi Arsitektur
+- Format surat Kenaikan Gaji Berkala (KGB) di Pengadilan Agama Indramayu memiliki format yang **100% baku dan permanen**:
+  `[NO_URUT]/KPA.W10-A2/KP2.1.2/[BULAN_ROMAWI]/[TAHUN]`
+  - Pengeluar surat: Selalu Ketua PA Indramayu (`KPA.W10-A2`).
+  - Kode klasifikasi surat: Selalu KGB (`KP2.1.2`).
+  - Bulan Romawi: Selalu mengikuti Tanggal Surat yang dicetak (`I` s/d `XII`).
+  - Tahun: Selalu mengikuti Tanggal Surat yang dicetak.
+- **Masalah & Permintaan Pengguna:**
+  Adanya dua kolom nomor surat di modal draf KGB (`No. Urut KGB` dan `Nomor Surat Lengkap`) membuat tampilan mubazir dan membingungkan. Pengguna meminta menghapus kolom *No. Urut KGB* dan menyisakan satu kolom tunggal yang formal, yaitu **Nomor Surat (KGB)**, dengan tetap menjaga otomatisasi penomoran MYSIMS.
+- **Solusi yang Diterapkan:**
+  1. Kolom visual `#kgbFieldNoKgb` disembunyikan menjadi `<input type="hidden" id="kgbFieldNoKgb">` di latar belakang (kompatibilitas webhook MYSIMS, badge status, dan Firestore tetap 100% aman).
+  2. Kolom `#kgbFieldNomorSurat` dijadikan satu-satunya input nomor surat visual yang tampil elegan dan formal di Seksi 1 Identitas Surat Dinas (`md:col-span-5`).
+  3. Ditambahkan parser input cerdas `handleInputNomorSuratKgb()` dan `formatNomorSuratKgbOnBlur()`: jika admin mengetik angka urut saja (misal `1102`), sistem otomatis melengkapinya menjadi `1102/KPA.W10-A2/KP2.1.2/XI/2026`.
+  4. Saat `Tanggal Surat` diubah, `syncTanggalSuratKgbOtomatis()` otomatis menyinkronkan segmen bulan Romawi dan tahun pada nomor surat tersebut.
+
+### 2. Implementasi Terukur Selesai Dilaksanakan
+1. **Modal UI ([`modules/eoffice/view_eoffice.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/view_eoffice.html)):**
+   - Mengubah `#kgbFieldNoKgb` menjadi `<input type="hidden">`.
+   - Mengatur `#kgbFieldNomorSurat` sebagai input tunggal dengan layout `md:col-span-5`, `Tanggal Surat` `md:col-span-3`, dan `Tujuan Surat` `md:col-span-4`.
+   - Menambahkan petunjuk format baku di bawah input nomor surat.
+2. **Logika Otomatisasi ([`modules/eoffice/kgb.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/kgb.js)):**
+   - Menambahkan fungsi `handleInputNomorSuratKgb(val)`, `formatNomorSuratKgbOnBlur(inputEl)`, dan `syncTanggalSuratKgbOtomatis()`.
+   - Menyelaraskan `applyKgbMysimsModalDom_()` dan `openKgbModalForm()` agar selalu menghasilkan nomor surat rakitan lengkap.
+   - Mengamankan `collectKgbFormPayload_()` agar mengekstrak `noKgb` dari segmen nomor surat dan merakit `noSurat` secara lengkap sebelum disimpan ke Firestore.
+3. **Form Cetak & Backend ([`modules/eoffice/cetak/js_cetak_kgb.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/cetak/js_cetak_kgb.js)):**
+   - Memperkuat `resolveNomorSuratKgb()` untuk mengekstrak nomor urut baik dari format angka mentah (`1102`) maupun nomor surat utuh, lalu merakitnya dengan bulan Romawi dan tahun sesuai tanggal surat aktif.
+4. **Verifikasi & Bump PWA `v3.8.65`:**
+   - Menjalankan `npm test`: seluruh 6/6 test suite lulus tanpa kegagalan (0 failures).
+   - Memperbarui versi PWA 3 titik (`3.8.64` -> `3.8.65`) di `index.html` dan `sw.js`.
+   - Mencatat rilis 99 di `prd.md`.
+   - Sinkronisasi deployment GitHub (`origin` & `prod`) dan Google Apps Script (`clasp push` + `clasp deploy`).
+
+### 3. Temuan Audit Lintas-Modul & Langkah Aktivasi Pasca-Eksekusi
+- **Audit Lintas-Modul:** Alur kerja n8n KGB Surat Keluar dan webhook MYSIMS tetap menerima dan mengirimkan field yang sama persis tanpa perubahan payload.
+- **Aktivasi Pengguna:** Hard refresh browser (`Ctrl + Shift + R`) untuk memuat PWA `v3.8.65`.
+
 
 
 

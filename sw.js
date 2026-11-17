@@ -1,10 +1,10 @@
 // =========================================================================
 // FILE: sw.js (TRANSKEP Progressive Web App Service Worker)
 // DESKRIPSI: Offline Asset Caching, Fast Load & Network Pass-Through
-// ENGINE: TRANSKEP PWA Engine v1.0.0 (Build: v3.8.64 - KGB Print Form Date Auto-Sync & Spacing Tighten)
+// ENGINE: TRANSKEP PWA Engine v1.0.0 (Build: v3.8.65 - Single Visible Nomor Surat & Hidden No Urut KGB)
 // =========================================================================
 
-const CACHE_NAME = 'transkep-v3.8.64';
+const CACHE_NAME = 'transkep-v3.8.65';
 
 // Daftar aset inti yang di-cache saat Service Worker dipasang (Install)
 const PRECACHE_ASSETS = [

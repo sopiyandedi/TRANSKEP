@@ -242,16 +242,64 @@ function autoHitungGajiLamaKgb(forceRecalc) {
 // ==========================================
 // EVENT LISTENER INPUT LIVE DI MODAL KGB
 // ==========================================
-function syncNomorSuratKgbOtomatis() {
+function handleInputNomorSuratKgb(val) {
   var elNoKgb = document.getElementById('kgbFieldNoKgb');
-  var elTglSurat = document.getElementById('kgbFieldTanggalSurat');
-  var elNoSurat = document.getElementById('kgbFieldNomorSurat');
-  if (!elNoSurat) return;
+  var raw = String(val || '').trim();
+  var cleanNo = '';
 
-  var noUrut = elNoKgb ? elNoKgb.value.trim() : '';
-  var tglSurat = elTglSurat ? elTglSurat.value.trim() : '';
-  elNoSurat.value = generateNomorKgbOtomatis(noUrut, tglSurat);
+  if (raw.indexOf('/') !== -1) {
+    var seg0 = raw.split('/')[0].trim();
+    if (seg0 && seg0 !== '...' && seg0 !== '......' && seg0 !== '-') cleanNo = seg0;
+  } else if (/^\d+[A-Za-z.]*$/.test(raw)) {
+    cleanNo = raw;
+  }
+
+  if (elNoKgb) {
+    elNoKgb.value = cleanNo;
+  }
+
+  var elMysimsBadge = document.getElementById('kgbMysimsBadge');
+  if (elMysimsBadge && cleanNo) {
+    elMysimsBadge.textContent = 'No. MYSIMS Aktif (' + cleanNo + ')';
+    elMysimsBadge.className = 'text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30';
+  }
+}
+
+function formatNomorSuratKgbOnBlur(inputEl) {
+  if (!inputEl) return;
+  var val = String(inputEl.value || '').trim();
+  var elTglSurat = document.getElementById('kgbFieldTanggalSurat');
+  var tglVal = elTglSurat ? elTglSurat.value : '';
+
+  if (val && /^\d+[A-Za-z.]*$/.test(val)) {
+    inputEl.value = generateNomorKgbOtomatis(val, tglVal);
+  }
+}
+
+function syncTanggalSuratKgbOtomatis() {
+  var elNoKgb = document.getElementById('kgbFieldNoKgb');
+  var elNoSurat = document.getElementById('kgbFieldNomorSurat');
+  var elTglSurat = document.getElementById('kgbFieldTanggalSurat');
+  var tglVal = elTglSurat ? elTglSurat.value.trim() : '';
+
+  if (elNoSurat) {
+    var curVal = elNoSurat.value.trim();
+    var noUrut = elNoKgb ? elNoKgb.value.trim() : '';
+    if (!noUrut && curVal.indexOf('/') !== -1) {
+      var seg0 = curVal.split('/')[0].trim();
+      if (seg0 && seg0 !== '...' && seg0 !== '......' && seg0 !== '-') noUrut = seg0;
+    }
+    // Jika nomor surat mengikuti format standar KGB atau kosong, sinkronkan bulan Romawi dan tahun
+    if (!curVal || curVal.indexOf('KPA.W10-A2') !== -1 || /^\d+/.test(curVal)) {
+      elNoSurat.value = generateNomorKgbOtomatis(noUrut, tglVal);
+      if (elNoKgb && noUrut) elNoKgb.value = noUrut;
+    }
+  }
   updateKgbDatePreview('kgbFieldTanggalSurat', 'kgbPreviewTanggalSurat');
+}
+
+function syncNomorSuratKgbOtomatis() {
+  syncTanggalSuratKgbOtomatis();
 }
 
 function syncMkgCombinedFields() {
@@ -366,8 +414,14 @@ function applyKgbMysimsModalDom_(noKgbVal, nomorSuratVal, isMysimsReq, isMysimsR
     elNoKgb.value = cleanNo;
   }
   var elNomorSurat = document.getElementById('kgbFieldNomorSurat');
-  if (elNomorSurat && nomorSuratVal && (hasCleanNo || !elNomorSurat.value)) {
-    elNomorSurat.value = nomorSuratVal;
+  if (elNomorSurat) {
+    var elTglSurat = document.getElementById('kgbFieldTanggalSurat');
+    var tglVal = elTglSurat ? elTglSurat.value : '';
+    if (cleanNo) {
+      elNomorSurat.value = generateNomorKgbOtomatis(cleanNo, tglVal);
+    } else if (nomorSuratVal) {
+      elNomorSurat.value = nomorSuratVal;
+    }
   }
   var elMysimsReq = document.getElementById('kgbFieldMysimsRequested');
   if (elMysimsReq) elMysimsReq.value = (isMysimsReq && !isMysimsRetryEligible) ? 'true' : 'false';
@@ -535,7 +589,7 @@ window.openKgbModalForm = function(kgbData) {
   var elNoKgb = document.getElementById('kgbFieldNoKgb');
   if (elNoKgb) elNoKgb.value = noKgbVal;
   var resolvedNomorFull = working.nomor_surat || generateNomorKgbOtomatis(noKgbVal, rawTglSurat);
-  if (working.nomor_surat && working.nomor_surat.indexOf('KPA.W10-A2') !== -1) {
+  if (!working.nomor_surat || working.nomor_surat.indexOf('KPA.W10-A2') !== -1 || working.nomor_surat.indexOf('...') !== -1) {
     // Selalu sinkronkan bulan Romawi dan tahun nomor surat dengan tanggal surat aktif
     resolvedNomorFull = generateNomorKgbOtomatis(noKgbVal, rawTglSurat);
   }
@@ -684,10 +738,17 @@ function collectKgbFormPayload_() {
   var tglSuratFormatted = formatTanggalIndoKgb(elTglSurat ? elTglSurat.value : '') || formatTanggalIndoKgb(new Date());
   var bt = extractBulanTahunKgbLocal(tglSuratFormatted);
   var elNoKgb = document.getElementById('kgbFieldNoKgb');
-  var noSurat = document.getElementById('kgbFieldNomorSurat').value;
+  var noSurat = document.getElementById('kgbFieldNomorSurat').value.trim();
   var noKgb = sanitizeNoKgbPlaceholder_(elNoKgb ? elNoKgb.value : '');
-  if (!noKgb && noSurat && noSurat.indexOf('/') !== -1) {
-    noKgb = sanitizeNoKgbPlaceholder_(noSurat.split('/')[0]);
+  if (!noKgb && noSurat) {
+    if (noSurat.indexOf('/') !== -1) {
+      noKgb = sanitizeNoKgbPlaceholder_(noSurat.split('/')[0]);
+    } else if (/^\d+[A-Za-z.]*$/.test(noSurat)) {
+      noKgb = sanitizeNoKgbPlaceholder_(noSurat);
+    }
+  }
+  if (noKgb && (!noSurat || noSurat === '...' || noSurat.indexOf('KPA.W10-A2') !== -1 || /^\d+[A-Za-z.]*$/.test(noSurat))) {
+    noSurat = generateNomorKgbOtomatis(noKgb, tglSuratFormatted);
   }
 
   var elStatus = document.getElementById('kgbFieldStatus');
@@ -877,6 +938,9 @@ async function submitKgbForm(actionType) {
 
 // Ekspos seluruh handler ke global window untuk atribut HTML inline
 window.terbilangRupiah = terbilangRupiah;
+window.handleInputNomorSuratKgb = handleInputNomorSuratKgb;
+window.formatNomorSuratKgbOnBlur = formatNomorSuratKgbOnBlur;
+window.syncTanggalSuratKgbOtomatis = syncTanggalSuratKgbOtomatis;
 window.syncNomorSuratKgbOtomatis = syncNomorSuratKgbOtomatis;
 window.syncMkgCombinedFields = syncMkgCombinedFields;
 window.handleTahunLamaInput = handleTahunLamaInput;

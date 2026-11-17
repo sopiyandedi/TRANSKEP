@@ -331,22 +331,28 @@
     var tahun = bt.tahun;
     var full = String((kgbData && kgbData.nomor_surat) || '').trim();
 
-    if (full && full.indexOf('/') !== -1) {
-      var segs = full.split('/');
-      var firstSeg = sanitizeNoKgbPlaceholder(segs[0]);
-      if (!nokgb && firstSeg) {
-        nokgb = firstSeg;
+    if (full) {
+      if (full.indexOf('/') !== -1) {
+        var segs = full.split('/');
+        var firstSeg = sanitizeNoKgbPlaceholder(segs[0]);
+        if (!nokgb && firstSeg) {
+          nokgb = firstSeg;
+        }
+      } else if (!nokgb && /^\d+[A-Za-z.]*$/.test(full)) {
+        nokgb = full;
       }
     }
 
     if (!nokgb) nokgb = '......';
     var assembled = nokgb + '/KPA.W10-A2/KP2.1.2/' + bulan + '/' + tahun;
 
+    var isCustomFull = Boolean(full && full.indexOf('/') !== -1 && full.indexOf('KPA.W10-A2') === -1 && full !== '...' && full !== '......');
+
     return {
       nokgb: nokgb,
       bulan: bulan,
       tahun: tahun,
-      full: (full && full.indexOf('KPA.W10-A2') === -1 && full !== '...' && full !== '......') ? full : assembled
+      full: isCustomFull ? full : assembled
     };
   }
 
