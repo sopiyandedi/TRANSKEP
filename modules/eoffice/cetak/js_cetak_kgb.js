@@ -227,7 +227,7 @@
   }
 
   /**
-   * Ekstrak bulan Romawi & tahun dari string tanggal surat
+   * Ekstrak bulan Romawi & tahun dari string tanggal surat / objek Date
    */
   function extractBulanTahunDariTanggalKgb(tglStr) {
     var now = new Date();
@@ -235,6 +235,26 @@
     var tahun = String(now.getFullYear());
 
     if (!tglStr) return { bulan: romawi, tahun: tahun };
+
+    if (tglStr instanceof Date && !isNaN(tglStr.getTime())) {
+      var m = tglStr.getMonth();
+      return {
+        bulan: BULAN_ROMAWI_KGB[m] || romawi,
+        tahun: String(tglStr.getFullYear())
+      };
+    }
+    if (typeof tglStr === 'object' && tglStr.toDate && typeof tglStr.toDate === 'function') {
+      try {
+        var dObj = tglStr.toDate();
+        if (dObj instanceof Date && !isNaN(dObj.getTime())) {
+          return {
+            bulan: BULAN_ROMAWI_KGB[dObj.getMonth()] || romawi,
+            tahun: String(dObj.getFullYear())
+          };
+        }
+      } catch (e) {}
+    }
+
     var s = String(tglStr).trim();
 
     var yMatch = s.match(/\b(20\d{2})\b/);
@@ -253,6 +273,12 @@
     if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
       var mIdx = parseInt(s.split('-')[1], 10) - 1;
       if (mIdx >= 0 && mIdx <= 11) romawi = BULAN_ROMAWI_KGB[mIdx];
+    } else {
+      var dt = new Date(s);
+      if (!isNaN(dt.getTime())) {
+        romawi = BULAN_ROMAWI_KGB[dt.getMonth()] || romawi;
+        tahun = String(dt.getFullYear());
+      }
     }
     return { bulan: romawi, tahun: tahun };
   }
@@ -295,23 +321,21 @@
 
   /**
    * Memecah komponen Nomor Surat KGB menjadi { nokgb, bulan, tahun, full }
+   * Bulan Romawi dan tahun otomatis mengikuti tanggal surat / tanggal cetak
    */
-  function resolveNomorSuratKgb(kgbData) {
-    var bt = extractBulanTahunDariTanggalKgb(kgbData.tanggal_surat || kgbData.tanggal);
-    var nokgb = sanitizeNoKgbPlaceholder(kgbData.nokgb);
-    var bulan = String(kgbData.bulan_surat || kgbData.bulan || '').trim() || bt.bulan;
-    var tahun = String(kgbData.tahun_surat || kgbData.tahun || '').trim() || bt.tahun;
-    var full = String(kgbData.nomor_surat || '').trim();
+  function resolveNomorSuratKgb(kgbData, tglSuratRef) {
+    var rawDate = tglSuratRef || (kgbData && (kgbData.tanggal_surat || kgbData.tanggal)) || new Date();
+    var bt = extractBulanTahunDariTanggalKgb(rawDate);
+    var nokgb = sanitizeNoKgbPlaceholder(kgbData && kgbData.nokgb);
+    var bulan = bt.bulan;
+    var tahun = bt.tahun;
+    var full = String((kgbData && kgbData.nomor_surat) || '').trim();
 
     if (full && full.indexOf('/') !== -1) {
       var segs = full.split('/');
       var firstSeg = sanitizeNoKgbPlaceholder(segs[0]);
       if (!nokgb && firstSeg) {
         nokgb = firstSeg;
-      }
-      if (segs.length >= 5) {
-        if (!kgbData.bulan_surat && segs[3]) bulan = segs[3].trim();
-        if (!kgbData.tahun_surat && segs[4]) tahun = segs[4].trim();
       }
     }
 
@@ -407,7 +431,8 @@
       : null;
 
     var defaultKetua = ketuaRef ? String(ketuaRef.nama || '').trim() : '-';
-    var noInfo = resolveNomorSuratKgb(kgbObj);
+    var tglSuratStr = formatTglCetakKgb(kgbObj.tanggal_surat || new Date());
+    var noInfo = resolveNomorSuratKgb(kgbObj, tglSuratStr);
     var mkgLama = resolveMasaKerjaKgb(kgbObj.tahun_lama, kgbObj.bulan_lama, kgbObj.mkg_lama);
     var mkgBaru = resolveMasaKerjaKgb(kgbObj.tahun_baru, kgbObj.bulan_baru, kgbObj.mkg_baru);
 
@@ -430,7 +455,6 @@
     var gajiBaruStr = formatNominalGajiKgb(kgbObj.gaji_baru);
     var hurufGaji = kgbObj.terbilang_gaji || (typeof terbilangRupiah === 'function' ? terbilangRupiah(kgbObj.gaji_baru) : '') || '-';
 
-    var tglSuratStr = formatTglCetakKgb(kgbObj.tanggal_surat || new Date());
     var tglSkLamaStr = formatTglCetakKgb(kgbObj.tanggal_sk_lama);
     var tmtLamaStr = formatTglCetakKgb(kgbObj.tmt_lama);
     var tmtBaruStr = formatTglCetakKgb(kgbObj.tmt_baru);

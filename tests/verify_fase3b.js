@@ -1311,6 +1311,73 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
     const kgbCodeNode = n8nWf.nodes.find(n => n.name === 'Mesin Otomasi KGB MYSIMS');
     assert(kgbCodeNode && kgbCodeNode.parameters.jsCode.includes('KPA.W10-A2') && kgbCodeNode.parameters.jsCode.includes('KP2.1.2') && kgbCodeNode.parameters.jsCode.includes("ket = 'Biasa'") && kgbCodeNode.parameters.jsCode.includes('updateNomorSuratKgb'),
       'Mesin Otomasi KGB MYSIMS must target KPA.W10-A2 / KP2.1.2, Biasa ket/sifat, and updateNomorSuratKgb callback');
+
+    // =========================================================================
+    // Tahap 130 (v3.8.64): KGB Print Spacing & Dynamic Date Month/Year Sync
+    // =========================================================================
+    const cetakKgbHtml = fs.readFileSync('modules/eoffice/cetak/cetak_kgb.html', 'utf8');
+    assert(cetakKgbHtml.includes('margin-bottom: 4px;'), 'cetak_kgb.html must tighten .kgb-paragraf bottom margin to 4px');
+    assert(cetakKgbHtml.includes('margin-top: 12px;'), 'cetak_kgb.html must tighten .kgb-tembusan top margin to 12px');
+    assert(cetakKgbHtml.includes('margin-top: 0px;'), 'cetak_kgb.html must tighten .kgb-tembusan-table top margin to 0px');
+    assert(cetakKgbHtml.includes('padding: 0px 0;'), 'cetak_kgb.html must tighten .kgb-tembusan-table td padding to 0px 0');
+
+    const pdfKgbJs = fs.readFileSync('eoffice/kgb_pdf_compiler.js', 'utf8');
+    assert(pdfKgbJs.includes('.paragraf { text-align: justify; margin-left: 82px; text-indent: 32px; margin-top: 0px; margin-bottom: 4px;'),
+      'kgb_pdf_compiler.js must match tightened 4px paragraph margin');
+    assert(pdfKgbJs.includes('.tembusan { margin-left: 82px; margin-top: 12px; font-size: 12pt; line-height: 1.25; }'),
+      'kgb_pdf_compiler.js must match tightened 12px tembusan margin and 1.25 line-height');
+
+    const cetakKgbJs = fs.readFileSync('modules/eoffice/cetak/js_cetak_kgb.js', 'utf8');
+    const cetakVm = {
+      window: {},
+      document: { getElementById: () => null },
+      console: console,
+      Date: Date
+    };
+    cetakVm.window = cetakVm;
+    vm.createContext(cetakVm);
+    vm.runInContext(cetakKgbJs, cetakVm, { filename: 'modules/eoffice/cetak/js_cetak_kgb.js' });
+    const printHelper = cetakVm.window.KgbPrintHelper;
+    assert(printHelper && typeof printHelper.resolveNomorSuratKgb === 'function', 'KgbPrintHelper.resolveNomorSuratKgb must be exported');
+
+    // Test: Month & Year strictly track tanggal_surat (e.g. November 2026 -> XI / 2026) even if old draft had October (X)
+    const resNov = printHelper.resolveNomorSuratKgb({
+      nokgb: '1102',
+      nomor_surat: '1102/KPA.W10-A2/KP2.1.2/X/2026',
+      tanggal_surat: '17 November 2026'
+    }, '17 November 2026');
+    assert.strictEqual(resNov.bulan, 'XI', 'resolveNomorSuratKgb must dynamically sync Roman month to XI for November');
+    assert.strictEqual(resNov.tahun, '2026', 'resolveNomorSuratKgb must sync year to 2026');
+    assert.strictEqual(resNov.full, '1102/KPA.W10-A2/KP2.1.2/XI/2026', 'Full assembled number must reflect updated Roman month and year');
+
+    // Test: Changing date to December 2026 -> XII / 2026
+    const resDes = printHelper.resolveNomorSuratKgb({
+      nokgb: '1102',
+      nomor_surat: '1102/KPA.W10-A2/KP2.1.2/XI/2026',
+      tanggal_surat: '2026-12-05'
+    }, '5 Desember 2026');
+    assert.strictEqual(resDes.bulan, 'XII', 'resolveNomorSuratKgb must sync Roman month to XII for December');
+    assert.strictEqual(resDes.tahun, '2026');
+    assert.strictEqual(resDes.full, '1102/KPA.W10-A2/KP2.1.2/XII/2026');
+
+    // Backend parseNomorKgbBackend_ check
+    const kgbBackendSrc = fs.readFileSync('eoffice/kgb.js', 'utf8');
+    const backendVm = {
+      KGB_BULAN_ROMAWI_: ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII"],
+      KGB_BULAN_INDO_: ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"],
+      console: console,
+      Date: Date
+    };
+    vm.createContext(backendVm);
+    vm.runInContext(kgbBackendSrc, backendVm, { filename: 'eoffice/kgb.js' });
+    const beRes = backendVm.parseNomorKgbBackend_({
+      nokgb: '1102',
+      nomor_surat: '1102/KPA.W10-A2/KP2.1.2/X/2026',
+      tanggal_surat: '17 November 2026'
+    });
+    assert.strictEqual(beRes.bulan, 'XI', 'parseNomorKgbBackend_ must sync Roman month to XI when tanggal_surat is November');
+    assert.strictEqual(beRes.tahun, '2026', 'parseNomorKgbBackend_ must sync year to 2026');
+    assert.strictEqual(beRes.full, '1102/KPA.W10-A2/KP2.1.2/XI/2026');
   } finally {
     browserSandbox.TranskepAPI.call = origApiCall;
     browserSandbox.TranskepFirebase.getDb = origGetDb;

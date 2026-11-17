@@ -205,7 +205,7 @@ function generateKgbPdfBase64_(kgbRecord, nomorSuratResmi) {
       '.meta-table { width: 100%; border-collapse: collapse; margin-bottom: 0px; font-size: 12pt; }' +
       '.meta-table td { vertical-align: top; padding: 1px 0; border: none; }' +
       '.tujuan-box { margin-left: 82px; margin-top: 24px; margin-bottom: 32px; font-size: 12pt; line-height: 1.38; }' +
-      '.paragraf { text-align: justify; margin-left: 82px; text-indent: 32px; margin-top: 0px; margin-bottom: 10px; font-size: 12pt; line-height: 1.4; }' +
+      '.paragraf { text-align: justify; margin-left: 82px; text-indent: 32px; margin-top: 0px; margin-bottom: 4px; font-size: 12pt; line-height: 1.4; }' +
       '.detail-wrap { margin-left: 82px; }' +
       '.detail-table { width: 100%; border-collapse: collapse; font-size: 12pt; }' +
       '.detail-table td { vertical-align: top; padding: 2px 0; border: none; }' +
@@ -217,9 +217,9 @@ function generateKgbPdfBase64_(kgbRecord, nomorSuratResmi) {
       '.banner { margin: 8px 0 8px 82px; text-align: left; font-size: 12pt; font-weight: normal; letter-spacing: 0.2px; }' +
       '.ttd-table { width: 100%; border-collapse: collapse; margin-top: 28px; font-size: 12pt; }' +
       '.ttd-table td { vertical-align: top; border: none; padding: 0; }' +
-      '.tembusan { margin-left: 82px; margin-top: 18px; font-size: 12pt; line-height: 1.38; }' +
-      '.tembusan-table { width: 100%; border-collapse: collapse; margin-top: 1px; font-size: 12pt; }' +
-      '.tembusan-table td { vertical-align: top; padding: 1px 0; border: none; }' +
+      '.tembusan { margin-left: 82px; margin-top: 12px; font-size: 12pt; line-height: 1.25; }' +
+      '.tembusan-table { width: 100%; border-collapse: collapse; margin-top: 0px; font-size: 12pt; }' +
+      '.tembusan-table td { vertical-align: top; padding: 0px 0; border: none; line-height: 1.25; }' +
       '</style></head><body>' +
 
       // KOP SURAT

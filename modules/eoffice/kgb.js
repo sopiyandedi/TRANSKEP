@@ -535,6 +535,10 @@ window.openKgbModalForm = function(kgbData) {
   var elNoKgb = document.getElementById('kgbFieldNoKgb');
   if (elNoKgb) elNoKgb.value = noKgbVal;
   var resolvedNomorFull = working.nomor_surat || generateNomorKgbOtomatis(noKgbVal, rawTglSurat);
+  if (working.nomor_surat && working.nomor_surat.indexOf('KPA.W10-A2') !== -1) {
+    // Selalu sinkronkan bulan Romawi dan tahun nomor surat dengan tanggal surat aktif
+    resolvedNomorFull = generateNomorKgbOtomatis(noKgbVal, rawTglSurat);
+  }
   document.getElementById('kgbFieldNomorSurat').value = resolvedNomorFull;
   document.getElementById('kgbFieldTujuanKppn').value = working.tujuan_kppn || 'Kepala Kantor Pelayanan Perbendaharaan Negara Cirebon di- CIREBON';
 

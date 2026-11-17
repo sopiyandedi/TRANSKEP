@@ -97,7 +97,7 @@ function parseNomorKgbBackend_(p) {
     const segs = full.split('/');
     const firstSeg = String(segs[0] || '').trim();
     if (!nokgb && firstSeg && firstSeg !== '...' && firstSeg !== '......' && firstSeg !== '-') nokgb = firstSeg;
-    if (segs.length >= 5) {
+    if (segs.length >= 5 && !tglRef) {
       if (!p.bulan_surat && segs[3]) bulan = segs[3].trim();
       if (!p.tahun_surat && segs[4]) tahun = segs[4].trim();
     }

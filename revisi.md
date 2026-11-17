@@ -6387,6 +6387,46 @@ Dari bukti screenshot pengguna pasca-Tahap 128 (`v3.8.62`), file PDF KGB terkomp
    - Tambah uji unit di [`tests/verify_fase1.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/tests/verify_fase1.js) (fallback `403` -> Firebase Admin ID Token di `firestoreRestPatch_`, dan RPC `getKgbMysimsStatus`) serta [`tests/verify_fase3b.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/tests/verify_fase3b.js) (sanitasi `'......'` di `resolveNomorSuratKgb`, auto-merge `vmEoffice.rawKgbList` di `printSuratKgb`/`printKgbFromModal`, dan poller `syncKgbMysimsNumberInBackground`).
    - Naikkan versi PWA 3-titik (`3.8.62` -> `3.8.63`) di `index.html` & `sw.js`, perbarui `revisi.md` & `prd.md`, lalu deploy GitHub + `clasp push` + `clasp deploy`.
 
+### 3. Temuan Audit Lintas-Modul & Langkah Aktivasi Pasca-Eksekusi
+- **Audit Lintas-Modul (Cuti & ST):** [`permohonan/st/st.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/permohonan/st/st.js) otomatis diperkuat dengan Dual-Auth Firestore REST fallback (`fetchFirestoreRestWithDualAuth_`), menjaga konsistensi transaksi zero-trust tanpa mengubah workflow n8n ST atau Cuti.
+- **Aktivasi Pengguna:** Hard refresh (`Ctrl + Shift + R`) untuk memuat PWA `v3.8.63`.
+
+---
+
+## Tahap 130 [SELESAI & AKTIF]: Penyelarasan Otomatis Bulan/Tahun Cetak Baris Nomor & Perapihan Jarak Paragraf 1 dan Tembusan KGB (`v3.8.64`)
+
+### 1. Masalah & Kebutuhan Penyesuaian Form Cetak KGB
+Berdasarkan hasil uji cetak terkini pengguna pada berkas *Raden Anantama Havid Ismail, A.Md.*:
+1. **Bulan Romawi & Tahun pada Baris Nomor Belum Otomatis Mengikuti Tanggal Cetak:**
+   - Pada baris `Nomor : {{nokgb}}/KPA.W10-A2/KP2.1.2/{{bulan}}/{{tahun}}`, jika data draf menyimpan nomor dengan segmen bulan/tahun lama (misal draf dibuat bulan lalu, lalu dicetak pada bulan/tahun yang berbeda), fungsi pemecah nomor di [`modules/eoffice/cetak/js_cetak_kgb.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/cetak/js_cetak_kgb.js#L299-L327) masih mempertahankan `segs[3]` dan `segs[4]`. Bagian bulan Romawi dan tahun pada nomor surat harus selalu **otomatis mengikuti bulan & tahun dari tanggal surat cetak** (`tanggal_surat` / tanggal hari cetak).
+2. **Jarak Akhir Paragraf Pertama ke Baris Poin 1 Masih Terlalu Renggang:**
+   - Pada [`modules/eoffice/cetak/cetak_kgb.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/cetak/cetak_kgb.html#L130-L144), class `.kgb-paragraf` memiliki `margin-bottom: 10px;`. Jarak antara kalimat pembuka *"Dengan ini kami beritahukan, bahwa berhubung dengan telah terpenuhinya masa kerja dan syarat- syarat lainnya atas:"* ke baris *"1. Nama/Tanggal lahir"* perlu dirapatkan sedikit agar proporsional dan menyatu.
+3. **Jarak Blok Tembusan & Antar-Baris 1, 2, dan 3 Perlu Dirapatkan Sedikit:**
+   - Pada [`modules/eoffice/cetak/cetak_kgb.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/cetak/cetak_kgb.html#L222-L245), blok `.kgb-tembusan` memiliki `margin-top: 18px;` dengan `line-height: 1.38;` dan padding sel tabel `padding: 1px 0;`. Perlu dirapatkan sedikit (jarak atas dari tanda tangan, spasi judul `Tembusan :`, serta spasi antar-baris poin 1, 2, dan 3).
+
+### 2. Implementasi Terukur Selesai Dilaksanakan
+1. **Otomatisasi Bulan Romawi & Tahun Mengikuti Tanggal Cetak ([`modules/eoffice/cetak/js_cetak_kgb.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/cetak/js_cetak_kgb.js), [`modules/eoffice/kgb.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/kgb.js), [`eoffice/kgb_pdf_compiler.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/kgb_pdf_compiler.js)):**
+   - Di `resolveNomorSuratKgb(kgbData, tglSuratRef)`: ekstrak `bt` (`bulan` Romawi dan `tahun`) langsung dari tanggal cetak yang aktif (`tglSuratRef || kgbData.tanggal_surat || new Date()`). Nilai `noInfo.bulan` dan `noInfo.tahun` selalu dipaksa mengikuti `bt.bulan` dan `bt.tahun`, dan nomor rakitan `assembled` otomatis memakai bulan/tahun tanggal cetak tersebut tanpa ditimpa segmen string usang.
+   - Di `modules/eoffice/kgb.js`: saat modal dibuka (`openKgbModalForm`) atau tanggal surat diubah (`syncNomorSuratKgbOtomatis`), regenerasikan nomor surat lengkap agar segmen bulan & tahun langsung selaras dengan tanggal surat yang aktif.
+   - Di `eoffice/kgb_pdf_compiler.js` & `eoffice/kgb.js`: logika backend diselaraskan agar file PDF kompilasi MYSIMS juga selalu menggunakan bulan Romawi dan tahun dari `p.tanggal_surat`.
+2. **Merapatkan Jarak Paragraf Pertama ke Poin 1 ([`modules/eoffice/cetak/cetak_kgb.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/cetak/cetak_kgb.html), [`eoffice/kgb_pdf_compiler.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/kgb_pdf_compiler.js)):**
+   - Di `.kgb-paragraf`, ubah `margin-bottom` dari `10px` menjadi `4px`.
+   - Di `eoffice/kgb_pdf_compiler.js`, ubah `.paragraf` `margin-bottom` dari `10px` menjadi `4px`.
+3. **Merapatkan Blok Tembusan & Antar-Baris 1, 2, 3 ([`modules/eoffice/cetak/cetak_kgb.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/cetak/cetak_kgb.html), [`eoffice/kgb_pdf_compiler.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/kgb_pdf_compiler.js)):**
+   - Rapatkan jarak atas blok tembusan dari nama Ketua: `.kgb-tembusan` `margin-top: 18px` -> `12px` dan `line-height: 1.25`.
+   - Rapatkan spasi teks `Tembusan :` dan tabel: atur `.kgb-tembusan-table { margin-top: 0px; }`.
+   - Rapatkan jarak antar-baris tembusan: `.kgb-tembusan-table td` `padding: 0px 0; line-height: 1.25;`.
+   - Terapkan penyesuaian yang sama pada class `.tembusan` dan `.tembusan-table` di `eoffice/kgb_pdf_compiler.js`.
+4. **Verifikasi & Bump PWA `v3.8.64`:**
+   - Jalankan `npm test`: seluruh 6/6 test suite lulus tanpa kegagalan (0 failures).
+   - Perbarui versi PWA 3 titik (`3.8.63` -> `3.8.64`) di `index.html` dan `sw.js`.
+   - Catat rilis 98 di `prd.md`.
+   - Sinkronisasi deployment GitHub (`origin` & `prod`) dan Google Apps Script (`clasp push` + `clasp deploy`).
+
+### 3. Temuan Audit Lintas-Modul & Langkah Aktivasi Pasca-Eksekusi
+- **Audit Lintas-Modul (Cuti, ST, & E-Office):** Tidak ada dampak negatif ke modul lain. Penomoran otomatis dan spasi hanya berlaku pada formulir cetak dan kompilator PDF KGB, menjaga kompatibilitas penuh dengan sistem backend dan n8n.
+- **Aktivasi Pengguna:** Hard refresh browser (`Ctrl + Shift + R`) untuk memuat PWA `v3.8.64`.
+
 
 
 
