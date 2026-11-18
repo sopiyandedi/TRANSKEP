@@ -341,6 +341,23 @@ window.dashboardApp = Vue.createApp({
           let birthDate = new Date(parseInt(nipClean.substring(0, 4)), parseInt(nipClean.substring(4, 6)) - 1, parseInt(nipClean.substring(6, 8)));
           birthDate.setFullYear(birthDate.getFullYear() + (parseInt(u.bup) || 58));
           birthDate.setMonth(birthDate.getMonth() + 1, 1);
+
+          let diffDaysPensiun = Math.ceil((birthDate.getTime() - today.getTime()) / (1000 * 3600 * 24));
+
+          // 1. Jika status pensiun sudah SELESAI: abaikan jika sudah lewat dari 30 hari sejak tanggal selesai atau jika TMT sudah lewat
+          if (u.status_pensiun && u.status_pensiun.toUpperCase() === 'SELESAI') {
+            if (u.tgl_selesai_pensiun) {
+              let diffSelesai = (today.getTime() - new Date(u.tgl_selesai_pensiun).getTime()) / (1000 * 3600 * 24);
+              if (diffSelesai >= 30) return;
+            } else if (diffDaysPensiun < 0) {
+              return;
+            }
+          }
+
+          // 2. Jika TMT pensiun sudah lampau lebih dari 30 hari (misal pensiun tahun 2022, 2024, dll):
+          // Pegawai purnabakti tidak dimasukkan ke dalam antrean aktif Peringatan Dini
+          if (diffDaysPensiun < -30) return;
+
           warnings.push(createWarningObj(u, 'Pensiun', birthDate, today, u.status_pensiun));
         }
       });
@@ -486,7 +503,11 @@ window.dashboardApp = Vue.createApp({
           birthDate.setFullYear(birthDate.getFullYear() + (parseInt(u.bup) || 58));
           birthDate.setMonth(birthDate.getMonth() + 1, 1);
         }
-        itemPensiun = createCustomWarning('Pensiun', birthDate, u.status_pensiun, '');
+        let diffP = birthDate ? Math.ceil((birthDate.getTime() - today.getTime()) / (1000 * 3600 * 24)) : 0;
+        let isDone = u.status_pensiun && u.status_pensiun.toUpperCase() === 'SELESAI';
+        if (!(isDone && diffP < 0) && !(diffP < -30)) {
+          itemPensiun = createCustomWarning('Pensiun', birthDate, u.status_pensiun, '');
+        }
       }
 
       return [itemKnp, itemKgb, itemPensiun].filter(Boolean);
@@ -619,16 +640,32 @@ window.dashboardApp = Vue.createApp({
         // Sinkronkan ke global state jika ada
         if (window.vueState && Array.isArray(window.vueState.usersList)) {
           const vUser = window.vueState.usersList.find(u => safeNip(u.nip) === cleanTargetNip);
-          if (vUser && typeStr === 'KGB') {
-            vUser.status_kgb = userRef.status_kgb;
-            vUser.tgl_selesai_kgb = userRef.tgl_selesai_kgb;
+          if (vUser) {
+            if (typeStr === 'KGB') {
+              vUser.status_kgb = userRef.status_kgb;
+              vUser.tgl_selesai_kgb = userRef.tgl_selesai_kgb;
+            } else if (typeStr === 'Pangkat' || typeStr === 'KNP') {
+              vUser.status_knp = userRef.status_knp;
+              vUser.tgl_selesai_knp = userRef.tgl_selesai_knp;
+            } else if (typeStr === 'Pensiun') {
+              vUser.status_pensiun = userRef.status_pensiun;
+              vUser.tgl_selesai_pensiun = userRef.tgl_selesai_pensiun;
+            }
           }
         }
         if (typeof state !== 'undefined' && Array.isArray(state.usersList)) {
           const sUser = state.usersList.find(u => safeNip(u.nip) === cleanTargetNip);
-          if (sUser && typeStr === 'KGB') {
-            sUser.status_kgb = userRef.status_kgb;
-            sUser.tgl_selesai_kgb = userRef.tgl_selesai_kgb;
+          if (sUser) {
+            if (typeStr === 'KGB') {
+              sUser.status_kgb = userRef.status_kgb;
+              sUser.tgl_selesai_kgb = userRef.tgl_selesai_kgb;
+            } else if (typeStr === 'Pangkat' || typeStr === 'KNP') {
+              sUser.status_knp = userRef.status_knp;
+              sUser.tgl_selesai_knp = userRef.tgl_selesai_knp;
+            } else if (typeStr === 'Pensiun') {
+              sUser.status_pensiun = userRef.status_pensiun;
+              sUser.tgl_selesai_pensiun = userRef.tgl_selesai_pensiun;
+            }
           }
         }
 

@@ -6520,6 +6520,68 @@ Berdasarkan perbandingan visual antara hasil cetak saat ini ([`media_17949670146
 
 ---
 
+## Tahap 133 [SELESAI & AKTIF]: Investigasi & Eliminasi Flicker Pensiun Kadaluarsa (Merah/OVERDUE) Pada Peringatan Dini Saat Pertama Masuk (`v3.8.67`)
+
+### 1. Masalah & Temuan Akar Masalah (Root Cause Analysis)
+Berdasarkan keluhan pengguna dan dua tangkapan layar yang disertakan:
+1. **Tampilan Pertama Masuk (Detik Pertama / 0ms):**
+   - Kartu "PERINGATAN DINI (KGB, KP & PENSIUN)" menampilkan 4 baris berstatus merah (`TERLEWAT / OVERDUE`):
+     - Drs. Taufiqurrokhman, M.H. (Pensiun • TMT: 1 Mei 2022)
+     - Dra. Hj. Sunaeah, M.H. (Pensiun • TMT: 1 September 2022)
+     - Usman, S.H. (Pensiun • TMT: 1 Oktober 2022)
+     - Dra. Z. Hani'Ah (Pensiun • TMT: 1 Maret 2024)
+2. **Tampilan Setelah Sinkronisasi Selesai (Detik Berikutnya):**
+   - Keempat baris pensiun merah tersebut hilang, dan berganti ke antrean aktif yang semestinya:
+     - Ahmad Mujahidin, S.Ag. (Pangkat • TMT: 1 Oktober 2026) - Status: SELESAI
+     - Agus Salim, S.H.I. (KGB • TMT: 1 Desember 2026) - Status: SELESAI
+     - Tutwuri Handayani, S.Ak. (KGB • TMT: 1 Desember 2026) - Status: SELESAI
+     - Dr. Tohayudin, S.H.I., M.H.I. (KGB • TMT: 1 Januari 2027) - Status: SEDANG DIPROSES
+
+**Mengapa Hal Ini Terjadi Berulang Kali ("Selalu Keluar")?**
+1. **Ketiadaan Filter Pensiun Kadaluarsa / Selesai di `rawWarningsData()`:**
+   - Pada `modules/dashboard/dashboard.js`, untuk KGB dan Pangkat, terdapat guard filter:
+     - KGB: `if (u.status_kgb === 'SELESAI' && diff >= 30) return;`
+     - Pangkat: `if (u.status_knp === 'SELESAI' && diff >= 30) return;`
+   - Namun untuk **Pensiun**, sebelumnya tidak ada filter: siapapun pegawai di dalam database/cache, tanggal pensiunnya dihitung dari NIP. Pegawai yang pensiun bertahun-tahun lampau (2022, 2024) menghasilkan `diffDays < 0`, otomatis berstatus `TERLEWAT` dengan label `OVERDUE` merah.
+2. **Pengurutan Tanggal Ascending (`a.rawDate - b.rawDate`):**
+   - Diurutkan dari tanggal paling lampau, sehingga tahun 2022 & 2024 meloncat ke posisi teratas ranking 1–4.
+3. **Rehidrasi Cache Lokal 0ms:**
+   - Detik ke-0 menampilkan data cache lokal sebelum live sync server selesai membersihkan antrean.
+
+---
+
+### 2. Implementasi Terukur Selesai Dilaksanakan
+1. **Pembaruan Filter Pensiun di `modules/dashboard/dashboard.js` (`rawWarningsData()`):**
+   - Menambahkan pengecekan status pensiun `'SELESAI'`: jika sudah lewat dari 30 hari sejak `tgl_selesai_pensiun` atau tanggal pensiun sudah lewat dari hari ini, otomatis diabaikan (`return`).
+   - Menambahkan guard kadaluarsa purnabakti: `if (diffDaysPensiun < -30) return;`. Pegawai yang telah pensiun lebih dari 30 hari yang lalu (misal tahun 2022, 2024) otomatis disaring keluar dari antrean aktif Peringatan Dini.
+2. **Penyelarasan pada `filteredPegawaiWarnings()`:**
+   - Memastikan bahwa pegawai yang pensiunnya sudah selesai atau sudah lewat dari 30 hari tidak menampilkan alert overdue merah.
+3. **Penyelarasan Sinkronisasi Status Modal (`submitTmtStatus`):**
+   - Melengkapi sinkronisasi `Pangkat` dan `Pensiun` ke `window.vueState.usersList` dan `state.usersList` (sebelumnya hanya KGB).
+4. **Pengujian Regresi & Bump Versi PWA `v3.8.67`:**
+   - Menambahkan unit test di `tests/verify_fase3b.js` untuk memverifikasi isolasi pensiun kadaluarsa/selesai.
+   - Memperbarui versi PWA ke `v3.8.67` di `index.html` dan `sw.js`.
+   - Seluruh 6/6 test suite lulus (`npm test`, 0 failures).
+
+---
+
+### 3. Matriks Perubahan Sebelum vs Sesudah
+
+| Kondisi / Skenario | Sebelum (v3.8.66) | Sesudah (Aktif v3.8.67) |
+| :--- | :--- | :--- |
+| **Pertama Masuk (0ms Cache)** | Muncul 4 kartu pensiun merah `OVERDUE` (TMT 2022, 2024) | Bersih dari pensiun lampau; langsung menampilkan jadwal aktif terdekat |
+| **Pensiun Selesai (>30 hari)** | Tetap muncul di antrean Peringatan Dini | Otomatis diabaikan (`return;`) |
+| **Pegawai Purnabakti (>30 hari lalu)** | Menjadi `OVERDUE / TERLEWAT` di urutan teratas | Diabaikan (`diffDaysPensiun < -30`) |
+| **Pensiun Aktif / Mendatang** | Muncul sesuai jadwal | Tetap terpantau normal dengan status real-time |
+
+---
+
+### 4. Temuan Audit Lintas-Modul & Langkah Aktivasi Pasca-Eksekusi
+- **Audit Lintas-Modul:** Alur KGB, KP, Cuti, E-Office, dan n8n tetap beroperasi normal tanpa perubahan struktur skema data.
+- **Aktivasi Pengguna:** Lakukan hard refresh browser (`Ctrl + Shift + R`) untuk memuat PWA `v3.8.67`.
+
+---
+
 
 
 

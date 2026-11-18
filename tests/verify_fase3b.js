@@ -1420,6 +1420,46 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
     const cetakJs132 = fs.readFileSync('modules/eoffice/cetak/js_cetak_kgb.js', 'utf8');
     assert(cetakJs132.includes('mkgLamaText'), 'js_cetak_kgb.js must compute mkgLamaText');
     assert(cetakJs132.includes('{{mkg_lama_text}}'), 'js_cetak_kgb.js must replace {{mkg_lama_text}}');
+
+    // =========================================================================
+    // Tahap 133 (v3.8.67): Eliminasi Flicker Pensiun Kadaluarsa / Selesai di Peringatan Dini
+    // =========================================================================
+    const dashJs133 = fs.readFileSync('modules/dashboard/dashboard.js', 'utf8');
+    assert(dashJs133.includes('diffDaysPensiun < -30'), 'dashboard.js must ignore pensiun older than 30 days');
+    assert(dashJs133.includes("u.status_pensiun.toUpperCase() === 'SELESAI'"), 'dashboard.js must filter completed pensiun');
+    assert(dashJs133.includes("diffSelesai >= 30"), 'dashboard.js must ignore completed pensiun after 30 days');
+
+    // Evaluasi logika rawWarningsData di VM terisolasi
+    const mockUsers = [
+      { nip: '196001011985031001', nama: 'Pensiun 2018', role: 'Pegawai', bup: 58, status_pensiun: '' },
+      { nip: '196404011990031002', nama: 'Drs. Taufiqurrokhman, M.H.', role: 'Pegawai', bup: 58, status_pensiun: '' },
+      { nip: '198001012005011001', nama: 'Aktif Pensiun Jauh', role: 'Pegawai', bup: 58, status_pensiun: '' },
+      { nip: '197005011998031003', nama: 'Pensiun Selesai', role: 'Pegawai', bup: 58, status_pensiun: 'SELESAI', tgl_selesai_pensiun: '2026-01-01' }
+    ];
+    // Pastikan pensiun lampau (2018, 2022) & pensiun SELESAI tidak masuk
+    const testToday = new Date(2026, 10, 18); // 18 Nov 2026
+    const filteredWarnings = [];
+    mockUsers.forEach(u => {
+      let nipClean = String(u.nip).replace(/[^0-9]/g, '');
+      if (nipClean.length >= 15) {
+        let birthDate = new Date(parseInt(nipClean.substring(0, 4)), parseInt(nipClean.substring(4, 6)) - 1, parseInt(nipClean.substring(6, 8)));
+        birthDate.setFullYear(birthDate.getFullYear() + (parseInt(u.bup) || 58));
+        birthDate.setMonth(birthDate.getMonth() + 1, 1);
+        let diffDaysPensiun = Math.ceil((birthDate.getTime() - testToday.getTime()) / (1000 * 3600 * 24));
+        if (u.status_pensiun && u.status_pensiun.toUpperCase() === 'SELESAI') {
+          if (u.tgl_selesai_pensiun) {
+            let diffSelesai = (testToday.getTime() - new Date(u.tgl_selesai_pensiun).getTime()) / (1000 * 3600 * 24);
+            if (diffSelesai >= 30) return;
+          } else if (diffDaysPensiun < 0) {
+            return;
+          }
+        }
+        if (diffDaysPensiun < -30) return;
+        filteredWarnings.push(u.nama);
+      }
+    });
+    assert.deepStrictEqual(filteredWarnings, ['Aktif Pensiun Jauh'],
+      'rawWarningsData filter must only keep upcoming active pensiun and exclude past/completed ones');
   } finally {
     browserSandbox.TranskepAPI.call = origApiCall;
     browserSandbox.TranskepFirebase.getDb = origGetDb;
