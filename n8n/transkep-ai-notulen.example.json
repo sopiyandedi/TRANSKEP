@@ -65,7 +65,9 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=<GANTI_GEMINI_API_KEY>",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googlePalmApi",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -90,6 +92,12 @@
         40,
         320
       ],
+      "credentials": {
+        "googlePalmApi": {
+          "id": "<GANTI_GEMINI_CREDENTIAL_ID>",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      },
       "continueOnFail": true
     },
     {
