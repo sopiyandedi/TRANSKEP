@@ -14,6 +14,19 @@
   var fotoRapatList = [];
   var isRapatFullscreen = false;
   var currentRapatTab = 'undangan';
+  var rapatAudioState = {
+    dataUri: '',
+    mimeType: '',
+    fileName: '',
+    sizeBytes: 0,
+    objectUrl: '',
+    recorder: null,
+    stream: null,
+    chunks: [],
+    recording: false,
+    timerId: null,
+    startedAt: 0
+  };
 
   var HARI_INDO_RAPAT = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
   var BULAN_INDO_RAPAT = [
@@ -726,6 +739,570 @@
     renderFotoRapatPreview_();
   };
 
+  // ==========================================
+  // AI NOTULIS OTOMATIS: AUDIO + TRANSKRIP -> 5 KOLOM NOTULA (TAHAP 140)
+  // ==========================================
+  function formatBytesRapat_(bytes) {
+    var b = Number(bytes || 0);
+    if (!b || b < 1024) return (b || 0) + ' B';
+    if (b < 1024 * 1024) return (b / 1024).toFixed(1) + ' KB';
+    return (b / (1024 * 1024)).toFixed(2) + ' MB';
+  }
+
+  function encodeWavMono16k_(audioBuffer) {
+    var srcData = audioBuffer.getChannelData(0);
+    var srcRate = audioBuffer.sampleRate || 44100;
+    var targetRate = 16000;
+    var ratio = srcRate / targetRate;
+    var outLen = Math.max(1, Math.floor(srcData.length / ratio));
+    var buf = new ArrayBuffer(44 + outLen * 2);
+    var view = new DataView(buf);
+    function writeStr(off, s) {
+      for (var i = 0; i < s.length; i++) view.setUint8(off + i, s.charCodeAt(i));
+    }
+    writeStr(0, 'RIFF');
+    view.setUint32(4, 36 + outLen * 2, true);
+    writeStr(8, 'WAVE');
+    writeStr(12, 'fmt ');
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true);
+    view.setUint16(22, 1, true);
+    view.setUint32(24, targetRate, true);
+    view.setUint32(28, targetRate * 2, true);
+    view.setUint16(32, 2, true);
+    view.setUint16(34, 16, true);
+    writeStr(36, 'data');
+    view.setUint32(40, outLen * 2, true);
+    var offset = 44;
+    for (var i = 0; i < outLen; i++) {
+      var sample = Math.max(-1, Math.min(1, srcData[Math.min(srcData.length - 1, Math.floor(i * ratio))]));
+      view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
+      offset += 2;
+    }
+    return new Blob([view], { type: 'audio/wav' });
+  }
+
+  function blobToDataUri_(blob) {
+    return new Promise(function (resolve, reject) {
+      if (typeof FileReader === 'undefined') {
+        return reject(new Error('FileReader tidak tersedia.'));
+      }
+      var reader = new FileReader();
+      reader.onerror = function () { reject(new Error('Gagal membaca berkas audio.')); };
+      reader.onload = function (ev) {
+        resolve(ev && ev.target ? String(ev.target.result || '') : '');
+      };
+      reader.readAsDataURL(blob);
+    });
+  }
+
+  async function readAndCompressAudioFile_(file) {
+    if (!file) throw new Error('Berkas audio kosong.');
+    var rawMime = String(file.type || '').split(';')[0].trim().toLowerCase();
+    var fileName = String(file.name || 'rekaman_rapat.webm').trim();
+    if (!rawMime) {
+      if (/\.mp3$/i.test(fileName)) rawMime = 'audio/mpeg';
+      else if (/\.m4a$/i.test(fileName)) rawMime = 'audio/mp4';
+      else if (/\.wav$/i.test(fileName)) rawMime = 'audio/wav';
+      else if (/\.ogg$/i.test(fileName)) rawMime = 'audio/ogg';
+      else rawMime = 'audio/webm';
+    }
+
+    var maxRawBytes = 15 * 1024 * 1024;
+    if (file.size && file.size > maxRawBytes) {
+      throw new Error('Ukuran file audio terlalu besar (maks. 15 MB). Potong rekaman atau gunakan tempel catatan/transkrip.');
+    }
+
+    // Resampling ringan khusus berkas WAV besar jika browser mendukung Web Audio API
+    var targetBlob = file;
+    var finalMime = rawMime;
+    if ((rawMime === 'audio/wav' || rawMime === 'audio/x-wav') && file.size > 2.5 * 1024 * 1024 &&
+        typeof window !== 'undefined' && (window.AudioContext || window.webkitAudioContext) &&
+        typeof file.arrayBuffer === 'function') {
+      try {
+        var Ctx = window.AudioContext || window.webkitAudioContext;
+        var ctx = new Ctx();
+        var decoded = await ctx.decodeAudioData(await file.arrayBuffer());
+        if (typeof ctx.close === 'function') ctx.close().catch(function () {});
+        var wavBlob = encodeWavMono16k_(decoded);
+        if (wavBlob.size < file.size) {
+          targetBlob = wavBlob;
+          finalMime = 'audio/wav';
+        }
+      } catch (eWav) {
+        // Gunakan file asli jika decoding WAV gagal
+      }
+    }
+
+    if (targetBlob.size && targetBlob.size > 8.5 * 1024 * 1024) {
+      throw new Error('Ukuran audio melebihi batas kirim AI (8.5 MB). Gunakan rekaman terkompresi (.mp3/.ogg/.webm) atau paste transkrip.');
+    }
+
+    var dataUri = await blobToDataUri_(targetBlob);
+    return {
+      dataUri: dataUri,
+      mimeType: finalMime,
+      fileName: fileName,
+      sizeBytes: targetBlob.size || file.size || 0
+    };
+  }
+
+  function updateRapatAudioPreviewUi_() {
+    var box = document.getElementById('rapatAudioPreviewBox');
+    var info = document.getElementById('rapatAudioFileInfo');
+    var player = document.getElementById('rapatAudioPlayer');
+    var btnClear = document.getElementById('btnRapatClearAudio');
+    var badge = document.getElementById('rapatAiStatusBadge');
+
+    var hasAudio = Boolean(rapatAudioState.dataUri || rapatAudioState.objectUrl);
+    if (box) {
+      if (hasAudio) box.classList.remove('hidden');
+      else box.classList.add('hidden');
+    }
+    if (btnClear) {
+      if (hasAudio) btnClear.classList.remove('hidden');
+      else btnClear.classList.add('hidden');
+    }
+    if (info) {
+      info.innerText = hasAudio
+        ? (rapatAudioState.fileName || 'rekaman_rapat.webm') + (rapatAudioState.sizeBytes ? ' (' + formatBytesRapat_(rapatAudioState.sizeBytes) + ')' : '')
+        : 'Belum ada file audio';
+    }
+    if (player && player.src !== (rapatAudioState.objectUrl || '')) {
+      player.src = rapatAudioState.objectUrl || '';
+    }
+    if (badge && !rapatAudioState.recording) {
+      badge.innerText = hasAudio ? 'Audio Siap Analisa AI' : 'Siap AI Notulis';
+    }
+  }
+
+  function stopRapatRecordingTracks_() {
+    if (rapatAudioState.timerId) {
+      clearInterval(rapatAudioState.timerId);
+      rapatAudioState.timerId = null;
+    }
+    if (rapatAudioState.stream && typeof rapatAudioState.stream.getTracks === 'function') {
+      rapatAudioState.stream.getTracks().forEach(function (t) {
+        try { t.stop(); } catch (e) {}
+      });
+    }
+    rapatAudioState.stream = null;
+    rapatAudioState.recorder = null;
+    rapatAudioState.recording = false;
+
+    var btnRec = document.getElementById('btnRapatRecordAudio');
+    var timerEl = document.getElementById('rapatAudioRecordTimer');
+    if (btnRec) {
+      btnRec.classList.remove('animate-pulse');
+      var spanLbl = btnRec.querySelector('span:not(#rapatAudioRecordTimer)');
+      if (spanLbl) spanLbl.innerText = 'Rekam Mikrofon';
+    }
+    if (timerEl) {
+      timerEl.classList.add('hidden');
+      timerEl.innerText = '00:00';
+    }
+  }
+
+  window.clearRapatAudioSelection = function (keepUrlField) {
+    if (rapatAudioState.recording && rapatAudioState.recorder) {
+      try { rapatAudioState.recorder.stop(); } catch (e) {}
+    }
+    stopRapatRecordingTracks_();
+    if (rapatAudioState.objectUrl && typeof URL !== 'undefined' && typeof URL.revokeObjectURL === 'function') {
+      try { URL.revokeObjectURL(rapatAudioState.objectUrl); } catch (e) {}
+    }
+    rapatAudioState.dataUri = '';
+    rapatAudioState.mimeType = '';
+    rapatAudioState.fileName = '';
+    rapatAudioState.sizeBytes = 0;
+    rapatAudioState.objectUrl = '';
+    rapatAudioState.chunks = [];
+
+    if (!keepUrlField) {
+      var urlEl = document.getElementById('rapatFieldAudioUrl');
+      if (urlEl) urlEl.value = '';
+    }
+    updateRapatAudioPreviewUi_();
+  };
+
+  window.handleRapatAudioSelect = async function (files) {
+    if (!files || files.length === 0) return;
+    var f = files[0];
+    try {
+      var res = await readAndCompressAudioFile_(f);
+      window.clearRapatAudioSelection(true);
+      rapatAudioState.dataUri = res.dataUri;
+      rapatAudioState.mimeType = res.mimeType;
+      rapatAudioState.fileName = res.fileName;
+      rapatAudioState.sizeBytes = res.sizeBytes;
+      if (typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
+        try { rapatAudioState.objectUrl = URL.createObjectURL(f); } catch (eObj) {}
+      }
+      updateRapatAudioPreviewUi_();
+      if (typeof showNotify === 'function') {
+        showNotify('Audio Dipilih', res.fileName + ' siap diproses oleh AI Notulis.', 'success');
+      }
+    } catch (err) {
+      if (typeof showNotify === 'function') {
+        showNotify('Audio Tidak Valid', err.message || err.toString(), 'warning');
+      }
+    }
+  };
+
+  window.toggleRapatAudioRecording = async function () {
+    if (rapatAudioState.recording && rapatAudioState.recorder) {
+      try { rapatAudioState.recorder.stop(); } catch (e) {}
+      return;
+    }
+
+    if (typeof navigator === 'undefined' || !navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== 'function' ||
+        typeof MediaRecorder === 'undefined') {
+      if (typeof showNotify === 'function') {
+        showNotify('Tidak Didukung', 'Browser belum mendukung perekaman mikrofon langsung. Gunakan + Pilih File Audio.', 'warning');
+      }
+      return;
+    }
+
+    try {
+      window.clearRapatAudioSelection(true);
+      var stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      var mimeOpts = {};
+      if (typeof MediaRecorder.isTypeSupported === 'function') {
+        if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) mimeOpts = { mimeType: 'audio/webm;codecs=opus', audioBitsPerSecond: 24000 };
+        else if (MediaRecorder.isTypeSupported('audio/webm')) mimeOpts = { mimeType: 'audio/webm', audioBitsPerSecond: 24000 };
+      }
+      var rec = new MediaRecorder(stream, mimeOpts);
+      rapatAudioState.stream = stream;
+      rapatAudioState.recorder = rec;
+      rapatAudioState.chunks = [];
+      rapatAudioState.recording = true;
+      rapatAudioState.startedAt = Date.now();
+
+      rec.ondataavailable = function (ev) {
+        if (ev && ev.data && ev.data.size > 0) rapatAudioState.chunks.push(ev.data);
+      };
+      rec.onstop = async function () {
+        var chunks = rapatAudioState.chunks.slice();
+        var recMime = String((rec && rec.mimeType) || 'audio/webm').split(';')[0].trim() || 'audio/webm';
+        stopRapatRecordingTracks_();
+        if (chunks.length === 0) return;
+        var blob = new Blob(chunks, { type: recMime });
+        try {
+          var dataUri = await blobToDataUri_(blob);
+          rapatAudioState.dataUri = dataUri;
+          rapatAudioState.mimeType = recMime;
+          rapatAudioState.fileName = 'Rekaman_Mikrofon_' + new Date().toISOString().slice(11, 19).replace(/:/g, '') + '.webm';
+          rapatAudioState.sizeBytes = blob.size || 0;
+          if (typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
+            try { rapatAudioState.objectUrl = URL.createObjectURL(blob); } catch (eObj) {}
+          }
+          updateRapatAudioPreviewUi_();
+          if (typeof showNotify === 'function') {
+            showNotify('Rekaman Selesai', 'Audio berhasil direkam. Klik Proses AI Notulis untuk menyusun Notula.', 'success');
+          }
+        } catch (errBlob) {
+          console.warn('Gagal konversi rekaman audio:', errBlob);
+        }
+      };
+
+      rec.start(1000);
+      var btnRec = document.getElementById('btnRapatRecordAudio');
+      var timerEl = document.getElementById('rapatAudioRecordTimer');
+      var badge = document.getElementById('rapatAiStatusBadge');
+      if (btnRec) {
+        btnRec.classList.add('animate-pulse');
+        var spanLbl = btnRec.querySelector('span:not(#rapatAudioRecordTimer)');
+        if (spanLbl) spanLbl.innerText = 'Hentikan Rekaman';
+      }
+      if (badge) badge.innerText = 'Sedang Merekam...';
+      if (timerEl) {
+        timerEl.classList.remove('hidden');
+        timerEl.innerText = '00:00';
+      }
+      rapatAudioState.timerId = setInterval(function () {
+        var sec = Math.max(0, Math.floor((Date.now() - rapatAudioState.startedAt) / 1000));
+        var mm = String(Math.floor(sec / 60)).padStart(2, '0');
+        var ss = String(sec % 60).padStart(2, '0');
+        if (timerEl) timerEl.innerText = mm + ':' + ss;
+      }, 500);
+    } catch (errMic) {
+      stopRapatRecordingTracks_();
+      if (typeof showNotify === 'function') {
+        showNotify('Akses Mikrofon Ditolak', errMic.message || 'Izinkan akses mikrofon di browser atau unggah file audio.', 'error');
+      }
+    }
+  };
+
+  function matchPegawaiForAiSpeaker_(speakerName, rowNip, rowJabatan) {
+    var users = getUsersListRapat_();
+    if (rowNip) {
+      var byNip = users.find(function (u) { return String(u.nip) === String(rowNip).trim(); });
+      if (byNip) {
+        return {
+          nip: String(byNip.nip || ''),
+          jabatan: String(rowJabatan || byNip.jabatan || ''),
+          namaDisplay: byNip.nama + (byNip.jabatan ? ' (' + byNip.jabatan + ')' : '')
+        };
+      }
+    }
+    var target = String(speakerName || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+    if (!target) return null;
+    for (var i = 0; i < users.length; i++) {
+      var u = users[i];
+      var baseNama = String(u.nama || '').split(',')[0].toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+      if (baseNama && baseNama.length >= 3 && (target.indexOf(baseNama) !== -1 || baseNama.indexOf(target) !== -1)) {
+        return {
+          nip: String(u.nip || ''),
+          jabatan: String(rowJabatan || u.jabatan || ''),
+          namaDisplay: u.nama + (u.jabatan ? ' (' + u.jabatan + ')' : '')
+        };
+      }
+    }
+    return null;
+  }
+
+  function joinAiLines_(val) {
+    if (Array.isArray(val)) {
+      var arr = val.map(function (x) { return String(x == null ? '' : x).trim(); }).filter(Boolean);
+      if (arr.length === 0) return '';
+      if (arr.length === 1) return arr[0];
+      return arr.map(function (line, i) { return (i + 1) + '. ' + line; }).join('\n');
+    }
+    return String(val == null ? '' : val).trim();
+  }
+
+  window.applyAiNotulenToForm = function (aiData, opts) {
+    var data = aiData || {};
+    var options = opts || {};
+
+    var elPengarahan = document.getElementById('rapatFieldPengarahanUmum');
+    var elKesimpulan = document.getElementById('rapatFieldKesimpulan');
+    var elDasar = document.getElementById('rapatFieldDasarNotula');
+    var elTrans = document.getElementById('rapatFieldAiTranscript');
+
+    if (elPengarahan && String(data.pengarahan_umum || '').trim()) {
+      elPengarahan.value = String(data.pengarahan_umum).trim();
+    }
+    if (elKesimpulan && String(data.kesimpulan || '').trim()) {
+      elKesimpulan.value = String(data.kesimpulan).trim();
+    }
+    if (elDasar && !String(elDasar.value || '').trim() && String(data.dasar_opsional || '').trim()) {
+      elDasar.value = String(data.dasar_opsional).trim();
+    }
+    if (elTrans && String(data.transkrip_ringkas || '').trim()) {
+      if (!String(elTrans.value || '').trim() || options.overwriteTranscript) {
+        elTrans.value = String(data.transkrip_ringkas).trim();
+      }
+    }
+
+    var rows = Array.isArray(data.pembahasan) ? data.pembahasan : [];
+    if (rows.length > 0) {
+      pembahasanRowsList = rows.slice(0, 30).map(function (r, idx) {
+        var row = (r && typeof r === 'object') ? r : {};
+        var rawSpeaker = String(row.pembicara_nama || row.pembicara || ('Pembicara #' + (idx + 1))).trim();
+        var rawNip = String(row.pembicara_nip || '').trim();
+        var rawJab = String(row.pembicara_jabatan || '').trim();
+        var matched = matchPegawaiForAiSpeaker_(rawSpeaker, rawNip, rawJab);
+
+        return {
+          pembicara_nama: (matched && rawSpeaker.indexOf('(') === -1) ? matched.namaDisplay : rawSpeaker,
+          pembicara_nip: matched ? matched.nip : rawNip,
+          pembicara_jabatan: matched ? matched.jabatan : rawJab,
+          uraian: joinAiLines_(row.uraian_text || row.uraian),
+          tindak_lanjut: joinAiLines_(row.tindak_lanjut_text || row.tindak_lanjut),
+          target: String(row.target || '').trim(),
+          penanggung_jawab: String(row.penanggung_jawab || '').trim(),
+          tanggal_penyelesaian: String(row.tanggal_penyelesaian || '').trim()
+        };
+      });
+      renderPembahasanRows_();
+    }
+
+    return {
+      pembahasanCount: rows.length,
+      hasPengarahan: Boolean(String(data.pengarahan_umum || '').trim()),
+      hasKesimpulan: Boolean(String(data.kesimpulan || '').trim())
+    };
+  };
+
+  function parseNotesLocallyForNotula_(rawText) {
+    var cleanText = String(rawText || '').trim();
+    var lines = cleanText.split(/\r?\n/).map(function (l) { return l.trim(); }).filter(Boolean);
+    var agendaTitle = ((document.getElementById('rapatFieldAgenda') || {}).value || 'Rapat Kedinasan').trim();
+    var pemimpinNama = ((document.getElementById('rapatFieldPemimpin') || {}).value || 'Pimpinan Rapat').trim();
+
+    var pengarahan = [];
+    var kesimpulan = [];
+    var rows = [];
+    var activeRow = null;
+
+    lines.forEach(function (line) {
+      if (/^(?:arahan|pengarahan|pimpinan)\s*:/i.test(line)) {
+        pengarahan.push(line.replace(/^[^:]+:\s*/, '').trim());
+        return;
+      }
+      if (/^(?:kesimpulan|keputusan)\s*:/i.test(line)) {
+        kesimpulan.push(line.replace(/^[^:]+:\s*/, '').trim());
+        return;
+      }
+
+      var spkMatch = line.match(/^(?:\d+\.\s*)?([A-Za-z0-9.,()\-\/\s]{3,80}?)\s*:\s*(.+)$/);
+      if (spkMatch && !/^https?$/i.test(spkMatch[1])) {
+        var key = spkMatch[1].trim();
+        var body = spkMatch[2].trim();
+        if (/^tindak\s*lanjut$/i.test(key) && activeRow) {
+          activeRow.tindak_lanjut.push(body);
+          return;
+        }
+        if (/^target$/i.test(key) && activeRow) {
+          activeRow.target = body;
+          return;
+        }
+        if (/^(?:pj|penanggung\s*jawab)$/i.test(key) && activeRow) {
+          activeRow.penanggung_jawab = body;
+          return;
+        }
+        if (/^(?:tanggal|tgl|deadline)(?:\s+penyelesaian)?$/i.test(key) && activeRow) {
+          activeRow.tanggal_penyelesaian = body;
+          return;
+        }
+
+        var matched = matchPegawaiForAiSpeaker_(key, '', '');
+        activeRow = {
+          pembicara_nama: matched ? matched.namaDisplay : key,
+          pembicara_nip: matched ? matched.nip : '',
+          pembicara_jabatan: matched ? matched.jabatan : '',
+          uraian: [body],
+          tindak_lanjut: [],
+          target: '',
+          penanggung_jawab: matched ? (matched.jabatan || key) : key,
+          tanggal_penyelesaian: ''
+        };
+        rows.push(activeRow);
+        return;
+      }
+
+      if (activeRow) activeRow.uraian.push(line);
+      else pengarahan.push(line);
+    });
+
+    if (rows.length === 0 && lines.length > 0) {
+      rows.push({
+        pembicara_nama: pemimpinNama,
+        pembicara_nip: (document.getElementById('rapatFieldPemimpinNip') || {}).value || '',
+        pembicara_jabatan: (document.getElementById('rapatFieldPemimpinJabatan') || {}).value || '',
+        uraian: lines,
+        tindak_lanjut: kesimpulan.length > 0 ? kesimpulan : ['Ditindaklanjuti sesuai hasil rapat.'],
+        target: 'Terselesaikannya agenda ' + agendaTitle,
+        penanggung_jawab: pemimpinNama,
+        tanggal_penyelesaian: 'Segera'
+      });
+    }
+
+    return {
+      dasar_opsional: '',
+      pengarahan_umum: pengarahan.join('\n') || ('Arahan pimpinan terkait ' + agendaTitle + '.'),
+      kesimpulan: kesimpulan.join('\n') || 'Rapat menyepakati tindak lanjut pembahasan di atas.',
+      transkrip_ringkas: cleanText,
+      pembahasan: rows
+    };
+  }
+
+  window.parseLocalTranscriptToNotula = function () {
+    var transEl = document.getElementById('rapatFieldAiTranscript');
+    var rawText = transEl ? String(transEl.value || '').trim() : '';
+    if (!rawText) {
+      if (typeof showNotify === 'function') {
+        showNotify('Catatan Kosong', 'Isi kolom Catatan Mentah / Transkrip terlebih dahulu.', 'warning');
+      }
+      return null;
+    }
+
+    var parsed = parseNotesLocallyForNotula_(rawText);
+    var summary = window.applyAiNotulenToForm(parsed, { overwriteTranscript: false });
+    switchRapatTab('notula');
+    if (typeof showNotify === 'function') {
+      showNotify(
+        'Draf Notula Disusun (Tinjau Sebelum Simpan)',
+        summary.pembahasanCount + ' topik pembicara diisikan ke 5 kolom Notula. Periksa ejaan nama & detail sebelum menyimpan.',
+        'success'
+      );
+    }
+    return parsed;
+  };
+
+  window.processAiNotulenRapat = async function () {
+    var transEl = document.getElementById('rapatFieldAiTranscript');
+    var transcriptText = transEl ? String(transEl.value || '').trim() : '';
+
+    if (!rapatAudioState.dataUri && !transcriptText) {
+      if (typeof showNotify === 'function') {
+        showNotify('Input Belum Ada', 'Pilih/rekam audio rapat atau tempel catatan mentah terlebih dahulu.', 'warning');
+      }
+      return;
+    }
+
+    var currentUser = (window.vueState && window.vueState.user) ? window.vueState.user : (typeof state !== 'undefined' ? state.user : null);
+    var adminNip = (currentUser && currentUser.nip) || localStorage.getItem('transkep_active_nip') || '';
+    var token = localStorage.getItem('transkep_session_token') || '';
+
+    var aiPayload = {
+      id_rapat: ((document.getElementById('rapatFieldIdRapat') || {}).value || '').trim() || 'RPT-DRAFT',
+      agenda: ((document.getElementById('rapatFieldAgenda') || {}).value || '').trim() || 'Rapat Kedinasan',
+      hari_tanggal: ((document.getElementById('rapatFieldHariTanggal') || {}).value || '').trim(),
+      tempat: ((document.getElementById('rapatFieldTempat') || {}).value || '').trim(),
+      pemimpin: ((document.getElementById('rapatFieldPemimpin') || {}).value || '').trim(),
+      notulis: ((document.getElementById('rapatFieldNotulis') || {}).value || '').trim(),
+      peserta_list: tujuanUndanganList.slice(0, 50),
+      transcript_text: transcriptText,
+      audio_data: rapatAudioState.dataUri || '',
+      audio_mime_type: rapatAudioState.mimeType || '',
+      allow_text_fallback: Boolean(transcriptText)
+    };
+
+    var btnAi = document.getElementById('btnRapatProcessAiNotulen');
+    var badge = document.getElementById('rapatAiStatusBadge');
+    if (btnAi) {
+      btnAi.disabled = true;
+      btnAi.classList.add('opacity-70', 'cursor-wait');
+    }
+    if (badge) badge.innerText = 'Memproses Gemini AI...';
+
+    try {
+      if (!window.EofficeDataService || typeof window.EofficeDataService.requestAiNotulenRapat !== 'function') {
+        throw new Error('Layanan EofficeDataService.requestAiNotulenRapat belum siap.');
+      }
+      var res = await window.EofficeDataService.requestAiNotulenRapat(aiPayload, adminNip, token);
+      if (res && res.status === 'success' && res.data) {
+        var applied = window.applyAiNotulenToForm(res.data, { overwriteTranscript: !transcriptText });
+        switchRapatTab('notula');
+        if (badge) badge.innerText = 'Draf AI Terisi (Siap Tinjau)';
+        if (typeof showNotify === 'function') {
+          showNotify(
+            'AI Notulis Selesai — Harap Tinjau',
+            'Berhasil mengisi Pengarahan Umum & ' + applied.pembahasanCount + ' pembicara 5 kolom. Periksa ejaan nama sebelum klik Simpan Agenda Rapat.',
+            'success'
+          );
+        }
+      } else {
+        if (badge) badge.innerText = 'Gagal Proses AI';
+        if (typeof showNotify === 'function') {
+          showNotify('AI Notulis Gagal', (res && res.message) ? res.message : 'Gagal mengekstrak notula rapat.', 'error');
+        }
+      }
+    } catch (err) {
+      if (badge) badge.innerText = 'Kendala Koneksi AI';
+      if (typeof showNotify === 'function') {
+        showNotify('Error AI Notulis', err.message || err.toString(), 'error');
+      }
+    } finally {
+      if (btnAi) {
+        btnAi.disabled = false;
+        btnAi.classList.remove('opacity-70', 'cursor-wait');
+      }
+    }
+  };
+
   function serializeFotoRapatForFirestore_() {
     var clean = fotoRapatList.map(function (f) {
       var obj = {
@@ -894,6 +1471,12 @@
     }
     renderFotoRapatPreview_();
 
+    if (typeof window.clearRapatAudioSelection === 'function') {
+      window.clearRapatAudioSelection(true);
+    }
+    var elAudioUrl = document.getElementById('rapatFieldAudioUrl');
+    if (elAudioUrl) elAudioUrl.value = rapatData.audio_rapat_url || '';
+
     var elAiTrans = document.getElementById('rapatFieldAiTranscript');
     if (elAiTrans) elAiTrans.value = rapatData.ai_transcript || '';
 
@@ -910,6 +1493,11 @@
   window.openRapatDetailModal = window.openRapatModalForm;
 
   window.closeRapatModalForm = function () {
+    if (rapatAudioState.recording && rapatAudioState.recorder) {
+      try { rapatAudioState.recorder.stop(); } catch (e) {}
+    } else {
+      stopRapatRecordingTracks_();
+    }
     var modal = document.getElementById('modalAgendaRapat');
     if (!modal) return;
     modal.classList.add('opacity-0');
@@ -1008,6 +1596,7 @@
       pembahasan_json: JSON.stringify(cleanPembahasanRows),
       kesimpulan: (document.getElementById('rapatFieldKesimpulan') || {}).value || '',
       foto_rapat_json: serializeFotoRapatForFirestore_(),
+      audio_rapat_url: (document.getElementById('rapatFieldAudioUrl') || {}).value || '',
       ai_transcript: (document.getElementById('rapatFieldAiTranscript') || {}).value || '',
       doc_undangan_url: (document.getElementById('rapatFieldDocUndanganUrl') || {}).value || '',
       doc_absen_url: (document.getElementById('rapatFieldDocAbsenUrl') || {}).value || '',

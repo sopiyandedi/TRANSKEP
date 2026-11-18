@@ -468,3 +468,151 @@ if (hasLive) {
 }
 
 console.log(`[PASS] Behavioral VM simulation passed for ${hasLive ? 'example + live local' : 'example CI'} Transkep AI Assistant workflows.`);
+
+// =========================================================================
+// 3. Validate Tahap 140 Workflow: Transkep AI Notulen Rapat (Audio -> JSON)
+// =========================================================================
+const notulenExPath = 'n8n/transkep-ai-notulen.example.json';
+const notulenLivePath = 'n8n/transkep-ai-notulen.json';
+
+assert(fs.existsSync(notulenExPath), `Missing ${notulenExPath}`);
+const notulenExRaw = fs.readFileSync(notulenExPath, 'utf8');
+const notulenExWf = JSON.parse(notulenExRaw);
+
+function validateNotulenWorkflowTopology(wf, rawText, label) {
+  assert.strictEqual(wf.name, 'Transkep AI Notulen Rapat', `${label}: workflow name must be 'Transkep AI Notulen Rapat'`);
+  assert(!/zet+bot+/i.test(rawText), `${label}: must not contain zet+bot branding`);
+  assert(!rawText.includes('.item.json'), `${label}: must avoid fragile .item.json references`);
+
+  const byName = new Map();
+  const byId = new Map();
+  for (const n of wf.nodes) {
+    assert(n.id && !byId.has(n.id), `${label}: duplicate/missing id on ${n.name}`);
+    assert(n.name && !byName.has(n.name), `${label}: duplicate/missing name ${n.name}`);
+    byId.set(n.id, n);
+    byName.set(n.name, n);
+    if (n.type === 'n8n-nodes-base.code') {
+      new vm.Script(`(function(){\n${n.parameters.jsCode}\n})()`, { filename: `${label}:${n.name}` });
+    }
+  }
+  assert.strictEqual(wf.nodes.length, 8, `${label}: expected 8 nodes`);
+
+  for (const [srcName, connGroups] of Object.entries(wf.connections || {})) {
+    assert(byName.has(srcName), `${label}: missing connection source ${srcName}`);
+    for (const branches of Object.values(connGroups)) {
+      for (const branch of branches) {
+        for (const edge of branch) {
+          assert(byName.has(edge.node), `${label}: missing connection target ${edge.node}`);
+        }
+      }
+    }
+  }
+
+  const webhookNode = byName.get('1. Webhook AI Notulen Rapat');
+  assert(webhookNode && webhookNode.parameters.path === 'transkep-ai-notulen', `${label}: webhook path must be transkep-ai-notulen`);
+  assert.strictEqual(webhookNode.parameters.responseMode, 'responseNode', `${label}: webhook must use responseNode`);
+
+  const geminiHttp = byName.get('Panggil Gemini Multimodal API (HTTP)');
+  assert(geminiHttp && String(geminiHttp.parameters.url).includes('models/gemini-3.8-flash:generateContent'), `${label}: HTTP node must invoke models/gemini-3.8-flash`);
+  assert.strictEqual(geminiHttp.continueOnFail, true, `${label}: Gemini HTTP node must set continueOnFail: true`);
+
+  const ifNode = byName.get('Otorisasi Webhook Valid? (IF)');
+  assert(ifNode && wf.connections['Otorisasi Webhook Valid? (IF)'].main.length === 2, `${label}: Auth IF node must have 2 branches`);
+}
+
+validateNotulenWorkflowTopology(notulenExWf, notulenExRaw, 'transkep-ai-notulen.example.json');
+for (const ph of ['<GANTI_TRANSKEP_WEBHOOK_KEY>', '<GANTI_GEMINI_API_KEY>', '<GANTI_N8N_INSTANCE_ID>', '<GANTI_WORKFLOW_ID>']) {
+  assert(notulenExRaw.includes(ph), `Notulen example missing placeholder: ${ph}`);
+}
+
+const hasNotulenLive = fs.existsSync(notulenLivePath);
+if (hasNotulenLive) {
+  const notulenLiveRaw = fs.readFileSync(notulenLivePath, 'utf8');
+  assert(!/<GANTI_[A-Z0-9_]+>/.test(notulenLiveRaw), 'Live transkep-ai-notulen.json must not contain <GANTI_...> placeholders');
+  validateNotulenWorkflowTopology(JSON.parse(notulenLiveRaw), notulenLiveRaw, 'transkep-ai-notulen.json');
+}
+
+// VM simulations for Notulen workflow Code nodes
+{
+  const manualOut = runCodeNode(notulenExWf, 'Validasi & Siapkan Prompt Notulen (Code)', { inputJson: {} })[0].json;
+  assert.strictEqual(manualOut.isAuthorized, true, 'Manual execution must be authorized');
+  assert.strictEqual(manualOut.isManualTest, true);
+  assert.strictEqual(manualOut.geminiRequestBody.generationConfig.responseMimeType, 'application/json');
+
+  const unauthOut = runCodeNode(notulenExWf, 'Validasi & Siapkan Prompt Notulen (Code)', {
+    inputJson: { body: { secret_key: 'WRONG', id_rapat: 'RPT-1', agenda: 'Tes' } },
+  })[0].json;
+  assert.strictEqual(unauthOut.isAuthorized, false, 'Wrong secret_key must fail authorization');
+
+  const authAudioOut = runCodeNode(notulenExWf, 'Validasi & Siapkan Prompt Notulen (Code)', {
+    inputJson: {
+      body: {
+        secret_key: '<GANTI_TRANSKEP_WEBHOOK_KEY>',
+        id_rapat: 'RPT-2026-140',
+        agenda: 'Evaluasi Kinerja Bulanan',
+        hari_tanggal: 'Rabu, 18 November 2026',
+        tempat: 'Ruang Sidang Utama',
+        pemimpin: 'Ketua',
+        notulis: 'Dedi Sopiyan, S.H.',
+        peserta_list: [{ nip: '197901012003011008', nama: 'Agus Salim, S.Ag.', jabatan: 'Sekretaris' }],
+        transcript_text: 'Pembahasan sarana sidang.',
+        audio_base64: 'data:audio/webm;base64,UklGRiQAAABXQVZF',
+        audio_mime_type: 'audio/webm',
+      },
+    },
+  })[0].json;
+  assert.strictEqual(authAudioOut.isAuthorized, true);
+  assert.strictEqual(authAudioOut.audioAttached, true);
+  assert.strictEqual(authAudioOut.geminiRequestBody.contents[0].parts[0].inline_data.mime_type, 'audio/webm');
+  assert.strictEqual(authAudioOut.geminiRequestBody.contents[0].parts[0].inline_data.data, 'UklGRiQAAABXQVZF');
+
+  const parsedOut = runCodeNode(notulenExWf, 'Parse & Normalisasi JSON Notula (Code)', {
+    inputJson: {
+      candidates: [
+        {
+          content: {
+            parts: [
+              {
+                text: '```json\n' + JSON.stringify({
+                  dasar_opsional: 'Surat Edaran Sekretaris MA',
+                  pengarahan_umum: 'Pimpinan mengarahkan percepatan pelaporan.',
+                  kesimpulan: 'Seluruh unit wajib lapor tepat waktu.',
+                  transkrip_ringkas: 'Ketua membuka rapat lalu Sekretaris melaporkan progres.',
+                  pembahasan: [
+                    {
+                      pembicara_nama: 'Agus Salim, S.Ag. (Sekretaris)',
+                      pembicara_nip: '197901012003011008',
+                      pembicara_jabatan: 'Sekretaris',
+                      uraian: ['Laporan realisasi anggaran triwulan IV', 'Identifikasi kebutuhan ATK'],
+                      tindak_lanjut: ['Susun revisi halaman III DIPA'],
+                      target: 'Revisi DIPA selesai 100%',
+                      penanggung_jawab: 'Kasubbag Keuangan',
+                      tanggal_penyelesaian: '25 November 2026',
+                    },
+                  ],
+                }) + '\n```',
+              },
+            ],
+          },
+        },
+      ],
+    },
+    nodeMap: { 'Validasi & Siapkan Prompt Notulen (Code)': authAudioOut },
+  })[0].json;
+
+  assert.strictEqual(parsedOut.status, 'success');
+  assert.strictEqual(parsedOut.id_rapat, 'RPT-2026-140');
+  assert(parsedOut.data.pengarahan_umum.includes('percepatan pelaporan'));
+  assert.strictEqual(parsedOut.data.pembahasan.length, 1);
+  assert.strictEqual(parsedOut.data.pembahasan[0].uraian_text, '1. Laporan realisasi anggaran triwulan IV\n2. Identifikasi kebutuhan ATK');
+  assert.strictEqual(parsedOut.data.pembahasan[0].target, 'Revisi DIPA selesai 100%');
+
+  const errParsed = runCodeNode(notulenExWf, 'Parse & Normalisasi JSON Notula (Code)', {
+    inputJson: { error: { message: 'Quota exceeded' } },
+    nodeMap: { 'Validasi & Siapkan Prompt Notulen (Code)': authAudioOut },
+  })[0].json;
+  assert.strictEqual(errParsed.status, 'error');
+  assert(errParsed.message.includes('Quota exceeded'));
+}
+
+console.log('[PASS] Transkep AI Notulen Rapat workflow topology, multimodal Gemini payload & JSON normalizer verified.');

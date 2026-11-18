@@ -1357,22 +1357,67 @@
               </div>
             </div>
 
-            <!-- Kartu AI Rekaman Audio (Siap Tahap 140) -->
+            <!-- Kartu AI Rekaman Audio (Aktif Tahap 140: Rekaman Suara / Audio File -> n8n & Gemini Auto-Fill Notula) -->
             <div class="bg-slate-950/50 border border-slate-800/80 rounded-2xl p-4 space-y-3">
-              <div class="flex items-center justify-between border-b border-slate-800/70 pb-2">
+              <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800/70 pb-2">
                 <h4 class="font-bold text-slate-200 uppercase tracking-wider text-[11px] flex items-center gap-2">
                   <i class="fa-solid fa-microphone-lines text-indigo-400"></i>AI Notulis Otomatis (Rekaman Suara)
                 </h4>
-                <span class="px-2 py-0.5 rounded-full text-[9px] font-bold bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">Tahap 140</span>
+                <span id="rapatAiStatusBadge"
+                  class="px-2 py-0.5 rounded-full text-[9px] font-bold bg-indigo-500/15 text-indigo-300 border border-indigo-500/30">Siap AI Notulis</span>
               </div>
               <p class="text-[11px] text-slate-400 leading-relaxed">
-                Unggah rekaman audio rapat untuk diolah oleh Agen AI n8n + Gemini menjadi draf <b>Pengarahan Umum</b> &amp; <b>5 Kolom Pembahasan</b> secara otomatis.
+                Unggah rekaman audio rapat (<b>.mp3, .m4a, .wav, .ogg, .webm</b>) atau rekam langsung dari mikrofon, lalu klik <b>Proses AI Notulis</b> untuk mengisi otomatis <b>Pengarahan Umum</b> &amp; <b>5 Kolom Pembahasan</b>.
               </p>
+
+              <input type="hidden" id="rapatFieldAudioUrl" value="">
+              <input type="file" id="rapatInputAudioFile" accept="audio/*,.mp3,.m4a,.wav,.ogg,.webm" class="hidden"
+                onchange="handleRapatAudioSelect(this.files); this.value='';">
+
+              <div class="flex flex-wrap items-center gap-2">
+                <button type="button" onclick="document.getElementById('rapatInputAudioFile').click()"
+                  class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-[10px] transition inline-flex items-center gap-1.5 shadow-sm">
+                  <i class="fa-solid fa-file-audio"></i>
+                  <span>+ Pilih File Audio</span>
+                </button>
+                <button type="button" id="btnRapatRecordAudio" onclick="toggleRapatAudioRecording()"
+                  class="px-3 py-1.5 bg-rose-600/90 hover:bg-rose-500 text-white font-bold rounded-xl text-[10px] transition inline-flex items-center gap-1.5 shadow-sm">
+                  <i class="fa-solid fa-microphone"></i>
+                  <span>Rekam Mikrofon</span>
+                  <span id="rapatAudioRecordTimer" class="hidden font-mono ml-1 px-1.5 py-0.5 rounded bg-black/30 text-[9px]">00:00</span>
+                </button>
+                <button type="button" id="btnRapatClearAudio" onclick="clearRapatAudioSelection()"
+                  class="hidden px-2.5 py-1.5 bg-slate-800 hover:bg-rose-500/20 text-slate-300 hover:text-rose-300 font-bold rounded-xl text-[10px] border border-slate-700 transition">
+                  Hapus Audio
+                </button>
+              </div>
+
+              <div id="rapatAudioPreviewBox" class="hidden p-2.5 rounded-xl bg-slate-900/90 border border-indigo-500/30 space-y-2">
+                <div class="flex items-center justify-between text-[10px]">
+                  <span id="rapatAudioFileInfo" class="text-indigo-300 font-bold truncate">Belum ada file audio</span>
+                  <span class="px-1.5 py-0.5 rounded bg-indigo-500/15 text-indigo-300 border border-indigo-500/20 text-[9px] shrink-0">Siap Analisa AI</span>
+                </div>
+                <audio id="rapatAudioPlayer" controls class="w-full h-8"></audio>
+              </div>
+
               <div>
-                <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Catatan Mentah / Transkrip Sementara</label>
+                <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Catatan Mentah / Transkrip Rapat</label>
                 <textarea id="rapatFieldAiTranscript" rows="4"
-                  placeholder="Anda sudah dapat menyimpan catatan mentah atau transkrip rapat di sini bersama data agenda..."
+                  placeholder="Tempel catatan mentah rapat (misal format Pembicara: isi uraian...) atau konteks tambahan agar AI Gemini menyusun draf 5 kolom Notula lebih akurat..."
                   class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-slate-200 text-xs focus:ring-1 focus:ring-indigo-500 outline-none custom-scrollbar"></textarea>
+              </div>
+
+              <div class="flex flex-wrap items-center gap-2 pt-1">
+                <button type="button" id="btnRapatProcessAiNotulen" onclick="processAiNotulenRapat()"
+                  class="px-3.5 py-2 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-bold rounded-xl text-[11px] transition inline-flex items-center gap-2 shadow-lg shadow-indigo-600/25">
+                  <i class="fa-solid fa-wand-magic-sparkles"></i>
+                  <span>Proses AI Notulis (Auto-Fill Notula)</span>
+                </button>
+                <button type="button" id="btnRapatParseLocalNotes" onclick="parseLocalTranscriptToNotula()"
+                  class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-xl text-[11px] border border-slate-700 transition inline-flex items-center gap-1.5">
+                  <i class="fa-solid fa-bolt text-amber-400"></i>
+                  <span>Susun Cepat dari Teks</span>
+                </button>
               </div>
             </div>
           </div>

@@ -37,7 +37,8 @@ const n8nExampleFiles = [
   'n8n/n8n_workflow_mysims_surat_keluar.example.json',
   'n8n/CI CD Docker Github.example.json',
   'n8n/Waha reset Paswors dan Cuti.example.json',
-  'n8n/transkep-ai-assistant.example.json'
+  'n8n/transkep-ai-assistant.example.json',
+  'n8n/transkep-ai-notulen.example.json'
 ];
 const leakedPatterns = [
   '192.168.188.10', 'TRANSKEP_WA_BOT_2026', 'AKfycb', "pass: 'admin'", "pass: 'panitera'", "pass: 'sekretaris'",
@@ -54,7 +55,7 @@ for (const exFile of n8nExampleFiles) {
     assert(!raw.includes(leaked), `${exFile} leaked secret/PII: ${leaked}`);
   }
 }
-console.log('[PASS] A1 (.gitignore, .claspignore, 4 sanitized n8n/*.example.json blueprints) checks passed.');
+console.log('[PASS] A1 (.gitignore, .claspignore, 5 sanitized n8n/*.example.json blueprints) checks passed.');
 
 // A4 checks
 const indexHtml = fs.readFileSync('index.html', 'utf8');
@@ -1688,6 +1689,138 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
     assert(renderedNotula.includes('Uraian Pembahasan/Laporan') && renderedNotula.includes('Tindak Lanjut/Tanggapan/Masukan') && renderedNotula.includes('Tanggal Penyelesaian'), 'Notula must render hierarchical a..e subsections');
     assert(renderedNotula.includes('notula-foto-grid-table') && renderedNotula.includes('data:image/jpeg;base64,/9j/4AAQ'), 'Notula must render Foto Rapat 2x2 grid for safe data:image URIs');
     assert(!renderedNotula.includes('evil.example.com') && !renderedNotula.includes('<script>alert(1)') && !renderedNotula.includes('<img src=x>'), 'Notula must reject non-data-URI images and escape XSS');
+
+    // Tahap 140: AI Notulis Otomatis (Audio + Transkrip -> n8n Gemini -> Auto-Fill 5 Kolom Notula)
+    assert(fs.readFileSync('api_router.js', 'utf8').includes('generateAiNotulenRapat: true'), 'api_router.js must allow generateAiNotulenRapat RPC');
+    assert(fs.readFileSync('eoffice/rapat.js', 'utf8').includes('function generateAiNotulenRapat('), 'eoffice/rapat.js must define generateAiNotulenRapat');
+    assert(fs.readFileSync('modules/eoffice/eoffice_data.js', 'utf8').includes('async requestAiNotulenRapat('), 'eoffice_data.js must define requestAiNotulenRapat');
+    assert(fs.readFileSync('index.html', 'utf8').includes("media-src 'self' data: blob:;"), 'index.html CSP must permit self/data/blob media-src for audio player');
+    const viewEoffice140 = fs.readFileSync('modules/eoffice/view_eoffice.html', 'utf8');
+    for (const elId of ['btnRapatProcessAiNotulen', 'btnRapatRecordAudio', 'btnRapatParseLocalNotes', 'rapatInputAudioFile', 'rapatFieldAudioUrl']) {
+      assert(viewEoffice140.includes(`id="${elId}"`), `view_eoffice.html missing AI Notulis element #${elId}`);
+    }
+
+    // Backend GAS RPC generateAiNotulenRapat: RBAC, validasi input & n8n Gemini normalization
+    const pegAiDeny = parseResp(gasSandbox.handleApiPost_({
+      action: 'call',
+      method: 'generateAiNotulenRapat',
+      args: [{ agenda: 'Tes', transcript_text: 'Catatan' }, '199002022015012002', pegA.token],
+      nip: '199002022015012002',
+      token: pegA.token
+    }));
+    assert.strictEqual(pegAiDeny.status, 'error', 'Pegawai role must be blocked from generateAiNotulenRapat');
+
+    const emptyAiErr = gasSandbox.generateAiNotulenRapat({ agenda: 'Kosong' }, '198001012005011001', admCutover.token);
+    assert.strictEqual(emptyAiErr.status, 'error', 'generateAiNotulenRapat must reject empty audio & transcript');
+
+    const origGasFetch = gasSandbox.UrlFetchApp.fetch;
+    let capturedAiReq = null;
+    gasSandbox.UrlFetchApp.fetch = (url, opts) => {
+      capturedAiReq = { url: String(url), opts: opts || {} };
+      return {
+        getResponseCode: () => 200,
+        getContentText: () => JSON.stringify({
+          status: 'success',
+          model: 'models/gemini-3.8-flash',
+          data: {
+            dasar_opsional: 'Surat Undangan Evaluasi',
+            pengarahan_umum: 'Pimpinan menekankan ketepatan waktu.',
+            kesimpulan: 'Seluruh unit melakukan monitoring mingguan.',
+            transkrip_ringkas: 'Ringkasan rapat evaluasi bulanan.',
+            pembahasan: [
+              {
+                pembicara_nama: 'Atasan Satu',
+                uraian: ['Evaluasi kepatuhan laporan bulanan', 'Pemutakhiran data pegawai'],
+                tindak_lanjut: ['Kirim rekap per minggu'],
+                target: 'Laporan 100% tepat waktu',
+                penanggung_jawab: 'Panitera',
+                tanggal_penyelesaian: '28 November 2026'
+              }
+            ]
+          }
+        })
+      };
+    };
+    try {
+      const aiRpcOk = gasSandbox.generateAiNotulenRapat({
+        id_rapat: 'RPT-140-TEST',
+        agenda: 'Rapat Evaluasi Bulanan',
+        peserta_list: [{ nip: '197901012003011008', nama: 'Atasan Satu', jabatan: 'Panitera' }],
+        audio_data: 'data:audio/webm;codecs=opus;base64,UklGRg==',
+        transcript_text: 'Atasan Satu melaporkan evaluasi.'
+      }, '198001012005011001', admCutover.token);
+      assert.strictEqual(aiRpcOk.status, 'success', 'Admin generateAiNotulenRapat must succeed via n8n webhook');
+      assert.strictEqual(aiRpcOk.source, 'n8n_gemini');
+      assert(capturedAiReq && capturedAiReq.url.includes('transkep-ai-notulen'), 'generateAiNotulenRapat must post to transkep-ai-notulen webhook');
+      const sentBody = JSON.parse(capturedAiReq.opts.payload);
+      assert.strictEqual(sentBody.event, 'AI_NOTULEN_RAPAT');
+      assert.strictEqual(sentBody.secret_key, 'webhook-secret-999');
+      assert.strictEqual(sentBody.audio_mime_type, 'audio/webm');
+      assert.strictEqual(sentBody.audio_base64, 'UklGRg==');
+      assert.strictEqual(aiRpcOk.data.pembahasan[0].pembicara_nip, '197901012003011008', 'Backend AI normalizer must auto-match speaker NIP');
+      assert.strictEqual(aiRpcOk.data.pembahasan[0].uraian, '1. Evaluasi kepatuhan laporan bulanan\n2. Pemutakhiran data pegawai');
+    } finally {
+      gasSandbox.UrlFetchApp.fetch = origGasFetch;
+    }
+
+    // Frontend VM: applyAiNotulenToForm & parseLocalTranscriptToNotula (Human-in-the-Loop auto-fill + XSS safe)
+    const mkCls = () => ({ _s: new Set(), add(c) { this._s.add(c); }, remove(c) { this._s.delete(c); }, contains(c) { return this._s.has(c); } });
+    const aiDom140 = {
+      rapatFieldPengarahanUmum: { value: '' },
+      rapatFieldKesimpulan: { value: '' },
+      rapatFieldDasarNotula: { value: '' },
+      rapatFieldAiTranscript: { value: 'Arahan: Rapat dimulai tepat waktu.\nAtasan Satu: Laporan persidangan triwulan berjalan baik\nTindak Lanjut: Pertahankan ketepatan minutasi\nTarget: Minutasi 100% one day minute\nPJ: Panitera Muda <img src=x>\nTanggal Penyelesaian: 30 November 2026' },
+      rapatFieldAgenda: { value: 'Rapat Kinerja <script>alert(1)</script>' },
+      rapatFieldPemimpin: { value: 'Ketua' },
+      rapatPembahasanListContainer: { innerHTML: '' },
+      rapatCountPembicara: { innerText: '0' },
+      rapatTabPanel_undangan: { classList: mkCls() },
+      rapatTabPanel_peserta: { classList: mkCls() },
+      rapatTabPanel_notula: { classList: mkCls() },
+      rapatTabPanel_media: { classList: mkCls() },
+      rapatTabBtn_undangan: { classList: mkCls() },
+      rapatTabBtn_peserta: { classList: mkCls() },
+      rapatTabBtn_notula: { classList: mkCls() },
+      rapatTabBtn_media: { classList: mkCls() }
+    };
+    const aiVm140 = {
+      console, Date, Math, Array, Object, String, Number, Boolean, JSON,
+      localStorage: { getItem: () => '', setItem: () => {} },
+      document: { getElementById: (id) => aiDom140[id] || null },
+      vueState: {
+        usersList: [{ nip: '197901012003011008', nama: 'Atasan Satu', jabatan: 'Panitera', role: 'Pegawai' }]
+      },
+      showNotify: () => {},
+      window: {}
+    };
+    aiVm140.window = aiVm140;
+    vm.createContext(aiVm140);
+    vm.runInContext(fs.readFileSync('modules/eoffice/rapat.js', 'utf8'), aiVm140, { filename: 'modules/eoffice/rapat.js' });
+
+    const localParsed = aiVm140.parseLocalTranscriptToNotula();
+    assert(localParsed && aiDom140.rapatFieldPengarahanUmum.value.includes('Rapat dimulai tepat waktu'), 'parseLocalTranscriptToNotula must fill Pengarahan Umum');
+    assert.strictEqual(aiDom140.rapatCountPembicara.innerText, '1');
+    assert(aiDom140.rapatPembahasanListContainer.innerHTML.includes('Laporan persidangan triwulan berjalan baik'));
+    assert(!aiDom140.rapatPembahasanListContainer.innerHTML.includes('<img src=x>'), 'AI Notulis rendered table must escape HTML/XSS');
+    assert(!aiDom140.rapatTabPanel_notula.classList.contains('hidden'), 'parseLocalTranscriptToNotula must switch user to Notula review tab');
+
+    const applyStat = aiVm140.applyAiNotulenToForm({
+      dasar_opsional: 'Surat Tugas No. 123',
+      pengarahan_umum: 'Arahan Evaluasi Gemini',
+      kesimpulan: 'Keputusan Rapat AI',
+      pembahasan: [{
+        pembicara_nama: 'Atasan Satu',
+        uraian: ['Poin A', 'Poin B'],
+        tindak_lanjut: ['Aksi 1'],
+        target: 'Target OK',
+        penanggung_jawab: 'Panitera',
+        tanggal_penyelesaian: '1 Desember 2026'
+      }]
+    });
+    assert.strictEqual(applyStat.pembahasanCount, 1);
+    assert.strictEqual(aiDom140.rapatFieldDasarNotula.value, 'Surat Tugas No. 123');
+    assert.strictEqual(aiDom140.rapatFieldPengarahanUmum.value, 'Arahan Evaluasi Gemini');
+    assert(aiDom140.rapatPembahasanListContainer.innerHTML.includes('Atasan Satu (Panitera)') && aiDom140.rapatPembahasanListContainer.innerHTML.includes('1. Poin A'), 'applyAiNotulenToForm must format speaker and numbered rows into 5-column editor');
   } finally {
     browserSandbox.TranskepAPI.call = origApiCall;
     browserSandbox.TranskepFirebase.getDb = origGetDb;

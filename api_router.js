@@ -263,6 +263,7 @@ var AUTHENTICATED_RPC_METHODS_ = {
   deleteKgbDocRecord: true,
   createPaketRapatDocs: true,
   uploadFotoRapat: true,
+  generateAiNotulenRapat: true,
   saveJobdes: true,
   createPdfJobdes: true,
   getUsulanMenunggu: true,

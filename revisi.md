@@ -6742,7 +6742,7 @@ Berdasarkan tangkapan layar pengguna ([`media_1794986712224_63fb4a95.png`](file:
 ---
 
 ## RANCANGAN ROADMAP BESAR MODUL RAPAT KEDINASAN (TAHAP 137 – 140)
-**Status:** `[TAHAP 137–139 SELESAI & AKTIF (v3.8.73) | TAHAP 140 MENUNGGU EKSEKUSI BERIKUTNYA]`
+**Status:** `[TAHAP 137–140 SELESAI & AKTIF — v3.8.74]`
 
 ### 1. Tujuan & Ruang Lingkup Transformasi
 Merombak total modul **Paket Administrasi Rapat** pada menu **E-Office** agar beralih dari generator teks sederhana Google Docs menjadi sistem **Workspace Fullscreen + 3 Mesin Cetak HTML Instan (0ms) Standar PA Indramayu + Dokumentasi Foto Drive + AI Notulis Audio**, mengacu 1:1 pada contoh dokumen PDF 9 halaman dan spesifikasi tata naskah dinas yang telah disepakati bersama pengguna:
@@ -6831,26 +6831,28 @@ Merombak total modul **Paket Administrasi Rapat** pada menu **E-Office** agar be
 
 ---
 
-#### 📌 TAHAP 140 — Integrasi AI Notulis Otomatis (Rekaman Audio Rapat → Auto-Fill Notula via n8n & Gemini)
+#### ✅ TAHAP 140 [SELESAI & AKTIF — v3.8.74] — Integrasi AI Notulis Otomatis (Rekaman Audio Rapat → Auto-Fill Notula via n8n & Gemini)
+**Status Verifikasi:** `ALL 6 SECURITY & SCHEMA SUITES PASSED (0 FAILURES)` • `PWA transkep-v3.8.74`
 **Fokus:** Menghubungkan rekaman suara rapat (atau transkrip kasar) ke agen AI n8n + Google Gemini agar kolom Notula terisi otomatis secara terstruktur.
 - **File Target Baru & Diperbarui:**
-  - `n8n/transkep-ai-notulen.example.json` (blueprint workflow n8n Webhook + Gemini Multimodal Audio/Text JSON Extractor)
-  - `modules/eoffice/rapat.js`, `modules/eoffice/view_eoffice.html`, & `modules/eoffice/eoffice_data.js`
-  - `tests/verify_n8n_workflow.js` & `tests/verify_fase3b.js`
+  - `n8n/transkep-ai-notulen.example.json` (blueprint workflow n8n Webhook + Gemini Multimodal Audio/Text JSON Extractor) & `n8n/README.md`
+  - `eoffice/rapat.js`, `api_router.js`, `modules/eoffice/eoffice_data.js`, `modules/eoffice/rapat.js`, `modules/eoffice/view_eoffice.html`, `index.html`, `sw.js`
+  - `tests/verify_n8n_ai_assistant.js` & `tests/verify_fase3b.js`
 - **Detail Teknis Tahap 140:**
   1. **Alur Audio Cerdas & Tangguh:**
-     - Pada **Tab AI Notulis & Rekaman** di popup Rapat, tersedia pilihan **Upload File Rekaman Audio** (`.mp3`, `.m4a`, `.wav`, `.ogg`, `.webm`) lengkap dengan **kompresi/resampling audio ringan** atau **Rekam Langsung dari Mikrofon Browser**, plus kolom cadangan **Paste Teks/Catatan Kasar** (jika rekaman berdurasi sangat panjang atau kendala koneksi).
+     - Pada **Tab AI Notulis & Rekaman** di popup Rapat, tersedia pilihan **Upload File Rekaman Audio** (`.mp3`, `.m4a`, `.wav`, `.ogg`, `.webm`) lengkap dengan **resampling WAV mono 16 kHz ringan** dan **Rekam Langsung dari Mikrofon Browser (`MediaRecorder`)**, plus kolom cadangan **Paste Teks/Catatan Kasar** dengan tombol **`Susun Cepat dari Teks`** maupun eksekusi penuh **`Proses AI Notulis`**.
   2. **Endpoint n8n AI Notulen (`Gemini Multimodal`):**
-     - Audio dikirim dengan proteksi autentikasi ke webhook n8n Docker → diproses oleh **Gemini API** (ekstraksi suara langsung + pemetaan pembicara) dengan skema keluaran **Strict JSON**:
-       `{ dasar_opsional, pengarahan_umum, pembahasan: [{ pembicara, uraian[], tindak_lanjut[], target, penanggung_jawab, tanggal_penyelesaian }] }`.
+     - Audio & metadata rapat dikirim terautentikasi via RPC `generateAiNotulenRapat` ke webhook n8n (`transkep-ai-notulen`) → diproses oleh **Gemini API (`models/gemini-3.8-flash`)** dengan skema keluaran **Strict JSON**:
+       `{ dasar_opsional, pengarahan_umum, kesimpulan, transkrip_ringkas, pembahasan: [{ pembicara_nama, pembicara_nip, pembicara_jabatan, uraian[], tindak_lanjut[], target, penanggung_jawab, tanggal_penyelesaian }] }`.
   3. **Auto-Fill & Human-in-the-Loop Review:**
-     - Setelah selesai diproses, hasil AI otomatis diisikan ke field **Pengarahan Umum** dan baris-baris **5 Kolom Kiri-ke-Kanan** di Tab Notula, lengkap dengan notifikasi agar Notulis dapat meninjau/mengoreksi ejaan nama sebelum menyimpan dan mencetak.
+     - Setelah selesai diproses, `applyAiNotulenToForm` & `parseLocalTranscriptToNotula` otomatis mengisi **Pengarahan Umum**, **Kesimpulan**, dan baris **5 Kolom Kiri-ke-Kanan** di Tab Notula sambil mencocokkan NIP/jabatan pembicara, lalu berpindah ke Tab Notula agar Notulis meninjau sebelum menyimpan dan mencetak.
 
 ---
 
-### 3. Kebutuhan Verifikasi & Pengujian Bertahap
-- Setiap tahap wajib lulus **seluruh 6 test suite** (`npm test`), termasuk sinkronisasi skema `firestore.rules` ↔ `core/firebase.js` (Parity Test), pengecekan sintaks & keamanan XSS (`escHtml`), isolasi proxy Drive (nol `ANYONE_WITH_LINK`), serta sinkronisasi nomor versi PWA di `index.html` & `sw.js`.
-- **Menunggu Persetujuan Pengguna:** Eksekusi **Tahap 137** baru akan dimulai setelah pengguna memberikan persetujuan (**`"OKE TERAPKAN"`**).
+### 3. Kebutuhan Verifikasi & Status Akhir Roadmap (Tahap 137–140)
+- Seluruh 4 tahap (**Tahap 137 s.d. Tahap 140**) telah selesai diterapkan dan lulus **seluruh 6 test suite** (`npm test`), mencakup sinkronisasi skema `firestore.rules` ↔ `core/firebase.js` (Parity Test), pengecekan sintaks & keamanan XSS (`escHtml`), isolasi proxy Drive (nol `ANYONE_WITH_LINK`), validasi workflow n8n (`transkep-ai-assistant` & `transkep-ai-notulen`), serta sinkronisasi nomor versi PWA **`v3.8.74`** di `index.html` & `sw.js`.
+- **Branch:** `main` (tersinkronisasi ke `origin/main` dan `prod/main`).
+- **Aktivasi Pengguna:** Lakukan hard refresh browser (`Ctrl + Shift + R`), deploy ulang Google Apps Script (untuk `uploadFotoRapat` & `generateAiNotulenRapat`), dan impor blueprint `n8n/transkep-ai-notulen.example.json` ke n8n apabila ingin memakai ekstraksi audio AI penuh.
 
 
 

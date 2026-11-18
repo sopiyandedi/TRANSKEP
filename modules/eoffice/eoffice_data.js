@@ -1037,6 +1037,27 @@ const EofficeDataService = {
   },
 
   /**
+   * Memproses rekaman audio dan/atau catatan mentah rapat menjadi Draft Notula via Webhook n8n & Gemini
+   */
+  async requestAiNotulenRapat(aiPayload, adminNip, token) {
+    const authToken = token || (typeof localStorage !== 'undefined' ? localStorage.getItem('transkep_session_token') : '') || '';
+    const creatorNip = adminNip || (typeof localStorage !== 'undefined' ? localStorage.getItem('transkep_active_nip') : '') || '';
+
+    if (typeof window !== 'undefined' && window.TranskepAPI && typeof window.TranskepAPI.call === 'function') {
+      return await window.TranskepAPI.call('generateAiNotulenRapat', aiPayload, creatorNip, authToken);
+    }
+    if (typeof google !== 'undefined' && google.script && google.script.run) {
+      return await new Promise((resolve, reject) => {
+        google.script.run
+          .withSuccessHandler((r) => resolve(r))
+          .withFailureHandler((err) => reject(err))
+          .generateAiNotulenRapat(aiPayload, creatorNip, authToken);
+      });
+    }
+    return { status: 'error', message: 'Koneksi backend Apps Script belum tersedia untuk AI Notulis.' };
+  },
+
+  /**
    * Menerbitkan paket dokumen rapat 3-in-1 ke Google Docs dan menyimpannya ke Cloud Firestore
    */
   createPaketRapat(payload, adminNip, token) {

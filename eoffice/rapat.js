@@ -96,6 +96,361 @@ function uploadFotoRapat(payload, adminNip, clientToken) {
 }
 
 /**
+ * Helper: Mengubah list/teks poin AI menjadi teks multiline terstruktur
+ */
+function formatAiPointListText_(val) {
+  if (Array.isArray(val)) {
+    const clean = val.map(function (item) {
+      return String(item == null ? '' : item).trim();
+    }).filter(Boolean);
+    if (clean.length === 0) return '';
+    if (clean.length === 1) return clean[0];
+    return clean.map(function (line, i) {
+      return (i + 1) + '. ' + line;
+    }).join('\n');
+  }
+  return String(val == null ? '' : val).trim();
+}
+
+/**
+ * Helper: Mencocokkan nama pembicara hasil AI dengan daftar peserta rapat agar NIP & Jabatan terisi otomatis
+ */
+function matchSpeakerFromPesertaList_(speakerName, pesertaList) {
+  const target = String(speakerName || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+  if (!target || !Array.isArray(pesertaList) || pesertaList.length === 0) return null;
+
+  let best = null;
+  for (let i = 0; i < pesertaList.length; i++) {
+    const p = pesertaList[i];
+    if (!p) continue;
+    const rawName = String(typeof p === 'string' ? p : (p.nama || p.label || '')).trim();
+    const rawJab = String(typeof p === 'string' ? '' : (p.jabatan || '')).trim();
+    const rawNip = String(typeof p === 'string' ? '' : (p.nip || '')).trim();
+    const cleanNama = rawName.split(',')[0].toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+    if (!cleanNama || cleanNama.length < 3) continue;
+
+    if (target.indexOf(cleanNama) !== -1 || cleanNama.indexOf(target) !== -1) {
+      best = { nip: rawNip, nama: rawName, jabatan: rawJab };
+      break;
+    }
+    const firstWord = cleanNama.split(' ')[0];
+    if (firstWord && firstWord.length >= 4 && target.indexOf(firstWord) !== -1) {
+      best = { nip: rawNip, nama: rawName, jabatan: rawJab };
+    }
+  }
+  return best;
+}
+
+/**
+ * Helper: Normalisasi output JSON Notula dari n8n / Gemini menjadi format 5 kolom Notula Rapat PA Indramayu
+ */
+function normalizeAiNotulenResponse_(rawObj, payload) {
+  const src = (rawObj && rawObj.data && typeof rawObj.data === 'object') ? rawObj.data : (rawObj || {});
+  let pesertaList = [];
+  if (payload && Array.isArray(payload.peserta_list)) {
+    pesertaList = payload.peserta_list;
+  } else if (payload && typeof payload.peserta_list === 'string' && payload.peserta_list.trim()) {
+    try {
+      const parsedP = JSON.parse(payload.peserta_list);
+      if (Array.isArray(parsedP)) pesertaList = parsedP;
+    } catch (eP) {}
+  }
+
+  const rawRows = Array.isArray(src.pembahasan) ? src.pembahasan : [];
+  const pembahasan = rawRows.slice(0, 30).map(function (row, idx) {
+    const r = (row && typeof row === 'object') ? row : {};
+    let nama = String(r.pembicara_nama || r.pembicara || ('Pembicara #' + (idx + 1))).trim();
+    let nip = String(r.pembicara_nip || '').trim();
+    let jabatan = String(r.pembicara_jabatan || '').trim();
+
+    if (!nip || !jabatan) {
+      const matched = matchSpeakerFromPesertaList_(nama, pesertaList);
+      if (matched) {
+        if (!nip && matched.nip) nip = matched.nip;
+        if (!jabatan && matched.jabatan) jabatan = matched.jabatan;
+        if (nama.indexOf('(') === -1 && matched.nama) {
+          nama = matched.nama + (matched.jabatan ? ' (' + matched.jabatan + ')' : '');
+        }
+      }
+    }
+
+    const uraianStr = formatAiPointListText_(r.uraian_text || r.uraian);
+    const tindakStr = formatAiPointListText_(r.tindak_lanjut_text || r.tindak_lanjut);
+    return {
+      pembicara_nama: nama,
+      pembicara_nip: nip,
+      pembicara_jabatan: jabatan,
+      uraian: uraianStr,
+      tindak_lanjut: tindakStr,
+      target: String(r.target || '').trim(),
+      penanggung_jawab: String(r.penanggung_jawab || '').trim(),
+      tanggal_penyelesaian: String(r.tanggal_penyelesaian || '').trim()
+    };
+  });
+
+  return {
+    dasar_opsional: String(src.dasar_opsional || '').trim(),
+    pengarahan_umum: String(src.pengarahan_umum || '').trim(),
+    kesimpulan: String(src.kesimpulan || '').trim(),
+    transkrip_ringkas: String(src.transkrip_ringkas || '').trim(),
+    pembahasan: pembahasan
+  };
+}
+
+/**
+ * Helper Fallback: Penyusun deterministik catatan mentah/transkrip menjadi draf Pengarahan + 5 Kolom Pembahasan
+ */
+function parseTranscriptFallbackRapat_(transcriptText, payload) {
+  const cleanText = String(transcriptText || '').trim();
+  const p = payload || {};
+  const lines = cleanText.split(/\r?\n/).map(function (l) { return l.trim(); }).filter(Boolean);
+  let pesertaList = Array.isArray(p.peserta_list) ? p.peserta_list : [];
+
+  let pengarahanParts = [];
+  let kesimpulanParts = [];
+  let pembahasan = [];
+  let currentSpeaker = null;
+
+  lines.forEach(function (line) {
+    const lower = line.toLowerCase();
+    if (/^(?:arahan|pengarahan|pimpinan)\s*:/i.test(line)) {
+      pengarahanParts.push(line.replace(/^[^:]+:\s*/, '').trim());
+      return;
+    }
+    if (/^(?:kesimpulan|keputusan)\s*:/i.test(line)) {
+      kesimpulanParts.push(line.replace(/^[^:]+:\s*/, '').trim());
+      return;
+    }
+
+    const spkMatch = line.match(/^(?:\d+\.\s*)?([A-Za-z0-9.,()\-\/\s]{3,80}?)\s*:\s*(.+)$/);
+    if (spkMatch && !/^https?$/i.test(spkMatch[1])) {
+      const spkName = spkMatch[1].trim();
+      const bodyText = spkMatch[2].trim();
+      if (/^tindak\s*lanjut$/i.test(spkName) && currentSpeaker) {
+        currentSpeaker.tindak_lanjut.push(bodyText);
+        return;
+      }
+      if (/^target$/i.test(spkName) && currentSpeaker) {
+        currentSpeaker.target = bodyText;
+        return;
+      }
+      if (/^(?:pj|penanggung\s*jawab)$/i.test(spkName) && currentSpeaker) {
+        currentSpeaker.penanggung_jawab = bodyText;
+        return;
+      }
+      if (/^(?:tanggal|tgl|deadline)(?:\s+penyelesaian)?$/i.test(spkName) && currentSpeaker) {
+        currentSpeaker.tanggal_penyelesaian = bodyText;
+        return;
+      }
+
+      const matched = matchSpeakerFromPesertaList_(spkName, pesertaList);
+      currentSpeaker = {
+        pembicara_nama: matched ? (matched.nama + (matched.jabatan ? ' (' + matched.jabatan + ')' : '')) : spkName,
+        pembicara_nip: matched ? (matched.nip || '') : '',
+        pembicara_jabatan: matched ? (matched.jabatan || '') : '',
+        uraian: [bodyText],
+        tindak_lanjut: [],
+        target: '',
+        penanggung_jawab: matched ? (matched.jabatan || matched.nama || '') : spkName,
+        tanggal_penyelesaian: ''
+      };
+      pembahasan.push(currentSpeaker);
+      return;
+    }
+
+    if (currentSpeaker) {
+      if (lower.indexOf('tindak lanjut') !== -1 || lower.indexOf('solusi') !== -1) {
+        currentSpeaker.tindak_lanjut.push(line);
+      } else {
+        currentSpeaker.uraian.push(line);
+      }
+    } else {
+      pengarahanParts.push(line);
+    }
+  });
+
+  if (pembahasan.length === 0 && lines.length > 0) {
+    pembahasan.push({
+      pembicara_nama: String(p.pemimpin || 'Pembahasan Umum Rapat').trim(),
+      pembicara_nip: '',
+      pembicara_jabatan: '',
+      uraian: lines,
+      tindak_lanjut: kesimpulanParts.length > 0 ? kesimpulanParts : ['Ditindaklanjuti sesuai hasil rapat.'],
+      target: 'Terselesaikannya agenda ' + String(p.agenda || 'rapat').trim(),
+      penanggung_jawab: String(p.pemimpin || 'Tim Terkait').trim(),
+      tanggal_penyelesaian: 'Segera'
+    });
+  }
+
+  return normalizeAiNotulenResponse_({
+    dasar_opsional: '',
+    pengarahan_umum: pengarahanParts.join('\n') || ('Arahan pimpinan terkait ' + String(p.agenda || 'rapat kedinasan') + '.'),
+    kesimpulan: kesimpulanParts.join('\n') || 'Rapat menyepakati tindak lanjut dari seluruh poin pembahasan.',
+    transkrip_ringkas: cleanText,
+    pembahasan: pembahasan
+  }, p);
+}
+
+/**
+ * RPC Aman: Ekstraksi Rekaman Audio / Transkrip Rapat menjadi Draft Notula Terstruktur via n8n + Gemini
+ */
+function generateAiNotulenRapat(payload, adminNip, clientToken) {
+  try {
+    if (!cekOtorisasiAdmin(adminNip, clientToken)) {
+      return { status: 'error', message: 'Akses Ditolak: Fitur AI Notulis Rapat hanya dapat dijalankan oleh Admin/Operator.' };
+    }
+
+    const p = payload || {};
+    const rawAudio = String(p.audio_data || p.audio_base64 || '').trim();
+    const transcriptText = String(p.transcript_text || p.ai_transcript || '').trim();
+
+    if (!rawAudio && !transcriptText) {
+      return { status: 'error', message: 'Silakan unggah rekaman audio rapat atau isi catatan/transkrip mentah terlebih dahulu.' };
+    }
+
+    let cleanAudioBase64 = '';
+    let audioMimeType = '';
+    if (rawAudio) {
+      const dataUriMatch = rawAudio.match(/^data:([^;,]+)(?:;[^,]*)?;base64,(.+)$/i);
+      const declaredMime = dataUriMatch ? dataUriMatch[1] : String(p.audio_mime_type || p.mime_type || 'audio/webm');
+      audioMimeType = String(declaredMime || 'audio/webm').split(';')[0].trim().toLowerCase();
+      if (!/^audio\/(webm|ogg|mp3|mpeg|mp4|m4a|wav|x-wav|aac|flac)$/i.test(audioMimeType)) {
+        return { status: 'error', message: 'Format audio tidak didukung (' + audioMimeType + '). Gunakan .webm, .ogg, .mp3, .m4a, atau .wav.' };
+      }
+      cleanAudioBase64 = String(dataUriMatch ? dataUriMatch[2] : rawAudio).replace(/\s+/g, '');
+      if (cleanAudioBase64.length > 12 * 1024 * 1024) {
+        return { status: 'error', message: 'Ukuran rekaman audio melebihi batas aman (maks. ~9 MB per pengiriman).' };
+      }
+    }
+
+    const props = PropertiesService.getScriptProperties();
+    const n8nWebhookUrl = String(
+      props.getProperty('N8N_WEBHOOK_AI_NOTULEN') ||
+      'https://supernova-endpoint-unsubtly.ngrok-free.dev/webhook/transkep-ai-notulen'
+    ).trim();
+    const webhookSecret = String(props.getProperty('TRANSKEP_WEBHOOK_KEY') || 'TRANSKEP_WA_BOT_2026').trim();
+
+    const outboundPayload = {
+      event: 'AI_NOTULEN_RAPAT',
+      secret_key: webhookSecret,
+      id_rapat: String(p.id_rapat || 'RPT-DRAFT').trim(),
+      agenda: String(p.agenda || 'Rapat Kedinasan').trim(),
+      hari_tanggal: String(p.hari_tanggal || '').trim(),
+      tempat: String(p.tempat || '').trim(),
+      pemimpin: String(p.pemimpin || '').trim(),
+      notulis: String(p.notulis || '').trim(),
+      peserta_list: Array.isArray(p.peserta_list) ? p.peserta_list.slice(0, 50) : [],
+      transcript_text: transcriptText,
+      audio_base64: cleanAudioBase64,
+      audio_mime_type: audioMimeType
+    };
+
+    let lastErrorMsg = '';
+    if (n8nWebhookUrl) {
+      try {
+        const resp = UrlFetchApp.fetch(n8nWebhookUrl, {
+          method: 'post',
+          contentType: 'application/json',
+          payload: JSON.stringify(outboundPayload),
+          muteHttpExceptions: true
+        });
+        const code = Number(resp.getResponseCode() || 0);
+        const rawBody = String(resp.getContentText() || '').trim();
+        if (code >= 200 && code < 300 && rawBody) {
+          let parsed = null;
+          try {
+            parsed = JSON.parse(rawBody);
+          } catch (eJson) {
+            parsed = null;
+          }
+          if (parsed && (parsed.status === 'success' || parsed.pengarahan_umum || parsed.pembahasan || (parsed.data && parsed.data.pembahasan))) {
+            const normalized = normalizeAiNotulenResponse_(parsed, p);
+            return {
+              status: 'success',
+              source: 'n8n_gemini',
+              model: String(parsed.model || 'models/gemini-3.8-flash'),
+              data: normalized
+            };
+          }
+          if (parsed && parsed.status === 'error' && parsed.message) {
+            lastErrorMsg = String(parsed.message);
+          } else {
+            lastErrorMsg = 'Respons webhook n8n tidak sesuai format JSON Notula.';
+          }
+        } else {
+          lastErrorMsg = 'Webhook n8n mengembalikan HTTP ' + code;
+        }
+      } catch (eN8n) {
+        lastErrorMsg = 'Gagal terhubung ke webhook n8n AI Notulen: ' + eN8n.toString();
+      }
+    }
+
+    // Fallback opsional ke Gemini REST langsung bila GEMINI_API_KEY diset di ScriptProperties
+    const directGeminiKey = String(props.getProperty('GEMINI_API_KEY') || '').trim();
+    if (directGeminiKey) {
+      try {
+        const parts = [];
+        if (cleanAudioBase64) {
+          parts.push({ inline_data: { mime_type: audioMimeType || 'audio/webm', data: cleanAudioBase64 } });
+        }
+        parts.push({
+          text: 'Susun Notula Rapat Kedinasan PA Indramayu dalam JSON murni { dasar_opsional, pengarahan_umum, kesimpulan, transkrip_ringkas, pembahasan: [{ pembicara_nama, pembicara_nip, pembicara_jabatan, uraian: [], tindak_lanjut: [], target, penanggung_jawab, tanggal_penyelesaian }] }.\nAgenda: ' +
+            outboundPayload.agenda + '\nPimpinan: ' + outboundPayload.pemimpin + '\nCatatan: ' + (transcriptText || '-')
+        });
+        const geminiResp = UrlFetchApp.fetch(
+          'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=' + encodeURIComponent(directGeminiKey),
+          {
+            method: 'post',
+            contentType: 'application/json',
+            payload: JSON.stringify({
+              contents: [{ role: 'user', parts: parts }],
+              generationConfig: { temperature: 0.2, responseMimeType: 'application/json' }
+            }),
+            muteHttpExceptions: true
+          }
+        );
+        if (Number(geminiResp.getResponseCode() || 0) === 200) {
+          const gJson = JSON.parse(geminiResp.getContentText() || '{}');
+          const txt = gJson && gJson.candidates && gJson.candidates[0] && gJson.candidates[0].content &&
+            gJson.candidates[0].content.parts && gJson.candidates[0].content.parts[0]
+            ? String(gJson.candidates[0].content.parts[0].text || '')
+            : '';
+          if (txt) {
+            const cleaned = txt.trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/i, '').trim();
+            const parsedG = JSON.parse(cleaned);
+            return {
+              status: 'success',
+              source: 'gemini_direct',
+              model: 'models/gemini-3.8-flash',
+              data: normalizeAiNotulenResponse_(parsedG, p)
+            };
+          }
+        }
+      } catch (eGem) {
+        lastErrorMsg = (lastErrorMsg ? lastErrorMsg + ' | ' : '') + 'Gemini direct error: ' + eGem.toString();
+      }
+    }
+
+    if (p.allow_text_fallback === true && transcriptText) {
+      return {
+        status: 'success',
+        source: 'local_fallback',
+        message: 'Disusun dari catatan teks lokal karena layanan AI n8n sedang tidak tersedia (' + (lastErrorMsg || 'offline') + ').',
+        data: parseTranscriptFallbackRapat_(transcriptText, p)
+      };
+    }
+
+    return {
+      status: 'error',
+      message: lastErrorMsg || 'Gagal memproses AI Notulis Rapat via n8n & Gemini.'
+    };
+  } catch (err) {
+    Logger.log('ERROR generateAiNotulenRapat: ' + err.toString());
+    return { status: 'error', message: err.message || err.toString() };
+  }
+}
+
+/**
  * Helper: Menambahkan Kop Surat Standar PA Indramayu pada Google Docs
  */
 function appendKopSuratPaIndramayu_(body) {
