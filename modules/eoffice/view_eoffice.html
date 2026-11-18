@@ -217,7 +217,8 @@
 
                 <!-- Aksi Khusus KGB: 4 IKON KONTROL (EDIT, KIRIM TTE, CETAK, DELETE) -->
                 <div v-if="item.itemType === 'KGB'" class="flex items-center justify-end gap-1.5">
-                  <button type="button" v-if="item.fileDocUrl" @click="openSecureFile(item.fileDocUrl, item.title || 'Dokumen KGB')"
+                  <button type="button" v-if="item.fileDocUrl"
+                    @click="openSecureFile(item.fileDocUrl, item.title || 'Dokumen KGB')"
                     class="w-8 h-8 rounded-lg bg-blue-500/10 hover:bg-blue-500 text-blue-400 hover:text-white border border-blue-500/30 transition flex items-center justify-center shadow-sm cursor-pointer"
                     title="Buka File Dokumen KGB (Proxy Aman)">
                     <i class="fa-solid fa-file-word text-xs"></i>
@@ -260,17 +261,20 @@
                     <i class="fa-solid fa-folder-open"></i>
                   </button>
 
-                  <button type="button" v-if="item.docUndanganUrl" @click="openSecureFile(item.docUndanganUrl, 'Undangan Rapat')"
+                  <button type="button" v-if="item.docUndanganUrl"
+                    @click="openSecureFile(item.docUndanganUrl, 'Undangan Rapat')"
                     class="px-2 py-1 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/20 font-bold rounded-lg text-[10px] transition cursor-pointer"
                     title="Undangan">
                     Undangan
                   </button>
-                  <button type="button" v-if="item.docAbsenUrl" @click="openSecureFile(item.docAbsenUrl, 'Daftar Hadir Rapat')"
+                  <button type="button" v-if="item.docAbsenUrl"
+                    @click="openSecureFile(item.docAbsenUrl, 'Daftar Hadir Rapat')"
                     class="px-2 py-1 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/20 font-bold rounded-lg text-[10px] transition cursor-pointer"
                     title="Daftar Hadir">
                     Absen
                   </button>
-                  <button type="button" v-if="item.docNotulenUrl" @click="openSecureFile(item.docNotulenUrl, 'Notulen Rapat')"
+                  <button type="button" v-if="item.docNotulenUrl"
+                    @click="openSecureFile(item.docNotulenUrl, 'Notulen Rapat')"
                     class="px-2 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 font-bold rounded-lg text-[10px] transition cursor-pointer"
                     title="Notulen">
                     Notulen
@@ -405,7 +409,9 @@
               <i class="fa-solid fa-envelope text-indigo-400"></i>
               <h4 class="font-bold text-slate-200 uppercase tracking-wider text-[11px]">1. Identitas Surat Dinas</h4>
             </div>
-            <span id="kgbMysimsBadge" class="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-indigo-500/15 text-indigo-300 border border-indigo-500/30">Otomatis minta No. Ketua MYSIMS</span>
+            <span id="kgbMysimsBadge"
+              class="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-indigo-500/15 text-indigo-300 border border-indigo-500/30">Otomatis
+              minta No. Ketua MYSIMS</span>
           </div>
 
           <div class="grid grid-cols-1 md:grid-cols-12 gap-3">
@@ -414,17 +420,22 @@
 
             <!-- Nomor Surat Lengkap (Satu-satunya kolom nomor yang tampil) -->
             <div class="md:col-span-5">
-              <label class="block text-[10px] font-bold text-indigo-300 uppercase tracking-wider mb-1">Nomor Surat (KGB)</label>
-              <input type="text" id="kgbFieldNomorSurat" oninput="handleInputNomorSuratKgb(this.value)" onblur="formatNomorSuratKgbOnBlur(this)" placeholder=".../KPA.W10-A2/KP2.1.2/XI/2026"
+              <label class="block text-[10px] font-bold text-indigo-300 uppercase tracking-wider mb-1">Nomor Surat
+                (KGB)</label>
+              <input type="text" id="kgbFieldNomorSurat" oninput="handleInputNomorSuratKgb(this.value)"
+                onblur="formatNomorSuratKgbOnBlur(this)" placeholder=".../KPA.W10-A2/KP2.1.2/XI/2026"
                 class="w-full px-3 py-2 bg-slate-900 border border-indigo-500/40 rounded-xl text-white font-mono font-bold text-xs focus:ring-1 focus:ring-indigo-500 outline-none">
-              <span class="block text-[10px] text-slate-400 mt-1 font-mono">Format Baku: <strong class="text-indigo-400">.../KPA.W10-A2/KP2.1.2/{{bulan}}/{{tahun}}</strong></span>
+              <span class="block text-[10px] text-slate-400 mt-1 font-mono">Format Baku: <strong
+                  class="text-indigo-400">.../KPA.W10-A2/KP2.1.2/{{bulan}}/{{tahun}}</strong></span>
             </div>
 
             <!-- Tanggal Surat -->
             <div class="md:col-span-3">
               <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Tanggal
                 Surat</label>
-              <input type="date" id="kgbFieldTanggalSurat" oninput="syncTanggalSuratKgbOtomatis(); updateKgbDatePreview('kgbFieldTanggalSurat', 'kgbPreviewTanggalSurat')" onchange="syncTanggalSuratKgbOtomatis(); updateKgbDatePreview('kgbFieldTanggalSurat', 'kgbPreviewTanggalSurat')"
+              <input type="date" id="kgbFieldTanggalSurat"
+                oninput="syncTanggalSuratKgbOtomatis(); updateKgbDatePreview('kgbFieldTanggalSurat', 'kgbPreviewTanggalSurat')"
+                onchange="syncTanggalSuratKgbOtomatis(); updateKgbDatePreview('kgbFieldTanggalSurat', 'kgbPreviewTanggalSurat')"
                 class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-slate-200 text-xs focus:ring-1 focus:ring-indigo-500 outline-none">
               <span id="kgbPreviewTanggalSurat" class="block text-[10px] text-slate-400 mt-1 font-medium"></span>
             </div>
@@ -466,7 +477,8 @@
             <div class="md:col-span-3">
               <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Tanggal Lahir
                 <span class="text-[9px] font-normal text-blue-400">(Otomatis NIP)</span></label>
-              <input type="date" id="kgbFieldTglLahir" onchange="updateKgbDatePreview('kgbFieldTglLahir', 'kgbPreviewTglLahir')"
+              <input type="date" id="kgbFieldTglLahir"
+                onchange="updateKgbDatePreview('kgbFieldTglLahir', 'kgbPreviewTglLahir')"
                 class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-slate-200 text-xs focus:ring-1 focus:ring-indigo-500 outline-none">
               <span id="kgbPreviewTglLahir" class="block text-[10px] text-slate-400 mt-1 font-medium"></span>
             </div>
@@ -509,7 +521,8 @@
               </h4>
             </div>
             <div class="flex items-center gap-2">
-              <button type="button" onclick="autoHitungGajiLamaKgb(true)" title="Hitung ulang gaji lama berdasarkan tabel PP 5/2024"
+              <button type="button" onclick="autoHitungGajiLamaKgb(true)"
+                title="Hitung ulang gaji lama berdasarkan tabel PP 5/2024"
                 class="px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 transition flex items-center gap-1">
                 <i class="fa-solid fa-calculator"></i>Hitung dari Tabel
               </button>
@@ -522,7 +535,8 @@
 
           <div class="grid grid-cols-1 md:grid-cols-12 gap-3">
             <div class="md:col-span-3">
-              <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Golongan SK Lama</label>
+              <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Golongan SK
+                Lama</label>
               <select id="kgbFieldGolonganLama" onchange="autoHitungGajiLamaKgb()"
                 class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-amber-300 font-bold text-xs focus:ring-1 focus:ring-indigo-500 outline-none">
                 <option value="">-- Pilih Golongan --</option>
@@ -563,7 +577,8 @@
             <div class="md:col-span-3">
               <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Tanggal SK
                 Lama</label>
-              <input type="date" id="kgbFieldTanggalSkLama" onchange="updateKgbDatePreview('kgbFieldTanggalSkLama', 'kgbPreviewTanggalSkLama')"
+              <input type="date" id="kgbFieldTanggalSkLama"
+                onchange="updateKgbDatePreview('kgbFieldTanggalSkLama', 'kgbPreviewTanggalSkLama')"
                 class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-slate-200 text-xs focus:ring-1 focus:ring-indigo-500 outline-none">
               <span id="kgbPreviewTanggalSkLama" class="block text-[10px] text-slate-400 mt-1 font-medium"></span>
             </div>
@@ -578,7 +593,8 @@
             <div class="md:col-span-3">
               <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">TMT Gaji
                 Lama</label>
-              <input type="date" id="kgbFieldTmtLama" onchange="updateKgbDatePreview('kgbFieldTmtLama', 'kgbPreviewTmtLama')"
+              <input type="date" id="kgbFieldTmtLama"
+                onchange="updateKgbDatePreview('kgbFieldTmtLama', 'kgbPreviewTmtLama')"
                 class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-slate-200 text-xs focus:ring-1 focus:ring-indigo-500 outline-none">
               <span id="kgbPreviewTmtLama" class="block text-[10px] text-slate-400 mt-1 font-medium"></span>
             </div>
@@ -586,8 +602,8 @@
             <div class="md:col-span-2">
               <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">MKG Lama
                 (Thn)</label>
-              <input type="number" min="0" id="kgbFieldTahunLama" oninput="handleTahunLamaInput(this.value); autoHitungGajiLamaKgb()"
-                placeholder="2"
+              <input type="number" min="0" id="kgbFieldTahunLama"
+                oninput="handleTahunLamaInput(this.value); autoHitungGajiLamaKgb()" placeholder="2"
                 class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-slate-200 font-bold text-xs focus:ring-1 focus:ring-indigo-500 outline-none">
             </div>
 
@@ -620,7 +636,8 @@
 
           <div class="grid grid-cols-1 md:grid-cols-12 gap-3">
             <div class="md:col-span-3">
-              <label class="block text-[10px] font-bold text-indigo-300 uppercase tracking-wider mb-1">Golongan Baru</label>
+              <label class="block text-[10px] font-bold text-indigo-300 uppercase tracking-wider mb-1">Golongan
+                Baru</label>
               <select id="kgbFieldGolonganBaru" onchange="autoHitungGajiBaruKgb()"
                 class="w-full px-3 py-2 bg-slate-900 border border-indigo-500/40 rounded-xl text-emerald-300 font-bold text-xs focus:ring-2 focus:ring-indigo-500 outline-none">
                 <option value="">-- Pilih Golongan --</option>
@@ -666,7 +683,8 @@
             <div class="md:col-span-2">
               <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">MKG Baru
                 (Thn)</label>
-              <input type="number" min="0" id="kgbFieldTahunBaru" oninput="syncMkgCombinedFields(); autoHitungGajiBaruKgb()" placeholder="4"
+              <input type="number" min="0" id="kgbFieldTahunBaru"
+                oninput="syncMkgCombinedFields(); autoHitungGajiBaruKgb()" placeholder="4"
                 class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-white font-bold text-xs focus:ring-1 focus:ring-indigo-500 outline-none">
             </div>
 
@@ -689,7 +707,8 @@
             <div class="md:col-span-3">
               <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Kenaikan Gaji YAD
                 (+2 Thn)</label>
-              <input type="date" id="kgbFieldTmtYad" onchange="updateKgbDatePreview('kgbFieldTmtYad', 'kgbPreviewTmtYad')"
+              <input type="date" id="kgbFieldTmtYad"
+                onchange="updateKgbDatePreview('kgbFieldTmtYad', 'kgbPreviewTmtYad')"
                 class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-indigo-300 font-bold text-xs focus:ring-1 focus:ring-indigo-500 outline-none">
               <span id="kgbPreviewTmtYad" class="block text-[10px] text-indigo-300 mt-1 font-medium"></span>
             </div>

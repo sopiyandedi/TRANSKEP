@@ -44,8 +44,8 @@
       max-width: 216mm;
       min-height: 356mm;
       margin: 0 auto;
-      /* ⬇️ TAG 1: PADDING MARGIN KERTAS LEGAL (Atas 9mm / 0.9cm, Kanan 16mm / 1.6cm, Bawah 10mm / 1.0cm, Kiri 20mm / 2.0cm) ⬇️ */
-      padding: 9mm 16mm 10mm 20mm;
+      /* ⬇️ TAG 1: PADDING MARGIN KERTAS LEGAL (Atas 9mm / 0.9cm, Kanan 12mm / 1.2cm, Bawah 10mm / 1.0cm, Kiri 20mm / 2.0cm) ⬇️ */
+      padding: 9mm 12mm 10mm 20mm;
       box-sizing: border-box;
       font-family: 'Bookman Old Style', 'Times New Roman', serif;
       font-size: 12pt;
@@ -159,13 +159,13 @@
 
     .kgb-col-no {
       /* ⬇️ TAG 6C: Lebar kolom nomor/huruf poin (1., 2., a., b., 6., dsb) ⬇️ */
-      width: 22px;
+      width: 20px;
       text-align: left;
     }
 
     .kgb-col-label {
       /* ⬇️ TAG 6D: Lebar kolom nama atribut/label (dimajukan sejajar garis kuning agar kolom nilai lebih lega) ⬇️ */
-      width: 163px;
+      width: 138px;
       white-space: nowrap;
       padding-right: 2px;
     }
@@ -289,9 +289,8 @@
 
     <!-- 3. KEPADA YTH (12pt, LURUS 92px) -->
     <div class="kgb-tujuan-box">
-      Kepada<br>
-      Yth. Kepala Kantor Pelayanan Perbendaharaan<br>
-      Negara Cirebon<br>
+      Kepada Yth.<br>
+      Kepala Kantor Pelayanan Perbendaharaan Negara Cirebon<br>
       di-<br>
       <!-- ⬇️ HILANGKAN UNDERLINE PADA CIREBON & INDENTASI 36px ⬇️ -->
       <div style="margin-left: 36px; letter-spacing: 2px;">Cirebon</div>
@@ -371,7 +370,7 @@
         <td class="kgb-col-no">e.</td>
         <td class="kgb-col-label">Masa kerja golongan</td>
         <td class="kgb-col-colon">:</td>
-        <td class="kgb-col-val">{{tahun_lama}} Tahun {{bulan_lama}} bulan</td>
+        <td class="kgb-col-val">{{mkg_lama_text}}</td>
       </tr>
     </table>
 

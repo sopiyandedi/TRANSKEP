@@ -394,7 +394,7 @@ function findLiveKgbMatchFromVm_(targetObj) {
       var row = list[j];
       if (!row || !hasCleanKgbNumberLocal_(row)) continue;
       if (String(row.nip || '').replace(/['"\s]/g, '').trim() === targetNip &&
-          String(row.status || '').toLowerCase() !== 'selesai') {
+        String(row.status || '').toLowerCase() !== 'selesai') {
         return row;
       }
     }
@@ -449,7 +449,7 @@ function applyKgbMysimsModalDom_(noKgbVal, nomorSuratVal, isMysimsReq, isMysimsR
 // ==========================================
 // BUKA & TUTUP MODAL DETAIL KGB
 // ==========================================
-window.openKgbModalForm = function(kgbData) {
+window.openKgbModalForm = function (kgbData) {
   var modal = document.getElementById('modalDetailKGB');
   if (!modal) return;
 
@@ -471,16 +471,16 @@ window.openKgbModalForm = function(kgbData) {
     ? window.vueState.usersList
     : (typeof state !== 'undefined' ? state.usersList : []);
   var userObj = Array.isArray(uList)
-    ? uList.find(function(u) { return String(u.nip) === nip; })
+    ? uList.find(function (u) { return String(u.nip) === nip; })
     : null;
 
   // Cari Nama Ketua Pengadilan Agama Indramayu (bukan Wakil Ketua) untuk penandatangan
   var ketuaObj = Array.isArray(uList)
-    ? (uList.find(function(u) {
-        return u.jabatan && u.jabatan.toLowerCase().indexOf('ketua') !== -1 && u.jabatan.toLowerCase().indexOf('wakil') === -1;
-      }) || uList.find(function(u) {
-        return u.jabatan && u.jabatan.toLowerCase().indexOf('ketua') !== -1;
-      }))
+    ? (uList.find(function (u) {
+      return u.jabatan && u.jabatan.toLowerCase().indexOf('ketua') !== -1 && u.jabatan.toLowerCase().indexOf('wakil') === -1;
+    }) || uList.find(function (u) {
+      return u.jabatan && u.jabatan.toLowerCase().indexOf('ketua') !== -1;
+    }))
     : null;
   var defaultNamaKetua = ketuaObj ? String(ketuaObj.nama || '').trim() : '';
 
@@ -630,8 +630,8 @@ window.openKgbModalForm = function(kgbData) {
     : { tahun: '', bulan: '' };
   var elThnLama = document.getElementById('kgbFieldTahunLama');
   var elBlnLama = document.getElementById('kgbFieldBulanLama');
-  if (elThnLama) elThnLama.value = (mkgLamaObj.tahun !== '' && !( !working.tahun_lama && !working.mkg_lama )) ? mkgLamaObj.tahun : '';
-  if (elBlnLama) elBlnLama.value = (mkgLamaObj.tahun !== '' && !( !working.tahun_lama && !working.mkg_lama )) ? (mkgLamaObj.bulan || '0') : '';
+  if (elThnLama) elThnLama.value = (mkgLamaObj.tahun !== '' && !(!working.tahun_lama && !working.mkg_lama)) ? mkgLamaObj.tahun : '';
+  if (elBlnLama) elBlnLama.value = (mkgLamaObj.tahun !== '' && !(!working.tahun_lama && !working.mkg_lama)) ? (mkgLamaObj.bulan || '0') : '';
 
   // Data KGB Baru
   var elGolBaru = document.getElementById('kgbFieldGolonganBaru');
@@ -712,7 +712,7 @@ window.openKgbModalForm = function(kgbData) {
 
   // Tampilkan Modal
   modal.classList.remove('hidden');
-  setTimeout(function() {
+  setTimeout(function () {
     modal.classList.remove('opacity-0');
     modal.firstElementChild.classList.remove('scale-95');
   }, 10);
@@ -723,7 +723,7 @@ function closeKgbModalForm() {
   if (!modal) return;
   modal.classList.add('opacity-0');
   modal.firstElementChild.classList.add('scale-95');
-  setTimeout(function() {
+  setTimeout(function () {
     modal.classList.add('hidden');
   }, 300);
 }
@@ -838,7 +838,7 @@ function printKgbFromModal() {
     }
   }
 
-  var dispatchPrint = function(finalPayload) {
+  var dispatchPrint = function (finalPayload) {
     if (typeof window.printSuratKgb === 'function') {
       window.printSuratKgb(finalPayload);
     } else if (typeof showNotify === 'function') {
@@ -848,10 +848,10 @@ function printKgbFromModal() {
 
   var isCandidateRemoteSync = Boolean(payload.mysims_requested || (payload.id_kgb && String(payload.id_kgb).indexOf('DRAFT-') !== 0));
   if (!hasCleanKgbNumberLocal_(payload) && isCandidateRemoteSync &&
-      window.EofficeDataService && typeof window.EofficeDataService.fetchLatestKgbMysimsNumber === 'function') {
+    window.EofficeDataService && typeof window.EofficeDataService.fetchLatestKgbMysimsNumber === 'function') {
     if (typeof showLoading === 'function') showLoading("Memeriksa nomor surat MYSIMS terbaru...");
     return window.EofficeDataService.fetchLatestKgbMysimsNumber(payload.id_kgb, payload.nip)
-      .then(function(issued) {
+      .then(function (issued) {
         if (typeof hideLoading === 'function') hideLoading();
         if (issued && hasCleanKgbNumberLocal_(issued)) {
           payload.nokgb = issued.nokgb || payload.nokgb;
@@ -862,7 +862,7 @@ function printKgbFromModal() {
         }
         dispatchPrint(payload);
       })
-      .catch(function() {
+      .catch(function () {
         if (typeof hideLoading === 'function') hideLoading();
         dispatchPrint(payload);
       });

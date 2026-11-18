@@ -441,6 +441,9 @@
     var noInfo = resolveNomorSuratKgb(kgbObj, tglSuratStr);
     var mkgLama = resolveMasaKerjaKgb(kgbObj.tahun_lama, kgbObj.bulan_lama, kgbObj.mkg_lama);
     var mkgBaru = resolveMasaKerjaKgb(kgbObj.tahun_baru, kgbObj.bulan_baru, kgbObj.mkg_baru);
+    var mkgLamaText = (mkgLama.bulan && String(mkgLama.bulan).trim() !== '' && String(mkgLama.bulan).trim() !== '0')
+      ? (mkgLama.tahun + ' Tahun ' + mkgLama.bulan + ' bulan')
+      : (mkgLama.tahun + ' Tahun');
 
     var namaPegawai = kgbObj.nama_pegawai || (userRef ? userRef.nama : '') || '-';
     var nipPegawai = String(kgbObj.nip || (userRef ? userRef.nip : '') || '-');
@@ -507,6 +510,8 @@
       '{{tmt_lama}}': tmtLamaStr,
       '{{tahun_lama}}': mkgLama.tahun,
       '{{bulan_lama}}': mkgLama.bulan,
+      '{{tahun_lama}} Tahun {{bulan_lama}} bulan': mkgLamaText,
+      '{{mkg_lama_text}}': mkgLamaText,
       '{{gaji_baru}}': gajiBaruStr,
       '{{hurif_gaji}}': hurufGaji,
       '{{huruf_gaji}}': hurufGaji,

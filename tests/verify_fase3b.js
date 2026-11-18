@@ -1401,6 +1401,25 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
     assert.strictEqual(resBareNum.bulan, 'XI');
     assert.strictEqual(resBareNum.tahun, '2026');
     assert.strictEqual(resBareNum.full, '1102/KPA.W10-A2/KP2.1.2/XI/2026');
+
+    // =========================================================================
+    // Tahap 132 (v3.8.66): Kepada Yth., 1 Baris KPPN, Poin e Tanpa 0 Bulan, & Poin 6
+    // =========================================================================
+    const cetakHtml132 = fs.readFileSync('modules/eoffice/cetak/cetak_kgb.html', 'utf8');
+    assert(cetakHtml132.includes('Kepada Yth.<br>'), 'cetak_kgb.html must unify Kepada Yth. on the first line');
+    assert(cetakHtml132.includes('Kepala Kantor Pelayanan Perbendaharaan Negara Cirebon<br>'), 'cetak_kgb.html must render KPPN Cirebon in 1 unbroken line');
+    assert(cetakHtml132.includes('{{mkg_lama_text}}'), 'cetak_kgb.html must use dynamic mkg_lama_text for point e');
+    assert(cetakHtml132.includes('width: 138px;'), 'cetak_kgb.html must optimize .kgb-col-label to 138px');
+
+    const pdfCompiler132 = fs.readFileSync('eoffice/kgb_pdf_compiler.js', 'utf8');
+    assert(pdfCompiler132.includes('Kepada Yth.<br>') && pdfCompiler132.includes('Kepala Kantor Pelayanan Perbendaharaan Negara Cirebon<br>'),
+      'kgb_pdf_compiler.js must match unified Kepada Yth. and 1-line KPPN');
+    assert(pdfCompiler132.includes('.col-lbl { width: 138px;'), 'kgb_pdf_compiler.js must match 138px label width');
+    assert(pdfCompiler132.includes('mkgLamaStr'), 'kgb_pdf_compiler.js must compute mkgLamaStr');
+
+    const cetakJs132 = fs.readFileSync('modules/eoffice/cetak/js_cetak_kgb.js', 'utf8');
+    assert(cetakJs132.includes('mkgLamaText'), 'js_cetak_kgb.js must compute mkgLamaText');
+    assert(cetakJs132.includes('{{mkg_lama_text}}'), 'js_cetak_kgb.js must replace {{mkg_lama_text}}');
   } finally {
     browserSandbox.TranskepAPI.call = origApiCall;
     browserSandbox.TranskepFirebase.getDb = origGetDb;

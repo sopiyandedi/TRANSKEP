@@ -166,6 +166,9 @@ function generateKgbPdfBase64_(kgbRecord, nomorSuratResmi) {
 
     const mkgLama = parseMkg(p.tahun_lama, p.bulan_lama, p.mkg_lama);
     const mkgBaru = parseMkg(p.tahun_baru, p.bulan_baru, p.mkg_baru);
+    const mkgLamaStr = (mkgLama.bulan && String(mkgLama.bulan).trim() !== '' && String(mkgLama.bulan).trim() !== '0')
+      ? (mkgLama.tahun + ' Tahun ' + mkgLama.bulan + ' bulan')
+      : (mkgLama.tahun + ' Tahun');
 
     const namaPegawai = String(p.nama_pegawai || p.nama || '-').trim();
     const nipPegawai = String(p.nip || '-').replace(/^'+/, '').trim();
@@ -193,7 +196,7 @@ function generateKgbPdfBase64_(kgbRecord, nomorSuratResmi) {
 
     const fullHtml = '<!DOCTYPE html><html><head><meta charset="utf-8">' +
       '<style>' +
-      '@page { size: legal portrait; margin: 9mm 16mm 10mm 20mm; }' +
+      '@page { size: legal portrait; margin: 9mm 12mm 10mm 20mm; }' +
       'body { margin: 0; padding: 0; font-family: "Bookman Old Style", Georgia, "Times New Roman", serif; font-size: 12pt; line-height: 1.4; color: #000000; background: #ffffff; }' +
       '.kop-table { width: 100%; border-collapse: collapse; border-bottom: 2px solid #000000; margin-bottom: 8px; }' +
       '.kop-table td { vertical-align: middle; border: none; padding: 0 0 5px 0; }' +
@@ -209,8 +212,8 @@ function generateKgbPdfBase64_(kgbRecord, nomorSuratResmi) {
       '.detail-wrap { margin-left: 82px; }' +
       '.detail-table { width: 100%; border-collapse: collapse; font-size: 12pt; }' +
       '.detail-table td { vertical-align: top; padding: 2px 0; border: none; }' +
-      '.col-no { width: 22px; text-align: left; }' +
-      '.col-lbl { width: 163px; white-space: nowrap; padding-right: 2px; }' +
+      '.col-no { width: 20px; text-align: left; }' +
+      '.col-lbl { width: 138px; white-space: nowrap; padding-right: 2px; }' +
       '.col-cln { width: 10px; text-align: center; }' +
       '.col-val { text-align: left; }' +
       '.subnote { margin-left: 82px; margin-top: 6px; margin-bottom: 6px; font-size: 12pt; }' +
@@ -251,9 +254,8 @@ function generateKgbPdfBase64_(kgbRecord, nomorSuratResmi) {
 
       // TUJUAN
       '<div class="tujuan-box">' +
-      'Kepada<br>' +
-      'Yth. Kepala Kantor Pelayanan Perbendaharaan<br>' +
-      'Negara Cirebon<br>' +
+      'Kepada Yth.<br>' +
+      'Kepala Kantor Pelayanan Perbendaharaan Negara Cirebon<br>' +
       'di-<br>' +
       '<div style="margin-left: 36px; letter-spacing: 2px;">Cirebon</div>' +
       '</div>' +
@@ -278,7 +280,7 @@ function generateKgbPdfBase64_(kgbRecord, nomorSuratResmi) {
       '<tr><td class="col-no">b.</td><td class="col-lbl">Nomor</td><td class="col-cln">:</td><td class="col-val">' + escapeHtmlKgbPdf_(nomorSkLama) + '</td></tr>' +
       '<tr><td class="col-no">c.</td><td class="col-lbl">Tanggal</td><td class="col-cln">:</td><td class="col-val">' + escapeHtmlKgbPdf_(tglSkLamaStr) + '</td></tr>' +
       '<tr><td class="col-no">d.</td><td class="col-lbl">Tanggal mulai gaji</td><td class="col-cln">:</td><td class="col-val">' + escapeHtmlKgbPdf_(tmtLamaStr) + '</td></tr>' +
-      '<tr><td class="col-no">e.</td><td class="col-lbl">Masa kerja golongan</td><td class="col-cln">:</td><td class="col-val">' + escapeHtmlKgbPdf_(mkgLama.tahun + ' Tahun ' + mkgLama.bulan + ' bulan') + '</td></tr>' +
+      '<tr><td class="col-no">e.</td><td class="col-lbl">Masa kerja golongan</td><td class="col-cln">:</td><td class="col-val">' + escapeHtmlKgbPdf_(mkgLamaStr) + '</td></tr>' +
       '</table></div>' +
 
       '<div class="banner">DIBERIKAN KENAIKAN GAJI BERKALA HINGGA MEMPEROLEH :</div>' +

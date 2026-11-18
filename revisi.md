@@ -6467,6 +6467,60 @@ Berdasarkan hasil uji cetak terkini pengguna pada berkas *Raden Anantama Havid I
 - **Audit Lintas-Modul:** Alur kerja n8n KGB Surat Keluar dan webhook MYSIMS tetap menerima dan mengirimkan field yang sama persis tanpa perubahan payload.
 - **Aktivasi Pengguna:** Hard refresh browser (`Ctrl + Shift + R`) untuk memuat PWA `v3.8.65`.
 
+---
+
+## Tahap 132 [SELESAI & AKTIF]: Penyempurnaan Tata Letak Cetak KGB (Kepada Yth., 1 Baris KPPN, Eliminasi "0 bulan" MKG Lama, dan Perluasan Teks Poin 6) (`v3.8.66`)
+
+### 1. Masalah & Permintaan Pengguna
+Berdasarkan perbandingan visual antara hasil cetak saat ini ([`media_1794967014678_c9bb2f8f.png`](file:///C:/Users/user/.gemini/antigravity/brain/437cf215-e2db-4d6e-8a31-ee9e66ec1279/.user_uploaded/media_1794967014678_c9bb2f8f.png)) dengan standar format yang diinginkan ([`media_1794967060137_82b04c52.png`](file:///C:/Users/user/.gemini/antigravity/brain/437cf215-e2db-4d6e-8a31-ee9e66ec1279/.user_uploaded/media_1794967060137_82b04c52.png) & [`media_1794967080403_a0098f62.png`](file:///C:/Users/user/.gemini/antigravity/brain/437cf215-e2db-4d6e-8a31-ee9e66ec1279/.user_uploaded/media_1794967080403_a0098f62.png)), terdapat 4 poin penyesuaian estetika & tipografi:
+1. **Pindah "Yth." ke Posisi Atas Setelah "Kepada":**
+   - Saat ini: Baris 1 `Kepada`, Baris 2 `Yth. Kepala Kantor Pelayanan Perbendaharaan`.
+   - Diinginkan: Baris 1 menjadi satu kesatuan `Kepada Yth.` persis sesuai contoh resmi.
+2. **Penulisan Kantor Tujuan KPPN Menjadi 1 Baris Utuh (Tanpa Terpotong ke Bawah):**
+   - Saat ini: `Kepala Kantor Pelayanan Perbendaharaan` terputus lalu turun kata `Negara Cirebon` di baris berikutnya karena adanya tag `<br>`.
+   - Diinginkan: Ditulis dalam 1 baris utuh `Kepala Kantor Pelayanan Perbendaharaan Negara Cirebon`.
+3. **Poin e (Masa Kerja Golongan Lama): Tidak Menampilkan "0 bulan" Jika Nilai Bulan Kosong/Nol:**
+   - Saat ini: Menampilkan `15 Tahun 0 bulan`.
+   - Diinginkan: Jika bulan kosong, `0`, atau `null`, cukup tampilkan `15 Tahun` (kata `0 bulan` dihilangkan). Jika bulan > 0 (misal `2 bulan`), tetap ditampilkan `15 Tahun 2 bulan`.
+4. **Poin 6 (Gaji Pokok Baru): Huruf Mengisi Sampai Ujung Kanan Sehingga Kata "belas" Masuk di Baris Pertama:**
+   - Saat ini: `Rp. 3.219.200,- (tiga juta dua ratus sembilan` lalu kata `belas` terpotong turun ke baris ke-2 (`belas ribu dua ratus rupiah)`), meninggalkan ruang kosong di sebelah kanan kata `sembilan`.
+   - Diinginkan: Kolom nilai poin diperlebar ke kanan (optimasi lebar kolom label `.kgb-col-label` dari `163px` ke `138px` dan penyesuaian margin/padding kertas), sehingga kata `"belas"` muat di baris pertama: `Rp. 3.219.200,- (tiga juta dua ratus sembilan belas` / `ribu dua ratus rupiah)`.
+
+### 2. Implementasi Terukur Selesai Dilaksanakan
+1. **Pembaruan Template HTML Cetak KGB ([`modules/eoffice/cetak/cetak_kgb.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/cetak/cetak_kgb.html)):**
+   - **Blok Tujuan:** Diperbarui menjadi `Kepada Yth.<br>Kepala Kantor Pelayanan Perbendaharaan Negara Cirebon<br>di-...`.
+   - **Poin e:** Diganti menggunakan `<td class="kgb-col-val">{{mkg_lama_text}}</td>`.
+   - **Perluasan Kolom Nilai Poin 6 & Penyelarasan Label:**
+     - Mengubah `.kgb-col-label` dari `width: 163px;` menjadi `width: 138px;` (label terpanjang `Masa kerja golongan` ~132px tetap muat utuh tanpa wrap, titik dua tetap lurus sejajar di semua tabel).
+     - Mengatur `.kgb-col-no` menjadi `width: 20px;` dan padding kertas kanan menjadi `12mm`, memberikan ruang lebih dari 450px untuk teks nominal dan terbilang sehingga kata `"belas"` masuk di baris pertama.
+2. **Pembaruan Mesin Cetak JavaScript ([`modules/eoffice/cetak/js_cetak_kgb.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/cetak/js_cetak_kgb.js)):**
+   - Menghitung `mkgLamaText` secara dinamis: jika bulan kosong atau `0`, menghasilkan format `${tahun} Tahun` tanpa kata `0 bulan`.
+   - Mendaftarkan `'{{mkg_lama_text}}'` dan `'{{tahun_lama}} Tahun {{bulan_lama}} bulan'` pada daftar `replacements`.
+3. **Penyelarasan Kompilator PDF Backend ([`eoffice/kgb_pdf_compiler.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/kgb_pdf_compiler.js)):**
+   - Menyelaraskan blok Tujuan (`Kepada Yth.` dan 1 baris KPPN).
+   - Menghitung `mkgLamaStr` untuk menghilangkan `"0 bulan"` pada Poin e PDF.
+   - Menyelaraskan `.col-lbl` (`138px`), `.col-no` (`20px`), dan `@page` margin kanan `12mm` agar PDF MYSIMS identik 100% dengan cetak browser.
+4. **Verifikasi Mandiri, Audit Lintas-Modul & Bump PWA `v3.8.66`:**
+   - Menjalankan `npm test`: seluruh 6/6 test suite lulus tanpa kegagalan (0 failures).
+   - Memperbarui versi PWA 3 titik (`3.8.65` -> `3.8.66`) di `index.html` dan `sw.js`.
+   - Menambahkan pengujian regresi spesifik Tahap 132 di `tests/verify_fase3b.js`.
+
+### 3. Matriks Perubahan Sebelum vs Sesudah
+
+| Aspek / Elemen | Sebelum (v3.8.65) | Sesudah (Aktif v3.8.66) |
+| :--- | :--- | :--- |
+| **Header Tujuan 1** | `Kepada`<br>`Yth. Kepala Kantor Pelayanan...` | `Kepada Yth.` (1 baris padu) |
+| **Header Tujuan 2** | `Negara Cirebon` terputus di baris ke-3 | `Kepala Kantor Pelayanan Perbendaharaan Negara Cirebon` (1 baris utuh) |
+| **Poin e (MKG Lama)** | `15 Tahun 0 bulan` | `15 Tahun` (kata `0 bulan` dihilangkan jika nol/kosong) |
+| **Poin 6 (Gaji Pokok Baru)** | `...sembilan`<br>`belas ribu dua ratus rupiah)` | `...sembilan belas`<br>`ribu dua ratus rupiah)` |
+
+### 4. Temuan Audit Lintas-Modul & Langkah Aktivasi Pasca-Eksekusi
+- **Audit Lintas-Modul:** Alur kerja n8n KGB Surat Keluar dan webhook MYSIMS tetap menerima dan mengirimkan field yang sama persis tanpa perubahan payload.
+- **Aktivasi Pengguna:** Hard refresh browser (`Ctrl + Shift + R`) untuk memuat PWA `v3.8.66`.
+
+---
+
+
 
 
 
