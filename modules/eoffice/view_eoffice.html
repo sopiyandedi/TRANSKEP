@@ -208,14 +208,11 @@
                 <!-- Dropdown Khusus KGB: Glassmorphism Pill & Floating Menu -->
                 <div v-if="item.itemType === 'KGB'" class="relative inline-block text-left" @click.stop>
                   <!-- Trigger Button (Badge Pill Interaktif) -->
-                  <button type="button"
-                    @click="toggleStatusDropdown(item.keyId)"
-                    :class="[
+                  <button type="button" @click="toggleStatusDropdown(item.keyId)" :class="[
                       'px-3 py-1.5 rounded-full text-[10px] font-bold border inline-flex items-center gap-2 transition-all duration-200 cursor-pointer shadow-sm hover:scale-105 active:scale-95 select-none',
                       item.statusBadgeClass,
                       activeStatusDropdownId === item.keyId ? 'ring-2 ring-indigo-500/50 shadow-lg' : ''
-                    ]"
-                    :title="'Ubah status berkas: ' + item.title">
+                    ]" :title="'Ubah status berkas: ' + item.title">
                     <span :class="['w-2 h-2 rounded-full', item.statusDotClass]"></span>
                     <span>{{ item.statusText }}</span>
                     <i class="fa-solid fa-chevron-down text-[8px] transition-transform duration-300 opacity-70 ml-0.5"
@@ -225,16 +222,15 @@
                   <!-- Popover Menu Mengambang (Dark Glassmorphism Ultra-Modern) -->
                   <div v-show="activeStatusDropdownId === item.keyId"
                     class="absolute z-[150] left-1/2 -translate-x-1/2 mt-2 w-56 bg-slate-900/95 backdrop-blur-xl border border-slate-700/80 rounded-2xl shadow-2xl shadow-black/90 p-1.5 space-y-1 animate-fade-in text-left">
-                    
-                    <div class="px-2.5 py-1 text-[9px] font-extrabold uppercase tracking-wider text-slate-500 border-b border-slate-800/80 mb-1 flex items-center justify-between">
+
+                    <div
+                      class="px-2.5 py-1 text-[9px] font-extrabold uppercase tracking-wider text-slate-500 border-b border-slate-800/80 mb-1 flex items-center justify-between">
                       <span>Ubah Status Berkas</span>
                       <i class="fa-solid fa-sliders text-indigo-400"></i>
                     </div>
 
                     <!-- Pilihan 1: Sedang Diproses -->
-                    <button type="button"
-                      @click="selectStatus(item, 'Sedang Diproses')"
-                      :class="[
+                    <button type="button" @click="selectStatus(item, 'Sedang Diproses')" :class="[
                         'w-full px-2.5 py-2 rounded-xl text-xs font-semibold flex items-center justify-between transition-all group',
                         item.rawStatus === 'Sedang Diproses'
                           ? 'bg-blue-500/20 text-blue-300 border border-blue-500/40 shadow-md shadow-blue-500/10'
@@ -247,13 +243,12 @@
                           <span class="text-[9px] text-slate-500 group-hover:text-slate-400">Penyusunan draf SK</span>
                         </div>
                       </div>
-                      <i v-if="item.rawStatus === 'Sedang Diproses'" class="fa-solid fa-check text-blue-400 text-xs"></i>
+                      <i v-if="item.rawStatus === 'Sedang Diproses'"
+                        class="fa-solid fa-check text-blue-400 text-xs"></i>
                     </button>
 
                     <!-- Pilihan 2: Menunggu TTE Pimpinan -->
-                    <button type="button"
-                      @click="selectStatus(item, 'Menunggu TTE Pimpinan')"
-                      :class="[
+                    <button type="button" @click="selectStatus(item, 'Menunggu TTE Pimpinan')" :class="[
                         'w-full px-2.5 py-2 rounded-xl text-xs font-semibold flex items-center justify-between transition-all group',
                         item.rawStatus === 'Menunggu TTE Pimpinan'
                           ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-md shadow-amber-500/10'
@@ -266,13 +261,12 @@
                           <span class="text-[9px] text-slate-500 group-hover:text-slate-400">Antrean tanda tangan</span>
                         </div>
                       </div>
-                      <i v-if="item.rawStatus === 'Menunggu TTE Pimpinan'" class="fa-solid fa-check text-amber-400 text-xs"></i>
+                      <i v-if="item.rawStatus === 'Menunggu TTE Pimpinan'"
+                        class="fa-solid fa-check text-amber-400 text-xs"></i>
                     </button>
 
                     <!-- Pilihan 3: Selesai / Terbit -->
-                    <button type="button"
-                      @click="selectStatus(item, 'Selesai')"
-                      :class="[
+                    <button type="button" @click="selectStatus(item, 'Selesai')" :class="[
                         'w-full px-2.5 py-2 rounded-xl text-xs font-semibold flex items-center justify-between transition-all group',
                         item.rawStatus === 'Selesai'
                           ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-md shadow-emerald-500/10'
@@ -342,29 +336,35 @@
 
                 <!-- Aksi Khusus Rapat -->
                 <div v-else-if="item.itemType === 'Rapat'" class="flex items-center justify-end gap-1.5">
-                  <button @click="openModalRapatDetail(item)"
-                    class="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-lg text-xs transition border border-slate-700"
-                    title="Buka Detail">
-                    <i class="fa-solid fa-folder-open"></i>
+                  <button type="button" @click="openModalRapatDetail(item)"
+                    class="w-8 h-8 rounded-lg bg-indigo-500/10 hover:bg-indigo-500 text-indigo-400 hover:text-white border border-indigo-500/30 transition flex items-center justify-center shadow-sm"
+                    title="Edit &amp; Kelola Agenda Rapat">
+                    <i class="fa-solid fa-pen-to-square text-xs"></i>
                   </button>
 
                   <button type="button" v-if="item.docUndanganUrl"
                     @click="openSecureFile(item.docUndanganUrl, 'Undangan Rapat')"
                     class="px-2 py-1 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/20 font-bold rounded-lg text-[10px] transition cursor-pointer"
-                    title="Undangan">
+                    title="Undangan (Google Docs)">
                     Undangan
                   </button>
                   <button type="button" v-if="item.docAbsenUrl"
                     @click="openSecureFile(item.docAbsenUrl, 'Daftar Hadir Rapat')"
                     class="px-2 py-1 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/20 font-bold rounded-lg text-[10px] transition cursor-pointer"
-                    title="Daftar Hadir">
+                    title="Daftar Hadir (Google Docs)">
                     Absen
                   </button>
                   <button type="button" v-if="item.docNotulenUrl"
                     @click="openSecureFile(item.docNotulenUrl, 'Notulen Rapat')"
                     class="px-2 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 font-bold rounded-lg text-[10px] transition cursor-pointer"
-                    title="Notulen">
+                    title="Notulen (Google Docs)">
                     Notulen
+                  </button>
+
+                  <button type="button" @click="promptDeleteRapat(item)"
+                    class="w-8 h-8 rounded-lg bg-rose-500/10 hover:bg-rose-500 text-rose-400 hover:text-white border border-rose-500/30 transition flex items-center justify-center shadow-sm"
+                    title="Hapus Agenda Rapat">
+                    <i class="fa-solid fa-trash-can text-xs"></i>
                   </button>
                 </div>
 
@@ -382,15 +382,18 @@
       <div class="glass border border-slate-800 bg-slate-900/95 rounded-3xl w-full max-w-md p-6 shadow-2xl space-y-5">
         <div class="flex items-start gap-4">
           <div
-            :class="['w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 border text-xl', confirmModal.mode === 'delete' ? 'bg-rose-500/10 border-rose-500/20 text-rose-400' : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400']">
-            <i :class="['fa-solid', confirmModal.mode === 'delete' ? 'fa-trash-can' : 'fa-paper-plane']"></i>
+            :class="['w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 border text-xl', (confirmModal.mode === 'delete' || confirmModal.mode === 'delete_rapat') ? 'bg-rose-500/10 border-rose-500/20 text-rose-400' : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400']">
+            <i :class="['fa-solid', (confirmModal.mode === 'delete' || confirmModal.mode === 'delete_rapat') ? 'fa-trash-can' : 'fa-paper-plane']"></i>
           </div>
           <div class="min-w-0 flex-1">
             <h4 class="text-sm font-bold text-white">
-              {{ confirmModal.mode === 'delete' ? 'Hapus Berkas KGB?' : 'Kirim Pengajuan KGB untuk TTE Pimpinan?' }}
+              {{ confirmModal.mode === 'delete_rapat' ? 'Hapus Agenda Rapat?' : (confirmModal.mode === 'delete' ? 'Hapus Berkas KGB?' : 'Kirim Pengajuan KGB untuk TTE Pimpinan?') }}
             </h4>
             <p class="text-xs text-slate-400 mt-1 leading-relaxed">
-              <template v-if="confirmModal.mode === 'delete'">
+              <template v-if="confirmModal.mode === 'delete_rapat'">
+                Agenda rapat <strong class="text-slate-200">{{ confirmModal.target ? confirmModal.target.title : '' }}</strong> akan dihapus dari database E-Office Cloud Firestore.
+              </template>
+              <template v-else-if="confirmModal.mode === 'delete'">
                 Berkas KGB atas nama <strong class="text-slate-200">{{ confirmModal.target ? confirmModal.target.title :
                   '' }}</strong> akan dihapus dari database E-Office Cloud Firestore.
               </template>
@@ -426,9 +429,9 @@
             Batal
           </button>
           <button type="button" @click="executeConfirmModal()"
-            :class="['px-4 py-2 text-white font-bold rounded-xl text-xs transition shadow-lg flex items-center gap-2', confirmModal.mode === 'delete' ? 'bg-rose-600 hover:bg-rose-500 shadow-rose-600/20' : 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-600/20']">
-            <i :class="['fa-solid', confirmModal.mode === 'delete' ? 'fa-trash-can' : 'fa-paper-plane']"></i>
-            <span>{{ confirmModal.mode === 'delete' ? 'Ya, Hapus Data' : 'Kirim ke TTE Pimpinan' }}</span>
+            :class="['px-4 py-2 text-white font-bold rounded-xl text-xs transition shadow-lg flex items-center gap-2', (confirmModal.mode === 'delete' || confirmModal.mode === 'delete_rapat') ? 'bg-rose-600 hover:bg-rose-500 shadow-rose-600/20' : 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-600/20']">
+            <i :class="['fa-solid', (confirmModal.mode === 'delete' || confirmModal.mode === 'delete_rapat') ? 'fa-trash-can' : 'fa-paper-plane']"></i>
+            <span>{{ (confirmModal.mode === 'delete' || confirmModal.mode === 'delete_rapat') ? 'Ya, Hapus Data' : 'Kirim ke TTE Pimpinan' }}</span>
           </button>
         </div>
       </div>
@@ -893,179 +896,466 @@
      ========================================== -->
 
 <div id="modalAgendaRapat"
-  class="fixed inset-0 z-[150] flex items-center justify-center bg-black/80 backdrop-blur-md transition-opacity duration-300 opacity-0 hidden p-3 md:p-6 no-print">
+  class="fixed inset-0 z-[150] flex items-center justify-center bg-black/80 backdrop-blur-md transition-opacity duration-300 opacity-0 hidden p-2 md:p-5 no-print">
 
-  <div
-    class="glass border border-slate-800 bg-slate-900/95 rounded-3xl w-full max-w-4xl flex flex-col max-h-[92vh] shadow-2xl transform transition-transform duration-300 scale-95 overflow-hidden">
+  <div id="modalAgendaRapatBox"
+    class="glass border border-slate-800 bg-slate-900/95 rounded-3xl w-[96vw] max-w-6xl h-[92vh] flex flex-col shadow-2xl transform transition-all duration-300 scale-95 overflow-hidden">
 
     <!-- HEADER MODAL -->
-    <div class="px-6 py-4 border-b border-slate-800/80 bg-slate-950/60 flex items-center justify-between shrink-0">
-      <div class="flex items-center gap-3">
+    <div class="px-5 py-3.5 border-b border-slate-800/80 bg-slate-950/70 flex items-center justify-between gap-3 shrink-0">
+      <div class="flex items-center gap-3 min-w-0">
         <div
-          class="w-10 h-10 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+          class="w-10 h-10 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shrink-0">
           <i class="fa-solid fa-users-between-lines text-lg"></i>
         </div>
-        <div>
-          <h3 class="text-base font-bold text-white flex items-center gap-2">
-            Paket Administrasi Rapat & Notulen (3-in-1)
-            <span
-              class="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">Otomatisasi
-              Dokumen</span>
+        <div class="min-w-0">
+          <h3 class="text-sm md:text-base font-bold text-white flex flex-wrap items-center gap-2">
+            <span>Workspace Administrasi Rapat &amp; Notula</span>
+            <span id="rapatHeaderModeBadge"
+              class="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">Standar PA Indramayu</span>
           </h3>
-          <p class="text-[11px] text-slate-400">Sekali input menghasilkan: Surat Undangan, Lembar Daftar Hadir, dan
-            Notulen Rapat.</p>
+          <p class="text-[11px] text-slate-400 truncate">Kelola Undangan (1/2 Lembar), Pengaturan Daftar Hadir (Maks. 48), dan Notula Rapat 5 Kolom.</p>
         </div>
       </div>
-      <button type="button" onclick="closeRapatModalForm()"
-        class="w-8 h-8 rounded-xl bg-slate-800/50 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 border border-slate-700/50 transition flex items-center justify-center">
-        <i class="fa-solid fa-xmark text-sm"></i>
+
+      <div class="flex items-center gap-2 shrink-0">
+        <button type="button" onclick="toggleRapatFullscreen()" id="btnRapatFullscreenToggle"
+          title="Perbesar / Layar Penuh"
+          class="w-9 h-9 rounded-xl bg-slate-800/60 hover:bg-indigo-500/20 text-slate-400 hover:text-indigo-300 border border-slate-700/60 transition flex items-center justify-center">
+          <i id="iconRapatFullscreen" class="fa-solid fa-expand text-sm"></i>
+        </button>
+        <button type="button" onclick="closeRapatModalForm()" title="Tutup"
+          class="w-9 h-9 rounded-xl bg-slate-800/60 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 border border-slate-700/60 transition flex items-center justify-center">
+          <i class="fa-solid fa-xmark text-sm"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- BAR TAB NAVIGASI WORKSPACE -->
+    <div class="px-5 py-2.5 border-b border-slate-800/80 bg-slate-950/40 flex flex-wrap items-center gap-2 shrink-0">
+      <button type="button" onclick="switchRapatTab('undangan')" id="rapatTabBtn_undangan"
+        class="px-3.5 py-1.5 rounded-xl text-[11px] font-bold border transition flex items-center gap-2 bg-emerald-500/20 border-emerald-500/40 text-emerald-300">
+        <i class="fa-solid fa-envelope-open-text"></i>
+        <span>1. Undangan &amp; Jadwal</span>
+      </button>
+      <button type="button" onclick="switchRapatTab('peserta')" id="rapatTabBtn_peserta"
+        class="px-3.5 py-1.5 rounded-xl text-[11px] font-bold border transition flex items-center gap-2 bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200 hover:bg-slate-800/70">
+        <i class="fa-solid fa-clipboard-user"></i>
+        <span>2. Yang Diundang &amp; Absensi</span>
+        <span id="rapatCountPeserta"
+          class="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">0</span>
+      </button>
+      <button type="button" onclick="switchRapatTab('notula')" id="rapatTabBtn_notula"
+        class="px-3.5 py-1.5 rounded-xl text-[11px] font-bold border transition flex items-center gap-2 bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200 hover:bg-slate-800/70">
+        <i class="fa-solid fa-table-columns"></i>
+        <span>3. Notula &amp; Pembahasan</span>
+        <span id="rapatCountPembicara"
+          class="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-indigo-500/15 text-indigo-300 border border-indigo-500/30">0</span>
+      </button>
+      <button type="button" onclick="switchRapatTab('media')" id="rapatTabBtn_media"
+        class="px-3.5 py-1.5 rounded-xl text-[11px] font-bold border transition flex items-center gap-2 bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200 hover:bg-slate-800/70">
+        <i class="fa-solid fa-photo-film"></i>
+        <span>4. Foto &amp; AI Rekaman</span>
       </button>
     </div>
 
     <!-- BODY FORMULIR (SCROLLABLE) -->
-    <div class="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar text-xs">
+    <div class="flex-1 overflow-y-auto p-5 md:p-6 space-y-5 custom-scrollbar text-xs">
       <form id="formRapatDokumen" onsubmit="event.preventDefault();">
         <input type="hidden" id="rapatFieldIdRapat">
+        <input type="hidden" id="rapatFieldDocUndanganUrl">
+        <input type="hidden" id="rapatFieldDocAbsenUrl">
+        <input type="hidden" id="rapatFieldDocNotulenUrl">
+        <input type="hidden" id="rapatFieldStatus" value="Terjadwal">
+        <input type="hidden" id="rapatFieldPejabatTtdNip">
+        <input type="hidden" id="rapatFieldPejabatTtdNama">
+        <input type="hidden" id="rapatFieldPejabatTtdJabatan">
+        <input type="hidden" id="rapatFieldPemimpinNip">
+        <input type="hidden" id="rapatFieldPemimpinJabatan">
+        <input type="hidden" id="rapatFieldNotulisNip">
+        <input type="hidden" id="rapatFieldNotulisJabatan">
 
         <!-- ============================================== -->
-        <!-- SEKSI 1: INFORMASI ACARA & JADWAL RAPAT        -->
+        <!-- TAB 1: UNDANGAN, PENOMORAN & IDENTITAS RAPAT   -->
         <!-- ============================================== -->
-        <div class="bg-slate-950/40 border border-slate-800/80 rounded-2xl p-4 space-y-4">
-          <div class="flex items-center gap-2 border-b border-slate-800/60 pb-2">
-            <i class="fa-solid fa-calendar-days text-emerald-400"></i>
-            <h4 class="font-bold text-slate-200 uppercase tracking-wider text-[11px]">1. Informasi Acara & Jadwal Rapat
-            </h4>
+        <div id="rapatTabPanel_undangan" class="space-y-4">
+
+          <!-- BLOK 1A: STATUS & PENOMORAN OTOMATIS UNDANGAN -->
+          <div class="bg-slate-950/50 border border-slate-800/80 rounded-2xl p-4 space-y-4">
+            <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800/70 pb-2.5">
+              <div class="flex items-center gap-2">
+                <i class="fa-solid fa-hashtag text-amber-400"></i>
+                <h4 class="font-bold text-slate-200 uppercase tracking-wider text-[11px]">Penomoran Surat &amp; Pejabat Penandatangan Undangan</h4>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <button type="button" onclick="setRapatModalStatus('Terjadwal')" id="btnRapatStatusTerjadwal"
+                  class="px-3 py-1 rounded-lg text-[10px] font-bold border transition bg-amber-500/20 border-amber-500/50 text-amber-300">
+                  Terjadwal
+                </button>
+                <button type="button" onclick="setRapatModalStatus('Selesai')" id="btnRapatStatusSelesai"
+                  class="px-3 py-1 rounded-lg text-[10px] font-bold border transition bg-slate-900 border-slate-800 text-slate-400 hover:bg-slate-800">
+                  Selesai
+                </button>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-12 gap-3">
+              <div class="md:col-span-4">
+                <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Pejabat Penandatangan Undangan</label>
+                <select id="rapatFieldPejabatTtdSelect" onchange="handleRapatPejabatTtdChange(this.value)"
+                  class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-amber-300 font-bold text-xs focus:ring-1 focus:ring-amber-500 outline-none">
+                  <option value="">-- Pilih Pejabat TTD Undangan --</option>
+                </select>
+              </div>
+
+              <div class="md:col-span-2">
+                <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Kode Jabatan TTD</label>
+                <select id="rapatFieldKodePejabat" onchange="syncNomorUndanganPreview()"
+                  class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-slate-200 font-mono font-bold text-xs focus:ring-1 focus:ring-amber-500 outline-none">
+                  <option value="KPA.W10-A2">KPA.W10-A2</option>
+                  <option value="WKPA.W10-A2">WKPA.W10-A2</option>
+                  <option value="PAN.PA.W10-A2">PAN.PA.W10-A2</option>
+                  <option value="SEK.PA.W10-A2">SEK.PA.W10-A2</option>
+                </select>
+              </div>
+
+              <div class="md:col-span-2">
+                <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">No. Urut Surat</label>
+                <input type="text" id="rapatFieldNoUrutSurat" oninput="syncNomorUndanganPreview()"
+                  placeholder="Contoh: 1059"
+                  class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-slate-200 font-mono font-bold text-xs focus:ring-1 focus:ring-amber-500 outline-none">
+              </div>
+
+              <div class="md:col-span-2">
+                <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Kode Surat <span class="text-amber-400">(Auto UND.)</span></label>
+                <input type="text" id="rapatFieldKodeSurat" oninput="syncNomorUndanganPreview()"
+                  placeholder="PW1.1.1"
+                  class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-slate-200 font-mono font-bold text-xs focus:ring-1 focus:ring-amber-500 outline-none">
+              </div>
+
+              <div class="md:col-span-2">
+                <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Tanggal Surat</label>
+                <input type="date" id="rapatFieldTglSuratIso" onchange="handleTglSuratChange(this.value)"
+                  class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-slate-200 text-xs focus:ring-1 focus:ring-amber-500 outline-none">
+                <input type="hidden" id="rapatFieldTglSuratIndo">
+              </div>
+
+              <div class="md:col-span-6">
+                <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Nomor Surat Undangan Lengkap (Otomatis / Bisa Diedit)</label>
+                <input type="text" id="rapatFieldNomorUndangan"
+                  placeholder="1059/KPA.W10-A2/UND.PW1.1.1/X/2026"
+                  class="w-full px-3 py-2 bg-slate-950 border border-amber-500/30 rounded-xl text-amber-300 font-mono font-bold text-xs focus:ring-1 focus:ring-amber-500 outline-none">
+              </div>
+
+              <div class="md:col-span-3">
+                <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Teks Lampiran (Hal. 1)</label>
+                <input type="text" id="rapatFieldLampiranSurat" value="-" placeholder="- atau 1 (satu) lembar"
+                  class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-slate-200 text-xs focus:ring-1 focus:ring-amber-500 outline-none">
+              </div>
+
+              <div class="md:col-span-3 flex items-end pb-1">
+                <label class="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 cursor-pointer w-full hover:border-slate-700 transition">
+                  <input type="checkbox" id="rapatFieldTampilkanGelarUndangan" class="rounded border-slate-700 text-amber-500 focus:ring-0 bg-slate-950">
+                  <span class="text-[11px] font-semibold text-slate-300">Tampilkan Gelar di TTD Undangan</span>
+                </label>
+              </div>
+            </div>
           </div>
 
-          <div class="grid grid-cols-1 md:grid-cols-12 gap-3">
-            <div class="md:col-span-8">
-              <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Agenda / Judul
-                Rapat</label>
-              <input type="text" id="rapatFieldAgenda"
-                placeholder="Contoh: Rapat Koordinasi Evaluasi Kinerja Bulanan & Pelayanan Publik"
-                class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-slate-200 font-bold text-xs focus:ring-1 focus:ring-emerald-500 outline-none">
+          <!-- BLOK 1B: INFORMASI ACARA, JADWAL, DASAR & PIMPINAN/NOTULIS -->
+          <div class="bg-slate-950/50 border border-slate-800/80 rounded-2xl p-4 space-y-4">
+            <div class="flex items-center gap-2 border-b border-slate-800/70 pb-2">
+              <i class="fa-solid fa-calendar-days text-emerald-400"></i>
+              <h4 class="font-bold text-slate-200 uppercase tracking-wider text-[11px]">Informasi Acara, Jadwal, Dasar &amp; Penanggung Jawab</h4>
             </div>
 
-            <div class="md:col-span-4">
-              <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Nomor Surat
-                Undangan</label>
-              <input type="text" id="rapatFieldNomorUndangan" placeholder=".../KPA.W10-A2/OT.01.1/X/2026"
-                class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-slate-200 font-mono text-xs focus:ring-1 focus:ring-emerald-500 outline-none">
-            </div>
+            <div class="grid grid-cols-1 md:grid-cols-12 gap-3">
+              <div class="md:col-span-12">
+                <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Acara / Perihal / Judul Rapat</label>
+                <input type="text" id="rapatFieldAgenda"
+                  placeholder="Contoh: Pembahasan Laporan Pengendalian Intern Atas Pelaporan Keuangan (PIPK)"
+                  class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-white font-bold text-xs focus:ring-1 focus:ring-emerald-500 outline-none">
+              </div>
 
-            <div class="md:col-span-4">
-              <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Hari & Tanggal
-                Pelaksanaan</label>
-              <input type="text" id="rapatFieldHariTanggal" placeholder="Senin, 19 Oktober 2026"
-                class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-slate-200 text-xs focus:ring-1 focus:ring-emerald-500 outline-none">
-            </div>
+              <div class="md:col-span-6">
+                <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Dasar Pelaksanaan (Untuk Header "Dasar :" di Notula)</label>
+                <textarea id="rapatFieldDasarNotula" rows="2"
+                  placeholder="Contoh: Tindak Lanjut Surat Sekretaris Mahkamah Agung RI Tanggal 14 September 2026 tentang..."
+                  class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-slate-200 text-xs focus:ring-1 focus:ring-emerald-500 outline-none leading-relaxed"></textarea>
+              </div>
 
-            <div class="md:col-span-2">
-              <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Jam Mulai</label>
-              <input type="text" id="rapatFieldWaktuMulai" placeholder="09:00 WIB" value="09:00 WIB"
-                class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-slate-200 text-xs focus:ring-1 focus:ring-emerald-500 outline-none">
-            </div>
+              <div class="md:col-span-6">
+                <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Poin Agenda Rapat di Surat Undangan (Pisahkan per baris bila &gt; 1)</label>
+                <textarea id="rapatFieldAgendaPoin" rows="2"
+                  placeholder="1. Pembahasan hasil laporan Tim Penerap PIPK.&#10;2. Hasil penilaian Tim Penilai PIPK."
+                  class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-slate-200 text-xs focus:ring-1 focus:ring-emerald-500 outline-none leading-relaxed"></textarea>
+              </div>
 
-            <div class="md:col-span-2">
-              <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Jam
-                Selesai</label>
-              <input type="text" id="rapatFieldWaktuSelesai" placeholder="Selesai" value="11:30 WIB"
-                class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-slate-200 text-xs focus:ring-1 focus:ring-emerald-500 outline-none">
-            </div>
+              <div class="md:col-span-2">
+                <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Pilih Tanggal Rapat</label>
+                <input type="date" id="rapatFieldTglRapatIso" onchange="handleTglRapatIsoChange(this.value)"
+                  class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-slate-200 text-xs focus:ring-1 focus:ring-emerald-500 outline-none">
+              </div>
 
-            <div class="md:col-span-4">
-              <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Tempat
-                Pelaksanaan</label>
-              <input type="text" id="rapatFieldTempat" value="Ruang Sidang Utama Pengadilan Agama Indramayu"
-                class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-slate-200 text-xs focus:ring-1 focus:ring-emerald-500 outline-none">
-            </div>
+              <div class="md:col-span-3">
+                <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Hari &amp; Tanggal (Teks Cetak)</label>
+                <input type="text" id="rapatFieldHariTanggal" placeholder="Rabu, 28 Oktober 2026"
+                  class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-slate-200 font-semibold text-xs focus:ring-1 focus:ring-emerald-500 outline-none">
+              </div>
 
-            <div class="md:col-span-6">
-              <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Pemimpin /
-                Pimpinan Rapat</label>
-              <input type="text" id="rapatFieldPemimpin" value="Ketua Pengadilan Agama Indramayu"
-                class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-slate-200 text-xs focus:ring-1 focus:ring-emerald-500 outline-none">
-            </div>
+              <div class="md:col-span-2">
+                <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Jam Mulai</label>
+                <input type="text" id="rapatFieldWaktuMulai" placeholder="08:00 WIB" value="08:00 WIB"
+                  class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-slate-200 text-xs focus:ring-1 focus:ring-emerald-500 outline-none">
+              </div>
 
-            <div class="md:col-span-6">
-              <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Notulis / Pencatat
-                Notulen</label>
-              <input type="text" id="rapatFieldNotulis" placeholder="Ketik nama notulis..."
-                class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-slate-200 text-xs focus:ring-1 focus:ring-emerald-500 outline-none">
+              <div class="md:col-span-2">
+                <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Jam Selesai</label>
+                <input type="text" id="rapatFieldWaktuSelesai" placeholder="Selesai" value="Selesai"
+                  class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-slate-200 text-xs focus:ring-1 focus:ring-emerald-500 outline-none">
+              </div>
+
+              <div class="md:col-span-3">
+                <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Tempat Pelaksanaan</label>
+                <input type="text" id="rapatFieldTempat" value="Ruang Rapat Pimpinan Pengadilan Agama Indramayu"
+                  class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-slate-200 text-xs focus:ring-1 focus:ring-emerald-500 outline-none">
+              </div>
+
+              <div class="md:col-span-3">
+                <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Pilih Pimpinan Rapat (Pegawai)</label>
+                <select id="rapatFieldPemimpinSelect" onchange="handleRapatPemimpinChange(this.value)"
+                  class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-cyan-300 font-semibold text-xs focus:ring-1 focus:ring-emerald-500 outline-none">
+                  <option value="">-- Pilih Pimpinan Rapat --</option>
+                </select>
+              </div>
+
+              <div class="md:col-span-3">
+                <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Label Jabatan Pimpinan di TTD</label>
+                <input type="text" id="rapatFieldPemimpin" placeholder="Ketua / Wakil Ketua / Ketua Tim..."
+                  class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-slate-200 text-xs focus:ring-1 focus:ring-emerald-500 outline-none">
+              </div>
+
+              <div class="md:col-span-3">
+                <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Pilih Notulis Rapat (Pegawai)</label>
+                <select id="rapatFieldNotulisSelect" onchange="handleRapatNotulisChange(this.value)"
+                  class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-emerald-300 font-semibold text-xs focus:ring-1 focus:ring-emerald-500 outline-none">
+                  <option value="">-- Pilih Notulis Rapat --</option>
+                </select>
+              </div>
+
+              <div class="md:col-span-3">
+                <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Nama Notulis (Otomatis / Edit)</label>
+                <input type="text" id="rapatFieldNotulis" placeholder="Nama lengkap & gelar notulis..."
+                  class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-slate-200 text-xs focus:ring-1 focus:ring-emerald-500 outline-none">
+              </div>
             </div>
           </div>
         </div>
 
         <!-- ============================================== -->
-        <!-- SEKSI 2: DAFTAR PESERTA RAPAT (MULTI-SELECT)   -->
+        <!-- TAB 2: YANG DIUNDANG (1 vs 2 LEMBAR) & ABSENSI -->
         <!-- ============================================== -->
-        <div class="bg-slate-950/40 border border-slate-800/80 rounded-2xl p-4 space-y-4">
-          <div
-            class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800/60 pb-2">
-            <div class="flex items-center gap-2">
-              <i class="fa-solid fa-clipboard-user text-cyan-400"></i>
-              <h4 class="font-bold text-slate-200 uppercase tracking-wider text-[11px]">2. Daftar Peserta Rapat</h4>
-              <span id="rapatCountPeserta"
-                class="px-2 py-0.5 rounded-full text-[9px] font-bold bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">0
-                Terpilih</span>
+        <div id="rapatTabPanel_peserta" class="space-y-4 hidden">
+
+          <!-- BLOK 2A: DAFTAR TUJUAN UNDANGAN -->
+          <div class="bg-slate-950/50 border border-slate-800/80 rounded-2xl p-4 space-y-4">
+            <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800/70 pb-2.5">
+              <div class="flex items-center gap-2">
+                <i class="fa-solid fa-user-check text-cyan-400"></i>
+                <h4 class="font-bold text-slate-200 uppercase tracking-wider text-[11px]">Daftar Tujuan Undangan (Penentu 1 Lembar vs 2 Lembar Lampiran)</h4>
+              </div>
+              <span id="rapatModeLembarBadge"
+                class="px-3 py-1 rounded-full text-[10px] font-bold bg-slate-800 text-slate-300 border border-slate-700">
+                Belum ada tujuan undangan
+              </span>
             </div>
 
-            <div class="flex items-center gap-1.5">
-              <button type="button" onclick="pilihSemuaPesertaRapat(true)"
-                class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-[10px] font-bold transition">Pilih
-                Semua</button>
-              <button type="button" onclick="pilihSemuaPesertaRapat(false)"
-                class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-400 rounded-lg text-[10px] font-bold transition">Batal
-                Semua</button>
+            <!-- Input Teks Bebas + Preset Kelompok -->
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-2.5 items-end">
+              <div class="lg:col-span-7">
+                <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Tambah Tujuan Kustom / Kelompok (Contoh: Seluruh ASN Pengadilan Agama Indramayu)</label>
+                <div class="flex gap-2">
+                  <input type="text" id="rapatCustomTujuanInput" onkeydown="if(event.key==='Enter'){event.preventDefault(); addCustomTujuanUndangan();}"
+                    placeholder="Ketik jabatan, nama, atau kelompok penerima..."
+                    class="flex-1 px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-slate-200 text-xs focus:ring-1 focus:ring-cyan-500 outline-none">
+                  <button type="button" onclick="addCustomTujuanUndangan()"
+                    class="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded-xl text-xs transition shrink-0">
+                    + Tambah
+                  </button>
+                </div>
+              </div>
+              <div class="lg:col-span-5 flex flex-wrap gap-1.5">
+                <button type="button" onclick="addPresetTujuanUndangan('Wakil Ketua')"
+                  class="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-[10px] font-semibold border border-slate-700 transition">+ Wakil Ketua</button>
+                <button type="button" onclick="addPresetTujuanUndangan('Hakim')"
+                  class="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-[10px] font-semibold border border-slate-700 transition">+ Hakim</button>
+                <button type="button" onclick="addPresetTujuanUndangan('Panitera')"
+                  class="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-[10px] font-semibold border border-slate-700 transition">+ Panitera</button>
+                <button type="button" onclick="addPresetTujuanUndangan('Sekretaris')"
+                  class="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-[10px] font-semibold border border-slate-700 transition">+ Sekretaris</button>
+                <button type="button" onclick="addPresetTujuanUndangan('Seluruh ASN Pengadilan Agama Indramayu')"
+                  class="px-2.5 py-1.5 bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 rounded-lg text-[10px] font-bold border border-cyan-500/30 transition">+ Seluruh ASN PA Indramayu</button>
+              </div>
+            </div>
+
+            <!-- Daftar Terpilih Berurutan -->
+            <div class="bg-slate-900/70 border border-slate-800 rounded-2xl p-3 space-y-2">
+              <div class="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                <span>Urutan Tertulis di Undangan / Lampiran &amp; Notula</span>
+                <button type="button" onclick="clearAllTujuanUndangan()" class="text-rose-400 hover:text-rose-300 transition">Kosongkan Daftar</button>
+              </div>
+              <div id="rapatTujuanOrderedContainer" class="space-y-1.5 max-h-48 overflow-y-auto custom-scrollbar pr-1"></div>
+            </div>
+
+            <!-- Pemilih Pegawai dari Database -->
+            <div class="space-y-2 pt-1">
+              <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div class="relative flex-1">
+                  <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-500 text-xs"></i>
+                  <input type="text" id="rapatSearchPesertaInput" oninput="filterPesertaListModal(this.value)"
+                    placeholder="Atau cari pegawai dari database untuk dimasukkan ke daftar undangan..."
+                    class="w-full pl-8 pr-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-slate-200 text-xs focus:ring-1 focus:ring-cyan-500 outline-none">
+                </div>
+                <div class="flex items-center gap-1.5 shrink-0">
+                  <button type="button" onclick="pilihSemuaPesertaRapat(true)"
+                    class="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-[10px] font-bold transition">Pilih Semua Pegawai</button>
+                </div>
+              </div>
+              <div id="rapatListPesertaContainer"
+                class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-44 overflow-y-auto p-1 custom-scrollbar">
+              </div>
             </div>
           </div>
 
-          <div class="relative">
-            <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-500 text-xs"></i>
-            <input type="text" id="rapatSearchPesertaInput" oninput="filterPesertaListModal(this.value)"
-              placeholder="Cari nama atau jabatan pegawai untuk diundang..."
-              class="w-full pl-8 pr-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-slate-200 text-xs focus:ring-1 focus:ring-cyan-500 outline-none">
-          </div>
+          <!-- BLOK 2B: PENGATURAN FORM DAFTAR HADIR KOSONG (TULIS TANGAN) -->
+          <div class="bg-slate-950/50 border border-slate-800/80 rounded-2xl p-4 space-y-3">
+            <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800/70 pb-2">
+              <div class="flex items-center gap-2">
+                <i class="fa-solid fa-list-ol text-indigo-400"></i>
+                <h4 class="font-bold text-slate-200 uppercase tracking-wider text-[11px]">Pengaturan Cetak Daftar Hadir Rapat (Tabel Kosong Tulis Tangan)</h4>
+              </div>
+              <span id="rapatEstimasiHalamanHadir" class="text-[10px] font-bold text-indigo-300 bg-indigo-500/10 border border-indigo-500/20 px-2.5 py-0.5 rounded-full">
+                Estimasi: 1 Lembar A4
+              </span>
+            </div>
 
-          <div id="rapatListPesertaContainer"
-            class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 max-h-48 overflow-y-auto p-1 custom-scrollbar">
-          </div>
+            <div class="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
+              <div class="md:col-span-4">
+                <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Jenis Kegiatan</label>
+                <input type="text" id="rapatFieldJenisKegiatan" value="Rapat" placeholder="Rapat / Sosialisasi / Bimtek"
+                  class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-slate-200 text-xs focus:ring-1 focus:ring-indigo-500 outline-none">
+              </div>
 
-          <div>
-            <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Peserta / Tamu Luar
-              Tambahan (Opsional)</label>
-            <input type="text" id="rapatFieldTamuLuar"
-              placeholder="Contoh: Perwakilan KPPN Cirebon, BSI Cabang Indramayu (pisahkan dengan koma)"
-              class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-slate-200 text-xs focus:ring-1 focus:ring-cyan-500 outline-none">
+              <div class="md:col-span-3">
+                <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Jumlah Baris Tabel Hadir (1 – 48)</label>
+                <input type="number" min="1" max="48" id="rapatFieldJumlahBarisHadir" value="15" oninput="updateEstimasiHadir(this.value)"
+                  class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-indigo-300 font-bold text-xs focus:ring-1 focus:ring-indigo-500 outline-none">
+              </div>
+
+              <div class="md:col-span-5 flex flex-wrap gap-1.5">
+                <button type="button" onclick="setJumlahBarisHadir(13)" class="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-[10px] font-bold border border-slate-700 transition">13 Baris</button>
+                <button type="button" onclick="setJumlahBarisHadir(20)" class="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-[10px] font-bold border border-slate-700 transition">20 Baris (1 Lbr)</button>
+                <button type="button" onclick="setJumlahBarisHadir(32)" class="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-[10px] font-bold border border-slate-700 transition">32 Baris (2 Lbr)</button>
+                <button type="button" onclick="setJumlahBarisHadir(48)" class="px-2.5 py-1.5 bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-300 rounded-lg text-[10px] font-bold border border-indigo-500/30 transition">48 Maksimal</button>
+              </div>
+            </div>
+            <p class="text-[10px] text-slate-500">Kolom Nama, Jabatan, dan Tanda Tangan zig-zag dicetak kosong untuk diisi tanda tangan manual peserta; bagian atas &amp; TTD Pimpinan Rapat (kiri) + Notulis (kanan) terisi otomatis.</p>
           </div>
         </div>
 
         <!-- ============================================== -->
-        <!-- SEKSI 3: HASIL PEMBAHASAN & NOTULEN RAPAT      -->
+        <!-- TAB 3: NOTULA & PEMBAHASAN (5 KOLOM HORIZONTAL)-->
         <!-- ============================================== -->
-        <div
-          class="bg-gradient-to-br from-emerald-950/20 to-slate-950/60 border border-emerald-500/20 rounded-2xl p-4 space-y-4 shadow-lg shadow-emerald-500/5">
-          <div class="flex items-center gap-2 border-b border-emerald-500/20 pb-2">
-            <i class="fa-solid fa-file-lines text-emerald-400"></i>
-            <h4 class="font-bold text-white uppercase tracking-wider text-[11px]">3. Catatan Notulen & Kesimpulan Rapat
-            </h4>
+        <div id="rapatTabPanel_notula" class="space-y-4 hidden">
+
+          <!-- A. PENGARAHAN UMUM -->
+          <div class="bg-slate-950/50 border border-slate-800/80 rounded-2xl p-4 space-y-2.5">
+            <div class="flex items-center justify-between gap-2">
+              <label class="block text-[11px] font-bold text-emerald-300 uppercase tracking-wider">
+                <i class="fa-solid fa-bullhorn mr-1.5"></i>A. Pengarahan Umum Pimpinan Rapat
+              </label>
+              <span class="text-[10px] text-slate-500">Paragraf pembuka jalannya rapat</span>
+            </div>
+            <textarea id="rapatFieldPengarahanUmum" rows="4"
+              placeholder="Assalamualaikum Wr. Wb. Puji syukur kita panjatkan ke hadirat Allah SWT karena pada pagi hari ini..."
+              class="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-slate-200 text-xs focus:ring-1 focus:ring-emerald-500 outline-none custom-scrollbar leading-relaxed"></textarea>
           </div>
 
-          <div class="grid grid-cols-1 md:grid-cols-12 gap-3">
-            <div class="md:col-span-12">
-              <label class="block text-[10px] font-bold text-emerald-300 uppercase tracking-wider mb-1">Pokok Pembahasan
-                / Arahan Pimpinan Rapat</label>
-              <textarea id="rapatFieldPembahasan" rows="4"
-                placeholder="Ketik jalannya rapat dan poin-poin yang dibahas (bisa menggunakan penomoran 1, 2, 3)..."
-                class="w-full px-3 py-2 bg-slate-900 border border-emerald-500/30 rounded-xl text-slate-200 text-xs focus:ring-2 focus:ring-emerald-500 outline-none custom-scrollbar leading-relaxed"></textarea>
+          <!-- B. PEMBAHASAN PER PEMBICARA (INPUT 5 KOLOM KIRI -> KANAN) -->
+          <div class="bg-gradient-to-br from-emerald-950/20 to-slate-950/70 border border-emerald-500/25 rounded-2xl p-4 space-y-3">
+            <div class="flex flex-wrap items-center justify-between gap-2 border-b border-emerald-500/20 pb-2.5">
+              <div>
+                <h4 class="font-bold text-white uppercase tracking-wider text-[11px]">
+                  <i class="fa-solid fa-table-list text-emerald-400 mr-1.5"></i>B. Pembahasan Per Pembicara (Input Kiri ke Kanan &rarr; Cetak Bertingkat)
+                </h4>
+                <p class="text-[10px] text-slate-400 mt-0.5">Pisahkan poin dengan Enter (baris baru) pada kolom Uraian / Tindak Lanjut untuk penomoran otomatis 1, 2, 3.</p>
+              </div>
+              <button type="button" onclick="addPembahasanRow()"
+                class="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-[11px] transition flex items-center gap-1.5 shadow-md shadow-emerald-600/20">
+                <i class="fa-solid fa-plus"></i>
+                <span>Tambah Pembicara / Poin</span>
+              </button>
             </div>
 
-            <div class="md:col-span-12">
-              <label class="block text-[10px] font-bold text-emerald-300 uppercase tracking-wider mb-1">Kesimpulan &
-                Keputusan Rapat (Rencana Aksi)</label>
-              <textarea id="rapatFieldKesimpulan" rows="3"
-                placeholder="Ketik kesimpulan akhir rapat dan pihak penanggung jawab tindak lanjut..."
-                class="w-full px-3 py-2 bg-slate-900 border border-emerald-500/30 rounded-xl text-slate-200 text-xs focus:ring-2 focus:ring-emerald-500 outline-none custom-scrollbar leading-relaxed"></textarea>
+            <!-- Header Kolom Kiri ke Kanan (Desktop) -->
+            <div class="hidden xl:grid xl:grid-cols-[2.2fr_1.8fr_1.2fr_1.1fr_1fr] gap-2.5 px-3 py-1.5 bg-slate-900/90 border border-slate-800 rounded-xl text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
+              <div>a. Uraian Pembahasan / Laporan</div>
+              <div>b. Tindak Lanjut / Tanggapan</div>
+              <div>c. Target Penyelesaian</div>
+              <div>d. Penanggung Jawab</div>
+              <div>e. Tanggal Penyelesaian</div>
+            </div>
+
+            <div id="rapatPembahasanListContainer" class="space-y-3"></div>
+          </div>
+
+          <!-- CATATAN KESIMPULAN TAMBAHAN (OPSIONAL / BACKWARD COMPAT) -->
+          <div class="bg-slate-950/40 border border-slate-800/80 rounded-2xl p-4 space-y-2">
+            <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Catatan Kesimpulan / Penutup Tambahan (Opsional)</label>
+            <textarea id="rapatFieldKesimpulan" rows="2"
+              placeholder="Catatan penutup atau ringkasan keputusan tambahan bila diperlukan..."
+              class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-slate-200 text-xs focus:ring-1 focus:ring-emerald-500 outline-none custom-scrollbar"></textarea>
+          </div>
+        </div>
+
+        <!-- ============================================== -->
+        <!-- TAB 4: FOTO DOKUMENTASI & AI REKAMAN RAPAT     -->
+        <!-- ============================================== -->
+        <div id="rapatTabPanel_media" class="space-y-4 hidden">
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <!-- Kartu Upload Foto (Siap Tahap 139) -->
+            <div class="bg-slate-950/50 border border-slate-800/80 rounded-2xl p-4 space-y-3">
+              <div class="flex items-center justify-between border-b border-slate-800/70 pb-2">
+                <h4 class="font-bold text-slate-200 uppercase tracking-wider text-[11px] flex items-center gap-2">
+                  <i class="fa-solid fa-images text-cyan-400"></i>Foto Dokumentasi Rapat
+                </h4>
+                <span class="px-2 py-0.5 rounded-full text-[9px] font-bold bg-cyan-500/10 text-cyan-300 border border-cyan-500/20">Tahap 139</span>
+              </div>
+              <p class="text-[11px] text-slate-400 leading-relaxed">
+                Unggah foto dokumentasi kegiatan rapat (otomatis dikompresi agar ringan dan disimpan aman di Google Drive) untuk dicetak pada halaman akhir <b>Foto Rapat</b> grid 2&times;2 di Notula.
+              </p>
+              <div id="rapatFotoPreviewContainer" class="p-4 rounded-xl border border-dashed border-slate-700 bg-slate-900/40 text-center text-[11px] text-slate-500">
+                Modul kompresi &amp; unggah foto Drive akan aktif penuh pada Tahap 139.
+              </div>
+            </div>
+
+            <!-- Kartu AI Rekaman Audio (Siap Tahap 140) -->
+            <div class="bg-slate-950/50 border border-slate-800/80 rounded-2xl p-4 space-y-3">
+              <div class="flex items-center justify-between border-b border-slate-800/70 pb-2">
+                <h4 class="font-bold text-slate-200 uppercase tracking-wider text-[11px] flex items-center gap-2">
+                  <i class="fa-solid fa-microphone-lines text-indigo-400"></i>AI Notulis Otomatis (Rekaman Suara)
+                </h4>
+                <span class="px-2 py-0.5 rounded-full text-[9px] font-bold bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">Tahap 140</span>
+              </div>
+              <p class="text-[11px] text-slate-400 leading-relaxed">
+                Unggah rekaman audio rapat untuk diolah oleh Agen AI n8n + Gemini menjadi draf <b>Pengarahan Umum</b> &amp; <b>5 Kolom Pembahasan</b> secara otomatis.
+              </p>
+              <div>
+                <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Catatan Mentah / Transkrip Sementara</label>
+                <textarea id="rapatFieldAiTranscript" rows="4"
+                  placeholder="Anda sudah dapat menyimpan catatan mentah atau transkrip rapat di sini bersama data agenda..."
+                  class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-slate-200 text-xs focus:ring-1 focus:ring-indigo-500 outline-none custom-scrollbar"></textarea>
+              </div>
             </div>
           </div>
         </div>
@@ -1075,10 +1365,10 @@
 
     <!-- FOOTER MODAL & TOMBOL AKSI -->
     <div
-      class="px-6 py-4 border-t border-slate-800/80 bg-slate-950/80 flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
-      <div class="text-[11px] text-slate-500">
-        <i class="fa-solid fa-layer-group mr-1 text-emerald-400"></i> Sistem akan menerbitkan 3 Google Docs (Undangan,
-        Absensi, Notulen).
+      class="px-5 py-3.5 border-t border-slate-800/80 bg-slate-950/80 flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
+      <div class="text-[11px] text-slate-400 flex items-center gap-2">
+        <i class="fa-solid fa-cloud-arrow-up text-emerald-400"></i>
+        <span>Data tersimpan ke Cloud Firestore; tombol cetak Undangan, Daftar Hadir, dan Notula tersedia di tabel E-Office.</span>
       </div>
 
       <div class="flex items-center gap-2 w-full sm:w-auto justify-end">
@@ -1087,10 +1377,10 @@
           Batal
         </button>
 
-        <button type="button" onclick="submitRapatForm()" id="btnRapatGenerateDoc"
+        <button type="button" onclick="submitRapatForm()" id="btnRapatSaveAgenda"
           class="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl transition text-xs shadow-lg shadow-emerald-600/30 flex items-center gap-2">
-          <i class="fa-solid fa-file-shield"></i>
-          <span>Terbitkan 3 Dokumen Rapat</span>
+          <i class="fa-solid fa-floppy-disk"></i>
+          <span>Simpan Agenda Rapat</span>
         </button>
       </div>
     </div>

@@ -6739,6 +6739,117 @@ Berdasarkan tangkapan layar pengguna ([`media_1794986712224_63fb4a95.png`](file:
 - **Hasil Test Suite:** `ALL 6 SECURITY & SCHEMA SUITES PASSED (0 FAILURES)`.
 - **Aktivasi Pengguna:** Lakukan hard refresh browser (`Ctrl + Shift + R`) untuk memuat PWA `v3.8.70`.
 
+---
+
+## RANCANGAN ROADMAP BESAR MODUL RAPAT KEDINASAN (TAHAP 137 – 140)
+**Status:** `[TAHAP 137 SELESAI & AKTIF (v3.8.71) | TAHAP 138–140 MENUNGGU EKSEKUSI BERIKUTNYA]`
+
+### 1. Tujuan & Ruang Lingkup Transformasi
+Merombak total modul **Paket Administrasi Rapat** pada menu **E-Office** agar beralih dari generator teks sederhana Google Docs menjadi sistem **Workspace Fullscreen + 3 Mesin Cetak HTML Instan (0ms) Standar PA Indramayu + Dokumentasi Foto Drive + AI Notulis Audio**, mengacu 1:1 pada contoh dokumen PDF 9 halaman dan spesifikasi tata naskah dinas yang telah disepakati bersama pengguna:
+
+- **Ukuran Kertas & Tipografi Baku:** Seluruh cetakan menggunakan kertas **A4 Portrait (`210mm x 297mm`)**, jenis huruf **Bookman Old Style**:
+  - **Surat Undangan Rapat:** `12pt` (menggunakan Kop Surat Tugas).
+  - **Daftar Hadir Rapat:** `12pt` (tanpa Kop Surat).
+  - **Notula Rapat & Lampiran Foto:** `11pt` (menggunakan Kop Surat Tugas).
+- **Pemisahan Alur Simpan vs Cetak:** Tombol footer popup fokus pada **"Simpan Agenda Rapat"** (ke Cloud Firestore `eoffice_rapat`), sedangkan **3 tombol cetak instan (`Undangan`, `Absen`, `Notula`)** berada di luar popup pada kolom Aksi tabel E-Office agar dapat dicetak bertahap (sebelum dan sesudah rapat).
+
+---
+
+### 2. Rincian Pekerjaan Per Tahap (4 Tahap Berurutan)
+
+#### ✅ TAHAP 137 [SELESAI & AKTIF — v3.8.71] — Fondasi Skema Database, Keamanan & Modal Workspace Fullscreen Rapat
+**Status Verifikasi:** `ALL 6 SECURITY & SCHEMA SUITES PASSED (0 FAILURES)` • `PWA transkep-v3.8.71`
+**Fokus:** Menyiapkan fondasi data dan antarmuka input yang luas, terstruktur, dan siap menampung seluruh field Undangan, Daftar Hadir, Notula, Foto, dan AI.
+- **File Target:**
+  - `firestore.rules` *(wajib didelegasikan ke sub-agen `firestore-rules-author`)*
+  - `core/firebase.js` (`EOFFICE_RAPAT_ALLOWED_FIELDS` & `saveRapatToFirestore`)
+  - `modules/eoffice/eoffice_data.js` (metode `saveRapatLocalAndFirestore` / `deleteRapat` yang konsisten dengan Firestore-first)
+  - `modules/eoffice/view_eoffice.html` (`#modalAgendaRapat`)
+  - `modules/eoffice/rapat.js` & `modules/eoffice/eoffice.js`
+- **Detail Teknis Tahap 137:**
+  1. **Perluasan Skema `eoffice_rapat` (Firestore Rules & Client):**
+     Menambahkan field tervalidasi: `tgl_surat`, `no_urut_surat`, `kode_klasifikasi_surat`, `kode_pejabat_ttd`, `pejabat_ttd_nip`, `pejabat_ttd_jabatan`, `tampilkan_gelar_undangan`, `lampiran_surat`, `tujuan_undangan_json`, `dasar_notula`, `jenis_kegiatan`, `jumlah_baris_hadir`, `pemimpin_nip`, `pemimpin_jabatan`, `notulis_nip`, `notulis_jabatan`, `pengarahan_umum`, `pembahasan_json`, `foto_rapat_json`, `audio_rapat_url`, `ai_transcript`. Mempertahankan kompatibilitas seluruh dokumen rapat lama.
+  2. **Modal Fullscreen-Toggle + 4 Tab Navigasi (`#modalAgendaRapat`):**
+     - Menambahkan tombol **Expand / Compress Fullscreen** di header modal (mengadopsi pola `isFullscreen` pada menu Uraian Tugas / Jobdes).
+     - Membagi isi form ke dalam **4 Tab Rapi**:
+       - **Tab 1 — Undangan & Identitas Rapat:** Input No. Urut, Dropdown Pejabat TTD (*Ketua / Wakil Ketua / Panitera / Sekretaris / Panmud / Kasubbag*) dengan pemetaan kode otomatis (`KPA.W10-A2`, `WKPA.W10-A2`, `PAN.PA.W10-A2`, `SEK.PA.W10-A2`, dst.), input Kode Klasifikasi (cukup ketik misal `PW1.1.1` → otomatis dirakit menjadi `[No]/[KodePejabat]/UND.[KodeSurat]/[Romawi]/[Tahun]`), Tanggal Surat, Hari/Tanggal Rapat, Jam Mulai–Selesai, Tempat, Pimpinan Rapat & Notulis (dipilih dari `usersList` agar NIP/Jabatan tertarik otomatis), serta `Dasar` dan `Agenda` (mendukung daftar bernomor).
+       - **Tab 2 — Tujuan Undangan & Pengaturan Daftar Hadir:** Input dinamis **Daftar Yang Diundang** (bisa memilih pegawai atau mengetik teks kelompok seperti *"Seluruh ASN Pengadilan Agama Indramayu"*) dengan indikator otomatis **`1 Lembar (1–3 penerima)` vs `2 Lembar + Lampiran (>3 penerima)`**; ditambah pengaturan **Jenis Kegiatan** & **Jumlah Baris Tulis Tangan Daftar Hadir (1 s.d. 48 baris)**.
+       - **Tab 3 — Notula & Pembahasan (Kolom Kiri-ke-Kanan):** Field *Pengarahan Umum Pimpinan Rapat* + Repeater Dinamis **`+ Tambah Pembicara / Topik`** di mana tiap baris menampilkan **5 kolom berjajar dari kiri ke kanan** pada layar lebar (`Uraian Pembahasan`, `Tindak Lanjut`, `Target`, `Penanggung Jawab`, `Tanggal Penyelesaian`).
+       - **Tab 4 — Dokumentasi Foto & AI Rekaman** *(kerangka UI disiapkan; fungsi upload & AI diaktifkan penuh di Tahap 139–140)*.
+  3. **Tombol Simpan Agenda Rapat (0ms Optimistic UI):** Mengganti tombol penerbitan Google Docs otomatis dengan **"Simpan Agenda Rapat"** langsung ke Firestore & Cache Lokal, plus opsi tombol sekunder opsional di dalam modal jika tetap ingin ekspor Google Docs.
+
+---
+
+#### 📌 TAHAP 138 — Mesin Cetak Instan 1 & 2: Surat Undangan (`cetak_undangan`) & Daftar Hadir (`cetak_hadir`)
+**Fokus:** Menghadirkan hasil cetak presisi 1:1 sesuai Halaman 1–3 contoh PDF beserta aktivasi tombol cetak luar di tabel E-Office.
+- **File Target Baru & Diperbarui:**
+  - `modules/eoffice/cetak/cetak_undangan.html` + `modules/eoffice/cetak/js_cetak_undangan.js`
+  - `modules/eoffice/cetak/cetak_hadir.html` + `modules/eoffice/cetak/js_cetak_hadir.js`
+  - `modules/eoffice/view_eoffice.html` & `modules/eoffice/eoffice.js` (tombol aksi luar tabel: `Undangan`, `Absen`, `Notula`)
+  - `index.html` (`CETAK_TEMPLATES`, `CETAK_SCRIPTS`) & `sw.js` (`PRECACHE_ASSETS`)
+- **Detail Teknis Tahap 138:**
+  1. **Mesin Cetak Undangan (`cetak_undangan` — A4, 12pt, Kop Surat Tugas):**
+     - Mengadopsi Kop Surat resmi dari `modules/permohonan/cetak/cetak_st.html`.
+     - **Logika 1 Lembar vs 2 Lembar:**
+       - *Jika penerima 1 s.d. 3 poin:* Halaman 1 langsung mencantumkan daftar bernomor `1..3` di bawah `Kepada Yth.`, `Lampiran : -`, dan tidak ada halaman 2.
+       - *Jika penerima > 3 poin:* Halaman 1 tertulis `Kepada Yth. Para Pejabat pada daftar terlampir`, otomatis membuat **Halaman 2 (`page-break-before: always`)** dengan header pojok kanan atas persis contoh PDF:
+         - `Lampiran Surat Undangan` (**11pt bold**)
+         - `[Jabatan Penandatangan] Pengadilan Agama Indramayu` (**9pt**)
+         - `Nomor : [Nomor Undangan]` (**9pt**)
+         - `Tanggal : [Tanggal Surat]` (**9pt**)
+         Dilanjutkan judul `DAFTAR NAMA PEJABAT/TIM YANG DIUNDANG`, daftar bernomor penerima, dan blok tanda tangan penutup di kanan bawah.
+     - **Blok TTD Undangan:** Menampilkan `Wassalam, / [Jabatan Penandatangan], / [Nama Tanpa Gelar]` (tanpa NIP, default mengikuti contoh PDF; memanfaatkan helper `stripGelar`).
+  2. **Mesin Cetak Daftar Hadir (`cetak_hadir` — A4, 12pt, Tanpa Kop Surat):**
+     - Judul `DAFTAR HADIR RAPAT` + 5 baris meta kiri (`Jenis Kegiatan`, `Nama Kegiatan`, `Hari, Tanggal`, `Waktu`, `Tempat`).
+     - Tabel 4 kolom (`NO | Nama | Jabatan | Tanda Tangan`) lengkap dengan baris sub-header penomoran kolom (`1 | 2 | 3 | 4`).
+     - Sel `Nama` dan `Jabatan` **kosong (untuk tulis tangan)** sebanyak `jumlah_baris_hadir` (1–48), sedangkan kolom `Tanda Tangan` memiliki angka **zig-zag kiri-kanan** otomatis (ganjil di kiri, genap di tengah/kanan).
+     - **Auto-Pagination (Maks. 48 Baris):** Jika baris tidak muat 1 halaman A4, otomatis terpecah rapi ke halaman berikutnya dengan mengulang header tabel (`thead { display: table-header-group; }`), dan blok tanda tangan **hanya dicetak di halaman terakhir** (`break-inside: avoid`): Kiri (`Mengetahui, / [Pimpinan Rapat], / Nama + NIP`) & Kanan (`Indramayu, [Tanggal Rapat] / Notulis, / Nama + NIP`).
+
+---
+
+#### 📌 TAHAP 139 — Upload & Kompresi Foto Rapat (Google Drive) + Mesin Cetak 3: Notula Rapat (`cetak_notula`)
+**Fokus:** Menyelesaikan siklus administrasi pasca-rapat berupa dokumentasi foto aman dan cetakan Notula Rapat bertingkat (Halaman 4–9 PDF).
+- **File Target Baru & Diperbarui:**
+  - `code.js` & `api_router.js` (endpoint upload foto rapat terkompresi ke Google Drive Folder Rapat, menggunakan `validateUploadedFile_` `allowImages: true`)
+  - `modules/eoffice/rapat.js` & `modules/eoffice/view_eoffice.html` (Kompresor gambar HTML5 Canvas di browser max 1280px JPEG 80% + preview aman via `getDriveFileBlob` / thumbnail)
+  - `modules/eoffice/cetak/cetak_notula.html` + `modules/eoffice/cetak/js_cetak_notula.js`
+  - `index.html` & `sw.js`
+- **Detail Teknis Tahap 139:**
+  1. **Upload Foto Rapat Aman Anti-Overload Firestore:**
+     - Foto dikompresi otomatis di sisi browser (~150–250 KB/foto) sebelum dikirim ke GAS → tersimpan privat di Google Drive, sehingga dokumen Firestore hanya menyimpan array referensi Drive ID/URL (`foto_rapat_json`, aman jauh di bawah batas 1 MB).
+     - Saat mencetak Notula, gambar di-fetch melalui `TranskepAPI` (`getDriveFileBlob` Base64 DataURI) sehingga 100% aman (nol `ANYONE_WITH_LINK`) dan langsung muncul di pratinjau cetak.
+  2. **Mesin Cetak Notula (`cetak_notula` — A4, 11pt, Kop Surat Tugas):**
+     - Mengadopsi Kop Surat Tugas di halaman pertama.
+     - Judul `NOTULA` + blok identitas sejajar (`Dasar`, `Hari`, `Tanggal`, `Pukul`, `Tempat`, `Acara`) + `Peserta Rapat` bernomor.
+     - Bagian `Jalannya Rapat :` merender:
+       - `A. Pengarahan Umum Pimpinan Rapat (...)`
+       - `B. Pembahasan` → Mengonversi data 5 kolom kiri-ke-kanan per pembicara menjadi format hierarkis persis contoh PDF (`1. Nama (Jabatan)` → `a. Uraian Pembahasan/Laporan` `1, 2, ...` → `b. Tindak Lanjut/Tanggapan/Masukan` → `c. Target Penyelesaian` → `d. Penanggung Jawab` → `e. Tanggal Penyelesaian`).
+     - Blok TTD Kiri (`Mengetahui, / Pimpinan Rapat / Nama Gelar`) & Kanan (`Indramayu, Tanggal / Notulis, / Nama Gelar`).
+     - **Lampiran Halaman Foto Rapat:** Otomatis `page-break-before: always` jika terdapat foto rapat, menampilkan judul `Foto Rapat` + tata letak grid 2×2 yang proporsional (4 foto per halaman).
+
+---
+
+#### 📌 TAHAP 140 — Integrasi AI Notulis Otomatis (Rekaman Audio Rapat → Auto-Fill Notula via n8n & Gemini)
+**Fokus:** Menghubungkan rekaman suara rapat (atau transkrip kasar) ke agen AI n8n + Google Gemini agar kolom Notula terisi otomatis secara terstruktur.
+- **File Target Baru & Diperbarui:**
+  - `n8n/transkep-ai-notulen.example.json` (blueprint workflow n8n Webhook + Gemini Multimodal Audio/Text JSON Extractor)
+  - `modules/eoffice/rapat.js`, `modules/eoffice/view_eoffice.html`, & `modules/eoffice/eoffice_data.js`
+  - `tests/verify_n8n_workflow.js` & `tests/verify_fase3b.js`
+- **Detail Teknis Tahap 140:**
+  1. **Alur Audio Cerdas & Tangguh:**
+     - Pada **Tab AI Notulis & Rekaman** di popup Rapat, tersedia pilihan **Upload File Rekaman Audio** (`.mp3`, `.m4a`, `.wav`, `.ogg`, `.webm`) lengkap dengan **kompresi/resampling audio ringan** atau **Rekam Langsung dari Mikrofon Browser**, plus kolom cadangan **Paste Teks/Catatan Kasar** (jika rekaman berdurasi sangat panjang atau kendala koneksi).
+  2. **Endpoint n8n AI Notulen (`Gemini Multimodal`):**
+     - Audio dikirim dengan proteksi autentikasi ke webhook n8n Docker → diproses oleh **Gemini API** (ekstraksi suara langsung + pemetaan pembicara) dengan skema keluaran **Strict JSON**:
+       `{ dasar_opsional, pengarahan_umum, pembahasan: [{ pembicara, uraian[], tindak_lanjut[], target, penanggung_jawab, tanggal_penyelesaian }] }`.
+  3. **Auto-Fill & Human-in-the-Loop Review:**
+     - Setelah selesai diproses, hasil AI otomatis diisikan ke field **Pengarahan Umum** dan baris-baris **5 Kolom Kiri-ke-Kanan** di Tab Notula, lengkap dengan notifikasi agar Notulis dapat meninjau/mengoreksi ejaan nama sebelum menyimpan dan mencetak.
+
+---
+
+### 3. Kebutuhan Verifikasi & Pengujian Bertahap
+- Setiap tahap wajib lulus **seluruh 6 test suite** (`npm test`), termasuk sinkronisasi skema `firestore.rules` ↔ `core/firebase.js` (Parity Test), pengecekan sintaks & keamanan XSS (`escHtml`), isolasi proxy Drive (nol `ANYONE_WITH_LINK`), serta sinkronisasi nomor versi PWA di `index.html` & `sw.js`.
+- **Menunggu Persetujuan Pengguna:** Eksekusi **Tahap 137** baru akan dimulai setelah pengguna memberikan persetujuan (**`"OKE TERAPKAN"`**).
+
 
 
 

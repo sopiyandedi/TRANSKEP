@@ -572,6 +572,15 @@ document.addEventListener("DOMContentLoaded", () => {
         };
       },
 
+      promptDeleteRapat(item) {
+        if (!item) return;
+        this.confirmModal = {
+          open: true,
+          mode: 'delete_rapat',
+          target: item
+        };
+      },
+
       closeConfirmModal() {
         this.confirmModal = {
           open: false,
@@ -610,6 +619,32 @@ document.addEventListener("DOMContentLoaded", () => {
             }
           } catch (err) {
             console.error("Gagal menghapus KGB:", err);
+            if (typeof showNotify === 'function') {
+              showNotify("Gagal Menghapus", err.toString(), "error");
+            }
+            this.loadData(true);
+          }
+          return;
+        }
+
+        if (mode === 'delete_rapat') {
+          this._allowEmptyFirestoreSnapshot = true;
+          const targetId = String(raw.id_rapat || raw.id || '');
+          this.rawRapatList = this.rawRapatList.filter(r => String(r.id_rapat || r.id || '') !== targetId);
+          if (window.EofficeDataService && typeof window.EofficeDataService.setLocalCache === 'function') {
+            window.EofficeDataService.setLocalCache({ kgb: this.rawKgbList, rapat: this.rawRapatList });
+          }
+          this.closeConfirmModal();
+
+          try {
+            if (window.EofficeDataService && typeof window.EofficeDataService.deleteRapat === 'function') {
+              await window.EofficeDataService.deleteRapat(targetId);
+            }
+            if (typeof showNotify === 'function') {
+              showNotify("Agenda Rapat Dihapus", "Agenda " + (raw.agenda || target.title) + " berhasil dihapus.", "success");
+            }
+          } catch (err) {
+            console.error("Gagal menghapus Rapat:", err);
             if (typeof showNotify === 'function') {
               showNotify("Gagal Menghapus", err.toString(), "error");
             }

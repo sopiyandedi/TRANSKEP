@@ -915,6 +915,45 @@ const EofficeDataService = {
   },
 
   /**
+   * Menyimpan / Memperbarui Data Agenda & Notula Rapat langsung ke Cloud Firestore & Cache Lokal (0ms)
+   */
+  async saveRapatData(payload, adminNip) {
+    const creatorNip = adminNip || (typeof localStorage !== 'undefined' ? localStorage.getItem('transkep_active_nip') : '') || '';
+    const existingId = String((payload && (payload.id_rapat || payload.id)) || '').trim();
+    const docId = existingId || ('RPT-' + Date.now());
+    const rapatData = {
+      ...(payload || {}),
+      id: docId,
+      id_rapat: docId,
+      status: String((payload && payload.status) || 'Terjadwal'),
+      tanggal_input: (payload && payload.tanggal_input) || new Date().toISOString().split('T')[0],
+      created_by: (payload && payload.created_by) || creatorNip
+    };
+
+    try {
+      const cached = this.getLocalCache() || { kgb: [], rapat: [] };
+      const list = Array.isArray(cached.rapat) ? [...cached.rapat] : [];
+      const idx = list.findIndex(r => String(r.id_rapat || r.id) === docId);
+      if (idx !== -1) {
+        list[idx] = { ...list[idx], ...rapatData };
+      } else {
+        list.unshift(rapatData);
+      }
+      this.setLocalCache({ kgb: Array.isArray(cached.kgb) ? cached.kgb : [], rapat: list });
+    } catch (e) {}
+
+    if (typeof TranskepFirebase !== 'undefined' && TranskepFirebase.isReady && TranskepFirebase.isReady()) {
+      const fsRes = await TranskepFirebase.saveRapatToFirestore(rapatData);
+      return {
+        status: 'success',
+        id_rapat: docId,
+        data: (fsRes && fsRes.data) ? { ...rapatData, ...fsRes.data } : rapatData
+      };
+    }
+    return { status: 'success', id_rapat: docId, data: rapatData };
+  },
+
+  /**
    * Menerbitkan paket dokumen rapat 3-in-1 ke Google Docs dan menyimpannya ke Cloud Firestore
    */
   createPaketRapat(payload, adminNip, token) {

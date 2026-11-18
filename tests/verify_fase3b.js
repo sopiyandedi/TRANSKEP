@@ -1515,6 +1515,43 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
     const kgbJs136 = fs.readFileSync('modules/eoffice/kgb.js', 'utf8');
     assert(kgbJs136.includes('window.setKgbModalStatus = function'), 'kgb.js must define window.setKgbModalStatus');
     assert(kgbJs136.includes('function updateKgbModalStatusButtons('), 'kgb.js must define updateKgbModalStatusButtons');
+
+    // Tahap 137: Fondasi Skema & Workspace Fullscreen Rapat
+    assert(viewEoffice136.includes('toggleRapatFullscreen()'), 'view_eoffice.html must provide toggleRapatFullscreen');
+    for (const tabId of ['rapatTabPanel_undangan', 'rapatTabPanel_peserta', 'rapatTabPanel_notula', 'rapatTabPanel_media']) {
+      assert(viewEoffice136.includes(`id="${tabId}"`), `view_eoffice.html missing tab panel ${tabId}`);
+    }
+    for (const kode of ['KPA.W10-A2', 'WKPA.W10-A2', 'PAN.PA.W10-A2', 'SEK.PA.W10-A2']) {
+      assert(viewEoffice136.includes(`value="${kode}"`), `view_eoffice.html missing signatory code ${kode}`);
+    }
+    assert(viewEoffice136.includes('id="btnRapatSaveAgenda"') && eofficeJs136.includes('promptDeleteRapat('), 'Rapat save button & delete action must exist');
+
+    const eofficeDataJs137 = fs.readFileSync('modules/eoffice/eoffice_data.js', 'utf8');
+    assert(eofficeDataJs137.includes('async saveRapatData('), 'eoffice_data.js must define saveRapatData');
+
+    const rapatJsSrc137 = fs.readFileSync('modules/eoffice/rapat.js', 'utf8');
+    const rapatDom = {
+      rapatFieldNoUrutSurat: { value: '1059' },
+      rapatFieldKodePejabat: { value: 'PAN.PA.W10-A2' },
+      rapatFieldKodeSurat: { value: 'PW1.1.1' },
+      rapatFieldTglSuratIso: { value: '2026-10-27' },
+      rapatFieldNomorUndangan: { value: '' }
+    };
+    const rapatVm = {
+      console, Date, Math, Array, Object, String, Number, Boolean, JSON,
+      localStorage: { getItem: () => '', setItem: () => {} },
+      document: { getElementById: (id) => rapatDom[id] || null },
+      window: {}
+    };
+    rapatVm.window = rapatVm;
+    vm.createContext(rapatVm);
+    vm.runInContext(rapatJsSrc137, rapatVm);
+    rapatVm.syncNomorUndanganPreview();
+    assert.strictEqual(
+      rapatDom.rapatFieldNomorUndangan.value,
+      '1059/PAN.PA.W10-A2/UND.PW1.1.1/X/2026',
+      'syncNomorUndanganPreview must assemble UND.kode surat with signatory code and Roman month'
+    );
   } finally {
     browserSandbox.TranskepAPI.call = origApiCall;
     browserSandbox.TranskepFirebase.getDb = origGetDb;
