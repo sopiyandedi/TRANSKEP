@@ -41,6 +41,7 @@ document.addEventListener("DOMContentLoaded", () => {
         },
         searchQuery: '',
         isDropdownOpen: false,
+        activeStatusDropdownId: null,
         _allowEmptyFirestoreSnapshot: false
       };
     },
@@ -412,6 +413,16 @@ document.addEventListener("DOMContentLoaded", () => {
       // ==========================================
       // KONTROL STATUS MANDIRI LANGSUNG DI TABEL E-OFFICE (TAHAP 135)
       // ==========================================
+      toggleStatusDropdown(keyId) {
+        this.activeStatusDropdownId = (this.activeStatusDropdownId === keyId) ? null : keyId;
+      },
+
+      selectStatus(item, newStatus) {
+        this.activeStatusDropdownId = null;
+        if (!item || item.rawStatus === newStatus) return;
+        this.updateKgbStatusDirectly(item, newStatus);
+      },
+
       async updateKgbStatusDirectly(item, newStatus) {
         if (!item || !item.rawData) return;
         const raw = { ...item.rawData, status: newStatus };
@@ -695,6 +706,13 @@ document.addEventListener("DOMContentLoaded", () => {
       if (currentMenu === 'eoffice' && this.isAdmin) {
         this.loadData();
       }
+
+      // 4. Tutup dropdown status mengambang saat klik di luar
+      document.addEventListener('click', () => {
+        if (this.activeStatusDropdownId) {
+          this.activeStatusDropdownId = null;
+        }
+      });
     }
   }).mount('#vue-eoffice-app');
 });

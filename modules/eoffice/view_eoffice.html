@@ -153,7 +153,7 @@
       </div>
 
       <!-- State 3: Tabel Data Berjalan -->
-      <div v-else class="overflow-x-auto custom-scrollbar">
+      <div v-else class="overflow-x-auto custom-scrollbar pb-28 min-h-[340px]">
         <table class="w-full text-left border-collapse">
           <thead>
             <tr
@@ -203,20 +203,95 @@
                 <div class="truncate" :title="item.description">{{ item.description }}</div>
               </td>
 
-              <!-- Kolom 5: Status Berkas -->
-              <td class="py-3.5 px-4 text-center whitespace-nowrap">
-                <div v-if="item.itemType === 'KGB'" class="relative inline-flex items-center">
-                  <select
-                    :value="item.rawStatus"
-                    @change="updateKgbStatusDirectly(item, $event.target.value)"
-                    :class="['px-2.5 py-1 rounded-full text-[10px] font-bold border cursor-pointer outline-none transition appearance-none pr-6 text-center font-sans tracking-wide shadow-sm', item.statusBadgeClass]">
-                    <option value="Sedang Diproses" class="bg-slate-900 text-blue-400 font-bold">Sedang Diproses</option>
-                    <option value="Menunggu TTE Pimpinan" class="bg-slate-900 text-amber-400 font-bold">Menunggu TTE Pimpinan</option>
-                    <option value="Selesai" class="bg-slate-900 text-emerald-400 font-bold">Selesai / Terbit</option>
-                  </select>
-                  <i class="fa-solid fa-chevron-down absolute right-2 pointer-events-none text-[8px] opacity-70"
-                    :class="item.rawStatus === 'Selesai' ? 'text-emerald-400' : (item.rawStatus === 'Menunggu TTE Pimpinan' ? 'text-amber-400' : 'text-blue-400')"></i>
+              <!-- Kolom 5: Status Berkas (Dropdown Kustom Cantik & Modern) -->
+              <td class="py-3.5 px-4 text-center whitespace-nowrap relative">
+                <!-- Dropdown Khusus KGB: Glassmorphism Pill & Floating Menu -->
+                <div v-if="item.itemType === 'KGB'" class="relative inline-block text-left" @click.stop>
+                  <!-- Trigger Button (Badge Pill Interaktif) -->
+                  <button type="button"
+                    @click="toggleStatusDropdown(item.keyId)"
+                    :class="[
+                      'px-3 py-1.5 rounded-full text-[10px] font-bold border inline-flex items-center gap-2 transition-all duration-200 cursor-pointer shadow-sm hover:scale-105 active:scale-95 select-none',
+                      item.statusBadgeClass,
+                      activeStatusDropdownId === item.keyId ? 'ring-2 ring-indigo-500/50 shadow-lg' : ''
+                    ]"
+                    :title="'Ubah status berkas: ' + item.title">
+                    <span :class="['w-2 h-2 rounded-full', item.statusDotClass]"></span>
+                    <span>{{ item.statusText }}</span>
+                    <i class="fa-solid fa-chevron-down text-[8px] transition-transform duration-300 opacity-70 ml-0.5"
+                      :class="{ 'rotate-180': activeStatusDropdownId === item.keyId }"></i>
+                  </button>
+
+                  <!-- Popover Menu Mengambang (Dark Glassmorphism Ultra-Modern) -->
+                  <div v-show="activeStatusDropdownId === item.keyId"
+                    class="absolute z-[150] left-1/2 -translate-x-1/2 mt-2 w-56 bg-slate-900/95 backdrop-blur-xl border border-slate-700/80 rounded-2xl shadow-2xl shadow-black/90 p-1.5 space-y-1 animate-fade-in text-left">
+                    
+                    <div class="px-2.5 py-1 text-[9px] font-extrabold uppercase tracking-wider text-slate-500 border-b border-slate-800/80 mb-1 flex items-center justify-between">
+                      <span>Ubah Status Berkas</span>
+                      <i class="fa-solid fa-sliders text-indigo-400"></i>
+                    </div>
+
+                    <!-- Pilihan 1: Sedang Diproses -->
+                    <button type="button"
+                      @click="selectStatus(item, 'Sedang Diproses')"
+                      :class="[
+                        'w-full px-2.5 py-2 rounded-xl text-xs font-semibold flex items-center justify-between transition-all group',
+                        item.rawStatus === 'Sedang Diproses'
+                          ? 'bg-blue-500/20 text-blue-300 border border-blue-500/40 shadow-md shadow-blue-500/10'
+                          : 'text-slate-300 hover:bg-slate-800/80 hover:text-white border border-transparent'
+                      ]">
+                      <div class="flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-blue-400 animate-pulse"></span>
+                        <div class="flex flex-col">
+                          <span class="font-bold text-slate-200 group-hover:text-white">Sedang Diproses</span>
+                          <span class="text-[9px] text-slate-500 group-hover:text-slate-400">Penyusunan draf SK</span>
+                        </div>
+                      </div>
+                      <i v-if="item.rawStatus === 'Sedang Diproses'" class="fa-solid fa-check text-blue-400 text-xs"></i>
+                    </button>
+
+                    <!-- Pilihan 2: Menunggu TTE Pimpinan -->
+                    <button type="button"
+                      @click="selectStatus(item, 'Menunggu TTE Pimpinan')"
+                      :class="[
+                        'w-full px-2.5 py-2 rounded-xl text-xs font-semibold flex items-center justify-between transition-all group',
+                        item.rawStatus === 'Menunggu TTE Pimpinan'
+                          ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-md shadow-amber-500/10'
+                          : 'text-slate-300 hover:bg-slate-800/80 hover:text-white border border-transparent'
+                      ]">
+                      <div class="flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+                        <div class="flex flex-col">
+                          <span class="font-bold text-slate-200 group-hover:text-white">Menunggu TTE</span>
+                          <span class="text-[9px] text-slate-500 group-hover:text-slate-400">Antrean tanda tangan</span>
+                        </div>
+                      </div>
+                      <i v-if="item.rawStatus === 'Menunggu TTE Pimpinan'" class="fa-solid fa-check text-amber-400 text-xs"></i>
+                    </button>
+
+                    <!-- Pilihan 3: Selesai / Terbit -->
+                    <button type="button"
+                      @click="selectStatus(item, 'Selesai')"
+                      :class="[
+                        'w-full px-2.5 py-2 rounded-xl text-xs font-semibold flex items-center justify-between transition-all group',
+                        item.rawStatus === 'Selesai'
+                          ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-md shadow-emerald-500/10'
+                          : 'text-slate-300 hover:bg-slate-800/80 hover:text-white border border-transparent'
+                      ]">
+                      <div class="flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                        <div class="flex flex-col">
+                          <span class="font-bold text-slate-200 group-hover:text-white">Selesai / Terbit</span>
+                          <span class="text-[9px] text-slate-500 group-hover:text-slate-400">SK resmi diterbitkan</span>
+                        </div>
+                      </div>
+                      <i v-if="item.rawStatus === 'Selesai'" class="fa-solid fa-check text-emerald-400 text-xs"></i>
+                    </button>
+
+                  </div>
                 </div>
+
+                <!-- Status Standar Non-KGB (misal Rapat) -->
                 <span v-else
                   :class="['px-2.5 py-1 rounded-full text-[10px] font-bold border inline-flex items-center gap-1.5', item.statusBadgeClass]">
                   <span :class="['w-1.5 h-1.5 rounded-full', item.statusDotClass]"></span>
@@ -404,17 +479,32 @@
       <form id="formKgbDokumen" onsubmit="event.preventDefault();">
         <input type="hidden" id="kgbFieldIdKgb">
         <input type="hidden" id="kgbFieldNip">
-        <!-- Status Berkas Dokumen -->
-        <div class="flex items-center justify-between bg-slate-950/40 px-4 py-2.5 rounded-2xl border border-slate-800/80 mb-2">
-          <label class="text-[10px] font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
-            <i class="fa-solid fa-list-check text-indigo-400"></i> Status Berkas Dokumen:
-          </label>
-          <select id="kgbFieldStatus"
-            class="px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-900 border border-slate-700 text-slate-200 outline-none cursor-pointer focus:ring-1 focus:ring-indigo-500">
-            <option value="Sedang Diproses" class="bg-slate-900 text-blue-400 font-bold">Sedang Diproses</option>
-            <option value="Menunggu TTE Pimpinan" class="bg-slate-900 text-amber-400 font-bold">Menunggu TTE Pimpinan</option>
-            <option value="Selesai" class="bg-slate-900 text-emerald-400 font-bold">Selesai / Terbit</option>
-          </select>
+        <!-- Status Berkas Dokumen (Segmented Button Group Cantik) -->
+        <div class="bg-slate-950/40 p-3.5 rounded-2xl border border-slate-800/80 mb-3 space-y-2">
+          <div class="flex items-center justify-between">
+            <label class="text-[10px] font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+              <i class="fa-solid fa-list-check text-indigo-400"></i> Status Berkas Dokumen:
+            </label>
+            <span class="text-[10px] text-slate-500 font-medium">Klik untuk mengubah status draf</span>
+          </div>
+          <input type="hidden" id="kgbFieldStatus" value="Sedang Diproses">
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2" id="kgbStatusButtonGroup">
+            <button type="button" onclick="setKgbModalStatus('Sedang Diproses')" id="btnStatusProses"
+              class="px-3 py-2 rounded-xl text-xs font-bold border transition-all flex items-center justify-center gap-2 bg-blue-500/20 border-blue-500/50 text-blue-300 shadow-sm">
+              <span class="w-2 h-2 rounded-full bg-blue-400 animate-pulse"></span>
+              <span>Sedang Diproses</span>
+            </button>
+            <button type="button" onclick="setKgbModalStatus('Menunggu TTE Pimpinan')" id="btnStatusTte"
+              class="px-3 py-2 rounded-xl text-xs font-bold border transition-all flex items-center justify-center gap-2 bg-slate-900 border-slate-800 text-slate-400 hover:bg-slate-800/80">
+              <span class="w-2 h-2 rounded-full bg-amber-400"></span>
+              <span>Menunggu TTE</span>
+            </button>
+            <button type="button" onclick="setKgbModalStatus('Selesai')" id="btnStatusSelesai"
+              class="px-3 py-2 rounded-xl text-xs font-bold border transition-all flex items-center justify-center gap-2 bg-slate-900 border-slate-800 text-slate-400 hover:bg-slate-800/80">
+              <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+              <span>Selesai / Terbit</span>
+            </button>
+          </div>
         </div>
         <input type="hidden" id="kgbFieldFileDocUrl">
         <input type="hidden" id="kgbFieldFilePdfUrl">

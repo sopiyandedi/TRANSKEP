@@ -551,6 +551,7 @@ window.openKgbModalForm = function (kgbData) {
   document.getElementById('kgbFieldNip').value = nip;
   var elStatus = document.getElementById('kgbFieldStatus');
   if (elStatus) elStatus.value = working.status || 'Sedang Diproses';
+  updateKgbModalStatusButtons(working.status || 'Sedang Diproses');
   var elDocUrl = document.getElementById('kgbFieldFileDocUrl');
   if (elDocUrl) elDocUrl.value = working.file_doc_url || '';
   var elPdfUrl = document.getElementById('kgbFieldFilePdfUrl');
@@ -726,6 +727,48 @@ function closeKgbModalForm() {
   setTimeout(function () {
     modal.classList.add('hidden');
   }, 300);
+}
+
+window.setKgbModalStatus = function (statusVal) {
+  var el = document.getElementById('kgbFieldStatus');
+  if (el) el.value = statusVal;
+  updateKgbModalStatusButtons(statusVal);
+  var badge = document.getElementById('kgbBadgeStatus');
+  if (badge) {
+    if (statusVal === 'Selesai') {
+      badge.innerText = 'Selesai / Arsip';
+      badge.className = 'px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-emerald-500/10 border border-emerald-500/20 text-emerald-400';
+    } else if (statusVal === 'Menunggu TTE Pimpinan') {
+      badge.innerText = 'Menunggu TTE Pimpinan';
+      badge.className = 'px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-amber-500/10 border border-amber-500/20 text-amber-400';
+    } else {
+      badge.innerText = 'Draf Sedang Diproses';
+      badge.className = 'px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-blue-500/10 border border-blue-500/20 text-blue-400';
+    }
+  }
+};
+
+function updateKgbModalStatusButtons(statusVal) {
+  var bProses = document.getElementById('btnStatusProses');
+  var bTte = document.getElementById('btnStatusTte');
+  var bSelesai = document.getElementById('btnStatusSelesai');
+  var st = statusVal || 'Sedang Diproses';
+
+  if (bProses) {
+    bProses.className = (st === 'Sedang Diproses')
+      ? 'px-3 py-2 rounded-xl text-xs font-bold border transition-all flex items-center justify-center gap-2 bg-blue-500/20 border-blue-500/50 text-blue-300 ring-1 ring-blue-500/30 shadow-md shadow-blue-500/10'
+      : 'px-3 py-2 rounded-xl text-xs font-bold border transition-all flex items-center justify-center gap-2 bg-slate-900 border-slate-800 text-slate-400 hover:bg-slate-800';
+  }
+  if (bTte) {
+    bTte.className = (st === 'Menunggu TTE Pimpinan')
+      ? 'px-3 py-2 rounded-xl text-xs font-bold border transition-all flex items-center justify-center gap-2 bg-amber-500/20 border-amber-500/50 text-amber-300 ring-1 ring-amber-500/30 shadow-md shadow-amber-500/10'
+      : 'px-3 py-2 rounded-xl text-xs font-bold border transition-all flex items-center justify-center gap-2 bg-slate-900 border-slate-800 text-slate-400 hover:bg-slate-800';
+  }
+  if (bSelesai) {
+    bSelesai.className = (st === 'Selesai')
+      ? 'px-3 py-2 rounded-xl text-xs font-bold border transition-all flex items-center justify-center gap-2 bg-emerald-500/20 border-emerald-500/50 text-emerald-300 ring-1 ring-emerald-500/30 shadow-md shadow-emerald-500/10'
+      : 'px-3 py-2 rounded-xl text-xs font-bold border transition-all flex items-center justify-center gap-2 bg-slate-900 border-slate-800 text-slate-400 hover:bg-slate-800';
+  }
 }
 
 // ==========================================

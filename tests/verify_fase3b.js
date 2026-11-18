@@ -180,7 +180,7 @@ function createMockSheet(name, rows) {
       getValues: () => rows.map(r => r.slice())
     }),
     getRange: (r, c, nr = 1, nc = 1) => {
-      if (typeof r === 'string') return { setFontWeight: () => ({ setBackground: () => ({ setFontColor: () => {} }) }) };
+      if (typeof r === 'string') return { setFontWeight: () => ({ setBackground: () => ({ setFontColor: () => { } }) }) };
       const makeSetter = () => ({
         setNumberFormat: () => makeSetter(),
         setValue: (v) => { while (rows.length < r) rows.push([]); rows[r - 1][c - 1] = v; },
@@ -215,7 +215,7 @@ function createMockSheet(name, rows) {
     },
     appendRow: (row) => { rows.push(row.slice()); },
     deleteRow: (r) => { rows.splice(r - 1, 1); },
-    setFrozenRows: () => {}
+    setFrozenRows: () => { }
   };
 }
 
@@ -274,7 +274,7 @@ function registerMockDriveFile({ id, name, mime, size, content, parents = [] }) 
     getSize: () => (typeof size === 'number' ? size : fileBuf.length),
     getUrl: () => `https://drive.google.com/file/d/${id}/view`,
     setSharing: (acc, perm) => { sharingCalls.push({ id, acc, perm }); },
-    setTrashed: () => {},
+    setTrashed: () => { },
     getParents: () => {
       let idx = 0;
       return { hasNext: () => idx < parents.length, next: () => parents[idx++] };
@@ -371,8 +371,8 @@ const mockSS = {
 const gasSandbox = {
   console, Math, Date, JSON, String, Number, Boolean, Array, Object, Error, RegExp, parseInt, parseFloat, isNaN, encodeURIComponent, decodeURIComponent,
   MimeType: { HTML: 'text/html', PDF: 'application/pdf', MICROSOFT_EXCEL: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' },
-  Logger: { log: () => {} },
-  SpreadsheetApp: { getActiveSpreadsheet: () => mockSS, openById: () => mockSS, flush: () => {} },
+  Logger: { log: () => { } },
+  SpreadsheetApp: { getActiveSpreadsheet: () => mockSS, openById: () => mockSS, flush: () => { } },
   DriveApp: {
     Access: { ANYONE_WITH_LINK: 'ANYONE_WITH_LINK', PRIVATE: 'PRIVATE', DOMAIN_WITH_LINK: 'DOMAIN_WITH_LINK' },
     Permission: { VIEW: 'VIEW', NONE: 'NONE' },
@@ -402,14 +402,14 @@ const gasSandbox = {
       remove: (k) => { delete cacheStore[k]; }
     })
   },
-  LockService: { getScriptLock: () => ({ tryLock: () => true, releaseLock: () => {} }) },
+  LockService: { getScriptLock: () => ({ tryLock: () => true, releaseLock: () => { } }) },
   ContentService: { MimeType: { JSON: 'application/json' }, createTextOutput: (txt) => ({ setMimeType: () => ({ getContent: () => txt, _raw: txt }) }) },
   UrlFetchApp: { fetch: () => ({ getResponseCode: () => 200, getContentText: () => JSON.stringify({ ok: true }) }) },
   Utilities: {
     DigestAlgorithm: { SHA_256: 'SHA_256' },
     Charset: { UTF_8: 'UTF_8' },
     getUuid: () => crypto.randomUUID(),
-    sleep: () => {},
+    sleep: () => { },
     formatDate: (d) => d.toISOString().slice(0, 10),
     computeDigest: (_alg, val) => toSignedBytes(crypto.createHash('sha256').update(String(val), 'utf8').digest()),
     computeHmacSha256Signature: (val, key) => toSignedBytes(crypto.createHmac('sha256', String(key)).update(String(val), 'utf8').digest()),
@@ -579,12 +579,12 @@ function makeMockQuery(colName, ops = []) {
     where: (f, op, v) => makeMockQuery(colName, ops.concat([{ f, op, v }])),
     get: async () => {
       recordedFirestoreOps.push({ type: 'get', colName, ops });
-      return { empty: true, size: 0, forEach: () => {}, docs: [] };
+      return { empty: true, size: 0, forEach: () => { }, docs: [] };
     },
     onSnapshot: (cb) => {
       recordedFirestoreOps.push({ type: 'onSnapshot', colName, ops });
-      if (cb) cb({ empty: true, size: 0, forEach: () => {}, docs: [] });
-      return () => {};
+      if (cb) cb({ empty: true, size: 0, forEach: () => { }, docs: [] });
+      return () => { };
     }
   };
 }
@@ -606,18 +606,18 @@ const mockFirestore = {
     where: (f, op, v) => makeMockQuery(colName, [{ f, op, v }]),
     get: async () => {
       recordedFirestoreOps.push({ type: 'get', colName, ops: [] });
-      return { empty: true, size: 0, forEach: () => {}, docs: [] };
+      return { empty: true, size: 0, forEach: () => { }, docs: [] };
     },
     onSnapshot: (cb) => {
       recordedFirestoreOps.push({ type: 'onSnapshot', colName, ops: [] });
-      if (cb) cb({ empty: true, size: 0, forEach: () => {}, docs: [] });
-      return () => {};
+      if (cb) cb({ empty: true, size: 0, forEach: () => { }, docs: [] });
+      return () => { };
     }
   })
 };
 
 const lsStore = new Map();
-function MockStorage() {}
+function MockStorage() { }
 MockStorage.prototype.getItem = (k) => (lsStore.has(k) ? lsStore.get(k) : null);
 MockStorage.prototype.setItem = (k, v) => { lsStore.set(k, String(v)); };
 MockStorage.prototype.removeItem = (k) => { lsStore.delete(k); };
@@ -636,13 +636,13 @@ function getEl(id) {
       id, src: '', href: '', innerText: '', innerHTML: '', value: '', download: '',
       children: [],
       classList: { _s: new Set(), add(c) { this._s.add(c); }, remove(c) { this._s.delete(c); }, toggle(c) { this._s.has(c) ? this._s.delete(c) : this._s.add(c); }, contains(c) { return this._s.has(c); } },
-      removeAttribute: () => {},
-      appendChild: () => {},
-      click: () => {},
-      remove: () => {},
-      firstElementChild: { classList: { add() {}, remove() {} } },
+      removeAttribute: () => { },
+      appendChild: () => { },
+      click: () => { },
+      remove: () => { },
+      firstElementChild: { classList: { add() { }, remove() { } } },
       querySelector: () => null,
-      addEventListener: () => {}
+      addEventListener: () => { }
     });
   }
   return domMap.get(id);
@@ -672,19 +672,19 @@ const browserSandbox = {
     revokeObjectURL: (u) => { revokedBlobs.push(u); }
   }),
   location: { hostname: 'localhost', href: 'https://transkep.test/', protocol: 'https:', pathname: '/' },
-  navigator: { userAgent: 'Mozilla/5.0', onLine: true, clipboard: { writeText: async () => {} } },
+  navigator: { userAgent: 'Mozilla/5.0', onLine: true, clipboard: { writeText: async () => { } } },
   document: {
     getElementById: (id) => getEl(id),
     querySelector: () => null,
     querySelectorAll: () => [],
     createElement: () => getEl('dyn_' + Math.random()),
-    addEventListener: () => {},
-    body: { appendChild: () => {}, classList: { add() {}, remove() {} } }
+    addEventListener: () => { },
+    body: { appendChild: () => { }, classList: { add() { }, remove() { } } }
   },
   firebase: {
     apps: [],
     initializeApp: () => ({}),
-    appCheck: () => ({ activate: () => {} }),
+    appCheck: () => ({ activate: () => { } }),
     auth: () => ({
       get currentUser() { return mockFirebaseUser; },
       signInWithCustomToken: async (tok) => {
@@ -727,8 +727,8 @@ browserSandbox.window.location = browserSandbox.location;
 browserSandbox.globalThis = browserSandbox;
 browserSandbox.window.open = () => ({
   closed: false,
-  document: { write: () => {}, close: () => {}, body: { innerHTML: '' } },
-  location: { replace: () => {} }
+  document: { write: () => { }, close: () => { }, body: { innerHTML: '' } },
+  location: { replace: () => { } }
 });
 
 vm.createContext(browserSandbox);
@@ -739,7 +739,7 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
 
 (async () => {
   // Queue gating before auth resolves
-  browserSandbox.TranskepFirebase.subscribeFirestoreSks(() => {});
+  browserSandbox.TranskepFirebase.subscribeFirestoreSks(() => { });
   assert.strictEqual(recordedFirestoreOps.length, 0, 'Firestore listener must queue while auth not resolved');
 
   // Non-admin admin-only listeners must be suppressed after auth
@@ -748,13 +748,13 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
   assert(recordedFirestoreOps.some(o => o.colName === 'sk_documents'), 'Queued listener should flush after auth resolves');
 
   recordedFirestoreOps = [];
-  browserSandbox.TranskepFirebase.subscribeFirestoreRekapitulasi(() => {});
-  browserSandbox.TranskepFirebase.subscribeFirestoreKgbs(() => {});
-  browserSandbox.TranskepFirebase.subscribeFirestoreRapats(() => {});
+  browserSandbox.TranskepFirebase.subscribeFirestoreRekapitulasi(() => { });
+  browserSandbox.TranskepFirebase.subscribeFirestoreKgbs(() => { });
+  browserSandbox.TranskepFirebase.subscribeFirestoreRapats(() => { });
   assert.strictEqual(recordedFirestoreOps.length, 0, 'Non-admin must NOT attach admin-only listeners');
 
   // Participant-scoped queries for Pegawai
-  browserSandbox.TranskepFirebase.subscribeFirestoreUsulanJobdes(() => {});
+  browserSandbox.TranskepFirebase.subscribeFirestoreUsulanJobdes(() => { });
   await browserSandbox.TranskepFirebase.getFirestorePkps();
   await browserSandbox.TranskepFirebase.getFirestorePcks();
   assert(recordedFirestoreOps.some(o => o.colName === 'jobdes_usulan' && o.ops.length === 1), 'jobdes_usulan must be scoped');
@@ -774,7 +774,7 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
   // Admin attaches admin-only listeners cleanly
   await browserSandbox.TranskepFirebase.authenticateWithCustomToken(null, { nip: '198001012005011001', role: 'Admin' });
   recordedFirestoreOps = [];
-  browserSandbox.TranskepFirebase.subscribeFirestoreKgbs(() => {});
+  browserSandbox.TranskepFirebase.subscribeFirestoreKgbs(() => { });
   assert.strictEqual(recordedFirestoreOps.length, 1, 'Admin must be able to attach KGB listener');
 
   await browserSandbox.TranskepFirebase.signOutFirebase();
@@ -1029,12 +1029,12 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
     const kgbDom = {};
     const getKgbEl = (id) => {
       if (id === 'kgbFieldTempatLahir') return null;
-      if (!kgbDom[id]) kgbDom[id] = { id, value: '', textContent: '', innerText: '', className: '', dataset: {}, classList: { add() {}, remove() {} }, firstElementChild: { classList: { add() {}, remove() {} } } };
+      if (!kgbDom[id]) kgbDom[id] = { id, value: '', textContent: '', innerText: '', className: '', dataset: {}, classList: { add() { }, remove() { } }, firstElementChild: { classList: { add() { }, remove() { } } } };
       return kgbDom[id];
     };
     const kgbVm = {
       console,
-      localStorage: { getItem: () => null, setItem: () => {} },
+      localStorage: { getItem: () => null, setItem: () => { } },
       document: { getElementById: getKgbEl, activeElement: null },
       vueState: { usersList: [{ nip: '197507062014051001', nama: 'Ade Badrujaman, S.H.I.', tgl_lahir: '1 Januari 2025', pangkat: 'Penata Tingkat I (III/d)' }] },
       setTimeout: (fn) => fn()
@@ -1066,17 +1066,17 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
       }
       return getKgbEl(id);
     };
-    kgbVm.document.body = { contains: () => false, appendChild: () => {}, removeChild: () => {} };
+    kgbVm.document.body = { contains: () => false, appendChild: () => { }, removeChild: () => { } };
     kgbVm.document.createElement = () => ({
       style: {},
       contentWindow: {
         document: {
-          open: () => {},
+          open: () => { },
           write: (html) => { writtenPrintHtml = String(html || ''); },
-          close: () => {}
+          close: () => { }
         },
-        focus: () => {},
-        print: () => {}
+        focus: () => { },
+        print: () => { }
       }
     });
     kgbVm.vmEoffice = {
@@ -1139,7 +1139,7 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
     let mockRequestKgbResp = { status: 'success', id_kgb: 'KGB-19750706-2026' };
     const eofficeDataVm = {
       console,
-      localStorage: { getItem: () => '', setItem: () => {} },
+      localStorage: { getItem: () => '', setItem: () => { } },
       TranskepFirebase: {
         isReady: () => true,
         saveKgbToFirestore: async (doc) => { savedKgbDocs.push(JSON.parse(JSON.stringify(doc))); return doc; },
@@ -1236,7 +1236,7 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
     let pollAttemptCount = 0;
     const pollVm = {
       console,
-      localStorage: { getItem: () => '', setItem: () => {} },
+      localStorage: { getItem: () => '', setItem: () => { } },
       setTimeout: (fn) => { scheduledTimers.push(fn); },
       showNotify: (title, msg, type) => pollToasts.push({ title, msg, type }),
       vmEoffice: {
@@ -1497,6 +1497,24 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
       assert.strictEqual(cleanedQueue[1].id_kgb, 'KGB-197507062014051001-OFFICIAL', 'mergeDashboardQueue must keep Ade Badrujaman official SK');
       assert.strictEqual(cleanedQueue[1].status, 'Sedang Diproses', 'Ade Badrujaman must remain Sedang Diproses as per PROSES status');
     }
+
+    // Tahap 136: Custom Glassmorphism Status Dropdown Popover & Modal Segmented Controls
+    const viewEoffice136 = fs.readFileSync('modules/eoffice/view_eoffice.html', 'utf8');
+    assert(viewEoffice136.includes('toggleStatusDropdown(item.keyId)'), 'view_eoffice.html must invoke toggleStatusDropdown');
+    assert(viewEoffice136.includes('activeStatusDropdownId === item.keyId'), 'view_eoffice.html must condition popover on activeStatusDropdownId');
+    assert(viewEoffice136.includes("selectStatus(item, 'Sedang Diproses')"), 'view_eoffice.html must provide selectStatus for Sedang Diproses');
+    assert(viewEoffice136.includes("selectStatus(item, 'Menunggu TTE Pimpinan')"), 'view_eoffice.html must provide selectStatus for Menunggu TTE Pimpinan');
+    assert(viewEoffice136.includes("selectStatus(item, 'Selesai')"), 'view_eoffice.html must provide selectStatus for Selesai');
+    assert(viewEoffice136.includes('id="btnStatusProses"') && viewEoffice136.includes('id="btnStatusTte"') && viewEoffice136.includes('id="btnStatusSelesai"'), 'view_eoffice.html modal must have segmented status buttons');
+
+    const eofficeJs136 = fs.readFileSync('modules/eoffice/eoffice.js', 'utf8');
+    assert(eofficeJs136.includes('activeStatusDropdownId: null'), 'eoffice.js must declare activeStatusDropdownId state');
+    assert(eofficeJs136.includes('toggleStatusDropdown(keyId)'), 'eoffice.js must define toggleStatusDropdown method');
+    assert(eofficeJs136.includes('selectStatus(item, newStatus)'), 'eoffice.js must define selectStatus method');
+
+    const kgbJs136 = fs.readFileSync('modules/eoffice/kgb.js', 'utf8');
+    assert(kgbJs136.includes('window.setKgbModalStatus = function'), 'kgb.js must define window.setKgbModalStatus');
+    assert(kgbJs136.includes('function updateKgbModalStatusButtons('), 'kgb.js must define updateKgbModalStatusButtons');
   } finally {
     browserSandbox.TranskepAPI.call = origApiCall;
     browserSandbox.TranskepFirebase.getDb = origGetDb;

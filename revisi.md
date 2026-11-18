@@ -6694,6 +6694,51 @@ Berdasarkan tangkapan layar pengguna:
 - **Hasil Test Suite:** `ALL 6 SECURITY & SCHEMA SUITES PASSED (0 FAILURES)`.
 - **Aktivasi Pengguna:** Lakukan hard refresh browser (`Ctrl + Shift + R`) untuk memuat PWA `v3.8.69`.
 
+---
+
+## Tahap 136 [SELESAI & AKTIF]: Pembaruan Desain Glassmorphism Dropdown Status E-Office & Kontrol Segmented Modal KGB (`v3.8.70`)
+
+### 1. Masalah & Temuan Akar Masalah (Root Cause Analysis)
+Berdasarkan tangkapan layar pengguna ([`media_1794986712224_63fb4a95.png`](file:///C:/Users/user/.gemini/antigravity/brain/437cf215-e2db-4d6e-8a31-ee9e66ec1279/.user_uploaded/media_1794986712224_63fb4a95.png)):
+- Dropdown status pada kolom tabel E-Office sebelumnya menggunakan elemen HTML `<select>` native.
+- Di browser berbasis Chromium / Windows, elemen `<select>` native menghasilkan popup box persegi dengan sudut siku 90 derajat yang kaku, border abu-abu 1px, serta highlight biru default Windows saat item di-hover/dipilih.
+- Hal ini menimbulkan diskrepansi visual yang kontras (*design friction*) terhadap bahasa desain antarmuka TRANSKEP yang bernuansa *dark futuristic glassmorphism* (sudut melengkung, gradien neon, backdrop blur, dan animasi halus).
+
+### 2. Langkah Solusi & Implementasi Teknis
+1. **Custom Floating Popover Card Berbasis Vue.js pada Tabel E-Office ([`modules/eoffice/view_eoffice.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/view_eoffice.html)):**
+   - Menggantikan elemen `<select>` native dengan trigger pill button interaktif yang menampilkan badge status saat ini lengkap dengan chevron indikator teranimasi.
+   - Merancang custom floating popover card (`bg-slate-900/95 backdrop-blur-xl border border-slate-700/80 rounded-2xl shadow-2xl p-2 z-50 min-w-[240px]`).
+   - Setiap pilihan status dilengkapi titik status beranimasi (*pulsing colored dot*), label judul tebal, subjudul penjelas alur berkas, serta ikon centang aktif (*active checkmark*) jika status sedang terpilih.
+   - Menambahkan ruang scroll vertikal ekstra (`pb-28 min-h-[340px]`) pada container tabel untuk memastikan popover tidak terpotong tepi tabel.
+2. **Pengelolaan State & Event Listener Outside-Click ([`modules/eoffice/eoffice.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/eoffice.js)):**
+   - Menambahkan reactive state `activeStatusDropdownId: null` di `data()`.
+   - Menambahkan method `toggleStatusDropdown(keyId)` dengan `@click.stop` dan method `selectStatus(item, newStatus)` yang memanggil `updateKgbStatusDirectly`.
+   - Memasang `document.addEventListener('click')` pada lifecycle `mounted()` untuk menutup popover secara otomatis saat pengguna mengklik area luar dropdown (*outside click dismiss*).
+3. **Kontrol Pemilih Status Segmented pada Form Modal Detail KGB ([`modules/eoffice/view_eoffice.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/view_eoffice.html) & [`modules/eoffice/kgb.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/kgb.js)):**
+   - Menggantikan select input pada modal `#modalDetailKGB` dengan 3 tombol tersegmentasi modern (`btnStatusProses`, `btnStatusTte`, `btnStatusSelesai`) yang terikat ke `<input type="hidden" id="kgbFieldStatus">`.
+   - Menambahkan fungsi helper `window.setKgbModalStatus(statusVal)` dan `updateKgbModalStatusButtons(statusVal)` di `kgb.js` yang secara dinamis memperbarui visual tombol aktif (warna highlight, border neon, dan badge header).
+4. **Verifikasi Rangkaian Test Suite & Bump Versi PWA:**
+   - Menambahkan pengujian integrasi struktur UI pada [`tests/verify_fase3b.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/tests/verify_fase3b.js).
+   - Menjalankan `npm test` dengan hasil 100% lulus (6/6 test suites passed, 0 failures).
+   - Sinkronisasi versi PWA ke **`v3.8.70`** di `index.html` dan `sw.js`.
+
+### 3. Matriks Perbandingan Sebelum vs Sesudah
+
+| Fitur / Parameter | Sebelum (v3.8.69) | Sesudah (Aktif v3.8.70) |
+| :--- | :--- | :--- |
+| **Dropdown Status Tabel E-Office** | Native HTML `<select>` (kotak kaku sudut 90°, border abu-abu 1px, highlight biru Windows default) | **Custom Floating Popover Glassmorphism** (`backdrop-blur-xl`, border neon, rounded-2xl, colored indicator dots, subjudul deskriptif, centang aktif) |
+| **Interaksi Popover** | Kaku dan terbatas oleh OS browser | **Interaktif dengan outside-click auto-dismiss**, animasi rotasi chevron halus, dan proteksi overflow table |
+| **Pemilih Status di Modal Form KGB** | Select box native standar | **3-Button Segmented Control** (`Sedang Diproses`, `Menunggu TTE`, `Selesai`) dengan pencahayaan neon tematik |
+| **Versi PWA & Service Worker** | `v3.8.69` | **`v3.8.70`** |
+
+---
+
+### 4. Status Rilis & Verifikasi
+- **Branch:** `main` (tersinkronisasi ke `origin/main` dan `prod/main`).
+- **PWA Service Worker:** `transkep-v3.8.70`.
+- **Hasil Test Suite:** `ALL 6 SECURITY & SCHEMA SUITES PASSED (0 FAILURES)`.
+- **Aktivasi Pengguna:** Lakukan hard refresh browser (`Ctrl + Shift + R`) untuk memuat PWA `v3.8.70`.
+
 
 
 
