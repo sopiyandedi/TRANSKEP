@@ -6644,6 +6644,56 @@ Pengguna menegaskan bahwa saat perubahan status di Dashboard, **cukup rubah stat
 - **Hasil Test Suite:** `ALL 6 SECURITY & SCHEMA SUITES PASSED (0 FAILURES)`.
 - **Aktivasi Pengguna:** Lakukan hard refresh browser (`Ctrl + Shift + R`) untuk memuat PWA `v3.8.68`.
 
+---
+
+## Tahap 135 [SELESAI & AKTIF]: Pendekatan Hybrid: Penyelarasan Status In-Place & Kontrol Mandiri Status Dokumen di E-Office (`v3.8.69`)
+
+### 1. Masalah & Temuan Akar Masalah (Root Cause Analysis)
+Berdasarkan tangkapan layar pengguna:
+- **Di Dashboard Peringatan Dini ([`media_1794983137527_0c1739e1.png`](file:///C:/Users/user/.gemini/antigravity/brain/437cf215-e2db-4d6e-8a31-ee9e66ec1279/.user_uploaded/media_1794983137527_0c1739e1.png)):**
+  - Ketiga pegawai (Dr. Tohayudin, Ade Badrujaman, Raden Anantama) berstatus **`SELESAI`** (badge hijau / Target: Berkas Diterima).
+- **Di Tabel E-Office ([`media_1794983115950_ac281693.png`](file:///C:/Users/user/.gemini/antigravity/brain/437cf215-e2db-4d6e-8a31-ee9e66ec1279/.user_uploaded/media_1794983115950_ac281693.png)):**
+  - Ketiga pegawai yang sama memiliki berkas SK sah dengan No. SK `1102`, `1103`, `1099` dan rincian gaji baru, namun status dokumennya masih **`Sedang Diproses`** (badge biru).
+- **Penyebab:**
+  Setelah pemisahan status pada Tahap 134 (di mana kita menonaktifkan injeksi otomatis agar tidak muncul baris ganda), dokumen riil di E-Office tidak ikut berubah statusnya saat admin mengubah status di Dashboard. Selain itu, di tabel E-Office kolom status bersifat *read-only* statis dan di modal detail KGB status tersimpan di `<input type="hidden">` tanpa dropdown kontrol langsung.
+
+### 2. Implementasi Solusi Terpadu (Pendekatan Hybrid - Opsi C)
+1. **Penyelarasan Status Otomatis In-Place ([`modules/eoffice/eoffice_data.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/eoffice_data.js)):**
+   - Di `mergeDashboardQueue()`, jika seorang pegawai berstatus `SELESAI` di profil kepegawaian `usersList`/cache, dokumen KGB eksisting miliknya otomatis diselaraskan menjadi `status = 'Selesai'` (dengan `tgl_selesai` terisi) tanpa membuat baris baru.
+   - Di `handleDashboardKgbStatusChange()`, saat admin mengubah status di modal Dashboard, sistem mencari dokumen eksisting milik pegawai tersebut dan memutakhirkan statusnya secara *in-place* di memori, `localStorage`, dan Cloud Firestore. Jika dokumen belum ada, sistem tetap tidak membuat draf dummy baru.
+2. **Kontrol Mandiri Status Dokumen Langsung di Tabel E-Office ([`modules/eoffice/view_eoffice.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/view_eoffice.html) & [`modules/eoffice/eoffice.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/eoffice.js)):**
+   - Kolom 5 (*Status Berkas*) pada tabel E-Office kini dilengkapi dropdown selektor interaktif:
+     - `Sedang Diproses` (Biru)
+     - `Menunggu TTE Pimpinan` (Amber)
+     - `Selesai / Terbit` (Emerald)
+   - Metode `updateKgbStatusDirectly(item, newStatus)` di [`modules/eoffice/eoffice.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/eoffice.js) memutakhirkan status dokumen di tabel seketika (0ms), menyimpan ke Cloud Firestore, serta otomatis menyinkronkan status pegawai di Dashboard (`usersList` & Google Sheets).
+3. **Kontrol Status di Modal Formulir KGB ([`modules/eoffice/view_eoffice.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/view_eoffice.html)):**
+   - Mengganti `<input type="hidden" id="kgbFieldStatus">` menjadi pemilih status interaktif `<select id="kgbFieldStatus">` di bagian atas formulir modal sehingga operator leluasa menentukan status berkas saat menyusun draf SK.
+4. **Pengujian Regresi & Bump Versi PWA `v3.8.69`:**
+   - Menambahkan pengujian regresi di [`tests/verify_fase3b.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/tests/verify_fase3b.js) untuk memvalidasi in-place alignment status dan metode pembaruan langsung.
+   - Menaikkan versi PWA ke `v3.8.69` di [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) dan [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js).
+   - Seluruh 6 rangkaian pengujian keamanan dan fungsional (`npm test`) lulus 100% tanpa kegagalan (0 failures).
+
+---
+
+### 3. Matriks Sebelum vs Sesudah
+
+| Fitur / Parameter | Sebelum (v3.8.68) | Sesudah (Aktif v3.8.69) |
+| :--- | :--- | :--- |
+| **Status Berkas di Tabel E-Office** | Tetap "Sedang Diproses" (badge biru) meski di Dashboard sudah "SELESAI" | **Otomatis selaras menjadi "Selesai / Terbit"** (badge hijau) mengikuti status Dashboard tanpa duplikasi |
+| **Interaksi Kolom Status E-Office** | Badge statis hanya-baca (*read-only*) | **Dropdown interaktif**; admin bisa langsung mengubah status ke *Sedang Diproses*, *Menunggu TTE*, atau *Selesai* langsung dari tabel |
+| **Kontrol Status di Modal KGB** | Hidden field `<input type="hidden">` | **Select interaktif** `<select id="kgbFieldStatus">` di formulir modal |
+| **Sinkronisasi 2-Arah** | Terputus total | **Sinkronisasi In-Place Cerdas**: ubah di Dashboard memutakhirkan dokumen di E-Office; ubah di E-Office memutakhirkan data pegawai di Dashboard |
+| **Versi PWA & Service Worker** | `v3.8.68` | **`v3.8.69`** |
+
+---
+
+### 4. Status Rilis & Verifikasi
+- **Branch:** `main` (tersinkronisasi ke `origin/main` dan `prod/main`).
+- **PWA Service Worker:** `transkep-v3.8.69`.
+- **Hasil Test Suite:** `ALL 6 SECURITY & SCHEMA SUITES PASSED (0 FAILURES)`.
+- **Aktivasi Pengguna:** Lakukan hard refresh browser (`Ctrl + Shift + R`) untuk memuat PWA `v3.8.69`.
+
 
 
 

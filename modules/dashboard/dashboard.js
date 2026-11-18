@@ -669,8 +669,10 @@ window.dashboardApp = Vue.createApp({
           }
         }
 
-        // [Tahap 134]: Perubahan status di Dashboard hanya memutakhirkan status berkas pegawai (user_data),
-        // tidak menginput atau menduplikasi dokumen/draf ke E-Office.
+        // [Tahap 134/135 - Opsi C]: Sinkronisasi In-Place ke dokumen KGB eksisting di E-Office (tanpa membuat baris baru)
+        if (typeStr === 'KGB' && window.EofficeDataService && typeof window.EofficeDataService.handleDashboardKgbStatusChange === 'function') {
+          window.EofficeDataService.handleDashboardKgbStatusChange(userRef, newStatus, todayYMD);
+        }
       }
 
       showNotify("Status Diperbarui", "Status berkas berhasil diperbarui.", "success");

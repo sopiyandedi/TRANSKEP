@@ -312,6 +312,34 @@ const EofficeDataService = {
       cleaned.push(k);
     });
 
+    // [Tahap 135 - Opsi C]: Penyelarasan In-Place Status Dokumen Eksisting dari Status Dashboard Pegawai
+    let uList = (window.vueState && window.vueState.usersList)
+      ? window.vueState.usersList
+      : (typeof state !== 'undefined' ? state.usersList : []);
+    if (!Array.isArray(uList) || uList.length === 0) {
+      try {
+        const cachedUsers = localStorage.getItem('transkep_users_cache');
+        if (cachedUsers) uList = JSON.parse(cachedUsers);
+      } catch (e) {}
+    }
+
+    if (Array.isArray(uList)) {
+      cleaned.forEach(k => {
+        const nip = String(k.nip || '').replace(/['"\s]/g, '');
+        if (!nip) return;
+        const u = uList.find(user => String(user.nip || '').replace(/['"\s]/g, '') === nip);
+        if (u) {
+          const uStatusKgb = String(u.status_kgb || u.Status_KGB || '').trim().toUpperCase();
+          if (uStatusKgb === 'SELESAI' && k.status !== 'Selesai') {
+            k.status = 'Selesai';
+            if (!k.tgl_selesai) {
+              k.tgl_selesai = u.tgl_selesai_kgb || new Date().toISOString().split('T')[0];
+            }
+          }
+        }
+      });
+    }
+
     // Pembersihan asinkron di latar belakang untuk menghapus dokumen dummy dari local storage & Firestore
     if (phantomsToDelete.length > 0) {
       try {
@@ -336,11 +364,49 @@ const EofficeDataService = {
   },
 
   /**
-   * [Tahap 134]: Perubahan status berkas di Dashboard hanya memutakhirkan user_data pegawai,
-   * tidak menginput/menduplikasi berkas atau draf baru ke E-Office.
+   * [Tahap 135 - Opsi C]: Sinkronisasi In-Place Status KGB dari Dashboard ke Dokumen Eksisting E-Office.
+   * Catatan: HANYA memperbarui dokumen yang SUDAH ADA di E-Office (tidak membuat draf baru/dummy).
    */
   async handleDashboardKgbStatusChange(userRef, newStatus, todayYMD) {
-    return;
+    if (!userRef || !userRef.nip) return;
+
+    const targetNip = String(userRef.nip).replace(/['"\s]/g, '');
+    const dateNow = todayYMD || new Date().toISOString().split('T')[0];
+    const targetStatus = (newStatus === 'Selesai') ? 'Selesai' : ((newStatus === 'Proses') ? 'Sedang Diproses' : 'Sedang Diproses');
+
+    // 1. Ambil cache lokal
+    const cached = this.getLocalCache();
+    let baseKgb = (cached && Array.isArray(cached.kgb)) ? [...cached.kgb] : [];
+
+    const existIdx = baseKgb.findIndex(k => String(k.nip || '').replace(/['"\s]/g, '') === targetNip);
+    if (existIdx !== -1) {
+      baseKgb[existIdx].status = targetStatus;
+      if (newStatus === 'Selesai') {
+        baseKgb[existIdx].tgl_selesai = dateNow;
+      }
+      baseKgb[existIdx].updated_at = new Date().toISOString();
+
+      this.setLocalCache({ kgb: baseKgb, rapat: (cached && cached.rapat) || [] });
+      try {
+        localStorage.setItem('transkep_eoffice_local_kgbs', JSON.stringify(baseKgb));
+      } catch (e) {}
+
+      if (typeof window !== 'undefined' && window.vmEoffice && Array.isArray(window.vmEoffice.rawKgbList)) {
+        const vmIdx = window.vmEoffice.rawKgbList.findIndex(k => String(k.nip || '').replace(/['"\s]/g, '') === targetNip);
+        if (vmIdx !== -1) {
+          window.vmEoffice.rawKgbList[vmIdx] = { ...window.vmEoffice.rawKgbList[vmIdx], ...baseKgb[existIdx] };
+        }
+      }
+
+      // Simpan pembaruan in-place ke Firestore
+      if (typeof TranskepFirebase !== 'undefined' && TranskepFirebase.isReady && TranskepFirebase.isReady()) {
+        try {
+          await TranskepFirebase.saveKgbToFirestore(baseKgb[existIdx]);
+        } catch (fsErr) {
+          console.warn("⚠️ [E-Office] Notice sync in-place Firestore:", fsErr);
+        }
+      }
+    }
   },
 
   /**

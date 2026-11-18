@@ -410,6 +410,77 @@ document.addEventListener("DOMContentLoaded", () => {
       },
 
       // ==========================================
+      // KONTROL STATUS MANDIRI LANGSUNG DI TABEL E-OFFICE (TAHAP 135)
+      // ==========================================
+      async updateKgbStatusDirectly(item, newStatus) {
+        if (!item || !item.rawData) return;
+        const raw = { ...item.rawData, status: newStatus };
+        if (newStatus === 'Selesai') {
+          raw.tgl_selesai = new Date().toISOString().split('T')[0];
+        }
+
+        // 1. Update in-memory
+        const idx = this.rawKgbList.findIndex(k => String(k.id_kgb) === String(raw.id_kgb));
+        if (idx !== -1) {
+          this.rawKgbList.splice(idx, 1, { ...this.rawKgbList[idx], ...raw });
+        }
+
+        // 2. Simpan ke Firestore
+        if (typeof TranskepFirebase !== 'undefined' && TranskepFirebase.isReady && TranskepFirebase.isReady()) {
+          try {
+            await TranskepFirebase.saveKgbToFirestore(raw);
+          } catch (e) {
+            console.warn("⚠️ [E-Office] Gagal update status KGB ke Firestore:", e);
+          }
+        }
+
+        // 3. Simpan ke cache lokal
+        try {
+          const localRaw = localStorage.getItem('transkep_eoffice_local_kgbs');
+          if (localRaw) {
+            const lKgbs = JSON.parse(localRaw);
+            if (Array.isArray(lKgbs)) {
+              const lIdx = lKgbs.findIndex(k => String(k.id_kgb) === String(raw.id_kgb));
+              if (lIdx !== -1) {
+                lKgbs[lIdx] = { ...lKgbs[lIdx], ...raw };
+                localStorage.setItem('transkep_eoffice_local_kgbs', JSON.stringify(lKgbs));
+              }
+            }
+          }
+        } catch (e) {}
+
+        // 4. Sinkronkan balik ke data pegawai di Dashboard
+        const targetNip = String(raw.nip || '').replace(/['"\s]/g, '');
+        if (targetNip) {
+          const dashStatus = (newStatus === 'Selesai') ? 'Selesai' : ((newStatus === 'Sedang Diproses') ? 'Proses' : '');
+          const uList = (window.vueState && window.vueState.usersList)
+            ? window.vueState.usersList
+            : (typeof state !== 'undefined' ? state.usersList : []);
+          if (Array.isArray(uList)) {
+            const uRef = uList.find(u => String(u.nip || '').replace(/['"\s]/g, '') === targetNip);
+            if (uRef) {
+              uRef.status_kgb = dashStatus;
+              if (newStatus === 'Selesai') uRef.tgl_selesai_kgb = raw.tgl_selesai;
+            }
+          }
+          try {
+            if (Array.isArray(uList)) localStorage.setItem('transkep_users_cache', JSON.stringify(uList));
+          } catch (e) {}
+
+          if (window.DashboardDataService && typeof window.DashboardDataService.updateTmtStatus === 'function') {
+            const adminNip = localStorage.getItem('transkep_active_nip') || '';
+            const token = localStorage.getItem('transkep_session_token') || '';
+            window.DashboardDataService.updateTmtStatus(adminNip, targetNip, 'KGB', dashStatus, token).catch(() => {});
+          }
+        }
+
+        const labelStatus = (newStatus === 'Selesai') ? 'Selesai / Terbit' : newStatus;
+        if (typeof showNotify === 'function') {
+          showNotify("Status Berkas Diperbarui", `Status berkas ${item.title} diubah menjadi "${labelStatus}".`, "success");
+        }
+      },
+
+      // ==========================================
       // 4 KONTROL AKSI KGB: EDIT, KIRIM TTE, CETAK, DELETE
       // ==========================================
       openModalKgbDetail(item) {

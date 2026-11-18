@@ -1462,17 +1462,27 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
       'rawWarningsData filter must only keep upcoming active pensiun and exclude past/completed ones');
 
     // =========================================================================
-    // Tahap 134 (v3.8.68): Pemisahan Status Dashboard dari Modul E-Office KGB & Deduplikasi
+    // Tahap 134 & 135 (v3.8.69): Pendekatan Hybrid Sinkronisasi In-Place & Kontrol Mandiri E-Office
     // =========================================================================
-    const dashJs134 = fs.readFileSync('modules/dashboard/dashboard.js', 'utf8');
-    assert(!dashJs134.includes('handleDashboardKgbStatusChange'), 'dashboard.js submitTmtStatus must not call handleDashboardKgbStatusChange');
-    assert(!dashJs134.includes('Pegawai telah masuk antrean E-Office'), 'dashboard.js submitTmtStatus must not show E-Office queue message');
+    const dashJs135 = fs.readFileSync('modules/dashboard/dashboard.js', 'utf8');
+    assert(dashJs135.includes('handleDashboardKgbStatusChange'), 'dashboard.js submitTmtStatus must call handleDashboardKgbStatusChange for in-place sync');
+    assert(!dashJs135.includes('Pegawai telah masuk antrean E-Office'), 'dashboard.js submitTmtStatus must not show misleading queue message');
+    assert(!dashJs135.includes("id_kgb: 'DRAFT-' + targetNip"), 'dashboard.js submitTmtStatus must never synthesize dummy DRAFT- records');
 
-    const eofficeDataJs134 = fs.readFileSync('modules/eoffice/eoffice_data.js', 'utf8');
-    assert(eofficeDataJs134.includes('handleDashboardKgbStatusChange(userRef, newStatus, todayYMD)'), 'eoffice_data.js must declare handleDashboardKgbStatusChange');
+    const eofficeDataJs135 = fs.readFileSync('modules/eoffice/eoffice_data.js', 'utf8');
+    assert(eofficeDataJs135.includes('handleDashboardKgbStatusChange(userRef, newStatus, todayYMD)'), 'eoffice_data.js must declare handleDashboardKgbStatusChange');
 
-    // Evaluasi mergeDashboardQueue deduplikasi
+    const eofficeJs135 = fs.readFileSync('modules/eoffice/eoffice.js', 'utf8');
+    assert(eofficeJs135.includes('updateKgbStatusDirectly(item, newStatus)'), 'eoffice.js must provide updateKgbStatusDirectly');
+
+    // Evaluasi mergeDashboardQueue deduplikasi & in-place alignment
     if (browserSandbox.window && browserSandbox.window.EofficeDataService) {
+      browserSandbox.window.vueState = {
+        usersList: [
+          { nip: '198607092020121004', nama: 'Raden Anantama', status_kgb: 'SELESAI', tgl_selesai_kgb: '2026-11-18' },
+          { nip: '197507062014051001', nama: 'Ade Badrujaman', status_kgb: 'PROSES' }
+        ]
+      };
       const mockRawKgb = [
         { id_kgb: 'DRAFT-198607092020121004', nip: '198607092020121004', status: 'Selesai', is_from_dashboard: true },
         { id_kgb: 'KGB-198607092020121004-OFFICIAL', nip: '198607092020121004', status: 'Sedang Diproses', nomor_surat: '1102/KPA.W10-A2/KP2.1.2/XI/2026', gaji_baru: '3.219.200' },
@@ -1483,7 +1493,9 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
       const cleanedQueue = browserSandbox.window.EofficeDataService.mergeDashboardQueue(mockRawKgb);
       assert.strictEqual(cleanedQueue.length, 2, 'mergeDashboardQueue must filter out all dummy and duplicate phantom entries');
       assert.strictEqual(cleanedQueue[0].id_kgb, 'KGB-198607092020121004-OFFICIAL', 'mergeDashboardQueue must keep Raden Anantama official SK');
+      assert.strictEqual(cleanedQueue[0].status, 'Selesai', 'mergeDashboardQueue must auto-align status to Selesai from usersList');
       assert.strictEqual(cleanedQueue[1].id_kgb, 'KGB-197507062014051001-OFFICIAL', 'mergeDashboardQueue must keep Ade Badrujaman official SK');
+      assert.strictEqual(cleanedQueue[1].status, 'Sedang Diproses', 'Ade Badrujaman must remain Sedang Diproses as per PROSES status');
     }
   } finally {
     browserSandbox.TranskepAPI.call = origApiCall;
