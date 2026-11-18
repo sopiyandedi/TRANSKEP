@@ -1552,6 +1552,85 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
       '1059/PAN.PA.W10-A2/UND.PW1.1.1/X/2026',
       'syncNomorUndanganPreview must assemble UND.kode surat with signatory code and Roman month'
     );
+
+    // Tahap 138: Cetak Undangan (1 vs 2 Lembar) & Cetak Daftar Hadir (Maks 48, Zig-Zag, Tanpa Kop) + 3 Tombol Luar
+    const viewEoffice138 = fs.readFileSync('modules/eoffice/view_eoffice.html', 'utf8');
+    const eofficeJs138 = fs.readFileSync('modules/eoffice/eoffice.js', 'utf8');
+    for (const fn of ['triggerPrintUndanganRapat(item)', 'triggerPrintHadirRapat(item)', 'triggerPrintNotulaRapat(item)']) {
+      assert(viewEoffice138.includes(fn), `view_eoffice.html missing outer print button ${fn}`);
+    }
+    for (const fn of ['triggerPrintUndanganRapat(item)', 'triggerPrintHadirRapat(item)', 'triggerPrintNotulaRapat(item)']) {
+      assert(eofficeJs138.includes(fn), `eoffice.js missing print handler ${fn}`);
+    }
+
+    const cetakUndHtml = fs.readFileSync('modules/eoffice/cetak/cetak_undangan.html', 'utf8');
+    const cetakUndJs = fs.readFileSync('modules/eoffice/cetak/js_cetak_undangan.js', 'utf8');
+    const cetakHadHtml = fs.readFileSync('modules/eoffice/cetak/cetak_hadir.html', 'utf8');
+    const cetakHadJs = fs.readFileSync('modules/eoffice/cetak/js_cetak_hadir.js', 'utf8');
+
+    const printVm138 = {
+      console, Date, Math, Array, Object, String, Number, Boolean, JSON,
+      window: {},
+      vueState: {
+        usersList: [
+          { nip: '197309081998031001', nama: 'H. Zulkifli, S.Ag., S.H., M.H.', jabatan: 'Ketua Pengadilan Agama Indramayu' },
+          { nip: '199312242025211033', nama: 'Dedi Sopiyan, S.H.', jabatan: 'Penelaah Teknis Kebijakan' }
+        ]
+      }
+    };
+    printVm138.window = printVm138;
+    vm.createContext(printVm138);
+    vm.runInContext(cetakUndJs, printVm138);
+    vm.runInContext(cetakHadJs, printVm138);
+
+    // 1. Undangan 2 penerima -> 1 lembar tanpa Lampiran Halaman 2
+    const und1Page = printVm138.UndanganPrintHelper.buildUndanganHtml({
+      nomor_undangan: '1059/KPA.W10-A2/UND.PW1.1.1/X/2026',
+      tgl_surat: '2026-10-27',
+      pejabat_ttd_nip: '197309081998031001',
+      tampilkan_gelar_undangan: false,
+      agenda: 'Rapat Koordinasi PIPK',
+      hari_tanggal: 'Rabu, 28 Oktober 2026',
+      tujuan_undangan_json: JSON.stringify([{ label: 'Wakil Ketua' }, { label: 'Seluruh ASN PA Indramayu' }])
+    }, cetakUndHtml);
+    assert(!und1Page.includes('Lampiran Surat Undangan'), '1-3 invitees must fit on 1 page without attachment');
+    assert(und1Page.includes('Wakil Ketua') && und1Page.includes('Seluruh ASN PA Indramayu'), '1-page mode must list invitees directly');
+    assert(und1Page.includes('>Zulkifli<') || und1Page.includes('Zulkifli</div>'), 'Undangan signer must strip academic/religious titles by default');
+
+    // 2. Undangan 5 penerima -> 2 lembar + header 11pt/9pt persis PDF + XSS escaped
+    const und2Page = printVm138.UndanganPrintHelper.buildUndanganHtml({
+      nomor_undangan: '1059/KPA.W10-A2/UND.PW1.1.1/X/2026',
+      tgl_surat: '2026-10-27',
+      pejabat_ttd_nip: '197309081998031001',
+      agenda: 'Rapat <script>alert(1)</script>',
+      hari_tanggal: 'Rabu, 28 Oktober 2026',
+      tujuan_undangan_json: JSON.stringify([
+        { label: 'Wakil Ketua' }, { label: 'Hakim 1' }, { label: 'Sekretaris' }, { label: 'Panitera' }, { label: 'Kasubbag <img src=x>' }
+      ])
+    }, cetakUndHtml);
+    assert(und2Page.includes('Para Pejabat pada daftar terlampir'), '>3 invitees must say daftar terlampir on Page 1');
+    assert(und2Page.includes('page-break-before: always') && und2Page.includes('font-size: 11pt; font-weight: bold;">Lampiran Surat Undangan</div>'), 'Page 2 attachment must use 11pt bold header');
+    assert(und2Page.includes('font-size: 9pt;">Ketua Pengadilan Agama Indramayu</div>'), 'Page 2 attachment must include 9pt court signatory header');
+    assert(!und2Page.includes('<script>alert(1)') && !und2Page.includes('<img src=x>'), 'Undangan HTML output must escape XSS');
+
+    // 3. Daftar Hadir: Tanpa Kop, 48 baris kosong tulis tangan, zig-zag TTD, NIP Pimpinan & Notulis
+    assert(!cetakHadHtml.includes('MAHKAMAH AGUNG REPUBLIK INDONESIA'), 'Daftar Hadir template must NOT include Kop Surat');
+    const hadHtml48 = printVm138.HadirPrintHelper.buildDaftarHadirHtml({
+      jenis_kegiatan: 'Rapat',
+      agenda: 'Pembahasan PIPK',
+      hari_tanggal: 'Rabu, 28 Oktober 2026',
+      waktu_mulai: '08:00 WIB',
+      waktu_selesai: 'Selesai',
+      tempat: 'Ruang Rapat Pimpinan',
+      jumlah_baris_hadir: 48,
+      pemimpin_nip: '197309081998031001',
+      pemimpin: 'Ketua',
+      notulis_nip: '199312242025211033',
+      notulis: 'Dedi Sopiyan, S.H.'
+    }, cetakHadHtml);
+    assert(hadHtml48.includes('padding-left: 6px;') && hadHtml48.includes('padding-left: 52%;'), 'Daftar Hadir must render zig-zag TTD numbers');
+    assert((hadHtml48.match(/class="hadir-data-row"/g) || []).length === 48, 'Daftar Hadir must support 48 rows');
+    assert(hadHtml48.includes('NIP. 197309081998031001') && hadHtml48.includes('NIP. 199312242025211033'), 'Daftar Hadir must auto-fill Pimpinan and Notulis NIPs');
   } finally {
     browserSandbox.TranskepAPI.call = origApiCall;
     browserSandbox.TranskepFirebase.getDb = origGetDb;

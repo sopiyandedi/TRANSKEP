@@ -1,0 +1,299 @@
+<!-- VIEW COMPONENT: modules/eoffice/cetak/cetak_undangan.html -->
+<!-- ==========================================
+     FILE: cetak_undangan.html (Template Surat Undangan Rapat Kedinasan)
+     INSTANSI: Pengadilan Agama Indramayu Kelas 1.A.
+     STANDAR: Kertas A4 Portrait (210mm x 297mm) | Font 12pt Bookman Old Style
+     FITUR: Otomatis 1 Lembar (1-3 Tujuan) atau 2 Lembar + Lampiran (>3 Tujuan)
+     ========================================== -->
+<div id="template-cetak-undangan-container" style="display: none;" class="hidden no-print">
+  <style>
+    @media print {
+      @page {
+        size: A4 portrait;
+        margin: 0mm !important;
+      }
+
+      html,
+      body {
+        background-color: #ffffff !important;
+        color: #000000 !important;
+        font-family: 'Bookman Old Style', 'Times New Roman', serif !important;
+        font-size: 12pt !important;
+        line-height: 1.38 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+
+      .no-print {
+        display: none !important;
+      }
+    }
+
+    .undangan-page-wrapper {
+      width: 100%;
+      max-width: 210mm;
+      min-height: 297mm;
+      margin: 0 auto;
+      padding: 10mm 15mm 12mm 20mm;
+      box-sizing: border-box;
+      font-family: 'Bookman Old Style', 'Times New Roman', serif;
+      font-size: 12pt;
+      color: #000000;
+      line-height: 1.38;
+      background: #ffffff;
+    }
+
+    /* KOP SURAT RESMI PA INDRAMAYU (IDENTIK DENGAN SURAT TUGAS) */
+    .undangan-kop-container {
+      display: flex;
+      align-items: center;
+      padding-bottom: 5px;
+      border-bottom: 2px solid #000000;
+      margin-bottom: 12px;
+    }
+
+    .undangan-kop-logo {
+      width: 90px;
+      height: auto;
+      flex-shrink: 0;
+    }
+
+    .undangan-kop-text {
+      flex-grow: 1;
+      text-align: center;
+      padding-right: 30px;
+    }
+
+    .undangan-kop-text h3,
+    .undangan-kop-text h2 {
+      margin: 0;
+      font-size: 14pt;
+      font-weight: bold;
+      text-transform: uppercase;
+      line-height: 1.15;
+      font-family: 'Bookman Old Style', 'Times New Roman', serif;
+    }
+
+    .undangan-kop-text p {
+      margin: 2px 0 0 0;
+      font-size: 8pt;
+      line-height: 1.25;
+      font-family: 'Bookman Old Style', 'Times New Roman', serif;
+    }
+
+    /* META SURAT (NOMOR, LAMPIRAN, HAL & TANGGAL KANAN) */
+    .undangan-meta-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12pt;
+      margin-bottom: 0;
+    }
+
+    .undangan-meta-table td {
+      vertical-align: top;
+      padding: 1px 0;
+    }
+
+    /* BLOK TUJUAN KEPADA YTH */
+    .undangan-tujuan-box {
+      margin-left: 92px;
+      margin-top: 20px;
+      margin-bottom: 22px;
+      font-size: 12pt;
+      line-height: 1.38;
+    }
+
+    .undangan-tujuan-list-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12pt;
+      margin-top: 2px;
+    }
+
+    .undangan-tujuan-list-table td {
+      vertical-align: top;
+      padding: 1px 0;
+    }
+
+    /* BLOK ISI & JADWAL ACARA */
+    .undangan-body-box {
+      margin-left: 92px;
+      font-size: 12pt;
+      line-height: 1.45;
+      text-align: justify;
+    }
+
+    .undangan-jadwal-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12pt;
+      margin-bottom: 12px;
+    }
+
+    .undangan-jadwal-table td {
+      vertical-align: top;
+      padding: 2px 0;
+    }
+
+    /* BLOK TANDA TANGAN KANAN */
+    .undangan-ttd-area {
+      display: flow-root;
+      width: 100%;
+      margin-top: 14px;
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+
+    .undangan-ttd-box {
+      float: right;
+      width: 215px;
+      text-align: left;
+      font-size: 12pt;
+      line-height: 1.35;
+    }
+
+    /* HALAMAN 2 LAMPIRAN SURAT UNDANGAN */
+    .undangan-lampiran-header-wrap {
+      display: flow-root;
+      width: 100%;
+      margin-bottom: 26px;
+    }
+
+    .undangan-lampiran-header-box {
+      float: right;
+      width: 310px;
+      text-align: left;
+      line-height: 1.35;
+    }
+
+    .undangan-lampiran-meta {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 9pt;
+    }
+
+    .undangan-lampiran-meta td {
+      vertical-align: top;
+      padding: 0;
+    }
+
+    .undangan-lampiran-judul {
+      text-align: center;
+      font-size: 12pt;
+      font-weight: bold;
+      text-decoration: underline;
+      margin: 14px 0 18px 0;
+    }
+
+    .undangan-lampiran-daftar {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12pt;
+      line-height: 1.55;
+      margin-bottom: 22px;
+    }
+
+    .undangan-lampiran-daftar td {
+      vertical-align: top;
+      padding: 2px 0;
+    }
+  </style>
+
+  <!-- HALAMAN 1: SURAT UNDANGAN UTAMA -->
+  <div class="undangan-page-wrapper">
+    <div class="undangan-kop-container">
+      <img src="https://drive.google.com/thumbnail?id=1_Qbv_fdPOa2YEQAXXkvRxXevsd_4u1jZ&sz=w500"
+        onerror="this.onerror=null;this.src='img/logo_pa_indramayu_bw.png';" class="undangan-kop-logo" alt="Logo">
+      <div class="undangan-kop-text">
+        <h3>MAHKAMAH AGUNG REPUBLIK INDONESIA</h3>
+        <h3>DIREKTORAT JENDERAL BADAN PERADILAN AGAMA</h3>
+        <h3>PENGADILAN TINGGI AGAMA BANDUNG</h3>
+        <h2>PENGADILAN AGAMA INDRAMAYU</h2>
+        <p>Jalan M.T. Haryono No.2A Kel. Sindang Kec. Sindang Kab. Indramayu Kode Pos 45222<br>
+          Telepon (0234) 273880 | Situs: <a href="https://www.pa-indramayu.go.id"
+            style="color: blue; text-decoration: none;">www.pa-indramayu.go.id</a> | e-mail: <a
+            href="mailto:pa.indramayu_ptabdg@yahoo.co.id"
+            style="color: blue; text-decoration: none;">pa.indramayu_ptabdg@yahoo.co.id</a></p>
+      </div>
+    </div>
+
+    <table class="undangan-meta-table">
+      <tr>
+        <td style="width: 78px; white-space: nowrap;">Nomor</td>
+        <td style="width: 14px; text-align: center;">:</td>
+        <td>{{nomor_undangan}}</td>
+        <td style="text-align: right; white-space: nowrap; padding-left: 10px;">{{tanggal_surat}}</td>
+      </tr>
+      <tr>
+        <td>Lampiran</td>
+        <td style="text-align: center;">:</td>
+        <td colspan="2">{{lampiran_surat}}</td>
+      </tr>
+      <tr>
+        <td>Hal</td>
+        <td style="text-align: center;">:</td>
+        <td colspan="2">Undangan.</td>
+      </tr>
+    </table>
+
+    <div class="undangan-tujuan-box">
+      <div>Kepada Yth.</div>
+      <div>{{tujuan_halaman_1_html}}</div>
+      <div style="margin-top: 10px;">Di &ndash;</div>
+      <div style="margin-left: 36px; letter-spacing: 3px;">Tempat</div>
+    </div>
+
+    <div class="undangan-body-box">
+      <div style="margin-bottom: 10px;">Assalamualaikum Wr.Wb.</div>
+      <div style="margin-bottom: 10px;">
+        Sehubungan dengan adanya rapat perihal {{agenda_perihal}}, maka kami mohon kehadiran Bapak/Ibu dalam Acara tersebut, yang akan dilaksanakan, pada :
+      </div>
+
+      <table class="undangan-jadwal-table">
+        <tr>
+          <td style="width: 78px; white-space: nowrap;">Hari</td>
+          <td style="width: 14px; text-align: center;">:</td>
+          <td>{{hari_rapat}}</td>
+        </tr>
+        <tr>
+          <td>Tanggal</td>
+          <td style="text-align: center;">:</td>
+          <td>{{tanggal_rapat}}</td>
+        </tr>
+        <tr>
+          <td>Waktu</td>
+          <td style="text-align: center;">:</td>
+          <td>{{waktu_rapat}}</td>
+        </tr>
+        <tr>
+          <td>Tempat</td>
+          <td style="text-align: center;">:</td>
+          <td>{{tempat_rapat}}</td>
+        </tr>
+        <tr>
+          <td>Agenda</td>
+          <td style="text-align: center;">:</td>
+          <td>{{agenda_poin_html}}</td>
+        </tr>
+      </table>
+
+      <div style="margin-bottom: 10px;">Mengingat pentingnya acara tersebut, diharapkan hadir tepat pada waktunya.</div>
+      <div style="margin-bottom: 20px;">Demikian undangan ini kami sampaikan, atas perhatiannya diucapkan terimakasih.</div>
+    </div>
+
+    <div class="undangan-ttd-area">
+      <div class="undangan-ttd-box">
+        <div>Wassalam,</div>
+        <div>{{jabatan_ttd_undangan}},</div>
+        <div style="min-height: 68px;"></div>
+        <div style="font-weight: bold;">{{nama_ttd_undangan}}</div>
+        {{nip_ttd_undangan_html}}
+      </div>
+    </div>
+  </div>
+
+  <!-- HALAMAN 2: LAMPIRAN SURAT UNDANGAN (OTOMATIS JIKA TUJUAN > 3) -->
+  {{halaman_2_lampiran_html}}
+</div>

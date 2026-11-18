@@ -1,0 +1,197 @@
+<!-- VIEW COMPONENT: modules/eoffice/cetak/cetak_hadir.html -->
+<!-- ==========================================
+     FILE: cetak_hadir.html (Template Daftar Hadir Rapat)
+     INSTANSI: Pengadilan Agama Indramayu Kelas 1.A.
+     STANDAR: Kertas A4 Portrait (210mm x 297mm) | Font 12pt Bookman Old Style
+     CATATAN: Tanpa Kop Surat | Kolom Nama/Jabatan Kosong Tulis Tangan | Maks. 48 Baris
+     ========================================== -->
+<div id="template-cetak-hadir-container" style="display: none;" class="hidden no-print">
+  <style>
+    @media print {
+      @page {
+        size: A4 portrait;
+        margin: 0mm !important;
+      }
+
+      html,
+      body {
+        background-color: #ffffff !important;
+        color: #000000 !important;
+        font-family: 'Bookman Old Style', 'Times New Roman', serif !important;
+        font-size: 12pt !important;
+        line-height: 1.35 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+
+      .no-print {
+        display: none !important;
+      }
+    }
+
+    .hadir-print-wrapper {
+      width: 100%;
+      max-width: 210mm;
+      margin: 0 auto;
+      padding: 12mm 14mm 12mm 18mm;
+      box-sizing: border-box;
+      font-family: 'Bookman Old Style', 'Times New Roman', serif;
+      font-size: 12pt;
+      color: #000000;
+      line-height: 1.35;
+      background: #ffffff;
+    }
+
+    .hadir-judul {
+      text-align: center;
+      font-size: 14pt;
+      font-weight: bold;
+      letter-spacing: 0.5px;
+      margin: 0 0 14px 0;
+      text-transform: uppercase;
+    }
+
+    .hadir-meta-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12pt;
+      font-weight: bold;
+      margin-bottom: 12px;
+    }
+
+    .hadir-meta-table td {
+      vertical-align: top;
+      padding: 1.5px 0;
+    }
+
+    .hadir-main-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 12px;
+      font-size: 12pt;
+    }
+
+    .hadir-main-table thead {
+      display: table-header-group;
+    }
+
+    .hadir-main-table th,
+    .hadir-main-table td {
+      border: 1px solid #000000;
+      box-sizing: border-box;
+    }
+
+    .hadir-main-table thead th {
+      text-align: center;
+      font-weight: bold;
+      padding: 5px 6px;
+      background: #ffffff;
+    }
+
+    .hadir-colnum-row td {
+      text-align: center;
+      font-size: 10pt;
+      padding: 2px 4px;
+      font-weight: normal;
+    }
+
+    .hadir-data-row {
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+
+    .hadir-data-row td {
+      height: 30px;
+      vertical-align: middle;
+      padding: 2px 6px;
+    }
+
+    .hadir-ttd-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 18px;
+      font-size: 12pt;
+      line-height: 1.35;
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+
+    .hadir-ttd-table td {
+      vertical-align: top;
+      padding: 0;
+    }
+  </style>
+
+  <div class="hadir-print-wrapper">
+    <h3 class="hadir-judul">DAFTAR HADIR RAPAT</h3>
+
+    <table class="hadir-meta-table">
+      <tr>
+        <td style="width: 138px; white-space: nowrap;">Jenis Kegiatan</td>
+        <td style="width: 14px; text-align: center;">:</td>
+        <td>{{jenis_kegiatan}}</td>
+      </tr>
+      <tr>
+        <td>Nama Kegiatan</td>
+        <td style="text-align: center;">:</td>
+        <td>{{nama_kegiatan}}</td>
+      </tr>
+      <tr>
+        <td>Hari, Tanggal</td>
+        <td style="text-align: center;">:</td>
+        <td>{{hari_tanggal_rapat}}</td>
+      </tr>
+      <tr>
+        <td>Waktu</td>
+        <td style="text-align: center;">:</td>
+        <td>{{waktu_rapat}}</td>
+      </tr>
+      <tr>
+        <td>Tempat</td>
+        <td style="text-align: center;">:</td>
+        <td>{{tempat_rapat}}</td>
+      </tr>
+    </table>
+
+    <table class="hadir-main-table">
+      <thead>
+        <tr>
+          <th style="width: 40px;">NO</th>
+          <th style="width: 37%;">Nama</th>
+          <th style="width: 31%;">Jabatan</th>
+          <th style="width: 24%;">Tanda Tangan</th>
+        </tr>
+        <tr class="hadir-colnum-row">
+          <td>1</td>
+          <td>2</td>
+          <td>3</td>
+          <td>4</td>
+        </tr>
+      </thead>
+      <tbody>
+        {{baris_kosong_hadir_html}}
+      </tbody>
+    </table>
+
+    <table class="hadir-ttd-table">
+      <tr>
+        <td style="width: 52%; vertical-align: top;">
+          <div>Mengetahui,</div>
+          <div>{{jabatan_pimpinan_hadir}},</div>
+          <div style="height: 58px;"></div>
+          <div>{{nama_pimpinan_hadir}}</div>
+          {{nip_pimpinan_hadir_html}}
+        </td>
+        <td style="width: 48%; vertical-align: top; padding-left: 30px;">
+          <div>Indramayu, {{tanggal_saja_rapat}}</div>
+          <div>Notulis,</div>
+          <div style="height: 58px;"></div>
+          <div>{{nama_notulis_hadir}}</div>
+          {{nip_notulis_hadir_html}}
+        </td>
+      </tr>
+    </table>
+  </div>
+</div>

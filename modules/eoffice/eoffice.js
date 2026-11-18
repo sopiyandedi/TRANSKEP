@@ -707,6 +707,39 @@ document.addEventListener("DOMContentLoaded", () => {
         } else if (typeof showNotify === 'function') {
           showNotify("Detail Rapat", item.title, "info");
         }
+      },
+
+      triggerPrintUndanganRapat(item) {
+        if (!item || !item.rawData) return;
+        if (typeof window.printUndanganRapat === 'function') {
+          window.printUndanganRapat(item.rawData);
+        } else if (item.docUndanganUrl) {
+          this.openSecureFile(item.docUndanganUrl, 'Undangan Rapat');
+        } else if (typeof showNotify === 'function') {
+          showNotify("Modul Cetak Undangan", "Komponen cetak Undangan belum siap dimuat.", "warning");
+        }
+      },
+
+      triggerPrintHadirRapat(item) {
+        if (!item || !item.rawData) return;
+        if (typeof window.printDaftarHadirRapat === 'function') {
+          window.printDaftarHadirRapat(item.rawData);
+        } else if (item.docAbsenUrl) {
+          this.openSecureFile(item.docAbsenUrl, 'Daftar Hadir Rapat');
+        } else if (typeof showNotify === 'function') {
+          showNotify("Modul Cetak Daftar Hadir", "Komponen cetak Daftar Hadir belum siap dimuat.", "warning");
+        }
+      },
+
+      triggerPrintNotulaRapat(item) {
+        if (!item || !item.rawData) return;
+        if (typeof window.printNotulaRapat === 'function') {
+          window.printNotulaRapat(item.rawData);
+        } else if (item.docNotulenUrl) {
+          this.openSecureFile(item.docNotulenUrl, 'Notulen Rapat');
+        } else if (typeof showNotify === 'function') {
+          showNotify("Cetak Notula (Tahap 139)", "Mesin cetak Notula & Lampiran Foto Rapat akan aktif pada Tahap 139.", "info");
+        }
       }
     },
 

@@ -334,31 +334,33 @@
                   </button>
                 </div>
 
-                <!-- Aksi Khusus Rapat -->
-                <div v-else-if="item.itemType === 'Rapat'" class="flex items-center justify-end gap-1.5">
+                <!-- Aksi Khusus Rapat (3 Tombol Cetak Luar Instan + Edit + Hapus) -->
+                <div v-else-if="item.itemType === 'Rapat'" class="flex items-center justify-end gap-1.5 flex-wrap">
                   <button type="button" @click="openModalRapatDetail(item)"
                     class="w-8 h-8 rounded-lg bg-indigo-500/10 hover:bg-indigo-500 text-indigo-400 hover:text-white border border-indigo-500/30 transition flex items-center justify-center shadow-sm"
                     title="Edit &amp; Kelola Agenda Rapat">
                     <i class="fa-solid fa-pen-to-square text-xs"></i>
                   </button>
 
-                  <button type="button" v-if="item.docUndanganUrl"
-                    @click="openSecureFile(item.docUndanganUrl, 'Undangan Rapat')"
-                    class="px-2 py-1 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/20 font-bold rounded-lg text-[10px] transition cursor-pointer"
-                    title="Undangan (Google Docs)">
-                    Undangan
+                  <button type="button" @click="triggerPrintUndanganRapat(item)"
+                    class="px-2.5 py-1.5 bg-amber-500/10 hover:bg-amber-500 hover:text-white text-amber-400 border border-amber-500/30 font-bold rounded-lg text-[10px] transition cursor-pointer inline-flex items-center gap-1 shadow-sm"
+                    title="Cetak Surat Undangan Rapat (A4 12pt)">
+                    <i class="fa-solid fa-envelope-open-text text-[10px]"></i>
+                    <span>Undangan</span>
                   </button>
-                  <button type="button" v-if="item.docAbsenUrl"
-                    @click="openSecureFile(item.docAbsenUrl, 'Daftar Hadir Rapat')"
-                    class="px-2 py-1 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/20 font-bold rounded-lg text-[10px] transition cursor-pointer"
-                    title="Daftar Hadir (Google Docs)">
-                    Absen
+
+                  <button type="button" @click="triggerPrintHadirRapat(item)"
+                    class="px-2.5 py-1.5 bg-cyan-500/10 hover:bg-cyan-500 hover:text-white text-cyan-400 border border-cyan-500/30 font-bold rounded-lg text-[10px] transition cursor-pointer inline-flex items-center gap-1 shadow-sm"
+                    title="Cetak Daftar Hadir Rapat Kosong (A4 12pt)">
+                    <i class="fa-solid fa-clipboard-user text-[10px]"></i>
+                    <span>Absen</span>
                   </button>
-                  <button type="button" v-if="item.docNotulenUrl"
-                    @click="openSecureFile(item.docNotulenUrl, 'Notulen Rapat')"
-                    class="px-2 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 font-bold rounded-lg text-[10px] transition cursor-pointer"
-                    title="Notulen (Google Docs)">
-                    Notulen
+
+                  <button type="button" @click="triggerPrintNotulaRapat(item)"
+                    class="px-2.5 py-1.5 bg-emerald-500/10 hover:bg-emerald-500 hover:text-white text-emerald-400 border border-emerald-500/30 font-bold rounded-lg text-[10px] transition cursor-pointer inline-flex items-center gap-1 shadow-sm"
+                    title="Cetak Notula Rapat (A4 11pt)">
+                    <i class="fa-solid fa-file-lines text-[10px]"></i>
+                    <span>Notula</span>
                   </button>
 
                   <button type="button" @click="promptDeleteRapat(item)"
