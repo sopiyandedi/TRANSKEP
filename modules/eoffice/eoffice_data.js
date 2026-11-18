@@ -953,6 +953,89 @@ const EofficeDataService = {
     return { status: 'success', id_rapat: docId, data: rapatData };
   },
 
+  _rapatPhotoCache: {},
+
+  /**
+   * Mengunggah Foto Rapat terkompresi ke Google Drive Privat & menyimpan cache DataURI lokal
+   */
+  async uploadFotoRapatToDrive(photoPayload, adminNip, token) {
+    const authToken = token || (typeof localStorage !== 'undefined' ? localStorage.getItem('transkep_session_token') : '') || '';
+    const creatorNip = adminNip || (typeof localStorage !== 'undefined' ? localStorage.getItem('transkep_active_nip') : '') || '';
+    let res = null;
+
+    if (typeof window !== 'undefined' && window.TranskepAPI && typeof window.TranskepAPI.call === 'function') {
+      res = await window.TranskepAPI.call('uploadFotoRapat', photoPayload, creatorNip, authToken);
+    } else if (typeof google !== 'undefined' && google.script && google.script.run) {
+      res = await new Promise((resolve, reject) => {
+        google.script.run
+          .withSuccessHandler((r) => resolve(r))
+          .withFailureHandler((err) => reject(err))
+          .uploadFotoRapat(photoPayload, creatorNip, authToken);
+      });
+    } else {
+      return { status: 'error', message: 'Koneksi backend Apps Script belum tersedia.' };
+    }
+
+    if (res && res.status === 'success' && res.data && photoPayload && photoPayload.file_data) {
+      const fId = String(res.data.file_id || '');
+      const fUrl = String(res.data.url || '');
+      if (fId) this._rapatPhotoCache[fId] = photoPayload.file_data;
+      if (fUrl) this._rapatPhotoCache[fUrl] = photoPayload.file_data;
+    }
+    return res;
+  },
+
+  /**
+   * Mengambil DataURI aman (proxy getDriveFileBlob / cache memori) untuk render pratinjau & cetak Foto Rapat
+   */
+  async resolveFotoRapatDataUri(fotoItem) {
+    if (!fotoItem) return '';
+    if (typeof fotoItem === 'string') {
+      if (fotoItem.indexOf('data:image/') === 0) return fotoItem;
+      fotoItem = { url: fotoItem };
+    }
+    if (fotoItem.data_uri && String(fotoItem.data_uri).indexOf('data:image/') === 0) {
+      return String(fotoItem.data_uri);
+    }
+    const cacheKey = String(fotoItem.file_id || fotoItem.url || '').trim();
+    if (cacheKey && this._rapatPhotoCache[cacheKey]) {
+      return this._rapatPhotoCache[cacheKey];
+    }
+    if (fotoItem.thumb_data_uri && String(fotoItem.thumb_data_uri).indexOf('data:image/') === 0) {
+      return String(fotoItem.thumb_data_uri);
+    }
+    if (!cacheKey) return '';
+
+    const authToken = (typeof localStorage !== 'undefined' ? localStorage.getItem('transkep_session_token') : '') || '';
+    const callerNip = (typeof localStorage !== 'undefined' ? localStorage.getItem('transkep_active_nip') : '') || '';
+    if (!authToken || !callerNip) return '';
+
+    try {
+      let res = null;
+      if (typeof window !== 'undefined' && window.TranskepAPI && typeof window.TranskepAPI.call === 'function') {
+        res = await window.TranskepAPI.call('getDriveFileBlob', cacheKey, callerNip, authToken);
+      } else if (typeof google !== 'undefined' && google.script && google.script.run) {
+        res = await new Promise((resolve, reject) => {
+          google.script.run
+            .withSuccessHandler((r) => resolve(r))
+            .withFailureHandler((err) => reject(err))
+            .getDriveFileBlob(cacheKey, callerNip, authToken);
+        });
+      }
+      if (res && res.status === 'success' && res.base64) {
+        const mime = String(res.mimeType || 'image/jpeg').trim();
+        const dataUri = 'data:' + mime + ';base64,' + res.base64;
+        this._rapatPhotoCache[cacheKey] = dataUri;
+        if (fotoItem.file_id) this._rapatPhotoCache[String(fotoItem.file_id)] = dataUri;
+        if (fotoItem.url) this._rapatPhotoCache[String(fotoItem.url)] = dataUri;
+        return dataUri;
+      }
+    } catch (e) {
+      console.warn('⚠️ Gagal memuat blob Foto Rapat:', e);
+    }
+    return '';
+  },
+
   /**
    * Menerbitkan paket dokumen rapat 3-in-1 ke Google Docs dan menyimpannya ke Cloud Firestore
    */

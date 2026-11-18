@@ -2877,7 +2877,7 @@ function canUserAccessDriveFile_(file, fileId, callerSess, ss) {
 
   // 2. Cek folder brankas/arsip & dokumen PDF terbitan
   const meta = collectDriveAncestorMeta_(file, 4);
-  const publicInternalFolders = ['TRANSKEP SK', 'TRANSKEP SOP', 'Arsip SK TRANSKEP', 'Arsip SOP TRANSKEP', 'Arsip Dokumen Jobdes TRANSKEP'];
+  const publicInternalFolders = ['TRANSKEP SK', 'TRANSKEP SOP', 'Arsip SK TRANSKEP', 'Arsip SOP TRANSKEP', 'Arsip Dokumen Jobdes TRANSKEP', 'Arsip Foto Rapat TRANSKEP'];
   for (let i = 0; i < publicInternalFolders.length; i++) {
     if (meta.names.indexOf(publicInternalFolders[i]) !== -1) return true;
   }

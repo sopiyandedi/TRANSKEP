@@ -11,6 +11,7 @@
 
   var tujuanUndanganList = [];
   var pembahasanRowsList = [];
+  var fotoRapatList = [];
   var isRapatFullscreen = false;
   var currentRapatTab = 'undangan';
 
@@ -557,6 +558,199 @@
   };
 
   // ==========================================
+  // UPLOAD & KOMPRESI FOTO RAPAT KE GOOGLE DRIVE (TAHAP 139)
+  // ==========================================
+  function compressRapatImageFile_(file) {
+    return new Promise(function (resolve, reject) {
+      if (!file || typeof FileReader === 'undefined') {
+        return reject(new Error('Browser tidak mendukung pembacaan berkas gambar.'));
+      }
+      var reader = new FileReader();
+      reader.onerror = function () { reject(new Error('Gagal membaca berkas gambar.')); };
+      reader.onload = function (ev) {
+        var srcUrl = ev && ev.target ? ev.target.result : '';
+        if (typeof Image === 'undefined' || !document.createElement) {
+          return resolve({ dataUri: srcUrl, mimeType: file.type || 'image/jpeg' });
+        }
+        var img = new Image();
+        img.onerror = function () { reject(new Error('Format gambar tidak valid atau rusak.')); };
+        img.onload = function () {
+          var maxW = 960;
+          var maxH = 720;
+          var w = img.width || 800;
+          var h = img.height || 600;
+          var ratio = Math.min(1, maxW / w, maxH / h);
+          var tw = Math.max(1, Math.round(w * ratio));
+          var th = Math.max(1, Math.round(h * ratio));
+          var canvas = document.createElement('canvas');
+          canvas.width = tw;
+          canvas.height = th;
+          var ctx = canvas.getContext('2d');
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, 0, tw, th);
+          ctx.drawImage(img, 0, 0, tw, th);
+          var outUri = canvas.toDataURL('image/jpeg', 0.72);
+          resolve({ dataUri: outUri, mimeType: 'image/jpeg' });
+        };
+        img.src = srcUrl;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function renderFotoRapatPreview_() {
+    var badge = document.getElementById('rapatFotoCountBadge');
+    if (badge) badge.innerText = fotoRapatList.length + ' / 8 Foto';
+
+    var container = document.getElementById('rapatFotoPreviewContainer');
+    if (!container) return;
+
+    if (fotoRapatList.length === 0) {
+      container.innerHTML =
+        '<div class="sm:col-span-2 p-4 rounded-xl border border-dashed border-slate-700 bg-slate-900/40 text-center text-[11px] text-slate-500">' +
+          'Belum ada foto rapat terpilih. Klik <b>+ Pilih Foto (Auto-Kompres)</b> untuk menambahkan maksimal 8 foto.' +
+        '</div>';
+      return;
+    }
+
+    var html = '';
+    fotoRapatList.forEach(function (item, idx) {
+      var previewSrc = item.preview_uri || item.thumb_data_uri || '';
+      var safeSrc = (previewSrc && String(previewSrc).indexOf('data:image/') === 0) ? previewSrc : '';
+      var statusBadge = item.uploading
+        ? '<span class="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[9px] font-bold">Mengunggah...</span>'
+        : (item.file_id
+          ? '<span class="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[9px] font-bold">Drive Aman</span>'
+          : '<span class="px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-[9px] font-bold">Lokal Terkompresi</span>');
+
+      html +=
+        '<div class="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 space-y-2">' +
+          '<div class="relative aspect-video rounded-lg overflow-hidden bg-slate-950 border border-slate-800 flex items-center justify-center">' +
+            (safeSrc
+              ? '<img id="rapatFotoThumbImg_' + idx + '" src="' + safeSrc + '" alt="Foto Rapat ' + (idx + 1) + '" class="w-full h-full object-cover">'
+              : '<div id="rapatFotoThumbPlaceholder_' + idx + '" class="text-[10px] text-slate-500 flex flex-col items-center gap-1"><i class="fa-solid fa-image text-base"></i><span>Memuat dari Drive...</span></div>') +
+            '<div class="absolute top-1.5 left-1.5">' + statusBadge + '</div>' +
+            '<button type="button" onclick="removeFotoRapatItem(' + idx + ')" class="absolute top-1.5 right-1.5 w-6 h-6 rounded-lg bg-black/70 hover:bg-rose-600 text-white flex items-center justify-center transition"><i class="fa-solid fa-trash text-[10px]"></i></button>' +
+          '</div>' +
+          '<input type="text" value="' + escRapat_(item.caption || '') + '" oninput="updateFotoRapatCaption(' + idx + ', this.value)" ' +
+            'placeholder="Keterangan foto #' + (idx + 1) + ' (opsional)..." ' +
+            'class="w-full px-2.5 py-1 bg-slate-950 border border-slate-800 rounded-lg text-slate-200 text-[10px] focus:ring-1 focus:ring-cyan-500 outline-none">' +
+        '</div>';
+    });
+
+    container.innerHTML = html;
+
+    // Lazy resolve thumbnail dari Drive untuk foto tersimpan yang belum punya preview lokal
+    fotoRapatList.forEach(function (item, idx) {
+      if (!item.preview_uri && !item.thumb_data_uri && (item.file_id || item.url) &&
+          window.EofficeDataService && typeof window.EofficeDataService.resolveFotoRapatDataUri === 'function') {
+        window.EofficeDataService.resolveFotoRapatDataUri(item).then(function (uri) {
+          if (uri && fotoRapatList[idx]) {
+            fotoRapatList[idx].preview_uri = uri;
+            renderFotoRapatPreview_();
+          }
+        }).catch(function () {});
+      }
+    });
+  }
+
+  window.handleRapatFotoSelect = async function (files) {
+    if (!files || files.length === 0) return;
+    var remain = Math.max(0, 8 - fotoRapatList.length);
+    if (remain <= 0) {
+      if (typeof showNotify === 'function') showNotify('Batas Foto', 'Maksimal 8 foto dokumentasi per rapat.', 'warning');
+      return;
+    }
+
+    var arrFiles = Array.prototype.slice.call(files, 0, remain);
+    var currentUser = (window.vueState && window.vueState.user) ? window.vueState.user : (typeof state !== 'undefined' ? state.user : null);
+    var adminNip = (currentUser && currentUser.nip) || localStorage.getItem('transkep_active_nip') || '';
+    var token = localStorage.getItem('transkep_session_token') || '';
+    var idRapat = ((document.getElementById('rapatFieldIdRapat') || {}).value || '').trim() || 'RPT';
+
+    for (var i = 0; i < arrFiles.length; i++) {
+      var f = arrFiles[i];
+      if (!f || !/^image\/(jpeg|jpg|png)$/i.test(f.type || '')) continue;
+      try {
+        var compressed = await compressRapatImageFile_(f);
+        var entry = {
+          file_id: '',
+          url: '',
+          caption: '',
+          file_name: f.name || ('foto_rapat_' + (fotoRapatList.length + 1) + '.jpg'),
+          preview_uri: compressed.dataUri,
+          thumb_data_uri: compressed.dataUri,
+          uploading: true
+        };
+        var pushedIdx = fotoRapatList.push(entry) - 1;
+        renderFotoRapatPreview_();
+
+        if (window.EofficeDataService && typeof window.EofficeDataService.uploadFotoRapatToDrive === 'function') {
+          var upRes = await window.EofficeDataService.uploadFotoRapatToDrive({
+            id_rapat: idRapat,
+            file_data: compressed.dataUri,
+            file_name: entry.file_name,
+            mime_type: compressed.mimeType || 'image/jpeg'
+          }, adminNip, token);
+
+          if (fotoRapatList[pushedIdx]) {
+            fotoRapatList[pushedIdx].uploading = false;
+            if (upRes && upRes.status === 'success' && upRes.data) {
+              fotoRapatList[pushedIdx].file_id = String(upRes.data.file_id || '');
+              fotoRapatList[pushedIdx].url = String(upRes.data.url || '');
+              fotoRapatList[pushedIdx].thumb_data_uri = '';
+            }
+            renderFotoRapatPreview_();
+          }
+        } else {
+          entry.uploading = false;
+          renderFotoRapatPreview_();
+        }
+      } catch (err) {
+        console.warn('Gagal memproses foto rapat:', err);
+      }
+    }
+  };
+
+  window.updateFotoRapatCaption = function (idx, val) {
+    if (fotoRapatList[idx]) fotoRapatList[idx].caption = String(val || '').slice(0, 200);
+  };
+
+  window.removeFotoRapatItem = function (idx) {
+    fotoRapatList.splice(idx, 1);
+    renderFotoRapatPreview_();
+  };
+
+  window.clearAllFotoRapat = function () {
+    fotoRapatList = [];
+    renderFotoRapatPreview_();
+  };
+
+  function serializeFotoRapatForFirestore_() {
+    var clean = fotoRapatList.map(function (f) {
+      var obj = {
+        file_id: String(f.file_id || ''),
+        url: String(f.url || ''),
+        caption: String(f.caption || ''),
+        file_name: String(f.file_name || '')
+      };
+      if (!obj.file_id && f.thumb_data_uri) {
+        obj.thumb_data_uri = String(f.thumb_data_uri);
+      }
+      return obj;
+    }).filter(function (o) { return Boolean(o.file_id || o.url || o.thumb_data_uri); });
+
+    var serialized = JSON.stringify(clean);
+    if (serialized.length > 48000) {
+      clean = clean.map(function (o) {
+        return { file_id: o.file_id, url: o.url, caption: o.caption, file_name: o.file_name };
+      });
+      serialized = JSON.stringify(clean).slice(0, 48000);
+    }
+    return serialized;
+  }
+
+  // ==========================================
   // BUKA & TUTUP MODAL WORKSPACE RAPAT
   // ==========================================
   window.openRapatModalForm = function (rapatData) {
@@ -676,7 +870,30 @@
       renderPembahasanRows_();
     }
 
-    // Tab 4: Media / AI
+    // Tab 4: Media / Foto & AI
+    fotoRapatList = [];
+    if (rapatData.foto_rapat_json) {
+      try {
+        var parsedFoto = typeof rapatData.foto_rapat_json === 'string'
+          ? JSON.parse(rapatData.foto_rapat_json)
+          : rapatData.foto_rapat_json;
+        if (Array.isArray(parsedFoto)) {
+          fotoRapatList = parsedFoto.slice(0, 8).map(function (f) {
+            return {
+              file_id: String((f && f.file_id) || ''),
+              url: String((f && f.url) || ''),
+              caption: String((f && f.caption) || ''),
+              file_name: String((f && f.file_name) || ''),
+              thumb_data_uri: String((f && f.thumb_data_uri) || ''),
+              preview_uri: String((f && f.thumb_data_uri) || ''),
+              uploading: false
+            };
+          });
+        }
+      } catch (e) {}
+    }
+    renderFotoRapatPreview_();
+
     var elAiTrans = document.getElementById('rapatFieldAiTranscript');
     if (elAiTrans) elAiTrans.value = rapatData.ai_transcript || '';
 
@@ -790,6 +1007,7 @@
       pembahasan: flatPembahasanSummary,
       pembahasan_json: JSON.stringify(cleanPembahasanRows),
       kesimpulan: (document.getElementById('rapatFieldKesimpulan') || {}).value || '',
+      foto_rapat_json: serializeFotoRapatForFirestore_(),
       ai_transcript: (document.getElementById('rapatFieldAiTranscript') || {}).value || '',
       doc_undangan_url: (document.getElementById('rapatFieldDocUndanganUrl') || {}).value || '',
       doc_absen_url: (document.getElementById('rapatFieldDocAbsenUrl') || {}).value || '',

@@ -1,0 +1,302 @@
+<!-- VIEW COMPONENT: modules/eoffice/cetak/cetak_notula.html -->
+<!-- ==========================================
+     FILE: cetak_notula.html (Template Notula Rapat & Lampiran Foto Dokumentasi)
+     INSTANSI: Pengadilan Agama Indramayu Kelas 1.A.
+     STANDAR: Kertas A4 Portrait (210mm x 297mm) | Font 11pt Bookman Old Style
+     FITUR: Kop Surat Tugas | Identitas Dasar..Acara | Pembahasan Bertingkat a..e | Grid 2x2 Foto Rapat
+     ========================================== -->
+<div id="template-cetak-notula-container" style="display: none;" class="hidden no-print">
+  <style>
+    @media print {
+      @page {
+        size: A4 portrait;
+        margin: 14mm 15mm 14mm 20mm !important;
+      }
+
+      html,
+      body {
+        background-color: #ffffff !important;
+        color: #000000 !important;
+        font-family: 'Bookman Old Style', 'Times New Roman', serif !important;
+        font-size: 11pt !important;
+        line-height: 1.4 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+
+      .no-print {
+        display: none !important;
+      }
+    }
+
+    .notula-print-wrapper {
+      width: 100%;
+      max-width: 175mm;
+      margin: 0 auto;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Bookman Old Style', 'Times New Roman', serif;
+      font-size: 11pt;
+      color: #000000;
+      line-height: 1.4;
+      background: #ffffff;
+    }
+
+    /* KOP SURAT RESMI PA INDRAMAYU (IDENTIK DENGAN SURAT TUGAS) */
+    .notula-kop-container {
+      display: flex;
+      align-items: center;
+      padding-bottom: 5px;
+      border-bottom: 2px solid #000000;
+      margin-bottom: 14px;
+    }
+
+    .notula-kop-logo {
+      width: 86px;
+      height: auto;
+      flex-shrink: 0;
+    }
+
+    .notula-kop-text {
+      flex-grow: 1;
+      text-align: center;
+      padding-right: 26px;
+    }
+
+    .notula-kop-text h3,
+    .notula-kop-text h2 {
+      margin: 0;
+      font-size: 14pt;
+      font-weight: bold;
+      text-transform: uppercase;
+      line-height: 1.15;
+      font-family: 'Bookman Old Style', 'Times New Roman', serif;
+    }
+
+    .notula-kop-text p {
+      margin: 2px 0 0 0;
+      font-size: 8pt;
+      line-height: 1.25;
+      font-family: 'Bookman Old Style', 'Times New Roman', serif;
+    }
+
+    .notula-judul {
+      text-align: center;
+      font-size: 12pt;
+      font-weight: bold;
+      margin: 12px 0 14px 0;
+      letter-spacing: 0.5px;
+    }
+
+    .notula-meta-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 11pt;
+      margin-bottom: 10px;
+    }
+
+    .notula-meta-table td {
+      vertical-align: top;
+      padding: 2px 0;
+    }
+
+    .notula-meta-label {
+      width: 105px;
+      font-weight: bold;
+      white-space: nowrap;
+    }
+
+    .notula-meta-colon {
+      width: 14px;
+      text-align: center;
+      font-weight: bold;
+    }
+
+    .notula-section-heading {
+      font-size: 11pt;
+      font-weight: bold;
+      margin: 10px 0 4px 0;
+    }
+
+    .notula-list-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 11pt;
+    }
+
+    .notula-list-table td {
+      vertical-align: top;
+      padding: 1.5px 0;
+      text-align: justify;
+    }
+
+    .notula-sub-block {
+      margin-left: 18px;
+      margin-top: 4px;
+    }
+
+    .notula-sub-point {
+      margin-left: 22px;
+      margin-top: 4px;
+      margin-bottom: 4px;
+    }
+
+    .notula-ttd-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 24px;
+      font-size: 11pt;
+      line-height: 1.35;
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+
+    .notula-ttd-table td {
+      vertical-align: top;
+      text-align: center;
+      padding: 0 8px;
+    }
+
+    .notula-foto-page {
+      page-break-before: always;
+      break-before: page;
+    }
+
+    .notula-foto-judul {
+      font-size: 11pt;
+      font-weight: bold;
+      margin: 0 0 14px 0;
+    }
+
+    .notula-foto-grid-table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 12px 14px;
+    }
+
+    .notula-foto-cell {
+      width: 50%;
+      vertical-align: top;
+      text-align: center;
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+
+    .notula-foto-img {
+      width: 100%;
+      height: 195px;
+      object-fit: cover;
+      border: 1px solid #d1d5db;
+      display: block;
+    }
+
+    .notula-foto-caption {
+      font-size: 9pt;
+      margin-top: 4px;
+      text-align: center;
+      color: #111827;
+    }
+  </style>
+
+  <div class="notula-print-wrapper">
+    <div class="notula-kop-container">
+      <img src="https://drive.google.com/thumbnail?id=1_Qbv_fdPOa2YEQAXXkvRxXevsd_4u1jZ&sz=w500"
+        onerror="this.onerror=null;this.src='img/logo_pa_indramayu_bw.png';" class="notula-kop-logo" alt="Logo">
+      <div class="notula-kop-text">
+        <h3>MAHKAMAH AGUNG REPUBLIK INDONESIA</h3>
+        <h3>DIREKTORAT JENDERAL BADAN PERADILAN AGAMA</h3>
+        <h3>PENGADILAN TINGGI AGAMA BANDUNG</h3>
+        <h2>PENGADILAN AGAMA INDRAMAYU</h2>
+        <p>Jalan M.T. Haryono No.2A Kel. Sindang Kec. Sindang Kab. Indramayu Kode Pos 45222<br>
+          Telepon (0234) 273880 | Situs: <a href="https://www.pa-indramayu.go.id"
+            style="color: blue; text-decoration: none;">www.pa-indramayu.go.id</a> | e-mail: <a
+            href="mailto:pa.indramayu_ptabdg@yahoo.co.id"
+            style="color: blue; text-decoration: none;">pa.indramayu_ptabdg@yahoo.co.id</a></p>
+      </div>
+    </div>
+
+    <div class="notula-judul">NOTULA</div>
+
+    <table class="notula-meta-table">
+      <tr>
+        <td class="notula-meta-label">Dasar</td>
+        <td class="notula-meta-colon">:</td>
+        <td style="text-align: justify;">{{dasar_notula}}</td>
+      </tr>
+      <tr>
+        <td class="notula-meta-label">Hari</td>
+        <td class="notula-meta-colon">:</td>
+        <td>{{hari_rapat}}</td>
+      </tr>
+      <tr>
+        <td class="notula-meta-label">Tanggal</td>
+        <td class="notula-meta-colon">:</td>
+        <td>{{tanggal_rapat}}</td>
+      </tr>
+      <tr>
+        <td class="notula-meta-label">Pukul</td>
+        <td class="notula-meta-colon">:</td>
+        <td>{{waktu_rapat}}</td>
+      </tr>
+      <tr>
+        <td class="notula-meta-label">Tempat</td>
+        <td class="notula-meta-colon">:</td>
+        <td>{{tempat_rapat}}</td>
+      </tr>
+      <tr>
+        <td class="notula-meta-label">Acara</td>
+        <td class="notula-meta-colon">:</td>
+        <td style="text-align: justify;">{{acara_rapat}}</td>
+      </tr>
+    </table>
+
+    <div class="notula-section-heading">Peserta Rapat :</div>
+    {{peserta_notula_html}}
+
+    <div class="notula-section-heading" style="margin-top: 12px;">Jalannya Rapat :</div>
+
+    <table class="notula-list-table" style="margin-top: 4px;">
+      <tr>
+        <td style="width: 22px; font-weight: bold;">A.</td>
+        <td style="font-weight: bold;">Pengarahan Umum Pimpinan Rapat ({{label_pimpinan_notula}})</td>
+      </tr>
+      <tr>
+        <td></td>
+        <td style="padding-top: 4px; text-align: justify;">{{pengarahan_umum_html}}</td>
+      </tr>
+    </table>
+
+    <table class="notula-list-table" style="margin-top: 8px;">
+      <tr>
+        <td style="width: 22px; font-weight: bold;">B.</td>
+        <td style="font-weight: bold;">Pembahasan</td>
+      </tr>
+    </table>
+    <div class="notula-sub-block">
+      {{pembahasan_bertingkat_html}}
+    </div>
+
+    {{kesimpulan_notula_html}}
+
+    <table class="notula-ttd-table">
+      <tr>
+        <td style="width: 50%;">
+          <div>Mengetahui,</div>
+          <div>{{jabatan_pimpinan_notula}},</div>
+          <div style="height: 60px;"></div>
+          <div style="font-weight: bold;">{{nama_pimpinan_notula}}</div>
+        </td>
+        <td style="width: 50%;">
+          <div>Indramayu, {{tanggal_rapat}}</div>
+          <div>Notulis,</div>
+          <div style="height: 60px;"></div>
+          <div style="font-weight: bold;">{{nama_notulis_notula}}</div>
+        </td>
+      </tr>
+    </table>
+
+    {{halaman_foto_rapat_html}}
+  </div>
+</div>

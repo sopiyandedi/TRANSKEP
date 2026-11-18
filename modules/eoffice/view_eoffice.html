@@ -1325,19 +1325,35 @@
         <!-- ============================================== -->
         <div id="rapatTabPanel_media" class="space-y-4 hidden">
           <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <!-- Kartu Upload Foto (Siap Tahap 139) -->
+            <!-- Kartu Upload Foto (Aktif Tahap 139: Kompresi Canvas -> Google Drive) -->
             <div class="bg-slate-950/50 border border-slate-800/80 rounded-2xl p-4 space-y-3">
-              <div class="flex items-center justify-between border-b border-slate-800/70 pb-2">
+              <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800/70 pb-2">
                 <h4 class="font-bold text-slate-200 uppercase tracking-wider text-[11px] flex items-center gap-2">
                   <i class="fa-solid fa-images text-cyan-400"></i>Foto Dokumentasi Rapat
+                  <span id="rapatFotoCountBadge"
+                    class="px-2 py-0.5 rounded-full text-[9px] font-bold bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">0 / 8 Foto</span>
                 </h4>
-                <span class="px-2 py-0.5 rounded-full text-[9px] font-bold bg-cyan-500/10 text-cyan-300 border border-cyan-500/20">Tahap 139</span>
+                <div class="flex items-center gap-1.5">
+                  <input type="file" id="rapatInputFotoFiles" accept="image/jpeg,image/png" multiple class="hidden"
+                    onchange="handleRapatFotoSelect(this.files); this.value='';">
+                  <button type="button" onclick="document.getElementById('rapatInputFotoFiles').click()"
+                    class="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded-xl text-[10px] transition inline-flex items-center gap-1.5 shadow-sm">
+                    <i class="fa-solid fa-cloud-arrow-up"></i>
+                    <span>+ Pilih Foto (Auto-Kompres)</span>
+                  </button>
+                  <button type="button" onclick="clearAllFotoRapat()"
+                    class="px-2.5 py-1.5 bg-slate-800 hover:bg-rose-500/20 text-slate-400 hover:text-rose-300 font-bold rounded-xl text-[10px] border border-slate-700 transition">
+                    Hapus Semua
+                  </button>
+                </div>
               </div>
               <p class="text-[11px] text-slate-400 leading-relaxed">
-                Unggah foto dokumentasi kegiatan rapat (otomatis dikompresi agar ringan dan disimpan aman di Google Drive) untuk dicetak pada halaman akhir <b>Foto Rapat</b> grid 2&times;2 di Notula.
+                Foto otomatis dikompresi (maks. 960px JPEG) di browser lalu diunggah privat ke Google Drive agar ringan dan tampil di halaman akhir <b>Foto Rapat</b> (grid 2&times;2) Notula.
               </p>
-              <div id="rapatFotoPreviewContainer" class="p-4 rounded-xl border border-dashed border-slate-700 bg-slate-900/40 text-center text-[11px] text-slate-500">
-                Modul kompresi &amp; unggah foto Drive akan aktif penuh pada Tahap 139.
+              <div id="rapatFotoPreviewContainer" class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-64 overflow-y-auto custom-scrollbar pr-1">
+                <div class="sm:col-span-2 p-4 rounded-xl border border-dashed border-slate-700 bg-slate-900/40 text-center text-[11px] text-slate-500">
+                  Belum ada foto rapat terpilih. Klik <b>+ Pilih Foto</b> untuk menambahkan maksimal 8 foto.
+                </div>
               </div>
             </div>
 

@@ -1631,6 +1631,63 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
     assert(hadHtml48.includes('padding-left: 6px;') && hadHtml48.includes('padding-left: 52%;'), 'Daftar Hadir must render zig-zag TTD numbers');
     assert((hadHtml48.match(/class="hadir-data-row"/g) || []).length === 48, 'Daftar Hadir must support 48 rows');
     assert(hadHtml48.includes('NIP. 197309081998031001') && hadHtml48.includes('NIP. 199312242025211033'), 'Daftar Hadir must auto-fill Pimpinan and Notulis NIPs');
+
+    // Tahap 139: Upload Foto Drive Privat & Mesin Cetak Notula A4 11pt + Grid 2x2 Foto
+    assert(fs.readFileSync('api_router.js', 'utf8').includes('uploadFotoRapat: true'), 'api_router.js must allow uploadFotoRapat RPC');
+    assert(fs.readFileSync('eoffice/rapat.js', 'utf8').includes('function uploadFotoRapat('), 'eoffice/rapat.js must define uploadFotoRapat');
+    assert(fs.readFileSync('code.js', 'utf8').includes('Arsip Foto Rapat TRANSKEP'), 'code.js must allow Arsip Foto Rapat TRANSKEP in internal Drive proxy');
+    assert(fs.readFileSync('modules/eoffice/eoffice_data.js', 'utf8').includes('uploadFotoRapatToDrive(') && fs.readFileSync('modules/eoffice/eoffice_data.js', 'utf8').includes('resolveFotoRapatDataUri('), 'eoffice_data.js must define Drive photo upload and proxy resolution');
+
+    const cetakNotHtml = fs.readFileSync('modules/eoffice/cetak/cetak_notula.html', 'utf8');
+    const cetakNotJs = fs.readFileSync('modules/eoffice/cetak/js_cetak_notula.js', 'utf8');
+    assert(cetakNotHtml.includes('font-size: 11pt;') && cetakNotHtml.includes('MAHKAMAH AGUNG REPUBLIK INDONESIA'), 'cetak_notula.html must use 11pt font and official Kop Surat');
+
+    const notulaVm139 = {
+      console, Date, Math, Array, Object, String, Number, Boolean, JSON,
+      window: {},
+      vueState: {
+        usersList: [
+          { nip: '197801012005011002', nama: 'Ikin, S.Ag., M.E.', jabatan: 'Wakil Ketua Pengadilan Agama Indramayu' },
+          { nip: '199312242025211033', nama: 'Dedi Sopiyan, S.H.', jabatan: 'Notulis' }
+        ]
+      }
+    };
+    notulaVm139.window = notulaVm139;
+    vm.createContext(notulaVm139);
+    vm.runInContext(cetakNotJs, notulaVm139);
+
+    const renderedNotula = notulaVm139.NotulaPrintHelper.buildNotulaHtml({
+      dasar_notula: 'Surat Sekma RI Tanggal 14 September 2026 <script>alert(1)</script>',
+      hari_tanggal: 'Rabu, 28 Oktober 2026',
+      waktu_mulai: '08:00 WIB',
+      waktu_selesai: 'Selesai',
+      tempat: 'Ruang Rapat / Kesekretariatan',
+      agenda: 'Rapat Pembukaan PIPK',
+      pemimpin_nip: '197801012005011002',
+      pemimpin: 'Ketua Tim Penilai PIPK / Wakil Ketua',
+      notulis_nip: '199312242025211033',
+      notulis: 'Dedi Sopiyan, S.H.',
+      tujuan_undangan_json: JSON.stringify([{ label: 'Wakil Ketua' }, { label: 'Sekretaris' }]),
+      pengarahan_umum: 'Assalamualaikum Wr. Wb. Pembukaan rapat evaluasi.',
+      pembahasan_json: JSON.stringify([
+        {
+          pembicara_nama: 'Agus Salim, S.Ag. (Sekretaris)',
+          uraian: '1. Poin satu laporan\n2. Poin dua laporan',
+          tindak_lanjut: 'Inventarisir dokumen per SPM',
+          target: 'Terselesaikannya penilaian PIPK',
+          penanggung_jawab: 'Sekretaris & Tim Penerap',
+          tanggal_penyelesaian: '4 s.d. 6 November 2026'
+        }
+      ])
+    }, cetakNotHtml, [
+      { src: 'data:image/jpeg;base64,/9j/4AAQ', caption: 'Foto Suasana <img src=x>' },
+      { src: 'https://evil.example.com/x.png', caption: 'Should Be Filtered' }
+    ]);
+
+    assert(renderedNotula.includes('Dasar') && renderedNotula.includes('NOTULA'), 'Notula must include Dasar header and NOTULA title');
+    assert(renderedNotula.includes('Uraian Pembahasan/Laporan') && renderedNotula.includes('Tindak Lanjut/Tanggapan/Masukan') && renderedNotula.includes('Tanggal Penyelesaian'), 'Notula must render hierarchical a..e subsections');
+    assert(renderedNotula.includes('notula-foto-grid-table') && renderedNotula.includes('data:image/jpeg;base64,/9j/4AAQ'), 'Notula must render Foto Rapat 2x2 grid for safe data:image URIs');
+    assert(!renderedNotula.includes('evil.example.com') && !renderedNotula.includes('<script>alert(1)') && !renderedNotula.includes('<img src=x>'), 'Notula must reject non-data-URI images and escape XSS');
   } finally {
     browserSandbox.TranskepAPI.call = origApiCall;
     browserSandbox.TranskepFirebase.getDb = origGetDb;

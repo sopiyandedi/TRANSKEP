@@ -262,6 +262,7 @@ var AUTHENTICATED_RPC_METHODS_ = {
   getKgbMysimsStatus: true,
   deleteKgbDocRecord: true,
   createPaketRapatDocs: true,
+  uploadFotoRapat: true,
   saveJobdes: true,
   createPdfJobdes: true,
   getUsulanMenunggu: true,

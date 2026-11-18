@@ -1,10 +1,10 @@
 // =========================================================================
 // FILE: sw.js (TRANSKEP Progressive Web App Service Worker)
 // DESKRIPSI: Offline Asset Caching, Fast Load & Network Pass-Through
-// ENGINE: TRANSKEP PWA Engine v1.0.0 (Build: v3.8.72 - Cetak Instan Undangan Rapat 1/2 Lembar & Daftar Hadir A4)
+// ENGINE: TRANSKEP PWA Engine v1.0.0 (Build: v3.8.73 - Upload Foto Drive Terkompresi & Mesin Cetak Notula A4 11pt + Grid 2x2 Foto)
 // =========================================================================
 
-const CACHE_NAME = 'transkep-v3.8.72';
+const CACHE_NAME = 'transkep-v3.8.73';
 
 // Daftar aset inti yang di-cache saat Service Worker dipasang (Install)
 const PRECACHE_ASSETS = [
@@ -109,6 +109,8 @@ const PRECACHE_ASSETS = [
   './modules/eoffice/cetak/js_cetak_undangan.js',
   './modules/eoffice/cetak/cetak_hadir.html',
   './modules/eoffice/cetak/js_cetak_hadir.js',
+  './modules/eoffice/cetak/cetak_notula.html',
+  './modules/eoffice/cetak/js_cetak_notula.js',
   './modules/pegawai/view_pegawai.html',
   './modules/pegawai/pegawai_data.js',
   './modules/pegawai/pegawai.js',

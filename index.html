@@ -147,7 +147,7 @@
 
   <!-- TRANSKEP: Auto-Bust PWA Cache & Stale Service Worker Guard -->
   <script>
-    window.APP_BUILD_VER = '3.8.72';
+    window.APP_BUILD_VER = '3.8.73';
     (async function () {
       const CURRENT_APP_BUILD = 'transkep-v' + window.APP_BUILD_VER;
       if (localStorage.getItem('transkep_active_build') !== CURRENT_APP_BUILD) {
@@ -464,7 +464,8 @@
         'modules/permohonan/cetak/cetak_wfh_laporan.html',
         'modules/eoffice/cetak/cetak_kgb.html',
         'modules/eoffice/cetak/cetak_undangan.html',
-        'modules/eoffice/cetak/cetak_hadir.html'
+        'modules/eoffice/cetak/cetak_hadir.html',
+        'modules/eoffice/cetak/cetak_notula.html'
       ];
 
       const CORE_SCRIPTS = [
@@ -534,11 +535,12 @@
         'modules/permohonan/cetak/cetak_wfh_laporan.js',
         'modules/eoffice/cetak/js_cetak_kgb.js',
         'modules/eoffice/cetak/js_cetak_undangan.js',
-        'modules/eoffice/cetak/js_cetak_hadir.js'
+        'modules/eoffice/cetak/js_cetak_hadir.js',
+        'modules/eoffice/cetak/js_cetak_notula.js'
       ];
 
       try {
-        const APP_BUILD_VER = window.APP_BUILD_VER || '3.8.72';
+        const APP_BUILD_VER = window.APP_BUILD_VER || '3.8.73';
         console.log('🔄 [TRANSKEP Loader] Memuat komponen tampilan views/ secara paralel...');
         await Promise.all(VIEW_SLOTS.map(async item => {
           const res = await fetch(item.file + '?v=' + APP_BUILD_VER, { cache: 'no-cache' });

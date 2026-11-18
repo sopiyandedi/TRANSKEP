@@ -35,6 +35,67 @@ function generateSeqRapatId_(ss) {
 }
 
 /**
+ * Helper: Mengambil / Membuat Folder Privat Google Drive untuk Dokumentasi Foto Rapat
+ */
+function getOrCreateFotoRapatFolder_() {
+  const folderName = 'Arsip Foto Rapat TRANSKEP';
+  const folders = DriveApp.getFoldersByName(folderName);
+  let targetFolder;
+  if (folders.hasNext()) {
+    targetFolder = folders.next();
+  } else {
+    targetFolder = DriveApp.createFolder(folderName);
+  }
+  if (typeof setPrivateDriveSharing_ === 'function') {
+    setPrivateDriveSharing_(targetFolder);
+  }
+  return targetFolder;
+}
+
+/**
+ * RPC Aman: Upload Foto Dokumentasi Rapat Terkompresi ke Google Drive Privat
+ */
+function uploadFotoRapat(payload, adminNip, clientToken) {
+  try {
+    if (!cekOtorisasiAdmin(adminNip, clientToken)) {
+      return { status: 'error', message: 'Akses Ditolak: Unggah foto rapat hanya dapat dilakukan oleh Admin/Operator.' };
+    }
+    const p = payload || {};
+    const validated = validateUploadedFile_(
+      p.file_data,
+      p.file_name || 'foto_rapat.jpg',
+      p.mime_type || 'image/jpeg',
+      { allowPdf: false, allowImages: true, maxBytes: 5 * 1024 * 1024 }
+    );
+
+    const safePrefix = String(p.id_rapat || 'RPT').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 40) || 'RPT';
+    const stamp = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'yyyyMMdd_HHmmss');
+    const finalName = 'Foto_' + safePrefix + '_' + stamp + '_' + Math.floor(Math.random() * 1000) + '.' + validated.ext;
+
+    const blob = Utilities.newBlob(validated.bytes, validated.blobMimeType, finalName);
+    const folder = getOrCreateFotoRapatFolder_();
+    const file = folder.createFile(blob);
+    if (typeof setPrivateDriveSharing_ === 'function') {
+      setPrivateDriveSharing_(file);
+    }
+
+    const fileId = file.getId();
+    return {
+      status: 'success',
+      data: {
+        file_id: fileId,
+        url: 'https://drive.google.com/file/d/' + fileId + '/view',
+        file_name: file.getName(),
+        mime_type: validated.blobMimeType
+      }
+    };
+  } catch (err) {
+    Logger.log('ERROR uploadFotoRapat: ' + err.toString());
+    return { status: 'error', message: err.message || err.toString() };
+  }
+}
+
+/**
  * Helper: Menambahkan Kop Surat Standar PA Indramayu pada Google Docs
  */
 function appendKopSuratPaIndramayu_(body) {
