@@ -1460,6 +1460,31 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
     });
     assert.deepStrictEqual(filteredWarnings, ['Aktif Pensiun Jauh'],
       'rawWarningsData filter must only keep upcoming active pensiun and exclude past/completed ones');
+
+    // =========================================================================
+    // Tahap 134 (v3.8.68): Pemisahan Status Dashboard dari Modul E-Office KGB & Deduplikasi
+    // =========================================================================
+    const dashJs134 = fs.readFileSync('modules/dashboard/dashboard.js', 'utf8');
+    assert(!dashJs134.includes('handleDashboardKgbStatusChange'), 'dashboard.js submitTmtStatus must not call handleDashboardKgbStatusChange');
+    assert(!dashJs134.includes('Pegawai telah masuk antrean E-Office'), 'dashboard.js submitTmtStatus must not show E-Office queue message');
+
+    const eofficeDataJs134 = fs.readFileSync('modules/eoffice/eoffice_data.js', 'utf8');
+    assert(eofficeDataJs134.includes('handleDashboardKgbStatusChange(userRef, newStatus, todayYMD)'), 'eoffice_data.js must declare handleDashboardKgbStatusChange');
+
+    // Evaluasi mergeDashboardQueue deduplikasi
+    if (browserSandbox.window && browserSandbox.window.EofficeDataService) {
+      const mockRawKgb = [
+        { id_kgb: 'DRAFT-198607092020121004', nip: '198607092020121004', status: 'Selesai', is_from_dashboard: true },
+        { id_kgb: 'KGB-198607092020121004-OFFICIAL', nip: '198607092020121004', status: 'Sedang Diproses', nomor_surat: '1102/KPA.W10-A2/KP2.1.2/XI/2026', gaji_baru: '3.219.200' },
+        { id_kgb: 'KGB-197507062014051001-DUMMY', nip: '197507062014051001', status: 'Selesai' },
+        { id_kgb: 'KGB-197507062014051001-OFFICIAL', nip: '197507062014051001', status: 'Sedang Diproses', nomor_surat: '1103/KPA.W10-A2/KP2.1.2/XI/2026', gaji_baru: '4.436.700' },
+        { id_kgb: 'DRAFT-197507062014051001', nip: '197507062014051001', status: 'Sedang Diproses' }
+      ];
+      const cleanedQueue = browserSandbox.window.EofficeDataService.mergeDashboardQueue(mockRawKgb);
+      assert.strictEqual(cleanedQueue.length, 2, 'mergeDashboardQueue must filter out all dummy and duplicate phantom entries');
+      assert.strictEqual(cleanedQueue[0].id_kgb, 'KGB-198607092020121004-OFFICIAL', 'mergeDashboardQueue must keep Raden Anantama official SK');
+      assert.strictEqual(cleanedQueue[1].id_kgb, 'KGB-197507062014051001-OFFICIAL', 'mergeDashboardQueue must keep Ade Badrujaman official SK');
+    }
   } finally {
     browserSandbox.TranskepAPI.call = origApiCall;
     browserSandbox.TranskepFirebase.getDb = origGetDb;

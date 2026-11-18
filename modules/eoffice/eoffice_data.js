@@ -250,11 +250,12 @@ const EofficeDataService = {
   },
 
   /**
-   * Menyintesis antrean pegawai berstatus KGB 'Proses' dari state.usersList ke daftar KGB
-   * Catatan: Riwayat KGB berstatus 'Selesai' tetap dipertahankan & berdampingan dengan siklus baru
+   * Menggabungkan dan membersihkan daftar KGB E-Office.
+   * [Tahap 134]: Mengeliminasi duplikasi entri draf dummy dari perubahan status dashboard
+   * serta memastikan dokumen resmi ber-nomor surat tetap utuh dan rapi.
    */
   mergeDashboardQueue(kgbList) {
-    const list = Array.isArray(kgbList) ? [...kgbList] : [];
+    let list = Array.isArray(kgbList) ? [...kgbList] : [];
 
     // Prioritas 0: Sertakan draf lokal dari transkep_eoffice_local_kgbs
     try {
@@ -264,7 +265,7 @@ const EofficeDataService = {
         if (Array.isArray(localKgbs)) {
           localKgbs.forEach(lk => {
             const lkNip = String(lk.nip || '').replace(/['"\s]/g, '');
-            if (lkNip && !list.some(k => String(k.nip || '').replace(/['"\s]/g, '') === lkNip && String(k.status || '').toLowerCase() === String(lk.status || '').toLowerCase())) {
+            if (lkNip && !list.some(k => String(k.nip || '').replace(/['"\s]/g, '') === lkNip && String(k.id_kgb || '') === String(lk.id_kgb || ''))) {
               list.unshift(lk);
             }
           });
@@ -272,232 +273,74 @@ const EofficeDataService = {
       }
     } catch (e) {}
 
-    let uList = (window.vueState && window.vueState.usersList)
-      ? window.vueState.usersList
-      : (typeof state !== 'undefined' ? state.usersList : []);
+    // [Tahap 134]: Eliminasi phantom duplicate & draf dummy yang terinput dari perubahan status dashboard
+    const cleaned = [];
+    const phantomsToDelete = [];
 
-    // Fallback ambil dari localStorage jika in-memory usersList belum terisi
-    if (!Array.isArray(uList) || uList.length === 0) {
+    const hasOfficialNumber = (k) => {
+      const n = String(k.nomor_surat || k.nokgb || '').trim();
+      return Boolean(n && n !== '-' && n !== '...' && !n.startsWith('...'));
+    };
+
+    // Filter tahap 1: buang dokumen dummy yang tidak valid
+    const candidates = list.filter(k => {
+      if (!k) return false;
+      const isDashboardPhantom = (k.is_from_dashboard === true);
+      const isDummyDone = (String(k.status || '').toLowerCase() === 'selesai' && !hasOfficialNumber(k) && !k.gaji_baru);
+      if (isDashboardPhantom || isDummyDone) {
+        if (k.id_kgb) phantomsToDelete.push(k.id_kgb);
+        return false;
+      }
+      return true;
+    });
+
+    // Filter tahap 2: deduplikasi per NIP bila terdapat draf tanpa nomor berdampingan dengan berkas resmi yang sudah ber-nomor
+    const nipOfficialMap = new Set();
+    candidates.forEach(k => {
+      const nip = String(k.nip || '').replace(/['"\s]/g, '');
+      if (nip && hasOfficialNumber(k)) {
+        nipOfficialMap.add(nip);
+      }
+    });
+
+    candidates.forEach(k => {
+      const nip = String(k.nip || '').replace(/['"\s]/g, '');
+      if (nip && nipOfficialMap.has(nip) && !hasOfficialNumber(k) && String(k.id_kgb || '').startsWith('DRAFT-')) {
+        if (k.id_kgb) phantomsToDelete.push(k.id_kgb);
+        return;
+      }
+      cleaned.push(k);
+    });
+
+    // Pembersihan asinkron di latar belakang untuk menghapus dokumen dummy dari local storage & Firestore
+    if (phantomsToDelete.length > 0) {
       try {
-        const cachedUsers = localStorage.getItem('transkep_users_cache');
-        if (cachedUsers) uList = JSON.parse(cachedUsers);
+        const localRaw = localStorage.getItem('transkep_eoffice_local_kgbs');
+        if (localRaw) {
+          const lKgbs = JSON.parse(localRaw);
+          if (Array.isArray(lKgbs)) {
+            const filteredLocal = lKgbs.filter(lk => !phantomsToDelete.includes(lk.id_kgb));
+            localStorage.setItem('transkep_eoffice_local_kgbs', JSON.stringify(filteredLocal));
+          }
+        }
       } catch (e) {}
+
+      if (typeof TranskepFirebase !== 'undefined' && TranskepFirebase.isReady && TranskepFirebase.isReady()) {
+        phantomsToDelete.forEach(id => {
+          TranskepFirebase.deleteKgbFromFirestore(id).catch(() => {});
+        });
+      }
     }
 
-    if (Array.isArray(uList)) {
-      uList.forEach(u => {
-        const statusKgb = String(u.status_kgb || u.Status_KGB || '').trim().toUpperCase();
-        const strNip = String(u.nip || '').replace(/['"\s]/g, '');
-        if (!strNip) return;
-
-        // 1. KASUS: Pegawai berstatus KGB 'PROSES' (Sedang Diproses)
-        if (statusKgb === 'PROSES' || statusKgb === 'SEDANG DIPROSES' || statusKgb.includes('PROSES')) {
-          const hasActiveCycle = list.some(k => String(k.nip || '').replace(/['"\s]/g, '') === strNip && String(k.status || '').trim().toLowerCase() !== 'selesai');
-          if (!hasActiveCycle) {
-            let tmtLama = u.tmt_kgb || '';
-            let tmtBaru = tmtLama;
-            if (tmtLama) {
-              try {
-                const parseFn = (typeof parseTanggalLokal === 'function') ? parseTanggalLokal : (d => new Date(d));
-                const d = parseFn(tmtLama);
-                if (d && !isNaN(d.getTime())) {
-                  const dNew = new Date(d);
-                  dNew.setFullYear(dNew.getFullYear() + 2);
-                  tmtBaru = `${dNew.getFullYear()}-${String(dNew.getMonth() + 1).padStart(2, '0')}-${String(dNew.getDate()).padStart(2, '0')}`;
-                }
-              } catch (e) {}
-            }
-            list.unshift({
-              id_kgb: 'DRAFT-' + strNip,
-              nip: strNip,
-              nama_pegawai: u.nama || '',
-              pangkat: u.pangkat || '',
-              golongan: u.golongan || '',
-              jabatan: u.jabatan || '',
-              tmt_lama: tmtLama,
-              tmt_baru: tmtBaru,
-              status: 'Sedang Diproses',
-              is_from_dashboard: true,
-              tanggal_input: new Date().toISOString().split('T')[0]
-            });
-          }
-        }
-        // 2. KASUS: Pegawai berstatus KGB 'SELESAI' (Arsip KGB yang sudah terbit di Dashboard)
-        else if (statusKgb === 'SELESAI') {
-          const hasRecord = list.some(k => String(k.nip || '').replace(/['"\s]/g, '') === strNip);
-          if (!hasRecord) {
-            list.push({
-              id_kgb: 'KGB-' + strNip + '-' + (u.tmt_kgb ? String(u.tmt_kgb).replace(/[^0-9]/g, '') : 'DONE'),
-              nip: strNip,
-              nama_pegawai: u.nama || '',
-              pangkat: u.pangkat || '',
-              golongan: u.golongan || '',
-              jabatan: u.jabatan || '',
-              tmt_lama: u.tmt_kgb || '',
-              tmt_baru: u.tmt_kgb || '',
-              status: 'Selesai',
-              tgl_selesai: u.tgl_selesai_kgb || new Date().toISOString().split('T')[0],
-              is_from_dashboard: true,
-              tanggal_input: u.tgl_selesai_kgb || new Date().toISOString().split('T')[0]
-            });
-          }
-        }
-        // 3. KASUS CADANGAN: Tampilkan pegawai yang jatuh tempo KGB (deadline <= 90 hari) jika belum ada di daftar
-        else if (u.tmt_kgb) {
-          const hasItem = list.some(k => String(k.nip || '').replace(/['"\s]/g, '') === strNip);
-          if (hasItem) return;
-          try {
-            const parseFn = (typeof parseTanggalLokal === 'function') ? parseTanggalLokal : (d => new Date(d));
-            const d = parseFn(u.tmt_kgb);
-            if (d && !isNaN(d.getTime())) {
-              const targetKgb = new Date(d);
-              targetKgb.setFullYear(targetKgb.getFullYear() + 2);
-              const today = new Date();
-              today.setHours(0, 0, 0, 0);
-              const diffDays = Math.ceil((targetKgb.getTime() - today.getTime()) / (1000 * 3600 * 24));
-              if (diffDays <= 90) {
-                const hasItem = list.some(k => String(k.nip || '').replace(/['"\s]/g, '') === strNip);
-                if (!hasItem) {
-                  const dNew = new Date(d);
-                  dNew.setFullYear(dNew.getFullYear() + 2);
-                  const tmtBaru = `${dNew.getFullYear()}-${String(dNew.getMonth() + 1).padStart(2, '0')}-${String(dNew.getDate()).padStart(2, '0')}`;
-                  list.push({
-                    id_kgb: 'DRAFT-' + strNip,
-                    nip: strNip,
-                    nama_pegawai: u.nama || '',
-                    pangkat: u.pangkat || '',
-                    golongan: u.golongan || '',
-                    jabatan: u.jabatan || '',
-                    tmt_lama: u.tmt_kgb || '',
-                    tmt_baru: tmtBaru,
-                    status: 'Sedang Diproses',
-                    is_from_dashboard: true,
-                    tanggal_input: new Date().toISOString().split('T')[0]
-                  });
-                }
-              }
-            }
-          } catch(e) {}
-        }
-      });
-    }
-
-    return list;
+    return cleaned;
   },
 
   /**
-   * Sinkronisasi perubahan status KGB dari Bar Peringatan Dini Dashboard ke Cloud Firestore (eoffice_kgb)
-   * ATURAN RETENSI TAHAP 2:
-   * - 'Proses'  -> Buat/aktifkan draf siklus baru (dengan auto-prefill dari KGB Selesai sebelumnya jika ada)
-   * - 'Selesai' -> JANGAN HAPUS! Promosikan & simpan permanen sebagai status 'Selesai' di eoffice_kgb
-   * - 'Menunggu'-> Hanya hapus draf sementara 'DRAFT-{nip}' yang belum diterbitkan (arsip 'Selesai' tetap aman)
+   * [Tahap 134]: Perubahan status berkas di Dashboard hanya memutakhirkan user_data pegawai,
+   * tidak menginput/menduplikasi berkas atau draf baru ke E-Office.
    */
   async handleDashboardKgbStatusChange(userRef, newStatus, todayYMD) {
-    if (!userRef || !userRef.nip) return;
-
-    const targetNip = String(userRef.nip).replace(/['"\s]/g, '');
-    const dateNow = todayYMD || new Date().toISOString().split('T')[0];
-
-    let tmtLama = userRef.tmt_kgb || '';
-    let tmtBaru = tmtLama;
-    if (tmtLama) {
-      try {
-        const parseFn = (typeof parseTanggalLokal === 'function') ? parseTanggalLokal : (d => new Date(d));
-        const d = parseFn(tmtLama);
-        if (d && !isNaN(d.getTime())) {
-          const dNew = new Date(d);
-          dNew.setFullYear(dNew.getFullYear() + 2);
-          tmtBaru = `${dNew.getFullYear()}-${String(dNew.getMonth() + 1).padStart(2, '0')}-${String(dNew.getDate()).padStart(2, '0')}`;
-        }
-      } catch(e) {}
-    }
-
-    // 1. UPDATE IMMEDIATE LOCAL CACHE & MEMORY (0ms Responsif)
-    const cached = this.getLocalCache();
-    let baseKgb = (cached && Array.isArray(cached.kgb)) ? [...cached.kgb] : [];
-
-    let targetDraft = null;
-    let targetDone = null;
-
-    if (newStatus === 'Proses') {
-      targetDraft = {
-        id_kgb: 'DRAFT-' + targetNip,
-        nip: targetNip,
-        nama_pegawai: userRef.nama || '',
-        pangkat: userRef.pangkat || '',
-        golongan: userRef.golongan || '',
-        jabatan: userRef.jabatan || '',
-        unit_kerja: 'Pengadilan Agama Indramayu Kelas 1.A.',
-        tmt_lama: tmtLama,
-        tmt_baru: tmtBaru,
-        status: 'Sedang Diproses',
-        is_from_dashboard: true,
-        tanggal_input: dateNow
-      };
-
-      const existIdx = baseKgb.findIndex(k => String(k.nip || '').replace(/['"\s]/g, '') === targetNip && k.status !== 'Selesai');
-      if (existIdx !== -1) {
-        baseKgb[existIdx] = { ...baseKgb[existIdx], ...targetDraft };
-      } else {
-        baseKgb.unshift(targetDraft);
-      }
-    } else if (newStatus === 'Selesai') {
-      const periodId = 'KGB-' + targetNip + '-' + (tmtBaru ? tmtBaru.replace(/[^0-9]/g, '') : dateNow.replace(/[^0-9]/g, ''));
-      targetDone = {
-        id_kgb: periodId,
-        nip: targetNip,
-        nama_pegawai: userRef.nama || '',
-        pangkat: userRef.pangkat || '',
-        golongan: userRef.golongan || '',
-        jabatan: userRef.jabatan || '',
-        unit_kerja: 'Pengadilan Agama Indramayu Kelas 1.A.',
-        tmt_lama: tmtLama,
-        tmt_baru: tmtBaru,
-        status: 'Selesai',
-        tgl_selesai: dateNow,
-        is_from_dashboard: false,
-        tanggal_input: dateNow
-      };
-
-      const dIdx = baseKgb.findIndex(k => String(k.id_kgb || '') === ('DRAFT-' + targetNip) || (String(k.nip || '').replace(/['"\s]/g, '') === targetNip && k.status !== 'Selesai'));
-      if (dIdx !== -1) {
-        baseKgb.splice(dIdx, 1, targetDone);
-      } else {
-        baseKgb.unshift(targetDone);
-      }
-    } else if (newStatus === 'Menunggu') {
-      baseKgb = baseKgb.filter(k => String(k.id_kgb || '') !== ('DRAFT-' + targetNip));
-    }
-
-    this.setLocalCache({ kgb: baseKgb, rapat: (cached && cached.rapat) || [] });
-    try {
-      localStorage.setItem('transkep_eoffice_local_kgbs', JSON.stringify(baseKgb));
-    } catch (e) {}
-
-    if (typeof window !== 'undefined' && window.vmEoffice) {
-      window.vmEoffice.rawKgbList = [...baseKgb];
-    }
-
-    // 2. SINKRONISASI KE CLOUD FIRESTORE SECARA ASINKRON (Non-blocking)
-    if (typeof TranskepFirebase !== 'undefined' && TranskepFirebase.isReady && TranskepFirebase.isReady()) {
-      try {
-        if (targetDraft) {
-          await TranskepFirebase.saveKgbToFirestore(targetDraft);
-        } else if (targetDone) {
-          await TranskepFirebase.saveKgbToFirestore(targetDone);
-          await TranskepFirebase.deleteKgbFromFirestore('DRAFT-' + targetNip).catch(() => {});
-        } else if (newStatus === 'Menunggu') {
-          await TranskepFirebase.deleteKgbFromFirestore('DRAFT-' + targetNip).catch(() => {});
-        }
-      } catch (fsErr) {
-        const msg = String(fsErr && (fsErr.message || fsErr));
-        if (msg.toLowerCase().includes('permission') || msg.toLowerCase().includes('insufficient')) {
-          console.warn("⚠️ [E-Office] Firestore Security Rules memblokir koleksi 'eoffice_kgb'. Data tersimpan aman di penyimpanan lokal.", fsErr);
-        } else {
-          console.warn("⚠️ [E-Office] Firestore sync notice:", fsErr);
-        }
-      }
-    }
+    return;
   },
 
   /**

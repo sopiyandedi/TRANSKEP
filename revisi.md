@@ -6582,6 +6582,68 @@ Berdasarkan keluhan pengguna dan dua tangkapan layar yang disertakan:
 
 ---
 
+## Tahap 134 [SELESAI & AKTIF]: Pemisahan Independensi Status Dashboard Dari E-Office (Cukup Ubah Status Pegawai Tanpa Menginput Ulang ke E-Office & Eliminasi Duplikat Draf) (`v3.8.68`)
+
+### 1. Masalah & Temuan Akar Masalah (Root Cause Analysis)
+Berdasarkan keluhan dan tangkapan layar pengguna ([`media_1794975169591_7d072797.png`](file:///C:/Users/user/.gemini/antigravity/brain/437cf215-e2db-4d6e-8a31-ee9e66ec1279/.user_uploaded/media_1794975169591_7d072797.png)):
+Pada halaman **E-Office & Administrasi Kedinasan**, muncul duplikasi baris untuk pegawai yang sama:
+- **Baris Riil Berisi SK Lengkap (Baris 4, 5, 6):**
+  - Raden Anantama Havid Ismail, A.Md. (KGB • TMT 1 Jan 2027) - No. SK: `1102/KPA.W10-A2/KP2.1.2/XI/2026 • Rp 3.219.200` - Status: `Sedang Diproses`
+  - Ade Badrujaman, S.H.I. (KGB • TMT 1 Jan 2027) - No. SK: `1103/KPA.W10-A2/KP2.1.2/XI/2026 • Rp 4.436.700` - Status: `Sedang Diproses`
+  - Dr. Tohayudin, S.H.I., M.H.I. (KGB • TMT 1 Jan 2027) - No. SK: `1099/KPA.W10-A2/KP2.1.2/XI/2026 • Rp 4.042.500` - Status: `Sedang Diproses`
+- **Baris Duplikat Otomatis Tanpa SK (Baris 1, 2, 3):**
+  - Ketiga pegawai di atas tiba-tiba memiliki baris kembar kedua di urutan teratas dengan status `Selesai / Terbit`, keterangan `Draf SK Sedang Disusun`, dan tanpa nomor SK.
+
+**Mengapa Hal Ini Terjadi?**
+1. **Injeksi Otomatis dari Modal Status Dashboard:**
+   Pada [`modules/dashboard/dashboard.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/dashboard/dashboard.js) fungsi `submitTmtStatus()`, setiap kali admin mengubah status berkas KGB (misal mengubah ke "Selesai" atau "Proses"), script sebelumnya memanggil:
+   - `window.EofficeDataService.handleDashboardKgbStatusChange(userRef, newStatus, todayYMD)`
+   - `TranskepFirebase.saveKgbToFirestore(...)`
+   Kode lama ini secara sepihak menyuntikkan dokumen baru ke koleksi `eoffice_kgb` di Cloud Firestore dan `localStorage` (`transkep_eoffice_local_kgbs`) dengan ID periodik baru (`KGB-{nip}-{tmtBaru}`), padahal dokumen draf resmi yang sudah disusun di E-Office memiliki ID dokumen tersendiri dengan rincian nomor surat yang sudah diketik lengkap.
+2. **Sintesis Paksa di `mergeDashboardQueue()`:**
+   Pada [`modules/eoffice/eoffice_data.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/eoffice_data.js), fungsi `mergeDashboardQueue()` sebelumnya memindai `state.usersList` dan menyintesiskan baris baru setiap kali menemukan pegawai dengan status KGB `PROSES` atau `SELESAI`, sehingga dokumen E-Office terus-menerus diduplikasi dari antrean dashboard.
+
+Pengguna menegaskan bahwa saat perubahan status di Dashboard, **cukup rubah statusnya saja pada data pegawai/dashboard, tidak perlu menginput atau menyuntikkan data baru ke modul E-Office**.
+
+---
+
+### 2. Implementasi & Solusi Terukur
+1. **Pemisahan Total Logika di Dashboard ([`modules/dashboard/dashboard.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/dashboard/dashboard.js)):**
+   - Menghapus pemanggilan `handleDashboardKgbStatusChange` dan pembuatan/penyimpanan dokumen KGB baru ke Firestore dari `submitTmtStatus()`.
+   - Mengubah status di Dashboard murni hanya memperbarui status pegawai (`userRef.status_kgb`, `userRef.tgl_selesai_kgb`, `status_knp`, `status_pensiun`) pada memori runtime, `localStorage` (`transkep_users_cache`), dan basis data kepegawaian Google Sheets via `DashboardDataService.updateTmtStatus()`.
+   - Memperbarui notifikasi toast menjadi: `"Status berkas berhasil diperbarui."` tanpa pesan menyesatkan mengenai antrean E-Office.
+2. **Deduplikasi Cerdas & Eliminasi Phantom di E-Office ([`modules/eoffice/eoffice_data.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/eoffice_data.js)):**
+   - Mengubah `handleDashboardKgbStatusChange` menjadi safe no-op `return;`.
+   - Mengeliminasi loop sintesis dari `state.usersList` pada `mergeDashboardQueue()`.
+   - Menerapkan 2-tahap deduplikasi cerdas pada `mergeDashboardQueue()`:
+     a. **Tahap 1:** Menyaring dan membuang dokumen bertanda `is_from_dashboard === true` atau dokumen bertanda status `'Selesai'` yang tidak memiliki `nomor_surat` dan `gaji_baru`.
+     b. **Tahap 2:** Untuk NIP yang sudah memiliki berkas KGB ber-nomor SK resmi (seperti No. SK 1102, 1103, 1099), draf tanpa nomor surat resmi langsung dieliminasi.
+     c. **Pembersihan Latar Belakang:** Dokumen phantom yang teridentifikasi otomatis dibersihkan dari `transkep_eoffice_local_kgbs` dan dihapus dari Cloud Firestore (`deleteKgbFromFirestore`).
+3. **Pengujian Regresi & Bump Versi PWA `v3.8.68`:**
+   - Menambahkan unit test verifikasi di [`tests/verify_fase3b.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/tests/verify_fase3b.js) untuk menjamin pemisahan status dan kebersihan filter deduplikasi.
+   - Memutakhirkan versi PWA ke `v3.8.68` di [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) dan [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js).
+   - Seluruh 6 rangkaian pengujian keamanan dan fungsional (`npm test`) berhasil lulus 100% tanpa kegagalan (0 failures).
+
+---
+
+### 3. Matriks Sebelum vs Sesudah
+
+| Fitur / Parameter | Sebelum (v3.8.67) | Sesudah (Aktif v3.8.68) |
+| :--- | :--- | :--- |
+| **Aksi Update Status di Dashboard** | Otomatis membuat draf/arsip baru ke koleksi `eoffice_kgb` Firestore & cache E-Office | **Murni mengubah status pegawai di data kepegawaian** (`user_data`); tidak menyentuh atau menginput berkas baru ke E-Office |
+| **Tabel Dokumen E-Office** | Muncul baris duplikat di atas draf resmi (status "Selesai", keterangan "Draf SK Sedang Disusun", tanpa No. SK) | **Bersih tanpa duplikasi**; hanya dokumen sah/resmi dengan nomor SK dan draf aktif yang ditampilkan |
+| **Sintesis `mergeDashboardQueue`** | Mensintesis baris baru dari status `usersList` setiap kali load data | **Deduplikasi cerdas**; menyaring phantom `is_from_dashboard` & menghapus draf kosong jika sudah ada SK resmi |
+| **Notifikasi Toast Dashboard** | "Pegawai telah masuk antrean E-Office!" (menyesatkan) | "Status berkas berhasil diperbarui." (bersih & akurat) |
+| **Versi PWA & Cache Service Worker** | `v3.8.67` | **`v3.8.68`** |
+
+---
+
+### 4. Status Rilis & Verifikasi
+- **Branch:** `main` (tersinkronisasi ke `origin/main` dan `prod/main`).
+- **PWA Service Worker:** `transkep-v3.8.68`.
+- **Hasil Test Suite:** `ALL 6 SECURITY & SCHEMA SUITES PASSED (0 FAILURES)`.
+- **Aktivasi Pengguna:** Lakukan hard refresh browser (`Ctrl + Shift + R`) untuk memuat PWA `v3.8.68`.
+
 
 
 

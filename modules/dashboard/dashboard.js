@@ -669,61 +669,11 @@ window.dashboardApp = Vue.createApp({
           }
         }
 
-        // Sinkronisasi & Retensi Permanen Arsip KGB di Cloud Firestore (eoffice_kgb)
-        if (typeStr === 'KGB') {
-          if (window.EofficeDataService && typeof window.EofficeDataService.handleDashboardKgbStatusChange === 'function') {
-            window.EofficeDataService.handleDashboardKgbStatusChange(userRef, newStatus, todayYMD)
-              .then(() => {
-                if (window.vmEoffice && typeof window.vmEoffice.loadData === 'function') {
-                  window.vmEoffice.loadData(true);
-                }
-              });
-          } else if (typeof TranskepFirebase !== 'undefined' && TranskepFirebase.isReady && TranskepFirebase.isReady()) {
-            if (newStatus === 'Proses') {
-              TranskepFirebase.saveKgbToFirestore({
-                id_kgb: 'DRAFT-' + targetNip,
-                nip: targetNip,
-                nama_pegawai: userRef.nama || '',
-                pangkat: userRef.pangkat || '',
-                golongan: userRef.golongan || '',
-                jabatan: userRef.jabatan || '',
-                tmt_lama: userRef.tmt_kgb || '',
-                tmt_baru: userRef.tmt_kgb || '',
-                status: 'Sedang Diproses',
-                is_from_dashboard: true,
-                tanggal_input: todayYMD
-              }).catch(e => console.warn("⚠️ [Dashboard] Firestore KGB sync notice:", e));
-            } else if (newStatus === 'Selesai') {
-              const periodId = 'KGB-' + targetNip + '-' + todayYMD.slice(0, 7).replace('-', '');
-              TranskepFirebase.saveKgbToFirestore({
-                id_kgb: periodId,
-                nip: targetNip,
-                nama_pegawai: userRef.nama || '',
-                pangkat: userRef.pangkat || '',
-                golongan: userRef.golongan || '',
-                jabatan: userRef.jabatan || '',
-                tmt_lama: userRef.tmt_kgb || '',
-                tmt_baru: userRef.tmt_kgb || '',
-                status: 'Selesai',
-                tgl_selesai: todayYMD,
-                is_from_dashboard: false,
-                tanggal_input: todayYMD
-              }).then(() => TranskepFirebase.deleteKgbFromFirestore('DRAFT-' + targetNip).catch(() => { }))
-                .catch(e => console.warn("⚠️ [Dashboard] Firestore KGB archive notice:", e));
-            } else if (newStatus === 'Menunggu') {
-              TranskepFirebase.deleteKgbFromFirestore('DRAFT-' + targetNip).catch(() => { });
-            }
-            if (window.vmEoffice && typeof window.vmEoffice.loadData === 'function') {
-              window.vmEoffice.loadData(true);
-            }
-          }
-        }
+        // [Tahap 134]: Perubahan status di Dashboard hanya memutakhirkan status berkas pegawai (user_data),
+        // tidak menginput atau menduplikasi dokumen/draf ke E-Office.
       }
 
-      const notifyMsg = (typeStr === 'KGB' && newStatus === 'Proses')
-        ? "Status KGB diubah ke Proses. Pegawai telah masuk antrean E-Office!"
-        : (typeStr === 'KGB' && newStatus === 'Selesai') ? "Status KGB Selesai. Tersimpan di arsip E-Office!" : "Status berkas diperbarui.";
-      showNotify("Status Diperbarui", notifyMsg, "success");
+      showNotify("Status Diperbarui", "Status berkas berhasil diperbarui.", "success");
 
       // 3. Simpan ke Backend Google Sheets secara asinkron di latar belakang
       DashboardDataService.updateTmtStatus(adminNip, targetNip, typeStr, newStatus, token)
