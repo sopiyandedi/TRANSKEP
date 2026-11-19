@@ -705,6 +705,13 @@ const rapatSpeakerHtml = getOrCreateEl('rapatSpeakerDrop_0').innerHTML;
 assert(!rapatSpeakerHtml.includes('<img src=x') && !rapatSpeakerHtml.includes('<script>1'), 'openPembahasanSpeakerDrop must escape nama & jabatan');
 assert(rapatSpeakerHtml.includes('data-nip="') && rapatSpeakerHtml.includes('selectPembahasanSpeaker(0, this.dataset.nip)'), 'rapat speaker dropdown must use data-nip & this.dataset.nip');
 
+for (const [kind144, dropId144] of [['pejabatTtd', 'rapatPejabatTtdDrop'], ['pemimpin', 'rapatPemimpinDrop'], ['notulis', 'rapatNotulisDrop']]) {
+  browserSandbox.openOfficialSearchDrop(kind144);
+  const offHtml = getOrCreateEl(dropId144).innerHTML;
+  assert(!offHtml.includes('<img src=x') && !offHtml.includes('<script>1'), `openOfficialSearchDrop ${kind144} must escape nama & jabatan`);
+  assert(offHtml.includes('data-nip="') && offHtml.includes(`selectOfficialPegawai('${kind144}', this.dataset.nip)`), `${kind144} dropdown must use data-nip & this.dataset.nip`);
+}
+
 // Verify modules/pdf_viewer/pdf_viewer.js XSS & javascript: URL protection
 browserSandbox.vmSkApp = {
   groupedSkData: [{

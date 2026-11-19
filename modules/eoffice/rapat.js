@@ -20,6 +20,8 @@
   var tujuanSearchMatches = [];
   var speakerDropActiveMap = {};
   var speakerDropMatchesMap = {};
+  var officialDropActiveMap = { pejabatTtd: 0, pemimpin: 0, notulis: 0 };
+  var officialDropMatchesMap = { pejabatTtd: [], pemimpin: [], notulis: [] };
   var rapatLastKeyShiftTab = false;
 
   if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
@@ -177,13 +179,73 @@
   };
 
   // ==========================================
-  // PENOMORAN OTOMATIS & DROPDOWN PEJABAT TTD
+  // PENOMORAN OTOMATIS & SEARCHABLE PEJABAT TTD / PIMPINAN / NOTULIS
   // ==========================================
+  function setElValRapat_(id, val) {
+    if (!id || typeof document === 'undefined') return;
+    var el = document.getElementById(id);
+    if (el) el.value = (val == null) ? '' : String(val);
+  }
+
+  var OFFICIAL_SEARCH_CONFIG_ = {
+    pejabatTtd: {
+      inputId: 'rapatPejabatTtdSearch',
+      clearId: 'btnClearRapatPejabatTtd',
+      dropId: 'rapatPejabatTtdDrop',
+      nipId: 'rapatFieldPejabatTtdNip',
+      namaId: 'rapatFieldPejabatTtdNama',
+      jabatanId: 'rapatFieldPejabatTtdJabatan',
+      accentClass: 'bg-amber-600 text-white',
+      hoverClass: 'text-slate-300 hover:bg-amber-600 hover:text-white',
+      emptyText: 'Tidak ditemukan pejabat/pegawai yang cocok.',
+      preferPejabat: true
+    },
+    pemimpin: {
+      inputId: 'rapatPemimpinSearch',
+      clearId: 'btnClearRapatPemimpin',
+      dropId: 'rapatPemimpinDrop',
+      nipId: 'rapatFieldPemimpinNip',
+      namaId: null,
+      jabatanId: 'rapatFieldPemimpinJabatan',
+      accentClass: 'bg-cyan-600 text-white',
+      hoverClass: 'text-slate-300 hover:bg-cyan-600 hover:text-white',
+      emptyText: 'Pegawai tidak ditemukan. Isi manual Label Jabatan Pimpinan di kolom sebelahnya.',
+      preferPejabat: false
+    },
+    notulis: {
+      inputId: 'rapatNotulisSearch',
+      clearId: 'btnClearRapatNotulis',
+      dropId: 'rapatNotulisDrop',
+      nipId: 'rapatFieldNotulisNip',
+      namaId: null,
+      jabatanId: 'rapatFieldNotulisJabatan',
+      accentClass: 'bg-emerald-600 text-white',
+      hoverClass: 'text-slate-300 hover:bg-emerald-600 hover:text-white',
+      emptyText: 'Pegawai tidak ditemukan. Isi manual Nama Notulis di kolom sebelahnya.',
+      preferPejabat: false
+    }
+  };
+
+  function resolveOfficialDisplay_(nipVal, namaVal, jabVal) {
+    var cleanNip = String(nipVal || '').trim();
+    if (cleanNip) {
+      var matched = getUsersListRapat_().find(function (u) { return String(u.nip) === cleanNip; });
+      if (matched) return matched.nama + (matched.jabatan ? ' (' + matched.jabatan + ')' : '');
+    }
+    var cleanNama = String(namaVal || '').trim();
+    var cleanJab = String(jabVal || '').trim();
+    if (cleanNama) {
+      return (cleanJab && cleanJab !== cleanNama && cleanNama.indexOf('(') === -1) ? (cleanNama + ' (' + cleanJab + ')') : cleanNama;
+    }
+    return '';
+  }
+
   function populateRapatOfficialSelects_() {
     var list = getSortedPegawaiRapat_();
     var elTtd = document.getElementById('rapatFieldPejabatTtdSelect');
     var elPem = document.getElementById('rapatFieldPemimpinSelect');
     var elNot = document.getElementById('rapatFieldNotulisSelect');
+    if (!elTtd && !elPem && !elNot) return;
 
     var buildOpts = function (items, placeholder) {
       var h = '<option value="">' + escRapat_(placeholder) + '</option>';
@@ -227,17 +289,28 @@
     if (elNomor) elNomor.value = assembled;
   };
 
+  window.syncNoUrutFromNomorUndangan = function (fullVal) {
+    var s = String(fullVal == null ? '' : fullVal).trim();
+    var extracted = '';
+    if (s && s.indexOf('/') !== -1) {
+      var seg0 = s.split('/')[0].trim();
+      if (seg0 && seg0 !== '...' && seg0 !== '......' && seg0 !== '-') {
+        extracted = seg0;
+      }
+    }
+    setElValRapat_('rapatFieldNoUrutSurat', extracted);
+    return extracted;
+  };
+
   window.handleRapatPejabatTtdChange = function (nip) {
     var list = getUsersListRapat_();
     var u = list.find(function (x) { return String(x.nip) === String(nip); });
-    document.getElementById('rapatFieldPejabatTtdNip').value = u ? String(u.nip || '') : '';
-    document.getElementById('rapatFieldPejabatTtdNama').value = u ? String(u.nama || '') : '';
-    document.getElementById('rapatFieldPejabatTtdJabatan').value = u ? String(u.jabatan || '') : '';
+    setElValRapat_('rapatFieldPejabatTtdNip', u ? String(u.nip || '') : '');
+    setElValRapat_('rapatFieldPejabatTtdNama', u ? String(u.nama || '') : '');
+    setElValRapat_('rapatFieldPejabatTtdJabatan', u ? String(u.jabatan || '') : '');
 
     if (u && u.jabatan) {
-      var kode = inferKodePejabatFromJabatan_(u.jabatan);
-      var elKodePjb = document.getElementById('rapatFieldKodePejabat');
-      if (elKodePjb) elKodePjb.value = kode;
+      setElValRapat_('rapatFieldKodePejabat', inferKodePejabatFromJabatan_(u.jabatan));
     }
     syncNomorUndanganPreview();
   };
@@ -258,20 +331,198 @@
   window.handleRapatPemimpinChange = function (nip) {
     var list = getUsersListRapat_();
     var u = list.find(function (x) { return String(x.nip) === String(nip); });
-    document.getElementById('rapatFieldPemimpinNip').value = u ? String(u.nip || '') : '';
-    document.getElementById('rapatFieldPemimpinJabatan').value = u ? String(u.jabatan || '') : '';
+    setElValRapat_('rapatFieldPemimpinNip', u ? String(u.nip || '') : '');
+    setElValRapat_('rapatFieldPemimpinJabatan', u ? String(u.jabatan || '') : '');
     if (u) {
-      document.getElementById('rapatFieldPemimpin').value = u.jabatan || u.nama || '';
+      setElValRapat_('rapatFieldPemimpin', u.jabatan || u.nama || '');
     }
   };
 
   window.handleRapatNotulisChange = function (nip) {
     var list = getUsersListRapat_();
     var u = list.find(function (x) { return String(x.nip) === String(nip); });
-    document.getElementById('rapatFieldNotulisNip').value = u ? String(u.nip || '') : '';
-    document.getElementById('rapatFieldNotulisJabatan').value = u ? String(u.jabatan || '') : '';
+    setElValRapat_('rapatFieldNotulisNip', u ? String(u.nip || '') : '');
+    setElValRapat_('rapatFieldNotulisJabatan', u ? String(u.jabatan || '') : '');
     if (u) {
-      document.getElementById('rapatFieldNotulis').value = u.nama || '';
+      setElValRapat_('rapatFieldNotulis', u.nama || '');
+    }
+  };
+
+  function getFilteredOfficialPegawai_(kind, kw) {
+    var cfg = OFFICIAL_SEARCH_CONFIG_[kind];
+    var sorted = getSortedPegawaiRapat_();
+    var q = String(kw || '').toLowerCase().trim();
+    if (!q) {
+      if (cfg && cfg.preferPejabat) {
+        var pejabatOnly = sorted.filter(function (u) {
+          var j = String(u.jabatan || '').toLowerCase();
+          return j.indexOf('ketua') !== -1 || j.indexOf('panitera') !== -1 || j.indexOf('sekretaris') !== -1 || j.indexOf('kasubbag') !== -1 || j.indexOf('panmud') !== -1;
+        });
+        if (pejabatOnly.length > 0) return pejabatOnly;
+      }
+      return sorted;
+    }
+    return sorted.filter(function (u) {
+      return (u.nama && u.nama.toLowerCase().indexOf(q) !== -1) ||
+        (u.jabatan && u.jabatan.toLowerCase().indexOf(q) !== -1) ||
+        (u.nip && String(u.nip).toLowerCase().indexOf(q) !== -1);
+    });
+  }
+
+  function renderOfficialSearchDropdown_(kind, kw) {
+    var cfg = OFFICIAL_SEARCH_CONFIG_[kind];
+    if (!cfg) return;
+    var inp = document.getElementById(cfg.inputId);
+    var clearBtn = document.getElementById(cfg.clearId);
+    var drop = document.getElementById(cfg.dropId);
+    var hasText = Boolean((inp && String(inp.value || '').trim()) || String(kw || '').trim());
+    if (clearBtn) {
+      if (hasText) clearBtn.classList.remove('hidden');
+      else clearBtn.classList.add('hidden');
+    }
+    if (!drop) return;
+
+    var matches = getFilteredOfficialPegawai_(kind, kw);
+    officialDropMatchesMap[kind] = matches;
+    var curIdx = officialDropActiveMap[kind];
+    if (typeof curIdx !== 'number' || curIdx >= matches.length || curIdx < 0) {
+      curIdx = 0;
+      officialDropActiveMap[kind] = 0;
+    }
+
+    if (matches.length === 0) {
+      drop.innerHTML = '<div class="px-3 py-2 text-[11px] text-slate-400 italic text-center">' + escRapat_(cfg.emptyText) + '</div>';
+      drop.classList.remove('hidden');
+      return;
+    }
+
+    var h = '';
+    matches.slice(0, 40).forEach(function (u, mIdx) {
+      var isAct = (mIdx === curIdx);
+      h +=
+        '<div data-nip="' + escRapat_(String(u.nip || '')) + '" onmousedown="event.preventDefault(); selectOfficialPegawai(\'' + kind + '\', this.dataset.nip)" ' +
+          'class="px-3 py-2 text-[11px] cursor-pointer transition border-b border-slate-700/50 ' +
+          (isAct ? cfg.accentClass : cfg.hoverClass) + '">' +
+          '<div class="font-bold">' + escRapat_(u.nama || '-') + '</div>' +
+          '<div class="text-[9px] opacity-75">' + escRapat_(u.jabatan || '-') + '</div>' +
+        '</div>';
+    });
+    drop.innerHTML = h;
+    drop.classList.remove('hidden');
+  }
+
+  var OFFICIAL_HANDLER_MAP_ = {
+    pejabatTtd: function (nip) { if (typeof window.handleRapatPejabatTtdChange === 'function') window.handleRapatPejabatTtdChange(nip); },
+    pemimpin: function (nip) { if (typeof window.handleRapatPemimpinChange === 'function') window.handleRapatPemimpinChange(nip); },
+    notulis: function (nip) { if (typeof window.handleRapatNotulisChange === 'function') window.handleRapatNotulisChange(nip); }
+  };
+
+  window.openOfficialSearchDrop = function (kind) {
+    var cfg = OFFICIAL_SEARCH_CONFIG_[kind];
+    if (!cfg) return;
+    officialDropActiveMap[kind] = 0;
+    var inp = document.getElementById(cfg.inputId);
+    var rawVal = inp ? String(inp.value || '').trim() : '';
+    var curNipEl = document.getElementById(cfg.nipId);
+    var curNip = curNipEl ? String(curNipEl.value || '').trim() : '';
+    var kw = rawVal;
+    if (curNip && rawVal) {
+      var matched = getUsersListRapat_().find(function (u) { return String(u.nip) === curNip; });
+      if (matched) {
+        var expectedDisp = matched.nama + (matched.jabatan ? ' (' + matched.jabatan + ')' : '');
+        if (rawVal === expectedDisp) kw = '';
+      }
+    }
+    renderOfficialSearchDropdown_(kind, kw);
+  };
+
+  window.filterOfficialSearchDrop = function (kind, val) {
+    var cfg = OFFICIAL_SEARCH_CONFIG_[kind];
+    if (!cfg) return;
+    officialDropActiveMap[kind] = 0;
+    if (String(val || '').trim() === '') {
+      setElValRapat_(cfg.nipId, '');
+      setElValRapat_(cfg.jabatanId, '');
+      if (cfg.namaId) setElValRapat_(cfg.namaId, '');
+    }
+    renderOfficialSearchDropdown_(kind, val);
+  };
+
+  window.closeOfficialSearchDrop = function (kind) {
+    var cfg = OFFICIAL_SEARCH_CONFIG_[kind];
+    if (!cfg) return;
+    setTimeout(function () {
+      var drop = document.getElementById(cfg.dropId);
+      if (drop) drop.classList.add('hidden');
+    }, 160);
+  };
+
+  window.clearOfficialSearch = function (kind) {
+    var cfg = OFFICIAL_SEARCH_CONFIG_[kind];
+    if (!cfg) return;
+    setElValRapat_(cfg.inputId, '');
+    setElValRapat_(cfg.nipId, '');
+    setElValRapat_(cfg.jabatanId, '');
+    if (cfg.namaId) setElValRapat_(cfg.namaId, '');
+    if (kind === 'pejabatTtd') syncNomorUndanganPreview();
+    var inp = document.getElementById(cfg.inputId);
+    if (inp && typeof inp.focus === 'function') inp.focus();
+    officialDropActiveMap[kind] = 0;
+    renderOfficialSearchDropdown_(kind, '');
+  };
+
+  window.selectOfficialPegawai = function (kind, nip) {
+    var cfg = OFFICIAL_SEARCH_CONFIG_[kind];
+    if (!cfg || !nip) return;
+    var u = getUsersListRapat_().find(function (x) { return String(x.nip) === String(nip); });
+    if (!u) return;
+    var disp = u.nama + (u.jabatan ? ' (' + u.jabatan + ')' : '');
+    setElValRapat_(cfg.inputId, disp);
+    var clearBtn = document.getElementById(cfg.clearId);
+    if (clearBtn) clearBtn.classList.remove('hidden');
+    var drop = document.getElementById(cfg.dropId);
+    if (drop) drop.classList.add('hidden');
+    if (typeof OFFICIAL_HANDLER_MAP_[kind] === 'function') {
+      OFFICIAL_HANDLER_MAP_[kind](u.nip);
+    }
+  };
+
+  window.handleOfficialSearchKeydown = function (ev, kind) {
+    var cfg = OFFICIAL_SEARCH_CONFIG_[kind];
+    if (!ev || !cfg) return;
+    var matches = officialDropMatchesMap[kind] || [];
+    if (ev.key === 'ArrowDown') {
+      ev.preventDefault();
+      if (matches.length > 0) {
+        officialDropActiveMap[kind] = ((officialDropActiveMap[kind] || 0) + 1) % matches.length;
+        var inpD = document.getElementById(cfg.inputId);
+        renderOfficialSearchDropdown_(kind, inpD ? inpD.value : '');
+      }
+      return;
+    }
+    if (ev.key === 'ArrowUp') {
+      ev.preventDefault();
+      if (matches.length > 0) {
+        officialDropActiveMap[kind] = ((officialDropActiveMap[kind] || 0) - 1 + matches.length) % matches.length;
+        var inpU = document.getElementById(cfg.inputId);
+        renderOfficialSearchDropdown_(kind, inpU ? inpU.value : '');
+      }
+      return;
+    }
+    if (ev.key === 'Escape') {
+      var drop = document.getElementById(cfg.dropId);
+      if (drop) drop.classList.add('hidden');
+      return;
+    }
+    if (ev.key === 'Enter') {
+      ev.preventDefault();
+      if (matches.length > 0) {
+        var idx = officialDropActiveMap[kind] || 0;
+        var picked = matches[idx] || matches[0];
+        if (picked && picked.nip) {
+          window.selectOfficialPegawai(kind, picked.nip);
+        }
+      }
     }
   };
 
@@ -1812,44 +2063,68 @@
 
     // Tab 1 Fields
     var tglSuratIso = /^\d{4}-\d{2}-\d{2}$/.test(String(rapatData.tgl_surat || '')) ? rapatData.tgl_surat : todayIso;
-    document.getElementById('rapatFieldTglSuratIso').value = tglSuratIso;
-    document.getElementById('rapatFieldTglSuratIndo').value = formatIsoToIndoDateOnly_(tglSuratIso) || String(rapatData.tgl_surat || '');
+    setElValRapat_('rapatFieldTglSuratIso', tglSuratIso);
+    setElValRapat_('rapatFieldTglSuratIndo', formatIsoToIndoDateOnly_(tglSuratIso) || String(rapatData.tgl_surat || ''));
 
-    document.getElementById('rapatFieldPejabatTtdSelect').value = rapatData.pejabat_ttd_nip || '';
-    document.getElementById('rapatFieldPejabatTtdNip').value = rapatData.pejabat_ttd_nip || '';
-    document.getElementById('rapatFieldPejabatTtdNama').value = rapatData.pejabat_ttd_nama || '';
-    document.getElementById('rapatFieldPejabatTtdJabatan').value = rapatData.pejabat_ttd_jabatan || '';
-    document.getElementById('rapatFieldKodePejabat').value = rapatData.kode_pejabat_ttd || 'KPA.W10-A2';
-    document.getElementById('rapatFieldNoUrutSurat').value = rapatData.no_urut_surat || '';
-    document.getElementById('rapatFieldKodeSurat').value = rapatData.kode_klasifikasi_surat || 'OT.01.1';
-    document.getElementById('rapatFieldLampiranSurat').value = rapatData.lampiran_surat || '-';
-    document.getElementById('rapatFieldTampilkanGelarUndangan').checked = Boolean(rapatData.tampilkan_gelar_undangan);
+    setElValRapat_('rapatFieldPejabatTtdSelect', rapatData.pejabat_ttd_nip || '');
+    setElValRapat_('rapatFieldPejabatTtdNip', rapatData.pejabat_ttd_nip || '');
+    setElValRapat_('rapatFieldPejabatTtdNama', rapatData.pejabat_ttd_nama || '');
+    setElValRapat_('rapatFieldPejabatTtdJabatan', rapatData.pejabat_ttd_jabatan || '');
+    setElValRapat_('rapatFieldKodePejabat', rapatData.kode_pejabat_ttd || 'KPA.W10-A2');
+    var initNoUrut = String(rapatData.no_urut_surat || '').trim();
+    setElValRapat_('rapatFieldNoUrutSurat', initNoUrut);
+    setElValRapat_('rapatFieldKodeSurat', rapatData.kode_klasifikasi_surat || 'OT.01.1');
+    setElValRapat_('rapatFieldLampiranSurat', rapatData.lampiran_surat || '-');
+    var elTampGelar = document.getElementById('rapatFieldTampilkanGelarUndangan');
+    if (elTampGelar) elTampGelar.checked = Boolean(rapatData.tampilkan_gelar_undangan);
 
     if (rapatData.nomor_undangan) {
-      document.getElementById('rapatFieldNomorUndangan').value = rapatData.nomor_undangan;
+      setElValRapat_('rapatFieldNomorUndangan', rapatData.nomor_undangan);
+      if (!initNoUrut) window.syncNoUrutFromNomorUndangan(rapatData.nomor_undangan);
     } else {
       syncNomorUndanganPreview();
     }
 
-    document.getElementById('rapatFieldAgenda').value = rapatData.agenda || '';
-    document.getElementById('rapatFieldDasarNotula').value = rapatData.dasar_notula || '';
-    document.getElementById('rapatFieldAgendaPoin').value = rapatData.agenda_poin || '';
+    setElValRapat_('rapatFieldAgenda', rapatData.agenda || '');
+    setElValRapat_('rapatFieldDasarNotula', rapatData.dasar_notula || '');
+    setElValRapat_('rapatFieldAgendaPoin', rapatData.agenda_poin || '');
 
-    document.getElementById('rapatFieldTglRapatIso').value = '';
-    document.getElementById('rapatFieldHariTanggal').value = rapatData.hari_tanggal || formatIsoToHariTanggal_(todayIso);
-    document.getElementById('rapatFieldWaktuMulai').value = rapatData.waktu_mulai || '08:00 WIB';
-    document.getElementById('rapatFieldWaktuSelesai').value = rapatData.waktu_selesai || 'Selesai';
-    document.getElementById('rapatFieldTempat').value = rapatData.tempat || 'Ruang Rapat Pimpinan Pengadilan Agama Indramayu';
+    setElValRapat_('rapatFieldTglRapatIso', '');
+    setElValRapat_('rapatFieldHariTanggal', rapatData.hari_tanggal || formatIsoToHariTanggal_(todayIso));
+    setElValRapat_('rapatFieldWaktuMulai', rapatData.waktu_mulai || '08:00 WIB');
+    setElValRapat_('rapatFieldWaktuSelesai', rapatData.waktu_selesai || 'Selesai');
+    setElValRapat_('rapatFieldTempat', rapatData.tempat || 'Ruang Rapat Pimpinan Pengadilan Agama Indramayu');
 
-    document.getElementById('rapatFieldPemimpinSelect').value = rapatData.pemimpin_nip || '';
-    document.getElementById('rapatFieldPemimpinNip').value = rapatData.pemimpin_nip || '';
-    document.getElementById('rapatFieldPemimpinJabatan').value = rapatData.pemimpin_jabatan || '';
-    document.getElementById('rapatFieldPemimpin').value = rapatData.pemimpin || 'Ketua Pengadilan Agama Indramayu';
+    setElValRapat_('rapatFieldPemimpinSelect', rapatData.pemimpin_nip || '');
+    setElValRapat_('rapatFieldPemimpinNip', rapatData.pemimpin_nip || '');
+    setElValRapat_('rapatFieldPemimpinJabatan', rapatData.pemimpin_jabatan || '');
+    setElValRapat_('rapatFieldPemimpin', rapatData.pemimpin || 'Ketua Pengadilan Agama Indramayu');
 
-    document.getElementById('rapatFieldNotulisSelect').value = rapatData.notulis_nip || '';
-    document.getElementById('rapatFieldNotulisNip').value = rapatData.notulis_nip || '';
-    document.getElementById('rapatFieldNotulisJabatan').value = rapatData.notulis_jabatan || '';
-    document.getElementById('rapatFieldNotulis').value = rapatData.notulis || '';
+    setElValRapat_('rapatFieldNotulisSelect', rapatData.notulis_nip || '');
+    setElValRapat_('rapatFieldNotulisNip', rapatData.notulis_nip || '');
+    setElValRapat_('rapatFieldNotulisJabatan', rapatData.notulis_jabatan || '');
+    setElValRapat_('rapatFieldNotulis', rapatData.notulis || '');
+
+    var hasExistingRapat = Boolean(rapatData.id_rapat || rapatData.id);
+    var dispPejabatTtd = resolveOfficialDisplay_(rapatData.pejabat_ttd_nip, rapatData.pejabat_ttd_nama, rapatData.pejabat_ttd_jabatan);
+    var dispPemimpin = rapatData.pemimpin_nip
+      ? resolveOfficialDisplay_(rapatData.pemimpin_nip, rapatData.pemimpin_jabatan, rapatData.pemimpin)
+      : (hasExistingRapat ? resolveOfficialDisplay_('', rapatData.pemimpin, rapatData.pemimpin_jabatan) : '');
+    var dispNotulis = resolveOfficialDisplay_(rapatData.notulis_nip, rapatData.notulis, rapatData.notulis_jabatan);
+    var initDisplayMap = { pejabatTtd: dispPejabatTtd, pemimpin: dispPemimpin, notulis: dispNotulis };
+    ['pejabatTtd', 'pemimpin', 'notulis'].forEach(function (k) {
+      var cfg = OFFICIAL_SEARCH_CONFIG_[k];
+      setElValRapat_(cfg.inputId, initDisplayMap[k]);
+      var cBtn = document.getElementById(cfg.clearId);
+      if (cBtn) {
+        if (initDisplayMap[k]) cBtn.classList.remove('hidden');
+        else cBtn.classList.add('hidden');
+      }
+      var dEl = document.getElementById(cfg.dropId);
+      if (dEl) dEl.classList.add('hidden');
+      officialDropActiveMap[k] = 0;
+      officialDropMatchesMap[k] = [];
+    });
 
     // Tab 2: Tujuan Undangan & Daftar Hadir Config
     tujuanUndanganList = [];
@@ -2042,8 +2317,13 @@
     var tglSuratIso = (document.getElementById('rapatFieldTglSuratIso') || {}).value || '';
     var jumlahBaris = Math.min(48, Math.max(1, parseInt((document.getElementById('rapatFieldJumlahBarisHadir') || {}).value, 10) || 15));
 
-    // Jika pemimpin / notulis tidak dipilih dari dropdown, coba cocokkan dari field select atau default
-    var pejabatSelectVal = (document.getElementById('rapatFieldPejabatTtdSelect') || {}).value || '';
+    var nomorUndEl = document.getElementById('rapatFieldNomorUndangan');
+    if (nomorUndEl && typeof window.syncNoUrutFromNomorUndangan === 'function') {
+      window.syncNoUrutFromNomorUndangan(nomorUndEl.value);
+    }
+
+    var pejabatSelectEl = document.getElementById('rapatFieldPejabatTtdSelect');
+    var pejabatSelectVal = pejabatSelectEl ? (pejabatSelectEl.value || '') : '';
     var pjbNip = (document.getElementById('rapatFieldPejabatTtdNip') || {}).value || pejabatSelectVal || '';
 
     var payload = {

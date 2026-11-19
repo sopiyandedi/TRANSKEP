@@ -970,6 +970,7 @@
         <input type="hidden" id="rapatFieldDocAbsenUrl">
         <input type="hidden" id="rapatFieldDocNotulenUrl">
         <input type="hidden" id="rapatFieldStatus" value="Terjadwal">
+        <input type="hidden" id="rapatFieldNoUrutSurat">
         <input type="hidden" id="rapatFieldPejabatTtdNip">
         <input type="hidden" id="rapatFieldPejabatTtdNama">
         <input type="hidden" id="rapatFieldPejabatTtdJabatan">
@@ -1009,12 +1010,28 @@
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-12 gap-3">
-              <div class="md:col-span-4">
+              <div class="md:col-span-5">
                 <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Pejabat Penandatangan Undangan</label>
-                <select id="rapatFieldPejabatTtdSelect" onchange="handleRapatPejabatTtdChange(this.value)"
-                  class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-amber-300 font-bold text-xs focus:ring-1 focus:ring-amber-500 outline-none">
-                  <option value="">-- Pilih Pejabat TTD Undangan --</option>
-                </select>
+                <div class="relative">
+                  <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                    <i class="fa-solid fa-magnifying-glass text-slate-500 text-xs"></i>
+                  </div>
+                  <input type="text" id="rapatPejabatTtdSearch" autocomplete="off"
+                    onfocus="openOfficialSearchDrop('pejabatTtd')"
+                    oninput="filterOfficialSearchDrop('pejabatTtd', this.value)"
+                    onblur="closeOfficialSearchDrop('pejabatTtd')"
+                    onkeydown="handleOfficialSearchKeydown(event, 'pejabatTtd')"
+                    placeholder="Ketik nama / jabatan pejabat lalu Enter..."
+                    class="w-full pl-8 pr-8 py-2 bg-slate-900 border border-slate-700 rounded-xl text-amber-300 font-bold text-xs focus:ring-1 focus:ring-amber-500 outline-none">
+                  <button type="button" id="btnClearRapatPejabatTtd"
+                    onmousedown="event.preventDefault(); clearOfficialSearch('pejabatTtd');"
+                    class="hidden absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-rose-400 w-5 h-5 flex items-center justify-center">
+                    <i class="fa-solid fa-xmark text-[11px]"></i>
+                  </button>
+                  <div id="rapatPejabatTtdDrop"
+                    class="hidden absolute z-50 left-0 right-0 mt-1 bg-slate-800 border border-slate-600 rounded-xl overflow-hidden max-h-56 overflow-y-auto shadow-[0_20px_50px_rgba(0,0,0,0.8)]">
+                  </div>
+                </div>
               </div>
 
               <div class="md:col-span-2">
@@ -1029,20 +1046,13 @@
               </div>
 
               <div class="md:col-span-2">
-                <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">No. Urut Surat</label>
-                <input type="text" id="rapatFieldNoUrutSurat" oninput="syncNomorUndanganPreview()"
-                  placeholder="Kosongkan = Auto MYSIMS"
-                  class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-slate-200 font-mono font-bold text-xs focus:ring-1 focus:ring-amber-500 outline-none">
-              </div>
-
-              <div class="md:col-span-2">
                 <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Kode Surat <span class="text-amber-400">(Auto UND.)</span></label>
                 <input type="text" id="rapatFieldKodeSurat" oninput="syncNomorUndanganPreview()"
                   placeholder="PW1.1.1"
                   class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-slate-200 font-mono font-bold text-xs focus:ring-1 focus:ring-amber-500 outline-none">
               </div>
 
-              <div class="md:col-span-2">
+              <div class="md:col-span-3">
                 <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Tanggal Surat</label>
                 <input type="date" id="rapatFieldTglSuratIso" onchange="handleTglSuratChange(this.value)"
                   class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-slate-200 text-xs focus:ring-1 focus:ring-amber-500 outline-none">
@@ -1052,7 +1062,8 @@
               <div class="md:col-span-6">
                 <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Nomor Surat Undangan Lengkap (Otomatis / Bisa Diedit)</label>
                 <input type="text" id="rapatFieldNomorUndangan"
-                  placeholder="1059/KPA.W10-A2/UND.PW1.1.1/X/2026"
+                  oninput="syncNoUrutFromNomorUndangan(this.value)"
+                  placeholder=".../KPA.W10-A2/UND.OT.01.1/XI/2026 (Biarkan ... = Auto MYSIMS)"
                   class="w-full px-3 py-2 bg-slate-950 border border-amber-500/30 rounded-xl text-amber-300 font-mono font-bold text-xs focus:ring-1 focus:ring-amber-500 outline-none">
               </div>
 
@@ -1132,10 +1143,26 @@
 
               <div class="md:col-span-3">
                 <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Pilih Pimpinan Rapat (Pegawai)</label>
-                <select id="rapatFieldPemimpinSelect" onchange="handleRapatPemimpinChange(this.value)"
-                  class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-cyan-300 font-semibold text-xs focus:ring-1 focus:ring-emerald-500 outline-none">
-                  <option value="">-- Pilih Pimpinan Rapat --</option>
-                </select>
+                <div class="relative">
+                  <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                    <i class="fa-solid fa-magnifying-glass text-slate-500 text-xs"></i>
+                  </div>
+                  <input type="text" id="rapatPemimpinSearch" autocomplete="off"
+                    onfocus="openOfficialSearchDrop('pemimpin')"
+                    oninput="filterOfficialSearchDrop('pemimpin', this.value)"
+                    onblur="closeOfficialSearchDrop('pemimpin')"
+                    onkeydown="handleOfficialSearchKeydown(event, 'pemimpin')"
+                    placeholder="Ketik nama / jabatan lalu Enter..."
+                    class="w-full pl-8 pr-8 py-2 bg-slate-900 border border-slate-700 rounded-xl text-cyan-300 font-semibold text-xs focus:ring-1 focus:ring-cyan-500 outline-none">
+                  <button type="button" id="btnClearRapatPemimpin"
+                    onmousedown="event.preventDefault(); clearOfficialSearch('pemimpin');"
+                    class="hidden absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-rose-400 w-5 h-5 flex items-center justify-center">
+                    <i class="fa-solid fa-xmark text-[11px]"></i>
+                  </button>
+                  <div id="rapatPemimpinDrop"
+                    class="hidden absolute z-50 left-0 right-0 mt-1 bg-slate-800 border border-slate-600 rounded-xl overflow-hidden max-h-52 overflow-y-auto shadow-[0_20px_50px_rgba(0,0,0,0.8)]">
+                  </div>
+                </div>
               </div>
 
               <div class="md:col-span-3">
@@ -1146,10 +1173,26 @@
 
               <div class="md:col-span-3">
                 <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Pilih Notulis Rapat (Pegawai)</label>
-                <select id="rapatFieldNotulisSelect" onchange="handleRapatNotulisChange(this.value)"
-                  class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-emerald-300 font-semibold text-xs focus:ring-1 focus:ring-emerald-500 outline-none">
-                  <option value="">-- Pilih Notulis Rapat --</option>
-                </select>
+                <div class="relative">
+                  <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                    <i class="fa-solid fa-magnifying-glass text-slate-500 text-xs"></i>
+                  </div>
+                  <input type="text" id="rapatNotulisSearch" autocomplete="off"
+                    onfocus="openOfficialSearchDrop('notulis')"
+                    oninput="filterOfficialSearchDrop('notulis', this.value)"
+                    onblur="closeOfficialSearchDrop('notulis')"
+                    onkeydown="handleOfficialSearchKeydown(event, 'notulis')"
+                    placeholder="Ketik nama / jabatan lalu Enter..."
+                    class="w-full pl-8 pr-8 py-2 bg-slate-900 border border-slate-700 rounded-xl text-emerald-300 font-semibold text-xs focus:ring-1 focus:ring-emerald-500 outline-none">
+                  <button type="button" id="btnClearRapatNotulis"
+                    onmousedown="event.preventDefault(); clearOfficialSearch('notulis');"
+                    class="hidden absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-rose-400 w-5 h-5 flex items-center justify-center">
+                    <i class="fa-solid fa-xmark text-[11px]"></i>
+                  </button>
+                  <div id="rapatNotulisDrop"
+                    class="hidden absolute z-50 left-0 right-0 mt-1 bg-slate-800 border border-slate-600 rounded-xl overflow-hidden max-h-52 overflow-y-auto shadow-[0_20px_50px_rgba(0,0,0,0.8)]">
+                  </div>
+                </div>
               </div>
 
               <div class="md:col-span-3">

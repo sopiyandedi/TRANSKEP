@@ -6923,6 +6923,19 @@ Menyederhanakan alur pemilihan peserta undangan dan pembicara notula dengan kolo
 2. **Expression-Budget Guard ([`tests/verify_firestore_schema.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/tests/verify_firestore_schema.js)):** Menambahkan pengecekan otomatis agar setiap validator dokumen di `firestore.rules` selalu berada `<= 800` ekspresi dan `isValidEofficeRapat <= 650` ekspresi.
 3. **Deploy Live & Verifikasi:** Seluruh 6 test suite (`npm test`) lulus `0 FAILURES` dan `firestore.rules` di-deploy live ke project Firebase `transkep-314c0` (`npm run deploy:rules`).
 
+---
+
+## REVISI TAHAP 144B: SEARCHABLE PENANDATANGAN/PIMPINAN/NOTULIS OTOMATIS ENTER & PENGHAPUSAN KOLOM NO. URUT SURAT (`v3.8.78`)
+**Status:** `[SELESAI & AKTIF — v3.8.78]`
+
+### 1. Tujuan
+Menghilangkan dropdown `<select>` bawaan OS yang panjang dan kaku pada Tab 1 form Rapat dengan mengubah **Pejabat Penandatangan Undangan**, **Pimpinan Rapat**, dan **Notulis Rapat** menjadi *searchable autocomplete* (ketik -> sorot kandidat teratas -> `Enter` langsung pilih), sekaligus merapikan baris penomoran surat dengan menghilangkan kotak input terpisah **No. Urut Surat**.
+
+### 2. Rincian Implementasi
+1. **Tab 1 UI ([`modules/eoffice/view_eoffice.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/view_eoffice.html)):** Mengganti `#rapatFieldPejabatTtdSelect`, `#rapatFieldPemimpinSelect`, dan `#rapatFieldNotulisSelect` menjadi input pencarian `#rapatPejabatTtdSearch`, `#rapatPemimpinSearch`, dan `#rapatNotulisSearch` dengan dropdown interaktif & tombol clear `×`; menghapus blok input UI `No. Urut Surat` dan menjadikannya `<input type="hidden" id="rapatFieldNoUrutSurat">` tersinkron `oninput="syncNoUrutFromNomorUndangan(this.value)"`.
+2. **Controller Searchable & Two-Way Sync ([`modules/eoffice/rapat.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/rapat.js)):** Menambahkan `OFFICIAL_SEARCH_CONFIG_`, `getFilteredOfficialPegawai_`, `renderOfficialSearchDropdown_` (`data-nip` XSS-safe), `openOfficialSearchDrop`/`filterOfficialSearchDrop`/`closeOfficialSearchDrop`/`clearOfficialSearch`/`selectOfficialPegawai`/`handleOfficialSearchKeydown` (`Enter` langsung memilih item aktif/teratas, otomatis memperbarui NIP, Nama/Jabatan, Kode Jabatan TTD & preview nomor surat), serta `syncNoUrutFromNomorUndangan()` di input langsung maupun sebelum submit.
+3. **PWA & Pengujian:** Bump PWA **`v3.8.78`** ([`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) & [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js)) serta uji XSS + runtime di [`tests/verify_fase3a.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/tests/verify_fase3a.js) & [`tests/verify_fase3b.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/tests/verify_fase3b.js).
+
 
 
 

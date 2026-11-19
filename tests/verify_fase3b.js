@@ -2193,6 +2193,54 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
       'Notula print must format ISO dates into Indonesian dates');
 
     console.log('[PASS] Tahap 143 searchable undangan/pembicara, multi-baris notula PKP-style + auto-Tab & input tanggal verified.');
+
+    // Tahap 144B: Tab 1 Searchable Pejabat TTD/Pimpinan/Notulis Otomatis Enter & Hapus Kolom No. Urut Surat
+    assert(!eofficeHtml143.includes('id="rapatFieldPejabatTtdSelect"') &&
+      !eofficeHtml143.includes('id="rapatFieldPemimpinSelect"') &&
+      !eofficeHtml143.includes('id="rapatFieldNotulisSelect"'),
+      'Tahap 144B must replace legacy Tab 1 native select dropdowns');
+    assert(!eofficeHtml143.includes('type="text" id="rapatFieldNoUrutSurat"') &&
+      eofficeHtml143.includes('type="hidden" id="rapatFieldNoUrutSurat"'),
+      'Tahap 144B must replace visible No. Urut Surat input with hidden field');
+    for (const req144 of ['id="rapatPejabatTtdSearch"', 'id="rapatPemimpinSearch"', 'id="rapatNotulisSearch"', 'handleOfficialSearchKeydown', 'syncNoUrutFromNomorUndangan(this.value)']) {
+      assert(eofficeHtml143.includes(req144), `Tahap 144B view_eoffice.html missing ${req144}`);
+    }
+
+    ensureDom143('rapatFieldTglSuratIso').value = '2026-10-27';
+    ensureDom143('rapatFieldKodeSurat').value = 'PW1.1.1';
+    ensureDom143('rapatFieldKodePejabat').value = 'KPA.W10-A2';
+    ensureDom143('rapatFieldNoUrutSurat').value = '';
+
+    ensureDom143('rapatPejabatTtdSearch').value = 'Ikin';
+    rapatUxVm143.filterOfficialSearchDrop('pejabatTtd', 'Ikin');
+    rapatUxVm143.handleOfficialSearchKeydown({ key: 'Enter', preventDefault() {} }, 'pejabatTtd');
+    assert.strictEqual(ensureDom143('rapatPejabatTtdSearch').value, 'Ikin, S.Ag., M.E. (Wakil Ketua)');
+    assert.strictEqual(ensureDom143('rapatFieldPejabatTtdNip').value, '197601012001011002');
+    assert.strictEqual(ensureDom143('rapatFieldKodePejabat').value, 'WKPA.W10-A2');
+    assert.strictEqual(ensureDom143('rapatFieldNomorUndangan').value, '.../WKPA.W10-A2/UND.PW1.1.1/X/2026');
+
+    rapatUxVm143.syncNoUrutFromNomorUndangan('1088/WKPA.W10-A2/UND.PW1.1.1/X/2026');
+    assert.strictEqual(ensureDom143('rapatFieldNoUrutSurat').value, '1088', 'syncNoUrutFromNomorUndangan must extract numeric sequence');
+    rapatUxVm143.syncNomorUndanganPreview();
+    assert.strictEqual(ensureDom143('rapatFieldNomorUndangan').value, '1088/WKPA.W10-A2/UND.PW1.1.1/X/2026');
+    rapatUxVm143.syncNoUrutFromNomorUndangan('.../WKPA.W10-A2/UND.PW1.1.1/X/2026');
+    assert.strictEqual(ensureDom143('rapatFieldNoUrutSurat').value, '', 'Placeholder ellipsis must yield empty no_urut_surat for MYSIMS auto');
+
+    ensureDom143('rapatPemimpinSearch').value = 'Ikin';
+    rapatUxVm143.filterOfficialSearchDrop('pemimpin', 'Ikin');
+    rapatUxVm143.handleOfficialSearchKeydown({ key: 'Enter', preventDefault() {} }, 'pemimpin');
+    assert.strictEqual(ensureDom143('rapatPemimpinSearch').value, 'Ikin, S.Ag., M.E. (Wakil Ketua)');
+    assert.strictEqual(ensureDom143('rapatFieldPemimpinNip').value, '197601012001011002');
+    assert.strictEqual(ensureDom143('rapatFieldPemimpin').value, 'Wakil Ketua');
+
+    ensureDom143('rapatNotulisSearch').value = 'Agus';
+    rapatUxVm143.filterOfficialSearchDrop('notulis', 'Agus');
+    rapatUxVm143.handleOfficialSearchKeydown({ key: 'Enter', preventDefault() {} }, 'notulis');
+    assert.strictEqual(ensureDom143('rapatNotulisSearch').value, 'Agus Salim, S.Ag. (Sekretaris)');
+    assert.strictEqual(ensureDom143('rapatFieldNotulisNip').value, '197501012000011001');
+    assert.strictEqual(ensureDom143('rapatFieldNotulis').value, 'Agus Salim, S.Ag.');
+
+    console.log('[PASS] Tahap 144B Tab 1 searchable pejabat/pimpinan/notulis + Enter & two-way no_urut_surat sync verified.');
   } finally {
     browserSandbox.TranskepAPI.call = origApiCall;
     browserSandbox.TranskepFirebase.getDb = origGetDb;
