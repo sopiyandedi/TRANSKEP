@@ -239,6 +239,7 @@ function escapeHtml(str) {
            this.modals.editJobdes = true;
         },
         async submitEditJobdes() {
+           if (this.isLoadingForm) return;
            if(!this.formEdit.atasan) {
                (typeof showNotify === "function" ? showNotify("error" === "error" ? "Peringatan" : "Sukses", "Pilih Verifikator Atasan dari dropdown yang tersedia.", "error") : alert("Pilih Verifikator Atasan dari dropdown yang tersedia."));
                return;
@@ -290,6 +291,7 @@ function escapeHtml(str) {
            this.modals.usulan = true;
         },
         async submitUsulan() {
+           if (this.isLoadingForm) return;
            this.isLoadingForm = true;
            const payload = {
               nip_pegawai: this.selectedNip,
@@ -863,6 +865,7 @@ function escapeHtml(str) {
           this.importDocx.filesQueue.splice(idx, 1);
         },
         async submitBulkImportJobdes() {
+          if (this.importDocx.isSaving) return;
           const validItems = this.importDocx.filesQueue.filter(f => {
             if (!f.matched || !f.nip) return false;
             const sec = f.sections || {};

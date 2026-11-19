@@ -917,7 +917,10 @@ function printKgbFromModal() {
 // ==========================================
 // SUBMIT FORM KGB: SIMPAN DATA / GENERATE GOOGLE DOCS
 // ==========================================
+var isSubmittingKgb = false;
+
 async function submitKgbForm(actionType) {
+  if (isSubmittingKgb) return;
   var payload = collectKgbFormPayload_();
 
   if (!payload.nip || !payload.nama_pegawai) {
@@ -934,10 +937,26 @@ async function submitKgbForm(actionType) {
   var currentUser = (window.vueState && window.vueState.user) ? window.vueState.user : (typeof state !== 'undefined' ? state.user : null);
   var adminNip = (currentUser && currentUser.nip) || localStorage.getItem('transkep_active_nip') || '';
 
+  isSubmittingKgb = true;
   var btnDoc = document.getElementById('btnKgbGenerateDoc');
   var btnDraft = document.getElementById('btnKgbSaveDraft');
-  if (btnDoc) btnDoc.disabled = true;
-  if (btnDraft) btnDraft.disabled = true;
+  var origDocHtml = btnDoc ? btnDoc.innerHTML : '';
+  var origDraftHtml = btnDraft ? btnDraft.innerHTML : '';
+
+  if (btnDoc) {
+    btnDoc.disabled = true;
+    btnDoc.classList.add('opacity-60', 'cursor-not-allowed');
+    if (actionType === 'generate') {
+      btnDoc.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> <span>Menerbitkan...</span>';
+    }
+  }
+  if (btnDraft) {
+    btnDraft.disabled = true;
+    btnDraft.classList.add('opacity-60', 'cursor-not-allowed');
+    if (actionType !== 'generate') {
+      btnDraft.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> <span>Menyimpan...</span>';
+    }
+  }
 
   if (typeof showLoading === 'function') {
     showLoading(actionType === 'generate' ? "Menerbitkan SK KGB ke Folder Google Drive..." : "Menyimpan data KGB ke Cloud Firestore...");
@@ -945,9 +964,6 @@ async function submitKgbForm(actionType) {
 
   try {
     var res = await window.EofficeDataService.saveOrGenerateKgb(payload, actionType, adminNip, token);
-    if (typeof hideLoading === 'function') hideLoading();
-    if (btnDoc) btnDoc.disabled = false;
-    if (btnDraft) btnDraft.disabled = false;
 
     if (res && res.status === 'success') {
       closeKgbModalForm();
@@ -969,12 +985,22 @@ async function submitKgbForm(actionType) {
       showNotify("Gagal", (res ? res.message : "Terjadi kendala saat menyimpan berkas KGB."), "error");
     }
   } catch (err) {
-    if (typeof hideLoading === 'function') hideLoading();
-    if (btnDoc) btnDoc.disabled = false;
-    if (btnDraft) btnDraft.disabled = false;
     console.error("Error save KGB: ", err);
     if (typeof showNotify === 'function') {
       showNotify("Error Sistem", err.toString(), "error");
+    }
+  } finally {
+    isSubmittingKgb = false;
+    if (typeof hideLoading === 'function') hideLoading();
+    if (btnDoc) {
+      btnDoc.disabled = false;
+      btnDoc.classList.remove('opacity-60', 'cursor-not-allowed');
+      if (origDocHtml) btnDoc.innerHTML = origDocHtml;
+    }
+    if (btnDraft) {
+      btnDraft.disabled = false;
+      btnDraft.classList.remove('opacity-60', 'cursor-not-allowed');
+      if (origDraftHtml) btnDraft.innerHTML = origDraftHtml;
     }
   }
 }

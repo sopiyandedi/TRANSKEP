@@ -277,8 +277,10 @@
             </div>
           </div>
 
-          <button type="submit" class="w-full py-3.5 mt-4 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl shadow-lg transition">
-            Simpan Data Master PNS <i class="fa-solid fa-circle-check ml-1 text-xs"></i>
+          <button type="submit" :disabled="isSubmittingPegawai" class="w-full py-3.5 mt-4 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl shadow-lg transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+            <i v-if="isSubmittingPegawai" class="fa-solid fa-circle-notch fa-spin"></i>
+            <span>{{ isSubmittingPegawai ? 'Menyimpan...' : 'Simpan Data Master PNS' }}</span>
+            <i v-if="!isSubmittingPegawai" class="fa-solid fa-circle-check ml-1 text-xs"></i>
           </button>
         </form>
       </div>

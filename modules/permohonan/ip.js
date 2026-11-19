@@ -12,6 +12,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 s: state, // Mengambil reference state global
                 isOpen: false,
                 isScaled: false,
+                isSubmitting: false,
                 currentEditId: null,
                 form: {
                     tanggal: '',
@@ -173,6 +174,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 setTimeout(() => { this.isOpen = false; }, 200);
             },
             submitForm() {
+                if (this.isSubmitting) return;
                 if(!this.s.user) {
                     if(window.showNotify) window.showNotify("Sesi Berakhir", "Harap login ulang.", "error"); 
                     return;
@@ -191,6 +193,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     ...this.form
                 };
 
+                this.isSubmitting = true;
                 const token = localStorage.getItem('transkep_session_token'); 
                 if(window.showLoading) window.showLoading(this.currentEditId ? "Memperbarui Izin Pribadi..." : "Mengirimkan Izin Pribadi...");
                 
@@ -231,6 +234,9 @@ document.addEventListener("DOMContentLoaded", () => {
                     .catch((err) => {
                         if(window.hideLoading) window.hideLoading(); 
                         if(window.showNotify) window.showNotify("Error Jaringan", err.toString(), "error");
+                    })
+                    .finally(() => {
+                        this.isSubmitting = false;
                     });
             }
         }

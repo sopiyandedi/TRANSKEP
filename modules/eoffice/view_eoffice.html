@@ -426,14 +426,15 @@
         </div>
 
         <div class="flex items-center justify-end gap-2.5 pt-1">
-          <button type="button" @click="closeConfirmModal()"
-            class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl text-xs transition">
+          <button type="button" @click="closeConfirmModal()" :disabled="isExecutingConfirm"
+            class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl text-xs transition disabled:opacity-50 disabled:cursor-not-allowed">
             Batal
           </button>
-          <button type="button" @click="executeConfirmModal()"
-            :class="['px-4 py-2 text-white font-bold rounded-xl text-xs transition shadow-lg flex items-center gap-2', (confirmModal.mode === 'delete' || confirmModal.mode === 'delete_rapat') ? 'bg-rose-600 hover:bg-rose-500 shadow-rose-600/20' : 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-600/20']">
-            <i :class="['fa-solid', (confirmModal.mode === 'delete' || confirmModal.mode === 'delete_rapat') ? 'fa-trash-can' : 'fa-paper-plane']"></i>
-            <span>{{ (confirmModal.mode === 'delete' || confirmModal.mode === 'delete_rapat') ? 'Ya, Hapus Data' : 'Kirim ke TTE Pimpinan' }}</span>
+          <button type="button" @click="executeConfirmModal()" :disabled="isExecutingConfirm"
+            :class="['px-4 py-2 text-white font-bold rounded-xl text-xs transition shadow-lg flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed', (confirmModal.mode === 'delete' || confirmModal.mode === 'delete_rapat') ? 'bg-rose-600 hover:bg-rose-500 shadow-rose-600/20' : 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-600/20']">
+            <i v-if="isExecutingConfirm" class="fa-solid fa-circle-notch fa-spin"></i>
+            <i v-else :class="['fa-solid', (confirmModal.mode === 'delete' || confirmModal.mode === 'delete_rapat') ? 'fa-trash-can' : 'fa-paper-plane']"></i>
+            <span>{{ isExecutingConfirm ? 'Memproses...' : ((confirmModal.mode === 'delete' || confirmModal.mode === 'delete_rapat') ? 'Ya, Hapus Data' : 'Kirim ke TTE Pimpinan') }}</span>
           </button>
         </div>
       </div>
@@ -872,13 +873,13 @@
         </button>
 
         <button type="button" onclick="submitKgbForm('draft')" id="btnKgbSaveDraft"
-          class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-indigo-300 border border-indigo-500/30 font-bold rounded-xl transition text-xs flex items-center gap-1.5">
+          class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-indigo-300 border border-indigo-500/30 font-bold rounded-xl transition text-xs flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed">
           <i class="fa-regular fa-floppy-disk"></i>
           <span>Simpan Data</span>
         </button>
 
         <button type="button" onclick="submitKgbForm('generate')" id="btnKgbGenerateDoc"
-          class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl transition text-xs shadow-lg shadow-indigo-600/30 flex items-center gap-1.5">
+          class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl transition text-xs shadow-lg shadow-indigo-600/30 flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed">
           <i class="fa-solid fa-file-word"></i>
           <span>Buat Google Docs</span>
         </button>
@@ -1441,13 +1442,13 @@
       </div>
 
       <div class="flex items-center gap-2 w-full sm:w-auto justify-end">
-        <button type="button" onclick="closeRapatModalForm()"
-          class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl transition text-xs">
+        <button type="button" onclick="closeRapatModalForm()" id="btnRapatCancelAgenda"
+          class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl transition text-xs disabled:opacity-50 disabled:cursor-not-allowed">
           Batal
         </button>
 
         <button type="button" onclick="submitRapatForm()" id="btnRapatSaveAgenda"
-          class="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl transition text-xs shadow-lg shadow-emerald-600/30 flex items-center gap-2">
+          class="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl transition text-xs shadow-lg shadow-emerald-600/30 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
           <i class="fa-solid fa-floppy-disk"></i>
           <span>Simpan Agenda Rapat</span>
         </button>

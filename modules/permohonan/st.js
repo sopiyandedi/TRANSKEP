@@ -14,6 +14,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 // State Modal ST
                 isStOpen: false,
                 isStScaled: false,
+                isSubmittingST: false,
                 currentEditId: null,
                 
                 // Form Induk ST & SPD
@@ -54,6 +55,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 // State Modal Setting Default
                 isSettingOpen: false,
                 isSettingScaled: false,
+                isSavingSetting: false,
                 formSetting: {
                     ppk: '', menimbang: '', dasar: '', instansi: '',
                     mata_anggaran: '', angkutan: '', paragraf_biaya: ''
@@ -261,6 +263,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     });
             },
             submitST() {
+                if (this.isSubmittingST) return;
                 if(!this.s.user) { if(window.showNotify) window.showNotify("Sesi Berakhir", "Harap login ulang.", "error"); return; }
                 
                 if (this.pesertaList.length === 0) {
@@ -303,6 +306,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     data_ekstra_json: JSON.stringify(ekstraData) 
                 };
 
+                this.isSubmittingST = true;
                 // OPTIMISTIC ST TAHAP 4 (0ms Update & Auto-Rollback)
                 this.closeModalST();
                 const backupSt = [...(this.s.stList || [])];
@@ -341,6 +345,9 @@ document.addEventListener("DOMContentLoaded", () => {
                     .catch((err) => { 
                         this.s.stList = backupSt;
                         if(window.showNotify) window.showNotify("Error Koneksi", err.toString() + " (Data dikembalikan)", "error"); 
+                    })
+                    .finally(() => {
+                        this.isSubmittingST = false;
                     });
             },
 
@@ -408,9 +415,11 @@ document.addEventListener("DOMContentLoaded", () => {
                 setTimeout(() => { this.isSettingOpen = false; }, 200);
             },
             saveSetting() {
+                if (this.isSavingSetting) return;
                 if(!this.s.user) return;
+                this.isSavingSetting = true;
                 const token = localStorage.getItem('transkep_session_token');
-                if(window.showNotify) window.showNotify("Menyimpan...", "Menyimpan pengaturan dasar...", "success");
+                if(window.showLoading) window.showLoading("Menyimpan pengaturan dasar ST...");
                 
                 StDataService.saveSettings(this.formSetting, this.s.user.nip, token)
                     .then((res) => {
@@ -432,6 +441,10 @@ document.addEventListener("DOMContentLoaded", () => {
                     })
                     .catch((err) => { 
                         if(window.showNotify) window.showNotify("Error", err.toString(), "error"); 
+                    })
+                    .finally(() => {
+                        if(window.hideLoading) window.hideLoading();
+                        this.isSavingSetting = false;
                     });
             }
         },

@@ -308,8 +308,10 @@
           </div>
         </div>
 
-        <button type="submit" class="w-full py-4 mt-4 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl shadow-lg transition uppercase tracking-wider flex justify-center items-center gap-2">
-          {{ currentEditId ? 'Simpan Perubahan' : 'Kirim Usulan Resmi' }} <i class="fa-solid fa-paper-plane"></i>
+        <button type="submit" :disabled="isSubmittingCuti" class="w-full py-4 mt-4 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl shadow-lg transition uppercase tracking-wider flex justify-center items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+          <i v-if="isSubmittingCuti" class="fa-solid fa-circle-notch fa-spin"></i>
+          <span>{{ isSubmittingCuti ? 'Menyimpan...' : (currentEditId ? 'Simpan Perubahan' : 'Kirim Usulan Resmi') }}</span>
+          <i v-if="!isSubmittingCuti" class="fa-solid fa-paper-plane"></i>
         </button>
       </form>
     </div>
@@ -332,9 +334,11 @@
         </div>
         
         <div class="flex gap-3">
-           <button type="button" @click="closeCancelModal()" class="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-xl transition">Kembali</button>
-           <button type="button" @click="submitCancelCuti()" class="flex-1 py-3 bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-purple-600/20 transition flex items-center justify-center gap-2">
-              Ajukan Batal <i class="fa-solid fa-arrow-right"></i>
+           <button type="button" @click="closeCancelModal()" :disabled="isSubmittingCancel" class="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-xl transition disabled:opacity-50 disabled:cursor-not-allowed">Kembali</button>
+           <button type="button" @click="submitCancelCuti()" :disabled="isSubmittingCancel" class="flex-1 py-3 bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-purple-600/20 transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+              <i v-if="isSubmittingCancel" class="fa-solid fa-circle-notch fa-spin"></i>
+              <span>{{ isSubmittingCancel ? 'Mengajukan...' : 'Ajukan Batal' }}</span>
+              <i v-if="!isSubmittingCancel" class="fa-solid fa-arrow-right"></i>
            </button>
         </div>
       </div>
@@ -482,11 +486,11 @@
       </div>
 
       <div class="grid grid-cols-2 gap-3">
-        <button @click="submitSingle('Ditolak')" class="py-3 bg-rose-500/10 hover:bg-rose-500 border border-rose-500/20 hover:border-rose-500 text-rose-400 hover:text-white font-semibold rounded-xl transition duration-200">
-          <i class="fa-solid fa-circle-xmark mr-2"></i> Tolak Usulan
+        <button @click="submitSingle('Ditolak')" :disabled="isSubmittingSingle" class="py-3 bg-rose-500/10 hover:bg-rose-500 border border-rose-500/20 hover:border-rose-500 text-rose-400 hover:text-white font-semibold rounded-xl transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed">
+          <i :class="isSubmittingSingle ? 'fa-solid fa-circle-notch fa-spin mr-2' : 'fa-solid fa-circle-xmark mr-2'"></i> {{ isSubmittingSingle ? 'Memproses...' : 'Tolak Usulan' }}
         </button>
-        <button @click="submitSingle('Disetujui')" class="py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-xl shadow-lg shadow-emerald-600/20 transition duration-200">
-          <i class="fa-solid fa-circle-check mr-2"></i> Setujui Berkas
+        <button @click="submitSingle('Disetujui')" :disabled="isSubmittingSingle" class="py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-xl shadow-lg shadow-emerald-600/20 transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed">
+          <i :class="isSubmittingSingle ? 'fa-solid fa-circle-notch fa-spin mr-2' : 'fa-solid fa-circle-check mr-2'"></i> {{ isSubmittingSingle ? 'Memproses...' : 'Setujui Berkas' }}
         </button>
       </div>
     </div>
@@ -511,9 +515,9 @@
       </div>
 
       <div class="flex gap-3">
-        <button @click="showBulkModal = false" class="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-xl transition border border-slate-700">Batal</button>
-        <button @click="submitBulk()" class="flex-1 py-3 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-indigo-600/20 transition flex items-center justify-center gap-2">
-          <i class="fa-solid fa-bolt"></i> Eksekusi Bulk
+        <button @click="showBulkModal = false" :disabled="isSubmittingBulk" class="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-xl transition border border-slate-700 disabled:opacity-50 disabled:cursor-not-allowed">Batal</button>
+        <button @click="submitBulk()" :disabled="isSubmittingBulk" class="flex-1 py-3 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-indigo-600/20 transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+          <i :class="isSubmittingBulk ? 'fa-solid fa-circle-notch fa-spin' : 'fa-solid fa-bolt'"></i> {{ isSubmittingBulk ? 'Memproses...' : 'Eksekusi Bulk' }}
         </button>
       </div>
     </div>
@@ -979,9 +983,10 @@
           
           <!-- SUBMIT BUTTON -->
           <div class="pt-4 shrink-0">
-            <button type="submit" class="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl shadow-lg shadow-blue-600/20 transition uppercase tracking-wider flex items-center justify-center gap-2">
-                {{ currentEditId ? 'Perbarui Surat Tugas' : 'Terbitkan Surat Tugas Terpadu' }} 
-                <i :class="currentEditId ? 'fa-solid fa-floppy-disk' : 'fa-solid fa-paper-plane'"></i>
+            <button type="submit" :disabled="isSubmittingST" class="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl shadow-lg shadow-blue-600/20 transition uppercase tracking-wider flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                <i v-if="isSubmittingST" class="fa-solid fa-circle-notch fa-spin"></i>
+                <span>{{ isSubmittingST ? 'Menerbitkan...' : (currentEditId ? 'Perbarui Surat Tugas' : 'Terbitkan Surat Tugas Terpadu') }}</span>
+                <i v-if="!isSubmittingST" :class="currentEditId ? 'fa-solid fa-floppy-disk' : 'fa-solid fa-paper-plane'"></i>
             </button>
           </div>
         </form>
@@ -1072,8 +1077,10 @@
               </div>
               
               <div class="pt-3">
-                <button type="submit" class="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl shadow-lg shadow-blue-600/20 transition text-sm">
-                    Terapkan Default <i class="fa-solid fa-check ml-1"></i>
+                <button type="submit" :disabled="isSavingSetting" class="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl shadow-lg shadow-blue-600/20 transition text-sm flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                    <i v-if="isSavingSetting" class="fa-solid fa-circle-notch fa-spin"></i>
+                    <span>{{ isSavingSetting ? 'Menyimpan...' : 'Terapkan Default' }}</span>
+                    <i v-if="!isSavingSetting" class="fa-solid fa-check ml-1"></i>
                 </button>
               </div>
           </form>

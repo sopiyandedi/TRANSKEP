@@ -321,10 +321,16 @@ function hapusDokumenPCK(idPCK) {
     });
 }
 
+const activePkpActionLocks = new Set();
+
 function kirimDokumenPK(idPKP) {
+    const lockKey = 'KIRIM_PK:' + String(idPKP);
+    if (activePkpActionLocks.has(lockKey)) return;
     const token = localStorage.getItem('transkep_session_token');
     const userNip = state.user ? state.user.nip : '';
     showCustomConfirm("Kirim Dokumen PK", "Kirim ke Atasan Penilai? Setelah dikirim, Anda tidak bisa mengedit dokumen ini lagi.", function() {
+        if (activePkpActionLocks.has(lockKey)) return;
+        activePkpActionLocks.add(lockKey);
         let prevStatus = "Draft";
         for(var i=0; i<state.pkpDokumen.length; i++) {
             if(String(state.pkpDokumen[i].id_pkp) === String(idPKP)) {
@@ -347,18 +353,28 @@ function kirimDokumenPK(idPKP) {
                     if (window.vmPkpApp) window.vmPkpApp.syncData(state.pkpDokumen, state.pckDokumen);
                     if(typeof renderListPK === 'function') renderListPK();
                     showNotify("Gagal Kirim PK", (e && e.message) ? e.message : String(e), "error");
+                })
+                .finally(function() {
+                    activePkpActionLocks.delete(lockKey);
                 });
         } else if (typeof google !== 'undefined' && google.script) {
             google.script.run.aksiDokumenPKP(idPKP, "Kirim", userNip, token);
+            activePkpActionLocks.delete(lockKey);
             showNotify("Terkirim", "Dokumen PK berhasil diserahkan ke Atasan Penilai.", "success");
+        } else {
+            activePkpActionLocks.delete(lockKey);
         }
     });
 }
 
 function kirimDokumenPCK(idPCK) {
+    const lockKey = 'KIRIM_PCK:' + String(idPCK);
+    if (activePkpActionLocks.has(lockKey)) return;
     const token = localStorage.getItem('transkep_session_token');
     const userNip = state.user ? state.user.nip : '';
     showCustomConfirm("Kirim Laporan PCK", "Kirim laporan ini ke Atasan? Data akan terkunci.", function() {
+        if (activePkpActionLocks.has(lockKey)) return;
+        activePkpActionLocks.add(lockKey);
         let prevStatus = "Draft";
         for(var i=0; i<state.pckDokumen.length; i++) {
             if(String(state.pckDokumen[i].id_pck) === String(idPCK)) {
@@ -381,10 +397,16 @@ function kirimDokumenPCK(idPCK) {
                     if (window.vmPkpApp) window.vmPkpApp.syncData(state.pkpDokumen, state.pckDokumen);
                     if(typeof renderListPCK === 'function') renderListPCK();
                     showNotify("Gagal Kirim PCK", (e && e.message) ? e.message : String(e), "error");
+                })
+                .finally(function() {
+                    activePkpActionLocks.delete(lockKey);
                 });
         } else if (typeof google !== 'undefined' && google.script) {
             google.script.run.aksiDokumenPCK(idPCK, "Kirim", userNip, token);
+            activePkpActionLocks.delete(lockKey);
             showNotify("Terkirim", "Laporan PCK bulan ini telah diserahkan.", "success");
+        } else {
+            activePkpActionLocks.delete(lockKey);
         }
     });
 }
@@ -866,6 +888,7 @@ function mountPkpApp() {
                 }
             },
             async kunciDanSahkanRekap() {
+                if (this.isLockingRekap) return;
                 if (!this.selectedMonth || this.selectedMonth === '0') {
                     showNotify("Pilih Bulan", "Silakan tentukan bulan laporan terlebih dahulu untuk mengesahkan rekapitulasi.", "warning");
                     return;
@@ -991,6 +1014,7 @@ function mountPkpApp() {
                 }
             },
             async bukaKunciRekap() {
+                if (this.isLockingRekap) return;
                 if (!this.currentRekapSnapshot) return;
                 const snapshot = this.currentRekapSnapshot;
 
@@ -1014,6 +1038,7 @@ function mountPkpApp() {
                 if (!confirmResult) return;
 
                 try {
+                    this.isLockingRekap = true;
                     showLoading("Membuka Kunci Rekapitulasi...");
                     if (typeof PkpDataService !== 'undefined' && typeof PkpDataService.deleteFirestoreRekapitulasi === 'function') {
                         await PkpDataService.deleteFirestoreRekapitulasi(snapshot.id_rekap);
@@ -1027,6 +1052,8 @@ function mountPkpApp() {
                 } catch (err) {
                     hideLoading();
                     showNotify("Gagal Buka Kunci", err.message || String(err), "error");
+                } finally {
+                    this.isLockingRekap = false;
                 }
             },
             handleActionBtn() {
@@ -1279,6 +1306,7 @@ function mountPkpApp() {
                 });
             },
             savePKFull() {
+                if (this.modalPKSubmitting) return;
                 try {
                     const inputTahun = this.formPK.tahun;
                     const inputText = this.formPK.penilaiText;
@@ -1571,6 +1599,7 @@ function mountPkpApp() {
                     });
             },
             savePCKFull() {
+                if (this.modalPCKSubmitting) return;
                 try {
                     const thn = this.formPCK.tahun;
                     const blnVal = parseInt(this.formPCK.bulan);
@@ -1829,9 +1858,14 @@ function bukaDetailPCK(bulan, isVerifikasi = false, nipBawahan = null, isReadOnl
 }
 
 function validasiCepatDokumen(tipe, idDokumen) {
+    const lockKey = 'VAL:' + tipe + ':' + String(idDokumen);
+    if (activePkpActionLocks.has(lockKey)) return;
     const token = localStorage.getItem('transkep_session_token');
     showCustomConfirm("Validasi Dokumen", "Apakah Anda yakin dokumen ini sudah benar dan ingin langsung mensahkannya?", function() {
+        if (activePkpActionLocks.has(lockKey)) return;
+        activePkpActionLocks.add(lockKey);
         const userNip = state.user ? state.user.nip : '';
+        if (typeof showLoading === 'function') showLoading('Mensahkan dokumen ' + tipe + '...');
         const aksiPromise = (typeof PkpDataService !== 'undefined')
             ? (tipe === 'PK' ? PkpDataService.aksiDokumenPKP(idDokumen, "Setujui", userNip, token) : PkpDataService.aksiDokumenPCK(idDokumen, "Setujui", userNip, token))
             : new Promise((resolve, reject) => {
@@ -1866,7 +1900,11 @@ function validasiCepatDokumen(tipe, idDokumen) {
                     updateBadgeVerifikasiPKP();
                 } else { showNotify("Gagal", (res && res.message) ? res.message : "Gagal memvalidasi.", "error"); }
             })
-            .catch(function(e) { showNotify("Error", e.message || String(e), "error"); });
+            .catch(function(e) { showNotify("Error", e.message || String(e), "error"); })
+            .finally(function() {
+                activePkpActionLocks.delete(lockKey);
+                if (typeof hideLoading === 'function') hideLoading();
+            });
     });
 }
 

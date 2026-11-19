@@ -14,6 +14,8 @@
   var fotoRapatList = [];
   var isRapatFullscreen = false;
   var currentRapatTab = 'undangan';
+  var isSubmittingRapat = false;
+  var isProcessingAiNotulen = false;
   var rapatAudioState = {
     dataUri: '',
     mimeType: '',
@@ -1232,6 +1234,7 @@
   };
 
   window.processAiNotulenRapat = async function () {
+    if (isProcessingAiNotulen) return;
     var transEl = document.getElementById('rapatFieldAiTranscript');
     var transcriptText = transEl ? String(transEl.value || '').trim() : '';
 
@@ -1260,11 +1263,14 @@
       allow_text_fallback: Boolean(transcriptText)
     };
 
+    isProcessingAiNotulen = true;
     var btnAi = document.getElementById('btnRapatProcessAiNotulen');
+    var origAiHtml = btnAi ? btnAi.innerHTML : '';
     var badge = document.getElementById('rapatAiStatusBadge');
     if (btnAi) {
       btnAi.disabled = true;
       btnAi.classList.add('opacity-70', 'cursor-wait');
+      btnAi.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> <span>Memproses AI...</span>';
     }
     if (badge) badge.innerText = 'Memproses Gemini AI...';
 
@@ -1296,9 +1302,11 @@
         showNotify('Error AI Notulis', err.message || err.toString(), 'error');
       }
     } finally {
+      isProcessingAiNotulen = false;
       if (btnAi) {
         btnAi.disabled = false;
         btnAi.classList.remove('opacity-70', 'cursor-wait');
+        if (origAiHtml) btnAi.innerHTML = origAiHtml;
       }
     }
   };
@@ -1554,6 +1562,7 @@
   // SIMPAN DATA RAPAT KE FIRESTORE (0ms)
   // ==========================================
   window.submitRapatForm = async function () {
+    if (isSubmittingRapat) return;
     var agenda = (document.getElementById('rapatFieldAgenda') || {}).value || '';
     var hariTanggal = (document.getElementById('rapatFieldHariTanggal') || {}).value || '';
 
@@ -1644,12 +1653,26 @@
     var adminNip = (currentUser && currentUser.nip) || localStorage.getItem('transkep_active_nip') || '';
     var authToken = localStorage.getItem('transkep_session_token') || '';
 
+    isSubmittingRapat = true;
     var btnSubmit = document.getElementById('btnRapatSaveAgenda');
-    if (btnSubmit) btnSubmit.disabled = true;
+    var btnCancel = document.getElementById('btnRapatCancelAgenda');
+    var origBtnHtml = btnSubmit ? btnSubmit.innerHTML : '';
+
+    if (btnSubmit) {
+      btnSubmit.disabled = true;
+      btnSubmit.classList.add('opacity-60', 'cursor-not-allowed');
+      btnSubmit.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> <span>Menyimpan...</span>';
+    }
+    if (btnCancel) btnCancel.disabled = true;
+
+    if (typeof showLoading === 'function') {
+      showLoading(!payload.no_urut_surat && !payload.mysims_requested
+        ? 'Menyimpan agenda rapat & meminta nomor MYSIMS...'
+        : 'Menyimpan agenda rapat ke Cloud Firestore...');
+    }
 
     try {
       var res = await window.EofficeDataService.saveRapatData(payload, adminNip, authToken);
-      if (btnSubmit) btnSubmit.disabled = false;
 
       if (res && res.status === 'success') {
         var savedDoc = res.data || { ...payload, id_rapat: res.id_rapat, id: res.id_rapat };
@@ -1681,11 +1704,19 @@
         }
       }
     } catch (err) {
-      if (btnSubmit) btnSubmit.disabled = false;
       console.error('Error save rapat:', err);
       if (typeof showNotify === 'function') {
         showNotify('Error Sistem', err.toString(), 'error');
       }
+    } finally {
+      isSubmittingRapat = false;
+      if (typeof hideLoading === 'function') hideLoading();
+      if (btnSubmit) {
+        btnSubmit.disabled = false;
+        btnSubmit.classList.remove('opacity-60', 'cursor-not-allowed');
+        if (origBtnHtml) btnSubmit.innerHTML = origBtnHtml;
+      }
+      if (btnCancel) btnCancel.disabled = false;
     }
   };
 })();

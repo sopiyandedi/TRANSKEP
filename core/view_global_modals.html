@@ -109,11 +109,13 @@
           </div>
           
           <div class="flex gap-3 pt-4">
-             <button type="button" @click="cancelPasswordModal" class="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-xl transition">
+             <button type="button" @click="cancelPasswordModal" :disabled="isSubmittingPass" class="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-xl transition disabled:opacity-50 disabled:cursor-not-allowed">
                 {{ isMandatory ? 'Nanti Saja' : 'Batal' }}
              </button>
-             <button type="submit" :class="isMandatory ? 'bg-amber-600 hover:bg-amber-500 shadow-amber-600/20' : 'bg-purple-600 hover:bg-purple-500 shadow-purple-600/20'" class="flex-1 py-3 text-white text-xs font-bold rounded-xl shadow-lg transition flex items-center justify-center gap-2">
-                {{ isMandatory ? 'Simpan & Amankan' : 'Simpan' }} <i class="fa-solid fa-check"></i>
+             <button type="submit" :disabled="isSubmittingPass" :class="isMandatory ? 'bg-amber-600 hover:bg-amber-500 shadow-amber-600/20' : 'bg-purple-600 hover:bg-purple-500 shadow-purple-600/20'" class="flex-1 py-3 text-white text-xs font-bold rounded-xl shadow-lg transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                <i v-if="isSubmittingPass" class="fa-solid fa-circle-notch fa-spin"></i>
+                <span>{{ isSubmittingPass ? 'Menyimpan...' : (isMandatory ? 'Simpan & Amankan' : 'Simpan') }}</span>
+                <i v-if="!isSubmittingPass" class="fa-solid fa-check"></i>
              </button>
           </div>
         </form>

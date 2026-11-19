@@ -39,6 +39,7 @@ document.addEventListener("DOMContentLoaded", () => {
           mode: 'delete',
           target: null
         },
+        isExecutingConfirm: false,
         searchQuery: '',
         isDropdownOpen: false,
         activeStatusDropdownId: null,
@@ -590,6 +591,7 @@ document.addEventListener("DOMContentLoaded", () => {
       },
 
       async executeConfirmModal() {
+        if (this.isExecutingConfirm) return;
         const mode = this.confirmModal.mode;
         const target = this.confirmModal.target;
         if (!target || !target.rawData) {
@@ -597,99 +599,104 @@ document.addEventListener("DOMContentLoaded", () => {
           return;
         }
 
-        const raw = target.rawData;
-        const nip = (this.currentUser && this.currentUser.nip) || localStorage.getItem('transkep_active_nip') || '';
-        const token = localStorage.getItem('transkep_session_token') || '';
+        this.isExecutingConfirm = true;
+        try {
+          const raw = target.rawData;
+          const nip = (this.currentUser && this.currentUser.nip) || localStorage.getItem('transkep_active_nip') || '';
+          const token = localStorage.getItem('transkep_session_token') || '';
 
-        if (mode === 'delete') {
-          this._allowEmptyFirestoreSnapshot = true;
-          const targetId = String(raw.id_kgb || '');
-          this.rawKgbList = this.rawKgbList.filter(k => String(k.id_kgb || '') !== targetId);
-          if (window.EofficeDataService && typeof window.EofficeDataService.setLocalCache === 'function') {
-            window.EofficeDataService.setLocalCache({ kgb: this.rawKgbList, rapat: this.rawRapatList });
-          }
-          this.closeConfirmModal();
+          if (mode === 'delete') {
+            this._allowEmptyFirestoreSnapshot = true;
+            const targetId = String(raw.id_kgb || '');
+            this.rawKgbList = this.rawKgbList.filter(k => String(k.id_kgb || '') !== targetId);
+            if (window.EofficeDataService && typeof window.EofficeDataService.setLocalCache === 'function') {
+              window.EofficeDataService.setLocalCache({ kgb: this.rawKgbList, rapat: this.rawRapatList });
+            }
+            this.closeConfirmModal();
 
-          try {
-            if (window.EofficeDataService && typeof window.EofficeDataService.deleteKgb === 'function') {
-              await window.EofficeDataService.deleteKgb(targetId, raw);
-            }
-            if (typeof showNotify === 'function') {
-              showNotify("Berkas Dihapus", "Data KGB atas nama " + (raw.nama_pegawai || target.title) + " berhasil dihapus.", "success");
-            }
-          } catch (err) {
-            console.error("Gagal menghapus KGB:", err);
-            if (typeof showNotify === 'function') {
-              showNotify("Gagal Menghapus", err.toString(), "error");
-            }
-            this.loadData(true);
-          }
-          return;
-        }
-
-        if (mode === 'delete_rapat') {
-          this._allowEmptyFirestoreSnapshot = true;
-          const targetId = String(raw.id_rapat || raw.id || '');
-          this.rawRapatList = this.rawRapatList.filter(r => String(r.id_rapat || r.id || '') !== targetId);
-          if (window.EofficeDataService && typeof window.EofficeDataService.setLocalCache === 'function') {
-            window.EofficeDataService.setLocalCache({ kgb: this.rawKgbList, rapat: this.rawRapatList });
-          }
-          this.closeConfirmModal();
-
-          try {
-            if (window.EofficeDataService && typeof window.EofficeDataService.deleteRapat === 'function') {
-              await window.EofficeDataService.deleteRapat(targetId);
-            }
-            if (typeof showNotify === 'function') {
-              showNotify("Agenda Rapat Dihapus", "Agenda " + (raw.agenda || target.title) + " berhasil dihapus.", "success");
-            }
-          } catch (err) {
-            console.error("Gagal menghapus Rapat:", err);
-            if (typeof showNotify === 'function') {
-              showNotify("Gagal Menghapus", err.toString(), "error");
-            }
-            this.loadData(true);
-          }
-          return;
-        }
-
-        if (mode === 'tte') {
-          this.closeConfirmModal();
-          if (typeof showLoading === 'function') {
-            showLoading("Mengirim pengajuan KGB ke antrean TTE Pimpinan...");
-          }
-          try {
-            let res = null;
-            if (window.EofficeDataService && typeof window.EofficeDataService.sendKgbForTte === 'function') {
-              res = await window.EofficeDataService.sendKgbForTte(raw, nip, token);
-            }
-            if (typeof hideLoading === 'function') hideLoading();
-
-            if (res && res.status === 'success') {
-              const updatedDoc = res.data || { ...raw, status: 'Menunggu TTE Pimpinan' };
-              const oldId = String(raw.id_kgb || '');
-              const idx = this.rawKgbList.findIndex(k => String(k.id_kgb || '') === oldId);
-              if (idx !== -1) {
-                this.rawKgbList.splice(idx, 1, updatedDoc);
-              } else {
-                this.rawKgbList.unshift(updatedDoc);
-              }
-              if (window.EofficeDataService && typeof window.EofficeDataService.setLocalCache === 'function') {
-                window.EofficeDataService.setLocalCache({ kgb: this.rawKgbList, rapat: this.rawRapatList });
+            try {
+              if (window.EofficeDataService && typeof window.EofficeDataService.deleteKgb === 'function') {
+                await window.EofficeDataService.deleteKgb(targetId, raw);
               }
               if (typeof showNotify === 'function') {
-                showNotify("Terkirim ke Pimpinan", "Pengajuan KGB " + (raw.nama_pegawai || target.title) + " siap untuk proses TTE Ketua.", "success");
+                showNotify("Berkas Dihapus", "Data KGB atas nama " + (raw.nama_pegawai || target.title) + " berhasil dihapus.", "success");
               }
-            } else if (typeof showNotify === 'function') {
-              showNotify("Gagal Mengirim TTE", (res && res.message) ? res.message : "Terjadi kendala saat memperbarui status TTE.", "error");
+            } catch (err) {
+              console.error("Gagal menghapus KGB:", err);
+              if (typeof showNotify === 'function') {
+                showNotify("Gagal Menghapus", err.toString(), "error");
+              }
+              this.loadData(true);
             }
-          } catch (err) {
-            if (typeof hideLoading === 'function') hideLoading();
-            console.error("Gagal kirim TTE KGB:", err);
-            if (typeof showNotify === 'function') {
-              showNotify("Error Sistem", err.toString(), "error");
+            return;
+          }
+
+          if (mode === 'delete_rapat') {
+            this._allowEmptyFirestoreSnapshot = true;
+            const targetId = String(raw.id_rapat || raw.id || '');
+            this.rawRapatList = this.rawRapatList.filter(r => String(r.id_rapat || r.id || '') !== targetId);
+            if (window.EofficeDataService && typeof window.EofficeDataService.setLocalCache === 'function') {
+              window.EofficeDataService.setLocalCache({ kgb: this.rawKgbList, rapat: this.rawRapatList });
+            }
+            this.closeConfirmModal();
+
+            try {
+              if (window.EofficeDataService && typeof window.EofficeDataService.deleteRapat === 'function') {
+                await window.EofficeDataService.deleteRapat(targetId);
+              }
+              if (typeof showNotify === 'function') {
+                showNotify("Agenda Rapat Dihapus", "Agenda " + (raw.agenda || target.title) + " berhasil dihapus.", "success");
+              }
+            } catch (err) {
+              console.error("Gagal menghapus Rapat:", err);
+              if (typeof showNotify === 'function') {
+                showNotify("Gagal Menghapus", err.toString(), "error");
+              }
+              this.loadData(true);
+            }
+            return;
+          }
+
+          if (mode === 'tte') {
+            this.closeConfirmModal();
+            if (typeof showLoading === 'function') {
+              showLoading("Mengirim pengajuan KGB ke antrean TTE Pimpinan...");
+            }
+            try {
+              let res = null;
+              if (window.EofficeDataService && typeof window.EofficeDataService.sendKgbForTte === 'function') {
+                res = await window.EofficeDataService.sendKgbForTte(raw, nip, token);
+              }
+              if (typeof hideLoading === 'function') hideLoading();
+
+              if (res && res.status === 'success') {
+                const updatedDoc = res.data || { ...raw, status: 'Menunggu TTE Pimpinan' };
+                const oldId = String(raw.id_kgb || '');
+                const idx = this.rawKgbList.findIndex(k => String(k.id_kgb || '') === oldId);
+                if (idx !== -1) {
+                  this.rawKgbList.splice(idx, 1, updatedDoc);
+                } else {
+                  this.rawKgbList.unshift(updatedDoc);
+                }
+                if (window.EofficeDataService && typeof window.EofficeDataService.setLocalCache === 'function') {
+                  window.EofficeDataService.setLocalCache({ kgb: this.rawKgbList, rapat: this.rawRapatList });
+                }
+                if (typeof showNotify === 'function') {
+                  showNotify("Terkirim ke Pimpinan", "Pengajuan KGB " + (raw.nama_pegawai || target.title) + " siap untuk proses TTE Ketua.", "success");
+                }
+              } else if (typeof showNotify === 'function') {
+                showNotify("Gagal Mengirim TTE", (res && res.message) ? res.message : "Terjadi kendala saat memperbarui status TTE.", "error");
+              }
+            } catch (err) {
+              if (typeof hideLoading === 'function') hideLoading();
+              console.error("Gagal kirim TTE KGB:", err);
+              if (typeof showNotify === 'function') {
+                showNotify("Error Sistem", err.toString(), "error");
+              }
             }
           }
+        } finally {
+          this.isExecutingConfirm = false;
         }
       },
 

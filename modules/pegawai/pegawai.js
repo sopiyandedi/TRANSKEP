@@ -16,6 +16,7 @@
           expandedPegawai: [],
           visiblePasswords: [],
           showModalPegawai: false,
+          isSubmittingPegawai: false,
           modalPegMode: 'add',
           formPegawai: this.getEmptyForm(),
           showModalAntrean: false,
@@ -168,10 +169,12 @@
           this.showModalPegawai = false;
         },
         async submitPegawai() {
+          if (this.isSubmittingPegawai) return;
           this.formPegawai.pangkat = this.normalizePangkat(this.formPegawai.pangkat);
           const token = localStorage.getItem('transkep_session_token');
           const adminNip = (this.currentUser && this.currentUser.nip) || localStorage.getItem('transkep_active_nip');
 
+          this.isSubmittingPegawai = true;
           // OPTIMISTIC UI TAHAP 4 (0ms Update & Auto-Rollback)
           this.closePegawaiModal();
           const backupUsers = JSON.parse(JSON.stringify(this.usersList));
@@ -194,6 +197,8 @@
           } catch (err) {
             this.usersList = backupUsers;
             if(window.showNotify) window.showNotify("Error Sistem", err.toString() + " (Data dikembalikan)", "error");
+          } finally {
+            this.isSubmittingPegawai = false;
           }
         },
         deletePegawaiRecord(user) {

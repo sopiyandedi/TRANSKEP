@@ -1906,6 +1906,174 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
       'Rapat poller must sync issued nomor_undangan into Firestore');
     assert(rapatPollToasts.some(t => t.type === 'success' && t.msg.includes('1109/KPA.W10-A2/UND.HM3.1.1/XI/2026')),
       'Rapat poller must notify admin when MYSIMS number arrives');
+
+    // Tahap 142: Anti Double-Submit Lock & Loading UX Standardization
+    // 1. Runtime test: showCustomConfirm one-shot guard + spinner
+    let confirmFiredCount = 0;
+    browserSandbox.showCustomConfirm('Konfirmasi Uji', 'Lanjutkan aksi?', () => { confirmFiredCount++; });
+    const confirmYesBtn = getEl('btn-confirm-yes');
+    const confirmCancelBtn = getEl('btn-confirm-cancel');
+    assert.strictEqual(typeof confirmYesBtn.onclick, 'function', 'showCustomConfirm must wire btn-confirm-yes.onclick');
+    confirmYesBtn.onclick();
+    confirmYesBtn.onclick();
+    assert.strictEqual(confirmFiredCount, 1, 'showCustomConfirm must invoke callback strictly once on rapid double-click');
+    assert.strictEqual(confirmYesBtn.disabled, true, 'showCustomConfirm must disable btn-confirm-yes after first click');
+    assert.strictEqual(confirmCancelBtn.disabled, true, 'showCustomConfirm must disable btn-confirm-cancel after first click');
+    assert(confirmYesBtn.innerHTML.includes('fa-spin') && confirmYesBtn.innerHTML.includes('Memproses'),
+      'showCustomConfirm must display spinner and Memproses text on btn-confirm-yes');
+
+    // 2. Runtime test: submitRapatForm re-entry guard + button lock + showLoading + finally restore
+    let saveRapatCalls = 0;
+    let resolveSaveRapat = null;
+    let rapatLoadingCount = 0;
+    let rapatHideLoadingCount = 0;
+    const domRapat142 = {
+      rapatFieldAgenda: { value: 'Rapat Evaluasi Anti Double Click' },
+      rapatFieldHariTanggal: { value: '2026-11-20' },
+      btnRapatSaveAgenda: { disabled: false, innerHTML: '<i class="fa-solid fa-floppy-disk"></i><span>Simpan Agenda Rapat</span>', classList: mkCls() },
+      btnRapatCancelAgenda: { disabled: false }
+    };
+    const rapatLockVm142 = {
+      console, Date, Math, Array, Object, String, Number, Boolean, JSON, Promise,
+      localStorage: { getItem: () => '', setItem: () => {} },
+      document: { getElementById: (id) => domRapat142[id] || null },
+      vueState: { user: { nip: '198001012005011001', role: 'Admin' }, usersList: [] },
+      EofficeDataService: {
+        saveRapatData: () => {
+          saveRapatCalls += 1;
+          return new Promise((resolve) => { resolveSaveRapat = resolve; });
+        }
+      },
+      showLoading: () => { rapatLoadingCount += 1; },
+      hideLoading: () => { rapatHideLoadingCount += 1; },
+      showNotify: () => {},
+      window: {}
+    };
+    rapatLockVm142.window = rapatLockVm142;
+    vm.createContext(rapatLockVm142);
+    vm.runInContext(fs.readFileSync('modules/eoffice/rapat.js', 'utf8'), rapatLockVm142, { filename: 'modules/eoffice/rapat.js' });
+
+    const pRapat1 = rapatLockVm142.submitRapatForm();
+    const pRapat2 = rapatLockVm142.submitRapatForm();
+    assert.strictEqual(saveRapatCalls, 1, 'submitRapatForm concurrent double-click must call saveRapatData strictly once');
+    assert.strictEqual(domRapat142.btnRapatSaveAgenda.disabled, true, 'submitRapatForm must disable save button while saving');
+    assert.strictEqual(domRapat142.btnRapatCancelAgenda.disabled, true, 'submitRapatForm must disable cancel button while saving');
+    assert.strictEqual(rapatLoadingCount, 1, 'submitRapatForm must trigger global showLoading');
+    assert(domRapat142.btnRapatSaveAgenda.innerHTML.includes('fa-spin') && domRapat142.btnRapatSaveAgenda.innerHTML.includes('Menyimpan'),
+      'submitRapatForm must show spinner and Menyimpan text while saving');
+    resolveSaveRapat({ status: 'success', id_rapat: 'RPT-LOCK-142' });
+    await Promise.all([pRapat1, pRapat2]);
+    assert.strictEqual(domRapat142.btnRapatSaveAgenda.disabled, false, 'submitRapatForm must re-enable save button in finally');
+    assert.strictEqual(domRapat142.btnRapatCancelAgenda.disabled, false, 'submitRapatForm must re-enable cancel button in finally');
+    assert.strictEqual(rapatHideLoadingCount, 1, 'submitRapatForm must call hideLoading in finally');
+    assert(domRapat142.btnRapatSaveAgenda.innerHTML.includes('Simpan Agenda Rapat'),
+      'submitRapatForm must restore original button HTML in finally');
+
+    // 3. Runtime test: submitKgbForm re-entry guard + both buttons lock + finally restore
+    let saveKgbCalls = 0;
+    let resolveSaveKgb = null;
+    let kgbLoadingCount = 0;
+    let kgbHideLoadingCount = 0;
+    const domKgb142 = {
+      kgbFieldNip: { value: '199002022015012002', classList: mkCls() },
+      kgbFieldNama: { value: 'Pegawai Uji KGB', classList: mkCls() },
+      kgbFieldNomorSurat: { value: '1102', classList: mkCls() },
+      btnKgbGenerateDoc: { disabled: false, innerHTML: '<i class="fa-solid fa-file-word"></i><span>Buat Google Docs</span>', classList: mkCls() },
+      btnKgbSaveDraft: { disabled: false, innerHTML: '<i class="fa-regular fa-floppy-disk"></i><span>Simpan Data</span>', classList: mkCls() }
+    };
+    const getKgbEl142 = (id) => {
+      if (!domKgb142[id]) domKgb142[id] = { value: '', disabled: false, innerHTML: '', classList: mkCls(), firstElementChild: { classList: mkCls() } };
+      return domKgb142[id];
+    };
+    const kgbLockVm142 = {
+      console, Date, Math, Array, Object, String, Number, Boolean, JSON, Promise, RegExp, parseInt, parseFloat, isNaN,
+      setTimeout: (fn) => fn(),
+      localStorage: { getItem: () => '', setItem: () => {} },
+      document: { getElementById: getKgbEl142 },
+      vueState: { user: { nip: '198001012005011001', role: 'Admin' }, usersList: [] },
+      EofficeDataService: {
+        saveOrGenerateKgb: () => {
+          saveKgbCalls += 1;
+          return new Promise((resolve) => { resolveSaveKgb = resolve; });
+        }
+      },
+      showLoading: () => { kgbLoadingCount += 1; },
+      hideLoading: () => { kgbHideLoadingCount += 1; },
+      showNotify: () => {},
+      window: {}
+    };
+    kgbLockVm142.window = kgbLockVm142;
+    vm.createContext(kgbLockVm142);
+    vm.runInContext(fs.readFileSync('modules/eoffice/kgb.js', 'utf8'), kgbLockVm142, { filename: 'modules/eoffice/kgb.js' });
+
+    const pKgb1 = kgbLockVm142.submitKgbForm('draft');
+    const pKgb2 = kgbLockVm142.submitKgbForm('draft');
+    assert.strictEqual(saveKgbCalls, 1, 'submitKgbForm concurrent double-click must call saveOrGenerateKgb strictly once');
+    assert.strictEqual(domKgb142.btnKgbGenerateDoc.disabled, true, 'submitKgbForm must disable btnKgbGenerateDoc while saving');
+    assert.strictEqual(domKgb142.btnKgbSaveDraft.disabled, true, 'submitKgbForm must disable btnKgbSaveDraft while saving');
+    assert.strictEqual(kgbLoadingCount, 1, 'submitKgbForm must call showLoading');
+    assert(domKgb142.btnKgbSaveDraft.innerHTML.includes('fa-spin') && domKgb142.btnKgbSaveDraft.innerHTML.includes('Menyimpan'),
+      'submitKgbForm must show spinner on active KGB button');
+    resolveSaveKgb({ status: 'success' });
+    await Promise.all([pKgb1, pKgb2]);
+    assert.strictEqual(domKgb142.btnKgbGenerateDoc.disabled, false, 'submitKgbForm must re-enable btnKgbGenerateDoc in finally');
+    assert.strictEqual(domKgb142.btnKgbSaveDraft.disabled, false, 'submitKgbForm must re-enable btnKgbSaveDraft in finally');
+    assert.strictEqual(kgbHideLoadingCount, 1, 'submitKgbForm must call hideLoading in finally');
+    assert(domKgb142.btnKgbSaveDraft.innerHTML.includes('Simpan Data'), 'submitKgbForm must restore original draft button HTML');
+
+    // 4. Static parity check across Level 1, Level 2 & Level 3 handlers and templates
+    const parityChecks142 = [
+      ['core/core.js', 'if (window._isLoggingIn) return;'],
+      ['core/core.js', 'if (this.isSubmittingPass) return;'],
+      ['core/view_global_modals.html', ':disabled="isSubmittingPass"'],
+      ['core/login.js', 'if (isSubmittingLupaPass) return;'],
+      ['modules/eoffice/rapat.js', 'if (isSubmittingRapat) return;'],
+      ['modules/eoffice/rapat.js', 'if (isProcessingAiNotulen) return;'],
+      ['modules/eoffice/kgb.js', 'if (isSubmittingKgb) return;'],
+      ['modules/eoffice/eoffice.js', 'if (this.isExecutingConfirm) return;'],
+      ['modules/eoffice/view_eoffice.html', ':disabled="isExecutingConfirm"'],
+      ['modules/eoffice/view_eoffice.html', 'id="btnRapatCancelAgenda"'],
+      ['modules/permohonan/st.js', 'if (this.isSubmittingST) return;'],
+      ['modules/permohonan/st.js', 'if (this.isSavingSetting) return;'],
+      ['modules/permohonan/cuti.js', 'if (this.isSubmittingCuti) return;'],
+      ['modules/permohonan/cuti.js', 'if (this.isSubmittingCancel) return;'],
+      ['modules/permohonan/ip.js', 'if (this.isSubmitting) return;'],
+      ['modules/permohonan/ik.js', 'if (this.isSubmitting) return;'],
+      ['modules/permohonan/wfh.js', 'if (this.isSubmittingRencana) return;'],
+      ['modules/permohonan/wfh.js', 'if (this.isSubmittingLaporan) return;'],
+      ['modules/permohonan/persetujuan.js', 'if (this.isSubmittingSingle) return;'],
+      ['modules/permohonan/persetujuan.js', 'if (this.isSubmittingBulk) return;'],
+      ['modules/permohonan/magic_approval.js', 'if (this.isSubmitting) return;'],
+      ['modules/permohonan/view_permohonan.html', ':disabled="isSubmittingCuti"'],
+      ['modules/permohonan/view_permohonan.html', ':disabled="isSubmittingCancel"'],
+      ['modules/permohonan/view_permohonan.html', ':disabled="isSubmittingSingle"'],
+      ['modules/permohonan/view_permohonan.html', ':disabled="isSubmittingBulk"'],
+      ['modules/permohonan/view_permohonan.html', ':disabled="isSubmittingST"'],
+      ['modules/permohonan/view_permohonan.html', ':disabled="isSavingSetting"'],
+      ['modules/permohonan/view_modals_izin.html', ':disabled="isSubmitting"'],
+      ['modules/permohonan/view_modals_izin.html', ':disabled="isSubmittingRencana"'],
+      ['modules/permohonan/view_modals_izin.html', ':disabled="isSubmittingLaporan"'],
+      ['modules/pegawai/pegawai.js', 'if (this.isSubmittingPegawai) return;'],
+      ['modules/pegawai/view_pegawai.html', ':disabled="isSubmittingPegawai"'],
+      ['modules/pkp/pkp.js', 'activePkpActionLocks'],
+      ['modules/pkp/pkp.js', 'if (this.isLockingRekap) return;'],
+      ['modules/pkp/pkp.js', 'if (this.modalPKSubmitting) return;'],
+      ['modules/pkp/pkp.js', 'if (this.modalPCKSubmitting) return;'],
+      ['modules/pkp/view_pkp.html', ':disabled="isLockingRekap"'],
+      ['modules/dashboard/dashboard.js', 'if (this.isSubmittingTmt) return;'],
+      ['modules/dashboard/view_dashboard.html', ':disabled="isSubmittingTmt"'],
+      ['modules/sk/sk.js', 'if (this.isUploading) return;'],
+      ['modules/sk/sk_builder.js', 'if (this.isSavingBuilder) return;'],
+      ['modules/sk/sk_builder.js', 'if (this.isSubmittingRevisi) return;'],
+      ['modules/sop/sop.js', 'if (this.isUploadingSop) return;'],
+      ['modules/kinerja/kinerja.js', 'if (this.isUploading) return;'],
+      ['modules/jobdes/jobdes.js', 'if (this.isLoadingForm) return;'],
+      ['modules/jobdes/jobdes.js', 'if (this.importDocx.isSaving) return;']
+    ];
+    for (const [filePath, needle] of parityChecks142) {
+      assert(fs.readFileSync(filePath, 'utf8').includes(needle), `Tahap 142 lock/UI check missing "${needle}" in ${filePath}`);
+    }
+    console.log('[PASS] Tahap 142 anti double-submit locks & loading indicators verified across runtime and static checks.');
   } finally {
     browserSandbox.TranskepAPI.call = origApiCall;
     browserSandbox.TranskepFirebase.getDb = origGetDb;

@@ -5,6 +5,7 @@
 // ==========================================
 
 let cooldownResetPass = false; // Flag anti-spam click
+let isSubmittingLupaPass = false;
 
 function openLupaPassword() {
   const modal = document.getElementById('modalLupaPassword');
@@ -35,6 +36,7 @@ function closeLupaPassword() {
 
 function submitLupaPassword(e) {
   if (e) e.preventDefault();
+  if (isSubmittingLupaPass) return;
   
   if (cooldownResetPass) {
     if (typeof showNotify === 'function') {
@@ -51,6 +53,7 @@ function submitLupaPassword(e) {
     return;
   }
 
+  isSubmittingLupaPass = true;
   const btn = document.getElementById('btnSubmitLupa');
   const originalBtnHtml = btn ? btn.innerHTML : 'Kirim';
   if (btn) {
@@ -59,6 +62,7 @@ function submitLupaPassword(e) {
   }
 
   const handleSuccess = function(res) {
+    isSubmittingLupaPass = false;
     if (btn) {
       btn.innerHTML = originalBtnHtml;
       btn.disabled = false;
@@ -79,6 +83,7 @@ function submitLupaPassword(e) {
   };
 
   const handleFailure = function(err) {
+    isSubmittingLupaPass = false;
     if (btn) {
       btn.innerHTML = originalBtnHtml;
       btn.disabled = false;

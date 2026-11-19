@@ -14,6 +14,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 // State Modal Rencana
                 isRencanaOpen: false,
                 isRencanaScaled: false,
+                isSubmittingRencana: false,
                 currentEditIdRencana: null,
                 formRencana: {
                     tanggal: '',
@@ -24,6 +25,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 // State Modal Laporan
                 isLaporanOpen: false,
                 isLaporanScaled: false,
+                isSubmittingLaporan: false,
                 currentEditIdLaporan: null,
                 formLaporan: {
                     items: [], // Array of {deskripsi, kuantitas, jam_mulai, jam_selesai, realisasi, status_capaian}
@@ -149,6 +151,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 this.formRencana.targets.splice(index, 1);
             },
             submitRencana() {
+                if (this.isSubmittingRencana) return;
                 if(!this.s.user) { if(window.showNotify) window.showNotify("Sesi Berakhir", "Harap login ulang.", "error"); return; }
                 
                 // Validasi Hari Jumat
@@ -170,6 +173,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     rencana_json: JSON.stringify(cleanTargets) 
                 };
 
+                this.isSubmittingRencana = true;
                 const token = localStorage.getItem('transkep_session_token'); 
                 if(window.showLoading) window.showLoading(this.currentEditIdRencana ? "Memperbarui Rencana..." : "Mengirim Rencana...");
                 
@@ -211,6 +215,9 @@ document.addEventListener("DOMContentLoaded", () => {
                     .catch((err) => { 
                         if(window.hideLoading) window.hideLoading(); 
                         if(window.showNotify) window.showNotify("Error", err.toString(), "error"); 
+                    })
+                    .finally(() => {
+                        this.isSubmittingRencana = false;
                     });
             },
 
@@ -281,6 +288,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 this.formLaporan.evidenLama.splice(index, 1);
             },
             async submitLaporan() {
+                if (this.isSubmittingLaporan) return;
                 if(!this.s.user) { if(window.showNotify) window.showNotify("Sesi Berakhir", "Harap login ulang.", "error"); return; }
                 
                 const fileInput = this.$refs.fileUploadWFH;
@@ -295,10 +303,12 @@ document.addEventListener("DOMContentLoaded", () => {
                         return; 
                     }
                     
+                    this.isSubmittingLaporan = true;
                     if(window.showLoading) window.showLoading("Membaca dokumen eviden...");
                     try {
                         newFilesData = await IzinDataService.readMultipleFilesAsBase64(fileInput.files);
                     } catch(err) {
+                        this.isSubmittingLaporan = false;
                         if(window.hideLoading) window.hideLoading(); 
                         if(window.showNotify) window.showNotify("Error", "Gagal membaca file.", "error"); 
                         return; 
@@ -307,6 +317,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     if(window.showNotify) window.showNotify("Validasi", "Bukti dukung wajib dilampirkan!", "error"); return;
                 }
                 
+                this.isSubmittingLaporan = true;
                 const payload = { 
                     id: this.currentEditIdLaporan, 
                     laporan_json: JSON.stringify(this.formLaporan.items), 
@@ -341,6 +352,9 @@ document.addEventListener("DOMContentLoaded", () => {
                     .catch((err) => { 
                         if(window.hideLoading) window.hideLoading(); 
                         if(window.showNotify) window.showNotify("Error", err.toString(), "error"); 
+                    })
+                    .finally(() => {
+                        this.isSubmittingLaporan = false;
                     });
             }
         }

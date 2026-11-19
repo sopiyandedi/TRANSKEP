@@ -148,6 +148,7 @@ document.addEventListener("DOMContentLoaded", () => {
            if (file) this.files[type] = file;
         },
         async submitKinerja() {
+           if (this.isUploading) return;
            // Validasi manual jika Pejabat Penilai belum dipilih
            if (!this.form.pejabat_nip) {
                if(window.showNotify) window.showNotify("Pilih Pejabat Penilai", "Silakan ketik dan pilih nama pejabat penilai dari daftar.", "warning");

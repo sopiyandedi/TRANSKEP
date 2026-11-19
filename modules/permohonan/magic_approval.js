@@ -76,6 +76,7 @@ document.addEventListener("DOMContentLoaded", () => {
       },
 
       async submitDecision(decision) {
+        if (this.isSubmitting) return;
         if (decision === 'Ditolak' && (!this.decisionNotes || this.decisionNotes.trim() === '')) {
           if (window.showNotify) {
             window.showNotify("Catatan Wajib", "Silakan masukkan alasan penolakan pada kolom catatan.", "warning");

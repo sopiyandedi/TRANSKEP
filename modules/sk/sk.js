@@ -464,6 +464,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 this.tempMembers = this.tempMembers.filter(m => m.nip !== nip);
             },
             async submitSk() {
+                if (this.isUploading) return;
                 if(this.tempMembers.length === 0) {
                     if(window.showNotify) window.showNotify("Gagal Disimpan", "Daftar susunan tim tidak boleh kosong.", "error"); 
                     return;

@@ -23,6 +23,8 @@
                   
                   showSingleModal: false,
                   showBulkModal: false,
+                  isSubmittingSingle: false,
+                  isSubmittingBulk: false,
                   singleTarget: null,
                   singleNotes: '',
                   bulkDecision: '',
@@ -242,12 +244,14 @@
               },
 
               submitSingle(decision) {
+                  if (this.isSubmittingSingle) return;
                   let notes = this.singleNotes.trim();
                   if (decision === 'Ditolak' && notes === '') {
                       if(window.showNotify) window.showNotify("Validasi Ditolak", "Alasan penolakan wajib diisi pada catatan!", "error"); return;
                   }
                   if (notes === '') notes = 'ACC';
 
+                  this.isSubmittingSingle = true;
                   // OPTIMISTIC APPROVAL TAHAP 4 (0ms Update & Auto-Rollback)
                   this.showSingleModal = false;
                   const token = localStorage.getItem('transkep_session_token');
@@ -269,7 +273,10 @@
                   else if (zType === 'IK') actionPromise = PersetujuanDataService.updateIkStatus(logId, decision, notes, this.s.user.nip, this.bypassMode, token);
                   else if (zType === 'IP') actionPromise = PersetujuanDataService.updateIpStatus(logId, decision, notes, this.s.user.nip, this.bypassMode, token);
                   else if (zType === 'WFH') actionPromise = PersetujuanDataService.updateWfhStatus(logId, stage, decision, notes, this.s.user.nip, this.bypassMode, token);
-                  else return;
+                  else {
+                      this.isSubmittingSingle = false;
+                      return;
+                  }
 
                   actionPromise
                     .then((res) => {
@@ -290,16 +297,21 @@
                         this.s.cutiLogs = backupLogs; this.s.ikLogs = backupIk; this.s.ipLogs = backupIp; this.s.wfhLogs = backupWfh;
                         if(typeof updateBadgePermohonan === 'function') setTimeout(updateBadgePermohonan, 50);
                         if(window.showNotify) window.showNotify("Gagal Jaringan", err.toString() + " (Status dikembalikan)", "error");
+                    })
+                    .finally(() => {
+                        this.isSubmittingSingle = false;
                     });
               },
               
               submitBulk() {
+                  if (this.isSubmittingBulk) return;
                   let notes = this.bulkNotes.trim();
                   if (this.bulkDecision === 'Ditolak' && notes === '') {
                       if(window.showNotify) window.showNotify("Validasi Ditolak", "Alasan penolakan wajib diisi pada catatan!", "error"); return;
                   }
                   if (this.selectedItems.length === 0) return;
 
+                  this.isSubmittingBulk = true;
                   // OPTIMISTIC BULK APPROVAL TAHAP 4 (0ms Update & Auto-Rollback)
                   this.showBulkModal = false;
                   const token = localStorage.getItem('transkep_session_token');
@@ -333,6 +345,9 @@
                           this.s.cutiLogs = backupLogs; this.s.ikLogs = backupIk; this.s.ipLogs = backupIp; this.s.wfhLogs = backupWfh;
                           if(typeof updateBadgePermohonan === 'function') setTimeout(updateBadgePermohonan, 50);
                           if(window.showNotify) window.showNotify("Gagal Jaringan", err.toString() + " (Data dikembalikan)", "error");
+                      })
+                      .finally(() => {
+                          this.isSubmittingBulk = false;
                       });
               },
 

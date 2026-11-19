@@ -921,6 +921,8 @@
               return {
                   s: state, // Mengambil reference state global dari javascript.html
                   isBypassMode: false,
+                  isSubmittingCuti: false,
+                  isSubmittingCancel: false,
                   currentEditId: null,
                   form: {
                       bypassNip: '',
@@ -1229,6 +1231,7 @@
                   }
               },
               submitCuti() {
+                  if (this.isSubmittingCuti) return;
                   if(!this.s.user) { if(window.showNotify) window.showNotify("Error Sesi", "Harap login ulang", "error"); return; }
                   
                   let isEditMode = (this.currentEditId !== null);
@@ -1285,6 +1288,7 @@
                       if(window.showNotify) window.showNotify("Saldo Habis/Kurang", sim.errorMsg, "error"); return;
                   }
 
+                  this.isSubmittingCuti = true;
                   if(window.showLoading) window.showLoading("Memverifikasi ketersediaan Pejabat...");
                   const token = localStorage.getItem('transkep_session_token');
                   const currentNip = this.s.user.nip;
@@ -1459,6 +1463,9 @@
                       .catch((err) => {
                           if(window.hideLoading) window.hideLoading();
                           if(window.showNotify) window.showNotify("Error Koneksi", "Gagal memproses pengajuan cuti: " + (err.message || err.toString()), "error");
+                      })
+                      .finally(() => {
+                          this.isSubmittingCuti = false;
                       });
               },
               
@@ -1483,6 +1490,7 @@
                   }
               },
               submitCancelCuti() {
+                  if (this.isSubmittingCancel) return;
                   const id = this.cancelForm.id;
                   const alasanBatal = this.cancelForm.alasan;
                   
@@ -1491,6 +1499,7 @@
                       return; 
                   }
 
+                  this.isSubmittingCancel = true;
                   const token = localStorage.getItem('transkep_session_token');
                   const currentNip = this.s && this.s.user ? this.s.user.nip : '';
                   if(window.showLoading) window.showLoading("Mengajukan pembatalan ke Pejabat...");
@@ -1525,6 +1534,9 @@
                     .catch((err) => { 
                         if(window.hideLoading) window.hideLoading(); 
                         if(window.showNotify) window.showNotify("Error", err.message || err.toString(), "error"); 
+                    })
+                    .finally(() => {
+                        this.isSubmittingCancel = false;
                     });
               }
           }

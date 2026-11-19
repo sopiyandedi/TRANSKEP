@@ -370,6 +370,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 this.sopPelaksanaTerpilih = this.sopPelaksanaTerpilih.filter(p => String(p.nip) !== String(nipToRemove));
             },
             async saveSopSubmit() {
+                if (this.isUploadingSop) return;
                 if (!this.formSop.judul_sop || !this.formSop.nomor_sop || !this.formSop.tanggal_pembuatan || !this.formSop.tanggal_efektif) {
                     if(window.showNotify) window.showNotify("Data Belum Lengkap", "Mohon lengkapi Judul, Nomor SOP, Tanggal Pembuatan, dan Tanggal Efektif.", "warning");
                     return;

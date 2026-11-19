@@ -1549,6 +1549,7 @@ window.SkBuilderMixin = {
     // 6. SIMPAN DOKUMEN BUILDER KE CLOUD FIRESTORE (1 ROW = 1 SK)
     // ----------------------------------------------------
     async saveSkFromBuilder() {
+      if (this.isSavingBuilder) return;
       if (!this.skBuilderDoc.no_sk || !this.skBuilderDoc.judul_sk) {
         if (window.showNotify) window.showNotify("Data Belum Lengkap", "Nomor SK dan Judul SK wajib diisi.", "warning");
         return;
@@ -1691,6 +1692,7 @@ window.SkBuilderMixin = {
     },
 
     async submitSkRevisi() {
+      if (this.isSubmittingRevisi) return;
       if (!this.targetRevisiDoc) return;
       this.isSubmittingRevisi = true;
       try {

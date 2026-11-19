@@ -1137,6 +1137,7 @@ try {
 } catch (e) {}
 
 function resetLoginFormUI() {
+  window._isLoggingIn = false;
   if (typeof LoginRateLimiter !== 'undefined' && LoginRateLimiter.isLocked()) {
     LoginRateLimiter.startCountdown();
     return;
@@ -1153,7 +1154,6 @@ function resetLoginFormUI() {
     passInput.disabled = false;
     passInput.value = '';
   }
-
   const nipInput = document.getElementById('loginNip');
   const rememberCheckbox = document.getElementById('rememberMe');
   const isRemembered = localStorage.getItem('transkep_remember_me') === 'true';
@@ -1181,6 +1181,8 @@ function handleLogin(event) {
     if (typeof event.stopPropagation === 'function') event.stopPropagation();
   }
 
+  if (window._isLoggingIn) return;
+
   if (typeof LoginRateLimiter !== 'undefined' && LoginRateLimiter.isLocked()) {
     const sec = LoginRateLimiter.getRemainingSeconds();
     showNotify("Akses Terkunci", `Silakan tunggu ${sec} detik lagi.`, "warning");
@@ -1207,12 +1209,14 @@ function handleLogin(event) {
   const btnSubmit = document.getElementById('btnLoginSubmit') || (document.getElementById('loginForm') && document.getElementById('loginForm').querySelector('button[type="submit"]'));
   const originalBtnHtml = btnSubmit ? btnSubmit.innerHTML : '';
 
+  window._isLoggingIn = true;
   if (btnSubmit) {
     btnSubmit.disabled = true;
     btnSubmit.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin mr-2"></i><span>Memverifikasi...</span>';
   }
 
   const resetBtn = () => {
+    window._isLoggingIn = false;
     if (btnSubmit) {
       btnSubmit.disabled = false;
       btnSubmit.innerHTML = originalBtnHtml;
@@ -1337,6 +1341,7 @@ function handleLogin(event) {
         toggleAppVisibility(true, true);
         const hasCache = !!(state.usersList && state.usersList.length > 0);
         syncAllServerData(hasCache ? true : false, true);
+        window._isLoggingIn = false;
         showNotify("Login Berhasil", `Selamat datang kembali, ${response.data.nama}`, "success");
       };
 
@@ -2355,7 +2360,14 @@ function showCustomConfirm(title, message, onConfirm) {
 
   const yesBtn = document.getElementById('btn-confirm-yes');
   if (yesBtn) {
+    let confirmedOnce = false;
     yesBtn.onclick = () => {
+      if (confirmedOnce) return;
+      confirmedOnce = true;
+      yesBtn.disabled = true;
+      yesBtn.classList.add('opacity-60', 'cursor-not-allowed');
+      yesBtn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin text-[11px]"></i> Memproses...';
+      if (cancelBtn) cancelBtn.disabled = true;
       cleanup();
       if (typeof onConfirm === 'function') onConfirm();
     };
@@ -2465,6 +2477,7 @@ document.addEventListener("DOMContentLoaded", () => {
           showModalSisaCuti: false,
           showModalPassword: false,
           isMandatory: false,
+          isSubmittingPass: false,
           formPass: { old: '', new: '', confirm: '' },
           showOldPass: false, showNewPass: false, showConfirmPass: false
         };
@@ -2500,6 +2513,7 @@ document.addEventListener("DOMContentLoaded", () => {
           }
         },
         submitPassword() {
+          if (this.isSubmittingPass) return;
           if (this.formPass.new !== this.formPass.confirm) {
             showNotify("Validasi Gagal", "Konfirmasi sandi baru tidak sama.", "error");
             return;
@@ -2513,6 +2527,7 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
           }
 
+          this.isSubmittingPass = true;
           showLoading("Mencocokkan kredensial di database...");
 
           const nip = (this.currentUser && this.currentUser.nip) || localStorage.getItem('transkep_active_nip');
@@ -2520,6 +2535,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
           google.script.run
             .withSuccessHandler((res) => {
+              this.isSubmittingPass = false;
               hideLoading();
               if (res && res.status === 'success') {
                 this.showModalPassword = false;
@@ -2532,6 +2548,7 @@ document.addEventListener("DOMContentLoaded", () => {
               }
             })
             .withFailureHandler((err) => {
+              this.isSubmittingPass = false;
               hideLoading();
               showNotify("Error Jaringan", "Tidak dapat terhubung ke server: " + (err.message || ''), "error");
             })
@@ -2563,6 +2580,7 @@ window.openChangePasswordModal = function (oldPass, isMandatory) {
   const finalOldPass = oldPass || storedTemp || '';
 
   if (window.vmGlobalModals) {
+    window.vmGlobalModals.isSubmittingPass = false;
     window.vmGlobalModals.currentUser = currentUser;
     window.vmGlobalModals.formPass = { old: finalOldPass, new: '', confirm: '' };
     window.vmGlobalModals.isMandatory = (isMandatory !== undefined) ? !!isMandatory : Boolean(storedTemp);

@@ -106,6 +106,7 @@ window.dashboardApp = Vue.createApp({
       ikLogs: (cachedDash && cachedDash.ikLogs) || (window.state && window.state.ikLogs) || [],
       wfhLogs: (cachedDash && cachedDash.wfhLogs) || (window.state && window.state.wfhLogs) || [],
       showModalStatus: false,
+      isSubmittingTmt: false,
       modalTmt: { nip: '', type: '', nama: '', dbStatus: '' }
     };
   },
@@ -582,10 +583,12 @@ window.dashboardApp = Vue.createApp({
       this.showModalStatus = false;
     },
     submitTmtStatus(newStatus) {
+      if (this.isSubmittingTmt) return;
       if (!this.isAdmin) {
         showNotify("Akses Ditolak", "Hanya Admin dan Operator yang berwenang mengubah status berkas.", "error");
         return;
       }
+      this.isSubmittingTmt = true;
       const targetNip = this.modalTmt.nip;
       const typeStr = this.modalTmt.type;
       const token = localStorage.getItem('transkep_session_token') || localStorage.getItem('transkep_token') || '';
@@ -686,6 +689,9 @@ window.dashboardApp = Vue.createApp({
         })
         .catch((err) => {
           console.warn("⚠️ [Dashboard] Backend update notice (perubahan tetap aktif di browser):", err);
+        })
+        .finally(() => {
+          this.isSubmittingTmt = false;
         });
     }
   }
