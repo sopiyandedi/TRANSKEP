@@ -690,15 +690,20 @@ const kodeHtml = getOrCreateEl('kodeResultContainer').innerHTML;
 assert(!kodeHtml.includes('<script>') && !kodeHtml.includes('<img src=x'), 'handleKodeSearch must escape kode & desk');
 assert(kodeHtml.includes('onclick="copyKodeToClipboard(this.dataset.kode)"'), 'handleKodeSearch must use dataset.kode instead of string interpolation in onclick');
 
-// Verify modules/eoffice/rapat.js renderPesertaRapatCheckboxes escaping
+// Verify modules/eoffice/rapat.js Tahap 143 searchable dropdowns escaping & dataset.nip
 browserSandbox.vueState = {
   usersList: [{ nip: "123');alert(1);//", nama: '<img src=x onerror=alert(1)>', jabatan: 'Staf<script>1</script>', role: 'Pegawai' }],
   sopList: []
 };
-browserSandbox.renderPesertaRapatCheckboxes('');
-const rapatHtml = getOrCreateEl('rapatListPesertaContainer').innerHTML;
-assert(!rapatHtml.includes('<img src=x') && !rapatHtml.includes('<script>1'), 'renderPesertaRapatCheckboxes must escape nama & jabatan');
-assert(rapatHtml.includes('data-nip="') && rapatHtml.includes('onchange="togglePesertaRapatCheck(this.dataset.nip)"'), 'rapat checkbox must use data-nip & this.dataset.nip');
+browserSandbox.filterTujuanSearchDrop('');
+const rapatTujuanHtml = getOrCreateEl('rapatTujuanSearchDropdown').innerHTML;
+assert(!rapatTujuanHtml.includes('<img src=x') && !rapatTujuanHtml.includes('<script>1'), 'filterTujuanSearchDrop must escape nama & jabatan');
+assert(rapatTujuanHtml.includes('data-nip="') && rapatTujuanHtml.includes('selectTujuanPegawai(this.dataset.nip)'), 'rapat tujuan dropdown must use data-nip & this.dataset.nip');
+
+browserSandbox.openPembahasanSpeakerDrop(0);
+const rapatSpeakerHtml = getOrCreateEl('rapatSpeakerDrop_0').innerHTML;
+assert(!rapatSpeakerHtml.includes('<img src=x') && !rapatSpeakerHtml.includes('<script>1'), 'openPembahasanSpeakerDrop must escape nama & jabatan');
+assert(rapatSpeakerHtml.includes('data-nip="') && rapatSpeakerHtml.includes('selectPembahasanSpeaker(0, this.dataset.nip)'), 'rapat speaker dropdown must use data-nip & this.dataset.nip');
 
 // Verify modules/pdf_viewer/pdf_viewer.js XSS & javascript: URL protection
 browserSandbox.vmSkApp = {

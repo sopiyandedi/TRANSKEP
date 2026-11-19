@@ -6894,6 +6894,21 @@ Menyeragamkan proteksi **anti double-submit / anti klik ganda (3 lapis)** dan **
    - **Level 3 Early-Return Guard:** [`modules/sk/sk.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/sk/sk.js), [`modules/sk/sk_builder.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/sk/sk_builder.js), [`modules/sop/sop.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/sop/sop.js), [`modules/kinerja/kinerja.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/kinerja/kinerja.js), [`modules/jobdes/jobdes.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/jobdes/jobdes.js).
    - **PWA & Regresi:** Sync versi PWA **`v3.8.76`** pada [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) & [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js), serta uji runtime + paritas di [`tests/verify_fase3b.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/tests/verify_fase3b.js).
 
+---
+
+## REVISI TAHAP 143: SEARCHABLE UNDANGAN/PEMBICARA, MULTI-BARIS NOTULA PKP-STYLE + AUTO-TAB WORD & INPUT TANGGAL (`v3.8.77`)
+**Status:** `[SELESAI & AKTIF — v3.8.77]`
+
+### 1. Tujuan
+Menyederhanakan alur pemilihan peserta undangan dan pembicara notula dengan kolom *searchable autocomplete* gaya Surat Tugas, serta mendukung banyak baris pembahasan untuk pembicara yang sama (**Opsi 1A + 2A**) dengan ikon `+` bulat kecil bergaya PKP, hapus per baris, **Auto-Tab ala tabel Microsoft Word**, dan input tanggal `<input type="date">` pada kolom `c. Tgl. Target` & `e. Tgl. Penyelesaian`.
+
+### 2. Rincian Implementasi
+1. **Tab 2 Searchable Tunggal ([`modules/eoffice/view_eoffice.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/view_eoffice.html) & [`modules/eoffice/rapat.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/rapat.js)):** Menghapus kotak pencarian & grid ceklis pegawai di bawah; menaikkan fungsi `#rapatCustomTujuanInput` menjadi searchable autocomplete (`Enter` langsung memilih kandidat teratas atau menambahkan teks kustom ke urutan undangan), dengan pill `+ Semua Pegawai` di baris preset.
+2. **Tab 3 Searchable Pembicara & Header Ringkas:** Menghapus badge `Pembicara #1` & dropdown `<select> -- Pilih Cepat Pegawai --`; mengganti ke nomor urut ringkas + kolom searchable `Nama (Jabatan)` (`Enter` memilih pegawai teratas). Header deskriptif C & E diubah menjadi **`C. Tgl. Target`** & **`E. Tgl. Penyelesaian`** (`148px`) agar kolom Uraian & Tindak Lanjut jauh lebih lega.
+3. **Multi-Baris `items[]`, PKP-Style `+`, Hapus per Baris & Word Auto-Tab:** Tiap kartu pembicara menyimpan array `items[]` (kompatibel penuh dengan data lama & AI Notulis), dilengkapi ikon `+` bulat kecil di sudut bawah kiri, tombol `🗑` di ujung tiap baris, serta sentinel focus di ujung kolom e untuk otomatis menambah baris baru ke pembicara yang sama saat menekan `Tab` (`Shift+Tab` aman kembali ke input tanggal).
+4. **Cetak Notula Opsi 2A ([`modules/eoffice/cetak/js_cetak_notula.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/cetak/js_cetak_notula.js)):** Mengagregasi seluruh sub-baris milik pembicara yang sama menjadi daftar bernomor `1., 2., 3.` di masing-masing sub-bagian `a..e` di bawah 1 nama pembicara serta memformat nilai `<input type="date">` ISO ke format tanggal Indonesia.
+5. **PWA & Pengujian:** Bump PWA **`v3.8.77`** ([`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) & [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js)) dan penambahan uji runtime + struktur di [`tests/verify_fase3b.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/tests/verify_fase3b.js).
+
 
 
 

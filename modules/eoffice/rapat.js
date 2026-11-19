@@ -16,6 +16,19 @@
   var currentRapatTab = 'undangan';
   var isSubmittingRapat = false;
   var isProcessingAiNotulen = false;
+  var tujuanSearchActiveIdx = 0;
+  var tujuanSearchMatches = [];
+  var speakerDropActiveMap = {};
+  var speakerDropMatchesMap = {};
+  var rapatLastKeyShiftTab = false;
+
+  if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+    document.addEventListener('keydown', function (ev) {
+      if (ev && ev.key === 'Tab') {
+        rapatLastKeyShiftTab = Boolean(ev.shiftKey);
+      }
+    }, true);
+  }
   var rapatAudioState = {
     dataUri: '',
     mimeType: '',
@@ -291,7 +304,7 @@
     if (!container) return;
 
     if (tujuanUndanganList.length === 0) {
-      container.innerHTML = '<div class="text-center py-4 text-slate-500 text-[11px]">Belum ada penerima undangan. Tambahkan dari kotak input kustom atau pilih pegawai di bawah.</div>';
+      container.innerHTML = '<div class="text-center py-4 text-slate-500 text-[11px]">Belum ada penerima undangan. Ketik nama pegawai atau tujuan di kotak pencarian atas lalu tekan Enter.</div>';
       updateModeLembarUndanganBadge_();
       return;
     }
@@ -316,59 +329,156 @@
     updateModeLembarUndanganBadge_();
   }
 
-  window.renderPesertaRapatCheckboxes = function (searchKw) {
-    var container = document.getElementById('rapatListPesertaContainer');
-    if (!container) return;
-
+  function getFilteredTujuanPegawai_(kw) {
     var listPegawai = getSortedPegawaiRapat_();
-    if (searchKw) {
-      var q = searchKw.toLowerCase();
-      listPegawai = listPegawai.filter(function (u) {
-        return (u.nama && u.nama.toLowerCase().indexOf(q) !== -1) || (u.jabatan && u.jabatan.toLowerCase().indexOf(q) !== -1);
-      });
-    }
-
-    var selectedNips = tujuanUndanganList.map(function (t) { return String(t.nip || ''); });
-    var html = '';
-    listPegawai.forEach(function (u) {
-      var nipStr = String(u.nip || '');
-      var safeNip = escRapat_(nipStr);
-      var isChecked = selectedNips.indexOf(nipStr) !== -1;
-      html +=
-        '<label class="flex items-start gap-2.5 p-2 rounded-xl border cursor-pointer transition ' +
-        (isChecked ? 'bg-cyan-500/10 border-cyan-500/30 text-white' : 'bg-slate-900 border-slate-800 text-slate-300 hover:bg-slate-800/60') +
-        '">' +
-          '<input type="checkbox" data-nip="' + safeNip + '" onchange="togglePesertaRapatCheck(this.dataset.nip)" ' + (isChecked ? 'checked' : '') + ' class="mt-0.5 rounded border-slate-700 text-cyan-500 focus:ring-0 bg-slate-950">' +
-          '<div class="min-w-0 flex-1 leading-tight">' +
-            '<div class="font-bold text-[11px] truncate">' + escRapat_(u.nama || '-') + '</div>' +
-            '<div class="text-[9px] text-slate-500 truncate">' + escRapat_(u.jabatan || '-') + '</div>' +
-          '</div>' +
-        '</label>';
+    var selectedNips = {};
+    tujuanUndanganList.forEach(function (t) {
+      if (t && t.nip) selectedNips[String(t.nip)] = true;
     });
+    var q = String(kw || '').toLowerCase().trim();
+    return listPegawai.filter(function (u) {
+      var nipStr = String(u.nip || '');
+      if (nipStr && selectedNips[nipStr]) return false;
+      if (!q) return true;
+      return (u.nama && u.nama.toLowerCase().indexOf(q) !== -1) ||
+        (u.jabatan && u.jabatan.toLowerCase().indexOf(q) !== -1) ||
+        (nipStr && nipStr.toLowerCase().indexOf(q) !== -1);
+    });
+  }
 
-    container.innerHTML = html || '<div class="col-span-3 text-center py-4 text-slate-500 text-xs">Tidak ada pegawai yang cocok.</div>';
-  };
-  var renderPesertaRapatCheckboxes = window.renderPesertaRapatCheckboxes;
-
-  window.togglePesertaRapatCheck = function (nip) {
-    var idx = tujuanUndanganList.findIndex(function (t) { return String(t.nip || '') === String(nip); });
-    if (idx === -1) {
-      var u = getUsersListRapat_().find(function (x) { return String(x.nip) === String(nip); });
-      if (u) {
-        tujuanUndanganList.push({
-          label: u.nama + (u.jabatan ? ' (' + u.jabatan + ')' : ''),
-          nip: String(u.nip || ''),
-          nama: String(u.nama || ''),
-          jabatan: String(u.jabatan || '')
-        });
-      }
-    } else {
-      tujuanUndanganList.splice(idx, 1);
+  function renderTujuanSearchDropdown_(kw) {
+    var drop = document.getElementById('rapatTujuanSearchDropdown');
+    var clearBtn = document.getElementById('btnClearRapatTujuanInput');
+    var cleanKw = String(kw || '').trim();
+    if (clearBtn) {
+      if (cleanKw) clearBtn.classList.remove('hidden');
+      else clearBtn.classList.add('hidden');
     }
-    renderTujuanUndanganOrdered_();
-    var kw = (document.getElementById('rapatSearchPesertaInput') || {}).value || '';
-    renderPesertaRapatCheckboxes(kw);
+    if (!drop) return;
+
+    tujuanSearchMatches = getFilteredTujuanPegawai_(cleanKw);
+    if (tujuanSearchActiveIdx >= tujuanSearchMatches.length) tujuanSearchActiveIdx = 0;
+    if (tujuanSearchActiveIdx < 0) tujuanSearchActiveIdx = 0;
+
+    if (tujuanSearchMatches.length === 0) {
+      drop.innerHTML = cleanKw
+        ? '<div class="px-3 py-2.5 text-[11px] text-slate-400 italic text-center">Pegawai tidak ditemukan. Tekan <b class="text-cyan-300">Enter</b> atau klik <b class="text-cyan-300">+ Tambah</b> untuk memasukkan "<span class="text-white font-semibold">' + escRapat_(cleanKw) + '</span>" sebagai tujuan kustom.</div>'
+        : '<div class="px-3 py-2.5 text-[11px] text-slate-500 italic text-center">Semua pegawai sudah ada di daftar urutan atau data pegawai kosong.</div>';
+      drop.classList.remove('hidden');
+      return;
+    }
+
+    var h = '';
+    tujuanSearchMatches.slice(0, 40).forEach(function (u, index) {
+      var isActive = (index === tujuanSearchActiveIdx);
+      h +=
+        '<div data-nip="' + escRapat_(String(u.nip || '')) + '" onmousedown="event.preventDefault(); selectTujuanPegawai(this.dataset.nip)" ' +
+          'class="px-3 py-2 text-[11px] cursor-pointer transition border-b border-slate-700/50 ' +
+          (isActive ? 'bg-cyan-600 text-white' : 'text-slate-300 hover:bg-cyan-600 hover:text-white') + '">' +
+          '<div class="font-bold">' + escRapat_(u.nama || '-') + '</div>' +
+          '<div class="text-[9px] opacity-75">' + escRapat_(u.jabatan || '-') + (u.nip ? ' | ' + escRapat_(u.nip) : '') + '</div>' +
+        '</div>';
+    });
+    drop.innerHTML = h;
+    drop.classList.remove('hidden');
+  }
+
+  window.openTujuanSearchDrop = function () {
+    tujuanSearchActiveIdx = 0;
+    var input = document.getElementById('rapatCustomTujuanInput');
+    renderTujuanSearchDropdown_(input ? input.value : '');
   };
+
+  window.filterTujuanSearchDrop = function (val) {
+    tujuanSearchActiveIdx = 0;
+    renderTujuanSearchDropdown_(val);
+  };
+
+  window.closeTujuanSearchDrop = function () {
+    setTimeout(function () {
+      var drop = document.getElementById('rapatTujuanSearchDropdown');
+      if (drop) drop.classList.add('hidden');
+    }, 160);
+  };
+
+  window.clearTujuanSearchInput = function () {
+    var input = document.getElementById('rapatCustomTujuanInput');
+    if (input) {
+      input.value = '';
+      if (typeof input.focus === 'function') input.focus();
+    }
+    tujuanSearchActiveIdx = 0;
+    renderTujuanSearchDropdown_('');
+  };
+
+  window.selectTujuanPegawai = function (nip) {
+    var u = getUsersListRapat_().find(function (x) { return String(x.nip) === String(nip); });
+    if (!u) return;
+    var already = tujuanUndanganList.some(function (t) { return String(t.nip || '') === String(u.nip || ''); });
+    if (!already) {
+      tujuanUndanganList.push({
+        label: u.nama + (u.jabatan ? ' (' + u.jabatan + ')' : ''),
+        nip: String(u.nip || ''),
+        nama: String(u.nama || ''),
+        jabatan: String(u.jabatan || '')
+      });
+      renderTujuanUndanganOrdered_();
+    }
+    var input = document.getElementById('rapatCustomTujuanInput');
+    if (input) input.value = '';
+    var drop = document.getElementById('rapatTujuanSearchDropdown');
+    if (drop) drop.classList.add('hidden');
+    var clearBtn = document.getElementById('btnClearRapatTujuanInput');
+    if (clearBtn) clearBtn.classList.add('hidden');
+    tujuanSearchActiveIdx = 0;
+    tujuanSearchMatches = [];
+  };
+
+  window.handleTujuanSearchKeydown = function (ev) {
+    if (!ev) return;
+    if (ev.key === 'ArrowDown') {
+      ev.preventDefault();
+      if (tujuanSearchMatches.length > 0) {
+        tujuanSearchActiveIdx = (tujuanSearchActiveIdx + 1) % tujuanSearchMatches.length;
+        var inpDown = document.getElementById('rapatCustomTujuanInput');
+        renderTujuanSearchDropdown_(inpDown ? inpDown.value : '');
+      }
+      return;
+    }
+    if (ev.key === 'ArrowUp') {
+      ev.preventDefault();
+      if (tujuanSearchMatches.length > 0) {
+        tujuanSearchActiveIdx = (tujuanSearchActiveIdx - 1 + tujuanSearchMatches.length) % tujuanSearchMatches.length;
+        var inpUp = document.getElementById('rapatCustomTujuanInput');
+        renderTujuanSearchDropdown_(inpUp ? inpUp.value : '');
+      }
+      return;
+    }
+    if (ev.key === 'Escape') {
+      var dropEsc = document.getElementById('rapatTujuanSearchDropdown');
+      if (dropEsc) dropEsc.classList.add('hidden');
+      return;
+    }
+    if (ev.key === 'Enter') {
+      ev.preventDefault();
+      var inp = document.getElementById('rapatCustomTujuanInput');
+      var val = inp ? String(inp.value || '').trim() : '';
+      if (!val) return;
+      if (!tujuanSearchMatches || tujuanSearchMatches.length === 0) {
+        tujuanSearchMatches = getFilteredTujuanPegawai_(val);
+      }
+      if (tujuanSearchMatches.length > 0) {
+        var picked = tujuanSearchMatches[tujuanSearchActiveIdx] || tujuanSearchMatches[0];
+        window.selectTujuanPegawai(picked.nip);
+      } else {
+        window.addCustomTujuanUndangan();
+      }
+    }
+  };
+
+  window.renderPesertaRapatCheckboxes = function () {};
+  var renderPesertaRapatCheckboxes = window.renderPesertaRapatCheckboxes;
+  window.filterPesertaListModal = function () {};
 
   window.pilihSemuaPesertaRapat = function (pilihSemua) {
     if (pilihSemua) {
@@ -385,12 +495,6 @@
       tujuanUndanganList = [];
     }
     renderTujuanUndanganOrdered_();
-    var kw = (document.getElementById('rapatSearchPesertaInput') || {}).value || '';
-    renderPesertaRapatCheckboxes(kw);
-  };
-
-  window.filterPesertaListModal = function (val) {
-    renderPesertaRapatCheckboxes(val);
   };
 
   window.addCustomTujuanUndangan = function () {
@@ -400,6 +504,11 @@
     if (!val) return;
     tujuanUndanganList.push({ label: val, nip: '', nama: val, jabatan: 'Tujuan Kustom' });
     input.value = '';
+    var drop = document.getElementById('rapatTujuanSearchDropdown');
+    if (drop) drop.classList.add('hidden');
+    var clearBtn = document.getElementById('btnClearRapatTujuanInput');
+    if (clearBtn) clearBtn.classList.add('hidden');
+    tujuanSearchMatches = [];
     renderTujuanUndanganOrdered_();
   };
 
@@ -428,15 +537,11 @@
   window.removeTujuanUndangan = function (idx) {
     tujuanUndanganList.splice(idx, 1);
     renderTujuanUndanganOrdered_();
-    var kw = (document.getElementById('rapatSearchPesertaInput') || {}).value || '';
-    renderPesertaRapatCheckboxes(kw);
   };
 
   window.clearAllTujuanUndangan = function () {
     tujuanUndanganList = [];
     renderTujuanUndanganOrdered_();
-    var kw = (document.getElementById('rapatSearchPesertaInput') || {}).value || '';
-    renderPesertaRapatCheckboxes(kw);
   };
 
   window.setJumlahBarisHadir = function (n) {
@@ -456,8 +561,148 @@
   };
 
   // ==========================================
-  // NOTULA: INPUT 5 KOLOM KIRI -> KANAN PER PEMBICARA
+  // NOTULA: SEARCHABLE PEMBICARA & MULTI-BARIS 5 KOLOM + INPUT TANGGAL + AUTO-TAB
   // ==========================================
+  var BULAN_PARSE_MAP_RAPAT = {
+    januari: '01', jan: '01',
+    februari: '02', feb: '02',
+    maret: '03', mar: '03',
+    april: '04', apr: '04',
+    mei: '05',
+    juni: '06', jun: '06',
+    juli: '07', jul: '07',
+    agustus: '08', agu: '08', ags: '08', agt: '08',
+    september: '09', sep: '09', sept: '09',
+    oktober: '10', okt: '10',
+    november: '11', nov: '11', nop: '11',
+    desember: '12', des: '12'
+  };
+
+  function toIsoDateInput_(val) {
+    var s = String(val == null ? '' : val).trim();
+    if (!s) return '';
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+    var m = s.match(/^(\d{1,2})\s+([A-Za-z.]+)\s+(\d{4})$/);
+    if (m) {
+      var dd = String(parseInt(m[1], 10)).padStart(2, '0');
+      var monKey = m[2].replace(/\./g, '').toLowerCase();
+      var mm = BULAN_PARSE_MAP_RAPAT[monKey];
+      if (mm) return m[3] + '-' + mm + '-' + dd;
+    }
+    return '';
+  }
+
+  function createEmptyPembahasanSubItem_(base) {
+    var b = (base && typeof base === 'object') ? base : {};
+    return {
+      uraian: String(b.uraian || ''),
+      tindak_lanjut: String(b.tindak_lanjut || ''),
+      target: String(b.target || ''),
+      penanggung_jawab: String(b.penanggung_jawab || ''),
+      tanggal_penyelesaian: String(b.tanggal_penyelesaian || '')
+    };
+  }
+
+  function syncPembahasanFlatFields_(row) {
+    if (!row) return;
+    var items = Array.isArray(row.items) && row.items.length > 0 ? row.items : [createEmptyPembahasanSubItem_(row)];
+    row.items = items;
+
+    var collectJoined = function (key, isDate) {
+      var lines = [];
+      items.forEach(function (sub) {
+        var v = String((sub && sub[key]) || '').trim();
+        if (!v) return;
+        if (isDate) {
+          lines.push(v);
+        } else if (items.length === 1) {
+          lines.push(v);
+        } else {
+          v.split(/\r?\n/).forEach(function (ln) {
+            var cleanLn = String(ln || '').trim().replace(/^[0-9]+[.)]\s*/, '').trim();
+            if (cleanLn) lines.push(cleanLn);
+          });
+        }
+      });
+      if (items.length === 1) return lines[0] || '';
+      if (lines.length === 0) return '';
+      if (lines.length === 1) return lines[0];
+      return lines.map(function (ln, i) { return (i + 1) + '. ' + ln; }).join('\n');
+    };
+
+    row.uraian = collectJoined('uraian', false);
+    row.tindak_lanjut = collectJoined('tindak_lanjut', false);
+    row.target = collectJoined('target', true);
+    row.penanggung_jawab = collectJoined('penanggung_jawab', false);
+    row.tanggal_penyelesaian = collectJoined('tanggal_penyelesaian', true);
+  }
+
+  function normalizePembahasanRow_(raw) {
+    var base = (raw && typeof raw === 'object') ? raw : {};
+    var subItems = [];
+    if (Array.isArray(base.items) && base.items.length > 0) {
+      subItems = base.items.map(function (it) { return createEmptyPembahasanSubItem_(it); });
+    } else {
+      subItems = [createEmptyPembahasanSubItem_(base)];
+    }
+    var out = {
+      pembicara_nama: String(base.pembicara_nama || ''),
+      pembicara_nip: String(base.pembicara_nip || ''),
+      pembicara_jabatan: String(base.pembicara_jabatan || ''),
+      items: subItems
+    };
+    syncPembahasanFlatFields_(out);
+    return out;
+  }
+
+  function getFilteredSpeakerPegawai_(kw) {
+    var sortedUsers = getSortedPegawaiRapat_();
+    var q = String(kw || '').toLowerCase().trim();
+    if (!q) return sortedUsers;
+    return sortedUsers.filter(function (u) {
+      return (u.nama && u.nama.toLowerCase().indexOf(q) !== -1) ||
+        (u.jabatan && u.jabatan.toLowerCase().indexOf(q) !== -1) ||
+        (u.nip && String(u.nip).toLowerCase().indexOf(q) !== -1);
+    });
+  }
+
+  function renderPembahasanSpeakerDropdown_(idx, kw) {
+    var drop = document.getElementById('rapatSpeakerDrop_' + idx);
+    var clearBtn = document.getElementById('btnClearSpeaker_' + idx);
+    if (clearBtn) {
+      if (String(kw || '').trim()) clearBtn.classList.remove('hidden');
+      else clearBtn.classList.add('hidden');
+    }
+    if (!drop) return;
+
+    var matches = getFilteredSpeakerPegawai_(kw);
+    speakerDropMatchesMap[idx] = matches;
+    if (typeof speakerDropActiveMap[idx] !== 'number' || speakerDropActiveMap[idx] >= matches.length || speakerDropActiveMap[idx] < 0) {
+      speakerDropActiveMap[idx] = 0;
+    }
+
+    if (matches.length === 0) {
+      drop.innerHTML = '<div class="px-3 py-2 text-[11px] text-slate-400 italic text-center">Tidak ditemukan di daftar pegawai. Teks tetap tersimpan sebagai nama pembicara kustom.</div>';
+      drop.classList.remove('hidden');
+      return;
+    }
+
+    var activeIdx = speakerDropActiveMap[idx];
+    var h = '';
+    matches.slice(0, 35).forEach(function (u, mIdx) {
+      var isAct = (mIdx === activeIdx);
+      h +=
+        '<div data-nip="' + escRapat_(String(u.nip || '')) + '" onmousedown="event.preventDefault(); selectPembahasanSpeaker(' + idx + ', this.dataset.nip)" ' +
+          'class="px-3 py-2 text-[11px] cursor-pointer transition border-b border-slate-700/50 ' +
+          (isAct ? 'bg-emerald-600 text-white' : 'text-slate-300 hover:bg-emerald-600 hover:text-white') + '">' +
+          '<div class="font-bold">' + escRapat_(u.nama || '-') + '</div>' +
+          '<div class="text-[9px] opacity-75">' + escRapat_(u.jabatan || '-') + '</div>' +
+        '</div>';
+    });
+    drop.innerHTML = h;
+    drop.classList.remove('hidden');
+  }
+
   function renderPembahasanRows_() {
     var container = document.getElementById('rapatPembahasanListContainer');
     var countBadge = document.getElementById('rapatCountPembicara');
@@ -472,54 +717,95 @@
       return;
     }
 
-    var sortedUsers = getSortedPegawaiRapat_();
-    var userOptions = '<option value="">-- Pilih Cepat Pegawai --</option>';
-    sortedUsers.forEach(function (u) {
-      userOptions += '<option value="' + escRapat_(u.nip) + '">' + escRapat_(u.nama) + ' (' + escRapat_(u.jabatan || '-') + ')</option>';
-    });
-
     var html = '';
     pembahasanRowsList.forEach(function (row, idx) {
-      html +=
-        '<div class="p-3 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-2.5 shadow-sm">' +
-          '<div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800/80 pb-2">' +
-            '<div class="flex flex-wrap items-center gap-2 flex-1 min-w-0">' +
-              '<span class="px-2 py-0.5 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 font-bold text-[10px] shrink-0">Pembicara #' + (idx + 1) + '</span>' +
-              '<select onchange="pickPembahasanSpeaker(' + idx + ', this.value)" class="px-2.5 py-1 bg-slate-950 border border-slate-800 rounded-lg text-cyan-300 text-[11px] outline-none max-w-[220px]">' +
-                userOptions +
-              '</select>' +
-              '<input type="text" value="' + escRapat_(row.pembicara_nama || '') + '" oninput="updatePembahasanField(' + idx + ', \'pembicara_nama\', this.value)" ' +
-                'placeholder="Nama &amp; Jabatan Pembicara (cth: Agus Salim, S.Ag. (Sekretaris))" ' +
-                'class="flex-1 min-w-[200px] px-2.5 py-1 bg-slate-950 border border-slate-700 rounded-lg text-white font-bold text-xs focus:ring-1 focus:ring-emerald-500 outline-none">' +
-            '</div>' +
-            '<div class="flex items-center gap-1 shrink-0">' +
-              '<button type="button" onclick="movePembahasanRow(' + idx + ', -1)" ' + (idx === 0 ? 'disabled' : '') + ' class="w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-30 text-slate-300 flex items-center justify-center"><i class="fa-solid fa-arrow-up text-[10px]"></i></button>' +
-              '<button type="button" onclick="movePembahasanRow(' + idx + ', 1)" ' + (idx === pembahasanRowsList.length - 1 ? 'disabled' : '') + ' class="w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-30 text-slate-300 flex items-center justify-center"><i class="fa-solid fa-arrow-down text-[10px]"></i></button>' +
-              '<button type="button" onclick="removePembahasanRow(' + idx + ')" class="w-7 h-7 rounded-lg bg-rose-500/10 hover:bg-rose-500 text-rose-400 hover:text-white border border-rose-500/20 flex items-center justify-center"><i class="fa-solid fa-trash text-[10px]"></i></button>' +
-            '</div>' +
-          '</div>' +
+      if (!row || !Array.isArray(row.items) || row.items.length === 0) {
+        row = normalizePembahasanRow_(row);
+        pembahasanRowsList[idx] = row;
+      }
+      var items = row.items;
+      var speakerVal = String(row.pembicara_nama || '');
 
-          '<div class="grid grid-cols-1 xl:grid-cols-[2.2fr_1.8fr_1.2fr_1.1fr_1fr] gap-2.5">' +
+      var subRowsHtml = '';
+      items.forEach(function (sub, subIdx) {
+        var isoTarget = toIsoDateInput_(sub.target);
+        var isoTanggal = toIsoDateInput_(sub.tanggal_penyelesaian);
+        var legacyTargetHint = (sub.target && !isoTarget)
+          ? '<div class="text-[9px] text-amber-400/80 mt-1 truncate" title="' + escRapat_(sub.target) + '">Teks lama: ' + escRapat_(sub.target) + '</div>'
+          : '';
+        var legacyTglHint = (sub.tanggal_penyelesaian && !isoTanggal)
+          ? '<div class="text-[9px] text-amber-400/80 mt-1 truncate" title="' + escRapat_(sub.tanggal_penyelesaian) + '">Teks lama: ' + escRapat_(sub.tanggal_penyelesaian) + '</div>'
+          : '';
+
+        subRowsHtml +=
+          '<div class="grid grid-cols-1 xl:grid-cols-[2.4fr_2fr_148px_1.2fr_148px_36px] gap-2.5 items-start' + (subIdx > 0 ? ' pt-2 border-t border-slate-800/60' : '') + '">' +
             '<div>' +
               '<label class="xl:hidden block text-[9px] font-bold text-slate-400 uppercase mb-1">a. Uraian Pembahasan / Laporan</label>' +
-              '<textarea rows="4" oninput="updatePembahasanField(' + idx + ', \'uraian\', this.value)" placeholder="1 baris = 1 poin pembahasan..." class="w-full px-2.5 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 text-[11px] focus:ring-1 focus:ring-emerald-500 outline-none custom-scrollbar leading-relaxed">' + escRapat_(row.uraian || '') + '</textarea>' +
+              '<textarea id="rapatPembahasanUraian_' + idx + '_' + subIdx + '" rows="3" oninput="updatePembahasanSubField(' + idx + ', ' + subIdx + ', \'uraian\', this.value)" placeholder="Uraian pembahasan / laporan..." class="w-full px-2.5 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 text-[11px] focus:ring-1 focus:ring-emerald-500 outline-none custom-scrollbar leading-relaxed">' + escRapat_(sub.uraian || '') + '</textarea>' +
             '</div>' +
             '<div>' +
               '<label class="xl:hidden block text-[9px] font-bold text-slate-400 uppercase mb-1">b. Tindak Lanjut / Tanggapan / Masukan</label>' +
-              '<textarea rows="4" oninput="updatePembahasanField(' + idx + ', \'tindak_lanjut\', this.value)" placeholder="1 baris = 1 poin tindak lanjut..." class="w-full px-2.5 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 text-[11px] focus:ring-1 focus:ring-emerald-500 outline-none custom-scrollbar leading-relaxed">' + escRapat_(row.tindak_lanjut || '') + '</textarea>' +
+              '<textarea id="rapatPembahasanTindak_' + idx + '_' + subIdx + '" rows="3" oninput="updatePembahasanSubField(' + idx + ', ' + subIdx + ', \'tindak_lanjut\', this.value)" placeholder="Tindak lanjut / tanggapan..." class="w-full px-2.5 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 text-[11px] focus:ring-1 focus:ring-emerald-500 outline-none custom-scrollbar leading-relaxed">' + escRapat_(sub.tindak_lanjut || '') + '</textarea>' +
             '</div>' +
             '<div>' +
-              '<label class="xl:hidden block text-[9px] font-bold text-slate-400 uppercase mb-1">c. Target Penyelesaian</label>' +
-              '<textarea rows="4" oninput="updatePembahasanField(' + idx + ', \'target\', this.value)" placeholder="Target output..." class="w-full px-2.5 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 text-[11px] focus:ring-1 focus:ring-emerald-500 outline-none custom-scrollbar leading-relaxed">' + escRapat_(row.target || '') + '</textarea>' +
+              '<label class="xl:hidden block text-[9px] font-bold text-slate-400 uppercase mb-1">c. Tgl. Target</label>' +
+              '<input type="date" id="rapatPembahasanTarget_' + idx + '_' + subIdx + '" value="' + escRapat_(isoTarget) + '" onchange="updatePembahasanSubField(' + idx + ', ' + subIdx + ', \'target\', this.value)" class="w-full px-2.5 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 text-[11px] focus:ring-1 focus:ring-emerald-500 outline-none">' +
+              legacyTargetHint +
             '</div>' +
             '<div>' +
               '<label class="xl:hidden block text-[9px] font-bold text-slate-400 uppercase mb-1">d. Penanggung Jawab</label>' +
-              '<textarea rows="4" oninput="updatePembahasanField(' + idx + ', \'penanggung_jawab\', this.value)" placeholder="Pihak / jabatan PJ..." class="w-full px-2.5 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 text-[11px] focus:ring-1 focus:ring-emerald-500 outline-none custom-scrollbar leading-relaxed">' + escRapat_(row.penanggung_jawab || '') + '</textarea>' +
+              '<textarea id="rapatPembahasanPj_' + idx + '_' + subIdx + '" rows="3" oninput="updatePembahasanSubField(' + idx + ', ' + subIdx + ', \'penanggung_jawab\', this.value)" placeholder="Pihak / jabatan PJ..." class="w-full px-2.5 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 text-[11px] focus:ring-1 focus:ring-emerald-500 outline-none custom-scrollbar leading-relaxed">' + escRapat_(sub.penanggung_jawab || '') + '</textarea>' +
             '</div>' +
             '<div>' +
-              '<label class="xl:hidden block text-[9px] font-bold text-slate-400 uppercase mb-1">e. Tanggal Penyelesaian</label>' +
-              '<textarea rows="4" oninput="updatePembahasanField(' + idx + ', \'tanggal_penyelesaian\', this.value)" placeholder="cth: 4 s.d. 6 Nov 2026" class="w-full px-2.5 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 text-[11px] focus:ring-1 focus:ring-emerald-500 outline-none custom-scrollbar leading-relaxed">' + escRapat_(row.tanggal_penyelesaian || '') + '</textarea>' +
+              '<label class="xl:hidden block text-[9px] font-bold text-slate-400 uppercase mb-1">e. Tgl. Penyelesaian</label>' +
+              '<input type="date" id="rapatPembahasanTanggal_' + idx + '_' + subIdx + '" value="' + escRapat_(isoTanggal) + '" onchange="updatePembahasanSubField(' + idx + ', ' + subIdx + ', \'tanggal_penyelesaian\', this.value)" class="w-full px-2.5 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 text-[11px] focus:ring-1 focus:ring-emerald-500 outline-none">' +
+              legacyTglHint +
             '</div>' +
+            '<div class="flex items-center justify-center pt-1">' +
+              '<button type="button" tabindex="-1" onclick="removePembahasanSubRow(' + idx + ', ' + subIdx + ')" title="' + (items.length > 1 ? 'Hapus baris ini' : 'Kosongkan baris ini') + '" class="w-8 h-8 flex items-center justify-center bg-slate-950 border border-slate-800 hover:bg-rose-500/20 text-slate-500 hover:border-rose-500/50 hover:text-rose-400 rounded-lg transition-all mx-auto"><i class="fa-solid fa-trash text-[10px]"></i></button>' +
+            '</div>' +
+          '</div>';
+      });
+
+      html +=
+        '<div class="p-3 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-2.5 shadow-sm">' +
+          '<div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800/80 pb-2">' +
+            '<div class="flex items-center gap-2 flex-1 min-w-0">' +
+              '<span class="w-7 h-7 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 font-bold text-xs flex items-center justify-center shrink-0">' + (idx + 1) + '</span>' +
+              '<div class="relative flex-1 min-w-[220px]">' +
+                '<div class="absolute inset-y-0 left-0 flex items-center pl-2.5 pointer-events-none">' +
+                  '<i class="fa-solid fa-magnifying-glass text-slate-500 text-[11px]"></i>' +
+                '</div>' +
+                '<input type="text" id="rapatSpeakerSearch_' + idx + '" value="' + escRapat_(speakerVal) + '" autocomplete="off" ' +
+                  'onfocus="openPembahasanSpeakerDrop(' + idx + ')" ' +
+                  'oninput="filterPembahasanSpeakerDrop(' + idx + ', this.value)" ' +
+                  'onblur="closePembahasanSpeakerDrop(' + idx + ')" ' +
+                  'onkeydown="handlePembahasanSpeakerKeydown(event, ' + idx + ')" ' +
+                  'placeholder="Ketik nama / jabatan pembicara lalu tekan Enter..." ' +
+                  'class="w-full pl-8 pr-8 py-1.5 bg-slate-950 border border-slate-700 rounded-lg text-white font-bold text-xs focus:ring-1 focus:ring-emerald-500 outline-none">' +
+                '<button type="button" tabindex="-1" id="btnClearSpeaker_' + idx + '" onmousedown="event.preventDefault(); clearPembahasanSpeaker(' + idx + ')" ' +
+                  'class="' + (speakerVal ? '' : 'hidden ') + 'absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-rose-400 w-5 h-5 flex items-center justify-center">' +
+                  '<i class="fa-solid fa-xmark text-[11px]"></i>' +
+                '</button>' +
+                '<div id="rapatSpeakerDrop_' + idx + '" class="hidden absolute z-50 left-0 right-0 mt-1 bg-slate-800 border border-slate-600 rounded-xl overflow-hidden max-h-48 overflow-y-auto shadow-[0_20px_50px_rgba(0,0,0,0.8)]"></div>' +
+              '</div>' +
+            '</div>' +
+            '<div class="flex items-center gap-1 shrink-0">' +
+              '<button type="button" tabindex="-1" onclick="movePembahasanRow(' + idx + ', -1)" ' + (idx === 0 ? 'disabled' : '') + ' title="Geser naik" class="w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-30 text-slate-300 flex items-center justify-center"><i class="fa-solid fa-arrow-up text-[10px]"></i></button>' +
+              '<button type="button" tabindex="-1" onclick="movePembahasanRow(' + idx + ', 1)" ' + (idx === pembahasanRowsList.length - 1 ? 'disabled' : '') + ' title="Geser turun" class="w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-30 text-slate-300 flex items-center justify-center"><i class="fa-solid fa-arrow-down text-[10px]"></i></button>' +
+              '<button type="button" tabindex="-1" onclick="removePembahasanRow(' + idx + ')" title="Hapus seluruh blok pembicara ini" class="w-7 h-7 rounded-lg bg-rose-500/10 hover:bg-rose-500 text-rose-400 hover:text-white border border-rose-500/20 flex items-center justify-center"><i class="fa-solid fa-trash text-[10px]"></i></button>' +
+            '</div>' +
+          '</div>' +
+
+          '<div class="space-y-2">' + subRowsHtml + '</div>' +
+          '<span tabindex="0" data-rapat-tab-sentinel="' + idx + '" onfocus="handlePembahasanTabSentinel(event, ' + idx + ')" class="sr-only">Tambah baris baru</span>' +
+
+          '<div class="flex items-center gap-2 pt-1">' +
+            '<button type="button" tabindex="-1" onclick="addPembahasanSubRow(' + idx + ', true)" title="Tambah baris baru untuk pembicara ini" ' +
+              'class="w-7 h-7 flex items-center justify-center bg-indigo-600 hover:bg-indigo-500 text-white rounded-full shadow-lg shadow-indigo-500/40 transition-all hover:scale-110 group">' +
+              '<i class="fa-solid fa-plus text-xs group-hover:rotate-90 transition-transform duration-300"></i>' +
+            '</button>' +
+            '<span class="text-[10px] text-slate-500">Tambah baris untuk pembicara yang sama (atau tekan <kbd class="px-1 py-0.5 bg-slate-800 border border-slate-700 rounded text-[9px] text-slate-300">Tab</kbd> di kolom e)</span>' +
           '</div>' +
         '</div>';
     });
@@ -527,18 +813,160 @@
     container.innerHTML = html;
   }
 
+  window.openPembahasanSpeakerDrop = function (idx) {
+    speakerDropActiveMap[idx] = 0;
+    var inp = document.getElementById('rapatSpeakerSearch_' + idx);
+    renderPembahasanSpeakerDropdown_(idx, inp ? inp.value : '');
+  };
+
+  window.filterPembahasanSpeakerDrop = function (idx, val) {
+    speakerDropActiveMap[idx] = 0;
+    if (pembahasanRowsList[idx]) {
+      pembahasanRowsList[idx].pembicara_nama = val;
+      pembahasanRowsList[idx].pembicara_nip = '';
+      pembahasanRowsList[idx].pembicara_jabatan = '';
+    }
+    renderPembahasanSpeakerDropdown_(idx, val);
+  };
+
+  window.closePembahasanSpeakerDrop = function (idx) {
+    setTimeout(function () {
+      var drop = document.getElementById('rapatSpeakerDrop_' + idx);
+      if (drop) drop.classList.add('hidden');
+    }, 160);
+  };
+
+  window.clearPembahasanSpeaker = function (idx) {
+    if (pembahasanRowsList[idx]) {
+      pembahasanRowsList[idx].pembicara_nama = '';
+      pembahasanRowsList[idx].pembicara_nip = '';
+      pembahasanRowsList[idx].pembicara_jabatan = '';
+    }
+    var inp = document.getElementById('rapatSpeakerSearch_' + idx);
+    if (inp) {
+      inp.value = '';
+      if (typeof inp.focus === 'function') inp.focus();
+    }
+    speakerDropActiveMap[idx] = 0;
+    renderPembahasanSpeakerDropdown_(idx, '');
+  };
+
+  window.selectPembahasanSpeaker = function (idx, nip) {
+    if (!pembahasanRowsList[idx] || !nip) return;
+    var u = getUsersListRapat_().find(function (x) { return String(x.nip) === String(nip); });
+    if (!u) return;
+    var displayNama = u.nama + (u.jabatan ? ' (' + u.jabatan + ')' : '');
+    pembahasanRowsList[idx].pembicara_nip = String(u.nip || '');
+    pembahasanRowsList[idx].pembicara_jabatan = String(u.jabatan || '');
+    pembahasanRowsList[idx].pembicara_nama = displayNama;
+
+    var inp = document.getElementById('rapatSpeakerSearch_' + idx);
+    if (inp) inp.value = displayNama;
+    var clearBtn = document.getElementById('btnClearSpeaker_' + idx);
+    if (clearBtn) clearBtn.classList.remove('hidden');
+    var drop = document.getElementById('rapatSpeakerDrop_' + idx);
+    if (drop) drop.classList.add('hidden');
+
+    var firstUraian = document.getElementById('rapatPembahasanUraian_' + idx + '_0');
+    if (firstUraian && typeof firstUraian.focus === 'function') firstUraian.focus();
+  };
+  window.pickPembahasanSpeaker = window.selectPembahasanSpeaker;
+
+  window.handlePembahasanSpeakerKeydown = function (ev, idx) {
+    if (!ev) return;
+    var matches = speakerDropMatchesMap[idx] || [];
+    if (ev.key === 'ArrowDown') {
+      ev.preventDefault();
+      if (matches.length > 0) {
+        speakerDropActiveMap[idx] = ((speakerDropActiveMap[idx] || 0) + 1) % matches.length;
+        var inpD = document.getElementById('rapatSpeakerSearch_' + idx);
+        renderPembahasanSpeakerDropdown_(idx, inpD ? inpD.value : '');
+      }
+      return;
+    }
+    if (ev.key === 'ArrowUp') {
+      ev.preventDefault();
+      if (matches.length > 0) {
+        speakerDropActiveMap[idx] = ((speakerDropActiveMap[idx] || 0) - 1 + matches.length) % matches.length;
+        var inpU = document.getElementById('rapatSpeakerSearch_' + idx);
+        renderPembahasanSpeakerDropdown_(idx, inpU ? inpU.value : '');
+      }
+      return;
+    }
+    if (ev.key === 'Escape') {
+      var drop = document.getElementById('rapatSpeakerDrop_' + idx);
+      if (drop) drop.classList.add('hidden');
+      return;
+    }
+    if (ev.key === 'Enter') {
+      ev.preventDefault();
+      var inp = document.getElementById('rapatSpeakerSearch_' + idx);
+      var kw = inp ? String(inp.value || '').trim() : '';
+      if (!matches || matches.length === 0) matches = getFilteredSpeakerPegawai_(kw);
+      if (matches.length > 0 && kw) {
+        var topMatch = matches[speakerDropActiveMap[idx] || 0] || matches[0];
+        window.selectPembahasanSpeaker(idx, topMatch.nip);
+      } else {
+        var dropEnt = document.getElementById('rapatSpeakerDrop_' + idx);
+        if (dropEnt) dropEnt.classList.add('hidden');
+      }
+    }
+  };
+
+  window.addPembahasanSubRow = function (idx, shouldFocus) {
+    if (!pembahasanRowsList[idx]) return;
+    if (!Array.isArray(pembahasanRowsList[idx].items)) {
+      pembahasanRowsList[idx] = normalizePembahasanRow_(pembahasanRowsList[idx]);
+    }
+    pembahasanRowsList[idx].items.push(createEmptyPembahasanSubItem_());
+    var newSubIdx = pembahasanRowsList[idx].items.length - 1;
+    syncPembahasanFlatFields_(pembahasanRowsList[idx]);
+    renderPembahasanRows_();
+    if (shouldFocus) {
+      var targetEl = document.getElementById('rapatPembahasanUraian_' + idx + '_' + newSubIdx);
+      if (targetEl && typeof targetEl.focus === 'function') targetEl.focus();
+    }
+  };
+
+  window.removePembahasanSubRow = function (idx, subIdx) {
+    if (!pembahasanRowsList[idx]) return;
+    if (!Array.isArray(pembahasanRowsList[idx].items)) {
+      pembahasanRowsList[idx] = normalizePembahasanRow_(pembahasanRowsList[idx]);
+    }
+    if (pembahasanRowsList[idx].items.length > 1) {
+      pembahasanRowsList[idx].items.splice(subIdx, 1);
+    } else {
+      pembahasanRowsList[idx].items[0] = createEmptyPembahasanSubItem_();
+    }
+    syncPembahasanFlatFields_(pembahasanRowsList[idx]);
+    renderPembahasanRows_();
+  };
+
+  window.updatePembahasanSubField = function (idx, subIdx, field, val) {
+    if (!pembahasanRowsList[idx]) return;
+    if (!Array.isArray(pembahasanRowsList[idx].items)) {
+      pembahasanRowsList[idx] = normalizePembahasanRow_(pembahasanRowsList[idx]);
+    }
+    if (pembahasanRowsList[idx].items[subIdx]) {
+      pembahasanRowsList[idx].items[subIdx][field] = val;
+      syncPembahasanFlatFields_(pembahasanRowsList[idx]);
+    }
+  };
+
+  window.handlePembahasanTabSentinel = function (ev, idx) {
+    if (rapatLastKeyShiftTab) {
+      rapatLastKeyShiftTab = false;
+      var row = pembahasanRowsList[idx];
+      var lastSubIdx = (row && Array.isArray(row.items) && row.items.length > 0) ? (row.items.length - 1) : 0;
+      var lastDateEl = document.getElementById('rapatPembahasanTanggal_' + idx + '_' + lastSubIdx);
+      if (lastDateEl && typeof lastDateEl.focus === 'function') lastDateEl.focus();
+      return;
+    }
+    window.addPembahasanSubRow(idx, true);
+  };
+
   window.addPembahasanRow = function (initialObj) {
-    var base = initialObj || {};
-    pembahasanRowsList.push({
-      pembicara_nama: String(base.pembicara_nama || ''),
-      pembicara_nip: String(base.pembicara_nip || ''),
-      pembicara_jabatan: String(base.pembicara_jabatan || ''),
-      uraian: String(base.uraian || ''),
-      tindak_lanjut: String(base.tindak_lanjut || ''),
-      target: String(base.target || ''),
-      penanggung_jawab: String(base.penanggung_jawab || ''),
-      tanggal_penyelesaian: String(base.tanggal_penyelesaian || '')
-    });
+    pembahasanRowsList.push(normalizePembahasanRow_(initialObj));
     renderPembahasanRows_();
   };
 
@@ -556,20 +984,13 @@
     renderPembahasanRows_();
   };
 
-  window.pickPembahasanSpeaker = function (idx, nip) {
-    if (!pembahasanRowsList[idx] || !nip) return;
-    var u = getUsersListRapat_().find(function (x) { return String(x.nip) === String(nip); });
-    if (!u) return;
-    pembahasanRowsList[idx].pembicara_nip = String(u.nip || '');
-    pembahasanRowsList[idx].pembicara_jabatan = String(u.jabatan || '');
-    pembahasanRowsList[idx].pembicara_nama = u.nama + (u.jabatan ? ' (' + u.jabatan + ')' : '');
-    renderPembahasanRows_();
-  };
-
   window.updatePembahasanField = function (idx, field, val) {
-    if (pembahasanRowsList[idx]) {
+    if (!pembahasanRowsList[idx]) return;
+    if (field === 'pembicara_nama' || field === 'pembicara_nip' || field === 'pembicara_jabatan') {
       pembahasanRowsList[idx][field] = val;
+      return;
     }
+    window.updatePembahasanSubField(idx, 0, field, val);
   };
 
   // ==========================================
@@ -1106,7 +1527,7 @@
         var rawJab = String(row.pembicara_jabatan || '').trim();
         var matched = matchPegawaiForAiSpeaker_(rawSpeaker, rawNip, rawJab);
 
-        return {
+        return normalizePembahasanRow_({
           pembicara_nama: (matched && rawSpeaker.indexOf('(') === -1) ? matched.namaDisplay : rawSpeaker,
           pembicara_nip: matched ? matched.nip : rawNip,
           pembicara_jabatan: matched ? matched.jabatan : rawJab,
@@ -1114,8 +1535,9 @@
           tindak_lanjut: joinAiLines_(row.tindak_lanjut_text || row.tindak_lanjut),
           target: String(row.target || '').trim(),
           penanggung_jawab: String(row.penanggung_jawab || '').trim(),
-          tanggal_penyelesaian: String(row.tanggal_penyelesaian || '').trim()
-        };
+          tanggal_penyelesaian: String(row.tanggal_penyelesaian || '').trim(),
+          items: Array.isArray(row.items) ? row.items : null
+        });
       });
       renderPembahasanRows_();
     }
@@ -1454,11 +1876,17 @@
 
     document.getElementById('rapatFieldJenisKegiatan').value = rapatData.jenis_kegiatan || 'Rapat';
     setJumlahBarisHadir(rapatData.jumlah_baris_hadir || 15);
-    if (document.getElementById('rapatSearchPesertaInput')) {
-      document.getElementById('rapatSearchPesertaInput').value = '';
-    }
+    var elCustomTujuan = document.getElementById('rapatCustomTujuanInput');
+    if (elCustomTujuan) elCustomTujuan.value = '';
+    var elClearTujuan = document.getElementById('btnClearRapatTujuanInput');
+    if (elClearTujuan) elClearTujuan.classList.add('hidden');
+    var elDropTujuan = document.getElementById('rapatTujuanSearchDropdown');
+    if (elDropTujuan) elDropTujuan.classList.add('hidden');
+    tujuanSearchActiveIdx = 0;
+    tujuanSearchMatches = [];
+    speakerDropActiveMap = {};
+    speakerDropMatchesMap = {};
     renderTujuanUndanganOrdered_();
-    renderPesertaRapatCheckboxes('');
 
     // Tab 3: Notula & Pembahasan 5 Kolom
     document.getElementById('rapatFieldPengarahanUmum').value = rapatData.pengarahan_umum || '';
@@ -1468,10 +1896,12 @@
     if (rapatData.pembahasan_json) {
       try {
         var parsedRows = JSON.parse(rapatData.pembahasan_json);
-        if (Array.isArray(parsedRows)) pembahasanRowsList = parsedRows;
+        if (Array.isArray(parsedRows)) {
+          pembahasanRowsList = parsedRows.map(function (r) { return normalizePembahasanRow_(r); });
+        }
       } catch (e) {}
     } else if (rapatData.pembahasan && String(rapatData.pembahasan).trim()) {
-      pembahasanRowsList.push({
+      pembahasanRowsList.push(normalizePembahasanRow_({
         pembicara_nama: rapatData.pemimpin || 'Pembahasan Umum',
         pembicara_nip: '',
         pembicara_jabatan: '',
@@ -1480,7 +1910,7 @@
         target: '',
         penanggung_jawab: '',
         tanggal_penyelesaian: ''
-      });
+      }));
     }
     if (pembahasanRowsList.length === 0) {
       addPembahasanRow();
@@ -1577,11 +2007,24 @@
       return;
     }
 
-    var cleanPembahasanRows = pembahasanRowsList.filter(function (r) {
+    var cleanPembahasanRows = pembahasanRowsList.map(function (r) {
+      var norm = normalizePembahasanRow_(r);
+      var nonEmptyItems = (norm.items || []).filter(function (sub) {
+        return String(sub.uraian || '').trim() ||
+          String(sub.tindak_lanjut || '').trim() ||
+          String(sub.target || '').trim() ||
+          String(sub.penanggung_jawab || '').trim() ||
+          String(sub.tanggal_penyelesaian || '').trim();
+      });
+      norm.items = nonEmptyItems.length > 0 ? nonEmptyItems : [];
+      syncPembahasanFlatFields_(norm);
+      return norm;
+    }).filter(function (r) {
       return String(r.pembicara_nama || '').trim() ||
         String(r.uraian || '').trim() ||
         String(r.tindak_lanjut || '').trim() ||
-        String(r.target || '').trim();
+        String(r.target || '').trim() ||
+        (Array.isArray(r.items) && r.items.length > 0);
     });
 
     var flatPembahasanSummary = cleanPembahasanRows.map(function (r, i) {

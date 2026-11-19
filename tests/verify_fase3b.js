@@ -2074,6 +2074,125 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
       assert(fs.readFileSync(filePath, 'utf8').includes(needle), `Tahap 142 lock/UI check missing "${needle}" in ${filePath}`);
     }
     console.log('[PASS] Tahap 142 anti double-submit locks & loading indicators verified across runtime and static checks.');
+
+    // Tahap 143: Searchable Undangan/Pembicara, Multi-Baris Notula PKP-Style + Auto-Tab & Input Tanggal
+    const eofficeHtml143 = fs.readFileSync('modules/eoffice/view_eoffice.html', 'utf8');
+    assert(!eofficeHtml143.includes('id="rapatListPesertaContainer"') && !eofficeHtml143.includes('id="rapatSearchPesertaInput"'),
+      'Tahap 143 must remove legacy #rapatListPesertaContainer and #rapatSearchPesertaInput from Tab 2');
+    assert(eofficeHtml143.includes('id="rapatTujuanSearchDropdown"') && eofficeHtml143.includes('handleTujuanSearchKeydown(event)'),
+      'Tahap 143 must wire Tab 2 searchable dropdown and Enter key handler');
+    assert(eofficeHtml143.includes('c. Tgl. Target') && eofficeHtml143.includes('e. Tgl. Penyelesaian'),
+      'Tahap 143 must rename Tab 3 C and E column headers');
+
+    let capturedKeydown143 = null;
+    const focusedIds143 = [];
+    const dom143 = {};
+    const ensureDom143 = (id) => {
+      if (!dom143[id]) {
+        dom143[id] = {
+          id,
+          value: '',
+          innerText: '',
+          innerHTML: '',
+          className: '',
+          classList: mkCls(),
+          focus: () => { focusedIds143.push(id); }
+        };
+      }
+      return dom143[id];
+    };
+    const rapatUxVm143 = {
+      console, Date, Math, Array, Object, String, Number, Boolean, JSON, Set, Map, RegExp, parseInt, parseFloat, isNaN, setTimeout, clearTimeout,
+      localStorage: { getItem: () => '', setItem: () => {} },
+      document: {
+        getElementById: (id) => ensureDom143(id),
+        addEventListener: (evName, fn) => { if (evName === 'keydown') capturedKeydown143 = fn; }
+      },
+      vueState: {
+        usersList: [
+          { nip: '197501012000011001', nama: 'Agus Salim, S.Ag.', jabatan: 'Sekretaris', role: 'Pegawai' },
+          { nip: '197601012001011002', nama: 'Ikin, S.Ag., M.E.', jabatan: 'Wakil Ketua', role: 'Pegawai' }
+        ]
+      },
+      showNotify: () => {},
+      window: {}
+    };
+    rapatUxVm143.window = rapatUxVm143;
+    vm.createContext(rapatUxVm143);
+    vm.runInContext(fs.readFileSync('modules/eoffice/rapat.js', 'utf8'), rapatUxVm143, { filename: 'modules/eoffice/rapat.js' });
+
+    // Tab 2: Searchable autocomplete + Enter top pick + duplicate NIP guard + custom text fallback
+    ensureDom143('rapatCustomTujuanInput').value = 'Agus';
+    rapatUxVm143.filterTujuanSearchDrop('Agus');
+    assert(!ensureDom143('rapatTujuanSearchDropdown').classList.contains('hidden') &&
+      ensureDom143('rapatTujuanSearchDropdown').innerHTML.includes('Agus Salim, S.Ag.'),
+      'Tab 2 searchable must show matching employee dropdown');
+    rapatUxVm143.handleTujuanSearchKeydown({ key: 'Enter', preventDefault() {} });
+    assert.strictEqual(ensureDom143('rapatCustomTujuanInput').value, '', 'Enter on Tab 2 searchable must clear input');
+    assert.strictEqual(ensureDom143('rapatCountPeserta').innerText, '1');
+    assert(ensureDom143('rapatTujuanOrderedContainer').innerHTML.includes('Agus Salim, S.Ag. (Sekretaris)'));
+    rapatUxVm143.selectTujuanPegawai('197501012000011001');
+    assert.strictEqual(ensureDom143('rapatCountPeserta').innerText, '1', 'Tab 2 searchable must prevent duplicate employee NIP');
+    ensureDom143('rapatCustomTujuanInput').value = 'Tim Penilai PIPK';
+    rapatUxVm143.handleTujuanSearchKeydown({ key: 'Enter', preventDefault() {} });
+    assert.strictEqual(ensureDom143('rapatCountPeserta').innerText, '2');
+    assert(ensureDom143('rapatTujuanOrderedContainer').innerHTML.includes('Tim Penilai PIPK'));
+
+    // Tab 3: Searchable speaker (no Pembicara #1 / no native select), PKP sub-rows, type=date, & Word Auto-Tab
+    rapatUxVm143.addPembahasanRow();
+    const listHtml143 = ensureDom143('rapatPembahasanListContainer').innerHTML;
+    assert(!listHtml143.includes('Pembicara #1') && !listHtml143.includes('-- Pilih Cepat Pegawai --'),
+      'Tab 3 must remove Pembicara #N pill and native select dropdown');
+    assert(listHtml143.includes('type="date"') && listHtml143.includes('handlePembahasanTabSentinel(event, 0)'),
+      'Tab 3 must render date inputs and Tab sentinel');
+    ensureDom143('rapatSpeakerSearch_0').value = 'Agus';
+    rapatUxVm143.filterPembahasanSpeakerDrop(0, 'Agus');
+    rapatUxVm143.handlePembahasanSpeakerKeydown({ key: 'Enter', preventDefault() {} }, 0);
+    assert.strictEqual(ensureDom143('rapatSpeakerSearch_0').value, 'Agus Salim, S.Ag. (Sekretaris)',
+      'Enter on Tab 3 speaker search must pick top match');
+
+    rapatUxVm143.addPembahasanSubRow(0, true);
+    assert(ensureDom143('rapatPembahasanListContainer').innerHTML.includes('rapatPembahasanUraian_0_1'),
+      'PKP + button must add 2nd sub-row for the same speaker');
+    assert.strictEqual(focusedIds143[focusedIds143.length - 1], 'rapatPembahasanUraian_0_1',
+      'Adding sub-row must focus col A of new row');
+    rapatUxVm143.removePembahasanSubRow(0, 1);
+    assert(!ensureDom143('rapatPembahasanListContainer').innerHTML.includes('rapatPembahasanUraian_0_1'),
+      'Per-row trash icon must remove sub-row');
+
+    assert.strictEqual(typeof capturedKeydown143, 'function');
+    capturedKeydown143({ key: 'Tab', shiftKey: false });
+    rapatUxVm143.handlePembahasanTabSentinel({}, 0);
+    assert(ensureDom143('rapatPembahasanListContainer').innerHTML.includes('rapatPembahasanUraian_0_1'),
+      'Forward Tab at end of col E must auto-add sub-row for same speaker');
+    assert.strictEqual(focusedIds143[focusedIds143.length - 1], 'rapatPembahasanUraian_0_1');
+
+    capturedKeydown143({ key: 'Tab', shiftKey: true });
+    rapatUxVm143.handlePembahasanTabSentinel({}, 0);
+    assert(!ensureDom143('rapatPembahasanListContainer').innerHTML.includes('rapatPembahasanUraian_0_2'),
+      'Shift+Tab must not add a new sub-row');
+    assert.strictEqual(focusedIds143[focusedIds143.length - 1], 'rapatPembahasanTanggal_0_1');
+
+    // Cetak Notula Opsi 2A: aggregate sub-items under 1 speaker + format Indonesian dates
+    const renderedNotula143 = notulaVm139.NotulaPrintHelper.buildNotulaHtml({
+      hari_tanggal: 'Rabu, 28 Oktober 2026',
+      agenda: 'Rapat Uji Multi Baris',
+      pembahasan_json: JSON.stringify([{
+        pembicara_nama: 'Agus Salim, S.Ag. (Sekretaris)',
+        items: [
+          { uraian: 'Laporan SPM Triwulan I', tindak_lanjut: 'Inventarisir berkas', target: '2026-11-20', penanggung_jawab: 'Sekretaris', tanggal_penyelesaian: '2026-11-22' },
+          { uraian: 'Evaluasi pemeliharaan', tindak_lanjut: 'Cek fisik lokasi', target: '2026-11-25', penanggung_jawab: 'Kasubbag Umum', tanggal_penyelesaian: '2026-11-28' }
+        ]
+      }])
+    }, cetakNotHtml, []);
+    assert.strictEqual((renderedNotula143.match(/Agus Salim, S\.Ag\. \(Sekretaris\)/g) || []).length, 1,
+      'Notula print must keep 1 speaker heading when merging multiple sub-rows');
+    assert(renderedNotula143.includes('Laporan SPM Triwulan I') && renderedNotula143.includes('Evaluasi pemeliharaan'));
+    assert(renderedNotula143.includes('20 November 2026') && renderedNotula143.includes('25 November 2026') &&
+      renderedNotula143.includes('22 November 2026') && renderedNotula143.includes('28 November 2026'),
+      'Notula print must format ISO dates into Indonesian dates');
+
+    console.log('[PASS] Tahap 143 searchable undangan/pembicara, multi-baris notula PKP-style + auto-Tab & input tanggal verified.');
   } finally {
     browserSandbox.TranskepAPI.call = origApiCall;
     browserSandbox.TranskepFirebase.getDb = origGetDb;

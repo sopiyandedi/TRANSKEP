@@ -116,6 +116,53 @@
     return html;
   }
 
+  var BULAN_INDO_NOTULA = [
+    'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+    'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+  ];
+
+  function formatNotulaDateIfIso_(raw) {
+    var s = String(raw == null ? '' : raw).trim();
+    if (!s) return '';
+    var m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!m) return s;
+    var yr = m[1];
+    var monIdx = parseInt(m[2], 10) - 1;
+    var dayNum = parseInt(m[3], 10);
+    if (monIdx >= 0 && monIdx < 12 && dayNum >= 1 && dayNum <= 31) {
+      return dayNum + ' ' + BULAN_INDO_NOTULA[monIdx] + ' ' + yr;
+    }
+    return s;
+  }
+
+  function collectSubSpecLines_(row, key, isDateField) {
+    var r = row || {};
+    var subItems = (Array.isArray(r.items) && r.items.length > 0) ? r.items : [r];
+    if (subItems.length === 1) {
+      var singleRaw = String(subItems[0][key] || '').trim();
+      return isDateField ? formatNotulaDateIfIso_(singleRaw) : singleRaw;
+    }
+
+    var mergedLines = [];
+    subItems.forEach(function (sub) {
+      if (!sub || typeof sub !== 'object') return;
+      var val = String(sub[key] || '').trim();
+      if (!val) return;
+      if (isDateField) {
+        mergedLines.push(formatNotulaDateIfIso_(val));
+        return;
+      }
+      val.split(/\r?\n/).forEach(function (ln) {
+        var cleanLn = String(ln || '').trim().replace(/^[0-9]+[.)]\s*/, '').trim();
+        if (cleanLn) mergedLines.push(cleanLn);
+      });
+    });
+
+    if (mergedLines.length === 0) return '';
+    if (mergedLines.length === 1) return mergedLines[0];
+    return mergedLines.map(function (ln, i) { return (i + 1) + '. ' + ln; }).join('\n');
+  }
+
   function buildPembahasanBertingkatHtml_(rapatObj) {
     var r = rapatObj || {};
     var rows = [];
@@ -142,11 +189,11 @@
     }
 
     var subSpecs = [
-      { key: 'uraian', letter: 'a.', title: 'Uraian Pembahasan/Laporan' },
-      { key: 'tindak_lanjut', letter: 'b.', title: 'Tindak Lanjut/Tanggapan/Masukan' },
-      { key: 'target', letter: 'c.', title: 'Target Penyelesaian' },
-      { key: 'penanggung_jawab', letter: 'd.', title: 'Penanggung Jawab' },
-      { key: 'tanggal_penyelesaian', letter: 'e.', title: 'Tanggal Penyelesaian' }
+      { key: 'uraian', letter: 'a.', title: 'Uraian Pembahasan/Laporan', isDate: false },
+      { key: 'tindak_lanjut', letter: 'b.', title: 'Tindak Lanjut/Tanggapan/Masukan', isDate: false },
+      { key: 'target', letter: 'c.', title: 'Target Penyelesaian', isDate: true },
+      { key: 'penanggung_jawab', letter: 'd.', title: 'Penanggung Jawab', isDate: false },
+      { key: 'tanggal_penyelesaian', letter: 'e.', title: 'Tanggal Penyelesaian', isDate: true }
     ];
 
     var html = '';
@@ -163,7 +210,7 @@
           '<div class="notula-sub-point">';
 
       subSpecs.forEach(function (spec) {
-        var rawVal = String(row[spec.key] || '').trim();
+        var rawVal = collectSubSpecLines_(row, spec.key, spec.isDate);
         if (!rawVal) return;
         html +=
           '<table class="notula-list-table" style="margin-top: 3px;">' +
