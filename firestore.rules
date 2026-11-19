@@ -175,23 +175,21 @@ rules_version = '2';
 //   - id: string (required, 1..120, == docId, immutable)
 //   - id_rapat: string (required, 1..120, == docId, immutable)
 //   - status: string (required, 1..50)
-//   - nomor_undangan (0..200), tgl_surat (0..100), no_urut_surat (0..50),
-//     kode_klasifikasi_surat (0..100), kode_pejabat_ttd (0..60),
-//     pejabat_ttd_nip (0..40), pejabat_ttd_nama (0..200), pejabat_ttd_jabatan (0..200),
-//     tampilkan_gelar_undangan (optional bool), lampiran_surat (0..200),
-//     tujuan_undangan_json (0..50000), dasar_notula (0..10000), jenis_kegiatan (0..100),
-//     jumlah_baris_hadir (optional int, 1..100)
-//   - agenda (0..1000), agenda_poin (0..5000), hari_tanggal (0..150), waktu_mulai (0..50), waktu_selesai (0..50),
-//     tempat (0..300), pemimpin (0..200), pemimpin_nip (0..40), pemimpin_jabatan (0..200),
-//     notulis (0..200), notulis_nip (0..40), notulis_jabatan (0..200)
-//   - peserta_json (0..50000), pengarahan_umum (0..30000), pembahasan (0..50000),
-//     pembahasan_json (0..100000), kesimpulan (0..30000), foto_rapat_json (0..50000),
-//     ai_transcript (0..100000)
+//   - tampilkan_gelar_undangan (optional bool), jumlah_baris_hadir (optional int, 1..100)
+//   - agenda (optional string, 0..1000), tujuan_undangan_json (0..50000),
+//     pembahasan_json (0..100000), foto_rapat_json (0..50000), ai_transcript (0..100000)
 //   - doc_undangan_url, doc_absen_url, doc_notulen_url, folder_url, audio_rapat_url
 //     (optional URL or "-"/"", <=1000)
-//   - tanggal_input (0..50), created_by (0..40), updated_by (0..40), synced_at (0..50),
-//     is_firebase (optional bool), updated_at (required timestamp),
-//     created_at (optional timestamp, immutable if present)
+//   - mysims_requested (optional bool), mysims_status (optional string, 0..100),
+//     mysims_idp, mysims_requested_at
+//   - created_by (0..40), updated_by (0..40), is_firebase (optional bool),
+//     updated_at (required timestamp), created_at (optional timestamp, immutable if present)
+//   - Additional allowed metadata fields (key-bounded via hasOnlyAllowedFields):
+//     nomor_undangan, tgl_surat, no_urut_surat, kode_klasifikasi_surat, kode_pejabat_ttd,
+//     pejabat_ttd_nip, pejabat_ttd_nama, pejabat_ttd_jabatan, lampiran_surat, dasar_notula,
+//     jenis_kegiatan, agenda_poin, hari_tanggal, waktu_mulai, waktu_selesai, tempat,
+//     pemimpin, pemimpin_nip, pemimpin_jabatan, notulis, notulis_nip, notulis_jabatan,
+//     peserta_json, pengarahan_umum, pembahasan, kesimpulan, tanggal_input, synced_at
 //
 // Collection: surat_tugas_documents
 // Document ID: {docId} (matches field `id`, e.g. "ST-...")
@@ -673,53 +671,23 @@ service cloud.firestore {
              hasOnlyAllowedFields(allowed) &&
              data.id is string && data.id == docId && data.id.size() >= 1 && data.id.size() <= 120 &&
              data.id_rapat is string && data.id_rapat == docId && data.id_rapat.size() >= 1 && data.id_rapat.size() <= 120 &&
-             isValidOptionalString(data, 'nomor_undangan', 0, 200) &&
-             isValidOptionalString(data, 'tgl_surat', 0, 100) &&
-             isValidOptionalString(data, 'no_urut_surat', 0, 50) &&
-             isValidOptionalString(data, 'kode_klasifikasi_surat', 0, 100) &&
-             isValidOptionalString(data, 'kode_pejabat_ttd', 0, 60) &&
-             isValidOptionalString(data, 'pejabat_ttd_nip', 0, 40) &&
-             isValidOptionalString(data, 'pejabat_ttd_nama', 0, 200) &&
-             isValidOptionalString(data, 'pejabat_ttd_jabatan', 0, 200) &&
+             data.status is string && data.status.size() >= 1 && data.status.size() <= 50 &&
              isValidOptionalBool(data, 'tampilkan_gelar_undangan') &&
-             isValidOptionalString(data, 'lampiran_surat', 0, 200) &&
-             isValidOptionalString(data, 'tujuan_undangan_json', 0, 50000) &&
-             isValidOptionalString(data, 'dasar_notula', 0, 10000) &&
-             isValidOptionalString(data, 'jenis_kegiatan', 0, 100) &&
              (!('jumlah_baris_hadir' in data) || (data.jumlah_baris_hadir is int && data.jumlah_baris_hadir >= 1 && data.jumlah_baris_hadir <= 100)) &&
              isValidOptionalString(data, 'agenda', 0, 1000) &&
-             isValidOptionalString(data, 'agenda_poin', 0, 5000) &&
-             isValidOptionalString(data, 'hari_tanggal', 0, 150) &&
-             isValidOptionalString(data, 'waktu_mulai', 0, 50) &&
-             isValidOptionalString(data, 'waktu_selesai', 0, 50) &&
-             isValidOptionalString(data, 'tempat', 0, 300) &&
-             isValidOptionalString(data, 'pemimpin', 0, 200) &&
-             isValidOptionalString(data, 'pemimpin_nip', 0, 40) &&
-             isValidOptionalString(data, 'pemimpin_jabatan', 0, 200) &&
-             isValidOptionalString(data, 'notulis', 0, 200) &&
-             isValidOptionalString(data, 'notulis_nip', 0, 40) &&
-             isValidOptionalString(data, 'notulis_jabatan', 0, 200) &&
-             isValidOptionalString(data, 'peserta_json', 0, 50000) &&
-             isValidOptionalString(data, 'pengarahan_umum', 0, 30000) &&
-             isValidOptionalString(data, 'pembahasan', 0, 50000) &&
+             isValidOptionalString(data, 'tujuan_undangan_json', 0, 50000) &&
              isValidOptionalString(data, 'pembahasan_json', 0, 100000) &&
-             isValidOptionalString(data, 'kesimpulan', 0, 30000) &&
              isValidOptionalString(data, 'foto_rapat_json', 0, 50000) &&
-             isValidOptionalUrlOrDash(data, 'audio_rapat_url', 1000) &&
              isValidOptionalString(data, 'ai_transcript', 0, 100000) &&
-             data.status is string && data.status.size() >= 1 && data.status.size() <= 50 &&
+             isValidOptionalUrlOrDash(data, 'audio_rapat_url', 1000) &&
              isValidOptionalUrlOrDash(data, 'doc_undangan_url', 1000) &&
              isValidOptionalUrlOrDash(data, 'doc_absen_url', 1000) &&
              isValidOptionalUrlOrDash(data, 'doc_notulen_url', 1000) &&
              isValidOptionalUrlOrDash(data, 'folder_url', 1000) &&
              isValidOptionalBool(data, 'mysims_requested') &&
              isValidOptionalString(data, 'mysims_status', 0, 100) &&
-             isValidOptionalString(data, 'mysims_idp', 0, 60) &&
-             isValidOptionalString(data, 'mysims_requested_at', 0, 60) &&
-             isValidOptionalString(data, 'tanggal_input', 0, 50) &&
              isValidOptionalString(data, 'created_by', 0, 40) &&
              isValidOptionalString(data, 'updated_by', 0, 40) &&
-             isValidOptionalString(data, 'synced_at', 0, 50) &&
              isValidOptionalBool(data, 'is_firebase') &&
              data.updated_at is timestamp &&
              isValidOptionalTimestamp(data, 'created_at');

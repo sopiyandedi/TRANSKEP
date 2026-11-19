@@ -69,7 +69,7 @@ function extractValidatorSpec(fnName) {
     ? Array.from(statusesMatch[1].matchAll(/'([^']+)'/g)).map(m => m[1])
     : null;
 
-  return { allowed, required, validStatuses };
+  return { allowed, required, validStatuses, body };
 }
 
 const specs = {
@@ -86,6 +86,41 @@ const specs = {
   surat_tugas_documents: extractValidatorSpec('isValidSuratTugas'),
   security_incidents: extractValidatorSpec('isValidSecurityIncident')
 };
+
+const validatorNamesBySpec = [
+  ['sk_documents', 'isValidSkDocument'],
+  ['sop_documents', 'isValidSopDocument'],
+  ['jobdes_documents', 'isValidJobdesDocument'],
+  ['jobdes_usulan', 'isValidJobdesUsulan'],
+  ['master_kinerja', 'isValidMasterKinerja'],
+  ['pkp_documents', 'isValidPkpDocument'],
+  ['pck_documents', 'isValidPckDocument'],
+  ['pck_rekapitulasi', 'isValidPckRekapitulasi'],
+  ['eoffice_kgb', 'isValidEofficeKgb'],
+  ['eoffice_rapat', 'isValidEofficeRapat'],
+  ['surat_tugas_documents', 'isValidSuratTugas'],
+  ['security_incidents', 'isValidSecurityIncident']
+];
+let maxEstimatedExpr = 0;
+let rapatEstimatedExpr = 0;
+for (const [specKey, fnName] of validatorNamesBySpec) {
+  const { allowed, body } = specs[specKey];
+  const optStr = (body.match(/isValidOptionalString\(/g) || []).length;
+  const optUrl = (body.match(/isValidOptionalUrl/g) || []).length;
+  const optBool = (body.match(/isValidOptionalBool\(/g) || []).length;
+  const estExpr = allowed.length + optStr * 28 + optUrl * 30 + optBool * 15 + 80;
+  if (estExpr > maxEstimatedExpr) maxEstimatedExpr = estExpr;
+  if (fnName === 'isValidEofficeRapat') rapatEstimatedExpr = estExpr;
+  assert(
+    estExpr <= 800,
+    `${fnName} estimated Firestore CEL expressions (${estExpr}) exceeded 800-expression safety budget (Cloud Firestore hard limit is 1000)`
+  );
+}
+assert(
+  rapatEstimatedExpr <= 650,
+  `isValidEofficeRapat estimated Firestore CEL expressions (${rapatEstimatedExpr}) exceeded 650-expression limit`
+);
+console.log(`[PASS] Firestore Rules expression-budget guard verified (max=${maxEstimatedExpr} <= 800; isValidEofficeRapat=${rapatEstimatedExpr} <= 650).`);
 
 const capturedWrites = [];
 const mockTimestamp = { __mockServerTimestamp: true };

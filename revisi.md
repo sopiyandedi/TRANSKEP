@@ -6909,6 +6909,20 @@ Menyederhanakan alur pemilihan peserta undangan dan pembicara notula dengan kolo
 4. **Cetak Notula Opsi 2A ([`modules/eoffice/cetak/js_cetak_notula.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/cetak/js_cetak_notula.js)):** Mengagregasi seluruh sub-baris milik pembicara yang sama menjadi daftar bernomor `1., 2., 3.` di masing-masing sub-bagian `a..e` di bawah 1 nama pembicara serta memformat nilai `<input type="date">` ISO ke format tanggal Indonesia.
 5. **PWA & Pengujian:** Bump PWA **`v3.8.77`** ([`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) & [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js)) dan penambahan uji runtime + struktur di [`tests/verify_fase3b.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/tests/verify_fase3b.js).
 
+---
+
+## REVISI TAHAP 144A: OPTIMASI BATAS EKSPRESI FIRESTORE RULES E-OFFICE RAPAT (HOTFIX PERMISSION-DENIED)
+**Status:** `[SELESAI & AKTIF — Hotfix Server-Side Firestore Rules, PWA tetap v3.8.77]`
+
+### 1. Akar Masalah
+- Saat menyimpan agenda rapat (`eoffice_rapat/RPT-...`), `saveRapatToFirestore` di [`core/firebase.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/core/firebase.js) selalu mengirimkan lengkap 51 field (termasuk 4 field `mysims_*` baru dari Tahap 141).
+- Di [`firestore.rules`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/firestore.rules), fungsi `isValidEofficeRapat` melakukan **38 panggilan `isValidOptionalString`** + 5 cek URL + 3 cek boolean + `allowed` 52 field, sehingga evaluasi ekspresi CEL per request mencapai **~1.391 ekspresi** dan melewati **batas keras 1.000 ekspresi Cloud Firestore**, menyebabkan penolakan `permission-denied` meski Auth Admin/Operator valid (`[docRead=OK(exists=false)]`).
+
+### 2. Rincian Perbaikan
+1. **Optimasi `isValidEofficeRapat` ([`firestore.rules`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/firestore.rules)):** Diterapkan oleh subagent spesialis `firestore-rules-author` dengan tetap mempertahankan seluruh 52 whitelist field pada `hasOnlyAllowedFields(allowed)`, akses ketat `isAdminOrOperator()`, validasi `id`/`id_rapat == docId`, `status`, `jumlah_baris_hadir` (1..100), seluruh 5 field URL (`isValidOptionalUrlOrDash`), seluruh 3 boolean (`isValidOptionalBool`), timestamp `updated_at`/`created_at`, serta 8 validasi string payload besar/kritis (`agenda`, `tujuan_undangan_json`, `pembahasan_json`, `foto_rapat_json`, `ai_transcript`, `mysims_status`, `created_by`, `updated_by`), menurunkan estimasi evaluasi menjadi **551 ekspresi**.
+2. **Expression-Budget Guard ([`tests/verify_firestore_schema.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/tests/verify_firestore_schema.js)):** Menambahkan pengecekan otomatis agar setiap validator dokumen di `firestore.rules` selalu berada `<= 800` ekspresi dan `isValidEofficeRapat <= 650` ekspresi.
+3. **Deploy Live & Verifikasi:** Seluruh 6 test suite (`npm test`) lulus `0 FAILURES` dan `firestore.rules` di-deploy live ke project Firebase `transkep-314c0` (`npm run deploy:rules`).
+
 
 
 
