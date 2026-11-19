@@ -1335,6 +1335,14 @@
     if (!modal) return;
 
     rapatData = rapatData || {};
+    var incomingId = String(rapatData.id_rapat || rapatData.id || '').trim();
+    if (incomingId && window.vmEoffice && Array.isArray(window.vmEoffice.rawRapatList)) {
+      var liveRapat = window.vmEoffice.rawRapatList.find(function (r) {
+        return String(r.id_rapat || r.id || '').trim() === incomingId;
+      });
+      if (liveRapat) rapatData = Object.assign({}, rapatData, liveRapat);
+    }
+
     populateRapatOfficialSelects_();
     toggleRapatFullscreen(false);
     switchRapatTab('undangan');
@@ -1345,6 +1353,31 @@
     document.getElementById('rapatFieldDocUndanganUrl').value = rapatData.doc_undangan_url || '';
     document.getElementById('rapatFieldDocAbsenUrl').value = rapatData.doc_absen_url || '';
     document.getElementById('rapatFieldDocNotulenUrl').value = rapatData.doc_notulen_url || '';
+    var elMyReq = document.getElementById('rapatFieldMysimsRequested');
+    var elMyStat = document.getElementById('rapatFieldMysimsStatus');
+    var elMyIdp = document.getElementById('rapatFieldMysimsIdp');
+    var elMyAt = document.getElementById('rapatFieldMysimsRequestedAt');
+    if (elMyReq) elMyReq.value = rapatData.mysims_requested ? 'true' : 'false';
+    if (elMyStat) elMyStat.value = rapatData.mysims_status || '';
+    if (elMyIdp) elMyIdp.value = rapatData.mysims_idp || '';
+    if (elMyAt) elMyAt.value = rapatData.mysims_requested_at || '';
+
+    var elMyBadge = document.getElementById('rapatMysimsBadge');
+    if (elMyBadge) {
+      var noStr = String(rapatData.no_urut_surat || '').trim();
+      var hasNo = Boolean(noStr && noStr !== '...' && noStr !== '......' && noStr !== '-') ||
+        Boolean(rapatData.nomor_undangan && /^\d+[^/]*\//.test(String(rapatData.nomor_undangan)) && String(rapatData.nomor_undangan).indexOf('...') === -1);
+      if (hasNo) {
+        elMyBadge.textContent = noStr ? ('No. MYSIMS Aktif (' + noStr + ')') : 'Nomor Surat Siap';
+        elMyBadge.className = 'text-[9px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30';
+      } else if (rapatData.mysims_requested) {
+        elMyBadge.textContent = String(rapatData.mysims_status || 'Meminta Nomor MYSIMS...');
+        elMyBadge.className = 'text-[9px] font-bold px-2.5 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30';
+      } else {
+        elMyBadge.textContent = 'Auto MYSIMS Saat Simpan';
+        elMyBadge.className = 'text-[9px] font-bold px-2.5 py-0.5 rounded-full bg-indigo-500/15 text-indigo-300 border border-indigo-500/30';
+      }
+    }
     setRapatModalStatus(rapatData.status || 'Terjadwal');
 
     // Tab 1 Fields
@@ -1600,17 +1633,22 @@
       ai_transcript: (document.getElementById('rapatFieldAiTranscript') || {}).value || '',
       doc_undangan_url: (document.getElementById('rapatFieldDocUndanganUrl') || {}).value || '',
       doc_absen_url: (document.getElementById('rapatFieldDocAbsenUrl') || {}).value || '',
-      doc_notulen_url: (document.getElementById('rapatFieldDocNotulenUrl') || {}).value || ''
+      doc_notulen_url: (document.getElementById('rapatFieldDocNotulenUrl') || {}).value || '',
+      mysims_requested: ((document.getElementById('rapatFieldMysimsRequested') || {}).value === 'true'),
+      mysims_status: (document.getElementById('rapatFieldMysimsStatus') || {}).value || '',
+      mysims_idp: (document.getElementById('rapatFieldMysimsIdp') || {}).value || '',
+      mysims_requested_at: (document.getElementById('rapatFieldMysimsRequestedAt') || {}).value || ''
     };
 
     var currentUser = (window.vueState && window.vueState.user) ? window.vueState.user : (typeof state !== 'undefined' ? state.user : null);
     var adminNip = (currentUser && currentUser.nip) || localStorage.getItem('transkep_active_nip') || '';
+    var authToken = localStorage.getItem('transkep_session_token') || '';
 
     var btnSubmit = document.getElementById('btnRapatSaveAgenda');
     if (btnSubmit) btnSubmit.disabled = true;
 
     try {
-      var res = await window.EofficeDataService.saveRapatData(payload, adminNip);
+      var res = await window.EofficeDataService.saveRapatData(payload, adminNip, authToken);
       if (btnSubmit) btnSubmit.disabled = false;
 
       if (res && res.status === 'success') {
@@ -1629,7 +1667,13 @@
 
         closeRapatModalForm();
         if (typeof showNotify === 'function') {
-          showNotify('Agenda Rapat Disimpan', 'Data rapat berhasil disimpan ke Cloud Firestore. Gunakan tombol cetak di tabel E-Office.', 'success');
+          if (res.mysims_requested_now && res.mysims_res && res.mysims_res.status === 'success') {
+            showNotify('Agenda Rapat Disimpan', 'Data tersimpan ke Firestore & permintaan nomor surat keluar Undangan MYSIMS sedang diproses otomatis.', 'success');
+          } else if (res.mysims_requested_now && res.mysims_res && res.mysims_res.status === 'error') {
+            showNotify('Disimpan (MYSIMS Tertunda)', 'Data tersimpan di Firestore, namun gagal meminta nomor MYSIMS: ' + (res.mysims_res.message || 'Cek koneksi n8n.'), 'warning');
+          } else {
+            showNotify('Agenda Rapat Disimpan', 'Data rapat berhasil disimpan ke Cloud Firestore. Gunakan tombol cetak di tabel E-Office.', 'success');
+          }
         }
       } else {
         if (typeof showNotify === 'function') {

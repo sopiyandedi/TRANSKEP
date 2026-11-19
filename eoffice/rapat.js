@@ -750,3 +750,437 @@ function createPaketRapatDocs(payload, adminNip, clientToken) {
     return { status: 'error', message: err.toString() };
   }
 }
+
+// ==========================================
+// TAHAP 141: OTOMASI NOMOR SURAT KELUAR & PDF UNDANGAN RAPAT MYSIMS
+// ==========================================
+
+function hasAssignedRapatNumber_(rec) {
+  if (!rec) return false;
+  const no = String(rec.no_urut_surat || '').trim();
+  const full = String(rec.nomor_undangan || '').trim();
+  if (no && no !== '...' && no !== '......' && no !== '-') return true;
+  if (full && /^\d+[^/]*\//.test(full) && full.indexOf('...') === -1 && full.indexOf('NOMOR_MYSIMS_TERCATAT') === -1) {
+    return true;
+  }
+  return false;
+}
+
+function resolveIsoDateForMysimsRapat_(val) {
+  const todayIso = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'yyyy-MM-dd');
+  if (!val) return todayIso;
+  const s = String(val).trim();
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+  const blnMap = {
+    januari: '01', februari: '02', maret: '03', april: '04', mei: '05', juni: '06',
+    juli: '07', agustus: '08', september: '09', oktober: '10', november: '11', desember: '12'
+  };
+  const m = s.match(/^(\d{1,2})\s+([a-zA-Z]+)\s+(\d{4})$/);
+  if (m && blnMap[m[2].toLowerCase()]) {
+    return m[3] + '-' + blnMap[m[2].toLowerCase()] + '-' + ('0' + m[1]).slice(-2);
+  }
+  const sl = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  if (sl) {
+    return sl[3] + '-' + ('0' + sl[2]).slice(-2) + '-' + ('0' + sl[1]).slice(-2);
+  }
+  return todayIso;
+}
+
+function resolveMysimsAccountMetaRapat_(kodePejabat, jabatanTtd) {
+  const k = String(kodePejabat || '').toUpperCase().trim();
+  const j = String(jabatanTtd || '').toLowerCase().trim();
+  if (k.indexOf('WKPA') !== -1 || j.indexOf('wakil ketua') !== -1) {
+    return { jabatan: 'Wakil Ketua', satker: 'WKPA.W10-A2' };
+  }
+  if (k.indexOf('PAN') !== -1 || j.indexOf('panitera') === 0) {
+    return { jabatan: 'Panitera', satker: 'PAN.PA.W10-A2' };
+  }
+  if (k.indexOf('SEK') !== -1 || j.indexOf('sekretaris') === 0) {
+    return { jabatan: 'Sekretaris', satker: 'SEK.PA.W10-A2' };
+  }
+  return { jabatan: 'Ketua', satker: 'KPA.W10-A2' };
+}
+
+function buildCompactRapatSnapshot_(payload) {
+  const src = payload || {};
+  return {
+    id_rapat: String(src.id_rapat || src.id || '').trim(),
+    tgl_surat: String(src.tgl_surat || '').trim(),
+    kode_pejabat_ttd: String(src.kode_pejabat_ttd || 'KPA.W10-A2').trim(),
+    kode_klasifikasi_surat: String(src.kode_klasifikasi_surat || '').trim(),
+    pejabat_ttd_nip: String(src.pejabat_ttd_nip || '').trim(),
+    pejabat_ttd_nama: String(src.pejabat_ttd_nama || '').trim(),
+    pejabat_ttd_jabatan: String(src.pejabat_ttd_jabatan || '').trim(),
+    tampilkan_gelar_undangan: Boolean(src.tampilkan_gelar_undangan),
+    lampiran_surat: String(src.lampiran_surat || '-').trim(),
+    tujuan_undangan_json: typeof src.tujuan_undangan_json === 'string'
+      ? src.tujuan_undangan_json
+      : JSON.stringify(src.tujuan_undangan_json || []),
+    agenda: String(src.agenda || '').trim(),
+    agenda_poin: String(src.agenda_poin || '').trim(),
+    hari_tanggal: String(src.hari_tanggal || '').trim(),
+    waktu_mulai: String(src.waktu_mulai || '08:00 WIB').trim(),
+    waktu_selesai: String(src.waktu_selesai || 'Selesai').trim(),
+    tempat: String(src.tempat || '').trim(),
+    pemimpin: String(src.pemimpin || '').trim(),
+    pemimpin_nip: String(src.pemimpin_nip || '').trim(),
+    pemimpin_jabatan: String(src.pemimpin_jabatan || '').trim(),
+    peserta_json: typeof src.peserta_json === 'string'
+      ? src.peserta_json
+      : JSON.stringify(src.peserta_json || [])
+  };
+}
+
+function summarizeKepadaRapat_(payload) {
+  const p = payload || {};
+  let list = [];
+  if (p.tujuan_undangan_json) {
+    try {
+      const parsed = typeof p.tujuan_undangan_json === 'string'
+        ? JSON.parse(p.tujuan_undangan_json)
+        : p.tujuan_undangan_json;
+      if (Array.isArray(parsed)) list = parsed;
+    } catch (e) {}
+  }
+  const labels = list.map(function (it) {
+    return typeof it === 'string' ? it.trim() : String((it && (it.label || it.nama || it.jabatan)) || '').trim();
+  }).filter(Boolean);
+  if (labels.length === 0) return 'Peserta Rapat PA Indramayu';
+  if (labels.length === 1) return labels[0];
+  if (labels.length <= 3) return labels.join(', ');
+  return labels[0] + ' dkk (' + labels.length + ' Pihak)';
+}
+
+function triggerN8nSuratKeluarRapat_(idRapat, payload) {
+  try {
+    const props = PropertiesService.getScriptProperties();
+    const webhookUrl = props.getProperty('N8N_WEBHOOK_SURAT_KELUAR') ||
+      'https://supernova-endpoint-unsubtly.ngrok-free.dev/webhook/generate-surat-keluar';
+    const verifiedExecUrl = props.getProperty('TRANSKEP_EXEC_URL') ||
+      'https://script.google.com/macros/s/AKfycbzFrbQTqmVzMio7mderK-S9ntFVjXiWYFgnXfy9fW_SUKOcIxfPywP2He1flhaK_AZ0ZA/exec';
+
+    const accMeta = resolveMysimsAccountMetaRapat_(payload.kode_pejabat_ttd, payload.pejabat_ttd_jabatan);
+    const cleanKode = String(payload.kode_klasifikasi_surat || payload.kode_surat || 'OT.01.1')
+      .replace(/^UND\./i, '')
+      .trim() || 'OT.01.1';
+    const tglSuratIso = resolveIsoDateForMysimsRapat_(payload.tgl_surat);
+    const agendaStr = String(payload.agenda || 'Rapat Dinas PA Indramayu').trim();
+    const compactSnap = buildCompactRapatSnapshot_(Object.assign({}, payload, { id_rapat: idRapat }));
+
+    const payloadN8n = {
+      event: 'RAPAT_UNDANGAN_SURAT_KELUAR',
+      id_rapat: String(idRapat),
+      agenda: agendaStr,
+      tanggal_surat: tglSuratIso,
+      callback_url: verifiedExecUrl,
+      secret_key: props.getProperty('TRANSKEP_WEBHOOK_KEY') || 'TRANSKEP_WA_BOT_2026',
+      rapat_snapshot: compactSnap,
+      task: {
+        tipe: 'UNDANGAN_RAPAT',
+        jabatan_penandatangan: accMeta.jabatan,
+        satker_kode: accMeta.satker,
+        kode_klasifikasi: cleanKode,
+        sifat: 'Biasa',
+        kepada: summarizeKepadaRapat_(payload),
+        uraian: 'Undangan ' + agendaStr,
+        ket: 'Biasa',
+        tgl_surat: tglSuratIso
+      },
+      timestamp: new Date().toISOString()
+    };
+
+    const resp = UrlFetchApp.fetch(webhookUrl, {
+      method: 'post',
+      contentType: 'application/json',
+      payload: JSON.stringify(payloadN8n),
+      muteHttpExceptions: true
+    });
+    const code = Number(resp.getResponseCode() || 0);
+    Logger.log('✅ [n8n Rapat Trigger] Webhook RAPAT_UNDANGAN_SURAT_KELUAR terkirim (' + idRapat + ' / ' + accMeta.satker + '/UND.' + cleanKode + '). Code: ' + code);
+    if (code >= 200 && code < 400) {
+      return { ok: true, code: code };
+    }
+    return { ok: false, code: code, message: 'Webhook n8n merespon HTTP ' + code };
+  } catch (err) {
+    Logger.log('⚠️ [triggerN8nSuratKeluarRapat_ Error] ' + err.toString());
+    return { ok: false, code: 0, message: err.toString() };
+  }
+}
+
+/**
+ * RPC Admin Terotorisasi: Meminta Nomor Surat Keluar Undangan Rapat MYSIMS (sekali saja saat simpan tanpa no. urut)
+ */
+function requestRapatUndanganSuratKeluar(payload, adminNip, clientToken) {
+  let lock = null;
+  try {
+    if (Array.isArray(payload)) {
+      adminNip = adminNip || payload[1];
+      clientToken = clientToken || payload[2];
+      payload = payload[0] || {};
+    }
+    if (!cekOtorisasiAdmin(adminNip, clientToken)) {
+      return { status: 'error', message: 'Akses Ditolak: Permintaan nomor surat keluar Undangan Rapat hanya untuk Admin/Operator.' };
+    }
+    const idRapat = payload ? String(payload.id_rapat || payload.id || '').trim() : '';
+    if (!payload || !idRapat) {
+      return { status: 'error', message: "Parameter 'id_rapat' wajib disertakan." };
+    }
+
+    const prevStatus = String(payload.mysims_status || '').trim();
+    const isPayloadAlreadySent = (
+      payload.mysims_requested === true &&
+      prevStatus !== 'Meminta Nomor MYSIMS' &&
+      prevStatus.indexOf('Gagal') !== 0
+    ) || prevStatus === 'Permintaan Terkirim ke MYSIMS' || prevStatus === 'Nomor Terbit MYSIMS';
+
+    if (hasAssignedRapatNumber_(payload) || isPayloadAlreadySent) {
+      return {
+        status: 'already_exists',
+        message: 'Agenda Rapat ini sudah memiliki atau sudah mengirimkan permintaan nomor surat MYSIMS.',
+        id_rapat: idRapat,
+        no_urut_surat: payload.no_urut_surat || '',
+        nomor_undangan: payload.nomor_undangan || ''
+      };
+    }
+
+    try {
+      lock = LockService.getScriptLock();
+      lock.waitLock(5000);
+    } catch (eLock) {}
+
+    const cache = CacheService.getScriptCache();
+    const guardKey = 'rapat_sk_req_' + idRapat;
+    if (cache.get(guardKey)) {
+      return {
+        status: 'already_exists',
+        message: 'Permintaan nomor surat keluar Undangan Rapat sedang diproses. Edit berikutnya tidak meminta nomor ulang.',
+        id_rapat: idRapat
+      };
+    }
+
+    if (typeof firestoreRestGet_ === 'function') {
+      const existingFs = firestoreRestGet_('eoffice_rapat', idRapat);
+      if (existingFs && (hasAssignedRapatNumber_(existingFs) || String(existingFs.mysims_status || '').trim() === 'Nomor Terbit MYSIMS')) {
+        return {
+          status: 'already_exists',
+          message: 'Nomor surat keluar Undangan Rapat sudah tercatat di Firestore.',
+          id_rapat: idRapat,
+          no_urut_surat: existingFs.no_urut_surat || '',
+          nomor_undangan: existingFs.nomor_undangan || ''
+        };
+      }
+    }
+
+    cache.put(guardKey, '1', 600);
+    try {
+      cache.put('rapat_snap_' + idRapat, JSON.stringify(buildCompactRapatSnapshot_(Object.assign({}, payload, { id_rapat: idRapat }))), 1800);
+    } catch (eSnap) {}
+
+    const sendRes = triggerN8nSuratKeluarRapat_(idRapat, payload);
+    if (!sendRes.ok) {
+      cache.remove(guardKey);
+      if (typeof firestoreRestPatch_ === 'function') {
+        firestoreRestPatch_('eoffice_rapat', idRapat, {
+          mysims_requested: false,
+          mysims_status: 'Gagal Menghubungi MYSIMS'
+        });
+      }
+      return { status: 'error', message: sendRes.message || 'Gagal menghubungi webhook n8n MYSIMS.' };
+    }
+
+    const accMeta = resolveMysimsAccountMetaRapat_(payload.kode_pejabat_ttd, payload.pejabat_ttd_jabatan);
+    const cleanKode = String(payload.kode_klasifikasi_surat || 'OT.01.1').replace(/^UND\./i, '').trim() || 'OT.01.1';
+    return {
+      status: 'success',
+      message: 'Permintaan nomor surat keluar Undangan (' + accMeta.satker + '/UND.' + cleanKode + ') berhasil dikirim ke MYSIMS.',
+      id_rapat: idRapat
+    };
+  } catch (err) {
+    Logger.log('⚠️ [requestRapatUndanganSuratKeluar Error] ' + err.toString());
+    return { status: 'error', message: err.toString() };
+  } finally {
+    if (lock) {
+      try { lock.releaseLock(); } catch (eRel) {}
+    }
+  }
+}
+
+/**
+ * Callback Resmi dari n8n untuk Undangan Rapat:
+ * 1. Verifikasi constant-time TRANSKEP_WEBHOOK_KEY
+ * 2. Update no_urut_surat & nomor_undangan ke Cloud Firestore eoffice_rapat
+ * 3. Kompilasi PDF Undangan Resmi via undangan_pdf_compiler.js -> kembalikan Base64 ke n8n
+ */
+function updateNomorSuratRapatFromExternal_(payload) {
+  try {
+    const idRapat = payload ? String(payload.id_rapat || payload.id || '').trim() : '';
+    const nomorRaw = payload ? String(payload.nomor_undangan || payload.nomor_surat || payload.no_surat || '').trim() : '';
+    if (!payload || !idRapat || !nomorRaw) {
+      return { status: 'error', message: "Parameter 'id_rapat' dan 'nomor_surat' wajib disertakan." };
+    }
+
+    const scriptProps = PropertiesService.getScriptProperties();
+    const configuredKey = String(scriptProps.getProperty('TRANSKEP_WEBHOOK_KEY') || 'TRANSKEP_WA_BOT_2026').trim();
+    const incomingKey = String(payload.secret_key || '').trim();
+    const isKeyMatch = (typeof constantTimeEquals_ === 'function')
+      ? constantTimeEquals_(incomingKey, configuredKey)
+      : (incomingKey !== '' && incomingKey === configuredKey);
+    if (!incomingKey || !isKeyMatch) {
+      return { status: 'error', message: 'Akses ditolak: Secret Key tidak valid.' };
+    }
+
+    if (nomorRaw.indexOf('NOMOR_MYSIMS_TERCATAT') !== -1 || nomorRaw.indexOf('...') !== -1) {
+      return { status: 'error', message: 'Nomor surat Undangan Rapat tidak valid.' };
+    }
+
+    const segs = nomorRaw.split('/');
+    const noUrutSurat = String(segs[0] || '').trim();
+
+    let snapCached = {};
+    try {
+      const rawSnap = CacheService.getScriptCache().get('rapat_snap_' + idRapat);
+      if (rawSnap) snapCached = JSON.parse(rawSnap);
+    } catch (eSnap) {}
+
+    let snapPayload = {};
+    if (payload.rapat_snapshot) {
+      try {
+        snapPayload = (typeof payload.rapat_snapshot === 'string')
+          ? JSON.parse(payload.rapat_snapshot)
+          : payload.rapat_snapshot;
+      } catch (ePs) {}
+    }
+
+    let fsRecord = null;
+    if (typeof firestoreRestGet_ === 'function') {
+      fsRecord = firestoreRestGet_('eoffice_rapat', idRapat);
+    }
+    const cleanFs = {};
+    if (fsRecord && typeof fsRecord === 'object') {
+      Object.keys(fsRecord).forEach(function (k) {
+        const val = fsRecord[k];
+        if (val !== undefined && val !== null && val !== '') cleanFs[k] = val;
+      });
+    }
+
+    const mergedRecord = Object.assign({}, snapCached, snapPayload, cleanFs, {
+      id: idRapat,
+      id_rapat: idRapat,
+      no_urut_surat: noUrutSurat,
+      nomor_undangan: nomorRaw
+    });
+
+    const cachedResultObj = {
+      id_rapat: idRapat,
+      no_urut_surat: noUrutSurat,
+      nomor_undangan: nomorRaw,
+      mysims_idp: String(payload.idp || ''),
+      mysims_status: 'Nomor Terbit MYSIMS',
+      updated_at: new Date().toISOString()
+    };
+    try {
+      CacheService.getScriptCache().put('rapat_res_' + idRapat, JSON.stringify(cachedResultObj), 21600);
+    } catch (eCache) {}
+
+    let firestoreSynced = false;
+    let firestoreStatusCode = 0;
+    if (typeof firestoreRestPatch_ === 'function') {
+      const patchRes = firestoreRestPatch_('eoffice_rapat', idRapat, {
+        no_urut_surat: noUrutSurat,
+        nomor_undangan: nomorRaw,
+        mysims_requested: true,
+        mysims_status: 'Nomor Terbit MYSIMS',
+        mysims_idp: String(payload.idp || ''),
+        updated_at: { __timestamp: true }
+      });
+      firestoreSynced = Boolean(patchRes && patchRes.ok);
+      firestoreStatusCode = Number((patchRes && patchRes.statusCode) || 0);
+    }
+
+    let pdfUndangan = { pdf_base64: '', pdf_filename: 'undangan_rapat.pdf' };
+    if (typeof generateUndanganPdfBase64_ === 'function') {
+      pdfUndangan = generateUndanganPdfBase64_(mergedRecord, nomorRaw);
+    }
+
+    Logger.log('✅ [n8n Rapat Callback] ID ' + idRapat + ' -> ' + nomorRaw + ' (Firestore=' + firestoreSynced + '/' + firestoreStatusCode + ', PDF=' + (pdfUndangan.pdf_base64 ? 'OK' : 'NO') + ')');
+    return {
+      status: 'success',
+      message: 'Nomor surat keluar Undangan Rapat berhasil diperbarui & PDF siap diunggah ke MYSIMS.',
+      id_rapat: idRapat,
+      no_urut_surat: noUrutSurat,
+      nomor_undangan: nomorRaw,
+      firestore_synced: firestoreSynced,
+      firestore_status_code: firestoreStatusCode,
+      pdf_undangan: pdfUndangan
+    };
+  } catch (err) {
+    Logger.log('❌ [updateNomorSuratRapatFromExternal_ Error] ' + err.toString());
+    return { status: 'error', message: err.toString() };
+  }
+}
+
+/**
+ * RPC Admin Terotorisasi: Mengecek hasil nomor surat MYSIMS Undangan Rapat terbaru dari Cache GAS / Cloud Firestore
+ */
+function getRapatMysimsStatus(idRapat, adminNip, clientToken) {
+  try {
+    if (idRapat && typeof idRapat === 'object' && !Array.isArray(idRapat)) {
+      const p = idRapat;
+      adminNip = adminNip || p.adminNip || p.nip;
+      clientToken = clientToken || p.token;
+      idRapat = p.id_rapat || p.idRapat || p.id || '';
+    }
+    if (!cekOtorisasiAdmin(adminNip, clientToken)) {
+      return { status: 'error', message: 'Akses Ditolak: Hanya Admin/Operator yang dapat memeriksa status MYSIMS Rapat.' };
+    }
+
+    const cleanId = String(idRapat || '').trim();
+    if (!cleanId) {
+      return { status: 'error', message: "Parameter 'id_rapat' wajib diisi." };
+    }
+
+    try {
+      const rawCached = CacheService.getScriptCache().get('rapat_res_' + cleanId);
+      if (rawCached) {
+        const parsed = JSON.parse(rawCached);
+        if (parsed && hasAssignedRapatNumber_(parsed)) {
+          return {
+            status: 'success',
+            source: 'cache',
+            data: parsed
+          };
+        }
+      }
+    } catch (eCache) {}
+
+    if (typeof firestoreRestGet_ === 'function') {
+      const fsDoc = firestoreRestGet_('eoffice_rapat', cleanId);
+      if (fsDoc && hasAssignedRapatNumber_(fsDoc)) {
+        const noUnd = String(fsDoc.nomor_undangan || '').trim();
+        const seg0 = (noUnd && noUnd.indexOf('/') !== -1) ? noUnd.split('/')[0].trim() : '';
+        return {
+          status: 'success',
+          source: 'firestore',
+          data: {
+            id_rapat: cleanId,
+            no_urut_surat: String(fsDoc.no_urut_surat || seg0 || '').trim(),
+            nomor_undangan: noUnd,
+            mysims_idp: String(fsDoc.mysims_idp || '').trim(),
+            mysims_status: String(fsDoc.mysims_status || 'Nomor Terbit MYSIMS').trim(),
+            updated_at: String(fsDoc.updated_at || '')
+          }
+        };
+      }
+    }
+
+    return {
+      status: 'pending',
+      source: 'none',
+      data: null,
+      message: 'Nomor surat MYSIMS Undangan Rapat belum diterbitkan.'
+    };
+  } catch (err) {
+    Logger.log('⚠️ [getRapatMysimsStatus] ' + err.toString());
+    return { status: 'error', message: err.toString() };
+  }
+}

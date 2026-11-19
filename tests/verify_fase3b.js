@@ -1298,20 +1298,32 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
     assert(pollToasts.some(t => t.type === 'success' && t.msg.includes('1105/KPA.W10-A2/KP2.1.2/XI/2026')),
       'Background poller must notify admin when MYSIMS number arrives');
 
-    // n8n Workflow Routing Verification (ST index 0, KGB index 1, Cuti fallback index 2)
+    // n8n Workflow Routing Verification (ST index 0, KGB index 1, Rapat Undangan index 2, Cuti fallback index 3)
     const n8nWf = JSON.parse(fs.readFileSync('n8n/n8n_workflow_mysims_surat_keluar.example.json', 'utf8'));
     const switchNode = n8nWf.nodes.find(n => n.id === 'switch-router');
-    assert(switchNode && switchNode.parameters.rules.values.length === 2, 'Router Event Surat Keluar must have 2 rules (ST_TERPADU + KGB_SURAT_KELUAR)');
+    assert(switchNode && switchNode.parameters.rules.values.length === 3, 'Router Event Surat Keluar must have 3 rules (ST_TERPADU + KGB_SURAT_KELUAR + RAPAT_UNDANGAN_SURAT_KELUAR)');
     assert.strictEqual(switchNode.parameters.rules.values[0].conditions.conditions[0].rightValue, 'ST_TERPADU');
     assert.strictEqual(switchNode.parameters.rules.values[1].conditions.conditions[0].rightValue, 'KGB_SURAT_KELUAR');
+    assert.strictEqual(switchNode.parameters.rules.values[2].conditions.conditions[0].rightValue, 'RAPAT_UNDANGAN_SURAT_KELUAR');
     const routerConns = n8nWf.connections['Router Event Surat Keluar'].main;
-    assert.strictEqual(routerConns.length, 3, 'Router must keep 3 outputs (ST=0, KGB=1, Cuti fallback=2)');
+    assert.strictEqual(routerConns.length, 4, 'Router must keep 4 outputs (ST=0, KGB=1, RAPAT=2, Cuti fallback=3)');
     assert.strictEqual(routerConns[0][0].node, 'Mesin Otomasi ST Terpadu');
     assert.strictEqual(routerConns[1][0].node, 'Mesin Otomasi KGB MYSIMS');
-    assert.strictEqual(routerConns[2][0].node, 'Mesin Otomasi MYSIMS & Callback');
+    assert.strictEqual(routerConns[2][0].node, 'Mesin Otomasi Undangan Rapat MYSIMS');
+    assert.strictEqual(routerConns[3][0].node, 'Mesin Otomasi MYSIMS & Callback');
     const kgbCodeNode = n8nWf.nodes.find(n => n.name === 'Mesin Otomasi KGB MYSIMS');
     assert(kgbCodeNode && kgbCodeNode.parameters.jsCode.includes('KPA.W10-A2') && kgbCodeNode.parameters.jsCode.includes('KP2.1.2') && kgbCodeNode.parameters.jsCode.includes("ket = 'Biasa'") && kgbCodeNode.parameters.jsCode.includes('updateNomorSuratKgb'),
       'Mesin Otomasi KGB MYSIMS must target KPA.W10-A2 / KP2.1.2, Biasa ket/sifat, and updateNomorSuratKgb callback');
+    const rapatCodeNode = n8nWf.nodes.find(n => n.name === 'Mesin Otomasi Undangan Rapat MYSIMS');
+    assert(rapatCodeNode && rapatCodeNode.parameters.jsCode.includes('WKPA.W10-A2') && rapatCodeNode.parameters.jsCode.includes('PAN.PA.W10-A2') && rapatCodeNode.parameters.jsCode.includes('SEK.PA.W10-A2') && rapatCodeNode.parameters.jsCode.includes("'/UND.'") && rapatCodeNode.parameters.jsCode.includes('updateNomorSuratRapat'),
+      'Mesin Otomasi Undangan Rapat MYSIMS must support 4 signatory accounts, /UND. prefix, and updateNomorSuratRapat callback');
+    assert.strictEqual(n8nWf.connections['Mesin Otomasi Undangan Rapat MYSIMS'].main[0][0].node, 'Suntik PDF Undangan Rapat ke MYSIMS',
+      'Mesin Otomasi Undangan Rapat MYSIMS must connect to Suntik PDF Undangan Rapat ke MYSIMS');
+    if (fs.existsSync('n8n/n8n_workflow_mysims_surat_keluar.json')) {
+      const liveSuratWf = JSON.parse(fs.readFileSync('n8n/n8n_workflow_mysims_surat_keluar.json', 'utf8'));
+      assert.strictEqual(liveSuratWf.nodes.length, n8nWf.nodes.length, 'Live & example MYSIMS Surat Keluar workflows must have identical node count');
+      assert.deepStrictEqual(liveSuratWf.connections, n8nWf.connections, 'Live & example MYSIMS Surat Keluar connections must match');
+    }
 
     // =========================================================================
     // Tahap 130 (v3.8.64): KGB Print Spacing & Dynamic Date Month/Year Sync
@@ -1821,6 +1833,79 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
     assert.strictEqual(aiDom140.rapatFieldDasarNotula.value, 'Surat Tugas No. 123');
     assert.strictEqual(aiDom140.rapatFieldPengarahanUmum.value, 'Arahan Evaluasi Gemini');
     assert(aiDom140.rapatPembahasanListContainer.innerHTML.includes('Atasan Satu (Panitera)') && aiDom140.rapatPembahasanListContainer.innerHTML.includes('1. Poin A'), 'applyAiNotulenToForm must format speaker and numbered rows into 5-column editor');
+
+    // Tahap 141: Otomasi Nomor Surat Keluar & Suntik PDF Undangan Rapat MYSIMS
+    const routerSrc141 = fs.readFileSync('api_router.js', 'utf8');
+    assert(routerSrc141.includes('requestRapatUndanganSuratKeluar: true') && routerSrc141.includes('getRapatMysimsStatus: true') && routerSrc141.includes("action === 'updateNomorSuratRapat'"),
+      'api_router.js must allow and dispatch Rapat MYSIMS RPCs & GET/POST callback');
+    assert(fs.existsSync('eoffice/undangan_pdf_compiler.js') && fs.readFileSync('eoffice/undangan_pdf_compiler.js', 'utf8').includes('function generateUndanganPdfBase64_('),
+      'eoffice/undangan_pdf_compiler.js must declare generateUndanganPdfBase64_');
+    assert(fs.readFileSync('modules/eoffice/view_eoffice.html', 'utf8').includes('id="rapatMysimsBadge"'),
+      'view_eoffice.html must render #rapatMysimsBadge in Rapat modal header');
+    assert(fs.readFileSync('modules/eoffice/eoffice.js', 'utf8').includes('fetchLatestRapatMysimsNumber'),
+      'eoffice.js triggerPrintUndanganRapat must check fetchLatestRapatMysimsNumber before printing');
+
+    // Poller latar belakang Rapat: syncRapatMysimsNumberInBackground -> hydrate vmEoffice.rawRapatList & Firestore
+    const rapatTimers = [];
+    const rapatPollSaved = [];
+    const rapatPollToasts = [];
+    let rapatPollTries = 0;
+    const rapatPollVm = {
+      console,
+      setTimeout: (fn) => { rapatTimers.push(fn); return rapatTimers.length; },
+      localStorage: { getItem: () => '', setItem: () => {} },
+      showNotify: (title, msg, type) => { rapatPollToasts.push({ title, msg, type }); },
+      vmEoffice: {
+        rawKgbList: [],
+        rawRapatList: [{
+          id: 'RPT-POLL-141',
+          id_rapat: 'RPT-POLL-141',
+          no_urut_surat: '',
+          nomor_undangan: '.../KPA.W10-A2/UND.HM3.1.1/XI/2026',
+          mysims_requested: true,
+          mysims_status: 'Permintaan Terkirim ke MYSIMS'
+        }]
+      },
+      TranskepFirebase: {
+        isReady: () => true,
+        saveRapatToFirestore: async (doc) => { rapatPollSaved.push(JSON.parse(JSON.stringify(doc))); return doc; }
+      },
+      TranskepAPI: {
+        call: async (method) => {
+          if (method === 'getRapatMysimsStatus') {
+            rapatPollTries += 1;
+            if (rapatPollTries === 1) return { status: 'pending', source: 'none', data: null };
+            return {
+              status: 'success',
+              source: 'cache',
+              data: {
+                id_rapat: 'RPT-POLL-141',
+                no_urut_surat: '1109',
+                nomor_undangan: '1109/KPA.W10-A2/UND.HM3.1.1/XI/2026',
+                mysims_idp: '1409',
+                mysims_status: 'Nomor Terbit MYSIMS'
+              }
+            };
+          }
+          return { status: 'success' };
+        }
+      }
+    };
+    rapatPollVm.window = rapatPollVm;
+    vm.createContext(rapatPollVm);
+    vm.runInContext(fs.readFileSync('modules/eoffice/eoffice_data.js', 'utf8'), rapatPollVm, { filename: 'modules/eoffice/eoffice_data.js' });
+
+    rapatPollVm.EofficeDataService.syncRapatMysimsNumberInBackground('RPT-POLL-141', '198001012005011001', 'tok-adm');
+    assert.strictEqual(rapatTimers.length, 1, 'syncRapatMysimsNumberInBackground must schedule 1st poll');
+    await rapatTimers.shift()();
+    assert.strictEqual(rapatTimers.length, 1, 'Pending getRapatMysimsStatus must schedule retry poll');
+    await rapatTimers.shift()();
+    assert.strictEqual(rapatTimers.length, 0, 'Issued Rapat MYSIMS number must stop polling');
+    assert.strictEqual(rapatPollVm.vmEoffice.rawRapatList[0].no_urut_surat, '1109', 'Rapat poller must hydrate no_urut_surat in vmEoffice.rawRapatList');
+    assert.strictEqual(rapatPollSaved[rapatPollSaved.length - 1].nomor_undangan, '1109/KPA.W10-A2/UND.HM3.1.1/XI/2026',
+      'Rapat poller must sync issued nomor_undangan into Firestore');
+    assert(rapatPollToasts.some(t => t.type === 'success' && t.msg.includes('1109/KPA.W10-A2/UND.HM3.1.1/XI/2026')),
+      'Rapat poller must notify admin when MYSIMS number arrives');
   } finally {
     browserSandbox.TranskepAPI.call = origApiCall;
     browserSandbox.TranskepFirebase.getDb = origGetDb;

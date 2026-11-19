@@ -75,6 +75,11 @@ function handleApiGet_(e) {
       return jsonResponse_(updateNomorSuratKgbFromExternal_(params));
     }
 
+    // 8. Update Nomor Surat Keluar Undangan Rapat MYSIMS (GET fallback)
+    if (action === 'updateNomorSuratRapat') {
+      return jsonResponse_(updateNomorSuratRapatFromExternal_(params));
+    }
+
     return jsonResponse_({
       status: 'error',
       message: "Aksi GET '" + action + "' tidak dikenali atau memerlukan metode POST."
@@ -220,6 +225,15 @@ function handleApiPost_(payload, e) {
       case 'updateNomorSuratKgb':
         return jsonResponse_(updateNomorSuratKgbFromExternal_(payload));
 
+      case 'requestRapatUndanganSuratKeluar':
+        return jsonResponse_(requestRapatUndanganSuratKeluar(payload.data || payload, payload.nip, payload.token));
+
+      case 'getRapatMysimsStatus':
+        return jsonResponse_(getRapatMysimsStatus(payload.id_rapat || payload.idRapat, payload.nip, payload.token));
+
+      case 'updateNomorSuratRapat':
+        return jsonResponse_(updateNomorSuratRapatFromExternal_(payload));
+
       // Fallback: Hanya izinkan method dalam whitelist RPC resmi
       default:
         return handleRpcCall_(
@@ -262,6 +276,8 @@ var AUTHENTICATED_RPC_METHODS_ = {
   getKgbMysimsStatus: true,
   deleteKgbDocRecord: true,
   createPaketRapatDocs: true,
+  requestRapatUndanganSuratKeluar: true,
+  getRapatMysimsStatus: true,
   uploadFotoRapat: true,
   generateAiNotulenRapat: true,
   saveJobdes: true,

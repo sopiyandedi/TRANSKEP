@@ -6854,6 +6854,27 @@ Merombak total modul **Paket Administrasi Rapat** pada menu **E-Office** agar be
 - **Branch:** `main` (tersinkronisasi ke `origin/main` dan `prod/main`).
 - **Aktivasi Pengguna:** Lakukan hard refresh browser (`Ctrl + Shift + R`), deploy ulang Google Apps Script (untuk `uploadFotoRapat` & `generateAiNotulenRapat`), dan impor blueprint `n8n/transkep-ai-notulen.example.json` ke n8n apabila ingin memakai ekstraksi audio AI penuh.
 
+---
+
+## REVISI TAHAP 141: OTOMASI NOMOR SURAT KELUAR & SUNTIK PDF UNDANGAN RAPAT MYSIMS (`v3.8.75`)
+**Status:** `[SELESAI & AKTIF — v3.8.75]`
+
+### 1. Tujuan
+Mengintegrasikan permintaan nomor surat keluar otomatis dan pengunggahan PDF resmi **Surat Undangan Rapat** ke MYSIMS menggunakan workflow n8n terpusat (`n8n/n8n_workflow_mysims_surat_keluar.json` dengan event baru `RAPAT_UNDANGAN_SURAT_KELUAR`), mendukung multi-pejabat (`KPA.W10-A2`, `WKPA.W10-A2`, `PAN.PA.W10-A2`, `SEK.PA.W10-A2`) dengan prefix `<SATKER>/UND.` + kode surat input pengguna (mis. `HM3.1.1`).
+
+### 2. Rincian Implementasi
+1. **Skema `eoffice_rapat` ([`firestore.rules`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/firestore.rules) & [`core/firebase.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/core/firebase.js)):** Menambahkan 4 field tracking (`mysims_requested`, `mysims_status`, `mysims_idp`, `mysims_requested_at`).
+2. **Headless Undangan PDF Compiler ([`eoffice/undangan_pdf_compiler.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/undangan_pdf_compiler.js)):** `generateUndanganPdfBase64_` (tabel CSS 2.1, A4 Portrait Bookman Old Style 12pt, otomatis 1 lembar vs 2 lembar lampiran `11pt`/`9pt`, 2-Stage Resilient Fallback anti-crash logo Drive).
+3. **Backend GAS ([`eoffice/rapat.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/rapat.js) & [`api_router.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/api_router.js)):** Menambahkan `requestRapatUndanganSuratKeluar`, callback `updateNomorSuratRapatFromExternal_` (`action=updateNomorSuratRapat`, POST & GET fallback, verifikasi `TRANSKEP_WEBHOOK_KEY`, Dual-Auth Firestore REST PATCH, cache snapshot & hasil), serta RPC poller `getRapatMysimsStatus`.
+4. **Workflow n8n ([`n8n/n8n_workflow_mysims_surat_keluar.json`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/n8n/n8n_workflow_mysims_surat_keluar.json) & [`.example.json`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/n8n/n8n_workflow_mysims_surat_keluar.example.json)):** Menambah cabang rule ke-3 `RAPAT_UNDANGAN_SURAT_KELUAR` pada `Router Event Surat Keluar` (total 4 output: ST=0, KGB=1, Undangan Rapat=2, Cuti=3) beserta node **`Mesin Otomasi Undangan Rapat MYSIMS`** & **`Suntik PDF Undangan Rapat ke MYSIMS`**.
+5. **Frontend Auto-Trigger & Sync ([`modules/eoffice/eoffice_data.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/eoffice_data.js), [`modules/eoffice/view_eoffice.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/view_eoffice.html), [`modules/eoffice/rapat.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/rapat.js), [`modules/eoffice/eoffice.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/eoffice.js)):** Auto-request pada simpan pertama jika `No. Urut Surat` kosong, anti-double trigger pada edit berikutnya, poller latar belakang `syncRapatMysimsNumberInBackground()`, badge `#rapatMysimsBadge`, dan sinkronisasi pre-print sebelum cetak Undangan.
+6. **PWA & Verifikasi:** Bump versi PWA ke **`v3.8.75`** pada [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) & [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js), penambahan uji penuh di [`tests/verify_fase1.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/tests/verify_fase1.js) & [`tests/verify_fase3b.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/tests/verify_fase3b.js).
+
+### 3. Status Rilis & Verifikasi
+- **Branch:** `main` (tersinkronisasi ke `origin/main` dan `prod/main`).
+- **PWA Service Worker:** `transkep-v3.8.75`.
+- **Hasil Test Suite:** `ALL 6 SECURITY & SCHEMA SUITES PASSED (0 FAILURES)`.
+
 
 
 

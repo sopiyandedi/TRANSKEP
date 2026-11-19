@@ -976,6 +976,10 @@
         <input type="hidden" id="rapatFieldPemimpinJabatan">
         <input type="hidden" id="rapatFieldNotulisNip">
         <input type="hidden" id="rapatFieldNotulisJabatan">
+        <input type="hidden" id="rapatFieldMysimsRequested" value="false">
+        <input type="hidden" id="rapatFieldMysimsStatus" value="">
+        <input type="hidden" id="rapatFieldMysimsIdp" value="">
+        <input type="hidden" id="rapatFieldMysimsRequestedAt" value="">
 
         <!-- ============================================== -->
         <!-- TAB 1: UNDANGAN, PENOMORAN & IDENTITAS RAPAT   -->
@@ -985,9 +989,11 @@
           <!-- BLOK 1A: STATUS & PENOMORAN OTOMATIS UNDANGAN -->
           <div class="bg-slate-950/50 border border-slate-800/80 rounded-2xl p-4 space-y-4">
             <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800/70 pb-2.5">
-              <div class="flex items-center gap-2">
+              <div class="flex flex-wrap items-center gap-2">
                 <i class="fa-solid fa-hashtag text-amber-400"></i>
                 <h4 class="font-bold text-slate-200 uppercase tracking-wider text-[11px]">Penomoran Surat &amp; Pejabat Penandatangan Undangan</h4>
+                <span id="rapatMysimsBadge"
+                  class="text-[9px] font-bold px-2.5 py-0.5 rounded-full bg-indigo-500/15 text-indigo-300 border border-indigo-500/30">Auto MYSIMS Saat Simpan</span>
               </div>
               <div class="flex items-center gap-1.5">
                 <button type="button" onclick="setRapatModalStatus('Terjadwal')" id="btnRapatStatusTerjadwal"
@@ -1024,7 +1030,7 @@
               <div class="md:col-span-2">
                 <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">No. Urut Surat</label>
                 <input type="text" id="rapatFieldNoUrutSurat" oninput="syncNomorUndanganPreview()"
-                  placeholder="Contoh: 1059"
+                  placeholder="Kosongkan = Auto MYSIMS"
                   class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-slate-200 font-mono font-bold text-xs focus:ring-1 focus:ring-amber-500 outline-none">
               </div>
 

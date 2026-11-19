@@ -915,20 +915,211 @@ const EofficeDataService = {
   },
 
   /**
-   * Menyimpan / Memperbarui Data Agenda & Notula Rapat langsung ke Cloud Firestore & Cache Lokal (0ms)
+   * Mengecek apakah record Rapat sudah memiliki no. urut surat Undangan bersih (bukan '...' / '......')
    */
-  async saveRapatData(payload, adminNip) {
+  hasValidRapatNumber(rec) {
+    if (!rec || typeof rec !== 'object') return false;
+    const no = String(rec.no_urut_surat || '').trim();
+    if (no && no !== '...' && no !== '......' && no !== '-') return true;
+    const full = String(rec.nomor_undangan || '').trim();
+    if (full && /^\d+[^/]*\//.test(full) && full.indexOf('...') === -1 && full.indexOf('NOMOR_MYSIMS_TERCATAT') === -1) {
+      return true;
+    }
+    return false;
+  },
+
+  /**
+   * Memicu permintaan nomor surat keluar Undangan Rapat MYSIMS & upload PDF otomatis via GAS -> n8n
+   */
+  async requestRapatUndanganSuratKeluar(rapatPayload, adminNip, token) {
+    const authToken = token || (typeof localStorage !== 'undefined' ? localStorage.getItem('transkep_session_token') : '') || '';
+    const creatorNip = adminNip || (typeof localStorage !== 'undefined' ? localStorage.getItem('transkep_active_nip') : '') || '';
+
+    if (typeof window !== 'undefined' && window.TranskepAPI && typeof window.TranskepAPI.call === 'function') {
+      return await window.TranskepAPI.call('requestRapatUndanganSuratKeluar', rapatPayload, creatorNip, authToken);
+    }
+    if (typeof google !== 'undefined' && google.script && google.script.run) {
+      return await new Promise((resolve, reject) => {
+        google.script.run
+          .withSuccessHandler((res) => resolve(res))
+          .withFailureHandler((err) => reject(err))
+          .requestRapatUndanganSuratKeluar(rapatPayload, creatorNip, authToken);
+      });
+    }
+    return { status: 'error', message: 'Koneksi API backend Apps Script tidak tersedia.' };
+  },
+
+  /**
+   * Menerapkan nomor MYSIMS Undangan Rapat terbit ke daftar E-Office, local cache, DOM modal aktif, dan Cloud Firestore
+   */
+  async applyRapatMysimsResultToLocalState(docId, issued) {
+    if (!issued || !this.hasValidRapatNumber(issued)) return null;
+    const cleanId = String(docId || issued.id_rapat || '').trim();
+    const issuedNo = String(issued.no_urut_surat || '').trim();
+    const issuedFull = String(issued.nomor_undangan || '').trim();
+    const firstSeg = (issuedFull && issuedFull.indexOf('/') !== -1) ? issuedFull.split('/')[0].trim() : '';
+    const finalNoUrut = (issuedNo && issuedNo !== '...' && issuedNo !== '......' && issuedNo !== '-') ? issuedNo : firstSeg;
+
+    const patchData = {
+      no_urut_surat: finalNoUrut,
+      nomor_undangan: issuedFull,
+      mysims_requested: true,
+      mysims_status: String(issued.mysims_status || 'Nomor Terbit MYSIMS').trim(),
+      mysims_idp: String(issued.mysims_idp || '').trim(),
+      updated_at: new Date().toISOString()
+    };
+
+    let updatedDoc = null;
+    if (typeof window !== 'undefined' && window.vmEoffice && Array.isArray(window.vmEoffice.rawRapatList)) {
+      const idx = window.vmEoffice.rawRapatList.findIndex(r =>
+        cleanId && String(r.id_rapat || r.id || '').trim() === cleanId
+      );
+      if (idx !== -1) {
+        updatedDoc = { ...window.vmEoffice.rawRapatList[idx], ...patchData };
+        window.vmEoffice.rawRapatList.splice(idx, 1, updatedDoc);
+        this.setLocalCache({ kgb: window.vmEoffice.rawKgbList || [], rapat: window.vmEoffice.rawRapatList });
+      }
+    }
+
+    if (typeof document !== 'undefined') {
+      const elId = document.getElementById('rapatFieldIdRapat');
+      const openId = elId ? String(elId.value || '').trim() : '';
+      if (cleanId && openId === cleanId) {
+        const elNo = document.getElementById('rapatFieldNoUrutSurat');
+        const elFull = document.getElementById('rapatFieldNomorUndangan');
+        const elReq = document.getElementById('rapatFieldMysimsRequested');
+        const elStat = document.getElementById('rapatFieldMysimsStatus');
+        const elIdp = document.getElementById('rapatFieldMysimsIdp');
+        const elBadge = document.getElementById('rapatMysimsBadge');
+        if (elNo && finalNoUrut) elNo.value = finalNoUrut;
+        if (elFull && issuedFull) elFull.value = issuedFull;
+        if (elReq) elReq.value = 'true';
+        if (elStat) elStat.value = patchData.mysims_status;
+        if (elIdp && patchData.mysims_idp) elIdp.value = patchData.mysims_idp;
+        if (elBadge && finalNoUrut) {
+          elBadge.textContent = 'No. MYSIMS Aktif (' + finalNoUrut + ')';
+          elBadge.className = 'text-[9px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30';
+        }
+      }
+    }
+
+    if (typeof TranskepFirebase !== 'undefined' && TranskepFirebase.isReady && TranskepFirebase.isReady() && updatedDoc) {
+      await TranskepFirebase.saveRapatToFirestore(updatedDoc).catch(() => {});
+    }
+
+    return { ...patchData, id_rapat: cleanId };
+  },
+
+  /**
+   * Mengambil status nomor MYSIMS Undangan Rapat terbaru dari Cache/Firestore backend GAS (1x cek instan)
+   */
+  async fetchLatestRapatMysimsNumber(idRapat, adminNip, token) {
+    const authToken = token || (typeof localStorage !== 'undefined' ? localStorage.getItem('transkep_session_token') : '') || '';
+    const creatorNip = adminNip || (typeof localStorage !== 'undefined' ? localStorage.getItem('transkep_active_nip') : '') || '';
+    const cleanId = String(idRapat || '').trim();
+    if (!cleanId) return null;
+
+    let res = null;
+    try {
+      if (typeof window !== 'undefined' && window.TranskepAPI && typeof window.TranskepAPI.call === 'function') {
+        res = await window.TranskepAPI.call('getRapatMysimsStatus', cleanId, creatorNip, authToken);
+      } else if (typeof google !== 'undefined' && google.script && google.script.run) {
+        res = await new Promise((resolve) => {
+          google.script.run
+            .withSuccessHandler((r) => resolve(r))
+            .withFailureHandler(() => resolve(null))
+            .getRapatMysimsStatus(cleanId, creatorNip, authToken);
+        });
+      }
+    } catch (e) {
+      return null;
+    }
+
+    if (res && res.status === 'success' && res.data && this.hasValidRapatNumber(res.data)) {
+      return await this.applyRapatMysimsResultToLocalState(cleanId, res.data);
+    }
+    return null;
+  },
+
+  /**
+   * Polling latar belakang setelah simpan agenda tanpa nomor urut agar nomor Undangan MYSIMS otomatis masuk
+   */
+  syncRapatMysimsNumberInBackground(docId, adminNip, token) {
+    if (typeof setTimeout !== 'function') return;
+    const cleanId = String(docId || '').trim();
+    if (!cleanId) return;
+    if (!this._activeRapatMysimsPolls) this._activeRapatMysimsPolls = {};
+    if (this._activeRapatMysimsPolls[cleanId]) return;
+    this._activeRapatMysimsPolls[cleanId] = true;
+
+    const maxAttempts = 10;
+    const pollDelayMs = 2000;
+    let attempt = 0;
+
+    const runStep = async () => {
+      attempt += 1;
+      try {
+        const applied = await this.fetchLatestRapatMysimsNumber(cleanId, adminNip, token);
+        if (applied && this.hasValidRapatNumber(applied)) {
+          delete this._activeRapatMysimsPolls[cleanId];
+          if (typeof showNotify === 'function') {
+            showNotify('Nomor Undangan MYSIMS Terbit', 'Nomor Undangan Rapat (' + (applied.nomor_undangan || applied.no_urut_surat) + ') siap dicetak.', 'success');
+          }
+          return;
+        }
+      } catch (e) {}
+
+      if (attempt < maxAttempts) {
+        setTimeout(runStep, pollDelayMs);
+      } else {
+        delete this._activeRapatMysimsPolls[cleanId];
+      }
+    };
+
+    setTimeout(runStep, pollDelayMs);
+  },
+
+  /**
+   * Menyimpan / Memperbarui Data Agenda & Notula Rapat langsung ke Cloud Firestore & Cache Lokal (0ms)
+   * Jika No. Urut Surat kosong pada simpan pertama -> otomatis meminta Nomor MYSIMS & suntik PDF Undangan
+   */
+  async saveRapatData(payload, adminNip, token) {
+    const authToken = token || (typeof localStorage !== 'undefined' ? localStorage.getItem('transkep_session_token') : '') || '';
     const creatorNip = adminNip || (typeof localStorage !== 'undefined' ? localStorage.getItem('transkep_active_nip') : '') || '';
     const existingId = String((payload && (payload.id_rapat || payload.id)) || '').trim();
     const docId = existingId || ('RPT-' + Date.now());
+
+    const hasCleanNomor = this.hasValidRapatNumber(payload);
+    const prevMysimsStatus = String((payload && payload.mysims_status) || '').trim();
+    const alreadySentToMysims = Boolean(payload && payload.mysims_requested) &&
+      prevMysimsStatus !== 'Meminta Nomor MYSIMS' &&
+      !prevMysimsStatus.startsWith('Gagal');
+    const shouldRequestMysims = (!hasCleanNomor && !alreadySentToMysims);
+
+    const resolvedMysimsStatus = hasCleanNomor
+      ? (prevMysimsStatus || 'Nomor Terbit / Manual')
+      : (shouldRequestMysims ? 'Permintaan Terkirim ke MYSIMS' : prevMysimsStatus);
+
     const rapatData = {
       ...(payload || {}),
       id: docId,
       id_rapat: docId,
       status: String((payload && payload.status) || 'Terjadwal'),
+      mysims_requested: shouldRequestMysims ? true : alreadySentToMysims,
+      mysims_status: resolvedMysimsStatus,
+      mysims_idp: String((payload && payload.mysims_idp) || ''),
+      mysims_requested_at: (payload && payload.mysims_requested_at) || (shouldRequestMysims ? new Date().toISOString() : ''),
       tanggal_input: (payload && payload.tanggal_input) || new Date().toISOString().split('T')[0],
-      created_by: (payload && payload.created_by) || creatorNip
+      created_by: (payload && payload.created_by) || creatorNip,
+      updated_at: new Date().toISOString()
     };
+
+    if (typeof TranskepFirebase !== 'undefined' && TranskepFirebase.isReady && TranskepFirebase.isReady()) {
+      const fsRes = await TranskepFirebase.saveRapatToFirestore(rapatData);
+      if (fsRes && fsRes.data) {
+        Object.assign(rapatData, fsRes.data);
+      }
+    }
 
     try {
       const cached = this.getLocalCache() || { kgb: [], rapat: [] };
@@ -942,15 +1133,54 @@ const EofficeDataService = {
       this.setLocalCache({ kgb: Array.isArray(cached.kgb) ? cached.kgb : [], rapat: list });
     } catch (e) {}
 
-    if (typeof TranskepFirebase !== 'undefined' && TranskepFirebase.isReady && TranskepFirebase.isReady()) {
-      const fsRes = await TranskepFirebase.saveRapatToFirestore(rapatData);
-      return {
-        status: 'success',
-        id_rapat: docId,
-        data: (fsRes && fsRes.data) ? { ...rapatData, ...fsRes.data } : rapatData
+    let mysimsRes = null;
+    if (shouldRequestMysims) {
+      const requestPayload = {
+        ...rapatData,
+        mysims_requested: false,
+        mysims_status: prevMysimsStatus
       };
+      try {
+        mysimsRes = await this.requestRapatUndanganSuratKeluar(requestPayload, creatorNip, authToken);
+        if (mysimsRes && mysimsRes.status === 'already_exists' && mysimsRes.nomor_undangan) {
+          rapatData.no_urut_surat = mysimsRes.no_urut_surat || rapatData.no_urut_surat;
+          rapatData.nomor_undangan = mysimsRes.nomor_undangan;
+          rapatData.mysims_requested = true;
+          rapatData.mysims_status = 'Nomor Terbit MYSIMS';
+          await this.applyRapatMysimsResultToLocalState(docId, {
+            id_rapat: docId,
+            no_urut_surat: rapatData.no_urut_surat,
+            nomor_undangan: rapatData.nomor_undangan,
+            mysims_status: 'Nomor Terbit MYSIMS'
+          });
+        } else if (mysimsRes && mysimsRes.status === 'success') {
+          this.syncRapatMysimsNumberInBackground(docId, creatorNip, authToken);
+        } else if (!mysimsRes || (mysimsRes.status !== 'success' && mysimsRes.status !== 'already_exists')) {
+          mysimsRes = mysimsRes || { status: 'error', message: 'Backend GAS tidak merespons permintaan nomor MYSIMS.' };
+          rapatData.mysims_requested = false;
+          rapatData.mysims_status = 'Gagal Minta Nomor MYSIMS';
+          if (typeof TranskepFirebase !== 'undefined' && TranskepFirebase.isReady && TranskepFirebase.isReady()) {
+            await TranskepFirebase.saveRapatToFirestore(rapatData).catch(() => {});
+          }
+        }
+      } catch (mErr) {
+        console.warn('⚠️ [E-Office] Gagal panggil MYSIMS Rapat:', mErr);
+        mysimsRes = { status: 'error', message: mErr.toString() };
+        rapatData.mysims_requested = false;
+        rapatData.mysims_status = 'Gagal Minta Nomor MYSIMS';
+        if (typeof TranskepFirebase !== 'undefined' && TranskepFirebase.isReady && TranskepFirebase.isReady()) {
+          await TranskepFirebase.saveRapatToFirestore(rapatData).catch(() => {});
+        }
+      }
     }
-    return { status: 'success', id_rapat: docId, data: rapatData };
+
+    return {
+      status: 'success',
+      id_rapat: docId,
+      mysims_requested_now: shouldRequestMysims,
+      mysims_res: mysimsRes,
+      data: rapatData
+    };
   },
 
   _rapatPhotoCache: {},

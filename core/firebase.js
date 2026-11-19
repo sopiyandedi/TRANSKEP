@@ -1366,8 +1366,9 @@ const TranskepFirebase = {
     'peserta_json', 'pengarahan_umum', 'pembahasan', 'pembahasan_json',
     'kesimpulan', 'foto_rapat_json', 'audio_rapat_url', 'ai_transcript',
     'status', 'doc_undangan_url', 'doc_absen_url', 'doc_notulen_url',
-    'folder_url', 'tanggal_input', 'created_by', 'updated_by', 'synced_at',
-    'is_firebase', 'updated_at', 'created_at'
+    'folder_url', 'mysims_requested', 'mysims_status', 'mysims_idp',
+    'mysims_requested_at', 'tanggal_input', 'created_by', 'updated_by',
+    'synced_at', 'is_firebase', 'updated_at', 'created_at'
   ],
 
   async _waitAuthForWrite(contextName) {
@@ -1708,6 +1709,10 @@ const TranskepFirebase = {
       doc_absen_url: this._cleanOptionalUrl(rapatData.doc_absen_url),
       doc_notulen_url: this._cleanOptionalUrl(rapatData.doc_notulen_url),
       folder_url: this._cleanOptionalUrl(rapatData.folder_url),
+      mysims_requested: Boolean(rapatData.mysims_requested),
+      mysims_status: String(rapatData.mysims_status || ''),
+      mysims_idp: String(rapatData.mysims_idp || ''),
+      mysims_requested_at: String(rapatData.mysims_requested_at || ''),
       tanggal_input: String(rapatData.tanggal_input || new Date().toISOString().split('T')[0]),
       created_by: String(rapatData.created_by || caller.nip || ''),
       updated_by: String(caller.nip || rapatData.updated_by || ''),

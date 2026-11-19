@@ -709,12 +709,43 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       },
 
-      triggerPrintUndanganRapat(item) {
+      async triggerPrintUndanganRapat(item) {
         if (!item || !item.rawData) return;
+        let merged = { ...item.rawData };
+
+        const curId = String(merged.id_rapat || merged.id || '').trim();
+        if (curId && Array.isArray(this.rawRapatList)) {
+          const liveMatch = this.rawRapatList.find(r => String(r.id_rapat || r.id || '').trim() === curId);
+          if (liveMatch) merged = { ...merged, ...liveMatch };
+        }
+
+        const hasValidNoFn = (rec) => {
+          if (!rec) return false;
+          const no = String(rec.no_urut_surat || '').trim();
+          if (no && no !== '...' && no !== '......' && no !== '-') return true;
+          const full = String(rec.nomor_undangan || '').trim();
+          return Boolean(full && /^\d+[^/]*\//.test(full) && full.indexOf('...') === -1);
+        };
+
+        const isCandidateRemote = Boolean(merged.mysims_requested) ||
+          (curId !== '' && !String(merged.mysims_status || '').startsWith('Gagal'));
+
+        if (!hasValidNoFn(merged) && isCandidateRemote &&
+            window.EofficeDataService && typeof window.EofficeDataService.fetchLatestRapatMysimsNumber === 'function') {
+          if (typeof showLoading === 'function') showLoading("Memeriksa nomor surat Undangan MYSIMS terbaru...");
+          try {
+            const issued = await window.EofficeDataService.fetchLatestRapatMysimsNumber(curId);
+            if (issued && hasValidNoFn(issued)) {
+              merged = { ...merged, ...issued };
+            }
+          } catch (e) {}
+          if (typeof hideLoading === 'function') hideLoading();
+        }
+
         if (typeof window.printUndanganRapat === 'function') {
-          window.printUndanganRapat(item.rawData);
-        } else if (item.docUndanganUrl) {
-          this.openSecureFile(item.docUndanganUrl, 'Undangan Rapat');
+          window.printUndanganRapat(merged);
+        } else if (merged.doc_undangan_url || item.docUndanganUrl) {
+          this.openSecureFile(merged.doc_undangan_url || item.docUndanganUrl, 'Undangan Rapat');
         } else if (typeof showNotify === 'function') {
           showNotify("Modul Cetak Undangan", "Komponen cetak Undangan belum siap dimuat.", "warning");
         }

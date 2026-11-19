@@ -13,7 +13,9 @@ const files = [
   'permohonan/st/st.js',
   'permohonan/persetujuan.js',
   'eoffice/kgb_pdf_compiler.js',
-  'eoffice/kgb.js'
+  'eoffice/kgb.js',
+  'eoffice/undangan_pdf_compiler.js',
+  'eoffice/rapat.js'
 ];
 
 // 1. Parse / Syntax check all modified GAS files
@@ -21,7 +23,7 @@ for (const f of files) {
   const src = fs.readFileSync(f, 'utf8');
   new vm.Script(src, { filename: f });
 }
-console.log('[PASS] Syntax check passed for all 7 modified GAS files.');
+console.log('[PASS] Syntax check passed for all 9 modified GAS files.');
 
 // 2. Check git working tree integrity & scan for anti-patterns
 const codeSrc = fs.readFileSync('code.js', 'utf8');
@@ -466,13 +468,15 @@ assert.strictEqual(recordedFetchCalls.filter(c => c.url.includes('webhook')).len
 
 // Integrated Frontend -> Backend Flow (EofficeDataService.saveOrGenerateKgb -> handleApiPost_ -> triggerN8nSuratKeluarKgb_)
 const fakeFsKgbStore = {};
+const fakeFsRapatStore = {};
 mockFetchResponder = (url, opts) => {
   if (url.includes('oauth2.googleapis.com/token')) {
     return { getResponseCode: () => 200, getContentText: () => JSON.stringify({ access_token: 'mock-sa-bearer-tok', expires_in: 3600 }) };
   }
-  if (url.includes('/eoffice_kgb/') && (!opts.method || String(opts.method).toUpperCase() === 'GET')) {
-    const idPart = decodeURIComponent(url.split('/eoffice_kgb/')[1].split('?')[0]);
-    const rec = fakeFsKgbStore[idPart];
+  if ((url.includes('/eoffice_kgb/') || url.includes('/eoffice_rapat/')) && (!opts.method || String(opts.method).toUpperCase() === 'GET')) {
+    const colSeg = url.includes('/eoffice_kgb/') ? '/eoffice_kgb/' : '/eoffice_rapat/';
+    const idPart = decodeURIComponent(url.split(colSeg)[1].split('?')[0]);
+    const rec = url.includes('/eoffice_kgb/') ? fakeFsKgbStore[idPart] : fakeFsRapatStore[idPart];
     if (!rec) return { getResponseCode: () => 404, getContentText: () => '{}' };
     const fields = {};
     Object.keys(rec).forEach(k => {
@@ -490,7 +494,9 @@ const feSandbox = {
   TranskepFirebase: {
     isReady: () => true,
     saveKgbToFirestore: async (doc) => { fakeFsKgbStore[doc.id_kgb] = Object.assign({}, doc); return doc; },
-    deleteKgbFromFirestore: async (id) => { delete fakeFsKgbStore[id]; return true; }
+    deleteKgbFromFirestore: async (id) => { delete fakeFsKgbStore[id]; return true; },
+    saveRapatToFirestore: async (doc) => { fakeFsRapatStore[doc.id_rapat] = Object.assign({}, doc); return { status: 'success', data: doc }; },
+    deleteRapatFromFirestore: async (id) => { delete fakeFsRapatStore[id]; return true; }
   },
   TranskepAPI: {
     call: async (method, ...args) => parseResp(sandbox.handleApiPost_({
@@ -689,6 +695,145 @@ const e2eSave1 = feSandbox.EofficeDataService.saveOrGenerateKgb({
   assert.strictEqual(adminMysimsStatus.source, 'cache');
   assert.strictEqual(adminMysimsStatus.data.nokgb, '1102');
   assert.strictEqual(adminMysimsStatus.data.nomor_surat, '1102/KPA.W10-A2/KP2.1.2/XI/2026');
+
+  // =========================================================================
+  // J. Tahap 141: Otomasi Nomor Surat Keluar & Suntik PDF Undangan Rapat MYSIMS
+  // =========================================================================
+  sandbox.CacheService.getScriptCache().remove('transkep_fs_sa_token_v1');
+  sandbox.CacheService.getScriptCache().remove('transkep_fs_admin_id_token_v1');
+
+  // 1. Tolak webhook tanpa secret_key valid
+  for (const badRapatCb of [
+    { id_rapat: 'RPT-141-1', nomor_surat: '1108/KPA.W10-A2/UND.HM3.1.1/XI/2026' },
+    { id_rapat: 'RPT-141-1', nomor_surat: '1108/KPA.W10-A2/UND.HM3.1.1/XI/2026', secret_key: '' },
+    { id_rapat: 'RPT-141-1', nomor_surat: '1108/KPA.W10-A2/UND.HM3.1.1/XI/2026', secret_key: 'WRONG' }
+  ]) {
+    assert.strictEqual(sandbox.updateNomorSuratRapatFromExternal_(badRapatCb).status, 'error', 'Rapat callback must reject invalid secret_key');
+  }
+
+  // 2. Blokir role Pegawai untuk requestRapatUndanganSuratKeluar & getRapatMysimsStatus
+  const pegRapatDeny = parseResp(sandbox.handleApiPost_({
+    action: 'call',
+    method: 'requestRapatUndanganSuratKeluar',
+    args: [{ id_rapat: 'RPT-141-1', agenda: 'Rapat' }, '199002022015012002', pegLogin2.token],
+    nip: '199002022015012002',
+    token: pegLogin2.token
+  }));
+  assert.strictEqual(pegRapatDeny.status, 'error', 'Pegawai must be blocked from requestRapatUndanganSuratKeluar');
+
+  const pegRapatStatDeny = parseResp(sandbox.handleApiPost_({
+    action: 'call',
+    method: 'getRapatMysimsStatus',
+    args: ['RPT-141-1', '199002022015012002', pegLogin2.token],
+    nip: '199002022015012002',
+    token: pegLogin2.token
+  }));
+  assert.strictEqual(pegRapatStatDeny.status, 'error', 'Pegawai must be blocked from getRapatMysimsStatus');
+
+  // 3. Kembalikan responder mock ke default OK untuk uji E2E saveRapatData -> n8n webhook
+  mockFetchResponder = (url, opts) => {
+    if (url.includes('oauth2.googleapis.com/token')) {
+      return { getResponseCode: () => 200, getContentText: () => JSON.stringify({ access_token: 'mock-sa-bearer-tok', expires_in: 3600 }) };
+    }
+    if (url.includes('/eoffice_rapat/') && (!opts.method || String(opts.method).toUpperCase() === 'GET')) {
+      const idPart = decodeURIComponent(url.split('/eoffice_rapat/')[1].split('?')[0]);
+      const rec = fakeFsRapatStore[idPart];
+      if (!rec) return { getResponseCode: () => 404, getContentText: () => '{}' };
+      const fields = {};
+      Object.keys(rec).forEach(k => {
+        if (typeof rec[k] === 'boolean') fields[k] = { booleanValue: rec[k] };
+        else if (rec[k] !== undefined && rec[k] !== null) fields[k] = { stringValue: String(rec[k]) };
+      });
+      return { getResponseCode: () => 200, getContentText: () => JSON.stringify({ fields }) };
+    }
+    return { getResponseCode: () => 200, getContentText: () => JSON.stringify({ name: url, fields: {} }) };
+  };
+
+  const rapatWebhookBefore = recordedFetchCalls.filter(c => c.url.includes('webhook')).length;
+  const rapatSave1 = await feSandbox.EofficeDataService.saveRapatData({
+    id_rapat: 'RPT-141-WKPA',
+    agenda: 'Rapat Evaluasi <script>alert(1)</script>',
+    tgl_surat: '2026-11-19',
+    no_urut_surat: '',
+    nomor_undangan: '.../WKPA.W10-A2/UND.HM3.1.1/XI/2026',
+    kode_pejabat_ttd: 'WKPA.W10-A2',
+    kode_klasifikasi_surat: 'HM3.1.1',
+    pejabat_ttd_nama: 'Ikin, S.Ag., M.E.',
+    pejabat_ttd_jabatan: 'Wakil Ketua Pengadilan Agama Indramayu',
+    tujuan_undangan_json: JSON.stringify([
+      { label: 'Hakim 1' }, { label: 'Panitera' }, { label: 'Sekretaris' }, { label: 'Kasubbag <img src=x>' }
+    ]),
+    mysims_requested: false
+  }, '198001012005011001', admLogin.token);
+
+  assert.strictEqual(rapatSave1.status, 'success');
+  assert.strictEqual(rapatSave1.mysims_requested_now, true, '1st Rapat save without no_urut_surat must trigger MYSIMS');
+  assert.strictEqual(rapatSave1.mysims_res.status, 'success', 'requestRapatUndanganSuratKeluar must succeed: ' + (rapatSave1.mysims_res && rapatSave1.mysims_res.message));
+  const rapatWebhooks = recordedFetchCalls.filter(c => c.url.includes('webhook'));
+  assert.strictEqual(rapatWebhooks.length, rapatWebhookBefore + 1, '1st Rapat save must call n8n webhook once');
+  const sentRapatN8n = JSON.parse(rapatWebhooks[rapatWebhooks.length - 1].opts.payload);
+  assert.strictEqual(sentRapatN8n.event, 'RAPAT_UNDANGAN_SURAT_KELUAR');
+  assert.strictEqual(sentRapatN8n.task.jabatan_penandatangan, 'Wakil Ketua');
+  assert.strictEqual(sentRapatN8n.task.satker_kode, 'WKPA.W10-A2');
+  assert.strictEqual(sentRapatN8n.task.kode_klasifikasi, 'HM3.1.1');
+  assert.strictEqual(sentRapatN8n.task.sifat, 'Biasa');
+  assert.strictEqual(sentRapatN8n.task.ket, 'Biasa');
+
+  // Edit ke-2 tidak boleh meminta nomor MYSIMS lagi
+  const rapatSave2 = await feSandbox.EofficeDataService.saveRapatData({
+    ...rapatSave1.data,
+    tempat: 'Ruang Sidang Utama'
+  }, '198001012005011001', admLogin.token);
+  assert.strictEqual(rapatSave2.mysims_requested_now, false, '2nd Rapat edit must NOT re-trigger MYSIMS');
+  assert.strictEqual(recordedFetchCalls.filter(c => c.url.includes('webhook')).length, rapatWebhookBefore + 1);
+
+  // 4. Headless Undangan PDF Compiler (2-Stage Resilient Fallback + 1 vs 2 Lembar + Callback PATCH Firestore)
+  const origHtmlFnRapat = sandbox.HtmlService.createHtmlOutput;
+  sandbox.HtmlService.createHtmlOutput = (html) => {
+    if (String(html).includes('<img')) throw new Error('Simulated logo timeout');
+    return origHtmlFnRapat(html);
+  };
+  const fallbackUndPdf = sandbox.generateUndanganPdfBase64_({
+    agenda: 'Rapat Koordinasi',
+    pejabat_ttd_nama: 'H. Zulkifli, S.Ag., S.H., M.H.',
+    pejabat_ttd_jabatan: 'Ketua Pengadilan Agama Indramayu',
+    tujuan_undangan_json: JSON.stringify([{ label: 'Wakil Ketua' }])
+  }, '1107/KPA.W10-A2/UND.OT.01.1/XI/2026');
+  sandbox.HtmlService.createHtmlOutput = origHtmlFnRapat;
+  assert(fallbackUndPdf && fallbackUndPdf.pdf_base64.length > 100, 'Undangan PDF 2-stage fallback must succeed even when <img> fails');
+  assert(!Buffer.from(fallbackUndPdf.pdf_base64, 'base64').toString('utf8').includes('Lampiran Surat Undangan'), '1 invitee Undangan PDF must stay 1 page');
+
+  const rapatCbOk = parseResp(sandbox.handleApiPost_({
+    action: 'updateNomorSuratRapat',
+    id_rapat: 'RPT-141-WKPA',
+    nomor_surat: '1108/WKPA.W10-A2/UND.HM3.1.1/XI/2026',
+    idp: '1408',
+    secret_key: 'TEST_HOOK_KEY_127'
+  }));
+  assert.strictEqual(rapatCbOk.status, 'success', 'Valid Rapat callback must succeed');
+  assert.strictEqual(rapatCbOk.no_urut_surat, '1108');
+  assert.strictEqual(rapatCbOk.firestore_synced, true);
+  assert(rapatCbOk.pdf_undangan && rapatCbOk.pdf_undangan.pdf_base64.length > 100, 'Rapat callback must compile Base64 PDF Undangan');
+  const decodedUndPdf = Buffer.from(rapatCbOk.pdf_undangan.pdf_base64, 'base64').toString('utf8');
+  assert(decodedUndPdf.includes('1108/WKPA.W10-A2/UND.HM3.1.1/XI/2026'), 'Compiled Undangan PDF must embed official MYSIMS number');
+  assert(decodedUndPdf.includes('Lampiran Surat Undangan') && decodedUndPdf.includes('font-size: 9pt;'), '>3 invitees Undangan PDF must generate Page 2 Lampiran');
+  assert(!decodedUndPdf.includes('<script>alert(1)') && !decodedUndPdf.includes('<img src=x>'), 'Compiled Undangan PDF must escape XSS');
+
+  const rapatPatchCall = recordedFetchCalls.find(c => c.url.includes('/eoffice_rapat/RPT-141-WKPA') && String(c.opts.method || '').toLowerCase() === 'patch');
+  assert(rapatPatchCall && rapatPatchCall.opts.headers && rapatPatchCall.opts.headers.Authorization === 'Bearer mock-sa-bearer-tok',
+    'Rapat Firestore REST PATCH must carry OAuth2 Service Account Bearer token');
+
+  const adminRapatStatus = parseResp(sandbox.handleApiPost_({
+    action: 'call',
+    method: 'getRapatMysimsStatus',
+    args: ['RPT-141-WKPA', '198001012005011001', admLogin.token],
+    nip: '198001012005011001',
+    token: admLogin.token
+  }));
+  assert.strictEqual(adminRapatStatus.status, 'success', 'Admin must fetch issued Rapat number via getRapatMysimsStatus');
+  assert.strictEqual(adminRapatStatus.source, 'cache');
+  assert.strictEqual(adminRapatStatus.data.no_urut_surat, '1108');
+  assert.strictEqual(adminRapatStatus.data.nomor_undangan, '1108/WKPA.W10-A2/UND.HM3.1.1/XI/2026');
 
   console.log('[PASS] ALL Fase 1 end-to-end functional & security tests passed (0 failures).');
 })().catch(err => {
