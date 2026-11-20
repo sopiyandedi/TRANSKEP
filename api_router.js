@@ -279,6 +279,7 @@ var AUTHENTICATED_RPC_METHODS_ = {
   requestRapatUndanganSuratKeluar: true,
   getRapatMysimsStatus: true,
   uploadFotoRapat: true,
+  uploadAudioRapat: true,
   generateAiNotulenRapat: true,
   saveJobdes: true,
   createPdfJobdes: true,

@@ -6936,6 +6936,24 @@ Menghilangkan dropdown `<select>` bawaan OS yang panjang dan kaku pada Tab 1 for
 2. **Controller Searchable & Two-Way Sync ([`modules/eoffice/rapat.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/rapat.js)):** Menambahkan `OFFICIAL_SEARCH_CONFIG_`, `getFilteredOfficialPegawai_`, `renderOfficialSearchDropdown_` (`data-nip` XSS-safe), `openOfficialSearchDrop`/`filterOfficialSearchDrop`/`closeOfficialSearchDrop`/`clearOfficialSearch`/`selectOfficialPegawai`/`handleOfficialSearchKeydown` (`Enter` langsung memilih item aktif/teratas, otomatis memperbarui NIP, Nama/Jabatan, Kode Jabatan TTD & preview nomor surat), serta `syncNoUrutFromNomorUndangan()` di input langsung maupun sebelum submit.
 3. **PWA & Pengujian:** Bump PWA **`v3.8.78`** ([`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) & [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js)) serta uji XSS + runtime di [`tests/verify_fase3a.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/tests/verify_fase3a.js) & [`tests/verify_fase3b.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/tests/verify_fase3b.js).
 
+---
+
+## REVISI TAHAP 145: PENYEMPURNAAN UX RAPAT, CEKLIS MULTI-PILIH, DRAG & DROP & SUBFOLDER DRIVE TAHUN/BULAN/JUDUL (`v3.8.79`)
+**Status:** `[SELESAI & AKTIF — v3.8.79]`
+
+### 1. Tujuan
+Menyempurnakan kenyamanan penggunaan Workspace Rapat serta mengotomatiskan kerapihan arsip dokumentasi Foto & Audio di Google Drive.
+
+### 2. Rincian Implementasi
+1. **Fix Footer Modal Naik Saat `Tab` ([`modules/eoffice/view_eoffice.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/view_eoffice.html) & [`modules/eoffice/rapat.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/rapat.js)):** Mengganti `overflow-hidden` menjadi `overflow-clip` pada `#modalAgendaRapatBox`, menambahkan `min-h-0` pada body scroll, memindahkan sentinel `Tab` dari `sr-only` menjadi elemen in-flow berdimensi 0 di dalam kartu `relative`, serta menjaga `modalAgendaRapatBox.scrollTop = 0`.
+2. **Ikon Biru `+` di Atas Ikon Delete `🗑`:** Menghapus bar keterangan bawah kartu pembicara dan memindahkan tombol bulat indigo `+` ke kolom aksi tepat di atas ikon tempat sampah pada baris terakhir setiap pembicara.
+3. **Tombol `+ Tambah Pembicara` di Header Modal Atas:** Memindahkan tombol tambah pembicara ke sebelah kiri ikon layar penuh & tutup (otomatis tampil saat Tab 3 aktif, langsung scroll & fokus ke pembicara baru).
+4. **Ceklis Multi-Pilih Tab 2 + `Enter`:** Menambahkan kotak ceklis di ujung kanan tiap baris dropdown `#rapatTujuanSearchDropdown` beserta tombol `Pilih Semua Hasil`; klik ceklis tidak menutup dropdown, dan menekan `Enter` (atau `+ Tambah`) langsung memasukkan seluruh pegawai yang diceklis sekaligus.
+5. **Drag & Drop Otomatis Foto & Audio (Tab 4):** Menambahkan dropzone interaktif `#rapatFotoDropZone` dan `#rapatAudioDropZone` dengan sorot batas saat file diseret & otomatis memproses file saat dilepas.
+6. **Tombol Cetak Ikon-Only di Tabel E-Office:** Mengubah tombol cetak `Undangan`, `Absen`, dan `Notula` menjadi tombol kotak `w-8 h-8` ikon saja lengkap dengan tooltip.
+7. **Subfolder Drive Bertingkat `Tahun / Bulan / Judul Rapat` ([`eoffice/rapat.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/rapat.js), [`code.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/code.js), [`api_router.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/api_router.js), [`modules/eoffice/eoffice_data.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/eoffice_data.js)):** Menambahkan `resolveRapatFolderParts_`, dukungan magic bytes audio di `validateUploadedFile_`, kedalaman ancestor 5 di `collectDriveAncestorMeta_`, serta RPC `uploadAudioRapat` agar foto & rekaman suara tersimpan rapi dalam folder `Arsip Foto Rapat TRANSKEP / <Tahun> / <Bulan> / <Judul Rapat>`.
+8. **PWA & Pengujian:** Bump PWA **`v3.8.79`** ([`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) & [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js)), perluasan uji audio & dataset XSS di [`tests/verify_fase3a.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/tests/verify_fase3a.js), serta suite penuh Tahap 145 di [`tests/verify_fase3b.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/tests/verify_fase3b.js).
+
 
 
 

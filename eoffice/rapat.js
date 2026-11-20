@@ -35,16 +35,21 @@ function generateSeqRapatId_(ss) {
 }
 
 /**
- * Helper: Mengambil / Membuat Folder Privat Google Drive untuk Dokumentasi Foto Rapat
+ * Helper: Mengambil atau membuat subfolder privat di dalam parentFolder (atau DriveApp root jika null)
  */
-function getOrCreateFotoRapatFolder_() {
-  const folderName = 'Arsip Foto Rapat TRANSKEP';
-  const folders = DriveApp.getFoldersByName(folderName);
-  let targetFolder;
-  if (folders.hasNext()) {
-    targetFolder = folders.next();
-  } else {
-    targetFolder = DriveApp.createFolder(folderName);
+function getOrCreateSubfolderByName_(parentFolder, name) {
+  const folderName = String(name || '').trim() || 'Folder';
+  const folders = parentFolder ? parentFolder.getFoldersByName(folderName) : DriveApp.getFoldersByName(folderName);
+  let targetFolder = null;
+  while (folders && typeof folders.hasNext === 'function' && folders.hasNext()) {
+    const candidate = folders.next();
+    if (candidate && (typeof candidate.isTrashed !== 'function' || !candidate.isTrashed())) {
+      targetFolder = candidate;
+      break;
+    }
+  }
+  if (!targetFolder) {
+    targetFolder = parentFolder ? parentFolder.createFolder(folderName) : DriveApp.createFolder(folderName);
   }
   if (typeof setPrivateDriveSharing_ === 'function') {
     setPrivateDriveSharing_(targetFolder);
@@ -53,44 +58,160 @@ function getOrCreateFotoRapatFolder_() {
 }
 
 /**
+ * Helper: Memecah konteks rapat menjadi nama subfolder berjenjang Tahun / Bulan Indonesia / Judul Rapat
+ */
+function resolveRapatFolderParts_(payload) {
+  const p = (payload && typeof payload === 'object') ? payload : {};
+  const BULAN_INDO = [
+    'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+    'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+  ];
+
+  let year = '';
+  let month = '';
+
+  const parseIsoParts = function (isoVal) {
+    const m = String(isoVal || '').trim().match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!m) return false;
+    const monIdx = parseInt(m[2], 10) - 1;
+    if (monIdx < 0 || monIdx >= 12) return false;
+    year = m[1];
+    month = BULAN_INDO[monIdx];
+    return true;
+  };
+
+  if (!parseIsoParts(p.tgl_rapat_iso)) {
+    const hariTgl = String(p.hari_tanggal || '').trim();
+    const htLow = hariTgl.toLowerCase();
+    const yMatch = hariTgl.match(/\b(19\d{2}|20\d{2})\b/);
+    let foundMon = '';
+    for (let i = 0; i < BULAN_INDO.length; i++) {
+      if (htLow.indexOf(BULAN_INDO[i].toLowerCase()) !== -1) {
+        foundMon = BULAN_INDO[i];
+        break;
+      }
+    }
+    if (!foundMon && htLow.indexOf('nopember') !== -1) {
+      foundMon = 'November';
+    }
+    if (yMatch && foundMon) {
+      year = yMatch[1];
+      month = foundMon;
+    } else if (!parseIsoParts(p.tgl_surat)) {
+      const todayIso = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'yyyy-MM-dd');
+      parseIsoParts(todayIso);
+      if (yMatch && !year) year = yMatch[1];
+      if (foundMon) month = foundMon;
+    }
+  }
+
+  if (!year) year = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'yyyy');
+  if (!month) month = BULAN_INDO[0];
+
+  const safePrefix = String(p.id_rapat || '').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 40);
+  const cleanTitle = String(p.agenda || '')
+    .replace(/[\/\\:*?"<>|\r\n\t]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 80)
+    .trim();
+
+  return {
+    year: year,
+    month: month,
+    title: cleanTitle || safePrefix || 'Rapat Tanpa Judul'
+  };
+}
+
+/**
+ * Helper: Mengambil / Membuat Folder Privat Google Drive untuk Dokumentasi Foto & Rekaman Rapat
+ * Struktur bertingkat bila payload diberikan: Arsip Foto Rapat TRANSKEP / Tahun / Bulan / Judul Rapat
+ */
+function getOrCreateFotoRapatFolder_(payload) {
+  const rootFolder = getOrCreateSubfolderByName_(null, 'Arsip Foto Rapat TRANSKEP');
+  if (!payload || typeof payload !== 'object' || Object.keys(payload).length === 0) {
+    return rootFolder;
+  }
+  const parts = resolveRapatFolderParts_(payload);
+  const yearFolder = getOrCreateSubfolderByName_(rootFolder, parts.year);
+  const monthFolder = getOrCreateSubfolderByName_(yearFolder, parts.month);
+  return getOrCreateSubfolderByName_(monthFolder, parts.title);
+}
+
+/**
+ * Helper bersama untuk mengunggah media rapat (foto/audio) ke subfolder Drive Tahun/Bulan/Judul Rapat
+ */
+function uploadRapatMediaToDrive_(payload, adminNip, clientToken, cfg) {
+  const opts = cfg || {};
+  if (!cekOtorisasiAdmin(adminNip, clientToken)) {
+    return { status: 'error', message: opts.deniedMessage || 'Akses Ditolak: Unggah media rapat hanya dapat dilakukan oleh Admin/Operator.' };
+  }
+  const p = payload || {};
+  const validated = validateUploadedFile_(
+    p.file_data,
+    p.file_name || opts.defaultFileName || 'media_rapat.bin',
+    p.mime_type || opts.defaultMime || 'application/octet-stream',
+    opts.validateOpts || {}
+  );
+
+  const safePrefix = String(p.id_rapat || 'RPT').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 40) || 'RPT';
+  const stamp = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'yyyyMMdd_HHmmss');
+  const finalName = (opts.filePrefix || 'Media_') + safePrefix + '_' + stamp + '_' + Math.floor(Math.random() * 1000) + '.' + validated.ext;
+
+  const blob = Utilities.newBlob(validated.bytes, validated.blobMimeType, finalName);
+  const parts = resolveRapatFolderParts_(p);
+  const folder = getOrCreateFotoRapatFolder_(p);
+  const file = folder.createFile(blob);
+  if (typeof setPrivateDriveSharing_ === 'function') {
+    setPrivateDriveSharing_(file);
+  }
+
+  const fileId = file.getId();
+  return {
+    status: 'success',
+    data: {
+      file_id: fileId,
+      url: 'https://drive.google.com/file/d/' + fileId + '/view',
+      file_name: file.getName(),
+      mime_type: validated.blobMimeType,
+      folder_url: typeof folder.getUrl === 'function' ? folder.getUrl() : '',
+      folder_path: 'Arsip Foto Rapat TRANSKEP / ' + parts.year + ' / ' + parts.month + ' / ' + parts.title
+    }
+  };
+}
+
+/**
  * RPC Aman: Upload Foto Dokumentasi Rapat Terkompresi ke Google Drive Privat
  */
 function uploadFotoRapat(payload, adminNip, clientToken) {
   try {
-    if (!cekOtorisasiAdmin(adminNip, clientToken)) {
-      return { status: 'error', message: 'Akses Ditolak: Unggah foto rapat hanya dapat dilakukan oleh Admin/Operator.' };
-    }
-    const p = payload || {};
-    const validated = validateUploadedFile_(
-      p.file_data,
-      p.file_name || 'foto_rapat.jpg',
-      p.mime_type || 'image/jpeg',
-      { allowPdf: false, allowImages: true, maxBytes: 5 * 1024 * 1024 }
-    );
-
-    const safePrefix = String(p.id_rapat || 'RPT').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 40) || 'RPT';
-    const stamp = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'yyyyMMdd_HHmmss');
-    const finalName = 'Foto_' + safePrefix + '_' + stamp + '_' + Math.floor(Math.random() * 1000) + '.' + validated.ext;
-
-    const blob = Utilities.newBlob(validated.bytes, validated.blobMimeType, finalName);
-    const folder = getOrCreateFotoRapatFolder_();
-    const file = folder.createFile(blob);
-    if (typeof setPrivateDriveSharing_ === 'function') {
-      setPrivateDriveSharing_(file);
-    }
-
-    const fileId = file.getId();
-    return {
-      status: 'success',
-      data: {
-        file_id: fileId,
-        url: 'https://drive.google.com/file/d/' + fileId + '/view',
-        file_name: file.getName(),
-        mime_type: validated.blobMimeType
-      }
-    };
+    return uploadRapatMediaToDrive_(payload, adminNip, clientToken, {
+      deniedMessage: 'Akses Ditolak: Unggah foto rapat hanya dapat dilakukan oleh Admin/Operator.',
+      defaultFileName: 'foto_rapat.jpg',
+      defaultMime: 'image/jpeg',
+      filePrefix: 'Foto_',
+      validateOpts: { allowPdf: false, allowImages: true, allowAudio: false, maxBytes: 5 * 1024 * 1024 }
+    });
   } catch (err) {
     Logger.log('ERROR uploadFotoRapat: ' + err.toString());
+    return { status: 'error', message: err.message || err.toString() };
+  }
+}
+
+/**
+ * RPC Aman: Upload Rekaman Audio Rapat ke Subfolder Google Drive Privat (Tahun/Bulan/Judul Rapat)
+ */
+function uploadAudioRapat(payload, adminNip, clientToken) {
+  try {
+    return uploadRapatMediaToDrive_(payload, adminNip, clientToken, {
+      deniedMessage: 'Akses Ditolak: Unggah audio rapat hanya dapat dilakukan oleh Admin/Operator.',
+      defaultFileName: 'rekaman_rapat.webm',
+      defaultMime: 'audio/webm',
+      filePrefix: 'Audio_',
+      validateOpts: { allowPdf: false, allowImages: false, allowAudio: true, maxBytes: 12 * 1024 * 1024 }
+    });
+  } catch (err) {
+    Logger.log('ERROR uploadAudioRapat: ' + err.toString());
     return { status: 'error', message: err.message || err.toString() };
   }
 }

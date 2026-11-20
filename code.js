@@ -360,6 +360,7 @@ function validateUploadedFile_(fileData, fileName, fileMimeType, opts) {
   const allowPdf = cfg.allowPdf !== false;
   const allowImages = Boolean(cfg.allowImages);
   const allowZip = Boolean(cfg.allowZip);
+  const allowAudio = Boolean(cfg.allowAudio);
   const maxBytes = Number(cfg.maxBytes) > 0 ? Number(cfg.maxBytes) : (10 * 1024 * 1024);
 
   if (!fileData || typeof fileData !== 'string') {
@@ -403,6 +404,18 @@ function validateUploadedFile_(fileData, fileName, fileMimeType, opts) {
     sig = { type: 'image', mime: 'image/jpeg', ext: 'jpg' };
   } else if (bytes.length >= 4 && u(0) === 0x50 && u(1) === 0x4B && ((u(2) === 0x03 && u(3) === 0x04) || (u(2) === 0x05 && u(3) === 0x06) || (u(2) === 0x07 && u(3) === 0x08))) {
     sig = { type: 'zip', mime: 'application/zip', ext: 'zip' };
+  } else if ((bytes.length >= 3 && u(0) === 0x49 && u(1) === 0x44 && u(2) === 0x33) ||
+             (bytes.length >= 2 && u(0) === 0xFF && (u(1) === 0xFB || u(1) === 0xF3 || u(1) === 0xF2 || u(1) === 0xFA))) {
+    sig = { type: 'audio', mime: 'audio/mpeg', ext: 'mp3' };
+  } else if (bytes.length >= 8 && u(4) === 0x66 && u(5) === 0x74 && u(6) === 0x79 && u(7) === 0x70) {
+    sig = { type: 'audio', mime: 'audio/mp4', ext: 'm4a' };
+  } else if (bytes.length >= 12 && u(0) === 0x52 && u(1) === 0x49 && u(2) === 0x46 && u(3) === 0x46 &&
+             u(8) === 0x57 && u(9) === 0x41 && u(10) === 0x56 && u(11) === 0x45) {
+    sig = { type: 'audio', mime: 'audio/wav', ext: 'wav' };
+  } else if (bytes.length >= 4 && u(0) === 0x4F && u(1) === 0x67 && u(2) === 0x67 && u(3) === 0x53) {
+    sig = { type: 'audio', mime: 'audio/ogg', ext: 'ogg' };
+  } else if (bytes.length >= 4 && u(0) === 0x1A && u(1) === 0x45 && u(2) === 0xDF && u(3) === 0xA3) {
+    sig = { type: 'audio', mime: 'audio/webm', ext: 'webm' };
   }
 
   if (!sig) {
@@ -416,6 +429,9 @@ function validateUploadedFile_(fileData, fileName, fileMimeType, opts) {
   }
   if (sig.type === 'zip' && !allowZip) {
     throw new Error('Berkas arsip ZIP tidak diizinkan untuk modul ini.');
+  }
+  if (sig.type === 'audio' && !allowAudio) {
+    throw new Error('Berkas audio tidak diizinkan untuk jenis unggahan ini.');
   }
 
   // Tolak jika bagian awal payload meniru markup aktif (HTML/SVG/Script)
@@ -441,7 +457,8 @@ function validateUploadedFile_(fileData, fileName, fileMimeType, opts) {
     const validMimesByType = {
       pdf: ['application/pdf'],
       image: ['image/png', 'image/jpeg', 'image/jpg'],
-      zip: ['application/zip', 'application/x-zip-compressed', 'application/octet-stream']
+      zip: ['application/zip', 'application/x-zip-compressed', 'application/octet-stream'],
+      audio: ['audio/mpeg', 'audio/mp3', 'audio/mp4', 'audio/x-m4a', 'audio/m4a', 'audio/wav', 'audio/x-wav', 'audio/wave', 'audio/ogg', 'audio/webm', 'video/webm', 'application/octet-stream']
     };
     const allowedMimes = validMimesByType[sig.type] || [];
     if (allowedMimes.indexOf(mimeToCheck) === -1) {
@@ -2876,7 +2893,7 @@ function canUserAccessDriveFile_(file, fileId, callerSess, ss) {
   }
 
   // 2. Cek folder brankas/arsip & dokumen PDF terbitan
-  const meta = collectDriveAncestorMeta_(file, 4);
+  const meta = collectDriveAncestorMeta_(file, 5);
   const publicInternalFolders = ['TRANSKEP SK', 'TRANSKEP SOP', 'Arsip SK TRANSKEP', 'Arsip SOP TRANSKEP', 'Arsip Dokumen Jobdes TRANSKEP', 'Arsip Foto Rapat TRANSKEP'];
   for (let i = 0; i < publicInternalFolders.length; i++) {
     if (meta.names.indexOf(publicInternalFolders[i]) !== -1) return true;

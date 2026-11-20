@@ -1216,6 +1216,27 @@ const EofficeDataService = {
   },
 
   /**
+   * Mengunggah Rekaman Audio Rapat ke Subfolder Google Drive Privat (Tahun/Bulan/Judul Rapat)
+   */
+  async uploadAudioRapatToDrive(audioPayload, adminNip, token) {
+    const authToken = token || (typeof localStorage !== 'undefined' ? localStorage.getItem('transkep_session_token') : '') || '';
+    const creatorNip = adminNip || (typeof localStorage !== 'undefined' ? localStorage.getItem('transkep_active_nip') : '') || '';
+
+    if (typeof window !== 'undefined' && window.TranskepAPI && typeof window.TranskepAPI.call === 'function') {
+      return await window.TranskepAPI.call('uploadAudioRapat', audioPayload, creatorNip, authToken);
+    }
+    if (typeof google !== 'undefined' && google.script && google.script.run) {
+      return await new Promise((resolve, reject) => {
+        google.script.run
+          .withSuccessHandler((r) => resolve(r))
+          .withFailureHandler((err) => reject(err))
+          .uploadAudioRapat(audioPayload, creatorNip, authToken);
+      });
+    }
+    return { status: 'error', message: 'Koneksi backend Apps Script belum tersedia untuk upload audio.' };
+  },
+
+  /**
    * Mengambil DataURI aman (proxy getDriveFileBlob / cache memori) untuk render pratinjau & cetak Foto Rapat
    */
   async resolveFotoRapatDataUri(fotoItem) {

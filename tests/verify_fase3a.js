@@ -295,6 +295,10 @@ const b64Pdf = Buffer.from('%PDF-1.4\n1 0 obj\n<<>>\nendobj\n').toString('base64
 const b64Png = Buffer.from([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D]).toString('base64');
 const b64Jpg = Buffer.from([0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46]).toString('base64');
 const b64Zip = Buffer.from([0x50, 0x4B, 0x03, 0x04, 0x14, 0x00, 0x00, 0x00]).toString('base64');
+const b64Mp3 = Buffer.from([0x49, 0x44, 0x33, 0x03, 0x00, 0x00, 0x00, 0x00]).toString('base64');
+const b64Wav = Buffer.from([0x52, 0x49, 0x46, 0x46, 0x24, 0x00, 0x00, 0x00, 0x57, 0x41, 0x56, 0x45]).toString('base64');
+const b64Ogg = Buffer.from([0x4F, 0x67, 0x67, 0x53, 0x00, 0x02, 0x00, 0x00]).toString('base64');
+const b64Webm = Buffer.from([0x1A, 0x45, 0xDF, 0xA3, 0x01, 0x00, 0x00, 0x00]).toString('base64');
 const b64Html = Buffer.from('<!DOCTYPE html><html><script>alert(1)</script></html>').toString('base64');
 const b64Svg = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" onload="alert(1)"></svg>').toString('base64');
 
@@ -302,12 +306,17 @@ assert.strictEqual(sandbox.validateUploadedFile_(b64Pdf, 'doc.pdf', 'application
 assert.strictEqual(sandbox.validateUploadedFile_(b64Png, 'foto.png', 'image/png', { allowPdf: true, allowImages: true }).ext, 'png');
 assert.strictEqual(sandbox.validateUploadedFile_(b64Jpg, 'foto.jpg', 'image/jpeg', { allowPdf: true, allowImages: true }).ext, 'jpg');
 assert.strictEqual(sandbox.validateUploadedFile_(b64Zip, 'arsip.zip', 'application/zip', { allowPdf: true, allowImages: true, allowZip: true }).ext, 'zip');
+assert.strictEqual(sandbox.validateUploadedFile_(b64Mp3, 'rekaman.mp3', 'audio/mpeg', { allowPdf: false, allowAudio: true }).ext, 'mp3');
+assert.strictEqual(sandbox.validateUploadedFile_(b64Wav, 'rekaman.wav', 'audio/wav', { allowPdf: false, allowAudio: true }).ext, 'wav');
+assert.strictEqual(sandbox.validateUploadedFile_(b64Ogg, 'rekaman.ogg', 'audio/ogg', { allowPdf: false, allowAudio: true }).ext, 'ogg');
+assert.strictEqual(sandbox.validateUploadedFile_(b64Webm, 'rekaman.webm', 'audio/webm', { allowPdf: false, allowAudio: true }).ext, 'webm');
 
 assert.throws(() => sandbox.validateUploadedFile_(b64Html, 'disguised.pdf', 'application/pdf', { allowPdf: true }), /Format isi berkas|markup/i);
 assert.throws(() => sandbox.validateUploadedFile_(b64Svg, 'disguised.png', 'image/png', { allowPdf: true, allowImages: true }), /Format isi berkas|markup/i);
 assert.throws(() => sandbox.validateUploadedFile_(b64Png, 'evil.svg', 'image/png', { allowPdf: true, allowImages: true }), /Ekstensi berkas \.svg/i);
 assert.throws(() => sandbox.validateUploadedFile_(b64Pdf, 'wrongmime.pdf', 'text/html', { allowPdf: true }), /Tipe MIME/i);
 assert.throws(() => sandbox.validateUploadedFile_(b64Zip, 'bundle.zip', 'application/zip', { allowPdf: true, allowImages: true, allowZip: false }), /ZIP tidak diizinkan/i);
+assert.throws(() => sandbox.validateUploadedFile_(b64Mp3, 'rekaman.mp3', 'audio/mpeg', { allowPdf: true, allowAudio: false }), /audio tidak diizinkan/i);
 assert.throws(() => sandbox.validateUploadedFile_('not@valid#base64!', 'x.pdf', 'application/pdf', { allowPdf: true }), /Base64/i);
 const overLimitB64 = Buffer.concat([Buffer.from('%PDF-1.4\n'), Buffer.alloc(150, 0x41)]).toString('base64');
 assert.throws(() => sandbox.validateUploadedFile_(overLimitB64, 'big.pdf', 'application/pdf', { allowPdf: true, maxBytes: 100 }), /melebihi batas maksimum/i);
@@ -699,6 +708,7 @@ browserSandbox.filterTujuanSearchDrop('');
 const rapatTujuanHtml = getOrCreateEl('rapatTujuanSearchDropdown').innerHTML;
 assert(!rapatTujuanHtml.includes('<img src=x') && !rapatTujuanHtml.includes('<script>1'), 'filterTujuanSearchDrop must escape nama & jabatan');
 assert(rapatTujuanHtml.includes('data-nip="') && rapatTujuanHtml.includes('selectTujuanPegawai(this.dataset.nip)'), 'rapat tujuan dropdown must use data-nip & this.dataset.nip');
+assert(rapatTujuanHtml.includes('toggleTujuanDropCheck(this.dataset.nip)'), 'rapat tujuan multi-check checkbox must use data-nip & this.dataset.nip');
 
 browserSandbox.openPembahasanSpeakerDrop(0);
 const rapatSpeakerHtml = getOrCreateEl('rapatSpeakerDrop_0').innerHTML;

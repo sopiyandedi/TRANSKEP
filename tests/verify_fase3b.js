@@ -2241,6 +2241,181 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
     assert.strictEqual(ensureDom143('rapatFieldNotulis').value, 'Agus Salim, S.Ag.');
 
     console.log('[PASS] Tahap 144B Tab 1 searchable pejabat/pimpinan/notulis + Enter & two-way no_urut_surat sync verified.');
+
+    // Tahap 145: Fix scroll Tab footer, ikon + di atas hapus, Drag&Drop foto/audio, ceklis multi-pilih + Enter, header Tambah Pembicara, tombol cetak ikon-only & subfolder Drive Tahun/Bulan/Judul
+    const eofficeHtml145 = fs.readFileSync('modules/eoffice/view_eoffice.html', 'utf8');
+    assert(eofficeHtml145.includes('id="modalAgendaRapatBox"') && eofficeHtml145.includes('overflow-clip') && eofficeHtml145.includes('id="modalAgendaRapatBody" class="flex-1 min-h-0'),
+      'Tahap 145 must use overflow-clip on #modalAgendaRapatBox and min-h-0 on body to prevent footer jump on Tab');
+    assert(eofficeHtml145.includes('id="btnRapatHeaderAddPembicara"') && !eofficeHtml145.includes('<span>Tambah Pembicara / Poin</span>'),
+      'Tahap 145 must move Tambah Pembicara button into top modal header');
+    assert(eofficeHtml145.includes('id="rapatFotoDropZone"') && eofficeHtml145.includes('handleRapatFotoDrop(event)') &&
+      eofficeHtml145.includes('id="rapatAudioDropZone"') && eofficeHtml145.includes('handleRapatAudioDrop(event)'),
+      'Tahap 145 must provide drag & drop dropzones for both Foto and Audio in Tab 4');
+    assert(!eofficeHtml145.includes('<span>Undangan</span>') && !eofficeHtml145.includes('<span>Absen</span>') && !eofficeHtml145.includes('<span>Notula</span>'),
+      'Tahap 145 must render Rapat outer print buttons as icon-only buttons');
+
+    // Runtime UX checks on fresh sandbox with full pegawai list
+    const dom145 = {};
+    const ensureDom145 = (id) => {
+      if (!dom145[id]) {
+        dom145[id] = {
+          id,
+          value: '',
+          innerText: '',
+          innerHTML: '',
+          className: '',
+          scrollTop: 0,
+          classList: mkCls(),
+          focus: () => {},
+          scrollIntoView: () => {}
+        };
+      }
+      return dom145[id];
+    };
+    const rapatVm145 = {
+      console, Date, Math, Array, Object, String, Number, Boolean, JSON, Set, Map, RegExp, parseInt, parseFloat, isNaN, setTimeout, clearTimeout,
+      localStorage: { getItem: () => '', setItem: () => {} },
+      document: {
+        getElementById: (id) => ensureDom145(id),
+        addEventListener: () => {}
+      },
+      vueState: {
+        usersList: [
+          { nip: '198501012010011001', nama: 'Rina, S.H.', jabatan: 'Panitera Pengganti', role: 'Pegawai' },
+          { nip: '198601012011011002', nama: 'Dedi, S.Sy.', jabatan: 'Panitera Pengganti', role: 'Pegawai' },
+          { nip: '198701012012011003', nama: 'Sari, S.Kom.', jabatan: 'Kasubbag', role: 'Pegawai' }
+        ]
+      },
+      showNotify: () => {},
+      window: {}
+    };
+    rapatVm145.window = rapatVm145;
+    vm.createContext(rapatVm145);
+    vm.runInContext(fs.readFileSync('modules/eoffice/rapat.js', 'utf8'), rapatVm145, { filename: 'modules/eoffice/rapat.js' });
+
+    // 1. overflow-clip preserved in fullscreen toggle & header button visibility on switchRapatTab
+    rapatVm145.toggleRapatFullscreen(true);
+    assert(ensureDom145('modalAgendaRapatBox').className.includes('overflow-clip') && !ensureDom145('modalAgendaRapatBox').className.includes('overflow-hidden'),
+      'toggleRapatFullscreen must use overflow-clip');
+    rapatVm145.switchRapatTab('undangan');
+    assert(ensureDom145('btnRapatHeaderAddPembicara').classList.contains('hidden'), 'Header Tambah Pembicara hidden outside Tab 3');
+    rapatVm145.switchRapatTab('notula');
+    assert(!ensureDom145('btnRapatHeaderAddPembicara').classList.contains('hidden'), 'Header Tambah Pembicara visible in Tab 3');
+
+    // 2. Blue + placed ABOVE trash button only on last sub-row & no sr-only sentinel
+    rapatVm145.addPembahasanRow(null, true);
+    rapatVm145.addPembahasanSubRow(0, false);
+    const pembHtml145 = ensureDom145('rapatPembahasanListContainer').innerHTML;
+    assert(!pembHtml145.includes('class="sr-only"') && pembHtml145.includes('data-rapat-tab-sentinel="0"'),
+      'Tab sentinel must be in-flow zero-size element instead of sr-only');
+    assert(!pembHtml145.includes('Tambah baris untuk pembicara yang sama'),
+      'Legacy bottom + bar must be removed');
+    const idxAddSub = pembHtml145.lastIndexOf('addPembahasanSubRow(0, true)');
+    const idxTrashLast = pembHtml145.lastIndexOf('removePembahasanSubRow(0, 1)');
+    assert(idxAddSub !== -1 && idxTrashLast !== -1 && idxAddSub < idxTrashLast,
+      'Blue + icon must be rendered immediately above delete button on the last sub-row');
+
+    // 4. Multi-check Panitera Pengganti in Tab 2 dropdown + Enter adds both in 1 shot
+    ensureDom145('rapatCustomTujuanInput').value = 'Panitera Pengganti';
+    rapatVm145.filterTujuanSearchDrop('Panitera Pengganti');
+    assert(ensureDom145('rapatTujuanSearchDropdown').innerHTML.includes('Pilih Semua Hasil'),
+      'Tab 2 dropdown must show multi-select header');
+    rapatVm145.toggleTujuanDropCheck('198501012010011001');
+    rapatVm145.toggleTujuanDropCheck('198601012011011002');
+    rapatVm145.handleTujuanSearchKeydown({ key: 'Enter', preventDefault() {} });
+    assert.strictEqual(ensureDom145('rapatCountPeserta').innerText, '2', 'Enter after checking 2 items must insert both');
+    const orderedHtml145 = ensureDom145('rapatTujuanOrderedContainer').innerHTML;
+    assert(orderedHtml145.includes('Rina, S.H. (Panitera Pengganti)') && orderedHtml145.includes('Dedi, S.Sy. (Panitera Pengganti)'));
+
+    // 3 & 7. Drag&Drop handler presence + Backend GAS Drive subfolder hierarchy (Year/Month/Title)
+    assert(typeof rapatVm145.handleRapatFotoDrop === 'function' && typeof rapatVm145.handleRapatAudioDrop === 'function',
+      'Drag & drop handlers for Foto and Audio must be exposed on window');
+    assert(fs.readFileSync('api_router.js', 'utf8').includes('uploadAudioRapat: true'), 'api_router.js must allow uploadAudioRapat RPC');
+    assert(fs.readFileSync('code.js', 'utf8').includes('collectDriveAncestorMeta_(file, 5)'),
+      'code.js must traverse depth 5 for nested Drive Year/Month/Title folders');
+    assert(fs.readFileSync('modules/eoffice/eoffice_data.js', 'utf8').includes('uploadAudioRapatToDrive('),
+      'eoffice_data.js must define uploadAudioRapatToDrive');
+
+    const createdDriveTree145 = [];
+    const mkMockFolder145 = (name, depthPath) => {
+      const children = {};
+      const folderObj = {
+        getId: () => 'fld_' + depthPath,
+        getName: () => name,
+        getUrl: () => 'https://drive.google.com/drive/folders/fld_' + encodeURIComponent(depthPath),
+        isTrashed: () => false,
+        setSharing: () => {},
+        getFoldersByName: (sub) => {
+          const hit = children[sub] ? [children[sub]] : [];
+          let i = 0;
+          return { hasNext: () => i < hit.length, next: () => hit[i++] };
+        },
+        createFolder: (sub) => {
+          const child = mkMockFolder145(sub, depthPath + '/' + sub);
+          children[sub] = child;
+          createdDriveTree145.push(depthPath + '/' + sub);
+          return child;
+        },
+        createFile: (blob) => {
+          const fPath = depthPath + '/' + blob.name;
+          return {
+            getId: () => 'file_' + createdDriveTree145.length,
+            getName: () => blob.name,
+            setSharing: () => {},
+            _path: fPath
+          };
+        }
+      };
+      return folderObj;
+    };
+    const driveRoot145 = mkMockFolder145('ROOT', '');
+    const gasRapatVm145 = {
+      console, Date, Math, Array, Object, String, Number, Boolean, JSON, RegExp, parseInt, Logger: { log: () => {} },
+      DriveApp: {
+        Access: { PRIVATE: 'PRIVATE' },
+        Permission: { NONE: 'NONE' },
+        getFoldersByName: (n) => driveRoot145.getFoldersByName(n),
+        createFolder: (n) => driveRoot145.createFolder(n)
+      },
+      Utilities: {
+        formatDate: () => '20261205_093000',
+        newBlob: (bytes, mime, name) => ({ bytes, mime, name })
+      },
+      cekOtorisasiAdmin: () => true,
+      setPrivateDriveSharing_: () => {},
+      validateUploadedFile_: (b64, name, mime, opts) => ({
+        bytes: Buffer.from(b64, 'base64'),
+        blobMimeType: mime,
+        ext: opts && opts.allowAudio ? 'webm' : 'jpg'
+      })
+    };
+    vm.createContext(gasRapatVm145);
+    vm.runInContext(fs.readFileSync('eoffice/rapat.js', 'utf8'), gasRapatVm145, { filename: 'eoffice/rapat.js' });
+
+    const upFoto145 = gasRapatVm145.uploadFotoRapat({
+      id_rapat: 'RPT-DES-01',
+      agenda: 'Rapat / Evaluasi: "Akhir Tahun"?',
+      hari_tanggal: 'Rabu, 05 Desember 2026',
+      file_data: 'AQID',
+      file_name: 'foto.jpg',
+      mime_type: 'image/jpeg'
+    }, '198001012005011001', 'tok');
+    assert.strictEqual(upFoto145.status, 'success');
+    assert.strictEqual(upFoto145.data.folder_path, 'Arsip Foto Rapat TRANSKEP / 2026 / Desember / Rapat Evaluasi Akhir Tahun');
+
+    const upAudio145 = gasRapatVm145.uploadAudioRapat({
+      id_rapat: 'RPT-DES-01',
+      agenda: 'Rapat / Evaluasi: "Akhir Tahun"?',
+      tgl_rapat_iso: '2026-12-05',
+      file_data: 'AQID',
+      file_name: 'rekaman.webm',
+      mime_type: 'audio/webm'
+    }, '198001012005011001', 'tok');
+    assert.strictEqual(upAudio145.status, 'success');
+    assert.strictEqual(upAudio145.data.folder_path, 'Arsip Foto Rapat TRANSKEP / 2026 / Desember / Rapat Evaluasi Akhir Tahun');
+    assert.strictEqual(createdDriveTree145.length, 4, 'Both Foto & Audio must reuse the same 4-level Drive folder tree without duplicating folders');
+
+    console.log('[PASS] Tahap 145 Rapat UX polish, Tab 2 multi-check Enter, Drag&Drop & Drive Year/Month/Title subfolders verified.');
   } finally {
     browserSandbox.TranskepAPI.call = origApiCall;
     browserSandbox.TranskepFirebase.getDb = origGetDb;

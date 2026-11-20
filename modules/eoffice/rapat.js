@@ -18,6 +18,7 @@
   var isProcessingAiNotulen = false;
   var tujuanSearchActiveIdx = 0;
   var tujuanSearchMatches = [];
+  var tujuanDropCheckedMap = {};
   var speakerDropActiveMap = {};
   var speakerDropMatchesMap = {};
   var officialDropActiveMap = { pejabatTtd: 0, pemimpin: 0, notulis: 0 };
@@ -134,8 +135,8 @@
     }
     if (box) {
       box.className = isRapatFullscreen
-        ? 'glass border border-slate-800 bg-slate-900/95 rounded-none w-full h-full max-w-none max-h-none flex flex-col shadow-2xl transform transition-all duration-300 scale-100 overflow-hidden'
-        : 'glass border border-slate-800 bg-slate-900/95 rounded-3xl w-[96vw] max-w-6xl h-[92vh] flex flex-col shadow-2xl transform transition-all duration-300 scale-100 overflow-hidden';
+        ? 'glass border border-slate-800 bg-slate-900/95 rounded-none w-full h-full max-w-none max-h-none flex flex-col shadow-2xl transform transition-all duration-300 scale-100 overflow-clip'
+        : 'glass border border-slate-800 bg-slate-900/95 rounded-3xl w-[96vw] max-w-6xl h-[92vh] flex flex-col shadow-2xl transform transition-all duration-300 scale-100 overflow-clip';
     }
     if (icon) {
       icon.className = isRapatFullscreen ? 'fa-solid fa-compress text-sm' : 'fa-solid fa-expand text-sm';
@@ -158,6 +159,11 @@
           : 'px-3.5 py-1.5 rounded-xl text-[11px] font-bold border transition flex items-center gap-2 bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200 hover:bg-slate-800/70';
       }
     });
+    var hdrAddBtn = document.getElementById('btnRapatHeaderAddPembicara');
+    if (hdrAddBtn) {
+      if (currentRapatTab === 'notula') hdrAddBtn.classList.remove('hidden');
+      else hdrAddBtn.classList.add('hidden');
+    }
   };
 
   window.setRapatModalStatus = function (statusVal) {
@@ -619,15 +625,52 @@
       return;
     }
 
-    var h = '';
-    tujuanSearchMatches.slice(0, 40).forEach(function (u, index) {
+    var sliced = tujuanSearchMatches.slice(0, 40);
+    var checkedCount = sliced.filter(function (u) {
+      return Boolean(u.nip && tujuanDropCheckedMap[String(u.nip)]);
+    }).length;
+    var totalChecked = Object.keys(tujuanDropCheckedMap).filter(function (k) {
+      return Boolean(tujuanDropCheckedMap[k]);
+    }).length;
+    var allSlicedChecked = (sliced.length > 0 && checkedCount === sliced.length);
+
+    var h =
+      '<div class="sticky top-0 z-10 px-3 py-1.5 bg-slate-900/95 border-b border-slate-700 flex items-center justify-between gap-2 text-[10px]">' +
+        '<span class="text-slate-400">' + sliced.length + ' kandidat ditemukan' +
+          (totalChecked > 0 ? ' &bull; <b class="text-cyan-300">' + totalChecked + ' diceklis (Enter)</b>' : '') +
+        '</span>' +
+        '<button type="button" onmousedown="event.preventDefault(); event.stopPropagation(); toggleAllTujuanDropChecks();" ' +
+          'class="px-2 py-0.5 rounded-md border font-bold transition ' +
+          (allSlicedChecked
+            ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-300'
+            : 'bg-slate-800 border-slate-700 text-slate-300 hover:border-cyan-500/40 hover:text-cyan-300') + '">' +
+          (allSlicedChecked ? 'Batal Ceklis Semua' : 'Pilih Semua Hasil') +
+        '</button>' +
+      '</div>';
+
+    sliced.forEach(function (u, index) {
       var isActive = (index === tujuanSearchActiveIdx);
+      var nipStr = String(u.nip || '');
+      var isChecked = Boolean(nipStr && tujuanDropCheckedMap[nipStr]);
       h +=
-        '<div data-nip="' + escRapat_(String(u.nip || '')) + '" onmousedown="event.preventDefault(); selectTujuanPegawai(this.dataset.nip)" ' +
-          'class="px-3 py-2 text-[11px] cursor-pointer transition border-b border-slate-700/50 ' +
-          (isActive ? 'bg-cyan-600 text-white' : 'text-slate-300 hover:bg-cyan-600 hover:text-white') + '">' +
-          '<div class="font-bold">' + escRapat_(u.nama || '-') + '</div>' +
-          '<div class="text-[9px] opacity-75">' + escRapat_(u.jabatan || '-') + (u.nip ? ' | ' + escRapat_(u.nip) : '') + '</div>' +
+        '<div class="flex items-center justify-between gap-2 px-3 py-2 text-[11px] border-b border-slate-700/50 transition ' +
+          (isChecked
+            ? 'bg-cyan-500/20 text-white'
+            : (isActive ? 'bg-cyan-600 text-white' : 'text-slate-300 hover:bg-cyan-600/80 hover:text-white')) + '">' +
+          '<div data-nip="' + escRapat_(nipStr) + '" onmousedown="event.preventDefault(); selectTujuanPegawai(this.dataset.nip)" ' +
+            'class="flex-1 min-w-0 cursor-pointer">' +
+            '<div class="font-bold truncate">' + escRapat_(u.nama || '-') + '</div>' +
+            '<div class="text-[9px] opacity-75 truncate">' + escRapat_(u.jabatan || '-') + (nipStr ? ' | ' + escRapat_(nipStr) : '') + '</div>' +
+          '</div>' +
+          '<button type="button" data-nip="' + escRapat_(nipStr) + '" ' +
+            'onmousedown="event.preventDefault(); event.stopPropagation(); toggleTujuanDropCheck(this.dataset.nip);" ' +
+            'title="Ceklis untuk tambah banyak lalu tekan Enter" ' +
+            'class="w-5 h-5 rounded-md border flex items-center justify-center shrink-0 transition ' +
+            (isChecked
+              ? 'bg-cyan-400 border-cyan-300 text-slate-950 shadow-sm'
+              : 'bg-slate-950/80 border-slate-600 text-transparent hover:border-cyan-400') + '">' +
+            '<i class="fa-solid fa-check text-[10px]"></i>' +
+          '</button>' +
         '</div>';
     });
     drop.innerHTML = h;
@@ -653,6 +696,7 @@
   };
 
   window.clearTujuanSearchInput = function () {
+    tujuanDropCheckedMap = {};
     var input = document.getElementById('rapatCustomTujuanInput');
     if (input) {
       input.value = '';
@@ -662,14 +706,74 @@
     renderTujuanSearchDropdown_('');
   };
 
+  window.toggleTujuanDropCheck = function (nip) {
+    var cleanNip = String(nip || '').trim();
+    if (!cleanNip) return;
+    tujuanDropCheckedMap[cleanNip] = !tujuanDropCheckedMap[cleanNip];
+    if (!tujuanDropCheckedMap[cleanNip]) delete tujuanDropCheckedMap[cleanNip];
+    var inp = document.getElementById('rapatCustomTujuanInput');
+    renderTujuanSearchDropdown_(inp ? inp.value : '');
+  };
+
+  window.toggleAllTujuanDropChecks = function () {
+    var sliced = (tujuanSearchMatches || []).slice(0, 40);
+    if (sliced.length === 0) return;
+    var allChecked = sliced.every(function (u) { return Boolean(u.nip && tujuanDropCheckedMap[String(u.nip)]); });
+    sliced.forEach(function (u) {
+      var n = String(u.nip || '').trim();
+      if (!n) return;
+      if (allChecked) delete tujuanDropCheckedMap[n];
+      else tujuanDropCheckedMap[n] = true;
+    });
+    var inp = document.getElementById('rapatCustomTujuanInput');
+    renderTujuanSearchDropdown_(inp ? inp.value : '');
+  };
+
+  window.commitCheckedTujuanPegawai = function () {
+    var checkedSet = tujuanDropCheckedMap || {};
+    var nips = Object.keys(checkedSet).filter(function (k) { return Boolean(checkedSet[k]); });
+    if (nips.length === 0) return 0;
+
+    var added = 0;
+    var users = getSortedPegawaiRapat_();
+    users.forEach(function (u) {
+      var uNip = String(u.nip || '').trim();
+      if (!uNip || !checkedSet[uNip]) return;
+      var already = tujuanUndanganList.some(function (t) { return String(t.nip || '') === uNip; });
+      if (!already) {
+        tujuanUndanganList.push({
+          label: u.nama + (u.jabatan ? ' (' + u.jabatan + ')' : ''),
+          nip: uNip,
+          nama: String(u.nama || ''),
+          jabatan: String(u.jabatan || '')
+        });
+        added += 1;
+      }
+    });
+
+    tujuanDropCheckedMap = {};
+    renderTujuanUndanganOrdered_();
+    var input = document.getElementById('rapatCustomTujuanInput');
+    if (input) input.value = '';
+    var drop = document.getElementById('rapatTujuanSearchDropdown');
+    if (drop) drop.classList.add('hidden');
+    var clearBtn = document.getElementById('btnClearRapatTujuanInput');
+    if (clearBtn) clearBtn.classList.add('hidden');
+    tujuanSearchActiveIdx = 0;
+    tujuanSearchMatches = [];
+    return added;
+  };
+
   window.selectTujuanPegawai = function (nip) {
     var u = getUsersListRapat_().find(function (x) { return String(x.nip) === String(nip); });
     if (!u) return;
-    var already = tujuanUndanganList.some(function (t) { return String(t.nip || '') === String(u.nip || ''); });
+    var cleanNip = String(u.nip || '');
+    if (cleanNip) delete tujuanDropCheckedMap[cleanNip];
+    var already = tujuanUndanganList.some(function (t) { return String(t.nip || '') === cleanNip; });
     if (!already) {
       tujuanUndanganList.push({
         label: u.nama + (u.jabatan ? ' (' + u.jabatan + ')' : ''),
-        nip: String(u.nip || ''),
+        nip: cleanNip,
         nama: String(u.nama || ''),
         jabatan: String(u.jabatan || '')
       });
@@ -712,6 +816,11 @@
     }
     if (ev.key === 'Enter') {
       ev.preventDefault();
+      var checkedCount = Object.keys(tujuanDropCheckedMap).filter(function (k) { return Boolean(tujuanDropCheckedMap[k]); }).length;
+      if (checkedCount > 0) {
+        window.commitCheckedTujuanPegawai();
+        return;
+      }
       var inp = document.getElementById('rapatCustomTujuanInput');
       var val = inp ? String(inp.value || '').trim() : '';
       if (!val) return;
@@ -749,6 +858,11 @@
   };
 
   window.addCustomTujuanUndangan = function () {
+    var checkedCount = Object.keys(tujuanDropCheckedMap).filter(function (k) { return Boolean(tujuanDropCheckedMap[k]); }).length;
+    if (checkedCount > 0) {
+      window.commitCheckedTujuanPegawai();
+      return;
+    }
     var input = document.getElementById('rapatCustomTujuanInput');
     if (!input) return;
     var val = input.value.trim();
@@ -963,7 +1077,7 @@
     if (pembahasanRowsList.length === 0) {
       container.innerHTML =
         '<div class="p-6 text-center rounded-2xl border border-dashed border-slate-700 bg-slate-900/40 text-slate-400 text-xs">' +
-          'Belum ada catatan pembicara. Klik <b>+ Tambah Pembicara / Poin</b> di kanan atas untuk mulai mengisi 5 kolom Notula.' +
+          'Belum ada catatan pembicara. Klik <b>+ Tambah Pembicara</b> di kanan atas header modal untuk mulai mengisi 5 kolom Notula.' +
         '</div>';
       return;
     }
@@ -981,6 +1095,7 @@
       items.forEach(function (sub, subIdx) {
         var isoTarget = toIsoDateInput_(sub.target);
         var isoTanggal = toIsoDateInput_(sub.tanggal_penyelesaian);
+        var isLastSub = (subIdx === items.length - 1);
         var legacyTargetHint = (sub.target && !isoTarget)
           ? '<div class="text-[9px] text-amber-400/80 mt-1 truncate" title="' + escRapat_(sub.target) + '">Teks lama: ' + escRapat_(sub.target) + '</div>'
           : '';
@@ -1012,14 +1127,17 @@
               '<input type="date" id="rapatPembahasanTanggal_' + idx + '_' + subIdx + '" value="' + escRapat_(isoTanggal) + '" onchange="updatePembahasanSubField(' + idx + ', ' + subIdx + ', \'tanggal_penyelesaian\', this.value)" class="w-full px-2.5 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 text-[11px] focus:ring-1 focus:ring-emerald-500 outline-none">' +
               legacyTglHint +
             '</div>' +
-            '<div class="flex items-center justify-center pt-1">' +
-              '<button type="button" tabindex="-1" onclick="removePembahasanSubRow(' + idx + ', ' + subIdx + ')" title="' + (items.length > 1 ? 'Hapus baris ini' : 'Kosongkan baris ini') + '" class="w-8 h-8 flex items-center justify-center bg-slate-950 border border-slate-800 hover:bg-rose-500/20 text-slate-500 hover:border-rose-500/50 hover:text-rose-400 rounded-lg transition-all mx-auto"><i class="fa-solid fa-trash text-[10px]"></i></button>' +
+            '<div class="flex flex-col items-center justify-start gap-1.5 pt-0.5">' +
+              (isLastSub
+                ? '<button type="button" tabindex="-1" onclick="addPembahasanSubRow(' + idx + ', true)" title="Tambah baris baru untuk pembicara ini" class="w-7 h-7 flex items-center justify-center bg-indigo-600 hover:bg-indigo-500 text-white rounded-full shadow-md shadow-indigo-500/40 transition-all hover:scale-110 group"><i class="fa-solid fa-plus text-[11px] group-hover:rotate-90 transition-transform duration-300"></i></button>'
+                : '') +
+              '<button type="button" tabindex="-1" onclick="removePembahasanSubRow(' + idx + ', ' + subIdx + ')" title="' + (items.length > 1 ? 'Hapus baris ini' : 'Kosongkan baris ini') + '" class="w-7 h-7 flex items-center justify-center bg-slate-950 border border-slate-800 hover:bg-rose-500/20 text-slate-500 hover:border-rose-500/50 hover:text-rose-400 rounded-lg transition-all mx-auto"><i class="fa-solid fa-trash text-[10px]"></i></button>' +
             '</div>' +
           '</div>';
       });
 
       html +=
-        '<div class="p-3 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-2.5 shadow-sm">' +
+        '<div class="relative p-3 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-2.5 shadow-sm">' +
           '<div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800/80 pb-2">' +
             '<div class="flex items-center gap-2 flex-1 min-w-0">' +
               '<span class="w-7 h-7 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 font-bold text-xs flex items-center justify-center shrink-0">' + (idx + 1) + '</span>' +
@@ -1049,15 +1167,7 @@
           '</div>' +
 
           '<div class="space-y-2">' + subRowsHtml + '</div>' +
-          '<span tabindex="0" data-rapat-tab-sentinel="' + idx + '" onfocus="handlePembahasanTabSentinel(event, ' + idx + ')" class="sr-only">Tambah baris baru</span>' +
-
-          '<div class="flex items-center gap-2 pt-1">' +
-            '<button type="button" tabindex="-1" onclick="addPembahasanSubRow(' + idx + ', true)" title="Tambah baris baru untuk pembicara ini" ' +
-              'class="w-7 h-7 flex items-center justify-center bg-indigo-600 hover:bg-indigo-500 text-white rounded-full shadow-lg shadow-indigo-500/40 transition-all hover:scale-110 group">' +
-              '<i class="fa-solid fa-plus text-xs group-hover:rotate-90 transition-transform duration-300"></i>' +
-            '</button>' +
-            '<span class="text-[10px] text-slate-500">Tambah baris untuk pembicara yang sama (atau tekan <kbd class="px-1 py-0.5 bg-slate-800 border border-slate-700 rounded text-[9px] text-slate-300">Tab</kbd> di kolom e)</span>' +
-          '</div>' +
+          '<span tabindex="0" data-rapat-tab-sentinel="' + idx + '" onfocus="handlePembahasanTabSentinel(event, ' + idx + ')" class="block w-0 h-0 overflow-hidden opacity-0 pointer-events-none"></span>' +
         '</div>';
     });
 
@@ -1164,6 +1274,14 @@
     }
   };
 
+  function keepRapatModalAnchored_(elToReveal) {
+    var box = document.getElementById('modalAgendaRapatBox');
+    if (box) box.scrollTop = 0;
+    if (elToReveal && typeof elToReveal.scrollIntoView === 'function') {
+      try { elToReveal.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch (e) {}
+    }
+  }
+
   window.addPembahasanSubRow = function (idx, shouldFocus) {
     if (!pembahasanRowsList[idx]) return;
     if (!Array.isArray(pembahasanRowsList[idx].items)) {
@@ -1176,6 +1294,7 @@
     if (shouldFocus) {
       var targetEl = document.getElementById('rapatPembahasanUraian_' + idx + '_' + newSubIdx);
       if (targetEl && typeof targetEl.focus === 'function') targetEl.focus();
+      keepRapatModalAnchored_(targetEl);
     }
   };
 
@@ -1211,14 +1330,21 @@
       var lastSubIdx = (row && Array.isArray(row.items) && row.items.length > 0) ? (row.items.length - 1) : 0;
       var lastDateEl = document.getElementById('rapatPembahasanTanggal_' + idx + '_' + lastSubIdx);
       if (lastDateEl && typeof lastDateEl.focus === 'function') lastDateEl.focus();
+      keepRapatModalAnchored_(lastDateEl);
       return;
     }
     window.addPembahasanSubRow(idx, true);
   };
 
-  window.addPembahasanRow = function (initialObj) {
+  window.addPembahasanRow = function (initialObj, shouldFocus) {
     pembahasanRowsList.push(normalizePembahasanRow_(initialObj));
     renderPembahasanRows_();
+    if (shouldFocus) {
+      var newIdx = pembahasanRowsList.length - 1;
+      var spkInp = document.getElementById('rapatSpeakerSearch_' + newIdx);
+      if (spkInp && typeof spkInp.focus === 'function') spkInp.focus();
+      keepRapatModalAnchored_(spkInp);
+    }
   };
 
   window.removePembahasanRow = function (idx) {
@@ -1294,8 +1420,10 @@
 
     if (fotoRapatList.length === 0) {
       container.innerHTML =
-        '<div class="sm:col-span-2 p-4 rounded-xl border border-dashed border-slate-700 bg-slate-900/40 text-center text-[11px] text-slate-500">' +
-          'Belum ada foto rapat terpilih. Klik <b>+ Pilih Foto (Auto-Kompres)</b> untuk menambahkan maksimal 8 foto.' +
+        '<div onclick="var fi=document.getElementById(\'rapatInputFotoFiles\'); if(fi) fi.click();" ' +
+          'class="sm:col-span-2 p-5 rounded-xl border border-dashed border-slate-700 hover:border-cyan-500/50 bg-slate-900/40 hover:bg-cyan-500/5 text-center text-[11px] text-slate-400 cursor-pointer transition space-y-1">' +
+          '<i class="fa-solid fa-cloud-arrow-up text-lg text-cyan-400/80 block mb-1"></i>' +
+          '<div>Seret &amp; lepas foto rapat di sini, atau klik untuk memilih (maks. 8 foto).</div>' +
         '</div>';
       return;
     }
@@ -1341,6 +1469,88 @@
     });
   }
 
+  function getRapatDriveFolderContext_() {
+    return {
+      id_rapat: ((document.getElementById('rapatFieldIdRapat') || {}).value || '').trim() || 'RPT',
+      agenda: ((document.getElementById('rapatFieldAgenda') || {}).value || '').trim(),
+      hari_tanggal: ((document.getElementById('rapatFieldHariTanggal') || {}).value || '').trim(),
+      tgl_surat: ((document.getElementById('rapatFieldTglSuratIso') || {}).value || '').trim(),
+      tgl_rapat_iso: ((document.getElementById('rapatFieldTglRapatIso') || {}).value || '').trim()
+    };
+  }
+
+  function setRapatDropZoneActive_(zoneId, isActive, accent) {
+    var zone = document.getElementById(zoneId);
+    if (!zone || !zone.classList) return;
+    var activeCls = (accent === 'indigo')
+      ? ['border-indigo-400', 'bg-indigo-500/15', 'ring-2', 'ring-indigo-400/30']
+      : ['border-cyan-400', 'bg-cyan-500/10', 'ring-2', 'ring-cyan-400/30'];
+    activeCls.forEach(function (cls) {
+      if (isActive) zone.classList.add(cls);
+      else zone.classList.remove(cls);
+    });
+  }
+
+  window.handleRapatDropDragOver = function (ev, kind) {
+    if (ev) {
+      if (typeof ev.preventDefault === 'function') ev.preventDefault();
+      if (typeof ev.stopPropagation === 'function') ev.stopPropagation();
+    }
+    if (kind === 'audio') setRapatDropZoneActive_('rapatAudioDropZone', true, 'indigo');
+    else setRapatDropZoneActive_('rapatFotoDropZone', true, 'cyan');
+  };
+
+  window.handleRapatDropDragLeave = function (ev, kind) {
+    if (ev) {
+      if (typeof ev.preventDefault === 'function') ev.preventDefault();
+      if (typeof ev.stopPropagation === 'function') ev.stopPropagation();
+    }
+    var zoneId = (kind === 'audio') ? 'rapatAudioDropZone' : 'rapatFotoDropZone';
+    var zone = document.getElementById(zoneId);
+    if (zone && ev && ev.relatedTarget && typeof zone.contains === 'function' && zone.contains(ev.relatedTarget)) {
+      return;
+    }
+    setRapatDropZoneActive_(zoneId, false, kind === 'audio' ? 'indigo' : 'cyan');
+  };
+
+  window.handleRapatFotoDrop = function (ev) {
+    if (ev) {
+      if (typeof ev.preventDefault === 'function') ev.preventDefault();
+      if (typeof ev.stopPropagation === 'function') ev.stopPropagation();
+    }
+    setRapatDropZoneActive_('rapatFotoDropZone', false, 'cyan');
+    var rawFiles = ev && ev.dataTransfer && ev.dataTransfer.files ? Array.prototype.slice.call(ev.dataTransfer.files) : [];
+    var imageFiles = rawFiles.filter(function (f) {
+      return f && (/^image\/(jpeg|jpg|png|webp)$/i.test(f.type || '') || /\.(jpe?g|png|webp)$/i.test(f.name || ''));
+    });
+    if (imageFiles.length === 0) {
+      if (rawFiles.length > 0 && typeof showNotify === 'function') {
+        showNotify('Format Foto Tidak Cocok', 'Seret file gambar JPG, PNG, atau WEBP ke kotak Foto Rapat.', 'warning');
+      }
+      return;
+    }
+    window.handleRapatFotoSelect(imageFiles);
+  };
+
+  window.handleRapatAudioDrop = function (ev) {
+    if (ev) {
+      if (typeof ev.preventDefault === 'function') ev.preventDefault();
+      if (typeof ev.stopPropagation === 'function') ev.stopPropagation();
+    }
+    setRapatDropZoneActive_('rapatAudioDropZone', false, 'indigo');
+    var rawFiles = ev && ev.dataTransfer && ev.dataTransfer.files ? Array.prototype.slice.call(ev.dataTransfer.files) : [];
+    var audioFile = rawFiles.find(function (f) {
+      return f && (/^audio\//i.test(f.type || '') || f.type === 'video/webm' || /\.(mp3|m4a|wav|ogg|webm)$/i.test(f.name || ''));
+    });
+    if (!audioFile) {
+      if (rawFiles.length > 0 && typeof showNotify === 'function') {
+        showNotify('Format Audio Tidak Cocok', 'Seret file audio .mp3, .m4a, .wav, .ogg, atau .webm.', 'warning');
+      }
+      return;
+    }
+    window.handleRapatAudioSelect([audioFile]);
+  };
+
   window.handleRapatFotoSelect = async function (files) {
     if (!files || files.length === 0) return;
     var remain = Math.max(0, 8 - fotoRapatList.length);
@@ -1353,11 +1563,11 @@
     var currentUser = (window.vueState && window.vueState.user) ? window.vueState.user : (typeof state !== 'undefined' ? state.user : null);
     var adminNip = (currentUser && currentUser.nip) || localStorage.getItem('transkep_active_nip') || '';
     var token = localStorage.getItem('transkep_session_token') || '';
-    var idRapat = ((document.getElementById('rapatFieldIdRapat') || {}).value || '').trim() || 'RPT';
+    var folderCtx = getRapatDriveFolderContext_();
 
     for (var i = 0; i < arrFiles.length; i++) {
       var f = arrFiles[i];
-      if (!f || !/^image\/(jpeg|jpg|png)$/i.test(f.type || '')) continue;
+      if (!f || (!/^image\/(jpeg|jpg|png|webp)$/i.test(f.type || '') && !/\.(jpe?g|png|webp)$/i.test(f.name || ''))) continue;
       try {
         var compressed = await compressRapatImageFile_(f);
         var entry = {
@@ -1374,7 +1584,11 @@
 
         if (window.EofficeDataService && typeof window.EofficeDataService.uploadFotoRapatToDrive === 'function') {
           var upRes = await window.EofficeDataService.uploadFotoRapatToDrive({
-            id_rapat: idRapat,
+            id_rapat: folderCtx.id_rapat,
+            agenda: folderCtx.agenda,
+            hari_tanggal: folderCtx.hari_tanggal,
+            tgl_surat: folderCtx.tgl_surat,
+            tgl_rapat_iso: folderCtx.tgl_rapat_iso,
             file_data: compressed.dataUri,
             file_name: entry.file_name,
             mime_type: compressed.mimeType || 'image/jpeg'
@@ -1542,8 +1756,14 @@
         ? (rapatAudioState.fileName || 'rekaman_rapat.webm') + (rapatAudioState.sizeBytes ? ' (' + formatBytesRapat_(rapatAudioState.sizeBytes) + ')' : '')
         : 'Belum ada file audio';
     }
-    if (player && player.src !== (rapatAudioState.objectUrl || '')) {
-      player.src = rapatAudioState.objectUrl || '';
+    if (player) {
+      if (rapatAudioState.objectUrl) {
+        player.classList.remove('hidden');
+        if (player.src !== rapatAudioState.objectUrl) player.src = rapatAudioState.objectUrl;
+      } else {
+        player.src = '';
+        player.classList.add('hidden');
+      }
     }
     if (badge && !rapatAudioState.recording) {
       badge.innerText = hasAudio ? 'Audio Siap Analisa AI' : 'Siap AI Notulis';
@@ -1599,6 +1819,52 @@
     updateRapatAudioPreviewUi_();
   };
 
+  function setAudioDriveStatusBadge_(text, tone) {
+    var st = document.getElementById('rapatAudioDriveStatus');
+    if (!st) return;
+    st.innerText = text || 'Siap Analisa AI';
+    if (tone === 'uploading') {
+      st.className = 'px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[9px] shrink-0';
+    } else if (tone === 'saved') {
+      st.className = 'px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[9px] shrink-0';
+    } else {
+      st.className = 'px-1.5 py-0.5 rounded bg-indigo-500/15 text-indigo-300 border border-indigo-500/20 text-[9px] shrink-0';
+    }
+  }
+
+  async function uploadRapatAudioToDriveInBackground_(dataUri, fileName, mimeType) {
+    if (!dataUri || !window.EofficeDataService || typeof window.EofficeDataService.uploadAudioRapatToDrive !== 'function') {
+      return;
+    }
+    var currentUser = (window.vueState && window.vueState.user) ? window.vueState.user : (typeof state !== 'undefined' ? state.user : null);
+    var adminNip = (currentUser && currentUser.nip) || localStorage.getItem('transkep_active_nip') || '';
+    var token = localStorage.getItem('transkep_session_token') || '';
+    var folderCtx = getRapatDriveFolderContext_();
+    setAudioDriveStatusBadge_('Mengunggah ke Drive...', 'uploading');
+    try {
+      var upRes = await window.EofficeDataService.uploadAudioRapatToDrive({
+        id_rapat: folderCtx.id_rapat,
+        agenda: folderCtx.agenda,
+        hari_tanggal: folderCtx.hari_tanggal,
+        tgl_surat: folderCtx.tgl_surat,
+        tgl_rapat_iso: folderCtx.tgl_rapat_iso,
+        file_data: dataUri,
+        file_name: fileName || 'rekaman_rapat.webm',
+        mime_type: mimeType || 'audio/webm'
+      }, adminNip, token);
+      if (upRes && upRes.status === 'success' && upRes.data && upRes.data.url) {
+        var urlEl = document.getElementById('rapatFieldAudioUrl');
+        if (urlEl) urlEl.value = String(upRes.data.url);
+        setAudioDriveStatusBadge_('Drive: ' + (upRes.data.folder_path || 'Tersimpan'), 'saved');
+      } else {
+        setAudioDriveStatusBadge_('Lokal Siap AI', 'ready');
+      }
+    } catch (errUp) {
+      console.warn('Upload audio rapat ke Drive ditunda:', errUp);
+      setAudioDriveStatusBadge_('Lokal Siap AI', 'ready');
+    }
+  }
+
   window.handleRapatAudioSelect = async function (files) {
     if (!files || files.length === 0) return;
     var f = files[0];
@@ -1613,9 +1879,11 @@
         try { rapatAudioState.objectUrl = URL.createObjectURL(f); } catch (eObj) {}
       }
       updateRapatAudioPreviewUi_();
+      setAudioDriveStatusBadge_('Siap Analisa AI', 'ready');
       if (typeof showNotify === 'function') {
         showNotify('Audio Dipilih', res.fileName + ' siap diproses oleh AI Notulis.', 'success');
       }
+      uploadRapatAudioToDriveInBackground_(res.dataUri, res.fileName, res.mimeType);
     } catch (err) {
       if (typeof showNotify === 'function') {
         showNotify('Audio Tidak Valid', err.message || err.toString(), 'warning');
@@ -1671,9 +1939,11 @@
             try { rapatAudioState.objectUrl = URL.createObjectURL(blob); } catch (eObj) {}
           }
           updateRapatAudioPreviewUi_();
+          setAudioDriveStatusBadge_('Siap Analisa AI', 'ready');
           if (typeof showNotify === 'function') {
             showNotify('Rekaman Selesai', 'Audio berhasil direkam. Klik Proses AI Notulis untuk menyusun Notula.', 'success');
           }
+          uploadRapatAudioToDriveInBackground_(dataUri, rapatAudioState.fileName, recMime);
         } catch (errBlob) {
           console.warn('Gagal konversi rekaman audio:', errBlob);
         }
@@ -2159,6 +2429,7 @@
     if (elDropTujuan) elDropTujuan.classList.add('hidden');
     tujuanSearchActiveIdx = 0;
     tujuanSearchMatches = [];
+    tujuanDropCheckedMap = {};
     speakerDropActiveMap = {};
     speakerDropMatchesMap = {};
     renderTujuanUndanganOrdered_();
@@ -2222,6 +2493,17 @@
     }
     var elAudioUrl = document.getElementById('rapatFieldAudioUrl');
     if (elAudioUrl) elAudioUrl.value = rapatData.audio_rapat_url || '';
+    if (rapatData.audio_rapat_url) {
+      var prevBox = document.getElementById('rapatAudioPreviewBox');
+      var infoEl = document.getElementById('rapatAudioFileInfo');
+      var plEl = document.getElementById('rapatAudioPlayer');
+      if (prevBox) prevBox.classList.remove('hidden');
+      if (plEl) plEl.classList.add('hidden');
+      if (infoEl) infoEl.innerText = 'Arsip Rekaman Google Drive';
+      setAudioDriveStatusBadge_('Arsip Drive Tersimpan', 'saved');
+    } else {
+      setAudioDriveStatusBadge_('Siap Analisa AI', 'ready');
+    }
 
     var elAiTrans = document.getElementById('rapatFieldAiTranscript');
     if (elAiTrans) elAiTrans.value = rapatData.ai_transcript || '';

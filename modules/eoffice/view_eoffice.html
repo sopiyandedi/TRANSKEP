@@ -334,38 +334,35 @@
                   </button>
                 </div>
 
-                <!-- Aksi Khusus Rapat (3 Tombol Cetak Luar Instan + Edit + Hapus) -->
-                <div v-else-if="item.itemType === 'Rapat'" class="flex items-center justify-end gap-1.5 flex-wrap">
+                <!-- Aksi Khusus Rapat (3 Tombol Cetak Ikon-Only + Edit + Hapus) -->
+                <div v-else-if="item.itemType === 'Rapat'" class="flex items-center justify-end gap-1.5">
                   <button type="button" @click="openModalRapatDetail(item)"
                     class="w-8 h-8 rounded-lg bg-indigo-500/10 hover:bg-indigo-500 text-indigo-400 hover:text-white border border-indigo-500/30 transition flex items-center justify-center shadow-sm"
-                    title="Edit &amp; Kelola Agenda Rapat">
+                    title="Edit &amp; Kelola Agenda Rapat" aria-label="Edit Agenda Rapat">
                     <i class="fa-solid fa-pen-to-square text-xs"></i>
                   </button>
 
                   <button type="button" @click="triggerPrintUndanganRapat(item)"
-                    class="px-2.5 py-1.5 bg-amber-500/10 hover:bg-amber-500 hover:text-white text-amber-400 border border-amber-500/30 font-bold rounded-lg text-[10px] transition cursor-pointer inline-flex items-center gap-1 shadow-sm"
-                    title="Cetak Surat Undangan Rapat (A4 12pt)">
-                    <i class="fa-solid fa-envelope-open-text text-[10px]"></i>
-                    <span>Undangan</span>
+                    class="w-8 h-8 rounded-lg bg-amber-500/10 hover:bg-amber-500 hover:text-white text-amber-400 border border-amber-500/30 transition cursor-pointer flex items-center justify-center shadow-sm"
+                    title="Cetak Surat Undangan Rapat (A4 12pt)" aria-label="Cetak Undangan Rapat">
+                    <i class="fa-solid fa-envelope-open-text text-xs"></i>
                   </button>
 
                   <button type="button" @click="triggerPrintHadirRapat(item)"
-                    class="px-2.5 py-1.5 bg-cyan-500/10 hover:bg-cyan-500 hover:text-white text-cyan-400 border border-cyan-500/30 font-bold rounded-lg text-[10px] transition cursor-pointer inline-flex items-center gap-1 shadow-sm"
-                    title="Cetak Daftar Hadir Rapat Kosong (A4 12pt)">
-                    <i class="fa-solid fa-clipboard-user text-[10px]"></i>
-                    <span>Absen</span>
+                    class="w-8 h-8 rounded-lg bg-cyan-500/10 hover:bg-cyan-500 hover:text-white text-cyan-400 border border-cyan-500/30 transition cursor-pointer flex items-center justify-center shadow-sm"
+                    title="Cetak Daftar Hadir Rapat Kosong (A4 12pt)" aria-label="Cetak Daftar Hadir Rapat">
+                    <i class="fa-solid fa-clipboard-user text-xs"></i>
                   </button>
 
                   <button type="button" @click="triggerPrintNotulaRapat(item)"
-                    class="px-2.5 py-1.5 bg-emerald-500/10 hover:bg-emerald-500 hover:text-white text-emerald-400 border border-emerald-500/30 font-bold rounded-lg text-[10px] transition cursor-pointer inline-flex items-center gap-1 shadow-sm"
-                    title="Cetak Notula Rapat (A4 11pt)">
-                    <i class="fa-solid fa-file-lines text-[10px]"></i>
-                    <span>Notula</span>
+                    class="w-8 h-8 rounded-lg bg-emerald-500/10 hover:bg-emerald-500 hover:text-white text-emerald-400 border border-emerald-500/30 transition cursor-pointer flex items-center justify-center shadow-sm"
+                    title="Cetak Notula Rapat (A4 11pt)" aria-label="Cetak Notula Rapat">
+                    <i class="fa-solid fa-file-lines text-xs"></i>
                   </button>
 
                   <button type="button" @click="promptDeleteRapat(item)"
                     class="w-8 h-8 rounded-lg bg-rose-500/10 hover:bg-rose-500 text-rose-400 hover:text-white border border-rose-500/30 transition flex items-center justify-center shadow-sm"
-                    title="Hapus Agenda Rapat">
+                    title="Hapus Agenda Rapat" aria-label="Hapus Agenda Rapat">
                     <i class="fa-solid fa-trash-can text-xs"></i>
                   </button>
                 </div>
@@ -902,7 +899,7 @@
   class="fixed inset-0 z-[150] flex items-center justify-center bg-black/80 backdrop-blur-md transition-opacity duration-300 opacity-0 hidden p-2 md:p-5 no-print">
 
   <div id="modalAgendaRapatBox"
-    class="glass border border-slate-800 bg-slate-900/95 rounded-3xl w-[96vw] max-w-6xl h-[92vh] flex flex-col shadow-2xl transform transition-all duration-300 scale-95 overflow-hidden">
+    class="glass border border-slate-800 bg-slate-900/95 rounded-3xl w-[96vw] max-w-6xl h-[92vh] flex flex-col shadow-2xl transform transition-all duration-300 scale-95 overflow-clip">
 
     <!-- HEADER MODAL -->
     <div class="px-5 py-3.5 border-b border-slate-800/80 bg-slate-950/70 flex items-center justify-between gap-3 shrink-0">
@@ -922,6 +919,12 @@
       </div>
 
       <div class="flex items-center gap-2 shrink-0">
+        <button type="button" id="btnRapatHeaderAddPembicara" onclick="addPembahasanRow(null, true)"
+          class="hidden px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-[11px] transition flex items-center gap-1.5 shadow-md shadow-emerald-600/20"
+          title="Tambah Pembicara / Poin Baru">
+          <i class="fa-solid fa-plus text-xs"></i>
+          <span class="hidden sm:inline">Tambah Pembicara</span>
+        </button>
         <button type="button" onclick="toggleRapatFullscreen()" id="btnRapatFullscreenToggle"
           title="Perbesar / Layar Penuh"
           class="w-9 h-9 rounded-xl bg-slate-800/60 hover:bg-indigo-500/20 text-slate-400 hover:text-indigo-300 border border-slate-700/60 transition flex items-center justify-center">
@@ -963,7 +966,7 @@
     </div>
 
     <!-- BODY FORMULIR (SCROLLABLE) -->
-    <div class="flex-1 overflow-y-auto p-5 md:p-6 space-y-5 custom-scrollbar text-xs">
+    <div id="modalAgendaRapatBody" class="flex-1 min-h-0 overflow-y-auto p-5 md:p-6 space-y-5 custom-scrollbar text-xs">
       <form id="formRapatDokumen" onsubmit="event.preventDefault();">
         <input type="hidden" id="rapatFieldIdRapat">
         <input type="hidden" id="rapatFieldDocUndanganUrl">
@@ -1340,13 +1343,8 @@
                 <h4 class="font-bold text-white uppercase tracking-wider text-[11px]">
                   <i class="fa-solid fa-table-list text-emerald-400 mr-1.5"></i>B. Pembahasan Per Pembicara (Input Kiri ke Kanan &rarr; Cetak Bertingkat)
                 </h4>
-                <p class="text-[10px] text-slate-400 mt-0.5">Tambahkan baris untuk pembicara yang sama dengan ikon <span class="font-bold text-indigo-300">+ bulat</span> atau tekan <kbd class="px-1 py-0.5 bg-slate-800 border border-slate-700 rounded text-[9px] text-slate-200">Tab</kbd> di ujung kolom <span class="font-bold text-slate-300">e.</span></p>
+                <p class="text-[10px] text-slate-400 mt-0.5">Tambahkan baris untuk pembicara yang sama dengan tombol <span class="font-bold text-indigo-300">+ biru</span> di atas ikon hapus atau tekan <kbd class="px-1 py-0.5 bg-slate-800 border border-slate-700 rounded text-[9px] text-slate-200">Tab</kbd> di ujung kolom <span class="font-bold text-slate-300">e.</span>; klik <span class="font-bold text-emerald-300">+ Tambah Pembicara</span> di header modal atas.</p>
               </div>
-              <button type="button" onclick="addPembahasanRow()"
-                class="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-[11px] transition flex items-center gap-1.5 shadow-md shadow-emerald-600/20">
-                <i class="fa-solid fa-plus"></i>
-                <span>Tambah Pembicara / Poin</span>
-              </button>
             </div>
 
             <!-- Header Kolom Kiri ke Kanan (Desktop) -->
@@ -1376,8 +1374,13 @@
         <!-- ============================================== -->
         <div id="rapatTabPanel_media" class="space-y-4 hidden">
           <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <!-- Kartu Upload Foto (Aktif Tahap 139: Kompresi Canvas -> Google Drive) -->
-            <div class="bg-slate-950/50 border border-slate-800/80 rounded-2xl p-4 space-y-3">
+            <!-- Kartu Upload Foto (Aktif Tahap 139 + Drag & Drop Tahap 145: Kompresi Canvas -> Google Drive Subfolder Tahun/Bulan/Judul) -->
+            <div id="rapatFotoDropZone"
+              ondragenter="handleRapatDropDragOver(event, 'foto')"
+              ondragover="handleRapatDropDragOver(event, 'foto')"
+              ondragleave="handleRapatDropDragLeave(event, 'foto')"
+              ondrop="handleRapatFotoDrop(event)"
+              class="bg-slate-950/50 border-2 border-dashed border-slate-800/90 hover:border-cyan-500/40 rounded-2xl p-4 space-y-3 transition-all">
               <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800/70 pb-2">
                 <h4 class="font-bold text-slate-200 uppercase tracking-wider text-[11px] flex items-center gap-2">
                   <i class="fa-solid fa-images text-cyan-400"></i>Foto Dokumentasi Rapat
@@ -1385,7 +1388,7 @@
                     class="px-2 py-0.5 rounded-full text-[9px] font-bold bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">0 / 8 Foto</span>
                 </h4>
                 <div class="flex items-center gap-1.5">
-                  <input type="file" id="rapatInputFotoFiles" accept="image/jpeg,image/png" multiple class="hidden"
+                  <input type="file" id="rapatInputFotoFiles" accept="image/jpeg,image/png,image/webp" multiple class="hidden"
                     onchange="handleRapatFotoSelect(this.files); this.value='';">
                   <button type="button" onclick="document.getElementById('rapatInputFotoFiles').click()"
                     class="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded-xl text-[10px] transition inline-flex items-center gap-1.5 shadow-sm">
@@ -1399,16 +1402,18 @@
                 </div>
               </div>
               <p class="text-[11px] text-slate-400 leading-relaxed">
-                Foto otomatis dikompresi (maks. 960px JPEG) di browser lalu diunggah privat ke Google Drive agar ringan dan tampil di halaman akhir <b>Foto Rapat</b> (grid 2&times;2) Notula.
+                <b>Seret &amp; lepas foto ke sini</b> atau klik <b>+ Pilih Foto (Auto-Kompres)</b> — otomatis masuk folder <b>Tahun / Bulan / Judul Rapat</b> di Google Drive dan tampil di halaman akhir <b>Foto Rapat</b> (grid 2&times;2) Notula.
               </p>
               <div id="rapatFotoPreviewContainer" class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-64 overflow-y-auto custom-scrollbar pr-1">
-                <div class="sm:col-span-2 p-4 rounded-xl border border-dashed border-slate-700 bg-slate-900/40 text-center text-[11px] text-slate-500">
-                  Belum ada foto rapat terpilih. Klik <b>+ Pilih Foto</b> untuk menambahkan maksimal 8 foto.
+                <div onclick="document.getElementById('rapatInputFotoFiles').click()"
+                  class="sm:col-span-2 p-5 rounded-xl border border-dashed border-slate-700 hover:border-cyan-500/50 bg-slate-900/40 hover:bg-cyan-500/5 text-center text-[11px] text-slate-400 cursor-pointer transition space-y-1">
+                  <i class="fa-solid fa-cloud-arrow-up text-lg text-cyan-400/80 block mb-1"></i>
+                  <div>Seret &amp; lepas foto rapat di sini, atau klik untuk memilih (maks. 8 foto).</div>
                 </div>
               </div>
             </div>
 
-            <!-- Kartu AI Rekaman Audio (Aktif Tahap 140: Rekaman Suara / Audio File -> n8n & Gemini Auto-Fill Notula) -->
+            <!-- Kartu AI Rekaman Audio (Aktif Tahap 140 + Drag & Drop & Arsip Drive Tahap 145) -->
             <div class="bg-slate-950/50 border border-slate-800/80 rounded-2xl p-4 space-y-3">
               <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800/70 pb-2">
                 <h4 class="font-bold text-slate-200 uppercase tracking-wider text-[11px] flex items-center gap-2">
@@ -1418,12 +1423,26 @@
                   class="px-2 py-0.5 rounded-full text-[9px] font-bold bg-indigo-500/15 text-indigo-300 border border-indigo-500/30">Siap AI Notulis</span>
               </div>
               <p class="text-[11px] text-slate-400 leading-relaxed">
-                Unggah rekaman audio rapat (<b>.mp3, .m4a, .wav, .ogg, .webm</b>) atau rekam langsung dari mikrofon, lalu klik <b>Proses AI Notulis</b> untuk mengisi otomatis <b>Pengarahan Umum</b> &amp; <b>5 Kolom Pembahasan</b>.
+                <b>Seret &amp; lepas rekaman audio</b> (.mp3, .m4a, .wav, .ogg, .webm), pilih file, atau rekam langsung dari mikrofon — audio otomatis diarsipkan ke subfolder Drive rapat &amp; dianalisa menjadi <b>Pengarahan Umum</b> &amp; <b>5 Kolom Pembahasan</b>.
               </p>
 
               <input type="hidden" id="rapatFieldAudioUrl" value="">
               <input type="file" id="rapatInputAudioFile" accept="audio/*,.mp3,.m4a,.wav,.ogg,.webm" class="hidden"
                 onchange="handleRapatAudioSelect(this.files); this.value='';">
+
+              <div id="rapatAudioDropZone"
+                onclick="document.getElementById('rapatInputAudioFile').click()"
+                ondragenter="handleRapatDropDragOver(event, 'audio')"
+                ondragover="handleRapatDropDragOver(event, 'audio')"
+                ondragleave="handleRapatDropDragLeave(event, 'audio')"
+                ondrop="handleRapatAudioDrop(event)"
+                class="p-3.5 rounded-xl border-2 border-dashed border-slate-700 hover:border-indigo-500/60 bg-slate-900/50 hover:bg-indigo-500/5 text-center cursor-pointer transition-all space-y-1">
+                <div class="text-[11px] font-semibold text-indigo-300 flex items-center justify-center gap-2">
+                  <i class="fa-solid fa-file-audio text-indigo-400"></i>
+                  <span>Seret &amp; Lepas File Rekaman Audio di Sini (atau klik untuk pilih file)</span>
+                </div>
+                <div class="text-[10px] text-slate-500">Mendukung .mp3, .m4a, .wav, .ogg, .webm &bull; Otomatis terarsip di Drive (Tahun / Bulan / Judul Rapat)</div>
+              </div>
 
               <div class="flex flex-wrap items-center gap-2">
                 <button type="button" onclick="document.getElementById('rapatInputAudioFile').click()"
@@ -1444,9 +1463,9 @@
               </div>
 
               <div id="rapatAudioPreviewBox" class="hidden p-2.5 rounded-xl bg-slate-900/90 border border-indigo-500/30 space-y-2">
-                <div class="flex items-center justify-between text-[10px]">
+                <div class="flex items-center justify-between text-[10px] gap-2">
                   <span id="rapatAudioFileInfo" class="text-indigo-300 font-bold truncate">Belum ada file audio</span>
-                  <span class="px-1.5 py-0.5 rounded bg-indigo-500/15 text-indigo-300 border border-indigo-500/20 text-[9px] shrink-0">Siap Analisa AI</span>
+                  <span id="rapatAudioDriveStatus" class="px-1.5 py-0.5 rounded bg-indigo-500/15 text-indigo-300 border border-indigo-500/20 text-[9px] shrink-0">Siap Analisa AI</span>
                 </div>
                 <audio id="rapatAudioPlayer" controls class="w-full h-8"></audio>
               </div>
