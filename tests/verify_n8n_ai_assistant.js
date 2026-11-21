@@ -22,19 +22,24 @@ function runCodeNode(wf, nodeName, opts = {}) {
   assert(node && node.parameters && typeof node.parameters.jsCode === 'string', `Missing Code node: ${nodeName}`);
 
   const inputJson = opts.inputJson !== undefined ? opts.inputJson : {};
+  const inputBinary = opts.inputBinary;
   const nodeMap = opts.nodeMap || {};
+  const nodeBinaryMap = opts.nodeBinaryMap || {};
   const staticData = opts.staticData || {};
 
   const sandbox = {
     $input: {
-      first: () => ({ json: inputJson }),
-      all: () => [{ json: inputJson }],
+      first: () => (inputBinary !== undefined ? { json: inputJson, binary: inputBinary } : { json: inputJson }),
+      all: () => [inputBinary !== undefined ? { json: inputJson, binary: inputBinary } : { json: inputJson }],
     },
     $: (refName) => {
       const val = nodeMap[refName] || {};
+      const binVal = nodeBinaryMap[refName];
+      const itemObj = binVal !== undefined ? { json: val, binary: binVal } : { json: val };
       return {
-        first: () => ({ json: val }),
-        item: { json: val },
+        first: () => itemObj,
+        item: itemObj,
+        all: () => [itemObj],
       };
     },
     $getWorkflowStaticData: (scope) => {
@@ -495,7 +500,7 @@ function validateNotulenWorkflowTopology(wf, rawText, label) {
       new vm.Script(`(function(){\n${n.parameters.jsCode}\n})()`, { filename: `${label}:${n.name}` });
     }
   }
-  assert.strictEqual(wf.nodes.length, 26, `${label}: expected 26 nodes`);
+  assert.strictEqual(wf.nodes.length, 33, `${label}: expected 33 nodes`);
 
   for (const [srcName, connGroups] of Object.entries(wf.connections || {})) {
     assert(byName.has(srcName), `${label}: missing connection source ${srcName}`);
@@ -702,6 +707,119 @@ function runNotulenBehaviorSuite(wf, expectedSecret, wfLabel) {
   assert.strictEqual(cbAsyncOut.callbackPayload.job_id, 'AINOT-TEST-99');
   assert.strictEqual(cbAsyncOut.callbackPayload.status, 'success');
   assert.strictEqual(cbAsyncOut.geminiFileName, 'files/gemini-audio-146');
+
+  // Tahap 147: FFmpeg 100MB gate + binary fallback + 2-Pass Smart Merge + SKB 2026-2027 Workday Calculator
+  const big150MbOut = runCodeNode(wf, 'Validasi & Siapkan Prompt Notulen (Code)', {
+    inputJson: {
+      body: {
+        secret_key: expectedSecret,
+        event: 'AI_NOTULEN_RAPAT_ASYNC',
+        async_mode: true,
+        job_id: 'AINOT-TEST-147',
+        id_rapat: 'RPT-2026-147',
+        agenda: 'Rapat Ruang Media Center',
+        tgl_rapat_iso: '2026-03-17',
+        ai_mode: 'merge',
+        existing_draft: { pengarahan_umum: 'Draf awal', pembahasan: [{ pembicara_nama: 'Ketua', items: [{ uraian: 'Upload putusan' }] }] },
+        audio_drive_file_id: '1DriveAudio150Mb',
+        audio_file_name: 'Rapat_Panjang.m4a',
+        audio_mime_type: 'audio/mp4',
+        audio_size_bytes: 150000000,
+      },
+    },
+  })[0].json;
+  assert.strictEqual(big150MbOut.needsFfmpeg, true, `${wfLabel}: >100 MB audio must trigger needsFfmpeg: true`);
+  assert.strictEqual(asyncDriveOut.needsFfmpeg, false, `${wfLabel}: 77 MB audio must bypass FFmpeg`);
+  assert.strictEqual(big150MbOut.tgl_rapat_iso, '2026-03-17');
+
+  const ffmpegOk = runCodeNode(wf, 'Evaluasi Hasil FFmpeg & Siapkan Binary (Code)', {
+    inputJson: {},
+    inputBinary: { data: { data: 'bXAzaGVhZA==', mimeType: 'audio/mpeg' } },
+    nodeMap: { 'Validasi & Siapkan Prompt Notulen (Code)': big150MbOut },
+  })[0];
+  assert.strictEqual(ffmpegOk.json.ffmpegUsed, true);
+  assert.strictEqual(ffmpegOk.json.finalMimeType, 'audio/mpeg');
+  assert.strictEqual(ffmpegOk.binary.data.data, 'bXAzaGVhZA==');
+
+  const ffmpegFallback = runCodeNode(wf, 'Evaluasi Hasil FFmpeg & Siapkan Binary (Code)', {
+    inputJson: { error: { message: 'FFmpeg offline' } },
+    nodeMap: { 'Validasi & Siapkan Prompt Notulen (Code)': big150MbOut },
+    nodeBinaryMap: { 'Download Audio dari Google Drive': { data: { data: 'origDriveBin', mimeType: 'audio/mp4' } } },
+  })[0];
+  assert.strictEqual(ffmpegFallback.json.ffmpegUsed, false);
+  assert.strictEqual(ffmpegFallback.json.ffmpegFallback, true);
+  assert.strictEqual(ffmpegFallback.binary.data.data, 'origDriveBin');
+
+  const mergedUpload = runCodeNode(wf, 'Gabungkan Sesi Upload & Binary (Code)', {
+    inputJson: { statusCode: 200, headers: { 'X-Goog-Upload-URL': 'https://upload.gemini/resumable/xyz' } },
+    nodeMap: {
+      'Validasi & Siapkan Prompt Notulen (Code)': big150MbOut,
+      'Evaluasi Hasil FFmpeg & Siapkan Binary (Code)': ffmpegOk.json,
+    },
+    nodeBinaryMap: {
+      'Evaluasi Hasil FFmpeg & Siapkan Binary (Code)': ffmpegOk.binary,
+    },
+  })[0];
+  assert.strictEqual(mergedUpload.json.uploadUrl, 'https://upload.gemini/resumable/xyz');
+  assert.strictEqual(mergedUpload.binary.data.data, 'bXAzaGVhZA==');
+
+  const pass2PrepOut = runCodeNode(wf, 'Siapkan Payload Pass 2 Smart Merge (Code)', {
+    inputJson: {
+      candidates: [{ content: { parts: [{ text: JSON.stringify({ pembicara_terdeteksi: [{ badge: 'Badge 1', nama_kandidat: 'Ketua' }] }) }] } }],
+    },
+    nodeMap: {
+      'Validasi & Siapkan Prompt Notulen (Code)': big150MbOut,
+      'Siapkan Payload Gemini FileURI (Code)': { fileName: 'files/gem-147', fileUri: 'https://gemini/gem-147', pollFailedMessage: '' },
+    },
+  })[0].json;
+  assert(pass2PrepOut.geminiPass2RequestBody.contents[0].parts[0].text.includes('Draf awal'), `${wfLabel}: Pass 2 prompt must include Tab 3 draft`);
+
+  const cb147Out = runCodeNode(wf, 'Parse & Siapkan Callback Async (Code)', {
+    inputJson: {
+      candidates: [{
+        content: {
+          parts: [{
+            text: JSON.stringify({
+              pengarahan_umum: 'Arahan lengkap.',
+              kesimpulan: 'Segera dilaksanakan.',
+              pembahasan: [{
+                pembicara_nama: 'Pembicara #2 (Belum Teridentifikasi — Bidang Media)',
+                pembicara_nip: '9999',
+                items: [
+                  {
+                    uraian: 'Upload putusan tepat waktu',
+                    tindak_lanjut: 'Laksanakan sesuai SOP',
+                    target_kategori_waktu: 'HARI_RAPAT',
+                    target_tanggal_eksplisit: '',
+                    penanggung_jawab: 'Panitera Muda',
+                    selesai_kategori_waktu: 'HARI_RAPAT',
+                    selesai_tanggal_eksplisit: '',
+                  },
+                  {
+                    uraian: 'Siapkan ruang Media Center',
+                    tindak_lanjut: 'Koordinasi tim sarpras & IT',
+                    target_kategori_waktu: 'JANGKA_PENDEK',
+                    target_tanggal_eksplisit: '',
+                    penanggung_jawab: 'Sekretaris',
+                    selesai_kategori_waktu: 'PROYEK_SARANA',
+                    selesai_tanggal_eksplisit: '',
+                  },
+                ],
+              }],
+            }),
+          }],
+        },
+      }],
+    },
+    nodeMap: {
+      'Validasi & Siapkan Prompt Notulen (Code)': big150MbOut,
+      'Siapkan Payload Pass 2 Smart Merge (Code)': pass2PrepOut,
+    },
+  })[0].json;
+  assert.strictEqual(cb147Out.callbackPayload.data.pembahasan[0].pembicara_nip, '', `${wfLabel}: uncertain speaker must not carry NIP`);
+  assert.strictEqual(cb147Out.callbackPayload.data.pembahasan[0].items[0].target, '2026-03-17', `${wfLabel}: HARI_RAPAT must stay on meeting date`);
+  assert.strictEqual(cb147Out.callbackPayload.data.pembahasan[0].items[1].target, '2026-03-31', `${wfLabel}: 2026-03-17 + 5 workdays must skip Lebaran 2026 SKB`);
+  assert.strictEqual(cb147Out.callbackPayload.data.pembahasan[0].items[1].tanggal_penyelesaian, '2026-04-15', `${wfLabel}: 2026-03-17 + 15 workdays must skip Lebaran & Wafat Yesus Kristus SKB`);
 }
 
 runNotulenBehaviorSuite(notulenExWf, '<GANTI_TRANSKEP_WEBHOOK_KEY>', 'notulen-example');

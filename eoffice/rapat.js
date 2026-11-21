@@ -251,7 +251,7 @@ function uploadAudioRapat(payload, adminNip, clientToken) {
 }
 
 /**
- * RPC Aman: Membuat Resumable Upload Session URL Google Drive v3 untuk Audio Rapat hingga 120 MB
+ * RPC Aman: Membuat Resumable Upload Session URL Google Drive v3 untuk Audio Rapat hingga 2 GB
  * agar browser dapat mengunggah chunk binary langsung ke Google Drive tanpa membebani payload GAS (50 MB).
  */
 function initAudioDriveUploadSession(payload, adminNip, clientToken) {
@@ -261,12 +261,12 @@ function initAudioDriveUploadSession(payload, adminNip, clientToken) {
     }
 
     const p = payload || {};
-    const maxBytes = 120 * 1024 * 1024;
+    const maxBytes = 2 * 1024 * 1024 * 1024;
     const fileSize = parseInt(p.file_size, 10) || 0;
     if (fileSize <= 0 || fileSize > maxBytes) {
       return {
         status: 'error',
-        message: 'Ukuran berkas audio tidak valid atau melebihi batas maksimal 120 MB (' + maxBytes + ' byte).'
+        message: 'Ukuran berkas audio tidak valid atau melebihi batas maksimal 2 GB (' + maxBytes + ' byte).'
       };
     }
 
@@ -371,9 +371,9 @@ function finalizeAudioDriveUpload(payload, adminNip, clientToken) {
 
     const driveSize = (typeof file.getSize === 'function') ? Number(file.getSize() || 0) : 0;
     const sizeBytes = driveSize > 0 ? driveSize : (parseInt(p.file_size, 10) || 0);
-    const maxBytes = 120 * 1024 * 1024;
+    const maxBytes = 2 * 1024 * 1024 * 1024;
     if (sizeBytes <= 0 || sizeBytes > maxBytes) {
-      return { status: 'error', message: 'Ukuran audio di Google Drive tidak valid atau melebihi 120 MB.' };
+      return { status: 'error', message: 'Ukuran audio di Google Drive tidak valid atau melebihi 2 GB.' };
     }
 
     const fileName = String((typeof file.getName === 'function' ? file.getName() : '') || p.file_name || 'rekaman_rapat.m4a').trim();
@@ -417,7 +417,11 @@ function formatAiPointListText_(val) {
  * Helper: Mencocokkan nama pembicara hasil AI dengan daftar peserta rapat agar NIP & Jabatan terisi otomatis
  */
 function matchSpeakerFromPesertaList_(speakerName, pesertaList) {
-  const target = String(speakerName || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+  const rawTarget = String(speakerName || '').trim();
+  if (!rawTarget || /^pembicara\s*#\d+/i.test(rawTarget) || /belum\s+teridentifikasi/i.test(rawTarget)) {
+    return null;
+  }
+  const target = rawTarget.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
   if (!target || !Array.isArray(pesertaList) || pesertaList.length === 0) return null;
 
   let best = null;
@@ -443,6 +447,127 @@ function matchSpeakerFromPesertaList_(speakerName, pesertaList) {
 }
 
 /**
+ * Kalender Hari Libur Nasional & Cuti Bersama SKB 3 Menteri (2026 & 2027) — Sinkron dengan modul Cuti TRANSKEP
+ */
+const RAPAT_SKB_HOLIDAYS_2026_2027_ = {
+  '2026-01-01': 'Tahun Baru 2026 Masehi',
+  '2026-01-16': 'Isra Mikraj Nabi Muhammad S.A.W.',
+  '2026-02-16': 'Cuti Bersama Tahun Baru Imlek 2577 Kongzili',
+  '2026-02-17': 'Tahun Baru Imlek 2577 Kongzili',
+  '2026-03-18': 'Cuti Bersama Hari Suci Nyepi',
+  '2026-03-19': 'Hari Suci Nyepi (Tahun Baru Saka 1948)',
+  '2026-03-20': 'Cuti Bersama Idul Fitri 1447 H',
+  '2026-03-21': 'Idul Fitri 1447 Hijriah',
+  '2026-03-22': 'Idul Fitri 1447 Hijriah',
+  '2026-03-23': 'Cuti Bersama Idul Fitri 1447 H',
+  '2026-03-24': 'Cuti Bersama Idul Fitri 1447 H',
+  '2026-04-03': 'Wafat Yesus Kristus',
+  '2026-04-05': 'Kebangkitan Yesus Kristus (Paskah)',
+  '2026-05-01': 'Hari Buruh Internasional',
+  '2026-05-14': 'Kenaikan Yesus Kristus',
+  '2026-05-15': 'Cuti Bersama Kenaikan Yesus Kristus',
+  '2026-05-27': 'Idul Adha 1447 Hijriah',
+  '2026-05-28': 'Cuti Bersama Idul Adha 1447 H',
+  '2026-05-31': 'Hari Raya Waisak 2570 BE',
+  '2026-06-01': 'Hari Lahir Pancasila',
+  '2026-06-16': 'Tahun Baru Islam 1448 Hijriah',
+  '2026-08-17': 'Proklamasi Kemerdekaan RI',
+  '2026-08-25': 'Maulid Nabi Muhammad S.A.W.',
+  '2026-12-24': 'Cuti Bersama Kelahiran Yesus Kristus',
+  '2026-12-25': 'Kelahiran Yesus Kristus',
+  '2027-01-01': 'Tahun Baru 2027 Masehi',
+  '2027-01-05': 'Isra Mikraj Nabi Muhammad S.A.W. 1448 H',
+  '2027-02-05': 'Cuti Bersama Tahun Baru Imlek 2578 Kongzili',
+  '2027-02-06': 'Tahun Baru Imlek 2578 Kongzili',
+  '2027-03-08': 'Hari Suci Nyepi (Tahun Baru Saka 1949)',
+  '2027-03-09': 'Cuti Bersama Idul Fitri 1448 H',
+  '2027-03-10': 'Idul Fitri 1448 Hijriah',
+  '2027-03-11': 'Idul Fitri 1448 Hijriah',
+  '2027-03-12': 'Cuti Bersama Idul Fitri 1448 H',
+  '2027-03-15': 'Cuti Bersama Idul Fitri 1448 H',
+  '2027-03-25': 'Cuti Bersama Wafat Yesus Kristus',
+  '2027-03-26': 'Wafat Yesus Kristus',
+  '2027-03-28': 'Kebangkitan Yesus Kristus (Paskah)',
+  '2027-05-01': 'Hari Buruh Internasional',
+  '2027-05-06': 'Kenaikan Yesus Kristus',
+  '2027-05-17': 'Idul Adha 1448 Hijriah',
+  '2027-05-18': 'Cuti Bersama Idul Adha 1448 H',
+  '2027-05-19': 'Cuti Bersama Hari Raya Waisak 2571 BE',
+  '2027-05-20': 'Hari Raya Waisak 2571 BE',
+  '2027-06-01': 'Hari Lahir Pancasila',
+  '2027-06-06': '1 Muharam Tahun Baru Islam 1449 H',
+  '2027-08-15': 'Maulid Nabi Muhammad S.A.W.',
+  '2027-08-17': 'Proklamasi Kemerdekaan RI',
+  '2027-12-24': 'Cuti Bersama Kelahiran Yesus Kristus',
+  '2027-12-25': 'Kelahiran Yesus Kristus',
+  '2027-12-26': 'Isra Mikraj Nabi Muhammad S.A.W. 1449 H'
+};
+
+function parseRapatIsoDate_(rawStr) {
+  const s = String(rawStr || '').trim();
+  if (!s) return '';
+  const mIso = s.match(/(\d{4})-(\d{2})-(\d{2})/);
+  if (mIso) return mIso[1] + '-' + mIso[2] + '-' + mIso[3];
+  const months = {
+    januari: '01', februari: '02', maret: '03', april: '04', mei: '05', juni: '06',
+    juli: '07', agustus: '08', september: '09', oktober: '10', november: '11', nopember: '11', desember: '12'
+  };
+  const mIndo = s.toLowerCase().match(/(\d{1,2})\s+(januari|februari|maret|april|mei|juni|juli|agustus|september|oktober|november|nopember|desember)\s+(\d{4})/);
+  if (mIndo) {
+    const dd = String(parseInt(mIndo[1], 10)).padStart(2, '0');
+    const mm = months[mIndo[2]] || '';
+    if (mm) return mIndo[3] + '-' + mm + '-' + dd;
+  }
+  return '';
+}
+
+function addWorkdaysSkbRapat_(baseIso, workdays) {
+  let cleanBase = parseRapatIsoDate_(baseIso);
+  if (!cleanBase) {
+    cleanBase = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'yyyy-MM-dd');
+  }
+  const parts = cleanBase.split('-');
+  const dt = new Date(Date.UTC(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10)));
+  const steps = parseInt(workdays, 10) || 0;
+  if (steps <= 0) return cleanBase;
+  let added = 0;
+  let guard = 0;
+  while (added < steps && guard < 180) {
+    dt.setUTCDate(dt.getUTCDate() + 1);
+    guard++;
+    const dow = dt.getUTCDay();
+    const y = dt.getUTCFullYear();
+    const m = String(dt.getUTCMonth() + 1).padStart(2, '0');
+    const d = String(dt.getUTCDate()).padStart(2, '0');
+    const iso = y + '-' + m + '-' + d;
+    if (dow !== 0 && dow !== 6 && !RAPAT_SKB_HOLIDAYS_2026_2027_[iso]) {
+      added++;
+    }
+  }
+  const fy = dt.getUTCFullYear();
+  const fm = String(dt.getUTCMonth() + 1).padStart(2, '0');
+  const fd = String(dt.getUTCDate()).padStart(2, '0');
+  return fy + '-' + fm + '-' + fd;
+}
+
+function resolveAiDateFieldRapat_(explicitVal, categoryVal, baseIso) {
+  const exp = String(explicitVal == null ? '' : explicitVal).trim();
+  const cat = String(categoryVal == null ? '' : categoryVal).trim().toUpperCase();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(exp)) return exp;
+  if (cat === 'EKSPLISIT') {
+    const parsedExp = parseRapatIsoDate_(exp);
+    if (parsedExp) return parsedExp;
+    if (exp) return exp;
+    return addWorkdaysSkbRapat_(baseIso, 5);
+  }
+  if (cat === 'HARI_RAPAT') return parseRapatIsoDate_(baseIso) || addWorkdaysSkbRapat_('', 0);
+  if (cat === 'JANGKA_PENDEK') return addWorkdaysSkbRapat_(baseIso, 5);
+  if (cat === 'JANGKA_MENENGAH') return addWorkdaysSkbRapat_(baseIso, 10);
+  if (cat === 'PROYEK_SARANA') return addWorkdaysSkbRapat_(baseIso, 15);
+  return exp;
+}
+
+/**
  * Helper: Normalisasi output JSON Notula dari n8n / Gemini menjadi format 5 kolom Notula Rapat PA Indramayu
  */
 function normalizeAiNotulenResponse_(rawObj, payload) {
@@ -456,6 +581,10 @@ function normalizeAiNotulenResponse_(rawObj, payload) {
       if (Array.isArray(parsedP)) pesertaList = parsedP;
     } catch (eP) {}
   }
+
+  const baseIso = parseRapatIsoDate_(
+    (payload && (payload.tgl_rapat_iso || payload.hari_tanggal)) || src.tgl_rapat_iso || ''
+  ) || Utilities.formatDate(new Date(), 'Asia/Jakarta', 'yyyy-MM-dd');
 
   const rawRows = Array.isArray(src.pembahasan) ? src.pembahasan : [];
   const pembahasan = rawRows.slice(0, 30).map(function (row, idx) {
@@ -475,6 +604,52 @@ function normalizeAiNotulenResponse_(rawObj, payload) {
       }
     }
 
+    const rawItems = Array.isArray(r.items) && r.items.length > 0 ? r.items.slice(0, 15) : null;
+    if (rawItems) {
+      const normItems = rawItems.map(function (it) {
+        const itemObj = (it && typeof it === 'object') ? it : {};
+        return {
+          uraian: formatAiPointListText_(itemObj.uraian_text || itemObj.uraian),
+          tindak_lanjut: formatAiPointListText_(itemObj.tindak_lanjut_text || itemObj.tindak_lanjut),
+          target: resolveAiDateFieldRapat_(itemObj.target_tanggal_eksplisit || itemObj.target, itemObj.target_kategori_waktu, baseIso),
+          penanggung_jawab: String(itemObj.penanggung_jawab || r.penanggung_jawab || '').trim(),
+          tanggal_penyelesaian: resolveAiDateFieldRapat_(itemObj.selesai_tanggal_eksplisit || itemObj.tanggal_penyelesaian, itemObj.selesai_kategori_waktu, baseIso)
+        };
+      });
+      const stripNum = function (ln) { return String(ln || '').trim().replace(/^[0-9]+[.)]\s*/, '').trim(); };
+      const joinFlat = function (k, isDate) {
+        const lines = [];
+        normItems.forEach(function (x) {
+          const v = String(x[k] || '').trim();
+          if (!v) return;
+          if (isDate || normItems.length === 1) {
+            lines.push(v);
+          } else {
+            v.split(/\r?\n/).forEach(function (ln) {
+              const c = stripNum(ln);
+              if (c) lines.push(c);
+            });
+          }
+        });
+        if (lines.length === 0) return '';
+        if (normItems.length === 1) return lines[0] || '';
+        if (isDate) return lines.join('\n');
+        if (lines.length === 1) return lines[0];
+        return lines.map(function (ln, idxV) { return (idxV + 1) + '. ' + ln; }).join('\n');
+      };
+      return {
+        pembicara_nama: nama,
+        pembicara_nip: nip,
+        pembicara_jabatan: jabatan,
+        uraian: joinFlat('uraian', false),
+        tindak_lanjut: joinFlat('tindak_lanjut', false),
+        target: joinFlat('target', true),
+        penanggung_jawab: joinFlat('penanggung_jawab', false),
+        tanggal_penyelesaian: joinFlat('tanggal_penyelesaian', true),
+        items: normItems
+      };
+    }
+
     const uraianStr = formatAiPointListText_(r.uraian_text || r.uraian);
     const tindakStr = formatAiPointListText_(r.tindak_lanjut_text || r.tindak_lanjut);
     return {
@@ -483,9 +658,9 @@ function normalizeAiNotulenResponse_(rawObj, payload) {
       pembicara_jabatan: jabatan,
       uraian: uraianStr,
       tindak_lanjut: tindakStr,
-      target: String(r.target || '').trim(),
+      target: resolveAiDateFieldRapat_(r.target_tanggal_eksplisit || r.target, r.target_kategori_waktu, baseIso),
       penanggung_jawab: String(r.penanggung_jawab || '').trim(),
-      tanggal_penyelesaian: String(r.tanggal_penyelesaian || '').trim()
+      tanggal_penyelesaian: resolveAiDateFieldRapat_(r.selesai_tanggal_eksplisit || r.tanggal_penyelesaian, r.selesai_kategori_waktu, baseIso)
     };
   });
 
@@ -615,8 +790,8 @@ function putAiNotulenJobCache_(jobId, jobObj) {
 /**
  * RPC Aman: Ekstraksi Rekaman Audio / Transkrip Rapat menjadi Draft Notula Terstruktur via n8n + Gemini
  * Mendukung 2 jalur:
- * - Sync cepat: audio kecil (<= 8.5 MB) atau catatan teks mentah
- * - Async Drive + Gemini Files API: rekaman besar dari Google Drive hingga 120 MB
+ * - Sync cepat: audio kecil (<= 8.5 MB), draf Tab 3, atau catatan teks mentah
+ * - Async Drive + FFmpeg + Gemini Files API: rekaman besar dari Google Drive hingga 2 GB
  */
 function generateAiNotulenRapat(payload, adminNip, clientToken) {
   try {
@@ -628,9 +803,20 @@ function generateAiNotulenRapat(payload, adminNip, clientToken) {
     const rawAudio = String(p.audio_data || p.audio_base64 || '').trim();
     const audioDriveFileId = String(p.audio_drive_file_id || '').trim();
     const transcriptText = String(p.transcript_text || p.ai_transcript || '').trim();
+    const aiMode = String(p.ai_mode || 'merge').trim().toLowerCase() === 'replace' ? 'replace' : 'merge';
+    const tglRapatIso = parseRapatIsoDate_(p.tgl_rapat_iso || p.hari_tanggal || '');
+    const existingDraft = (p.existing_draft && typeof p.existing_draft === 'object') ? p.existing_draft : null;
+    const hasExistingDraftContent = Boolean(
+      existingDraft && (
+        String(existingDraft.pengarahan_umum || '').trim() ||
+        String(existingDraft.kesimpulan || '').trim() ||
+        String(existingDraft.dasar_notula || '').trim() ||
+        (Array.isArray(existingDraft.pembahasan) && existingDraft.pembahasan.length > 0)
+      )
+    );
 
-    if (!rawAudio && !audioDriveFileId && !transcriptText) {
-      return { status: 'error', message: 'Silakan unggah rekaman audio rapat atau isi catatan/transkrip mentah terlebih dahulu.' };
+    if (!rawAudio && !audioDriveFileId && !transcriptText && !hasExistingDraftContent) {
+      return { status: 'error', message: 'Silakan unggah rekaman audio rapat, isi draf notula di Tab 3, atau masukkan konteks rapat terlebih dahulu.' };
     }
 
     const props = PropertiesService.getScriptProperties();
@@ -645,7 +831,7 @@ function generateAiNotulenRapat(payload, adminNip, clientToken) {
     ).trim();
 
     // =========================================================================
-    // JALUR ASYNC FILE BESAR (GOOGLE DRIVE s.d. 120 MB -> n8n -> GEMINI FILES API)
+    // JALUR ASYNC FILE BESAR (GOOGLE DRIVE s.d. 2 GB -> FFmpeg -> GEMINI FILES API 2-PASS)
     // =========================================================================
     if (audioDriveFileId) {
       if (!/^[a-zA-Z0-9_-]{10,120}$/.test(audioDriveFileId)) {
@@ -662,9 +848,9 @@ function generateAiNotulenRapat(payload, adminNip, clientToken) {
 
       const driveSize = (typeof driveFile.getSize === 'function') ? Number(driveFile.getSize() || 0) : 0;
       const resolvedSize = driveSize > 0 ? driveSize : (parseInt(p.audio_size_bytes, 10) || 0);
-      const maxBytes = 120 * 1024 * 1024;
+      const maxBytes = 2 * 1024 * 1024 * 1024;
       if (resolvedSize <= 0 || resolvedSize > maxBytes) {
-        return { status: 'error', message: 'Ukuran rekaman di Drive tidak valid atau melebihi batas maksimal 120 MB.' };
+        return { status: 'error', message: 'Ukuran rekaman di Drive tidak valid atau melebihi batas maksimal 2 GB.' };
       }
 
       const driveName = String((typeof driveFile.getName === 'function' ? driveFile.getName() : '') || p.audio_file_name || 'rekaman_rapat.m4a').trim();
@@ -686,6 +872,9 @@ function generateAiNotulenRapat(payload, adminNip, clientToken) {
         cache.put('ai_notulen_ctx_' + jobId, JSON.stringify({
           agenda: String(p.agenda || 'Rapat Kedinasan').trim(),
           pemimpin: String(p.pemimpin || '').trim(),
+          hari_tanggal: String(p.hari_tanggal || '').trim(),
+          tgl_rapat_iso: tglRapatIso,
+          ai_mode: aiMode,
           peserta_list: Array.isArray(p.peserta_list) ? p.peserta_list.slice(0, 50) : []
         }), 3600);
       } catch (eCtx) {}
@@ -699,6 +888,9 @@ function generateAiNotulenRapat(payload, adminNip, clientToken) {
         id_rapat: idRapatClean,
         agenda: String(p.agenda || 'Rapat Kedinasan').trim(),
         hari_tanggal: String(p.hari_tanggal || '').trim(),
+        tgl_rapat_iso: tglRapatIso,
+        ai_mode: aiMode,
+        existing_draft: existingDraft,
         tempat: String(p.tempat || '').trim(),
         pemimpin: String(p.pemimpin || '').trim(),
         notulis: String(p.notulis || '').trim(),
@@ -804,6 +996,9 @@ function generateAiNotulenRapat(payload, adminNip, clientToken) {
       id_rapat: String(p.id_rapat || 'RPT-DRAFT').trim(),
       agenda: String(p.agenda || 'Rapat Kedinasan').trim(),
       hari_tanggal: String(p.hari_tanggal || '').trim(),
+      tgl_rapat_iso: tglRapatIso,
+      ai_mode: aiMode,
+      existing_draft: existingDraft,
       tempat: String(p.tempat || '').trim(),
       pemimpin: String(p.pemimpin || '').trim(),
       notulis: String(p.notulis || '').trim(),

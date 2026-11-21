@@ -1323,6 +1323,19 @@
         <!-- ============================================== -->
         <div id="rapatTabPanel_notula" class="space-y-4 hidden">
 
+          <!-- BAR UNDO AI NOTULIS (MUNCUL SAAT DRAF AI DITERAPKAN) -->
+          <div id="rapatTab3AiUndoBar" class="hidden flex flex-wrap items-center justify-between gap-2 px-3.5 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30">
+            <div class="flex items-center gap-2 text-[11px] text-amber-200">
+              <i class="fa-solid fa-wand-magic-sparkles text-amber-400"></i>
+              <span>Draf Notula baru saja diperbarui oleh <b class="text-white">AI Notulis</b>. Anda dapat mengembalikan draf sebelumnya jika perlu.</span>
+            </div>
+            <button type="button" onclick="undoLastAiNotulenApply()"
+              class="px-3 py-1 bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 hover:text-white font-bold rounded-lg text-[10px] border border-amber-500/40 transition inline-flex items-center gap-1.5 shrink-0">
+              <i class="fa-solid fa-rotate-left"></i>
+              <span>Batalkan / Kembalikan Draf Sebelum AI</span>
+            </button>
+          </div>
+
           <!-- A. PENGARAHAN UMUM -->
           <div class="bg-slate-950/50 border border-slate-800/80 rounded-2xl p-4 space-y-2.5">
             <div class="flex items-center justify-between gap-2">
@@ -1441,7 +1454,7 @@
                   <i class="fa-solid fa-file-audio text-indigo-400"></i>
                   <span>Seret &amp; Lepas File Rekaman Audio di Sini (atau klik untuk pilih file)</span>
                 </div>
-                <div class="text-[10px] text-slate-500">Mendukung .mp3, .m4a, .wav, .ogg, .webm, .aac, .flac (<b class="text-indigo-300">Maks. 120 MB</b>) &bull; Otomatis terarsip di Drive (Tahun / Bulan / Judul Rapat)</div>
+                <div class="text-[10px] text-slate-500">Mendukung .mp3, .m4a, .wav, .ogg, .webm, .aac, .flac (<b class="text-indigo-300">Maks. 2 GB</b> &bull; File &gt; 100 MB otomatis dikompres FFmpeg) &bull; Otomatis terarsip di Drive (Tahun / Bulan / Judul Rapat)</div>
               </div>
 
               <div class="flex flex-wrap items-center gap-2">
@@ -1479,11 +1492,27 @@
                 <audio id="rapatAudioPlayer" controls class="w-full h-8"></audio>
               </div>
 
-              <div>
-                <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Catatan Mentah / Transkrip Rapat</label>
-                <textarea id="rapatFieldAiTranscript" rows="4"
-                  placeholder="Tempel catatan mentah rapat (misal format Pembicara: isi uraian...) atau konteks tambahan agar AI Gemini menyusun draf 5 kolom Notula lebih akurat..."
-                  class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-slate-200 text-xs focus:ring-1 focus:ring-indigo-500 outline-none custom-scrollbar"></textarea>
+              <input type="hidden" id="rapatFieldAiTranscript" value="">
+
+              <div class="p-3 rounded-xl bg-slate-900/75 border border-slate-800 space-y-2">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                  <span class="text-[10px] font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                    <i class="fa-solid fa-layer-group text-indigo-400"></i>Mode Penggabungan Notula (Smart Merge Tab 3)
+                  </span>
+                  <div class="inline-flex rounded-xl bg-slate-950 p-0.5 border border-slate-800">
+                    <button type="button" id="btnRapatAiModeMerge" onclick="setRapatAiMode('merge')"
+                      class="px-2.5 py-1 rounded-lg text-[10px] font-bold transition bg-indigo-600 text-white shadow-sm">
+                      Lengkapi &amp; Sempurnakan
+                    </button>
+                    <button type="button" id="btnRapatAiModeReplace" onclick="setRapatAiMode('replace')"
+                      class="px-2.5 py-1 rounded-lg text-[10px] font-bold transition text-slate-400 hover:text-white">
+                      Susun Ulang Total
+                    </button>
+                  </div>
+                </div>
+                <p id="rapatAiModeDesc" class="text-[10px] text-slate-400 leading-relaxed">
+                  AI otomatis membaca draf Notula Anda di <b class="text-emerald-300">Tab 3</b>: memperbaiki typo/resuman, melengkapi kolom &amp; target waktu (hari kerja SKB 2026–2027), atau mengisi dari nol bila Tab 3 masih kosong.
+                </p>
               </div>
 
               <div class="flex flex-wrap items-center gap-2 pt-1">
@@ -1492,10 +1521,10 @@
                   <i class="fa-solid fa-wand-magic-sparkles"></i>
                   <span>Proses AI Notulis (Auto-Fill Notula)</span>
                 </button>
-                <button type="button" id="btnRapatParseLocalNotes" onclick="parseLocalTranscriptToNotula()"
-                  class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-xl text-[11px] border border-slate-700 transition inline-flex items-center gap-1.5">
-                  <i class="fa-solid fa-bolt text-amber-400"></i>
-                  <span>Susun Cepat dari Teks</span>
+                <button type="button" id="btnRapatUndoAiNotulen" onclick="undoLastAiNotulenApply()"
+                  class="hidden px-3 py-2 bg-amber-500/15 hover:bg-amber-500/25 text-amber-200 font-bold rounded-xl text-[11px] border border-amber-500/35 transition inline-flex items-center gap-1.5">
+                  <i class="fa-solid fa-rotate-left"></i>
+                  <span>Batalkan Hasil AI Terakhir</span>
                 </button>
               </div>
             </div>

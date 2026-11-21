@@ -31,7 +31,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const NL = String.fromCharCode(10);\nconst inputData = $input.first().json || {};\nconst isManualTest =\n  Object.keys(inputData).length === 0 ||\n  (!inputData.body && !inputData.secret_key && !inputData.id_rapat && !inputData.agenda);\n\nconst root = inputData.body || inputData || {};\nconst expectedSecret = '<GANTI_TRANSKEP_WEBHOOK_KEY>';\nconst defaultCallbackUrl = 'https://script.google.com/macros/s/<GANTI_GAS_DEPLOYMENT_ID>/exec';\nconst incomingSecret = String(root.secret_key || '').trim();\nconst isAuthorized = isManualTest || (incomingSecret !== '' && incomingSecret === expectedSecret);\n\nconst idRapat = String(root.id_rapat || (isManualTest ? 'RPT-TEST-001' : '')).trim();\nconst agenda = String(root.agenda || (isManualTest ? 'Rapat Koordinasi Bulanan & Evaluasi Kinerja' : 'Rapat Kedinasan')).trim();\nconst hariTanggal = String(root.hari_tanggal || 'Rabu, 18 November 2026').trim();\nconst tempat = String(root.tempat || 'Ruang Rapat Pimpinan Pengadilan Agama Indramayu').trim();\nconst pemimpin = String(root.pemimpin || 'Ketua Pengadilan Agama Indramayu').trim();\nconst notulis = String(root.notulis || 'Notulis Rapat').trim();\n\nlet pesertaList = [];\ntry {\n  if (Array.isArray(root.peserta_list)) pesertaList = root.peserta_list;\n  else if (typeof root.peserta_list === 'string' && root.peserta_list.trim()) {\n    pesertaList = JSON.parse(root.peserta_list);\n  }\n} catch (e) {\n  pesertaList = [];\n}\n\nconst transcriptText = String(\n  root.transcript_text ||\n    root.ai_transcript ||\n    (isManualTest\n      ? 'Ketua memberikan pengarahan agar seluruh bagian mempercepat penyelesaian laporan bulanan. Sekretaris melaporkan progres pengadaan dan tindak lanjut pemeliharaan sarana sidang dengan target selesai akhir November 2026.'\n      : '')\n).trim();\n\nconst rawAudio = String(root.audio_base64 || root.audio_data || '').trim();\nconst cleanAudioBase64 = rawAudio.replace(/^data:audio\\/[^;]+;base64,/i, '').replace(/\\s+/g, '');\nconst audioDriveFileId = String(root.audio_drive_file_id || '').trim();\nconst audioFileName = String(root.audio_file_name || (audioDriveFileId ? 'rekaman_rapat.m4a' : 'rekaman_rapat.webm')).trim();\nlet audioMimeType = String(root.audio_mime_type || root.mime_type || 'audio/webm').split(';')[0].trim().toLowerCase() || 'audio/webm';\nif (audioMimeType === 'audio/x-m4a' || audioMimeType === 'audio/m4a' || (/\\.m4a$/i.test(audioFileName) && (!audioMimeType || audioMimeType === 'video/mp4'))) {\n  audioMimeType = 'audio/mp4';\n}\nconst audioSizeBytes = parseInt(root.audio_size_bytes || '0', 10) || 0;\nconst jobId = String(root.job_id || '').trim();\nconst callbackUrl = String(root.callback_url || defaultCallbackUrl).trim() || defaultCallbackUrl;\nconst isAsyncDriveAudio = Boolean(audioDriveFileId && jobId && !cleanAudioBase64);\n\nconst pesertaInfoLines = Array.isArray(pesertaList)\n  ? pesertaList\n      .slice(0, 50)\n      .map((p, idx) => {\n        if (typeof p === 'string') return idx + 1 + '. ' + p;\n        return (\n          idx +\n          1 +\n          '. ' +\n          String(p.nama || p.label || '-') +\n          (p.jabatan ? ' (' + p.jabatan + ')' : '') +\n          (p.nip ? ' [NIP: ' + p.nip + ']' : '')\n        );\n      })\n      .join(NL)\n  : '';\n\nconst fullSystemPrompt =\n  'Kamu adalah Transkep AI, Notulis Eksekutif resmi Pengadilan Agama Indramayu (Mahkamah Agung RI).' +\n  NL +\n  'Tugasmu menganalisis rekaman audio rapat dan/atau catatan mentah rapat menjadi JSON Notula Rapat Kedinasan terstruktur sesuai tata naskah dinas peradilan.' +\n  NL +\n  'KELUARAN WAJIB HANYA JSON MURNI (tanpa teks pembuka/penutup) dengan skema persis berikut:' +\n  NL +\n  '{' +\n  NL +\n  '  \"dasar_opsional\": \"string dasar pelaksanaan rapat jika disebut di audio/catatan, atau string kosong\",' +\n  NL +\n  '  \"pengarahan_umum\": \"ringkasan pengarahan umum pimpinan rapat yang rapi & formal\",' +\n  NL +\n  '  \"kesimpulan\": \"kesimpulan/keputusan akhir rapat secara ringkas\",' +\n  NL +\n  '  \"transkrip_ringkas\": \"ringkasan alur pembicaraan / transkrip bersih rapat\",' +\n  NL +\n  '  \"pembahasan\": [' +\n  NL +\n  '    {' +\n  NL +\n  '      \"pembicara_nama\": \"Nama & Jabatan Pembicara (cocokkan dengan daftar peserta bila tersedia)\",' +\n  NL +\n  '      \"pembicara_nip\": \"NIP pembicara jika ditemukan di daftar peserta, atau kosong\",' +\n  NL +\n  '      \"pembicara_jabatan\": \"Jabatan pembicara\",' +\n  NL +\n  '      \"uraian\": [\"Poin 1 uraian/laporan\", \"Poin 2 uraian/laporan\"],' +\n  NL +\n  '      \"tindak_lanjut\": [\"Poin 1 tindak lanjut/tanggapan\", \"Poin 2 tindak lanjut\"],' +\n  NL +\n  '      \"target\": \"Target penyelesaian output yang terukur\",' +\n  NL +\n  '      \"penanggung_jawab\": \"Pihak / jabatan penanggung jawab\",' +\n  NL +\n  '      \"tanggal_penyelesaian\": \"Batas waktu / tanggal penyelesaian jika disebut, atau Segera / -\"' +\n  NL +\n  '    }' +\n  NL +\n  '  ]' +\n  NL +\n  '}';\n\nconst hasAudioInput = Boolean(cleanAudioBase64 || isAsyncDriveAudio);\nconst cleanPrompt =\n  '=== IDENTITAS RAPAT KEDINASAN PA INDRAMAYU ===' +\n  NL +\n  'ID Rapat: ' +\n  (idRapat || '-') +\n  NL +\n  'Agenda / Acara: ' +\n  agenda +\n  NL +\n  'Hari / Tanggal: ' +\n  hariTanggal +\n  NL +\n  'Tempat: ' +\n  tempat +\n  NL +\n  'Pimpinan Rapat: ' +\n  pemimpin +\n  NL +\n  'Notulis: ' +\n  notulis +\n  NL +\n  (pesertaInfoLines ? NL + 'Daftar Peserta Terdaftar:' + NL + pesertaInfoLines + NL : '') +\n  (transcriptText ? NL + 'Catatan Mentah / Konteks Tambahan:' + NL + transcriptText + NL : '') +\n  NL +\n  (hasAudioInput\n    ? 'Dengarkan rekaman audio rapat terlampir secara cermat, identifikasi pembicara, dan susun ke dalam JSON skema notula 5 kolom (Uraian, Tindak Lanjut, Target, Penanggung Jawab, Tanggal Penyelesaian).'\n    : 'Susun catatan rapat di atas menjadi JSON skema notula 5 kolom (Uraian, Tindak Lanjut, Target, Penanggung Jawab, Tanggal Penyelesaian) dalam Bahasa Indonesia kedinasan yang baku.');\n\nconst parts = [];\nif (cleanAudioBase64) {\n  parts.push({\n    inline_data: {\n      mime_type: audioMimeType,\n      data: cleanAudioBase64,\n    },\n  });\n}\nparts.push({ text: cleanPrompt });\n\nconst geminiRequestBody = {\n  system_instruction: {\n    parts: [{ text: fullSystemPrompt }],\n  },\n  contents: [\n    {\n      role: 'user',\n      parts,\n    },\n  ],\n  generationConfig: {\n    temperature: 0.2,\n    responseMimeType: 'application/json',\n  },\n};\n\nreturn [\n  {\n    json: {\n      isAuthorized,\n      isManualTest,\n      isAsyncDriveAudio,\n      job_id: jobId,\n      callback_url: callbackUrl,\n      secret_key: expectedSecret,\n      id_rapat: idRapat,\n      agenda,\n      audioAttached: hasAudioInput,\n      audio_drive_file_id: audioDriveFileId,\n      audioFileName,\n      audioMimeType,\n      audioSizeBytes,\n      cleanPrompt,\n      fullSystemPrompt,\n      geminiRequestBody,\n    },\n  },\n];"
+        "jsCode": "const NL = String.fromCharCode(10);\nconst inputData = $input.first().json || {};\nconst isManualTest =\n  Object.keys(inputData).length === 0 ||\n  (!inputData.body && !inputData.secret_key && !inputData.id_rapat && !inputData.agenda);\n\nconst root = inputData.body || inputData || {};\nconst expectedSecret = '<GANTI_TRANSKEP_WEBHOOK_KEY>';\nconst defaultCallbackUrl = 'https://script.google.com/macros/s/<GANTI_GAS_DEPLOYMENT_ID>/exec';\nconst incomingSecret = String(root.secret_key || '').trim();\nconst isAuthorized = isManualTest || (incomingSecret !== '' && incomingSecret === expectedSecret);\n\nfunction parseIsoDate(rawStr) {\n  const s = String(rawStr || '').trim();\n  if (!s) return '';\n  const mIso = s.match(/(\\d{4})-(\\d{2})-(\\d{2})/);\n  if (mIso) return mIso[1] + '-' + mIso[2] + '-' + mIso[3];\n  const months = {\n    januari: '01', februari: '02', maret: '03', april: '04', mei: '05', juni: '06',\n    juli: '07', agustus: '08', september: '09', oktober: '10', november: '11', nopember: '11', desember: '12'\n  };\n  const mIndo = s.toLowerCase().match(/(\\d{1,2})\\s+(januari|februari|maret|april|mei|juni|juli|agustus|september|oktober|november|nopember|desember)\\s+(\\d{4})/);\n  if (mIndo) {\n    const dd = String(parseInt(mIndo[1], 10)).padStart(2, '0');\n    const mm = months[mIndo[2]] || '';\n    if (mm) return mIndo[3] + '-' + mm + '-' + dd;\n  }\n  return '';\n}\n\nconst idRapat = String(root.id_rapat || (isManualTest ? 'RPT-TEST-001' : '')).trim();\nconst agenda = String(root.agenda || (isManualTest ? 'Rapat Koordinasi Bulanan & Evaluasi Kinerja' : 'Rapat Kedinasan')).trim();\nconst hariTanggal = String(root.hari_tanggal || 'Rabu, 18 November 2026').trim();\nconst tglRapatIso = parseIsoDate(root.tgl_rapat_iso || hariTanggal) || new Date().toISOString().slice(0, 10);\nconst tempat = String(root.tempat || 'Ruang Rapat Pimpinan Pengadilan Agama Indramayu').trim();\nconst pemimpin = String(root.pemimpin || 'Ketua Pengadilan Agama Indramayu').trim();\nconst notulis = String(root.notulis || 'Notulis Rapat').trim();\nconst aiMode = String(root.ai_mode || 'merge').trim().toLowerCase() === 'replace' ? 'replace' : 'merge';\n\nlet pesertaList = [];\ntry {\n  if (Array.isArray(root.peserta_list)) pesertaList = root.peserta_list;\n  else if (typeof root.peserta_list === 'string' && root.peserta_list.trim()) {\n    pesertaList = JSON.parse(root.peserta_list);\n  }\n} catch (e) {\n  pesertaList = [];\n}\n\nlet existingDraftObj = null;\ntry {\n  if (root.existing_draft && typeof root.existing_draft === 'object') {\n    existingDraftObj = root.existing_draft;\n  } else if (typeof root.existing_draft === 'string' && root.existing_draft.trim().startsWith('{')) {\n    existingDraftObj = JSON.parse(root.existing_draft);\n  }\n} catch (eDraft) {\n  existingDraftObj = null;\n}\n\nconst existingDraftText = existingDraftObj\n  ? [\n      existingDraftObj.dasar_notula ? 'Dasar Rapat (Draf Operator): ' + existingDraftObj.dasar_notula : '',\n      existingDraftObj.pengarahan_umum ? 'Pengarahan Umum (Draf Operator): ' + existingDraftObj.pengarahan_umum : '',\n      existingDraftObj.kesimpulan ? 'Kesimpulan (Draf Operator): ' + existingDraftObj.kesimpulan : '',\n      Array.isArray(existingDraftObj.pembahasan) && existingDraftObj.pembahasan.length > 0\n        ? 'Baris Pembahasan Operator (Tab 3): ' + JSON.stringify(existingDraftObj.pembahasan)\n        : ''\n    ].filter(Boolean).join(NL)\n  : '';\n\nconst transcriptText = String(\n  root.transcript_text ||\n    root.ai_transcript ||\n    (isManualTest\n      ? 'Ketua memberikan pengarahan agar seluruh bagian mempercepat penyelesaian laporan bulanan. Sekretaris melaporkan progres pengadaan dan tindak lanjut pemeliharaan sarana sidang dengan target selesai akhir November 2026.'\n      : '')\n).trim();\n\nconst rawAudio = String(root.audio_base64 || root.audio_data || '').trim();\nconst cleanAudioBase64 = rawAudio.replace(/^data:audio\\/[^;]+;base64,/i, '').replace(/\\s+/g, '');\nconst audioDriveFileId = String(root.audio_drive_file_id || '').trim();\nconst audioFileName = String(root.audio_file_name || (audioDriveFileId ? 'rekaman_rapat.m4a' : 'rekaman_rapat.webm')).trim();\nlet audioMimeType = String(root.audio_mime_type || root.mime_type || 'audio/webm').split(';')[0].trim().toLowerCase() || 'audio/webm';\nif (audioMimeType === 'audio/x-m4a' || audioMimeType === 'audio/m4a' || (/\\.m4a$/i.test(audioFileName) && (!audioMimeType || audioMimeType === 'video/mp4'))) {\n  audioMimeType = 'audio/mp4';\n}\nconst audioSizeBytes = parseInt(root.audio_size_bytes || '0', 10) || 0;\nconst jobId = String(root.job_id || '').trim();\nconst callbackUrl = String(root.callback_url || defaultCallbackUrl).trim() || defaultCallbackUrl;\nconst isAsyncDriveAudio = Boolean(audioDriveFileId && jobId && !cleanAudioBase64);\nconst needsFfmpeg = Boolean(isAsyncDriveAudio && audioSizeBytes > 100 * 1024 * 1024);\n\nconst pesertaInfoLines = Array.isArray(pesertaList)\n  ? pesertaList\n      .slice(0, 50)\n      .map((p, idx) => {\n        if (typeof p === 'string') return idx + 1 + '. ' + p;\n        return (\n          idx +\n          1 +\n          '. ' +\n          String(p.nama || p.label || '-') +\n          (p.jabatan ? ' (' + p.jabatan + ')' : '') +\n          (p.nip ? ' [NIP: ' + p.nip + ']' : '')\n        );\n      })\n      .join(NL)\n  : '';\n\nconst fullSystemPrompt =\n  'Kamu adalah Transkep AI, Notulis Eksekutif resmi Pengadilan Agama Indramayu (Mahkamah Agung RI).' +\n  NL +\n  'Tugasmu menganalisis rekaman audio rapat, mengidentifikasi pembicara, memadukannya dengan Draf Tab 3 Notulis (mode: ' + aiMode.toUpperCase() + '), dan menyusun JSON Notula Rapat Kedinasan terstruktur sesuai tata naskah dinas peradilan.' +\n  NL +\n  'ATURAN IDENTIFIKASI & WAKTU:' +\n  NL +\n  '1. Jangan pernah mengarang nama pembicara bila ragu. Jika tidak yakin siapa pembicaranya, gunakan \"Pembicara #N (Belum Teridentifikasi — Bidang ...)\".' +\n  NL +\n  '2. Klasifikasikan target & penyelesaian secara cerdas:' +\n  NL +\n  '   - EKSPLISIT: tanggal disebut jelas dalam rapat (isi target_tanggal_eksplisit / selesai_tanggal_eksplisit format YYYY-MM-DD).' +\n  NL +\n  '   - HARI_RAPAT: arahan rutin / kepatuhan / operasional harian yang berlaku mulai hari rapat.' +\n  NL +\n  '   - JANGKA_PENDEK: tindak lanjut administratif cepat (~5 hari kerja).' +\n  NL +\n  '   - JANGKA_MENENGAH: koordinasi lintas subbagian / surat-menyurat / evaluasi (~10 hari kerja).' +\n  NL +\n  '   - PROYEK_SARANA: penyiapan sarana/ruangan/aplikasi/pengadaan (~15 hari kerja).' +\n  NL +\n  'KELUARAN WAJIB HANYA JSON MURNI (tanpa teks pembuka/penutup) dengan skema berikut:' +\n  NL +\n  '{' +\n  NL +\n  '  \"dasar_opsional\": \"string dasar pelaksanaan rapat jika disebut, atau string kosong\",' +\n  NL +\n  '  \"pengarahan_umum\": \"ringkasan pengarahan umum pimpinan rapat yang rapi & formal\",' +\n  NL +\n  '  \"kesimpulan\": \"kesimpulan/keputusan akhir rapat secara ringkas\",' +\n  NL +\n  '  \"transkrip_ringkas\": \"ringkasan alur pembicaraan / transkrip bersih rapat\",' +\n  NL +\n  '  \"pembahasan\": [' +\n  NL +\n  '    {' +\n  NL +\n  '      \"pembicara_nama\": \"Nama & Jabatan Pembicara (cocokkan dengan daftar peserta atau Pembicara #N)\",' +\n  NL +\n  '      \"pembicara_nip\": \"NIP jika cocok peserta resmi, selain itu string kosong\",' +\n  NL +\n  '      \"pembicara_jabatan\": \"Jabatan pembicara\",' +\n  NL +\n  '      \"items\": [' +\n  NL +\n  '        {' +\n  NL +\n  '          \"uraian\": \"Uraian pokok bahasan / laporan\",' +\n  NL +\n  '          \"tindak_lanjut\": \"Langkah tindak lanjut / keputusan\",' +\n  NL +\n  '          \"target_kategori_waktu\": \"EKSPLISIT | HARI_RAPAT | JANGKA_PENDEK | JANGKA_MENENGAH | PROYEK_SARANA\",' +\n  NL +\n  '          \"target_tanggal_eksplisit\": \"YYYY-MM-DD jika disebut, selain itu string kosong\",' +\n  NL +\n  '          \"penanggung_jawab\": \"Pihak / jabatan penanggung jawab\",' +\n  NL +\n  '          \"selesai_kategori_waktu\": \"EKSPLISIT | HARI_RAPAT | JANGKA_PENDEK | JANGKA_MENENGAH | PROYEK_SARANA\",' +\n  NL +\n  '          \"selesai_tanggal_eksplisit\": \"YYYY-MM-DD jika disebut, selain itu string kosong\"' +\n  NL +\n  '        }' +\n  NL +\n  '      ]' +\n  NL +\n  '    }' +\n  NL +\n  '  ]' +\n  NL +\n  '}';\n\nconst hasAudioInput = Boolean(cleanAudioBase64 || isAsyncDriveAudio);\nconst cleanPrompt =\n  '=== IDENTITAS RAPAT KEDINASAN PA INDRAMAYU ===' +\n  NL +\n  'ID Rapat: ' + (idRapat || '-') +\n  NL +\n  'Agenda / Acara: ' + agenda +\n  NL +\n  'Hari / Tanggal: ' + hariTanggal + ' (ISO: ' + tglRapatIso + ')' +\n  NL +\n  'Tempat: ' + tempat +\n  NL +\n  'Pimpinan Rapat: ' + pemimpin +\n  NL +\n  'Notulis: ' + notulis +\n  NL +\n  'Mode Smart Merge: ' + (aiMode === 'replace' ? 'SUSUN ULANG TOTAL (REPLACE)' : 'LENGKAPI & SEMPURNAKAN DRAF TAB 3 (MERGE)') +\n  NL +\n  (pesertaInfoLines ? NL + 'Daftar Peserta Terdaftar:' + NL + pesertaInfoLines + NL : '') +\n  (existingDraftText ? NL + 'Draf Notula Operator Saat Ini (Tab 3):' + NL + existingDraftText + NL : '') +\n  (transcriptText ? NL + 'Konteks / Catatan Tambahan:' + NL + transcriptText + NL : '') +\n  NL +\n  (hasAudioInput\n    ? 'Analisis audio rapat ini beserta konteks Tab 3, lalu kembalikan JSON skema multi-baris Notula Rapat PA Indramayu.'\n    : 'Sempurnakan / susun draf Notula Rapat di atas menjadi JSON skema multi-baris Notula Rapat PA Indramayu dalam Bahasa Indonesia kedinasan yang baku.');\n\nconst parts = [];\nif (cleanAudioBase64) {\n  parts.push({\n    inline_data: {\n      mime_type: audioMimeType,\n      data: cleanAudioBase64,\n    },\n  });\n}\nparts.push({ text: cleanPrompt });\n\nconst geminiRequestBody = {\n  system_instruction: {\n    parts: [{ text: fullSystemPrompt }],\n  },\n  contents: [\n    {\n      role: 'user',\n      parts,\n    },\n  ],\n  generationConfig: {\n    temperature: 0.2,\n    responseMimeType: 'application/json',\n  },\n};\n\nreturn [\n  {\n    json: {\n      isAuthorized,\n      isManualTest,\n      isAsyncDriveAudio,\n      needsFfmpeg,\n      job_id: jobId,\n      callback_url: callbackUrl,\n      secret_key: expectedSecret,\n      id_rapat: idRapat,\n      agenda,\n      hari_tanggal: hariTanggal,\n      tgl_rapat_iso: tglRapatIso,\n      tempat,\n      pemimpin,\n      notulis,\n      aiMode,\n      pesertaList,\n      pesertaInfoLines,\n      existingDraftObj,\n      existingDraftText,\n      transcriptText,\n      audioAttached: hasAudioInput,\n      audio_drive_file_id: audioDriveFileId,\n      audioFileName,\n      audioMimeType,\n      audioSizeBytes,\n      cleanPrompt,\n      fullSystemPrompt,\n      geminiRequestBody,\n    },\n  },\n];"
       },
       "id": "b1a7c4d0-19b2-4e8a-91d4-882011000003",
       "name": "Validasi & Siapkan Prompt Notulen (Code)",
@@ -122,7 +122,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const NL = String.fromCharCode(10);\nconst ctx = $('Validasi & Siapkan Prompt Notulen (Code)').first().json || {};\nconst item = $input.first().json || {};\n\nif (item.error) {\n  const errMsg = String(item.error.message || item.error || 'Gemini API gagal merespons.');\n  return [\n    {\n      json: {\n        status: 'error',\n        id_rapat: String(ctx.id_rapat || ''),\n        model: 'models/gemini-3.8-flash',\n        message: 'Kendala Gemini Multimodal API: ' + errMsg,\n      },\n    },\n  ];\n}\n\nlet rawText = '';\ntry {\n  if (\n    item.candidates &&\n    item.candidates[0] &&\n    item.candidates[0].content &&\n    Array.isArray(item.candidates[0].content.parts) &&\n    item.candidates[0].content.parts[0]\n  ) {\n    rawText = String(item.candidates[0].content.parts[0].text || '');\n  } else {\n    rawText = String(item.output || item.text || '');\n  }\n} catch (e) {\n  rawText = '';\n}\n\nconst cleanedJsonStr = rawText\n  .trim()\n  .replace(/^```(?:json)?\\s*/i, '')\n  .replace(/```\\s*$/i, '')\n  .trim();\n\nlet parsed = null;\ntry {\n  if (cleanedJsonStr.startsWith('{') || cleanedJsonStr.startsWith('[')) {\n    parsed = JSON.parse(cleanedJsonStr);\n  } else if (typeof item.pengarahan_umum === 'string' || Array.isArray(item.pembahasan)) {\n    parsed = item;\n  }\n} catch (e) {\n  parsed = null;\n}\n\nif (!parsed || typeof parsed !== 'object') {\n  return [\n    {\n      json: {\n        status: 'error',\n        id_rapat: String(ctx.id_rapat || ''),\n        model: 'models/gemini-3.8-flash',\n        message: 'Output Gemini tidak berbentuk JSON valid.',\n        raw_preview: cleanedJsonStr.slice(0, 500),\n      },\n    },\n  ];\n}\n\nfunction toList(val) {\n  if (Array.isArray(val)) {\n    return val.map((x) => String(x == null ? '' : x).trim()).filter(Boolean);\n  }\n  const s = String(val == null ? '' : val).trim();\n  if (!s) return [];\n  return s\n    .split(/\\r?\\n/)\n    .map((line) => line.replace(/^\\s*[-*•\\d.)]+\\s*/, '').trim())\n    .filter(Boolean);\n}\n\nfunction toNumberedText(list) {\n  if (!Array.isArray(list) || list.length === 0) return '';\n  if (list.length === 1) return list[0];\n  return list.map((line, i) => i + 1 + '. ' + line).join(NL);\n}\n\nconst rawRows = Array.isArray(parsed.pembahasan) ? parsed.pembahasan : [];\nconst pembahasan = rawRows.slice(0, 30).map((r, idx) => {\n  const row = r && typeof r === 'object' ? r : {};\n  const uraianList = toList(row.uraian);\n  const tindakList = toList(row.tindak_lanjut);\n  return {\n    pembicara_nama: String(row.pembicara_nama || row.pembicara || 'Pembicara #' + (idx + 1)).trim(),\n    pembicara_nip: String(row.pembicara_nip || '').trim(),\n    pembicara_jabatan: String(row.pembicara_jabatan || '').trim(),\n    uraian: uraianList,\n    uraian_text: toNumberedText(uraianList),\n    tindak_lanjut: tindakList,\n    tindak_lanjut_text: toNumberedText(tindakList),\n    target: String(row.target || '').trim(),\n    penanggung_jawab: String(row.penanggung_jawab || '').trim(),\n    tanggal_penyelesaian: String(row.tanggal_penyelesaian || '').trim(),\n  };\n});\n\nreturn [\n  {\n    json: {\n      status: 'success',\n      id_rapat: String(ctx.id_rapat || ''),\n      model: 'models/gemini-3.8-flash',\n      data: {\n        dasar_opsional: String(parsed.dasar_opsional || '').trim(),\n        pengarahan_umum: String(parsed.pengarahan_umum || '').trim(),\n        kesimpulan: String(parsed.kesimpulan || '').trim(),\n        transkrip_ringkas: String(parsed.transkrip_ringkas || '').trim(),\n        pembahasan,\n      },\n    },\n  },\n];"
+        "jsCode": "const NL = String.fromCharCode(10);\nconst ctx = $('Validasi & Siapkan Prompt Notulen (Code)').first().json || {};\nconst item = $input.first().json || {};\n\nif (item.error) {\n  const errMsg = String(item.error.message || item.error || 'Gemini API gagal merespons.');\n  return [\n    {\n      json: {\n        status: 'error',\n        id_rapat: String(ctx.id_rapat || ''),\n        model: 'models/gemini-3.8-flash',\n        message: 'Kendala Gemini Multimodal API: ' + errMsg,\n      },\n    },\n  ];\n}\n\nlet rawText = '';\ntry {\n  if (\n    item.candidates &&\n    item.candidates[0] &&\n    item.candidates[0].content &&\n    Array.isArray(item.candidates[0].content.parts) &&\n    item.candidates[0].content.parts[0]\n  ) {\n    rawText = String(item.candidates[0].content.parts[0].text || '');\n  } else {\n    rawText = String(item.output || item.text || '');\n  }\n} catch (e) {\n  rawText = '';\n}\n\nconst cleanedJsonStr = rawText\n  .trim()\n  .replace(/^```(?:json)?\\s*/i, '')\n  .replace(/```\\s*$/i, '')\n  .trim();\n\nlet parsed = null;\ntry {\n  if (cleanedJsonStr.startsWith('{') || cleanedJsonStr.startsWith('[')) {\n    parsed = JSON.parse(cleanedJsonStr);\n  } else if (typeof item.pengarahan_umum === 'string' || Array.isArray(item.pembahasan)) {\n    parsed = item;\n  }\n} catch (e) {\n  parsed = null;\n}\n\nif (!parsed || typeof parsed !== 'object') {\n  return [\n    {\n      json: {\n        status: 'error',\n        id_rapat: String(ctx.id_rapat || ''),\n        model: 'models/gemini-3.8-flash',\n        message: 'Output Gemini tidak berbentuk JSON valid.',\n        raw_preview: cleanedJsonStr.slice(0, 500),\n      },\n    },\n  ];\n}\n\nconst SKB_HOLIDAYS = {\n  '2026-01-01': 1, '2026-01-16': 1, '2026-02-16': 1, '2026-02-17': 1,\n  '2026-03-18': 1, '2026-03-19': 1, '2026-03-20': 1, '2026-03-21': 1, '2026-03-22': 1, '2026-03-23': 1, '2026-03-24': 1,\n  '2026-04-03': 1, '2026-04-05': 1, '2026-05-01': 1, '2026-05-14': 1, '2026-05-15': 1,\n  '2026-05-27': 1, '2026-05-28': 1, '2026-05-31': 1, '2026-06-01': 1, '2026-06-16': 1,\n  '2026-08-17': 1, '2026-08-25': 1, '2026-12-24': 1, '2026-12-25': 1,\n  '2027-01-01': 1, '2027-01-05': 1, '2027-02-05': 1, '2027-02-06': 1,\n  '2027-03-08': 1, '2027-03-09': 1, '2027-03-10': 1, '2027-03-11': 1, '2027-03-12': 1, '2027-03-15': 1,\n  '2027-03-25': 1, '2027-03-26': 1, '2027-03-28': 1, '2027-05-01': 1, '2027-05-06': 1,\n  '2027-05-17': 1, '2027-05-18': 1, '2027-05-19': 1, '2027-05-20': 1, '2027-06-01': 1, '2027-06-06': 1,\n  '2027-08-15': 1, '2027-08-17': 1, '2027-12-24': 1, '2027-12-25': 1, '2027-12-26': 1\n};\n\nfunction parseIsoDateLocal(rawStr) {\n  const s = String(rawStr || '').trim();\n  if (!s) return '';\n  const mIso = s.match(/(\\d{4})-(\\d{2})-(\\d{2})/);\n  if (mIso) return mIso[1] + '-' + mIso[2] + '-' + mIso[3];\n  const months = {\n    januari: '01', februari: '02', maret: '03', april: '04', mei: '05', juni: '06',\n    juli: '07', agustus: '08', september: '09', oktober: '10', november: '11', nopember: '11', desember: '12'\n  };\n  const mIndo = s.toLowerCase().match(/(\\d{1,2})\\s+(januari|februari|maret|april|mei|juni|juli|agustus|september|oktober|november|nopember|desember)\\s+(\\d{4})/);\n  if (mIndo) {\n    const dd = String(parseInt(mIndo[1], 10)).padStart(2, '0');\n    const mm = months[mIndo[2]] || '';\n    if (mm) return mIndo[3] + '-' + mm + '-' + dd;\n  }\n  return '';\n}\n\nfunction addWorkdaysSkb(baseIso, workdays) {\n  const cleanBase = parseIsoDateLocal(baseIso) || new Date().toISOString().slice(0, 10);\n  const parts = cleanBase.split('-');\n  const dt = new Date(Date.UTC(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10)));\n  const steps = parseInt(workdays, 10) || 0;\n  if (steps <= 0) return cleanBase;\n  let added = 0;\n  let guard = 0;\n  while (added < steps && guard < 180) {\n    dt.setUTCDate(dt.getUTCDate() + 1);\n    guard++;\n    const dow = dt.getUTCDay();\n    const iso = dt.getUTCFullYear() + '-' + String(dt.getUTCMonth() + 1).padStart(2, '0') + '-' + String(dt.getUTCDate()).padStart(2, '0');\n    if (dow !== 0 && dow !== 6 && !SKB_HOLIDAYS[iso]) {\n      added++;\n    }\n  }\n  return dt.getUTCFullYear() + '-' + String(dt.getUTCMonth() + 1).padStart(2, '0') + '-' + String(dt.getUTCDate()).padStart(2, '0');\n}\n\nfunction resolveAiDateField(explicitVal, catVal, baseIso) {\n  const exp = String(explicitVal == null ? '' : explicitVal).trim();\n  const cat = String(catVal == null ? '' : catVal).trim().toUpperCase();\n  if (/^\\d{4}-\\d{2}-\\d{2}$/.test(exp)) return exp;\n  if (cat === 'EKSPLISIT') {\n    const parsedExp = parseIsoDateLocal(exp);\n    if (parsedExp) return parsedExp;\n    if (exp) return exp;\n    return addWorkdaysSkb(baseIso, 5);\n  }\n  if (cat === 'HARI_RAPAT') return parseIsoDateLocal(baseIso) || addWorkdaysSkb('', 0);\n  if (cat === 'JANGKA_PENDEK') return addWorkdaysSkb(baseIso, 5);\n  if (cat === 'JANGKA_MENENGAH') return addWorkdaysSkb(baseIso, 10);\n  if (cat === 'PROYEK_SARANA') return addWorkdaysSkb(baseIso, 15);\n  return exp;\n}\n\nfunction toList(val) {\n  if (Array.isArray(val)) {\n    return val.map((x) => String(x == null ? '' : x).trim()).filter(Boolean);\n  }\n  const s = String(val == null ? '' : val).trim();\n  if (!s) return [];\n  return s\n    .split(/\\r?\\n/)\n    .map((line) => line.replace(/^\\s*[-*•\\d.)]+\\s*/, '').trim())\n    .filter(Boolean);\n}\n\nfunction toNumberedText(list) {\n  if (!Array.isArray(list) || list.length === 0) return '';\n  if (list.length === 1) return list[0];\n  return list.map((line, i) => i + 1 + '. ' + line).join(NL);\n}\n\nfunction normalizeRowsWithSkb(rawRows, baseIso) {\n  return (Array.isArray(rawRows) ? rawRows : []).slice(0, 30).map((r, idx) => {\n    const row = r && typeof r === 'object' ? r : {};\n    const speakerName = String(row.pembicara_nama || row.pembicara || 'Pembicara #' + (idx + 1)).trim();\n    const speakerNip = (/^pembicara\\s*#\\d+/i.test(speakerName) || /belum\\s+teridentifikasi/i.test(speakerName))\n      ? ''\n      : String(row.pembicara_nip || '').trim();\n    const speakerJab = String(row.pembicara_jabatan || '').trim();\n\n    if (Array.isArray(row.items) && row.items.length > 0) {\n      const normItems = row.items.slice(0, 15).map((sub) => {\n        const it = sub && typeof sub === 'object' ? sub : {};\n        const uList = toList(it.uraian_text || it.uraian);\n        const tList = toList(it.tindak_lanjut_text || it.tindak_lanjut);\n        return {\n          uraian: toNumberedText(uList),\n          tindak_lanjut: toNumberedText(tList),\n          target: resolveAiDateField(it.target_tanggal_eksplisit || it.target, it.target_kategori_waktu, baseIso),\n          penanggung_jawab: String(it.penanggung_jawab || row.penanggung_jawab || '').trim(),\n          tanggal_penyelesaian: resolveAiDateField(it.selesai_tanggal_eksplisit || it.tanggal_penyelesaian, it.selesai_kategori_waktu, baseIso)\n        };\n      });\n      const flatUraian = normItems.map((x) => x.uraian).filter(Boolean);\n      const flatTindak = normItems.map((x) => x.tindak_lanjut).filter(Boolean);\n      const flatTarget = normItems.map((x) => x.target).filter(Boolean).join(NL);\n      const flatPj = normItems.map((x) => x.penanggung_jawab).filter(Boolean);\n      const flatSelesai = normItems.map((x) => x.tanggal_penyelesaian).filter(Boolean).join(NL);\n      return {\n        pembicara_nama: speakerName,\n        pembicara_nip: speakerNip,\n        pembicara_jabatan: speakerJab,\n        uraian: flatUraian,\n        uraian_text: toNumberedText(flatUraian),\n        tindak_lanjut: flatTindak,\n        tindak_lanjut_text: toNumberedText(flatTindak),\n        target: flatTarget,\n        penanggung_jawab: flatPj.join('; '),\n        tanggal_penyelesaian: flatSelesai,\n        items: normItems\n      };\n    }\n\n    const uraianList = toList(row.uraian_text || row.uraian);\n    const tindakList = toList(row.tindak_lanjut_text || row.tindak_lanjut);\n    return {\n      pembicara_nama: speakerName,\n      pembicara_nip: speakerNip,\n      pembicara_jabatan: speakerJab,\n      uraian: uraianList,\n      uraian_text: toNumberedText(uraianList),\n      tindak_lanjut: tindakList,\n      tindak_lanjut_text: toNumberedText(tindakList),\n      target: resolveAiDateField(row.target_tanggal_eksplisit || row.target, row.target_kategori_waktu, baseIso),\n      penanggung_jawab: String(row.penanggung_jawab || '').trim(),\n      tanggal_penyelesaian: resolveAiDateField(row.selesai_tanggal_eksplisit || row.tanggal_penyelesaian, row.selesai_kategori_waktu, baseIso)\n    };\n  });\n}\n\nconst baseIso = parseIsoDateLocal(ctx.tgl_rapat_iso || ctx.hari_tanggal || '') || new Date().toISOString().slice(0, 10);\nconst pembahasan = normalizeRowsWithSkb(parsed.pembahasan, baseIso);\n\nreturn [\n  {\n    json: {\n      status: 'success',\n      id_rapat: String(ctx.id_rapat || ''),\n      model: 'models/gemini-3.8-flash',\n      data: {\n        dasar_opsional: String(parsed.dasar_opsional || '').trim(),\n        pengarahan_umum: String(parsed.pengarahan_umum || '').trim(),\n        kesimpulan: String(parsed.kesimpulan || '').trim(),\n        transkrip_ringkas: String(parsed.transkrip_ringkas || '').trim(),\n        pembahasan,\n      },\n    },\n  },\n];"
       },
       "id": "b1a7c4d0-19b2-4e8a-91d4-882011000006",
       "name": "Parse & Normalisasi JSON Notula (Code)",
@@ -183,61 +183,6 @@
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "https://generativelanguage.googleapis.com/upload/v1beta/files",
-        "authentication": "predefinedCredentialType",
-        "nodeCredentialType": "googlePalmApi",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "X-Goog-Upload-Protocol",
-              "value": "resumable"
-            },
-            {
-              "name": "X-Goog-Upload-Command",
-              "value": "start"
-            },
-            {
-              "name": "X-Goog-Upload-Header-Content-Type",
-              "value": "={{ $('Validasi & Siapkan Prompt Notulen (Code)').first().json.audioMimeType }}"
-            },
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ file: { display_name: $('Validasi & Siapkan Prompt Notulen (Code)').first().json.audioFileName || 'rekaman_rapat.m4a' } }) }}",
-        "options": {
-          "response": {
-            "response": {
-              "fullResponse": true
-            }
-          },
-          "timeout": 30000
-        }
-      },
-      "id": "b1a7c4d0-19b2-4e8a-91d4-882011000011",
-      "name": "Start Gemini Files Resumable Session (HTTP)",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        560,
-        220
-      ],
-      "credentials": {
-        "googlePalmApi": {
-          "id": "<GANTI_GEMINI_CREDENTIAL_ID>",
-          "name": "Google Gemini(PaLM) Api account"
-        }
-      },
-      "continueOnFail": true
-    },
-    {
-      "parameters": {
         "authentication": "serviceAccount",
         "resource": "file",
         "operation": "download",
@@ -255,7 +200,7 @@
       "type": "n8n-nodes-base.googleDrive",
       "typeVersion": 3,
       "position": [
-        820,
+        560,
         220
       ],
       "credentials": {
@@ -268,8 +213,157 @@
     },
     {
       "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $('Validasi & Siapkan Prompt Notulen (Code)').first().json.needsFfmpeg === true }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "b1a7c4d0-19b2-4e8a-91d4-882011000027",
+      "name": "Perlu Kompres FFmpeg (>100MB)? (IF)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        820,
+        220
+      ]
+    },
+    {
+      "parameters": {
         "method": "POST",
-        "url": "={{ ($('Start Gemini Files Resumable Session (HTTP)').first().json.headers || {})['x-goog-upload-url'] || ($('Start Gemini Files Resumable Session (HTTP)').first().json.headers || {})['X-Goog-Upload-URL'] || '' }}",
+        "url": "http://ffmpeg-api:3000/convert/audio/to/mp3",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "file",
+              "inputDataFieldName": "data"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "data"
+            }
+          },
+          "timeout": 600000
+        }
+      },
+      "id": "b1a7c4d0-19b2-4e8a-91d4-882011000028",
+      "name": "Kompres Audio via FFmpeg API (HTTP)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1080,
+        120
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const ctx = $('Validasi & Siapkan Prompt Notulen (Code)').first().json || {};\nconst inp = $input.first();\nconst itemJson = (inp && inp.json) ? inp.json : {};\nconst hasValidBinary = Boolean(inp && inp.binary && inp.binary.data && inp.binary.data.data && !itemJson.error);\n\nif (hasValidBinary) {\n  const rawName = String(ctx.audioFileName || 'rekaman_rapat').replace(/\\.[^.]+$/, '');\n  return [\n    {\n      json: {\n        finalMimeType: 'audio/mpeg',\n        finalFileName: rawName + '.mp3',\n        ffmpegUsed: true,\n        ffmpegFallback: false,\n      },\n      binary: {\n        data: inp.binary.data,\n      },\n    },\n  ];\n}\n\nlet origBin = {};\ntry {\n  const dlNode = $('Download Audio dari Google Drive').first();\n  if (dlNode && dlNode.binary) origBin = dlNode.binary;\n} catch (eDl) {}\n\nreturn [\n  {\n    json: {\n      finalMimeType: String(ctx.audioMimeType || 'audio/mp4'),\n      finalFileName: String(ctx.audioFileName || 'rekaman_rapat.m4a'),\n      ffmpegUsed: false,\n      ffmpegFallback: true,\n      ffmpegError: itemJson.error ? String(itemJson.error.message || itemJson.error) : '',\n    },\n    binary: origBin,\n  },\n];"
+      },
+      "id": "b1a7c4d0-19b2-4e8a-91d4-882011000029",
+      "name": "Evaluasi Hasil FFmpeg & Siapkan Binary (Code)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1340,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const ctx = $('Validasi & Siapkan Prompt Notulen (Code)').first().json || {};\nconst inp = $input.first();\n\nreturn [\n  {\n    json: {\n      finalMimeType: String(ctx.audioMimeType || 'audio/mp4'),\n      finalFileName: String(ctx.audioFileName || 'rekaman_rapat.m4a'),\n      ffmpegUsed: false,\n      ffmpegFallback: false,\n    },\n    binary: (inp && inp.binary) ? inp.binary : {},\n  },\n];"
+      },
+      "id": "b1a7c4d0-19b2-4e8a-91d4-882011000030",
+      "name": "Siapkan Binary Tanpa FFmpeg (Code)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1340,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/upload/v1beta/files",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googlePalmApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Upload-Protocol",
+              "value": "resumable"
+            },
+            {
+              "name": "X-Goog-Upload-Command",
+              "value": "start"
+            },
+            {
+              "name": "X-Goog-Upload-Header-Content-Type",
+              "value": "={{ $json.finalMimeType || $('Validasi & Siapkan Prompt Notulen (Code)').first().json.audioMimeType }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ file: { display_name: $json.finalFileName || $('Validasi & Siapkan Prompt Notulen (Code)').first().json.audioFileName || 'rekaman_rapat.m4a' } }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true
+            }
+          },
+          "timeout": 30000
+        }
+      },
+      "id": "b1a7c4d0-19b2-4e8a-91d4-882011000011",
+      "name": "Start Gemini Files Resumable Session (HTTP)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1600,
+        220
+      ],
+      "credentials": {
+        "googlePalmApi": {
+          "id": "<GANTI_GEMINI_CREDENTIAL_ID>",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const ctx = $('Validasi & Siapkan Prompt Notulen (Code)').first().json || {};\nconst sessRes = $input.first().json || {};\nconst hdrs = sessRes.headers || {};\nlet uploadUrl = '';\nfor (const k of Object.keys(hdrs)) {\n  if (String(k).toLowerCase() === 'x-goog-upload-url') {\n    uploadUrl = String(Array.isArray(hdrs[k]) ? hdrs[k][0] : hdrs[k]).trim();\n    break;\n  }\n}\n\nlet binNode = null;\ntry {\n  const ff = $('Evaluasi Hasil FFmpeg & Siapkan Binary (Code)').first();\n  if (ff && ff.binary && ff.binary.data) binNode = ff;\n} catch (e1) {}\nif (!binNode) {\n  try {\n    const noFf = $('Siapkan Binary Tanpa FFmpeg (Code)').first();\n    if (noFf && noFf.binary && noFf.binary.data) binNode = noFf;\n  } catch (e2) {}\n}\nif (!binNode) {\n  try {\n    const dl = $('Download Audio dari Google Drive').first();\n    if (dl && dl.binary && dl.binary.data) binNode = dl;\n  } catch (e3) {}\n}\n\nconst binJson = (binNode && binNode.json) ? binNode.json : {};\nreturn [\n  {\n    json: {\n      uploadUrl,\n      startStatusCode: Number(sessRes.statusCode || 0),\n      startError: sessRes.error ? String(sessRes.error.message || sessRes.error) : '',\n      finalMimeType: String(binJson.finalMimeType || ctx.audioMimeType || 'audio/mp4'),\n      finalFileName: String(binJson.finalFileName || ctx.audioFileName || 'rekaman_rapat.m4a'),\n      ffmpegUsed: Boolean(binJson.ffmpegUsed),\n    },\n    binary: (binNode && binNode.binary) ? binNode.binary : {},\n  },\n];"
+      },
+      "id": "b1a7c4d0-19b2-4e8a-91d4-882011000031",
+      "name": "Gabungkan Sesi Upload & Binary (Code)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1860,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.uploadUrl || ($('Start Gemini Files Resumable Session (HTTP)').first().json.headers || {})['x-goog-upload-url'] || ($('Start Gemini Files Resumable Session (HTTP)').first().json.headers || {})['X-Goog-Upload-URL'] || '' }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -283,7 +377,7 @@
             },
             {
               "name": "Content-Type",
-              "value": "={{ $('Validasi & Siapkan Prompt Notulen (Code)').first().json.audioMimeType }}"
+              "value": "={{ $json.finalMimeType || $('Validasi & Siapkan Prompt Notulen (Code)').first().json.audioMimeType }}"
             }
           ]
         },
@@ -291,7 +385,7 @@
         "contentType": "binaryData",
         "inputDataFieldName": "data",
         "options": {
-          "timeout": 300000
+          "timeout": 600000
         }
       },
       "id": "b1a7c4d0-19b2-4e8a-91d4-882011000013",
@@ -299,21 +393,21 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        1080,
+        2120,
         220
       ],
       "continueOnFail": true
     },
     {
       "parameters": {
-        "jsCode": "const ctx = $('Validasi & Siapkan Prompt Notulen (Code)').first().json || {};\nconst startRes = $('Start Gemini Files Resumable Session (HTTP)').first().json || {};\nconst dlRes = $('Download Audio dari Google Drive').first().json || {};\nconst upRes = $input.first().json || {};\n\nlet errMsg = '';\nif (startRes.error) {\n  errMsg = 'Gagal memulai sesi Gemini Files API: ' + String(startRes.error.message || startRes.error);\n} else if (startRes.statusCode && Number(startRes.statusCode) >= 400) {\n  errMsg = 'Gemini Files API menolak sesi upload (HTTP ' + startRes.statusCode + ').';\n} else if (dlRes.error) {\n  errMsg = 'Gagal mengunduh audio dari Google Drive (Service Account): ' + String(dlRes.error.message || dlRes.error);\n} else if (upRes.error) {\n  errMsg = 'Gagal mengunggah binary audio ke Gemini Files API: ' + String(upRes.error.message || upRes.error);\n}\n\nlet parsedBody = upRes;\nif (typeof upRes.body === 'string' && upRes.body.trim().startsWith('{')) {\n  try { parsedBody = JSON.parse(upRes.body); } catch (eP) {}\n} else if (upRes.body && typeof upRes.body === 'object') {\n  parsedBody = upRes.body;\n}\n\nconst fileObj = (parsedBody && parsedBody.file && typeof parsedBody.file === 'object') ? parsedBody.file : (parsedBody || {});\nconst fileName = String(fileObj.name || '').trim();\nconst fileUri = String(fileObj.uri || '').trim();\nconst fileState = String(fileObj.state || (fileUri ? 'ACTIVE' : '')).trim().toUpperCase();\nconst fileMime = String(fileObj.mimeType || ctx.audioMimeType || 'audio/mp4').trim();\n\nif (!errMsg && !fileUri) {\n  errMsg = 'Gemini Files API tidak mengembalikan file.uri setelah upload.';\n}\n\nreturn [\n  {\n    json: {\n      uploadOk: Boolean(fileUri && !errMsg),\n      errorMessage: errMsg,\n      fileName,\n      fileUri,\n      fileState,\n      fileMime,\n      pollCount: 0,\n      pollFailedMessage: '',\n    },\n  },\n];"
+        "jsCode": "const ctx = $('Validasi & Siapkan Prompt Notulen (Code)').first().json || {};\nlet startRes = {};\ntry { startRes = $('Start Gemini Files Resumable Session (HTTP)').first().json || {}; } catch (eS) {}\nlet dlRes = {};\ntry { dlRes = $('Download Audio dari Google Drive').first().json || {}; } catch (eD) {}\nlet binMeta = {};\ntry { binMeta = $('Gabungkan Sesi Upload & Binary (Code)').first().json || {}; } catch (eM) {}\nconst upRes = $input.first().json || {};\n\nlet errMsg = '';\nif (startRes.error || binMeta.startError) {\n  errMsg = 'Gagal memulai sesi Gemini Files API: ' + String(binMeta.startError || (startRes.error && (startRes.error.message || startRes.error)));\n} else if (startRes.statusCode && Number(startRes.statusCode) >= 400) {\n  errMsg = 'Gemini Files API menolak sesi upload (HTTP ' + startRes.statusCode + ').';\n} else if (dlRes.error) {\n  errMsg = 'Gagal mengunduh audio dari Google Drive (Service Account): ' + String(dlRes.error.message || dlRes.error);\n} else if (upRes.error) {\n  errMsg = 'Gagal mengunggah binary audio ke Gemini Files API: ' + String(upRes.error.message || upRes.error);\n}\n\nlet parsedBody = upRes;\nif (typeof upRes.body === 'string' && upRes.body.trim().startsWith('{')) {\n  try { parsedBody = JSON.parse(upRes.body); } catch (eP) {}\n} else if (upRes.body && typeof upRes.body === 'object') {\n  parsedBody = upRes.body;\n}\n\nconst fileObj = (parsedBody && parsedBody.file && typeof parsedBody.file === 'object') ? parsedBody.file : (parsedBody || {});\nconst fileName = String(fileObj.name || '').trim();\nconst fileUri = String(fileObj.uri || '').trim();\nconst fileState = String(fileObj.state || (fileUri ? 'ACTIVE' : '')).trim().toUpperCase();\nconst fileMime = String(fileObj.mimeType || binMeta.finalMimeType || ctx.audioMimeType || 'audio/mp4').trim();\n\nif (!errMsg && !fileUri) {\n  errMsg = 'Gemini Files API tidak mengembalikan file.uri setelah upload.';\n}\n\nreturn [\n  {\n    json: {\n      uploadOk: Boolean(fileUri && !errMsg),\n      errorMessage: errMsg,\n      fileName,\n      fileUri,\n      fileState,\n      fileMime,\n      pollCount: 0,\n      pollFailedMessage: '',\n    },\n  },\n];"
       },
       "id": "b1a7c4d0-19b2-4e8a-91d4-882011000014",
       "name": "Cek Upload & Siapkan Gemini FileURI (Code)",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1340,
+        2380,
         220
       ]
     },
@@ -333,7 +427,7 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 1,
       "position": [
-        1600,
+        2640,
         220
       ]
     },
@@ -353,7 +447,7 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 1,
       "position": [
-        1860,
+        2900,
         140
       ]
     },
@@ -367,7 +461,7 @@
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
       "position": [
-        2120,
+        3160,
         320
       ],
       "webhookId": "transkep-gemini-file-wait"
@@ -387,7 +481,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        2380,
+        3420,
         320
       ],
       "credentials": {
@@ -400,27 +494,27 @@
     },
     {
       "parameters": {
-        "jsCode": "const prev = $('Cek Upload & Siapkan Gemini FileURI (Code)').first().json || {};\nconst statusRes = $input.first().json || {};\nlet waitCount = 1;\ntry {\n  waitCount = $('Tunggu Proses File Gemini 5 Detik (Wait)').all().length;\n} catch (eW) {\n  waitCount = 1;\n}\n\nif (statusRes.error) {\n  return [\n    {\n      json: {\n        ...prev,\n        fileState: 'ACTIVE',\n        pollCount: waitCount,\n        pollFailedMessage: 'Gagal mengecek status file Gemini: ' + String(statusRes.error.message || statusRes.error),\n      },\n    },\n  ];\n}\n\nconst f = (statusRes.file && typeof statusRes.file === 'object') ? statusRes.file : statusRes;\nconst st = String(f.state || 'PROCESSING').trim().toUpperCase();\n\nif (st === 'FAILED') {\n  return [\n    {\n      json: {\n        ...prev,\n        fileState: 'ACTIVE',\n        pollCount: waitCount,\n        pollFailedMessage: 'Pemrosesan audio oleh Gemini Files API gagal (state: FAILED).',\n      },\n    },\n  ];\n}\n\nif (st === 'ACTIVE') {\n  return [\n    {\n      json: {\n        ...prev,\n        fileName: String(f.name || prev.fileName || ''),\n        fileUri: String(f.uri || prev.fileUri || ''),\n        fileMime: String(f.mimeType || prev.fileMime || 'audio/mp4'),\n        fileState: 'ACTIVE',\n        pollCount: waitCount,\n        pollFailedMessage: '',\n      },\n    },\n  ];\n}\n\nif (waitCount >= 24) {\n  return [\n    {\n      json: {\n        ...prev,\n        fileState: 'ACTIVE',\n        pollCount: waitCount,\n        pollFailedMessage: 'Timeout menunggu file audio Gemini ACTIVE (> 120 detik).',\n      },\n    },\n  ];\n}\n\nreturn [\n  {\n    json: {\n      ...prev,\n      fileState: st || 'PROCESSING',\n      pollCount: waitCount,\n      pollFailedMessage: '',\n    },\n  },\n];"
+        "jsCode": "const prev = $('Cek Upload & Siapkan Gemini FileURI (Code)').first().json || {};\nconst statusRes = $input.first().json || {};\nlet waitCount = 1;\ntry {\n  waitCount = $('Tunggu Proses File Gemini 5 Detik (Wait)').all().length;\n} catch (eW) {\n  waitCount = 1;\n}\n\nif (statusRes.error) {\n  return [\n    {\n      json: {\n        ...prev,\n        fileState: 'ACTIVE',\n        pollCount: waitCount,\n        pollFailedMessage: 'Gagal mengecek status file Gemini: ' + String(statusRes.error.message || statusRes.error),\n      },\n    },\n  ];\n}\n\nconst f = (statusRes.file && typeof statusRes.file === 'object') ? statusRes.file : statusRes;\nconst st = String(f.state || 'PROCESSING').trim().toUpperCase();\n\nif (st === 'FAILED') {\n  return [\n    {\n      json: {\n        ...prev,\n        fileState: 'ACTIVE',\n        pollCount: waitCount,\n        pollFailedMessage: 'Pemrosesan audio oleh Gemini Files API gagal (state: FAILED).',\n      },\n    },\n  ];\n}\n\nif (st === 'ACTIVE') {\n  return [\n    {\n      json: {\n        ...prev,\n        fileName: String(f.name || prev.fileName || ''),\n        fileUri: String(f.uri || prev.fileUri || ''),\n        fileMime: String(f.mimeType || prev.fileMime || 'audio/mp4'),\n        fileState: 'ACTIVE',\n        pollCount: waitCount,\n        pollFailedMessage: '',\n      },\n    },\n  ];\n}\n\nif (waitCount >= 48) {\n  return [\n    {\n      json: {\n        ...prev,\n        fileState: 'ACTIVE',\n        pollCount: waitCount,\n        pollFailedMessage: 'Timeout menunggu file audio Gemini ACTIVE (> 240 detik).',\n      },\n    },\n  ];\n}\n\nreturn [\n  {\n    json: {\n      ...prev,\n      fileState: st || 'PROCESSING',\n      pollCount: waitCount,\n      pollFailedMessage: '',\n    },\n  },\n];"
       },
       "id": "b1a7c4d0-19b2-4e8a-91d4-882011000019",
       "name": "Update Status Polling File Gemini (Code)",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2640,
+        3680,
         320
       ]
     },
     {
       "parameters": {
-        "jsCode": "const ctx = $('Validasi & Siapkan Prompt Notulen (Code)').first().json || {};\nconst cur = $input.first().json || {};\n\nconst geminiRequestBody = {\n  system_instruction: {\n    parts: [{ text: ctx.fullSystemPrompt }],\n  },\n  contents: [\n    {\n      role: 'user',\n      parts: [\n        {\n          file_data: {\n            mime_type: cur.fileMime || ctx.audioMimeType || 'audio/mp4',\n            file_uri: cur.fileUri,\n          },\n        },\n        {\n          text: ctx.cleanPrompt,\n        },\n      ],\n    },\n  ],\n  generationConfig: {\n    temperature: 0.2,\n    responseMimeType: 'application/json',\n  },\n};\n\nreturn [\n  {\n    json: {\n      fileName: cur.fileName || '',\n      fileUri: cur.fileUri || '',\n      pollFailedMessage: cur.pollFailedMessage || '',\n      geminiRequestBody,\n    },\n  },\n];"
+        "jsCode": "const NL = String.fromCharCode(10);\nconst ctx = $('Validasi & Siapkan Prompt Notulen (Code)').first().json || {};\nconst cur = $input.first().json || {};\n\nconst pass1SystemPrompt =\n  'Kamu adalah Transkep AI (Pass 1 — Analis Audio & Pembicara Rapat Kedinasan PA Indramayu).' +\n  NL +\n  'Dengarkan rekaman audio terlampir dari awal hingga akhir secara kronologis (seperti NotebookLM Speaker Diarization).' +\n  NL +\n  'ATURAN KETAT PASS 1:' +\n  NL +\n  '1. Identifikasi suara pembicara secara berurutan sebagai Badge 1, Badge 2, dst.' +\n  NL +\n  '2. Cocokkan suara dengan daftar peserta rapat dan isyarat percakapan (\"Silakan Pak Wakil\", \"Dari Panitera...\", \"Kasubbag Umum...\"), atau petunjuk pembicara pada Draf Operator Tab 3.' +\n  NL +\n  '3. JANGAN mengarang nama pegawai bila ragu! Bila tidak yakin siapa pemilik suara, tulis \"Pembicara #N (Belum Teridentifikasi — Bidang ...)\" berdasarkan konteks ucapannya.' +\n  NL +\n  '4. Tangkap setiap pokok bahasan, tindak lanjut, jawaban, pihak yang ditugaskan, serta petunjuk waktu/tanggal (apakah berlaku hari rapat / rutin, jangka pendek, menengah, proyek sarana 3 minggu, atau tanggal eksplisit).' +\n  NL +\n  'KELUARAN WAJIB HANYA JSON MURNI:' +\n  NL +\n  '{ \"dasar_terdeteksi\": \"\", \"pengarahan_pimpinan\": \"\", \"pembicara_terdeteksi\": [{ \"badge\": \"Badge 1\", \"nama_kandidat\": \"\", \"nip\": \"\", \"jabatan\": \"\", \"keyakinan\": \"tinggi|sedang|rendah\", \"segmen\": [{ \"uraian\": \"\", \"tindak_lanjut\": \"\", \"penanggung_jawab\": \"\", \"isyarat_waktu\": \"\" }] }], \"kesimpulan_awal\": \"\", \"transkrip_kronologis\": \"\" }';\n\nconst pass1UserPrompt =\n  '=== KONTEKS RAPAT PA INDRAMAYU ===' +\n  NL +\n  'Agenda: ' + String(ctx.agenda || 'Rapat Kedinasan') +\n  NL +\n  'Hari / Tanggal: ' + String(ctx.hari_tanggal || '-') + ' (ISO: ' + String(ctx.tgl_rapat_iso || '-') + ')' +\n  NL +\n  'Tempat: ' + String(ctx.tempat || '-') +\n  NL +\n  'Pimpinan: ' + String(ctx.pemimpin || '-') +\n  NL +\n  (ctx.pesertaInfoLines ? NL + 'Daftar Peserta Terdaftar:' + NL + ctx.pesertaInfoLines + NL : '') +\n  (ctx.existingDraftText ? NL + 'Petunjuk Draf Notula Operator (Tab 3):' + NL + ctx.existingDraftText + NL : '') +\n  (ctx.transcriptText ? NL + 'Catatan Tambahan:' + NL + ctx.transcriptText + NL : '') +\n  NL +\n  'Lakukan Pass 1 analisis audio mendalam dan kembalikan JSON murni sesuai skema Pass 1.';\n\nconst geminiRequestBody = {\n  system_instruction: {\n    parts: [{ text: pass1SystemPrompt }],\n  },\n  contents: [\n    {\n      role: 'user',\n      parts: [\n        {\n          file_data: {\n            mime_type: cur.fileMime || ctx.audioMimeType || 'audio/mp4',\n            file_uri: cur.fileUri,\n          },\n        },\n        {\n          text: pass1UserPrompt,\n        },\n      ],\n    },\n  ],\n  generationConfig: {\n    temperature: 0.15,\n    responseMimeType: 'application/json',\n  },\n};\n\nreturn [\n  {\n    json: {\n      fileName: cur.fileName || '',\n      fileUri: cur.fileUri || '',\n      pollFailedMessage: cur.pollFailedMessage || '',\n      geminiRequestBody,\n    },\n  },\n];"
       },
       "id": "b1a7c4d0-19b2-4e8a-91d4-882011000020",
       "name": "Siapkan Payload Gemini FileURI (Code)",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2120,
+        3160,
         120
       ]
     },
@@ -451,7 +545,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        2380,
+        3420,
         120
       ],
       "credentials": {
@@ -464,14 +558,65 @@
     },
     {
       "parameters": {
-        "jsCode": "const NL = String.fromCharCode(10);\nconst ctx = $('Validasi & Siapkan Prompt Notulen (Code)').first().json || {};\nconst fileCtx = $('Siapkan Payload Gemini FileURI (Code)').first().json || {};\nconst item = $input.first().json || {};\n\nconst baseMeta = {\n  action: 'callbackAiNotulenJob',\n  secret_key: String(ctx.secret_key || ''),\n  job_id: String(ctx.job_id || ''),\n  id_rapat: String(ctx.id_rapat || ''),\n  model: 'models/gemini-3.8-flash',\n};\n\nif (fileCtx.pollFailedMessage) {\n  return [\n    {\n      json: {\n        callbackUrl: ctx.callback_url,\n        geminiFileName: String(fileCtx.fileName || ''),\n        callbackPayload: {\n          ...baseMeta,\n          status: 'error',\n          message: String(fileCtx.pollFailedMessage),\n        },\n      },\n    },\n  ];\n}\n\nif (item.error) {\n  const errMsg = String(item.error.message || item.error || 'Gemini API gagal merespons.');\n  return [\n    {\n      json: {\n        callbackUrl: ctx.callback_url,\n        geminiFileName: String(fileCtx.fileName || ''),\n        callbackPayload: {\n          ...baseMeta,\n          status: 'error',\n          message: 'Kendala Gemini FileURI API: ' + errMsg,\n        },\n      },\n    },\n  ];\n}\n\nlet rawText = '';\ntry {\n  if (\n    item.candidates &&\n    item.candidates[0] &&\n    item.candidates[0].content &&\n    Array.isArray(item.candidates[0].content.parts) &&\n    item.candidates[0].content.parts[0]\n  ) {\n    rawText = String(item.candidates[0].content.parts[0].text || '');\n  } else {\n    rawText = String(item.output || item.text || '');\n  }\n} catch (e) {\n  rawText = '';\n}\n\nconst cleanedJsonStr = rawText\n  .trim()\n  .replace(/^```(?:json)?\\s*/i, '')\n  .replace(/```\\s*$/i, '')\n  .trim();\n\nlet parsed = null;\ntry {\n  if (cleanedJsonStr.startsWith('{') || cleanedJsonStr.startsWith('[')) {\n    parsed = JSON.parse(cleanedJsonStr);\n  } else if (typeof item.pengarahan_umum === 'string' || Array.isArray(item.pembahasan)) {\n    parsed = item;\n  }\n} catch (e) {\n  parsed = null;\n}\n\nif (!parsed || typeof parsed !== 'object') {\n  return [\n    {\n      json: {\n        callbackUrl: ctx.callback_url,\n        geminiFileName: String(fileCtx.fileName || ''),\n        callbackPayload: {\n          ...baseMeta,\n          status: 'error',\n          message: 'Output Gemini FileURI tidak berbentuk JSON valid.',\n        },\n      },\n    },\n  ];\n}\n\nfunction toList(val) {\n  if (Array.isArray(val)) {\n    return val.map((x) => String(x == null ? '' : x).trim()).filter(Boolean);\n  }\n  const s = String(val == null ? '' : val).trim();\n  if (!s) return [];\n  return s\n    .split(/\\r?\\n/)\n    .map((line) => line.replace(/^\\s*[-*•\\d.)]+\\s*/, '').trim())\n    .filter(Boolean);\n}\n\nfunction toNumberedText(list) {\n  if (!Array.isArray(list) || list.length === 0) return '';\n  if (list.length === 1) return list[0];\n  return list.map((line, i) => i + 1 + '. ' + line).join(NL);\n}\n\nconst rawRows = Array.isArray(parsed.pembahasan) ? parsed.pembahasan : [];\nconst pembahasan = rawRows.slice(0, 30).map((r, idx) => {\n  const row = r && typeof r === 'object' ? r : {};\n  const uraianList = toList(row.uraian);\n  const tindakList = toList(row.tindak_lanjut);\n  return {\n    pembicara_nama: String(row.pembicara_nama || row.pembicara || 'Pembicara #' + (idx + 1)).trim(),\n    pembicara_nip: String(row.pembicara_nip || '').trim(),\n    pembicara_jabatan: String(row.pembicara_jabatan || '').trim(),\n    uraian: uraianList,\n    uraian_text: toNumberedText(uraianList),\n    tindak_lanjut: tindakList,\n    tindak_lanjut_text: toNumberedText(tindakList),\n    target: String(row.target || '').trim(),\n    penanggung_jawab: String(row.penanggung_jawab || '').trim(),\n    tanggal_penyelesaian: String(row.tanggal_penyelesaian || '').trim(),\n  };\n});\n\nreturn [\n  {\n    json: {\n      callbackUrl: ctx.callback_url,\n      geminiFileName: String(fileCtx.fileName || ''),\n      callbackPayload: {\n        ...baseMeta,\n        status: 'success',\n        data: {\n          dasar_opsional: String(parsed.dasar_opsional || '').trim(),\n          pengarahan_umum: String(parsed.pengarahan_umum || '').trim(),\n          kesimpulan: String(parsed.kesimpulan || '').trim(),\n          transkrip_ringkas: String(parsed.transkrip_ringkas || '').trim(),\n          pembahasan,\n        },\n      },\n    },\n  },\n];"
+        "jsCode": "const NL = String.fromCharCode(10);\nconst ctx = $('Validasi & Siapkan Prompt Notulen (Code)').first().json || {};\nconst fileCtx = $('Siapkan Payload Gemini FileURI (Code)').first().json || {};\nconst pass1Res = $input.first().json || {};\n\nlet pass1FailedMessage = '';\nlet pass1RawText = '';\n\nif (fileCtx.pollFailedMessage) {\n  pass1FailedMessage = String(fileCtx.pollFailedMessage);\n} else if (pass1Res.error) {\n  pass1FailedMessage = 'Kendala Gemini Pass 1 (Analisa Audio): ' + String(pass1Res.error.message || pass1Res.error);\n} else {\n  try {\n    if (\n      pass1Res.candidates &&\n      pass1Res.candidates[0] &&\n      pass1Res.candidates[0].content &&\n      Array.isArray(pass1Res.candidates[0].content.parts) &&\n      pass1Res.candidates[0].content.parts[0]\n    ) {\n      pass1RawText = String(pass1Res.candidates[0].content.parts[0].text || '');\n    } else if (pass1Res.output || pass1Res.text) {\n      pass1RawText = String(pass1Res.output || pass1Res.text || '');\n    } else if (typeof pass1Res === 'object' && Object.keys(pass1Res).length > 0) {\n      pass1RawText = JSON.stringify(pass1Res);\n    }\n  } catch (eP1) {\n    pass1RawText = '';\n  }\n}\n\nconst aiMode = String(ctx.aiMode || 'merge').toLowerCase() === 'replace' ? 'replace' : 'merge';\nconst mergeInstruction = aiMode === 'replace'\n  ? 'MODE: SUSUN ULANG TOTAL (REPLACE). Susun notula bersih menyeluruh berdasarkan bukti Pass 1 dan identitas rapat resmi.'\n  : 'MODE: LENGKAPI & SEMPURNAKAN (SMART MERGE TAB 3). Jika Operator sudah menulis draf di Tab 3: pertahankan poin benar milik operator, perbaiki salah ketik / tata bahasa kedinasan, isi kolom kosong (Tindak Lanjut / PJ / Target / Penyelesaian), dan tambahkan pembicara/poin penting dari audio Pass 1 yang sempat terlewat. Jika Tab 3 masih kosong, susun lengkap dari awal.';\n\nconst pass2SystemPrompt =\n  'Kamu adalah Editor Notulis Eksekutif PA Indramayu (Pass 2 — Smart Merge, Refinement & Klasifikasi Waktu).' +\n  NL +\n  mergeInstruction +\n  NL +\n  'ATURAN KHUSUS KOLOM TARGET & TANGGAL PENYELESAIAN (C & E):' +\n  NL +\n  'Jangan menghitung tanggal kalender/hari libur sendiri kecuali tanggal disebut eksplisit di rapat! Gunakan tepat salah satu kategori berikut di \"target_kategori_waktu\" dan \"selesai_kategori_waktu\":' +\n  NL +\n  '- \"EKSPLISIT\": hanya jika tanggal disebut jelas di audio/catatan (wajib isi *_tanggal_eksplisit format YYYY-MM-DD).' +\n  NL +\n  '- \"HARI_RAPAT\": arahan kepatuhan, disiplin kerja, tugas rutin harian (berlaku sejak hari rapat).' +\n  NL +\n  '- \"JANGKA_PENDEK\": tindak lanjut cepat / pelaporan administratif ringan (~5 hari kerja).' +\n  NL +\n  '- \"JANGKA_MENENGAH\": koordinasi lintas bagian / penyiapan berkas atau surat (~10 hari kerja).' +\n  NL +\n  '- \"PROYEK_SARANA\": pengadaan / penyiapan ruangan (mis. Ruang Media Center) / aplikasi (~15 hari kerja).' +\n  NL +\n  'ATURAN IDENTITAS PEMBICARA:' +\n  NL +\n  'Gunakan \"Pembicara #N (Belum Teridentifikasi — Bidang ...)\" dan NIP kosong bila pemilik suara tidak terkonfirmasi yakin.' +\n  NL +\n  'KELUARAN WAJIB HANYA JSON MURNI:' +\n  NL +\n  '{' +\n  NL +\n  '  \"dasar_opsional\": \"\",' +\n  NL +\n  '  \"pengarahan_umum\": \"\",' +\n  NL +\n  '  \"kesimpulan\": \"\",' +\n  NL +\n  '  \"transkrip_ringkas\": \"\",' +\n  NL +\n  '  \"pembahasan\": [' +\n  NL +\n  '    {' +\n  NL +\n  '      \"pembicara_nama\": \"Nama Lengkap (Jabatan) atau Pembicara #N (Belum Teridentifikasi — ...)\",' +\n  NL +\n  '      \"pembicara_nip\": \"NIP sesuai Daftar Peserta resmi, atau string kosong\",' +\n  NL +\n  '      \"pembicara_jabatan\": \"Jabatan\",' +\n  NL +\n  '      \"items\": [' +\n  NL +\n  '        {' +\n  NL +\n  '          \"uraian\": \"Uraian pokok bahasan ke-i\",' +\n  NL +\n  '          \"tindak_lanjut\": \"Tindak lanjut konkret ke-i\",' +\n  NL +\n  '          \"target_kategori_waktu\": \"EKSPLISIT | HARI_RAPAT | JANGKA_PENDEK | JANGKA_MENENGAH | PROYEK_SARANA\",' +\n  NL +\n  '          \"target_tanggal_eksplisit\": \"YYYY-MM-DD jika EKSPLISIT, selain itu string kosong\",' +\n  NL +\n  '          \"penanggung_jawab\": \"Pihak/jabatan penanggung jawab\",' +\n  NL +\n  '          \"selesai_kategori_waktu\": \"EKSPLISIT | HARI_RAPAT | JANGKA_PENDEK | JANGKA_MENENGAH | PROYEK_SARANA\",' +\n  NL +\n  '          \"selesai_tanggal_eksplisit\": \"YYYY-MM-DD jika EKSPLISIT, selain itu string kosong\"' +\n  NL +\n  '        }' +\n  NL +\n  '      ]' +\n  NL +\n  '    }' +\n  NL +\n  '  ]' +\n  NL +\n  '}';\n\nconst pass2UserPrompt =\n  '=== IDENTITAS RAPAT ===' +\n  NL +\n  'Agenda: ' + String(ctx.agenda || '-') +\n  NL +\n  'Tanggal Rapat: ' + String(ctx.hari_tanggal || '-') + ' (ISO: ' + String(ctx.tgl_rapat_iso || '-') + ')' +\n  NL +\n  'Pimpinan: ' + String(ctx.pemimpin || '-') + ' | Notulis: ' + String(ctx.notulis || '-') +\n  NL +\n  (ctx.pesertaInfoLines ? NL + 'Daftar Peserta Resmi:' + NL + ctx.pesertaInfoLines + NL : '') +\n  (ctx.existingDraftText ? NL + 'Draf Notula Operator (Tab 3):' + NL + ctx.existingDraftText + NL : NL + 'Draf Tab 3 masih kosong.' + NL) +\n  NL +\n  '=== HASIL ANALISA AUDIO PASS 1 ===' +\n  NL +\n  (pass1RawText || '(Kosong)') +\n  NL +\n  NL +\n  'Gabungkan dan hasilkan JSON Notula akhir yang rapi dalam Bahasa Indonesia kedinasan.';\n\nconst geminiPass2RequestBody = {\n  system_instruction: {\n    parts: [{ text: pass2SystemPrompt }],\n  },\n  contents: [\n    {\n      role: 'user',\n      parts: [{ text: pass2UserPrompt }],\n    },\n  ],\n  generationConfig: {\n    temperature: 0.2,\n    responseMimeType: 'application/json',\n  },\n};\n\nreturn [\n  {\n    json: {\n      fileName: String(fileCtx.fileName || ''),\n      fileUri: String(fileCtx.fileUri || ''),\n      pollFailedMessage: String(fileCtx.pollFailedMessage || ''),\n      pass1FailedMessage,\n      pass1RawPreview: pass1RawText.slice(0, 400),\n      geminiPass2RequestBody,\n    },\n  },\n];"
+      },
+      "id": "b1a7c4d0-19b2-4e8a-91d4-882011000032",
+      "name": "Siapkan Payload Pass 2 Smart Merge (Code)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3680,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googlePalmApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.geminiPass2RequestBody) }}",
+        "options": {
+          "timeout": 240000
+        }
+      },
+      "id": "b1a7c4d0-19b2-4e8a-91d4-882011000033",
+      "name": "Panggil Gemini Pass 2 Editor Notulis (HTTP)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3940,
+        120
+      ],
+      "credentials": {
+        "googlePalmApi": {
+          "id": "<GANTI_GEMINI_CREDENTIAL_ID>",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const NL = String.fromCharCode(10);\nconst ctx = $('Validasi & Siapkan Prompt Notulen (Code)').first().json || {};\nlet fileCtx = {};\ntry { fileCtx = $('Siapkan Payload Pass 2 Smart Merge (Code)').first().json || {}; } catch (eP2) {}\nif (!fileCtx || (!fileCtx.fileName && !fileCtx.pollFailedMessage && !fileCtx.pass1FailedMessage)) {\n  try { fileCtx = $('Siapkan Payload Gemini FileURI (Code)').first().json || {}; } catch (eF1) {}\n}\nconst item = $input.first().json || {};\n\nconst baseMeta = {\n  action: 'callbackAiNotulenJob',\n  secret_key: String(ctx.secret_key || ''),\n  job_id: String(ctx.job_id || ''),\n  id_rapat: String(ctx.id_rapat || ''),\n  model: 'models/gemini-3.8-flash',\n};\n\nif (fileCtx.pollFailedMessage || fileCtx.pass1FailedMessage) {\n  return [\n    {\n      json: {\n        callbackUrl: ctx.callback_url,\n        geminiFileName: String(fileCtx.fileName || ''),\n        callbackPayload: {\n          ...baseMeta,\n          status: 'error',\n          message: String(fileCtx.pollFailedMessage || fileCtx.pass1FailedMessage),\n        },\n      },\n    },\n  ];\n}\n\nif (item.error) {\n  const errMsg = String(item.error.message || item.error || 'Gemini API gagal merespons.');\n  return [\n    {\n      json: {\n        callbackUrl: ctx.callback_url,\n        geminiFileName: String(fileCtx.fileName || ''),\n        callbackPayload: {\n          ...baseMeta,\n          status: 'error',\n          message: 'Kendala Gemini Editor Notulis (Pass 2): ' + errMsg,\n        },\n      },\n    },\n  ];\n}\n\nlet rawText = '';\ntry {\n  if (\n    item.candidates &&\n    item.candidates[0] &&\n    item.candidates[0].content &&\n    Array.isArray(item.candidates[0].content.parts) &&\n    item.candidates[0].content.parts[0]\n  ) {\n    rawText = String(item.candidates[0].content.parts[0].text || '');\n  } else {\n    rawText = String(item.output || item.text || '');\n  }\n} catch (e) {\n  rawText = '';\n}\n\nconst cleanedJsonStr = rawText\n  .trim()\n  .replace(/^```(?:json)?\\s*/i, '')\n  .replace(/```\\s*$/i, '')\n  .trim();\n\nlet parsed = null;\ntry {\n  if (cleanedJsonStr.startsWith('{') || cleanedJsonStr.startsWith('[')) {\n    parsed = JSON.parse(cleanedJsonStr);\n  } else if (typeof item.pengarahan_umum === 'string' || Array.isArray(item.pembahasan)) {\n    parsed = item;\n  }\n} catch (e) {\n  parsed = null;\n}\n\nif (!parsed || typeof parsed !== 'object') {\n  return [\n    {\n      json: {\n        callbackUrl: ctx.callback_url,\n        geminiFileName: String(fileCtx.fileName || ''),\n        callbackPayload: {\n          ...baseMeta,\n          status: 'error',\n          message: 'Output Gemini Pass 2 tidak berbentuk JSON valid.',\n        },\n      },\n    },\n  ];\n}\n\nconst SKB_HOLIDAYS = {\n  '2026-01-01': 1, '2026-01-16': 1, '2026-02-16': 1, '2026-02-17': 1,\n  '2026-03-18': 1, '2026-03-19': 1, '2026-03-20': 1, '2026-03-21': 1, '2026-03-22': 1, '2026-03-23': 1, '2026-03-24': 1,\n  '2026-04-03': 1, '2026-04-05': 1, '2026-05-01': 1, '2026-05-14': 1, '2026-05-15': 1,\n  '2026-05-27': 1, '2026-05-28': 1, '2026-05-31': 1, '2026-06-01': 1, '2026-06-16': 1,\n  '2026-08-17': 1, '2026-08-25': 1, '2026-12-24': 1, '2026-12-25': 1,\n  '2027-01-01': 1, '2027-01-05': 1, '2027-02-05': 1, '2027-02-06': 1,\n  '2027-03-08': 1, '2027-03-09': 1, '2027-03-10': 1, '2027-03-11': 1, '2027-03-12': 1, '2027-03-15': 1,\n  '2027-03-25': 1, '2027-03-26': 1, '2027-03-28': 1, '2027-05-01': 1, '2027-05-06': 1,\n  '2027-05-17': 1, '2027-05-18': 1, '2027-05-19': 1, '2027-05-20': 1, '2027-06-01': 1, '2027-06-06': 1,\n  '2027-08-15': 1, '2027-08-17': 1, '2027-12-24': 1, '2027-12-25': 1, '2027-12-26': 1\n};\n\nfunction parseIsoDateLocal(rawStr) {\n  const s = String(rawStr || '').trim();\n  if (!s) return '';\n  const mIso = s.match(/(\\d{4})-(\\d{2})-(\\d{2})/);\n  if (mIso) return mIso[1] + '-' + mIso[2] + '-' + mIso[3];\n  const months = {\n    januari: '01', februari: '02', maret: '03', april: '04', mei: '05', juni: '06',\n    juli: '07', agustus: '08', september: '09', oktober: '10', november: '11', nopember: '11', desember: '12'\n  };\n  const mIndo = s.toLowerCase().match(/(\\d{1,2})\\s+(januari|februari|maret|april|mei|juni|juli|agustus|september|oktober|november|nopember|desember)\\s+(\\d{4})/);\n  if (mIndo) {\n    const dd = String(parseInt(mIndo[1], 10)).padStart(2, '0');\n    const mm = months[mIndo[2]] || '';\n    if (mm) return mIndo[3] + '-' + mm + '-' + dd;\n  }\n  return '';\n}\n\nfunction addWorkdaysSkb(baseIso, workdays) {\n  const cleanBase = parseIsoDateLocal(baseIso) || new Date().toISOString().slice(0, 10);\n  const parts = cleanBase.split('-');\n  const dt = new Date(Date.UTC(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10)));\n  const steps = parseInt(workdays, 10) || 0;\n  if (steps <= 0) return cleanBase;\n  let added = 0;\n  let guard = 0;\n  while (added < steps && guard < 180) {\n    dt.setUTCDate(dt.getUTCDate() + 1);\n    guard++;\n    const dow = dt.getUTCDay();\n    const iso = dt.getUTCFullYear() + '-' + String(dt.getUTCMonth() + 1).padStart(2, '0') + '-' + String(dt.getUTCDate()).padStart(2, '0');\n    if (dow !== 0 && dow !== 6 && !SKB_HOLIDAYS[iso]) {\n      added++;\n    }\n  }\n  return dt.getUTCFullYear() + '-' + String(dt.getUTCMonth() + 1).padStart(2, '0') + '-' + String(dt.getUTCDate()).padStart(2, '0');\n}\n\nfunction resolveAiDateField(explicitVal, catVal, baseIso) {\n  const exp = String(explicitVal == null ? '' : explicitVal).trim();\n  const cat = String(catVal == null ? '' : catVal).trim().toUpperCase();\n  if (/^\\d{4}-\\d{2}-\\d{2}$/.test(exp)) return exp;\n  if (cat === 'EKSPLISIT') {\n    const parsedExp = parseIsoDateLocal(exp);\n    if (parsedExp) return parsedExp;\n    if (exp) return exp;\n    return addWorkdaysSkb(baseIso, 5);\n  }\n  if (cat === 'HARI_RAPAT') return parseIsoDateLocal(baseIso) || addWorkdaysSkb('', 0);\n  if (cat === 'JANGKA_PENDEK') return addWorkdaysSkb(baseIso, 5);\n  if (cat === 'JANGKA_MENENGAH') return addWorkdaysSkb(baseIso, 10);\n  if (cat === 'PROYEK_SARANA') return addWorkdaysSkb(baseIso, 15);\n  return exp;\n}\n\nfunction toList(val) {\n  if (Array.isArray(val)) {\n    return val.map((x) => String(x == null ? '' : x).trim()).filter(Boolean);\n  }\n  const s = String(val == null ? '' : val).trim();\n  if (!s) return [];\n  return s\n    .split(/\\r?\\n/)\n    .map((line) => line.replace(/^\\s*[-*•\\d.)]+\\s*/, '').trim())\n    .filter(Boolean);\n}\n\nfunction toNumberedText(list) {\n  if (!Array.isArray(list) || list.length === 0) return '';\n  if (list.length === 1) return list[0];\n  return list.map((line, i) => i + 1 + '. ' + line).join(NL);\n}\n\nfunction normalizeRowsWithSkb(rawRows, baseIso) {\n  return (Array.isArray(rawRows) ? rawRows : []).slice(0, 30).map((r, idx) => {\n    const row = r && typeof r === 'object' ? r : {};\n    const speakerName = String(row.pembicara_nama || row.pembicara || 'Pembicara #' + (idx + 1)).trim();\n    const speakerNip = (/^pembicara\\s*#\\d+/i.test(speakerName) || /belum\\s+teridentifikasi/i.test(speakerName))\n      ? ''\n      : String(row.pembicara_nip || '').trim();\n    const speakerJab = String(row.pembicara_jabatan || '').trim();\n\n    if (Array.isArray(row.items) && row.items.length > 0) {\n      const normItems = row.items.slice(0, 15).map((sub) => {\n        const it = sub && typeof sub === 'object' ? sub : {};\n        const uList = toList(it.uraian_text || it.uraian);\n        const tList = toList(it.tindak_lanjut_text || it.tindak_lanjut);\n        return {\n          uraian: toNumberedText(uList),\n          tindak_lanjut: toNumberedText(tList),\n          target: resolveAiDateField(it.target_tanggal_eksplisit || it.target, it.target_kategori_waktu, baseIso),\n          penanggung_jawab: String(it.penanggung_jawab || row.penanggung_jawab || '').trim(),\n          tanggal_penyelesaian: resolveAiDateField(it.selesai_tanggal_eksplisit || it.tanggal_penyelesaian, it.selesai_kategori_waktu, baseIso)\n        };\n      });\n      const flatUraian = normItems.map((x) => x.uraian).filter(Boolean);\n      const flatTindak = normItems.map((x) => x.tindak_lanjut).filter(Boolean);\n      const flatTarget = normItems.map((x) => x.target).filter(Boolean).join(NL);\n      const flatPj = normItems.map((x) => x.penanggung_jawab).filter(Boolean);\n      const flatSelesai = normItems.map((x) => x.tanggal_penyelesaian).filter(Boolean).join(NL);\n      return {\n        pembicara_nama: speakerName,\n        pembicara_nip: speakerNip,\n        pembicara_jabatan: speakerJab,\n        uraian: flatUraian,\n        uraian_text: toNumberedText(flatUraian),\n        tindak_lanjut: flatTindak,\n        tindak_lanjut_text: toNumberedText(flatTindak),\n        target: flatTarget,\n        penanggung_jawab: flatPj.join('; '),\n        tanggal_penyelesaian: flatSelesai,\n        items: normItems\n      };\n    }\n\n    const uraianList = toList(row.uraian_text || row.uraian);\n    const tindakList = toList(row.tindak_lanjut_text || row.tindak_lanjut);\n    return {\n      pembicara_nama: speakerName,\n      pembicara_nip: speakerNip,\n      pembicara_jabatan: speakerJab,\n      uraian: uraianList,\n      uraian_text: toNumberedText(uraianList),\n      tindak_lanjut: tindakList,\n      tindak_lanjut_text: toNumberedText(tindakList),\n      target: resolveAiDateField(row.target_tanggal_eksplisit || row.target, row.target_kategori_waktu, baseIso),\n      penanggung_jawab: String(row.penanggung_jawab || '').trim(),\n      tanggal_penyelesaian: resolveAiDateField(row.selesai_tanggal_eksplisit || row.tanggal_penyelesaian, row.selesai_kategori_waktu, baseIso)\n    };\n  });\n}\n\nconst baseIso = parseIsoDateLocal(ctx.tgl_rapat_iso || ctx.hari_tanggal || '') || new Date().toISOString().slice(0, 10);\nconst pembahasan = normalizeRowsWithSkb(parsed.pembahasan, baseIso);\n\nreturn [\n  {\n    json: {\n      callbackUrl: ctx.callback_url,\n      geminiFileName: String(fileCtx.fileName || ''),\n      callbackPayload: {\n        ...baseMeta,\n        status: 'success',\n        data: {\n          dasar_opsional: String(parsed.dasar_opsional || '').trim(),\n          pengarahan_umum: String(parsed.pengarahan_umum || '').trim(),\n          kesimpulan: String(parsed.kesimpulan || '').trim(),\n          transkrip_ringkas: String(parsed.transkrip_ringkas || '').trim(),\n          pembahasan,\n        },\n      },\n    },\n  },\n];"
       },
       "id": "b1a7c4d0-19b2-4e8a-91d4-882011000022",
       "name": "Parse & Siapkan Callback Async (Code)",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2640,
+        4200,
         120
       ]
     },
@@ -484,8 +629,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1860,
-        360
+        2900,
+        380
       ]
     },
     {
@@ -513,7 +658,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        2920,
+        4460,
         220
       ],
       "continueOnFail": true
@@ -534,7 +679,7 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 1,
       "position": [
-        3180,
+        4720,
         220
       ]
     },
@@ -553,7 +698,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        3440,
+        4980,
         160
       ],
       "credentials": {
@@ -662,6 +807,68 @@
       "main": [
         [
           {
+            "node": "Download Audio dari Google Drive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Audio dari Google Drive": {
+      "main": [
+        [
+          {
+            "node": "Perlu Kompres FFmpeg (>100MB)? (IF)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Perlu Kompres FFmpeg (>100MB)? (IF)": {
+      "main": [
+        [
+          {
+            "node": "Kompres Audio via FFmpeg API (HTTP)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Siapkan Binary Tanpa FFmpeg (Code)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Kompres Audio via FFmpeg API (HTTP)": {
+      "main": [
+        [
+          {
+            "node": "Evaluasi Hasil FFmpeg & Siapkan Binary (Code)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Evaluasi Hasil FFmpeg & Siapkan Binary (Code)": {
+      "main": [
+        [
+          {
+            "node": "Start Gemini Files Resumable Session (HTTP)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Siapkan Binary Tanpa FFmpeg (Code)": {
+      "main": [
+        [
+          {
             "node": "Start Gemini Files Resumable Session (HTTP)",
             "type": "main",
             "index": 0
@@ -673,14 +880,14 @@
       "main": [
         [
           {
-            "node": "Download Audio dari Google Drive",
+            "node": "Gabungkan Sesi Upload & Binary (Code)",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Download Audio dari Google Drive": {
+    "Gabungkan Sesi Upload & Binary (Code)": {
       "main": [
         [
           {
@@ -797,6 +1004,28 @@
       "main": [
         [
           {
+            "node": "Siapkan Payload Pass 2 Smart Merge (Code)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Siapkan Payload Pass 2 Smart Merge (Code)": {
+      "main": [
+        [
+          {
+            "node": "Panggil Gemini Pass 2 Editor Notulis (HTTP)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Panggil Gemini Pass 2 Editor Notulis (HTTP)": {
+      "main": [
+        [
+          {
             "node": "Parse & Siapkan Callback Async (Code)",
             "type": "main",
             "index": 0
@@ -855,7 +1084,7 @@
     "executionOrder": "v1",
     "binaryMode": "separate"
   },
-  "versionId": "c918e3b2-7f41-4a0d-b91e-34c509876002",
+  "versionId": "c918e3b2-7f41-4a0d-b91e-34c509876003",
   "meta": {
     "instanceId": "<GANTI_N8N_INSTANCE_ID>"
   },

@@ -61,6 +61,202 @@
     'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
   ];
 
+  var rapatAiMode = 'merge';
+  var rapatAiUndoSnapshot = null;
+
+  var RAPAT_SKB_HOLIDAYS_FE_ = {
+    '2026-01-01': 'Tahun Baru 2026 Masehi',
+    '2026-01-16': 'Isra Mikraj Nabi Muhammad S.A.W.',
+    '2026-02-16': 'Cuti Bersama Tahun Baru Imlek 2577 Kongzili',
+    '2026-02-17': 'Tahun Baru Imlek 2577 Kongzili',
+    '2026-03-18': 'Cuti Bersama Hari Suci Nyepi',
+    '2026-03-19': 'Hari Suci Nyepi (Tahun Baru Saka 1948)',
+    '2026-03-20': 'Cuti Bersama Idul Fitri 1447 H',
+    '2026-03-21': 'Idul Fitri 1447 Hijriah',
+    '2026-03-22': 'Idul Fitri 1447 Hijriah',
+    '2026-03-23': 'Cuti Bersama Idul Fitri 1447 H',
+    '2026-03-24': 'Cuti Bersama Idul Fitri 1447 H',
+    '2026-04-03': 'Wafat Yesus Kristus',
+    '2026-04-05': 'Kebangkitan Yesus Kristus (Paskah)',
+    '2026-05-01': 'Hari Buruh Internasional',
+    '2026-05-14': 'Kenaikan Yesus Kristus',
+    '2026-05-15': 'Cuti Bersama Kenaikan Yesus Kristus',
+    '2026-05-27': 'Idul Adha 1447 Hijriah',
+    '2026-05-28': 'Cuti Bersama Idul Adha 1447 H',
+    '2026-05-31': 'Hari Raya Waisak 2570 BE',
+    '2026-06-01': 'Hari Lahir Pancasila',
+    '2026-06-16': 'Tahun Baru Islam 1448 Hijriah',
+    '2026-08-17': 'Proklamasi Kemerdekaan RI',
+    '2026-08-25': 'Maulid Nabi Muhammad S.A.W.',
+    '2026-12-24': 'Cuti Bersama Kelahiran Yesus Kristus',
+    '2026-12-25': 'Kelahiran Yesus Kristus',
+    '2027-01-01': 'Tahun Baru 2027 Masehi',
+    '2027-01-05': 'Isra Mikraj Nabi Muhammad S.A.W. 1448 H',
+    '2027-02-05': 'Cuti Bersama Tahun Baru Imlek 2578 Kongzili',
+    '2027-02-06': 'Tahun Baru Imlek 2578 Kongzili',
+    '2027-03-08': 'Hari Suci Nyepi (Tahun Baru Saka 1949)',
+    '2027-03-09': 'Cuti Bersama Idul Fitri 1448 H',
+    '2027-03-10': 'Idul Fitri 1448 Hijriah',
+    '2027-03-11': 'Idul Fitri 1448 Hijriah',
+    '2027-03-12': 'Cuti Bersama Idul Fitri 1448 H',
+    '2027-03-15': 'Cuti Bersama Idul Fitri 1448 H',
+    '2027-03-25': 'Cuti Bersama Wafat Yesus Kristus',
+    '2027-03-26': 'Wafat Yesus Kristus',
+    '2027-03-28': 'Kebangkitan Yesus Kristus (Paskah)',
+    '2027-05-01': 'Hari Buruh Internasional',
+    '2027-05-06': 'Kenaikan Yesus Kristus',
+    '2027-05-17': 'Idul Adha 1448 Hijriah',
+    '2027-05-18': 'Cuti Bersama Idul Adha 1448 H',
+    '2027-05-19': 'Cuti Bersama Hari Raya Waisak 2571 BE',
+    '2027-05-20': 'Hari Raya Waisak 2571 BE',
+    '2027-06-01': 'Hari Lahir Pancasila',
+    '2027-06-06': '1 Muharam Tahun Baru Islam 1449 H',
+    '2027-08-15': 'Maulid Nabi Muhammad S.A.W.',
+    '2027-08-17': 'Proklamasi Kemerdekaan RI',
+    '2027-12-24': 'Cuti Bersama Kelahiran Yesus Kristus',
+    '2027-12-25': 'Kelahiran Yesus Kristus',
+    '2027-12-26': 'Isra Mikraj Nabi Muhammad S.A.W. 1449 H'
+  };
+
+  function parseRapatIsoDateFe_(rawStr) {
+    var s = String(rawStr || '').trim();
+    if (!s) return '';
+    var mIso = s.match(/(\d{4})-(\d{2})-(\d{2})/);
+    if (mIso) return mIso[1] + '-' + mIso[2] + '-' + mIso[3];
+    var months = {
+      januari: '01', februari: '02', maret: '03', april: '04', mei: '05', juni: '06',
+      juli: '07', agustus: '08', september: '09', oktober: '10', november: '11', nopember: '11', desember: '12'
+    };
+    var mIndo = s.toLowerCase().match(/(\d{1,2})\s+(januari|februari|maret|april|mei|juni|juli|agustus|september|oktober|november|nopember|desember)\s+(\d{4})/);
+    if (mIndo) {
+      var dd = String(parseInt(mIndo[1], 10)).padStart(2, '0');
+      var mm = months[mIndo[2]] || '';
+      if (mm) return mIndo[3] + '-' + mm + '-' + dd;
+    }
+    return '';
+  }
+
+  function addWorkdaysSkbFe_(baseIso, workdays) {
+    var cleanBase = parseRapatIsoDateFe_(baseIso);
+    if (!cleanBase) cleanBase = new Date().toISOString().slice(0, 10);
+    var p = cleanBase.split('-');
+    var dt = new Date(Date.UTC(parseInt(p[0], 10), parseInt(p[1], 10) - 1, parseInt(p[2], 10)));
+    var steps = parseInt(workdays, 10) || 0;
+    if (steps <= 0) return cleanBase;
+    var added = 0;
+    var guard = 0;
+    var holidayMap = (typeof window !== 'undefined' && window.TRANSKEP_HOLIDAYS_MAP) ? window.TRANSKEP_HOLIDAYS_MAP : RAPAT_SKB_HOLIDAYS_FE_;
+    while (added < steps && guard < 180) {
+      dt.setUTCDate(dt.getUTCDate() + 1);
+      guard++;
+      var dow = dt.getUTCDay();
+      var iso = dt.getUTCFullYear() + '-' + String(dt.getUTCMonth() + 1).padStart(2, '0') + '-' + String(dt.getUTCDate()).padStart(2, '0');
+      if (dow !== 0 && dow !== 6 && !holidayMap[iso]) {
+        added++;
+      }
+    }
+    return dt.getUTCFullYear() + '-' + String(dt.getUTCMonth() + 1).padStart(2, '0') + '-' + String(dt.getUTCDate()).padStart(2, '0');
+  }
+
+  function updateRapatAiUndoUi_() {
+    var hasUndo = Boolean(rapatAiUndoSnapshot);
+    var bar = document.getElementById('rapatTab3AiUndoBar');
+    var btn = document.getElementById('btnRapatUndoAiNotulen');
+    if (bar && bar.classList) {
+      if (hasUndo) bar.classList.remove('hidden');
+      else bar.classList.add('hidden');
+    }
+    if (btn && btn.classList) {
+      if (hasUndo) btn.classList.remove('hidden');
+      else btn.classList.add('hidden');
+    }
+  }
+
+  function captureTab3SnapshotForUndo_() {
+    return {
+      dasar_notula: String(((document.getElementById('rapatFieldDasarNotula') || {}).value || '')),
+      pengarahan_umum: String(((document.getElementById('rapatFieldPengarahanUmum') || {}).value || '')),
+      kesimpulan: String(((document.getElementById('rapatFieldKesimpulan') || {}).value || '')),
+      ai_transcript: String(((document.getElementById('rapatFieldAiTranscript') || {}).value || '')),
+      pembahasanRows: JSON.parse(JSON.stringify(pembahasanRowsList || []))
+    };
+  }
+
+  function collectExistingTab3DraftForAi_() {
+    var dasar = ((document.getElementById('rapatFieldDasarNotula') || {}).value || '').trim();
+    var pengarahan = ((document.getElementById('rapatFieldPengarahanUmum') || {}).value || '').trim();
+    var kesimpulan = ((document.getElementById('rapatFieldKesimpulan') || {}).value || '').trim();
+    var cleanRows = (pembahasanRowsList || []).map(function (r) {
+      var norm = normalizePembahasanRow_(r);
+      var nonEmptyItems = (norm.items || []).filter(function (sub) {
+        return String(sub.uraian || '').trim() ||
+          String(sub.tindak_lanjut || '').trim() ||
+          String(sub.target || '').trim() ||
+          String(sub.penanggung_jawab || '').trim() ||
+          String(sub.tanggal_penyelesaian || '').trim();
+      });
+      return {
+        pembicara_nama: String(norm.pembicara_nama || '').trim(),
+        pembicara_nip: String(norm.pembicara_nip || '').trim(),
+        pembicara_jabatan: String(norm.pembicara_jabatan || '').trim(),
+        items: nonEmptyItems
+      };
+    }).filter(function (r) {
+      return r.pembicara_nama || (r.items && r.items.length > 0);
+    });
+    return {
+      hasContent: Boolean(dasar || pengarahan || kesimpulan || cleanRows.length > 0),
+      payload: {
+        dasar_notula: dasar,
+        pengarahan_umum: pengarahan,
+        kesimpulan: kesimpulan,
+        pembahasan: cleanRows
+      }
+    };
+  }
+
+  window.setRapatAiMode = function (mode) {
+    rapatAiMode = (mode === 'replace') ? 'replace' : 'merge';
+    var btnMerge = document.getElementById('btnRapatAiModeMerge');
+    var btnReplace = document.getElementById('btnRapatAiModeReplace');
+    var descEl = document.getElementById('rapatAiModeDesc');
+    var activeCls = 'px-2.5 py-1 rounded-lg text-[10px] font-bold transition bg-indigo-600 text-white shadow-sm';
+    var idleCls = 'px-2.5 py-1 rounded-lg text-[10px] font-bold transition text-slate-400 hover:text-white';
+    if (btnMerge) btnMerge.className = (rapatAiMode === 'merge') ? activeCls : idleCls;
+    if (btnReplace) btnReplace.className = (rapatAiMode === 'replace') ? activeCls : idleCls;
+    if (descEl) {
+      descEl.innerText = (rapatAiMode === 'replace')
+        ? 'AI menyusun ulang seluruh isi Notula Tab 3 secara menyeluruh dari rekaman audio & identitas rapat (cocok bila Tab 3 masih kosong atau ingin dibuat ulang).'
+        : 'AI otomatis membaca draf Notula Anda di Tab 3: memperbaiki typo/resuman, melengkapi kolom & target waktu (hari kerja SKB 2026-2027), atau mengisi dari nol bila Tab 3 masih kosong.';
+    }
+    return rapatAiMode;
+  };
+
+  window.undoLastAiNotulenApply = function () {
+    if (!rapatAiUndoSnapshot) return false;
+    var snap = rapatAiUndoSnapshot;
+    var elDasar = document.getElementById('rapatFieldDasarNotula');
+    var elPeng = document.getElementById('rapatFieldPengarahanUmum');
+    var elKes = document.getElementById('rapatFieldKesimpulan');
+    var elTr = document.getElementById('rapatFieldAiTranscript');
+    if (elDasar) elDasar.value = snap.dasar_notula || '';
+    if (elPeng) elPeng.value = snap.pengarahan_umum || '';
+    if (elKes) elKes.value = snap.kesimpulan || '';
+    if (elTr) elTr.value = snap.ai_transcript || '';
+    pembahasanRowsList = Array.isArray(snap.pembahasanRows)
+      ? snap.pembahasanRows.map(function (r) { return normalizePembahasanRow_(r); })
+      : [];
+    renderPembahasanRows_();
+    rapatAiUndoSnapshot = null;
+    updateRapatAiUndoUi_();
+    var badge = document.getElementById('rapatAiStatusBadge');
+    if (badge) badge.innerText = 'Draf Dikembalikan (Undo)';
+    if (typeof showNotify === 'function') {
+      showNotify('Draf Dikembalikan', 'Isi Notula Tab 3 berhasil dikembalikan ke kondisi sebelum penerapan AI terakhir.', 'info');
+    }
+    return true;
+  };
+
   function escRapat_(v) {
     if (typeof window.escHtml === 'function') return window.escHtml(v);
     return String(v == null ? '' : v).replace(/[&<>"']/g, function (c) {
@@ -1746,9 +1942,9 @@
       rawMime = 'audio/webm';
     }
 
-    var maxRawBytes = 120 * 1024 * 1024;
+    var maxRawBytes = 2 * 1024 * 1024 * 1024;
     if (file.size && file.size > maxRawBytes) {
-      throw new Error('Ukuran file audio terlalu besar (maks. 120 MB). Potong rekaman atau bagi menjadi 2 bagian.');
+      throw new Error('Ukuran file audio terlalu besar (maks. 2 GB). Potong rekaman atau bagi menjadi 2 bagian.');
     }
 
     var largeAudioCutoffBytes = 8 * 1024 * 1024;
@@ -1942,6 +2138,8 @@
             function (pct, loadedBytes, totalBytes) {
               if (rapatAudioState.uploadSeq !== mySeq) return;
               setAudioDriveStatusBadge_('Mengunggah... ' + pct + '%', 'uploading');
+              var topBadgeProg = document.getElementById('rapatAiStatusBadge');
+              if (topBadgeProg && isLargeFile) topBadgeProg.innerText = 'Upload Drive... ' + pct + '%';
               updateAudioUploadProgressUi_(true, pct, 'Mengunggah ke Drive: ' + formatBytesRapat_(loadedBytes) + ' / ' + formatBytesRapat_(totalBytes));
             },
             function () {
@@ -1956,6 +2154,8 @@
             if (urlElR) urlElR.value = String(upRes.data.url);
             updateAudioUploadProgressUi_(false, 100, '');
             setAudioDriveStatusBadge_('Drive: ' + (upRes.data.folder_path || 'Tersimpan'), 'saved');
+            var topBadgeOk = document.getElementById('rapatAiStatusBadge');
+            if (topBadgeOk) topBadgeOk.innerText = 'Siap Analisa AI (Drive OK)';
             if (isLargeFile && typeof showNotify === 'function') {
               showNotify('Arsip Drive Selesai', (fileName || 'Rekaman') + ' berhasil masuk Google Drive & siap dianalisa AI Notulis.', 'success');
             }
@@ -1987,6 +2187,8 @@
             var urlEl = document.getElementById('rapatFieldAudioUrl');
             if (urlEl) urlEl.value = String(upRes.data.url);
             setAudioDriveStatusBadge_('Drive: ' + (upRes.data.folder_path || 'Tersimpan'), 'saved');
+            var topBadgeOk2 = document.getElementById('rapatAiStatusBadge');
+            if (topBadgeOk2) topBadgeOk2.innerText = 'Siap Analisa AI (Drive OK)';
             return upRes;
           }
           rapatAudioState.uploadError = (upRes && upRes.message) ? upRes.message : 'Gagal mengunggah rekaman ke Google Drive.';
@@ -1994,6 +2196,8 @@
 
         if (isLargeFile) {
           setAudioDriveStatusBadge_('Gagal Unggah Drive', 'error');
+          var topBadgeErr = document.getElementById('rapatAiStatusBadge');
+          if (topBadgeErr) topBadgeErr.innerText = 'Upload Drive Gagal';
           if (typeof showNotify === 'function') {
             showNotify('Unggah Audio Gagal', rapatAudioState.uploadError || 'Gagal mengunggah audio besar ke Google Drive.', 'warning');
           }
@@ -2007,6 +2211,8 @@
         rapatAudioState.uploadError = errUp && errUp.message ? errUp.message : String(errUp);
         if (isLargeFile) {
           setAudioDriveStatusBadge_('Gagal Unggah Drive', 'error');
+          var topBadgeErr2 = document.getElementById('rapatAiStatusBadge');
+          if (topBadgeErr2) topBadgeErr2.innerText = 'Upload Drive Gagal';
           if (typeof showNotify === 'function') {
             showNotify('Unggah Audio Gagal', rapatAudioState.uploadError, 'warning');
           }
@@ -2157,6 +2363,8 @@
   };
 
   function matchPegawaiForAiSpeaker_(speakerName, rowNip, rowJabatan) {
+    var rawSpk = String(speakerName || '').trim();
+    if (/^pembicara\s*#\d+/i.test(rawSpk) || /belum\s+teridentifikasi/i.test(rawSpk)) return null;
     var users = getUsersListRapat_();
     if (rowNip) {
       var byNip = users.find(function (u) { return String(u.nip) === String(rowNip).trim(); });
@@ -2168,7 +2376,7 @@
         };
       }
     }
-    var target = String(speakerName || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+    var target = rawSpk.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
     if (!target) return null;
     for (var i = 0; i < users.length; i++) {
       var u = users[i];
@@ -2198,6 +2406,11 @@
     var data = aiData || {};
     var options = opts || {};
 
+    if (!options.skipUndoSnapshot) {
+      rapatAiUndoSnapshot = captureTab3SnapshotForUndo_();
+      updateRapatAiUndoUi_();
+    }
+
     var elPengarahan = document.getElementById('rapatFieldPengarahanUmum');
     var elKesimpulan = document.getElementById('rapatFieldKesimpulan');
     var elDasar = document.getElementById('rapatFieldDasarNotula');
@@ -2209,8 +2422,10 @@
     if (elKesimpulan && String(data.kesimpulan || '').trim()) {
       elKesimpulan.value = String(data.kesimpulan).trim();
     }
-    if (elDasar && !String(elDasar.value || '').trim() && String(data.dasar_opsional || '').trim()) {
-      elDasar.value = String(data.dasar_opsional).trim();
+    if (elDasar && String(data.dasar_opsional || '').trim()) {
+      if (!String(elDasar.value || '').trim() || options.aiMode === 'replace') {
+        elDasar.value = String(data.dasar_opsional).trim();
+      }
     }
     if (elTrans && String(data.transkrip_ringkas || '').trim()) {
       if (!String(elTrans.value || '').trim() || options.overwriteTranscript) {
@@ -2227,6 +2442,20 @@
         var rawJab = String(row.pembicara_jabatan || '').trim();
         var matched = matchPegawaiForAiSpeaker_(rawSpeaker, rawNip, rawJab);
 
+        var mappedItems = null;
+        if (Array.isArray(row.items) && row.items.length > 0) {
+          mappedItems = row.items.map(function (sub) {
+            var s = (sub && typeof sub === 'object') ? sub : {};
+            return {
+              uraian: joinAiLines_(s.uraian_text || s.uraian),
+              tindak_lanjut: joinAiLines_(s.tindak_lanjut_text || s.tindak_lanjut),
+              target: String(s.target || '').trim(),
+              penanggung_jawab: String(s.penanggung_jawab || row.penanggung_jawab || '').trim(),
+              tanggal_penyelesaian: String(s.tanggal_penyelesaian || '').trim()
+            };
+          });
+        }
+
         return normalizePembahasanRow_({
           pembicara_nama: (matched && rawSpeaker.indexOf('(') === -1) ? matched.namaDisplay : rawSpeaker,
           pembicara_nip: matched ? matched.nip : rawNip,
@@ -2236,7 +2465,7 @@
           target: String(row.target || '').trim(),
           penanggung_jawab: String(row.penanggung_jawab || '').trim(),
           tanggal_penyelesaian: String(row.tanggal_penyelesaian || '').trim(),
-          items: Array.isArray(row.items) ? row.items : null
+          items: mappedItems
         });
       });
       renderPembahasanRows_();
@@ -2245,7 +2474,8 @@
     return {
       pembahasanCount: rows.length,
       hasPengarahan: Boolean(String(data.pengarahan_umum || '').trim()),
-      hasKesimpulan: Boolean(String(data.kesimpulan || '').trim())
+      hasKesimpulan: Boolean(String(data.kesimpulan || '').trim()),
+      hasUndoSnapshot: Boolean(rapatAiUndoSnapshot)
     };
   };
 
@@ -2360,10 +2590,11 @@
     var transEl = document.getElementById('rapatFieldAiTranscript');
     var transcriptText = transEl ? String(transEl.value || '').trim() : '';
     var hasAudioReady = Boolean(rapatAudioState.dataUri || rapatAudioState.driveFileId || rapatAudioState.uploading);
+    var existingDraftInfo = collectExistingTab3DraftForAi_();
 
-    if (!hasAudioReady && !transcriptText) {
+    if (!hasAudioReady && !transcriptText && !existingDraftInfo.hasContent) {
       if (typeof showNotify === 'function') {
-        showNotify('Input Belum Ada', 'Pilih/rekam audio rapat atau tempel catatan mentah terlebih dahulu.', 'warning');
+        showNotify('Input Belum Ada', 'Pilih/rekam audio rapat atau isi catatan rapat di Tab 3 terlebih dahulu.', 'warning');
       }
       return;
     }
@@ -2381,7 +2612,7 @@
       btnAi.classList.add('opacity-70', 'cursor-wait');
       btnAi.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> <span>Memproses AI...</span>';
     }
-    if (badge) badge.innerText = 'Memproses Gemini AI...';
+    if (badge) badge.innerText = 'Pass 1/2 Gemini AI...';
 
     try {
       if (rapatAudioState.uploading && rapatAudioState.uploadPromise) {
@@ -2399,15 +2630,20 @@
       }
 
       var useAsyncDriveAudio = Boolean(rapatAudioState.driveFileId && (!rapatAudioState.dataUri || rapatAudioState.isLargeFile));
+      var hariTanggalVal = ((document.getElementById('rapatFieldHariTanggal') || {}).value || '').trim();
+      var tglRapatIsoVal = ((document.getElementById('rapatFieldTglRapatIso') || {}).value || '').trim() || parseRapatIsoDateFe_(hariTanggalVal);
       var aiPayload = {
         id_rapat: ((document.getElementById('rapatFieldIdRapat') || {}).value || '').trim() || 'RPT-DRAFT',
         agenda: ((document.getElementById('rapatFieldAgenda') || {}).value || '').trim() || 'Rapat Kedinasan',
-        hari_tanggal: ((document.getElementById('rapatFieldHariTanggal') || {}).value || '').trim(),
+        hari_tanggal: hariTanggalVal,
+        tgl_rapat_iso: tglRapatIsoVal,
         tempat: ((document.getElementById('rapatFieldTempat') || {}).value || '').trim(),
         pemimpin: ((document.getElementById('rapatFieldPemimpin') || {}).value || '').trim(),
         notulis: ((document.getElementById('rapatFieldNotulis') || {}).value || '').trim(),
         peserta_list: tujuanUndanganList.slice(0, 50),
         transcript_text: transcriptText,
+        ai_mode: rapatAiMode,
+        existing_draft: existingDraftInfo.payload,
         audio_data: useAsyncDriveAudio ? '' : (rapatAudioState.dataUri || ''),
         audio_drive_file_id: useAsyncDriveAudio ? rapatAudioState.driveFileId : '',
         audio_file_name: rapatAudioState.fileName || '',
@@ -2422,7 +2658,7 @@
           ? '<i class="fa-solid fa-circle-notch fa-spin"></i> <span>Mengirim audio Drive ke n8n...</span>'
           : '<i class="fa-solid fa-circle-notch fa-spin"></i> <span>Memproses AI...</span>';
       }
-      if (badge) badge.innerText = useAsyncDriveAudio ? 'Mengirim ke n8n...' : 'Memproses Gemini AI...';
+      if (badge) badge.innerText = useAsyncDriveAudio ? 'Mengirim ke n8n...' : 'Pass 1/2 Gemini AI...';
 
       var res = await window.EofficeDataService.requestAiNotulenRapat(aiPayload, adminNip, token);
 
@@ -2430,7 +2666,7 @@
         var jobId = String(res.job_id).trim();
         rapatAudioState.activeJobId = jobId;
         var startedPollAt = Date.now();
-        var maxPolls = 90; // 90 x 4 dtk = 6 menit
+        var maxPolls = 225; // 225 x 4 dtk = 15 menit (rekaman hingga 2 GB + FFmpeg + 2-Pass)
 
         for (var pollIdx = 0; pollIdx < maxPolls; pollIdx++) {
           if (rapatAudioState.activeJobId !== jobId) {
@@ -2441,7 +2677,7 @@
             btnAi.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> <span>Analisa Audio Gemini... (' + elapsedSec + ' dtk)</span>';
           }
           if (badge) {
-            badge.innerText = String(res.stage || 'n8n & Gemini Files API memproses (' + elapsedSec + ' dtk)...');
+            badge.innerText = String(res.stage || 'Pass 1/2 Gemini AI memproses (' + elapsedSec + ' dtk)...');
           }
 
           await new Promise(function (resolve) { setTimeout(resolve, 4000); });
@@ -2473,18 +2709,21 @@
         }
 
         if (res && res.status === 'processing') {
-          res = { status: 'error', message: 'Proses AI Notulis melebihi batas tunggu 6 menit. Silakan coba beberapa saat lagi.' };
+          res = { status: 'error', message: 'Proses AI Notulis melebihi batas tunggu 15 menit. Silakan coba beberapa saat lagi.' };
         }
       }
 
       if (res && res.status === 'success' && res.data) {
-        var applied = window.applyAiNotulenToForm(res.data, { overwriteTranscript: !transcriptText });
+        var applied = window.applyAiNotulenToForm(res.data, {
+          overwriteTranscript: !transcriptText,
+          aiMode: rapatAiMode
+        });
         switchRapatTab('notula');
         if (badge) badge.innerText = 'Draf AI Terisi (Siap Tinjau)';
         if (typeof showNotify === 'function') {
           showNotify(
             'AI Notulis Selesai — Harap Tinjau',
-            'Berhasil mengisi Pengarahan Umum & ' + applied.pembahasanCount + ' pembicara 5 kolom. Periksa ejaan nama sebelum klik Simpan Agenda Rapat.',
+            'Berhasil mengisi Pengarahan Umum & ' + applied.pembahasanCount + ' pembicara 5 kolom. Periksa ejaan nama atau klik Batalkan jika ingin kembali ke draf sebelumnya.',
             'success'
           );
         }
@@ -2771,6 +3010,14 @@
 
     var elAiTrans = document.getElementById('rapatFieldAiTranscript');
     if (elAiTrans) elAiTrans.value = rapatData.ai_transcript || '';
+
+    rapatAiUndoSnapshot = null;
+    updateRapatAiUndoUi_();
+    if (typeof window.setRapatAiMode === 'function') window.setRapatAiMode('merge');
+    var topAiBadgeInit = document.getElementById('rapatAiStatusBadge');
+    if (topAiBadgeInit) {
+      topAiBadgeInit.innerText = rapatData.audio_rapat_url ? 'Siap Analisa AI (Drive OK)' : 'Siap AI Notulis';
+    }
 
     modal.classList.remove('hidden');
     setTimeout(function () {

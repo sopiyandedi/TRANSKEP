@@ -1279,15 +1279,15 @@ const EofficeDataService = {
   },
 
   /**
-   * Mengunggah file audio rapat hingga 120 MB langsung ke Google Drive per potongan 8 MB (Resumable Upload)
+   * Mengunggah file audio rapat hingga 2 GB langsung ke Google Drive dengan chunk adaptif 8/16 MB (Resumable Upload)
    */
   async uploadAudioFileToDriveResumable(file, folderCtx, adminNip, token, onProgress, isCancelledFn) {
     if (!file || !file.size) {
       return { status: 'error', message: 'Berkas audio kosong atau tidak terbaca.' };
     }
-    const maxBytes = 120 * 1024 * 1024;
+    const maxBytes = 2 * 1024 * 1024 * 1024;
     if (file.size > maxBytes) {
-      return { status: 'error', message: 'Ukuran file audio melebihi batas maksimal 120 MB.' };
+      return { status: 'error', message: 'Ukuran file audio melebihi batas maksimal 2 GB.' };
     }
     if (typeof XMLHttpRequest === 'undefined') {
       return { status: 'error', message: 'Browser tidak mendukung XMLHttpRequest untuk Resumable Upload.' };
@@ -1334,7 +1334,9 @@ const EofficeDataService = {
     const uploadUrl = String(sess.upload_url);
     const targetMime = String(sess.mime_type || rawMime || 'audio/mp4');
     const totalSize = Number(file.size);
-    const CHUNK_SIZE = 8 * 1024 * 1024; // 8 MB (kelipatan tepat 256 KiB sesuai standar Google Drive)
+    const CHUNK_SIZE = (totalSize > 100 * 1024 * 1024)
+      ? (16 * 1024 * 1024)
+      : (8 * 1024 * 1024); // Kelipatan tepat 256 KiB sesuai standar Google Drive
 
     const sendChunkOnce = (chunkBlob, startByte, endByte) => {
       return new Promise((resolve, reject) => {
@@ -1397,15 +1399,15 @@ const EofficeDataService = {
       const chunkBlob = file.slice(offset, endByte + 1);
       let chunkRes = null;
       let lastChunkErr = null;
-      for (let attempt = 0; attempt < 3; attempt++) {
+      for (let attempt = 0; attempt < 4; attempt++) {
         try {
           chunkRes = await sendChunkOnce(chunkBlob, offset, endByte);
           lastChunkErr = null;
           break;
         } catch (errCh) {
           lastChunkErr = errCh;
-          if (!errCh || !errCh.retryable || attempt >= 2) break;
-          await new Promise((r) => setTimeout(r, 1500));
+          if (!errCh || !errCh.retryable || attempt >= 3) break;
+          await new Promise((r) => setTimeout(r, 2000));
         }
       }
       if (lastChunkErr || !chunkRes) {

@@ -767,7 +767,7 @@ assert(persetujuanJsSrc.includes('${esc(log.tgl_mulai)}') && persetujuanJsSrc.in
 console.log('[PASS] Frontend XSS sanitization & URL scheme blocking verified in browser VM.');
 
 // =========================================================================
-// 8. TAHAP 146: AUDIO UPLOAD s.d. 120 MB (RESUMABLE DRIVE) & AI ASYNC N8N
+// 8. TAHAP 146 & 147: AUDIO UPLOAD s.d. 2 GB, FFmpeg, 2-PASS AI & SKB 2026-2027
 // =========================================================================
 assert(fs.readFileSync('api_router.js', 'utf8').includes('initAudioDriveUploadSession: true') &&
   fs.readFileSync('api_router.js', 'utf8').includes('finalizeAudioDriveUpload: true') &&
@@ -776,9 +776,9 @@ assert(fs.readFileSync('api_router.js', 'utf8').includes('initAudioDriveUploadSe
 'api_router.js must allow Resumable Audio Drive RPCs & callbackAiNotulenJob');
 
 const gasRapat146Src = fs.readFileSync('eoffice/rapat.js', 'utf8');
-assert(gasRapat146Src.includes('120 * 1024 * 1024') &&
+assert(gasRapat146Src.includes('2 * 1024 * 1024 * 1024') &&
   gasRapat146Src.includes('constantTimeEquals_(incomingKey, configuredKey)'),
-'eoffice/rapat.js must enforce 120 MB cap and constantTimeEquals_ on callbackAiNotulenJobFromExternal_');
+'eoffice/rapat.js must enforce 2 GB cap and constantTimeEquals_ on callbackAiNotulenJobFromExternal_');
 
 // Verify n8n blueprint (sanitized + zero secret leaks + valid graph wiring) & local n8n JSON
 for (const n8nPath of ['n8n/transkep-ai-notulen.example.json', 'n8n/transkep-ai-notulen.json']) {
@@ -818,8 +818,8 @@ const reqPegCall = (method, args) => JSON.parse(
 assert.strictEqual(reqPegCall('initAudioDriveUploadSession', [{ file_size: 1024 }]).status, 'error', 'Pegawai must be denied initAudioDriveUploadSession');
 assert.strictEqual(reqPegCall('checkAiNotulenJobStatus', ['AINOT-12345']).status, 'error', 'Pegawai must be denied checkAiNotulenJobStatus');
 
-const tooBigInit = reqAdminCall('initAudioDriveUploadSession', [{ file_size: 121 * 1024 * 1024, file_name: 'over.m4a' }, adm.data.nip, adm.token]);
-assert.strictEqual(tooBigInit.status, 'error', 'initAudioDriveUploadSession must reject > 120 MB');
+const tooBigInit = reqAdminCall('initAudioDriveUploadSession', [{ file_size: (2 * 1024 * 1024 * 1024) + 1024, file_name: 'over.m4a' }, adm.data.nip, adm.token]);
+assert.strictEqual(tooBigInit.status, 'error', 'initAudioDriveUploadSession must reject > 2 GB');
 
 const origFetch146 = sandbox.UrlFetchApp.fetch;
 const origScriptApp146 = sandbox.ScriptApp;
@@ -952,12 +952,12 @@ try {
   sandbox.DriveApp = origDriveApp146;
 }
 
-// Verify frontend modules/eoffice/eoffice_data.js Resumable Chunked Upload + modules/eoffice/rapat.js 120 MB handling
+// Verify frontend modules/eoffice/eoffice_data.js Resumable Chunked Upload + modules/eoffice/rapat.js 2 GB handling
 const largeFileStub = { name: 'Rapat Kepaniteraan.m4a', type: 'audio/x-m4a', size: 77000000, slice: (a, b) => ({ size: b - a }) };
-assert(fs.readFileSync('modules/eoffice/rapat.js', 'utf8').includes('120 * 1024 * 1024') &&
+assert(fs.readFileSync('modules/eoffice/rapat.js', 'utf8').includes('2 * 1024 * 1024 * 1024') &&
   fs.readFileSync('modules/eoffice/rapat.js', 'utf8').includes('uploadAudioFileToDriveResumable') &&
   fs.readFileSync('modules/eoffice/rapat.js', 'utf8').includes('checkAiNotulenJobStatus'),
-'modules/eoffice/rapat.js must support 120 MB Resumable Upload & Async Polling');
+'modules/eoffice/rapat.js must support 2 GB Resumable Upload & Async Polling');
 
 const dataSvcSandbox = {
   console, Math, Date, JSON, String, Number, Boolean, Array, Object, Error, RegExp, parseInt, setTimeout,
@@ -1030,7 +1030,80 @@ vm.runInContext(fs.readFileSync('modules/eoffice/eoffice_data.js', 'utf8'), data
   assert.strictEqual(resUp.status, 'success', 'Resumable chunked Drive upload helper must finish cleanly across 8 MB chunks');
   assert.strictEqual(resUp.data.file_id, '1ResumableDriveFileId12345');
   assert(progressLog.length >= 9 && progressLog[progressLog.length - 1] === 100, 'Progress callback must track 8 MB chunks up to 100%');
-  console.log('[PASS] Tahap 146 120 MB Resumable Drive Upload, Gemini Files API Async Webhook & Polling verified.');
+
+  // Tahap 147: Adaptive 16 MB chunk (>100 MB), SKB 2026-2027 Workdays, Uncertain Speaker & Undo
+  const giantFileStub = { name: 'Rapat_Akbar.m4a', type: 'audio/mp4', size: 110 * 1024 * 1024, slice: (a, b) => ({ size: b - a }) };
+  const giantProgress = [];
+  const giantUp = await dataSvcSandbox.EofficeDataService.uploadAudioFileToDriveResumable(
+    giantFileStub,
+    { id_rapat: 'RPT-147', agenda: 'Rapat Akbar', tgl_rapat_iso: '2026-03-17' },
+    '198001012005011001',
+    'tok',
+    (pct) => giantProgress.push(pct)
+  );
+  assert.strictEqual(giantUp.status, 'success', 'Adaptive 16 MB chunk upload (>100 MB) must succeed');
+  assert(giantProgress.length <= 8 && giantProgress[giantProgress.length - 1] === 100, '>100 MB audio must use adaptive 16 MB chunks');
+
+  assert.strictEqual(sandbox.addWorkdaysSkbRapat_('2026-03-17', 5), '2026-03-31', 'SKB 2026 Lebaran holidays must be skipped when computing +5 workdays');
+  assert.strictEqual(sandbox.addWorkdaysSkbRapat_('2027-03-05', 5), '2027-03-22', 'SKB 2027 Lebaran + Nyepi holidays must be skipped when computing +5 workdays');
+  assert.strictEqual(sandbox.addWorkdaysSkbRapat_('2026-03-17', 0), '2026-03-17', 'HARI_RAPAT (+0 workdays) must return meeting date');
+
+  const norm147 = sandbox.normalizeAiNotulenResponse_({
+    pengarahan_umum: 'Arahan',
+    pembahasan: [{
+      pembicara_nama: 'Pembicara #2 (Belum Teridentifikasi — Bidang Media)',
+      items: [
+        { uraian: 'Tugas rutin harian', tindak_lanjut: 'Upload tepat waktu', target_kategori_waktu: 'HARI_RAPAT', penanggung_jawab: 'Panmud', selesai_kategori_waktu: 'HARI_RAPAT' },
+        { uraian: 'Siapkan ruang media center', tindak_lanjut: 'Pengadaan sarpras', target_kategori_waktu: 'JANGKA_PENDEK', penanggung_jawab: 'Sekretaris', selesai_kategori_waktu: 'PROYEK_SARANA' }
+      ]
+    }]
+  }, {
+    tgl_rapat_iso: '2026-03-17',
+    peserta_list: [{ nip: '197901012003011008', nama: 'Atasan Satu', jabatan: 'Ketua' }]
+  });
+  assert.strictEqual(norm147.pembahasan[0].pembicara_nip, '', 'Uncertain speaker label must never falsely match pegawai NIP');
+  assert.strictEqual(norm147.pembahasan[0].items[0].target, '2026-03-17');
+  assert.strictEqual(norm147.pembahasan[0].items[1].target, '2026-03-31');
+  assert.strictEqual(norm147.pembahasan[0].items[1].tanggal_penyelesaian, '2026-04-15');
+
+  const dom147 = {
+    rapatFieldDasarNotula: { value: 'Dasar Lama' },
+    rapatFieldPengarahanUmum: { value: 'Arahan Lama' },
+    rapatFieldKesimpulan: { value: 'Kesimpulan Lama' },
+    rapatFieldAiTranscript: { value: '' },
+    rapatPembahasanListContainer: { innerHTML: '' },
+    rapatCountPembicara: { innerText: '0' },
+    rapatTab3AiUndoBar: { classList: { _s: new Set(['hidden']), add(c){this._s.add(c);}, remove(c){this._s.delete(c);}, contains(c){return this._s.has(c);} } },
+    btnRapatUndoAiNotulen: { classList: { _s: new Set(['hidden']), add(c){this._s.add(c);}, remove(c){this._s.delete(c);}, contains(c){return this._s.has(c);} } },
+    btnRapatAiModeMerge: { className: '' },
+    btnRapatAiModeReplace: { className: '' },
+    rapatAiModeDesc: { innerText: '' },
+    rapatAiStatusBadge: { innerText: 'Siap AI Notulis' }
+  };
+  const vm147 = {
+    console, Date, Math, Array, Object, String, Number, Boolean, JSON, Error, RegExp, parseInt,
+    localStorage: { getItem: () => '', setItem: () => {} },
+    document: { getElementById: (id) => dom147[id] || null },
+    vueState: { usersList: [{ nip: '197901012003011008', nama: 'Atasan Satu', jabatan: 'Ketua', role: 'Pegawai' }] },
+    showNotify: () => {},
+    window: {}
+  };
+  vm147.window = vm147;
+  vm.createContext(vm147);
+  vm.runInContext(fs.readFileSync('modules/eoffice/rapat.js', 'utf8'), vm147, { filename: 'modules/eoffice/rapat.js' });
+  assert.strictEqual(vm147.setRapatAiMode('replace'), 'replace');
+  assert.strictEqual(vm147.setRapatAiMode('merge'), 'merge');
+  vm147.applyAiNotulenToForm({
+    pengarahan_umum: 'Arahan Baru AI',
+    kesimpulan: 'Kesimpulan Baru AI',
+    pembahasan: [{ pembicara_nama: 'Atasan Satu', items: [{ uraian: 'Poin 1', tindak_lanjut: 'TL 1', target: '2026-03-31', penanggung_jawab: 'Ketua', tanggal_penyelesaian: '2026-04-15' }] }]
+  }, { aiMode: 'merge' });
+  assert.strictEqual(dom147.rapatFieldDasarNotula.value, 'Dasar Lama', 'Merge mode must preserve non-empty Dasar when AI returns blank');
+  assert(!dom147.rapatTab3AiUndoBar.classList.contains('hidden'), 'Undo banner must become visible after AI applies changes');
+  assert.strictEqual(vm147.undoLastAiNotulenApply(), true, 'Undo must restore previous Tab 3 state');
+  assert.strictEqual(dom147.rapatFieldPengarahanUmum.value, 'Arahan Lama');
+
+  console.log('[PASS] Tahap 146 & 147 2 GB Resumable Drive Upload, FFmpeg, 2-Pass Gemini, SKB 2026-2027 & Smart Merge Undo verified.');
   console.log('\n[PASS] ALL Fase 3A tests passed (0 failures).');
 })().catch((err) => {
   console.error(err);
