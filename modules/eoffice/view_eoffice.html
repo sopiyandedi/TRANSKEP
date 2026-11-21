@@ -1427,7 +1427,7 @@
               </p>
 
               <input type="hidden" id="rapatFieldAudioUrl" value="">
-              <input type="file" id="rapatInputAudioFile" accept="audio/*,.mp3,.m4a,.wav,.ogg,.webm" class="hidden"
+              <input type="file" id="rapatInputAudioFile" accept="audio/*,.mp3,.m4a,.wav,.ogg,.webm,.aac,.flac" class="hidden"
                 onchange="handleRapatAudioSelect(this.files); this.value='';">
 
               <div id="rapatAudioDropZone"
@@ -1441,7 +1441,7 @@
                   <i class="fa-solid fa-file-audio text-indigo-400"></i>
                   <span>Seret &amp; Lepas File Rekaman Audio di Sini (atau klik untuk pilih file)</span>
                 </div>
-                <div class="text-[10px] text-slate-500">Mendukung .mp3, .m4a, .wav, .ogg, .webm &bull; Otomatis terarsip di Drive (Tahun / Bulan / Judul Rapat)</div>
+                <div class="text-[10px] text-slate-500">Mendukung .mp3, .m4a, .wav, .ogg, .webm, .aac, .flac (<b class="text-indigo-300">Maks. 120 MB</b>) &bull; Otomatis terarsip di Drive (Tahun / Bulan / Judul Rapat)</div>
               </div>
 
               <div class="flex flex-wrap items-center gap-2">
@@ -1466,6 +1466,15 @@
                 <div class="flex items-center justify-between text-[10px] gap-2">
                   <span id="rapatAudioFileInfo" class="text-indigo-300 font-bold truncate">Belum ada file audio</span>
                   <span id="rapatAudioDriveStatus" class="px-1.5 py-0.5 rounded bg-indigo-500/15 text-indigo-300 border border-indigo-500/20 text-[9px] shrink-0">Siap Analisa AI</span>
+                </div>
+                <div id="rapatAudioUploadProgressWrap" class="hidden space-y-1">
+                  <div class="flex items-center justify-between text-[9px] text-amber-300">
+                    <span id="rapatAudioUploadProgressLabel" class="truncate">Mengunggah rekaman ke Google Drive...</span>
+                    <span id="rapatAudioUploadProgressPct" class="font-mono font-bold shrink-0">0%</span>
+                  </div>
+                  <div class="w-full h-1.5 rounded-full bg-slate-800 overflow-hidden">
+                    <div id="rapatAudioUploadProgressBar" class="h-full bg-gradient-to-r from-indigo-500 to-cyan-400 transition-all duration-200" style="width: 0%;"></div>
+                  </div>
                 </div>
                 <audio id="rapatAudioPlayer" controls class="w-full h-8"></audio>
               </div>

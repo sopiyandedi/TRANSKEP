@@ -199,6 +199,40 @@ function uploadFotoRapat(payload, adminNip, clientToken) {
 }
 
 /**
+ * Helper: Normalisasi MIME Type & Ekstensi Audio Rapat (termasuk audio/x-m4a -> audio/mp4)
+ */
+function normalizeRapatAudioMimeAndExt_(fileName, rawMime) {
+  const cleanName = String(fileName || 'rekaman_rapat.m4a').trim();
+  const cleanMime = String(rawMime || '').split(';')[0].trim().toLowerCase();
+  const extMatch = cleanName.match(/\.([a-z0-9]{2,6})$/i);
+  const extRaw = extMatch ? extMatch[1].toLowerCase() : '';
+
+  if (extRaw === 'm4a' || cleanMime === 'audio/x-m4a' || cleanMime === 'audio/m4a' || cleanMime === 'audio/mp4') {
+    return { mimeType: 'audio/mp4', ext: 'm4a' };
+  }
+  if (extRaw === 'mp3' || cleanMime === 'audio/mpeg' || cleanMime === 'audio/mp3') {
+    return { mimeType: 'audio/mpeg', ext: 'mp3' };
+  }
+  if (extRaw === 'wav' || cleanMime === 'audio/wav' || cleanMime === 'audio/x-wav') {
+    return { mimeType: 'audio/wav', ext: 'wav' };
+  }
+  if (extRaw === 'ogg' || cleanMime === 'audio/ogg') {
+    return { mimeType: 'audio/ogg', ext: 'ogg' };
+  }
+  if (extRaw === 'webm' || cleanMime === 'audio/webm' || (extRaw === 'webm' && cleanMime === 'video/webm')) {
+    return { mimeType: 'audio/webm', ext: 'webm' };
+  }
+  if (extRaw === 'aac' || cleanMime === 'audio/aac') {
+    return { mimeType: 'audio/aac', ext: 'aac' };
+  }
+  if (extRaw === 'flac' || cleanMime === 'audio/flac') {
+    return { mimeType: 'audio/flac', ext: 'flac' };
+  }
+
+  throw new Error('Format audio tidak didukung (' + (cleanMime || extRaw || 'tidak diketahui') + '). Gunakan .mp3, .m4a, .wav, .ogg, .webm, .aac, atau .flac.');
+}
+
+/**
  * RPC Aman: Upload Rekaman Audio Rapat ke Subfolder Google Drive Privat (Tahun/Bulan/Judul Rapat)
  */
 function uploadAudioRapat(payload, adminNip, clientToken) {
@@ -212,6 +246,152 @@ function uploadAudioRapat(payload, adminNip, clientToken) {
     });
   } catch (err) {
     Logger.log('ERROR uploadAudioRapat: ' + err.toString());
+    return { status: 'error', message: err.message || err.toString() };
+  }
+}
+
+/**
+ * RPC Aman: Membuat Resumable Upload Session URL Google Drive v3 untuk Audio Rapat hingga 120 MB
+ * agar browser dapat mengunggah chunk binary langsung ke Google Drive tanpa membebani payload GAS (50 MB).
+ */
+function initAudioDriveUploadSession(payload, adminNip, clientToken) {
+  try {
+    if (!cekOtorisasiAdmin(adminNip, clientToken)) {
+      return { status: 'error', message: 'Akses Ditolak: Sesi unggah audio rapat hanya dapat dibuat oleh Admin/Operator.' };
+    }
+
+    const p = payload || {};
+    const maxBytes = 120 * 1024 * 1024;
+    const fileSize = parseInt(p.file_size, 10) || 0;
+    if (fileSize <= 0 || fileSize > maxBytes) {
+      return {
+        status: 'error',
+        message: 'Ukuran berkas audio tidak valid atau melebihi batas maksimal 120 MB (' + maxBytes + ' byte).'
+      };
+    }
+
+    const audioMeta = normalizeRapatAudioMimeAndExt_(p.file_name || 'rekaman_rapat.m4a', p.mime_type || '');
+    const rawOrigin = String(p.origin || '').trim();
+    const safeOrigin = /^https?:\/\/[a-zA-Z0-9._:-]+$/i.test(rawOrigin) ? rawOrigin : '';
+
+    const safePrefix = String(p.id_rapat || 'RPT').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 40) || 'RPT';
+    const stamp = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'yyyyMMdd_HHmmss');
+    const finalName = 'Audio_' + safePrefix + '_' + stamp + '_' + Math.floor(Math.random() * 1000) + '.' + audioMeta.ext;
+
+    const parts = resolveRapatFolderParts_(p);
+    const folder = getOrCreateFotoRapatFolder_(p);
+    const folderPath = 'Arsip Foto Rapat TRANSKEP / ' + parts.year + ' / ' + parts.month + ' / ' + parts.title;
+
+    const initHeaders = {
+      Authorization: 'Bearer ' + ScriptApp.getOAuthToken(),
+      'X-Upload-Content-Type': audioMeta.mimeType,
+      'X-Upload-Content-Length': String(fileSize)
+    };
+    if (safeOrigin) {
+      initHeaders.Origin = safeOrigin;
+    }
+
+    const initResp = UrlFetchApp.fetch(
+      'https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&fields=id,name,mimeType,size',
+      {
+        method: 'post',
+        contentType: 'application/json; charset=UTF-8',
+        headers: initHeaders,
+        payload: JSON.stringify({
+          name: finalName,
+          mimeType: audioMeta.mimeType,
+          parents: [folder.getId()]
+        }),
+        muteHttpExceptions: true
+      }
+    );
+
+    const code = Number(initResp.getResponseCode() || 0);
+    const allHdrs = (typeof initResp.getAllHeaders === 'function')
+      ? (initResp.getAllHeaders() || {})
+      : ((typeof initResp.getHeaders === 'function' ? initResp.getHeaders() : {}) || {});
+    let uploadUrl = '';
+    const hdrKeys = Object.keys(allHdrs);
+    for (let i = 0; i < hdrKeys.length; i++) {
+      if (String(hdrKeys[i]).toLowerCase() === 'location') {
+        const rawLoc = allHdrs[hdrKeys[i]];
+        uploadUrl = String(Array.isArray(rawLoc) ? rawLoc[0] : (rawLoc || '')).trim();
+        break;
+      }
+    }
+
+    if (code < 200 || code >= 300 || !uploadUrl) {
+      Logger.log('ERROR initAudioDriveUploadSession HTTP ' + code + ': ' + String(initResp.getContentText ? initResp.getContentText() : ''));
+      return { status: 'error', message: 'Gagal membuat sesi unggah Google Drive (HTTP ' + code + ').' };
+    }
+
+    return {
+      status: 'success',
+      data: {
+        upload_url: uploadUrl,
+        file_name: finalName,
+        mime_type: audioMeta.mimeType,
+        folder_id: folder.getId(),
+        folder_url: typeof folder.getUrl === 'function' ? folder.getUrl() : '',
+        folder_path: folderPath
+      }
+    };
+  } catch (err) {
+    Logger.log('ERROR initAudioDriveUploadSession: ' + err.toString());
+    return { status: 'error', message: err.message || err.toString() };
+  }
+}
+
+/**
+ * RPC Aman: Finalisasi & penguncian akses privat berkas audio rapat hasil Resumable Upload di Drive
+ */
+function finalizeAudioDriveUpload(payload, adminNip, clientToken) {
+  try {
+    if (!cekOtorisasiAdmin(adminNip, clientToken)) {
+      return { status: 'error', message: 'Akses Ditolak: Finalisasi unggah audio hanya untuk Admin/Operator.' };
+    }
+
+    const p = payload || {};
+    const fileId = String(p.file_id || '').trim();
+    if (!/^[a-zA-Z0-9_-]{10,120}$/.test(fileId)) {
+      return { status: 'error', message: "Parameter 'file_id' Google Drive tidak valid." };
+    }
+
+    const file = DriveApp.getFileById(fileId);
+    if (typeof collectDriveAncestorMeta_ === 'function') {
+      const meta = collectDriveAncestorMeta_(file, 5);
+      if (!meta || !Array.isArray(meta.names) || meta.names.indexOf('Arsip Foto Rapat TRANSKEP') === -1) {
+        return { status: 'error', message: 'Akses Ditolak: File berada di luar folder arsip rapat resmi.' };
+      }
+    }
+
+    if (typeof setPrivateDriveSharing_ === 'function') {
+      setPrivateDriveSharing_(file);
+    }
+
+    const driveSize = (typeof file.getSize === 'function') ? Number(file.getSize() || 0) : 0;
+    const sizeBytes = driveSize > 0 ? driveSize : (parseInt(p.file_size, 10) || 0);
+    const maxBytes = 120 * 1024 * 1024;
+    if (sizeBytes <= 0 || sizeBytes > maxBytes) {
+      return { status: 'error', message: 'Ukuran audio di Google Drive tidak valid atau melebihi 120 MB.' };
+    }
+
+    const fileName = String((typeof file.getName === 'function' ? file.getName() : '') || p.file_name || 'rekaman_rapat.m4a').trim();
+    const mimeRaw = String(p.mime_type || (typeof file.getMimeType === 'function' ? file.getMimeType() : '') || 'audio/mp4').trim();
+
+    return {
+      status: 'success',
+      data: {
+        file_id: fileId,
+        url: 'https://drive.google.com/file/d/' + fileId + '/view',
+        file_name: fileName,
+        mime_type: mimeRaw,
+        size_bytes: sizeBytes,
+        folder_path: String(p.folder_path || '').trim()
+      }
+    };
+  } catch (err) {
+    Logger.log('ERROR finalizeAudioDriveUpload: ' + err.toString());
     return { status: 'error', message: err.message || err.toString() };
   }
 }
@@ -413,7 +593,30 @@ function parseTranscriptFallbackRapat_(transcriptText, payload) {
 }
 
 /**
+ * Helper: Simpan state Job Async AI Notulis ke ScriptCache dengan batas aman < 100 KB
+ */
+function putAiNotulenJobCache_(jobId, jobObj) {
+  const cache = CacheService.getScriptCache();
+  let clone = JSON.parse(JSON.stringify(jobObj || {}));
+  let serialized = JSON.stringify(clone);
+  if (serialized.length > 90000 && clone.data) {
+    if (typeof clone.data.transkrip_ringkas === 'string' && clone.data.transkrip_ringkas.length > 15000) {
+      clone.data.transkrip_ringkas = clone.data.transkrip_ringkas.slice(0, 15000) + '\n... [ringkasan dipangkas agar muat cache]';
+      serialized = JSON.stringify(clone);
+    }
+    if (serialized.length > 90000 && typeof clone.data.transkrip_ringkas === 'string') {
+      clone.data.transkrip_ringkas = clone.data.transkrip_ringkas.slice(0, 2000);
+      serialized = JSON.stringify(clone);
+    }
+  }
+  cache.put('ai_notulen_job_' + jobId, serialized, 3600);
+}
+
+/**
  * RPC Aman: Ekstraksi Rekaman Audio / Transkrip Rapat menjadi Draft Notula Terstruktur via n8n + Gemini
+ * Mendukung 2 jalur:
+ * - Sync cepat: audio kecil (<= 8.5 MB) atau catatan teks mentah
+ * - Async Drive + Gemini Files API: rekaman besar dari Google Drive hingga 120 MB
  */
 function generateAiNotulenRapat(payload, adminNip, clientToken) {
   try {
@@ -423,25 +626,11 @@ function generateAiNotulenRapat(payload, adminNip, clientToken) {
 
     const p = payload || {};
     const rawAudio = String(p.audio_data || p.audio_base64 || '').trim();
+    const audioDriveFileId = String(p.audio_drive_file_id || '').trim();
     const transcriptText = String(p.transcript_text || p.ai_transcript || '').trim();
 
-    if (!rawAudio && !transcriptText) {
+    if (!rawAudio && !audioDriveFileId && !transcriptText) {
       return { status: 'error', message: 'Silakan unggah rekaman audio rapat atau isi catatan/transkrip mentah terlebih dahulu.' };
-    }
-
-    let cleanAudioBase64 = '';
-    let audioMimeType = '';
-    if (rawAudio) {
-      const dataUriMatch = rawAudio.match(/^data:([^;,]+)(?:;[^,]*)?;base64,(.+)$/i);
-      const declaredMime = dataUriMatch ? dataUriMatch[1] : String(p.audio_mime_type || p.mime_type || 'audio/webm');
-      audioMimeType = String(declaredMime || 'audio/webm').split(';')[0].trim().toLowerCase();
-      if (!/^audio\/(webm|ogg|mp3|mpeg|mp4|m4a|wav|x-wav|aac|flac)$/i.test(audioMimeType)) {
-        return { status: 'error', message: 'Format audio tidak didukung (' + audioMimeType + '). Gunakan .webm, .ogg, .mp3, .m4a, atau .wav.' };
-      }
-      cleanAudioBase64 = String(dataUriMatch ? dataUriMatch[2] : rawAudio).replace(/\s+/g, '');
-      if (cleanAudioBase64.length > 12 * 1024 * 1024) {
-        return { status: 'error', message: 'Ukuran rekaman audio melebihi batas aman (maks. ~9 MB per pengiriman).' };
-      }
     }
 
     const props = PropertiesService.getScriptProperties();
@@ -450,6 +639,164 @@ function generateAiNotulenRapat(payload, adminNip, clientToken) {
       'https://supernova-endpoint-unsubtly.ngrok-free.dev/webhook/transkep-ai-notulen'
     ).trim();
     const webhookSecret = String(props.getProperty('TRANSKEP_WEBHOOK_KEY') || 'TRANSKEP_WA_BOT_2026').trim();
+    const verifiedExecUrl = String(
+      props.getProperty('TRANSKEP_EXEC_URL') ||
+      'https://script.google.com/macros/s/AKfycbzFrbQTqmVzMio7mderK-S9ntFVjXiWYFgnXfy9fW_SUKOcIxfPywP2He1flhaK_AZ0ZA/exec'
+    ).trim();
+
+    // =========================================================================
+    // JALUR ASYNC FILE BESAR (GOOGLE DRIVE s.d. 120 MB -> n8n -> GEMINI FILES API)
+    // =========================================================================
+    if (audioDriveFileId) {
+      if (!/^[a-zA-Z0-9_-]{10,120}$/.test(audioDriveFileId)) {
+        return { status: 'error', message: "Parameter 'audio_drive_file_id' tidak valid." };
+      }
+
+      const driveFile = DriveApp.getFileById(audioDriveFileId);
+      if (typeof collectDriveAncestorMeta_ === 'function') {
+        const meta = collectDriveAncestorMeta_(driveFile, 5);
+        if (!meta || !Array.isArray(meta.names) || meta.names.indexOf('Arsip Foto Rapat TRANSKEP') === -1) {
+          return { status: 'error', message: 'Akses Ditolak: Audio berada di luar folder arsip rapat resmi.' };
+        }
+      }
+
+      const driveSize = (typeof driveFile.getSize === 'function') ? Number(driveFile.getSize() || 0) : 0;
+      const resolvedSize = driveSize > 0 ? driveSize : (parseInt(p.audio_size_bytes, 10) || 0);
+      const maxBytes = 120 * 1024 * 1024;
+      if (resolvedSize <= 0 || resolvedSize > maxBytes) {
+        return { status: 'error', message: 'Ukuran rekaman di Drive tidak valid atau melebihi batas maksimal 120 MB.' };
+      }
+
+      const driveName = String((typeof driveFile.getName === 'function' ? driveFile.getName() : '') || p.audio_file_name || 'rekaman_rapat.m4a').trim();
+      const rawMimeInput = String(p.audio_mime_type || p.mime_type || (typeof driveFile.getMimeType === 'function' ? driveFile.getMimeType() : '') || '').trim();
+      const normAudioMeta = normalizeRapatAudioMimeAndExt_(driveName, rawMimeInput);
+
+      const jobId = 'AINOT-' + Date.now() + '-' + Math.floor(1000 + Math.random() * 9000);
+      const idRapatClean = String(p.id_rapat || 'RPT-DRAFT').trim();
+      const cache = CacheService.getScriptCache();
+
+      putAiNotulenJobCache_(jobId, {
+        status: 'processing',
+        stage: 'Mengirim tugas ke n8n & mengunduh audio dari Google Drive...',
+        job_id: jobId,
+        id_rapat: idRapatClean,
+        created_at: new Date().toISOString()
+      });
+      try {
+        cache.put('ai_notulen_ctx_' + jobId, JSON.stringify({
+          agenda: String(p.agenda || 'Rapat Kedinasan').trim(),
+          pemimpin: String(p.pemimpin || '').trim(),
+          peserta_list: Array.isArray(p.peserta_list) ? p.peserta_list.slice(0, 50) : []
+        }), 3600);
+      } catch (eCtx) {}
+
+      const asyncPayload = {
+        event: 'AI_NOTULEN_RAPAT_ASYNC',
+        async_mode: true,
+        job_id: jobId,
+        callback_url: verifiedExecUrl,
+        secret_key: webhookSecret,
+        id_rapat: idRapatClean,
+        agenda: String(p.agenda || 'Rapat Kedinasan').trim(),
+        hari_tanggal: String(p.hari_tanggal || '').trim(),
+        tempat: String(p.tempat || '').trim(),
+        pemimpin: String(p.pemimpin || '').trim(),
+        notulis: String(p.notulis || '').trim(),
+        peserta_list: Array.isArray(p.peserta_list) ? p.peserta_list.slice(0, 50) : [],
+        transcript_text: transcriptText,
+        audio_drive_file_id: audioDriveFileId,
+        audio_file_name: driveName,
+        audio_mime_type: normAudioMeta.mimeType,
+        audio_size_bytes: resolvedSize
+      };
+
+      let asyncErrMsg = '';
+      if (n8nWebhookUrl) {
+        try {
+          const asyncResp = UrlFetchApp.fetch(n8nWebhookUrl, {
+            method: 'post',
+            contentType: 'application/json',
+            payload: JSON.stringify(asyncPayload),
+            muteHttpExceptions: true
+          });
+          const asyncCode = Number(asyncResp.getResponseCode() || 0);
+          const asyncBody = String(asyncResp.getContentText() || '').trim();
+          if (asyncCode >= 200 && asyncCode < 300) {
+            let parsedAsync = null;
+            if (asyncBody) {
+              try { parsedAsync = JSON.parse(asyncBody); } catch (eJsonA) { parsedAsync = null; }
+            }
+            if (parsedAsync && parsedAsync.status === 'success' && (parsedAsync.data || parsedAsync.pembahasan)) {
+              const normalizedImmediate = normalizeAiNotulenResponse_(parsedAsync, p);
+              return {
+                status: 'success',
+                source: 'n8n_gemini',
+                model: String(parsedAsync.model || 'models/gemini-3.8-flash'),
+                data: normalizedImmediate
+              };
+            }
+            if (parsedAsync && parsedAsync.status === 'error' && parsedAsync.message) {
+              asyncErrMsg = String(parsedAsync.message);
+            } else {
+              return {
+                status: 'processing',
+                job_id: jobId,
+                source: 'n8n_gemini_async',
+                message: 'Rekaman rapat sedang dianalisa oleh n8n & Gemini Files API di latar belakang...'
+              };
+            }
+          } else {
+            asyncErrMsg = 'Webhook n8n mengembalikan HTTP ' + asyncCode;
+          }
+        } catch (eAsync) {
+          asyncErrMsg = 'Gagal terhubung ke webhook n8n AI Notulen: ' + eAsync.toString();
+        }
+      } else {
+        asyncErrMsg = 'URL webhook n8n AI Notulen belum dikonfigurasi.';
+      }
+
+      putAiNotulenJobCache_(jobId, {
+        status: 'error',
+        job_id: jobId,
+        id_rapat: idRapatClean,
+        message: asyncErrMsg || 'Gagal memulai proses async AI Notulis.',
+        updated_at: new Date().toISOString()
+      });
+
+      if (p.allow_text_fallback === true && transcriptText) {
+        return {
+          status: 'success',
+          source: 'local_fallback',
+          message: 'Disusun dari catatan teks lokal karena layanan AI n8n sedang tidak tersedia (' + (asyncErrMsg || 'offline') + ').',
+          data: parseTranscriptFallbackRapat_(transcriptText, p)
+        };
+      }
+
+      return {
+        status: 'error',
+        job_id: jobId,
+        message: asyncErrMsg || 'Gagal mengirim tugas AI Notulis ke n8n.'
+      };
+    }
+
+    // =========================================================================
+    // JALUR SYNC CEPAT (AUDIO KECIL <= 8.5 MB / CATATAN TEKS MENTAH)
+    // =========================================================================
+    let cleanAudioBase64 = '';
+    let audioMimeType = '';
+    if (rawAudio) {
+      const dataUriMatch = rawAudio.match(/^data:([^;,]+)(?:;[^,]*)?;base64,(.+)$/i);
+      const declaredMime = dataUriMatch ? dataUriMatch[1] : String(p.audio_mime_type || p.mime_type || 'audio/webm');
+      audioMimeType = String(declaredMime || 'audio/webm').split(';')[0].trim().toLowerCase();
+      if (!/^audio\/(webm|ogg|mp3|mpeg|mp4|m4a|x-m4a|wav|x-wav|aac|flac)$/i.test(audioMimeType)) {
+        return { status: 'error', message: 'Format audio tidak didukung (' + audioMimeType + '). Gunakan .webm, .ogg, .mp3, .m4a, atau .wav.' };
+      }
+      if (audioMimeType === 'audio/x-m4a' || audioMimeType === 'audio/m4a') audioMimeType = 'audio/mp4';
+      cleanAudioBase64 = String(dataUriMatch ? dataUriMatch[2] : rawAudio).replace(/\s+/g, '');
+      if (cleanAudioBase64.length > 12 * 1024 * 1024) {
+        return { status: 'error', message: 'Ukuran rekaman audio melebihi batas aman (maks. ~9 MB per pengiriman langsung).' };
+      }
+    }
 
     const outboundPayload = {
       event: 'AI_NOTULEN_RAPAT',
@@ -567,6 +914,117 @@ function generateAiNotulenRapat(payload, adminNip, clientToken) {
     };
   } catch (err) {
     Logger.log('ERROR generateAiNotulenRapat: ' + err.toString());
+    return { status: 'error', message: err.message || err.toString() };
+  }
+}
+
+/**
+ * Callback Eksternal dari n8n: Menerima hasil Async AI Notulis (Gemini Files API) dan menyimpannya ke ScriptCache
+ */
+function callbackAiNotulenJobFromExternal_(payload) {
+  try {
+    const p = payload || {};
+    const jobId = String(p.job_id || '').trim();
+    if (!/^AINOT-[a-zA-Z0-9_-]{4,80}$/.test(jobId)) {
+      return { status: 'error', message: "Parameter 'job_id' tidak valid." };
+    }
+
+    const scriptProps = PropertiesService.getScriptProperties();
+    const configuredKey = String(scriptProps.getProperty('TRANSKEP_WEBHOOK_KEY') || 'TRANSKEP_WA_BOT_2026').trim();
+    const incomingKey = String(p.secret_key || '').trim();
+    const isKeyMatch = (typeof constantTimeEquals_ === 'function')
+      ? constantTimeEquals_(incomingKey, configuredKey)
+      : (incomingKey !== '' && incomingKey === configuredKey);
+    if (!incomingKey || !isKeyMatch) {
+      return { status: 'error', message: 'Akses ditolak: Secret Key callback AI Notulis tidak valid.' };
+    }
+
+    const cache = CacheService.getScriptCache();
+    let ctx = {};
+    try {
+      const rawCtx = cache.get('ai_notulen_ctx_' + jobId);
+      if (rawCtx) ctx = JSON.parse(rawCtx);
+    } catch (eCtx) {}
+
+    const incomingStatus = String(p.status || '').trim().toLowerCase();
+    const idRapat = String(p.id_rapat || '').trim();
+
+    if (incomingStatus === 'processing') {
+      putAiNotulenJobCache_(jobId, {
+        status: 'processing',
+        stage: String(p.stage || 'Sedang memproses di Gemini AI...').trim(),
+        job_id: jobId,
+        id_rapat: idRapat,
+        updated_at: new Date().toISOString()
+      });
+      return { status: 'success', job_id: jobId, recorded_status: 'processing' };
+    }
+
+    if (incomingStatus === 'success') {
+      const normalized = normalizeAiNotulenResponse_(p, ctx);
+      putAiNotulenJobCache_(jobId, {
+        status: 'success',
+        job_id: jobId,
+        id_rapat: idRapat,
+        source: 'n8n_gemini_files_api',
+        model: String(p.model || 'models/gemini-3.8-flash'),
+        data: normalized,
+        updated_at: new Date().toISOString()
+      });
+      return { status: 'success', job_id: jobId, recorded_status: 'success' };
+    }
+
+    putAiNotulenJobCache_(jobId, {
+      status: 'error',
+      job_id: jobId,
+      id_rapat: idRapat,
+      message: String(p.message || 'Gagal memproses AI Notulis di n8n/Gemini.'),
+      updated_at: new Date().toISOString()
+    });
+    return { status: 'success', job_id: jobId, recorded_status: 'error' };
+  } catch (err) {
+    Logger.log('ERROR callbackAiNotulenJobFromExternal_: ' + err.toString());
+    return { status: 'error', message: err.message || err.toString() };
+  }
+}
+
+/**
+ * RPC Admin Terotorisasi: Mengecek status & mengambil hasil Async AI Notulis dari ScriptCache
+ */
+function checkAiNotulenJobStatus(jobId, adminNip, clientToken) {
+  try {
+    if (Array.isArray(jobId)) {
+      adminNip = adminNip || jobId[1];
+      clientToken = clientToken || jobId[2];
+      jobId = jobId[0];
+    }
+    if (jobId && typeof jobId === 'object') {
+      const obj = jobId;
+      adminNip = adminNip || obj.adminNip || obj.nip;
+      clientToken = clientToken || obj.token;
+      jobId = obj.job_id || obj.jobId || '';
+    }
+    if (!cekOtorisasiAdmin(adminNip, clientToken)) {
+      return { status: 'error', message: 'Akses Ditolak: Pengecekan status AI Notulis khusus Admin/Operator.' };
+    }
+
+    const cleanJobId = String(jobId || '').trim();
+    if (!/^AINOT-[a-zA-Z0-9_-]{4,80}$/.test(cleanJobId)) {
+      return { status: 'error', message: "Parameter 'job_id' tidak valid." };
+    }
+
+    const raw = CacheService.getScriptCache().get('ai_notulen_job_' + cleanJobId);
+    if (!raw) {
+      return {
+        status: 'not_found',
+        job_id: cleanJobId,
+        message: 'Sesi analisa AI tidak ditemukan atau sudah kedaluwarsa.'
+      };
+    }
+
+    return JSON.parse(raw);
+  } catch (err) {
+    Logger.log('ERROR checkAiNotulenJobStatus: ' + err.toString());
     return { status: 'error', message: err.message || err.toString() };
   }
 }

@@ -495,7 +495,7 @@ function validateNotulenWorkflowTopology(wf, rawText, label) {
       new vm.Script(`(function(){\n${n.parameters.jsCode}\n})()`, { filename: `${label}:${n.name}` });
     }
   }
-  assert.strictEqual(wf.nodes.length, 8, `${label}: expected 8 nodes`);
+  assert.strictEqual(wf.nodes.length, 26, `${label}: expected 26 nodes`);
 
   for (const [srcName, connGroups] of Object.entries(wf.connections || {})) {
     assert(byName.has(srcName), `${label}: missing connection source ${srcName}`);
@@ -524,7 +524,7 @@ function validateNotulenWorkflowTopology(wf, rawText, label) {
 }
 
 validateNotulenWorkflowTopology(notulenExWf, notulenExRaw, 'transkep-ai-notulen.example.json');
-for (const ph of ['<GANTI_TRANSKEP_WEBHOOK_KEY>', '<GANTI_GEMINI_CREDENTIAL_ID>', '<GANTI_N8N_INSTANCE_ID>', '<GANTI_WORKFLOW_ID>']) {
+for (const ph of ['<GANTI_TRANSKEP_WEBHOOK_KEY>', '<GANTI_GEMINI_CREDENTIAL_ID>', '<GANTI_N8N_INSTANCE_ID>', '<GANTI_WORKFLOW_ID>', '<GANTI_GAS_DEPLOYMENT_ID>', '<GANTI_GOOGLE_SERVICE_ACCOUNT_CREDENTIAL_ID>']) {
   assert(notulenExRaw.includes(ph), `Notulen example missing placeholder: ${ph}`);
 }
 
@@ -620,6 +620,88 @@ function runNotulenBehaviorSuite(wf, expectedSecret, wfLabel) {
   })[0].json;
   assert.strictEqual(errParsed.status, 'error');
   assert(errParsed.message.includes('Quota exceeded'));
+
+  // Async Drive + Gemini Files API simulation
+  const asyncDriveOut = runCodeNode(wf, 'Validasi & Siapkan Prompt Notulen (Code)', {
+    inputJson: {
+      body: {
+        secret_key: expectedSecret,
+        event: 'AI_NOTULEN_RAPAT_ASYNC',
+        async_mode: true,
+        job_id: 'AINOT-TEST-99',
+        callback_url: 'https://script.google.com/macros/s/MOCK/exec',
+        id_rapat: 'RPT-2026-146',
+        agenda: 'Rapat Panitera Pengganti',
+        audio_drive_file_id: '1DriveAudio73MbFileId12345',
+        audio_file_name: 'Rapat_PP.m4a',
+        audio_mime_type: 'audio/x-m4a',
+        audio_size_bytes: 77000000,
+      },
+    },
+  })[0].json;
+  assert.strictEqual(asyncDriveOut.isAuthorized, true);
+  assert.strictEqual(asyncDriveOut.isAsyncDriveAudio, true);
+  assert.strictEqual(asyncDriveOut.audioMimeType, 'audio/mp4');
+
+  const upCheckOut = runCodeNode(wf, 'Cek Upload & Siapkan Gemini FileURI (Code)', {
+    inputJson: {
+      file: {
+        name: 'files/gemini-audio-146',
+        uri: 'https://generativelanguage.googleapis.com/v1beta/files/gemini-audio-146',
+        state: 'PROCESSING',
+        mimeType: 'audio/mp4',
+      },
+    },
+    nodeMap: {
+      'Validasi & Siapkan Prompt Notulen (Code)': asyncDriveOut,
+      'Start Gemini Files Resumable Session (HTTP)': { statusCode: 200, headers: { 'x-goog-upload-url': 'https://upload' } },
+      'Download Audio dari Google Drive': { ok: true },
+    },
+  })[0].json;
+  assert.strictEqual(upCheckOut.uploadOk, true);
+  assert.strictEqual(upCheckOut.fileState, 'PROCESSING');
+
+  const payloadFileUriOut = runCodeNode(wf, 'Siapkan Payload Gemini FileURI (Code)', {
+    inputJson: {
+      ...upCheckOut,
+      fileState: 'ACTIVE',
+    },
+    nodeMap: { 'Validasi & Siapkan Prompt Notulen (Code)': asyncDriveOut },
+  })[0].json;
+  assert.strictEqual(payloadFileUriOut.geminiRequestBody.contents[0].parts[0].file_data.file_uri, 'https://generativelanguage.googleapis.com/v1beta/files/gemini-audio-146');
+
+  const cbAsyncOut = runCodeNode(wf, 'Parse & Siapkan Callback Async (Code)', {
+    inputJson: {
+      candidates: [{
+        content: {
+          parts: [{
+            text: JSON.stringify({
+              dasar_opsional: '',
+              pengarahan_umum: 'Evaluasi kepaniteraan berjalan lancar.',
+              kesimpulan: 'Selesai tepat waktu.',
+              transkrip_ringkas: 'Ringkasan',
+              pembahasan: [{
+                pembicara_nama: 'Agus Salim, S.Ag.',
+                uraian: ['Poin 1'],
+                tindak_lanjut: ['Aksi 1'],
+                target: '100%',
+                penanggung_jawab: 'Panitera',
+                tanggal_penyelesaian: 'Segera',
+              }],
+            }),
+          }],
+        },
+      }],
+    },
+    nodeMap: {
+      'Validasi & Siapkan Prompt Notulen (Code)': asyncDriveOut,
+      'Siapkan Payload Gemini FileURI (Code)': payloadFileUriOut,
+    },
+  })[0].json;
+  assert.strictEqual(cbAsyncOut.callbackPayload.action, 'callbackAiNotulenJob');
+  assert.strictEqual(cbAsyncOut.callbackPayload.job_id, 'AINOT-TEST-99');
+  assert.strictEqual(cbAsyncOut.callbackPayload.status, 'success');
+  assert.strictEqual(cbAsyncOut.geminiFileName, 'files/gemini-audio-146');
 }
 
 runNotulenBehaviorSuite(notulenExWf, '<GANTI_TRANSKEP_WEBHOOK_KEY>', 'notulen-example');

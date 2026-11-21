@@ -765,4 +765,274 @@ const persetujuanJsSrc = fs.readFileSync('modules/permohonan/persetujuan.js', 'u
 assert(persetujuanJsSrc.includes('${esc(log.tgl_mulai)}') && persetujuanJsSrc.includes('${esc(log.tgl_selesai)}') && persetujuanJsSrc.includes('${esc(log.tanggal)}') && persetujuanJsSrc.includes('${esc(tglMurniIP)}'), 'modules/permohonan/persetujuan.js must escape displayDurasi fields');
 
 console.log('[PASS] Frontend XSS sanitization & URL scheme blocking verified in browser VM.');
-console.log('\n[PASS] ALL Fase 3A tests passed (0 failures).');
+
+// =========================================================================
+// 8. TAHAP 146: AUDIO UPLOAD s.d. 120 MB (RESUMABLE DRIVE) & AI ASYNC N8N
+// =========================================================================
+assert(fs.readFileSync('api_router.js', 'utf8').includes('initAudioDriveUploadSession: true') &&
+  fs.readFileSync('api_router.js', 'utf8').includes('finalizeAudioDriveUpload: true') &&
+  fs.readFileSync('api_router.js', 'utf8').includes('checkAiNotulenJobStatus: true') &&
+  fs.readFileSync('api_router.js', 'utf8').includes("case 'callbackAiNotulenJob':"),
+'api_router.js must allow Resumable Audio Drive RPCs & callbackAiNotulenJob');
+
+const gasRapat146Src = fs.readFileSync('eoffice/rapat.js', 'utf8');
+assert(gasRapat146Src.includes('120 * 1024 * 1024') &&
+  gasRapat146Src.includes('constantTimeEquals_(incomingKey, configuredKey)'),
+'eoffice/rapat.js must enforce 120 MB cap and constantTimeEquals_ on callbackAiNotulenJobFromExternal_');
+
+// Verify n8n blueprint (sanitized + zero secret leaks + valid graph wiring) & local n8n JSON
+for (const n8nPath of ['n8n/transkep-ai-notulen.example.json', 'n8n/transkep-ai-notulen.json']) {
+  const rawN8n = fs.readFileSync(n8nPath, 'utf8');
+  assert(!rawN8n.includes('BEGIN PRIVATE KEY'), `${n8nPath} must NEVER contain private keys`);
+  const wf = JSON.parse(rawN8n);
+  const nodeNames = new Set((wf.nodes || []).map((n) => n.name));
+  assert(nodeNames.size >= 14, `${n8nPath} must contain full async Drive + Gemini Files API pipeline`);
+  for (const [srcNode, connMap] of Object.entries(wf.connections || {})) {
+    assert(nodeNames.has(srcNode), `${n8nPath} connection source missing node: ${srcNode}`);
+    for (const branch of connMap.main || []) {
+      for (const edge of branch || []) {
+        assert(nodeNames.has(edge.node), `${n8nPath} connection target missing node: ${edge.node}`);
+      }
+    }
+  }
+}
+const exNotulenRaw = fs.readFileSync('n8n/transkep-ai-notulen.example.json', 'utf8');
+for (const secretPat of ['TRANSKEP_WA_BOT_2026', 'AKfycb', 'ekWDS9nBCNqDspRg', '9ed8b316a1d5192e09dbfab4b713922f8ffb7a2b9191d04fdcc83d4167a6cebd', 'BEGIN PRIVATE KEY']) {
+  assert(!exNotulenRaw.includes(secretPat), `transkep-ai-notulen.example.json leaked secret: ${secretPat}`);
+}
+assert(exNotulenRaw.includes('n8n-nodes-base.googleDrive') &&
+  exNotulenRaw.includes('"authentication": "serviceAccount"') &&
+  exNotulenRaw.includes('generativelanguage.googleapis.com/upload/v1beta/files') &&
+  exNotulenRaw.includes('file_data') &&
+  exNotulenRaw.includes('callbackAiNotulenJob'),
+'transkep-ai-notulen.example.json must wire Drive Service Account -> Gemini Files API -> callbackAiNotulenJob');
+
+// Verify GAS backend RPCs for 120 MB Resumable Session, Finalize, Async AI & Polling
+const reqAdminCall = (method, args) => JSON.parse(
+  sandbox.handleApiPost_({ action: 'call', method, args, nip: adm.data.nip, token: adm.token }).getContent()
+);
+const reqPegCall = (method, args) => JSON.parse(
+  sandbox.handleApiPost_({ action: 'call', method, args, nip: pegA.data.nip, token: otpLogin.token }).getContent()
+);
+
+assert.strictEqual(reqPegCall('initAudioDriveUploadSession', [{ file_size: 1024 }]).status, 'error', 'Pegawai must be denied initAudioDriveUploadSession');
+assert.strictEqual(reqPegCall('checkAiNotulenJobStatus', ['AINOT-12345']).status, 'error', 'Pegawai must be denied checkAiNotulenJobStatus');
+
+const tooBigInit = reqAdminCall('initAudioDriveUploadSession', [{ file_size: 121 * 1024 * 1024, file_name: 'over.m4a' }, adm.data.nip, adm.token]);
+assert.strictEqual(tooBigInit.status, 'error', 'initAudioDriveUploadSession must reject > 120 MB');
+
+const origFetch146 = sandbox.UrlFetchApp.fetch;
+const origScriptApp146 = sandbox.ScriptApp;
+const origDriveApp146 = sandbox.DriveApp;
+const fetchLog146 = [];
+sandbox.ScriptApp = { getOAuthToken: () => 'mock-oauth-drive-tok' };
+const arsipParent146 = { getId: () => 'fld-arsip-146', getName: () => 'Arsip Foto Rapat TRANSKEP', getParents: () => ({ hasNext: () => false }) };
+const yrFolder146 = {
+  getId: () => 'fld-2026-146', getName: () => '2026', isTrashed: () => false, setSharing: () => {},
+  getFoldersByName: () => ({ hasNext: () => true, next: () => monFolder146 }),
+  getParents: () => { let d = 0; return { hasNext: () => d++ === 0, next: () => arsipParent146 }; }
+};
+const monFolder146 = {
+  getId: () => 'fld-nov-146', getName: () => 'November', isTrashed: () => false, setSharing: () => {},
+  getFoldersByName: () => ({ hasNext: () => true, next: () => titleFolder146 }),
+  getParents: () => { let d = 0; return { hasNext: () => d++ === 0, next: () => yrFolder146 }; }
+};
+const titleFolder146 = {
+  getId: () => 'fld-title-146', getName: () => 'Rapat Panitera Pengganti', getUrl: () => 'https://drive.google.com/drive/folders/fld-title-146',
+  isTrashed: () => false, setSharing: () => {},
+  getFoldersByName: () => ({ hasNext: () => false }), createFolder: () => titleFolder146,
+  getParents: () => { let d = 0; return { hasNext: () => d++ === 0, next: () => monFolder146 }; }
+};
+const rootArsip146 = {
+  getId: () => 'fld-root-146', getName: () => 'Arsip Foto Rapat TRANSKEP', isTrashed: () => false, setSharing: () => {},
+  getFoldersByName: () => ({ hasNext: () => true, next: () => yrFolder146 })
+};
+let driveShared146 = false;
+const mockAudioDriveFile146 = {
+  getId: () => '1DriveAudio73MbFileId12345',
+  getName: () => 'Audio_RPT-146_20261121_110000_12.m4a',
+  getMimeType: () => 'audio/mp4',
+  getSize: () => 77000000,
+  setSharing: () => { driveShared146 = true; },
+  getParents: () => { let d = 0; return { hasNext: () => d++ === 0, next: () => titleFolder146 }; }
+};
+sandbox.DriveApp = {
+  ...origDriveApp146,
+  getFoldersByName: () => ({ hasNext: () => true, next: () => rootArsip146 }),
+  getFileById: (id) => {
+    if (id === '1DriveAudio73MbFileId12345') return mockAudioDriveFile146;
+    if (id === '1OutsideFolderAudioFileId999') return {
+      getId: () => id, getName: () => 'evil.m4a', getSize: () => 1000, setSharing: () => {},
+      getParents: () => ({ hasNext: () => false })
+    };
+    return origDriveApp146.getFileById(id);
+  }
+};
+sandbox.UrlFetchApp.fetch = (url, opts) => {
+  fetchLog146.push({ url: String(url), opts: opts || {} });
+  if (String(url).includes('googleapis.com/upload/drive/v3/files')) {
+    return {
+      getResponseCode: () => 200,
+      getAllHeaders: () => ({ Location: 'https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&upload_id=mockSess146' }),
+      getContentText: () => ''
+    };
+  }
+  return {
+    getResponseCode: () => 202,
+    getContentText: () => JSON.stringify({ status: 'accepted', job_id: 'mock' })
+  };
+};
+try {
+  const initOk = reqAdminCall('initAudioDriveUploadSession', [{
+    id_rapat: 'RPT-146',
+    agenda: 'Rapat Panitera Pengganti',
+    tgl_rapat_iso: '2026-11-21',
+    file_name: 'Rapat Panitera Pengganti.m4a',
+    mime_type: 'audio/x-m4a',
+    file_size: 77000000,
+    origin: 'https://sso.pa-indramayu.go.id'
+  }, adm.data.nip, adm.token]);
+  assert.strictEqual(initOk.status, 'success', 'initAudioDriveUploadSession must succeed for 77 MB M4A');
+  assert(initOk.data.upload_url.includes('upload_id=mockSess146'));
+  assert.strictEqual(initOk.data.mime_type, 'audio/mp4', 'audio/x-m4a must normalize to audio/mp4');
+  assert.strictEqual(initOk.data.folder_path, 'Arsip Foto Rapat TRANSKEP / 2026 / November / Rapat Panitera Pengganti');
+  const driveCall146 = fetchLog146.find((x) => x.url.includes('googleapis.com/upload/drive/v3/files'));
+  assert(driveCall146 && driveCall146.opts.headers.Origin === 'https://sso.pa-indramayu.go.id', 'Drive Resumable init must forward safe Origin for browser CORS PUT');
+
+  const finOutside = reqAdminCall('finalizeAudioDriveUpload', [{ file_id: '1OutsideFolderAudioFileId999' }, adm.data.nip, adm.token]);
+  assert.strictEqual(finOutside.status, 'error', 'finalizeAudioDriveUpload must block files outside Arsip Foto Rapat TRANSKEP');
+
+  const finOk = reqAdminCall('finalizeAudioDriveUpload', [{ file_id: '1DriveAudio73MbFileId12345', folder_path: initOk.data.folder_path }, adm.data.nip, adm.token]);
+  assert.strictEqual(finOk.status, 'success');
+  assert.strictEqual(driveShared146, true, 'finalizeAudioDriveUpload must lock Drive file sharing to PRIVATE');
+
+  const aiStartRes = reqAdminCall('generateAiNotulenRapat', [{
+    id_rapat: 'RPT-146',
+    agenda: 'Rapat Panitera Pengganti',
+    peserta_list: [{ nip: '197901012003011008', nama: 'Atasan Satu', jabatan: 'Panitera' }],
+    audio_drive_file_id: '1DriveAudio73MbFileId12345',
+    async_mode: true
+  }, adm.data.nip, adm.token]);
+  assert.strictEqual(aiStartRes.status, 'processing', 'Large Drive audio must trigger async job_id flow');
+  assert(/^AINOT-\d+/.test(aiStartRes.job_id));
+
+  const badCb = JSON.parse(sandbox.handleApiPost_({
+    action: 'callbackAiNotulenJob',
+    secret_key: 'WRONG_KEY',
+    job_id: aiStartRes.job_id,
+    status: 'success',
+    data: {}
+  }).getContent());
+  assert.strictEqual(badCb.status, 'error', 'callbackAiNotulenJob must reject invalid secret_key');
+
+  const configuredWebhookKey = sandbox.PropertiesService.getScriptProperties().getProperty('TRANSKEP_WEBHOOK_KEY') || 'TRANSKEP_WA_BOT_2026';
+  const okCb = JSON.parse(sandbox.handleApiPost_({
+    action: 'callbackAiNotulenJob',
+    secret_key: configuredWebhookKey,
+    job_id: aiStartRes.job_id,
+    id_rapat: 'RPT-146',
+    status: 'success',
+    model: 'models/gemini-3.8-flash',
+    data: {
+      pengarahan_umum: 'Evaluasi berkas perkara tepat waktu.',
+      kesimpulan: 'Seluruh PP menyelesaikan BAS 1x24 jam.',
+      transkrip_ringkas: 'X'.repeat(95000),
+      pembahasan: [{ pembicara_nama: 'Atasan Satu', uraian: ['Monitoring BAS'], tindak_lanjut: ['Cek harian'], target: '100%', penanggung_jawab: 'Panitera', tanggal_penyelesaian: 'Segera' }]
+    }
+  }).getContent());
+  assert.strictEqual(okCb.status, 'success');
+
+  const pollRes = reqAdminCall('checkAiNotulenJobStatus', [aiStartRes.job_id, adm.data.nip, adm.token]);
+  assert.strictEqual(pollRes.status, 'success', 'checkAiNotulenJobStatus must return completed Notula from cache');
+  assert.strictEqual(pollRes.data.pembahasan[0].pembicara_nip, '197901012003011008', 'Callback normalizer must enrich speaker NIP from cached peserta_list');
+  assert(pollRes.data.transkrip_ringkas.length < 20000, 'putAiNotulenJobCache_ must clamp oversized transcript so CacheService never exceeds 100 KB');
+} finally {
+  sandbox.UrlFetchApp.fetch = origFetch146;
+  sandbox.ScriptApp = origScriptApp146;
+  sandbox.DriveApp = origDriveApp146;
+}
+
+// Verify frontend modules/eoffice/eoffice_data.js Resumable Chunked Upload + modules/eoffice/rapat.js 120 MB handling
+const largeFileStub = { name: 'Rapat Kepaniteraan.m4a', type: 'audio/x-m4a', size: 77000000, slice: (a, b) => ({ size: b - a }) };
+assert(fs.readFileSync('modules/eoffice/rapat.js', 'utf8').includes('120 * 1024 * 1024') &&
+  fs.readFileSync('modules/eoffice/rapat.js', 'utf8').includes('uploadAudioFileToDriveResumable') &&
+  fs.readFileSync('modules/eoffice/rapat.js', 'utf8').includes('checkAiNotulenJobStatus'),
+'modules/eoffice/rapat.js must support 120 MB Resumable Upload & Async Polling');
+
+const dataSvcSandbox = {
+  console, Math, Date, JSON, String, Number, Boolean, Array, Object, Error, RegExp, parseInt, setTimeout,
+  location: { origin: 'https://sso.pa-indramayu.go.id' },
+  localStorage: { getItem: () => '' },
+  TranskepAPI: {
+    call: async (method) => {
+      if (method === 'initAudioDriveUploadSession') {
+        return {
+          status: 'success',
+          data: {
+            upload_url: 'https://www.googleapis.com/upload/drive/v3/files?upload_id=mock146',
+            file_name: 'Audio_RPT-146.m4a',
+            mime_type: 'audio/mp4',
+            folder_path: 'Arsip Foto Rapat TRANSKEP / 2026 / November / Rapat Kepaniteraan'
+          }
+        };
+      }
+      if (method === 'finalizeAudioDriveUpload') {
+        return {
+          status: 'success',
+          data: {
+            file_id: '1ResumableDriveFileId12345',
+            url: 'https://drive.google.com/file/d/1ResumableDriveFileId12345/view',
+            file_name: 'Audio_RPT-146.m4a',
+            mime_type: 'audio/mp4',
+            size_bytes: 77000000,
+            folder_path: 'Arsip Foto Rapat TRANSKEP / 2026 / November / Rapat Kepaniteraan'
+          }
+        };
+      }
+      return { status: 'error' };
+    }
+  },
+  XMLHttpRequest: function MockXHR146() {
+    const hdrs = {};
+    this.upload = {};
+    this.open = () => {};
+    this.setRequestHeader = (k, v) => { hdrs[k] = v; };
+    this.getResponseHeader = (k) => (k === 'Range' ? 'bytes=0-' + (hdrs['Content-Range'].match(/-(\d+)\//)[1]) : null);
+    this.send = () => {
+      const m = hdrs['Content-Range'].match(/bytes (\d+)-(\d+)\/(\d+)/);
+      const endByte = Number(m[2]);
+      const total = Number(m[3]);
+      if (this.upload.onprogress) this.upload.onprogress({ lengthComputable: true, loaded: endByte - Number(m[1]) + 1 });
+      if (endByte + 1 < total) {
+        this.status = 308;
+        this.onload();
+      } else {
+        this.status = 200;
+        this.responseText = JSON.stringify({ id: '1ResumableDriveFileId12345', name: 'Audio_RPT-146.m4a' });
+        this.onload();
+      }
+    };
+  }
+};
+dataSvcSandbox.window = dataSvcSandbox;
+vm.createContext(dataSvcSandbox);
+vm.runInContext(fs.readFileSync('modules/eoffice/eoffice_data.js', 'utf8'), dataSvcSandbox, { filename: 'modules/eoffice/eoffice_data.js' });
+
+(async () => {
+  const progressLog = [];
+  const resUp = await dataSvcSandbox.EofficeDataService.uploadAudioFileToDriveResumable(
+    largeFileStub,
+    { id_rapat: 'RPT-146', agenda: 'Rapat Kepaniteraan', tgl_rapat_iso: '2026-11-21' },
+    '198001012005011001',
+    'tok',
+    (pct) => progressLog.push(pct)
+  );
+  assert.strictEqual(resUp.status, 'success', 'Resumable chunked Drive upload helper must finish cleanly across 8 MB chunks');
+  assert.strictEqual(resUp.data.file_id, '1ResumableDriveFileId12345');
+  assert(progressLog.length >= 9 && progressLog[progressLog.length - 1] === 100, 'Progress callback must track 8 MB chunks up to 100%');
+  console.log('[PASS] Tahap 146 120 MB Resumable Drive Upload, Gemini Files API Async Webhook & Polling verified.');
+  console.log('\n[PASS] ALL Fase 3A tests passed (0 failures).');
+})().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});

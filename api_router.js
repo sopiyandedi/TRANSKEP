@@ -234,6 +234,9 @@ function handleApiPost_(payload, e) {
       case 'updateNomorSuratRapat':
         return jsonResponse_(updateNomorSuratRapatFromExternal_(payload));
 
+      case 'callbackAiNotulenJob':
+        return jsonResponse_(callbackAiNotulenJobFromExternal_(payload));
+
       // Fallback: Hanya izinkan method dalam whitelist RPC resmi
       default:
         return handleRpcCall_(
@@ -280,7 +283,10 @@ var AUTHENTICATED_RPC_METHODS_ = {
   getRapatMysimsStatus: true,
   uploadFotoRapat: true,
   uploadAudioRapat: true,
+  initAudioDriveUploadSession: true,
+  finalizeAudioDriveUpload: true,
   generateAiNotulenRapat: true,
+  checkAiNotulenJobStatus: true,
   saveJobdes: true,
   createPdfJobdes: true,
   getUsulanMenunggu: true,

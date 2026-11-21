@@ -1237,6 +1237,227 @@ const EofficeDataService = {
   },
 
   /**
+   * Membuat Resumable Upload Session URL Google Drive v3 untuk file audio besar (hingga 120 MB)
+   */
+  async initAudioDriveUploadSession(metaPayload, adminNip, token) {
+    const authToken = token || (typeof localStorage !== 'undefined' ? localStorage.getItem('transkep_session_token') : '') || '';
+    const creatorNip = adminNip || (typeof localStorage !== 'undefined' ? localStorage.getItem('transkep_active_nip') : '') || '';
+
+    if (typeof window !== 'undefined' && window.TranskepAPI && typeof window.TranskepAPI.call === 'function') {
+      return await window.TranskepAPI.call('initAudioDriveUploadSession', metaPayload, creatorNip, authToken);
+    }
+    if (typeof google !== 'undefined' && google.script && google.script.run) {
+      return await new Promise((resolve, reject) => {
+        google.script.run
+          .withSuccessHandler((r) => resolve(r))
+          .withFailureHandler((err) => reject(err))
+          .initAudioDriveUploadSession(metaPayload, creatorNip, authToken);
+      });
+    }
+    return { status: 'error', message: 'Koneksi backend Apps Script belum tersedia untuk sesi Resumable Upload.' };
+  },
+
+  /**
+   * Memfinalisasi berkas hasil Resumable Upload di Google Drive (mengunci akses privat & cek integritas)
+   */
+  async finalizeAudioDriveUpload(filePayload, adminNip, token) {
+    const authToken = token || (typeof localStorage !== 'undefined' ? localStorage.getItem('transkep_session_token') : '') || '';
+    const creatorNip = adminNip || (typeof localStorage !== 'undefined' ? localStorage.getItem('transkep_active_nip') : '') || '';
+
+    if (typeof window !== 'undefined' && window.TranskepAPI && typeof window.TranskepAPI.call === 'function') {
+      return await window.TranskepAPI.call('finalizeAudioDriveUpload', filePayload, creatorNip, authToken);
+    }
+    if (typeof google !== 'undefined' && google.script && google.script.run) {
+      return await new Promise((resolve, reject) => {
+        google.script.run
+          .withSuccessHandler((r) => resolve(r))
+          .withFailureHandler((err) => reject(err))
+          .finalizeAudioDriveUpload(filePayload, creatorNip, authToken);
+      });
+    }
+    return { status: 'error', message: 'Koneksi backend Apps Script belum tersedia untuk finalisasi audio Drive.' };
+  },
+
+  /**
+   * Mengunggah file audio rapat hingga 120 MB langsung ke Google Drive per potongan 8 MB (Resumable Upload)
+   */
+  async uploadAudioFileToDriveResumable(file, folderCtx, adminNip, token, onProgress, isCancelledFn) {
+    if (!file || !file.size) {
+      return { status: 'error', message: 'Berkas audio kosong atau tidak terbaca.' };
+    }
+    const maxBytes = 120 * 1024 * 1024;
+    if (file.size > maxBytes) {
+      return { status: 'error', message: 'Ukuran file audio melebihi batas maksimal 120 MB.' };
+    }
+    if (typeof XMLHttpRequest === 'undefined') {
+      return { status: 'error', message: 'Browser tidak mendukung XMLHttpRequest untuk Resumable Upload.' };
+    }
+
+    const fileName = String(file.name || 'rekaman_rapat.m4a').trim();
+    let rawMime = String(file.type || '').split(';')[0].trim().toLowerCase();
+    if (/\.m4a$/i.test(fileName) || rawMime === 'audio/x-m4a' || rawMime === 'audio/m4a') {
+      rawMime = 'audio/mp4';
+    } else if (!rawMime) {
+      if (/\.mp3$/i.test(fileName)) rawMime = 'audio/mpeg';
+      else if (/\.wav$/i.test(fileName)) rawMime = 'audio/wav';
+      else if (/\.ogg$/i.test(fileName)) rawMime = 'audio/ogg';
+      else if (/\.aac$/i.test(fileName)) rawMime = 'audio/aac';
+      else if (/\.flac$/i.test(fileName)) rawMime = 'audio/flac';
+      else rawMime = 'audio/webm';
+    }
+
+    const ctx = folderCtx || {};
+    const origin = (typeof window !== 'undefined' && window.location && window.location.origin && window.location.origin !== 'null')
+      ? window.location.origin
+      : '';
+
+    const initRes = await this.initAudioDriveUploadSession({
+      id_rapat: ctx.id_rapat || 'RPT',
+      agenda: ctx.agenda || '',
+      hari_tanggal: ctx.hari_tanggal || '',
+      tgl_surat: ctx.tgl_surat || '',
+      tgl_rapat_iso: ctx.tgl_rapat_iso || '',
+      file_name: fileName,
+      mime_type: rawMime,
+      file_size: file.size,
+      origin: origin
+    }, adminNip, token);
+
+    if (!initRes || initRes.status !== 'success' || !initRes.data || !initRes.data.upload_url) {
+      return {
+        status: 'error',
+        message: (initRes && initRes.message) ? initRes.message : 'Gagal membuat sesi upload Google Drive.'
+      };
+    }
+
+    const sess = initRes.data;
+    const uploadUrl = String(sess.upload_url);
+    const targetMime = String(sess.mime_type || rawMime || 'audio/mp4');
+    const totalSize = Number(file.size);
+    const CHUNK_SIZE = 8 * 1024 * 1024; // 8 MB (kelipatan tepat 256 KiB sesuai standar Google Drive)
+
+    const sendChunkOnce = (chunkBlob, startByte, endByte) => {
+      return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('PUT', uploadUrl, true);
+        xhr.setRequestHeader('Content-Type', targetMime);
+        xhr.setRequestHeader('Content-Range', 'bytes ' + startByte + '-' + endByte + '/' + totalSize);
+
+        if (xhr.upload && typeof onProgress === 'function') {
+          xhr.upload.onprogress = function (ev) {
+            if (ev && ev.lengthComputable) {
+              const loaded = Math.min(totalSize, startByte + ev.loaded);
+              const pct = Math.min(99, Math.max(0, Math.round((loaded / totalSize) * 100)));
+              onProgress(pct, loaded, totalSize);
+            }
+          };
+        }
+
+        xhr.onerror = function () {
+          const err = new Error('Koneksi jaringan terputus saat mengunggah potongan audio ke Google Drive.');
+          err.retryable = true;
+          reject(err);
+        };
+        xhr.ontimeout = function () {
+          const err = new Error('Timeout saat mengunggah potongan audio ke Google Drive.');
+          err.retryable = true;
+          reject(err);
+        };
+        xhr.onload = function () {
+          const st = Number(xhr.status || 0);
+          if (st === 308) {
+            let nextOff = endByte + 1;
+            try {
+              const rangeHdr = xhr.getResponseHeader('Range');
+              const m = rangeHdr && String(rangeHdr).match(/bytes=0-(\d+)/i);
+              if (m) nextOff = parseInt(m[1], 10) + 1;
+            } catch (eR) {}
+            return resolve({ done: false, nextOffset: nextOff });
+          }
+          if (st === 200 || st === 201) {
+            let parsed = null;
+            try { parsed = JSON.parse(xhr.responseText || '{}'); } catch (eJ) { parsed = {}; }
+            return resolve({ done: true, driveFile: parsed });
+          }
+          const err = new Error('Google Drive mengembalikan HTTP ' + st + ' saat upload.');
+          err.retryable = (st >= 500 || st === 0);
+          reject(err);
+        };
+        xhr.send(chunkBlob);
+      });
+    };
+
+    let offset = 0;
+    let uploadedDriveFile = null;
+    while (offset < totalSize) {
+      if (typeof isCancelledFn === 'function' && isCancelledFn()) {
+        return { status: 'cancelled', message: 'Unggah audio dibatalkan.' };
+      }
+      const endByte = Math.min(offset + CHUNK_SIZE, totalSize) - 1;
+      const chunkBlob = file.slice(offset, endByte + 1);
+      let chunkRes = null;
+      let lastChunkErr = null;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          chunkRes = await sendChunkOnce(chunkBlob, offset, endByte);
+          lastChunkErr = null;
+          break;
+        } catch (errCh) {
+          lastChunkErr = errCh;
+          if (!errCh || !errCh.retryable || attempt >= 2) break;
+          await new Promise((r) => setTimeout(r, 1500));
+        }
+      }
+      if (lastChunkErr || !chunkRes) {
+        return {
+          status: 'error',
+          message: (lastChunkErr && lastChunkErr.message) ? lastChunkErr.message : 'Gagal mengunggah potongan audio ke Google Drive.'
+        };
+      }
+      if (chunkRes.done) {
+        uploadedDriveFile = chunkRes.driveFile || {};
+        break;
+      }
+      offset = Math.max(endByte + 1, Number(chunkRes.nextOffset || (endByte + 1)));
+    }
+
+    if (typeof isCancelledFn === 'function' && isCancelledFn()) {
+      return { status: 'cancelled', message: 'Unggah audio dibatalkan.' };
+    }
+    if (!uploadedDriveFile || !uploadedDriveFile.id) {
+      return { status: 'error', message: 'Upload selesai namun ID file Google Drive tidak diterima.' };
+    }
+
+    if (typeof onProgress === 'function') {
+      onProgress(100, totalSize, totalSize);
+    }
+
+    const finRes = await this.finalizeAudioDriveUpload({
+      file_id: String(uploadedDriveFile.id),
+      file_name: String(sess.file_name || uploadedDriveFile.name || fileName),
+      mime_type: targetMime,
+      file_size: totalSize,
+      folder_path: String(sess.folder_path || '')
+    }, adminNip, token);
+
+    if (!finRes || finRes.status !== 'success' || !finRes.data) {
+      return {
+        status: 'error',
+        message: (finRes && finRes.message) ? finRes.message : 'Gagal memfinalisasi audio di Google Drive.'
+      };
+    }
+
+    return {
+      status: 'success',
+      data: {
+        ...finRes.data,
+        folder_url: String(sess.folder_url || ''),
+        folder_path: String(finRes.data.folder_path || sess.folder_path || '')
+      }
+    };
+  },
+
+  /**
    * Mengambil DataURI aman (proxy getDriveFileBlob / cache memori) untuk render pratinjau & cetak Foto Rapat
    */
   async resolveFotoRapatDataUri(fotoItem) {
@@ -1306,6 +1527,27 @@ const EofficeDataService = {
       });
     }
     return { status: 'error', message: 'Koneksi backend Apps Script belum tersedia untuk AI Notulis.' };
+  },
+
+  /**
+   * Mengecek status & hasil pemrosesan Async AI Notulis untuk file audio besar (> 8 MB)
+   */
+  async checkAiNotulenJobStatus(jobId, adminNip, token) {
+    const authToken = token || (typeof localStorage !== 'undefined' ? localStorage.getItem('transkep_session_token') : '') || '';
+    const creatorNip = adminNip || (typeof localStorage !== 'undefined' ? localStorage.getItem('transkep_active_nip') : '') || '';
+
+    if (typeof window !== 'undefined' && window.TranskepAPI && typeof window.TranskepAPI.call === 'function') {
+      return await window.TranskepAPI.call('checkAiNotulenJobStatus', jobId, creatorNip, authToken);
+    }
+    if (typeof google !== 'undefined' && google.script && google.script.run) {
+      return await new Promise((resolve, reject) => {
+        google.script.run
+          .withSuccessHandler((r) => resolve(r))
+          .withFailureHandler((err) => reject(err))
+          .checkAiNotulenJobStatus(jobId, creatorNip, authToken);
+      });
+    }
+    return { status: 'error', message: 'Koneksi backend Apps Script belum tersedia untuk cek status AI.' };
   },
 
   /**

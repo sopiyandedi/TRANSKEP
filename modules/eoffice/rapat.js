@@ -38,6 +38,15 @@
     fileName: '',
     sizeBytes: 0,
     objectUrl: '',
+    file: null,
+    driveFileId: '',
+    driveUrl: '',
+    isLargeFile: false,
+    uploading: false,
+    uploadPromise: null,
+    uploadError: '',
+    uploadSeq: 0,
+    activeJobId: '',
     recorder: null,
     stream: null,
     chunks: [],
@@ -1540,11 +1549,11 @@
     setRapatDropZoneActive_('rapatAudioDropZone', false, 'indigo');
     var rawFiles = ev && ev.dataTransfer && ev.dataTransfer.files ? Array.prototype.slice.call(ev.dataTransfer.files) : [];
     var audioFile = rawFiles.find(function (f) {
-      return f && (/^audio\//i.test(f.type || '') || f.type === 'video/webm' || /\.(mp3|m4a|wav|ogg|webm)$/i.test(f.name || ''));
+      return f && (/^audio\//i.test(f.type || '') || f.type === 'video/webm' || /\.(mp3|m4a|wav|ogg|webm|aac|flac)$/i.test(f.name || ''));
     });
     if (!audioFile) {
       if (rawFiles.length > 0 && typeof showNotify === 'function') {
-        showNotify('Format Audio Tidak Cocok', 'Seret file audio .mp3, .m4a, .wav, .ogg, atau .webm.', 'warning');
+        showNotify('Format Audio Tidak Cocok', 'Seret file audio .mp3, .m4a, .wav, .ogg, .webm, .aac, atau .flac.', 'warning');
       }
       return;
     }
@@ -1684,24 +1693,77 @@
     });
   }
 
+  function extractDriveFileIdFromUrl_(url) {
+    var raw = String(url || '').trim();
+    if (!raw) return '';
+    if (/^[a-zA-Z0-9_-]{15,120}$/.test(raw)) return raw;
+    var mPath = raw.match(/\/d\/([a-zA-Z0-9_-]{10,120})/);
+    if (mPath) return mPath[1];
+    var mQuery = raw.match(/[?&]id=([a-zA-Z0-9_-]{10,120})/);
+    return mQuery ? mQuery[1] : '';
+  }
+
+  function updateAudioUploadProgressUi_(visible, pct, label) {
+    var wrap = document.getElementById('rapatAudioUploadProgressWrap');
+    var lblEl = document.getElementById('rapatAudioUploadProgressLabel');
+    var pctEl = document.getElementById('rapatAudioUploadProgressPct');
+    var barEl = document.getElementById('rapatAudioUploadProgressBar');
+    var cleanPct = Math.min(100, Math.max(0, Math.round(Number(pct || 0))));
+    if (wrap) {
+      if (visible) wrap.classList.remove('hidden');
+      else wrap.classList.add('hidden');
+    }
+    if (lblEl && label !== undefined) {
+      lblEl.innerText = String(label || 'Mengunggah rekaman ke Google Drive...');
+    }
+    if (pctEl) {
+      pctEl.innerText = cleanPct + '%';
+    }
+    if (barEl && barEl.style) {
+      barEl.style.width = cleanPct + '%';
+    }
+  }
+
   async function readAndCompressAudioFile_(file) {
     if (!file) throw new Error('Berkas audio kosong.');
-    var rawMime = String(file.type || '').split(';')[0].trim().toLowerCase();
     var fileName = String(file.name || 'rekaman_rapat.webm').trim();
-    if (!rawMime) {
-      if (/\.mp3$/i.test(fileName)) rawMime = 'audio/mpeg';
-      else if (/\.m4a$/i.test(fileName)) rawMime = 'audio/mp4';
-      else if (/\.wav$/i.test(fileName)) rawMime = 'audio/wav';
-      else if (/\.ogg$/i.test(fileName)) rawMime = 'audio/ogg';
-      else rawMime = 'audio/webm';
+    var rawMime = String(file.type || '').split(';')[0].trim().toLowerCase();
+    if (/\.m4a$/i.test(fileName) || rawMime === 'audio/x-m4a' || rawMime === 'audio/m4a') {
+      rawMime = 'audio/mp4';
+    } else if (/\.mp3$/i.test(fileName)) {
+      rawMime = 'audio/mpeg';
+    } else if (/\.wav$/i.test(fileName)) {
+      rawMime = 'audio/wav';
+    } else if (/\.ogg$/i.test(fileName)) {
+      rawMime = 'audio/ogg';
+    } else if (/\.aac$/i.test(fileName)) {
+      rawMime = 'audio/aac';
+    } else if (/\.flac$/i.test(fileName)) {
+      rawMime = 'audio/flac';
+    } else if (/\.webm$/i.test(fileName) || rawMime === 'video/webm') {
+      rawMime = 'audio/webm';
+    } else if (!rawMime) {
+      rawMime = 'audio/webm';
     }
 
-    var maxRawBytes = 15 * 1024 * 1024;
+    var maxRawBytes = 120 * 1024 * 1024;
     if (file.size && file.size > maxRawBytes) {
-      throw new Error('Ukuran file audio terlalu besar (maks. 15 MB). Potong rekaman atau gunakan tempel catatan/transkrip.');
+      throw new Error('Ukuran file audio terlalu besar (maks. 120 MB). Potong rekaman atau bagi menjadi 2 bagian.');
     }
 
-    // Resampling ringan khusus berkas WAV besar jika browser mendukung Web Audio API
+    var largeAudioCutoffBytes = 8 * 1024 * 1024;
+    if (file.size && file.size > largeAudioCutoffBytes) {
+      return {
+        dataUri: '',
+        isLargeFile: true,
+        file: file,
+        mimeType: rawMime,
+        fileName: fileName,
+        sizeBytes: file.size
+      };
+    }
+
+    // Resampling ringan khusus berkas WAV kecil (< 8 MB) jika browser mendukung Web Audio API
     var targetBlob = file;
     var finalMime = rawMime;
     if ((rawMime === 'audio/wav' || rawMime === 'audio/x-wav') && file.size > 2.5 * 1024 * 1024 &&
@@ -1723,12 +1785,21 @@
     }
 
     if (targetBlob.size && targetBlob.size > 8.5 * 1024 * 1024) {
-      throw new Error('Ukuran audio melebihi batas kirim AI (8.5 MB). Gunakan rekaman terkompresi (.mp3/.ogg/.webm) atau paste transkrip.');
+      return {
+        dataUri: '',
+        isLargeFile: true,
+        file: file,
+        mimeType: rawMime,
+        fileName: fileName,
+        sizeBytes: file.size
+      };
     }
 
     var dataUri = await blobToDataUri_(targetBlob);
     return {
       dataUri: dataUri,
+      isLargeFile: false,
+      file: targetBlob,
       mimeType: finalMime,
       fileName: fileName,
       sizeBytes: targetBlob.size || file.size || 0
@@ -1742,7 +1813,7 @@
     var btnClear = document.getElementById('btnRapatClearAudio');
     var badge = document.getElementById('rapatAiStatusBadge');
 
-    var hasAudio = Boolean(rapatAudioState.dataUri || rapatAudioState.objectUrl);
+    var hasAudio = Boolean(rapatAudioState.dataUri || rapatAudioState.objectUrl || rapatAudioState.driveFileId);
     if (box) {
       if (hasAudio) box.classList.remove('hidden');
       else box.classList.add('hidden');
@@ -1805,17 +1876,27 @@
     if (rapatAudioState.objectUrl && typeof URL !== 'undefined' && typeof URL.revokeObjectURL === 'function') {
       try { URL.revokeObjectURL(rapatAudioState.objectUrl); } catch (e) {}
     }
+    rapatAudioState.uploadSeq = (rapatAudioState.uploadSeq || 0) + 1;
     rapatAudioState.dataUri = '';
     rapatAudioState.mimeType = '';
     rapatAudioState.fileName = '';
     rapatAudioState.sizeBytes = 0;
     rapatAudioState.objectUrl = '';
+    rapatAudioState.file = null;
+    rapatAudioState.driveFileId = '';
+    rapatAudioState.driveUrl = '';
+    rapatAudioState.isLargeFile = false;
+    rapatAudioState.uploading = false;
+    rapatAudioState.uploadPromise = null;
+    rapatAudioState.uploadError = '';
+    rapatAudioState.activeJobId = '';
     rapatAudioState.chunks = [];
 
     if (!keepUrlField) {
       var urlEl = document.getElementById('rapatFieldAudioUrl');
       if (urlEl) urlEl.value = '';
     }
+    updateAudioUploadProgressUi_(false, 0, '');
     updateRapatAudioPreviewUi_();
   };
 
@@ -1827,42 +1908,122 @@
       st.className = 'px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[9px] shrink-0';
     } else if (tone === 'saved') {
       st.className = 'px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[9px] shrink-0';
+    } else if (tone === 'error') {
+      st.className = 'px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30 text-[9px] shrink-0';
     } else {
       st.className = 'px-1.5 py-0.5 rounded bg-indigo-500/15 text-indigo-300 border border-indigo-500/20 text-[9px] shrink-0';
     }
   }
 
-  async function uploadRapatAudioToDriveInBackground_(dataUri, fileName, mimeType) {
-    if (!dataUri || !window.EofficeDataService || typeof window.EofficeDataService.uploadAudioRapatToDrive !== 'function') {
-      return;
+  function uploadRapatAudioToDriveInBackground_(fileObj, dataUri, fileName, mimeType, isLargeFile) {
+    if ((!fileObj && !dataUri) || !window.EofficeDataService) {
+      return Promise.resolve({ status: 'skipped' });
     }
+    var mySeq = rapatAudioState.uploadSeq;
     var currentUser = (window.vueState && window.vueState.user) ? window.vueState.user : (typeof state !== 'undefined' ? state.user : null);
     var adminNip = (currentUser && currentUser.nip) || localStorage.getItem('transkep_active_nip') || '';
     var token = localStorage.getItem('transkep_session_token') || '';
     var folderCtx = getRapatDriveFolderContext_();
+
+    rapatAudioState.uploading = true;
+    rapatAudioState.uploadError = '';
     setAudioDriveStatusBadge_('Mengunggah ke Drive...', 'uploading');
-    try {
-      var upRes = await window.EofficeDataService.uploadAudioRapatToDrive({
-        id_rapat: folderCtx.id_rapat,
-        agenda: folderCtx.agenda,
-        hari_tanggal: folderCtx.hari_tanggal,
-        tgl_surat: folderCtx.tgl_surat,
-        tgl_rapat_iso: folderCtx.tgl_rapat_iso,
-        file_data: dataUri,
-        file_name: fileName || 'rekaman_rapat.webm',
-        mime_type: mimeType || 'audio/webm'
-      }, adminNip, token);
-      if (upRes && upRes.status === 'success' && upRes.data && upRes.data.url) {
-        var urlEl = document.getElementById('rapatFieldAudioUrl');
-        if (urlEl) urlEl.value = String(upRes.data.url);
-        setAudioDriveStatusBadge_('Drive: ' + (upRes.data.folder_path || 'Tersimpan'), 'saved');
-      } else {
-        setAudioDriveStatusBadge_('Lokal Siap AI', 'ready');
+
+    var p = (async function () {
+      try {
+        var upRes = null;
+        if (fileObj && typeof window.EofficeDataService.uploadAudioFileToDriveResumable === 'function') {
+          updateAudioUploadProgressUi_(true, 0, 'Menyiapkan sesi Google Drive...');
+          upRes = await window.EofficeDataService.uploadAudioFileToDriveResumable(
+            fileObj,
+            folderCtx,
+            adminNip,
+            token,
+            function (pct, loadedBytes, totalBytes) {
+              if (rapatAudioState.uploadSeq !== mySeq) return;
+              setAudioDriveStatusBadge_('Mengunggah... ' + pct + '%', 'uploading');
+              updateAudioUploadProgressUi_(true, pct, 'Mengunggah ke Drive: ' + formatBytesRapat_(loadedBytes) + ' / ' + formatBytesRapat_(totalBytes));
+            },
+            function () {
+              return rapatAudioState.uploadSeq !== mySeq;
+            }
+          );
+          if (rapatAudioState.uploadSeq !== mySeq) return { status: 'cancelled' };
+          if (upRes && upRes.status === 'success' && upRes.data && upRes.data.url) {
+            rapatAudioState.driveFileId = String(upRes.data.file_id || extractDriveFileIdFromUrl_(upRes.data.url));
+            rapatAudioState.driveUrl = String(upRes.data.url);
+            var urlElR = document.getElementById('rapatFieldAudioUrl');
+            if (urlElR) urlElR.value = String(upRes.data.url);
+            updateAudioUploadProgressUi_(false, 100, '');
+            setAudioDriveStatusBadge_('Drive: ' + (upRes.data.folder_path || 'Tersimpan'), 'saved');
+            if (isLargeFile && typeof showNotify === 'function') {
+              showNotify('Arsip Drive Selesai', (fileName || 'Rekaman') + ' berhasil masuk Google Drive & siap dianalisa AI Notulis.', 'success');
+            }
+            return upRes;
+          }
+          if (!isLargeFile && dataUri && typeof window.EofficeDataService.uploadAudioRapatToDrive === 'function') {
+            upRes = null;
+          } else {
+            rapatAudioState.uploadError = (upRes && upRes.message) ? upRes.message : 'Gagal mengunggah rekaman ke Google Drive.';
+          }
+        }
+
+        if (!upRes && dataUri && typeof window.EofficeDataService.uploadAudioRapatToDrive === 'function') {
+          updateAudioUploadProgressUi_(false, 0, '');
+          upRes = await window.EofficeDataService.uploadAudioRapatToDrive({
+            id_rapat: folderCtx.id_rapat,
+            agenda: folderCtx.agenda,
+            hari_tanggal: folderCtx.hari_tanggal,
+            tgl_surat: folderCtx.tgl_surat,
+            tgl_rapat_iso: folderCtx.tgl_rapat_iso,
+            file_data: dataUri,
+            file_name: fileName || 'rekaman_rapat.webm',
+            mime_type: mimeType || 'audio/webm'
+          }, adminNip, token);
+          if (rapatAudioState.uploadSeq !== mySeq) return { status: 'cancelled' };
+          if (upRes && upRes.status === 'success' && upRes.data && upRes.data.url) {
+            rapatAudioState.driveFileId = String(upRes.data.file_id || extractDriveFileIdFromUrl_(upRes.data.url));
+            rapatAudioState.driveUrl = String(upRes.data.url);
+            var urlEl = document.getElementById('rapatFieldAudioUrl');
+            if (urlEl) urlEl.value = String(upRes.data.url);
+            setAudioDriveStatusBadge_('Drive: ' + (upRes.data.folder_path || 'Tersimpan'), 'saved');
+            return upRes;
+          }
+          rapatAudioState.uploadError = (upRes && upRes.message) ? upRes.message : 'Gagal mengunggah rekaman ke Google Drive.';
+        }
+
+        if (isLargeFile) {
+          setAudioDriveStatusBadge_('Gagal Unggah Drive', 'error');
+          if (typeof showNotify === 'function') {
+            showNotify('Unggah Audio Gagal', rapatAudioState.uploadError || 'Gagal mengunggah audio besar ke Google Drive.', 'warning');
+          }
+        } else {
+          setAudioDriveStatusBadge_('Lokal Siap AI', 'ready');
+        }
+        return upRes || { status: 'error', message: rapatAudioState.uploadError };
+      } catch (errUp) {
+        if (rapatAudioState.uploadSeq !== mySeq) return { status: 'cancelled' };
+        console.warn('Upload audio rapat ke Drive ditunda:', errUp);
+        rapatAudioState.uploadError = errUp && errUp.message ? errUp.message : String(errUp);
+        if (isLargeFile) {
+          setAudioDriveStatusBadge_('Gagal Unggah Drive', 'error');
+          if (typeof showNotify === 'function') {
+            showNotify('Unggah Audio Gagal', rapatAudioState.uploadError, 'warning');
+          }
+        } else {
+          setAudioDriveStatusBadge_('Lokal Siap AI', 'ready');
+        }
+        return { status: 'error', message: rapatAudioState.uploadError };
+      } finally {
+        if (rapatAudioState.uploadSeq === mySeq) {
+          rapatAudioState.uploading = false;
+          updateAudioUploadProgressUi_(false, 0, '');
+        }
       }
-    } catch (errUp) {
-      console.warn('Upload audio rapat ke Drive ditunda:', errUp);
-      setAudioDriveStatusBadge_('Lokal Siap AI', 'ready');
-    }
+    })();
+
+    rapatAudioState.uploadPromise = p;
+    return p;
   }
 
   window.handleRapatAudioSelect = async function (files) {
@@ -1871,19 +2032,32 @@
     try {
       var res = await readAndCompressAudioFile_(f);
       window.clearRapatAudioSelection(true);
-      rapatAudioState.dataUri = res.dataUri;
+      rapatAudioState.dataUri = res.dataUri || '';
+      rapatAudioState.file = res.file || f;
+      rapatAudioState.isLargeFile = Boolean(res.isLargeFile);
       rapatAudioState.mimeType = res.mimeType;
       rapatAudioState.fileName = res.fileName;
       rapatAudioState.sizeBytes = res.sizeBytes;
+      rapatAudioState.driveFileId = '';
+      rapatAudioState.driveUrl = '';
       if (typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
         try { rapatAudioState.objectUrl = URL.createObjectURL(f); } catch (eObj) {}
       }
       updateRapatAudioPreviewUi_();
-      setAudioDriveStatusBadge_('Siap Analisa AI', 'ready');
-      if (typeof showNotify === 'function') {
-        showNotify('Audio Dipilih', res.fileName + ' siap diproses oleh AI Notulis.', 'success');
+      if (res.isLargeFile) {
+        setAudioDriveStatusBadge_('Mengunggah ke Drive...', 'uploading');
+        var badgeEl = document.getElementById('rapatAiStatusBadge');
+        if (badgeEl) badgeEl.innerText = 'File Besar (' + formatBytesRapat_(res.sizeBytes) + ') — Upload Drive';
+        if (typeof showNotify === 'function') {
+          showNotify('Audio Besar Dipilih', res.fileName + ' (' + formatBytesRapat_(res.sizeBytes) + ') sedang diunggah ke Google Drive. Setelah selesai, klik Proses AI Notulis.', 'info');
+        }
+      } else {
+        setAudioDriveStatusBadge_('Siap Analisa AI', 'ready');
+        if (typeof showNotify === 'function') {
+          showNotify('Audio Dipilih', res.fileName + ' siap diproses oleh AI Notulis.', 'success');
+        }
       }
-      uploadRapatAudioToDriveInBackground_(res.dataUri, res.fileName, res.mimeType);
+      uploadRapatAudioToDriveInBackground_(res.file || f, res.dataUri, res.fileName, res.mimeType, Boolean(res.isLargeFile));
     } catch (err) {
       if (typeof showNotify === 'function') {
         showNotify('Audio Tidak Valid', err.message || err.toString(), 'warning');
@@ -1930,20 +2104,25 @@
         if (chunks.length === 0) return;
         var blob = new Blob(chunks, { type: recMime });
         try {
-          var dataUri = await blobToDataUri_(blob);
+          var recLarge = blob.size > 8 * 1024 * 1024;
+          var dataUri = recLarge ? '' : await blobToDataUri_(blob);
           rapatAudioState.dataUri = dataUri;
+          rapatAudioState.file = blob;
+          rapatAudioState.isLargeFile = recLarge;
           rapatAudioState.mimeType = recMime;
           rapatAudioState.fileName = 'Rekaman_Mikrofon_' + new Date().toISOString().slice(11, 19).replace(/:/g, '') + '.webm';
           rapatAudioState.sizeBytes = blob.size || 0;
+          rapatAudioState.driveFileId = '';
+          rapatAudioState.driveUrl = '';
           if (typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
             try { rapatAudioState.objectUrl = URL.createObjectURL(blob); } catch (eObj) {}
           }
           updateRapatAudioPreviewUi_();
-          setAudioDriveStatusBadge_('Siap Analisa AI', 'ready');
+          setAudioDriveStatusBadge_(recLarge ? 'Mengunggah ke Drive...' : 'Siap Analisa AI', recLarge ? 'uploading' : 'ready');
           if (typeof showNotify === 'function') {
             showNotify('Rekaman Selesai', 'Audio berhasil direkam. Klik Proses AI Notulis untuk menyusun Notula.', 'success');
           }
-          uploadRapatAudioToDriveInBackground_(dataUri, rapatAudioState.fileName, recMime);
+          uploadRapatAudioToDriveInBackground_(blob, dataUri, rapatAudioState.fileName, recMime, recLarge);
         } catch (errBlob) {
           console.warn('Gagal konversi rekaman audio:', errBlob);
         }
@@ -2180,8 +2359,9 @@
     if (isProcessingAiNotulen) return;
     var transEl = document.getElementById('rapatFieldAiTranscript');
     var transcriptText = transEl ? String(transEl.value || '').trim() : '';
+    var hasAudioReady = Boolean(rapatAudioState.dataUri || rapatAudioState.driveFileId || rapatAudioState.uploading);
 
-    if (!rapatAudioState.dataUri && !transcriptText) {
+    if (!hasAudioReady && !transcriptText) {
       if (typeof showNotify === 'function') {
         showNotify('Input Belum Ada', 'Pilih/rekam audio rapat atau tempel catatan mentah terlebih dahulu.', 'warning');
       }
@@ -2191,20 +2371,6 @@
     var currentUser = (window.vueState && window.vueState.user) ? window.vueState.user : (typeof state !== 'undefined' ? state.user : null);
     var adminNip = (currentUser && currentUser.nip) || localStorage.getItem('transkep_active_nip') || '';
     var token = localStorage.getItem('transkep_session_token') || '';
-
-    var aiPayload = {
-      id_rapat: ((document.getElementById('rapatFieldIdRapat') || {}).value || '').trim() || 'RPT-DRAFT',
-      agenda: ((document.getElementById('rapatFieldAgenda') || {}).value || '').trim() || 'Rapat Kedinasan',
-      hari_tanggal: ((document.getElementById('rapatFieldHariTanggal') || {}).value || '').trim(),
-      tempat: ((document.getElementById('rapatFieldTempat') || {}).value || '').trim(),
-      pemimpin: ((document.getElementById('rapatFieldPemimpin') || {}).value || '').trim(),
-      notulis: ((document.getElementById('rapatFieldNotulis') || {}).value || '').trim(),
-      peserta_list: tujuanUndanganList.slice(0, 50),
-      transcript_text: transcriptText,
-      audio_data: rapatAudioState.dataUri || '',
-      audio_mime_type: rapatAudioState.mimeType || '',
-      allow_text_fallback: Boolean(transcriptText)
-    };
 
     isProcessingAiNotulen = true;
     var btnAi = document.getElementById('btnRapatProcessAiNotulen');
@@ -2218,10 +2384,99 @@
     if (badge) badge.innerText = 'Memproses Gemini AI...';
 
     try {
+      if (rapatAudioState.uploading && rapatAudioState.uploadPromise) {
+        if (btnAi) btnAi.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> <span>Menunggu unggah Drive selesai...</span>';
+        if (badge) badge.innerText = 'Menunggu Upload Drive...';
+        await rapatAudioState.uploadPromise;
+      }
+
+      if (rapatAudioState.isLargeFile && !rapatAudioState.driveFileId) {
+        throw new Error(rapatAudioState.uploadError || 'Rekaman besar belum selesai diunggah ke Google Drive. Pastikan unggah Drive berhasil sebelum Proses AI Notulis.');
+      }
+
       if (!window.EofficeDataService || typeof window.EofficeDataService.requestAiNotulenRapat !== 'function') {
         throw new Error('Layanan EofficeDataService.requestAiNotulenRapat belum siap.');
       }
+
+      var useAsyncDriveAudio = Boolean(rapatAudioState.driveFileId && (!rapatAudioState.dataUri || rapatAudioState.isLargeFile));
+      var aiPayload = {
+        id_rapat: ((document.getElementById('rapatFieldIdRapat') || {}).value || '').trim() || 'RPT-DRAFT',
+        agenda: ((document.getElementById('rapatFieldAgenda') || {}).value || '').trim() || 'Rapat Kedinasan',
+        hari_tanggal: ((document.getElementById('rapatFieldHariTanggal') || {}).value || '').trim(),
+        tempat: ((document.getElementById('rapatFieldTempat') || {}).value || '').trim(),
+        pemimpin: ((document.getElementById('rapatFieldPemimpin') || {}).value || '').trim(),
+        notulis: ((document.getElementById('rapatFieldNotulis') || {}).value || '').trim(),
+        peserta_list: tujuanUndanganList.slice(0, 50),
+        transcript_text: transcriptText,
+        audio_data: useAsyncDriveAudio ? '' : (rapatAudioState.dataUri || ''),
+        audio_drive_file_id: useAsyncDriveAudio ? rapatAudioState.driveFileId : '',
+        audio_file_name: rapatAudioState.fileName || '',
+        audio_mime_type: rapatAudioState.mimeType || '',
+        audio_size_bytes: Number(rapatAudioState.sizeBytes || 0),
+        async_mode: useAsyncDriveAudio,
+        allow_text_fallback: Boolean(transcriptText)
+      };
+
+      if (btnAi) {
+        btnAi.innerHTML = useAsyncDriveAudio
+          ? '<i class="fa-solid fa-circle-notch fa-spin"></i> <span>Mengirim audio Drive ke n8n...</span>'
+          : '<i class="fa-solid fa-circle-notch fa-spin"></i> <span>Memproses AI...</span>';
+      }
+      if (badge) badge.innerText = useAsyncDriveAudio ? 'Mengirim ke n8n...' : 'Memproses Gemini AI...';
+
       var res = await window.EofficeDataService.requestAiNotulenRapat(aiPayload, adminNip, token);
+
+      if (res && res.status === 'processing' && res.job_id) {
+        var jobId = String(res.job_id).trim();
+        rapatAudioState.activeJobId = jobId;
+        var startedPollAt = Date.now();
+        var maxPolls = 90; // 90 x 4 dtk = 6 menit
+
+        for (var pollIdx = 0; pollIdx < maxPolls; pollIdx++) {
+          if (rapatAudioState.activeJobId !== jobId) {
+            return;
+          }
+          var elapsedSec = Math.max(0, Math.round((Date.now() - startedPollAt) / 1000));
+          if (btnAi) {
+            btnAi.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> <span>Analisa Audio Gemini... (' + elapsedSec + ' dtk)</span>';
+          }
+          if (badge) {
+            badge.innerText = String(res.stage || 'n8n & Gemini Files API memproses (' + elapsedSec + ' dtk)...');
+          }
+
+          await new Promise(function (resolve) { setTimeout(resolve, 4000); });
+          if (rapatAudioState.activeJobId !== jobId) {
+            return;
+          }
+
+          if (typeof window.EofficeDataService.checkAiNotulenJobStatus !== 'function') {
+            res = { status: 'error', message: 'checkAiNotulenJobStatus belum tersedia di EofficeDataService.' };
+            break;
+          }
+
+          var stRes = await window.EofficeDataService.checkAiNotulenJobStatus(jobId, adminNip, token);
+          if (stRes && stRes.status === 'success' && stRes.data) {
+            res = stRes;
+            break;
+          }
+          if (stRes && stRes.status === 'error') {
+            res = stRes;
+            break;
+          }
+          if (stRes && stRes.status === 'not_found') {
+            res = { status: 'error', message: stRes.message || 'Sesi analisa AI tidak ditemukan atau sudah kedaluwarsa.' };
+            break;
+          }
+          if (stRes && stRes.stage) {
+            res.stage = stRes.stage;
+          }
+        }
+
+        if (res && res.status === 'processing') {
+          res = { status: 'error', message: 'Proses AI Notulis melebihi batas tunggu 6 menit. Silakan coba beberapa saat lagi.' };
+        }
+      }
+
       if (res && res.status === 'success' && res.data) {
         var applied = window.applyAiNotulenToForm(res.data, { overwriteTranscript: !transcriptText });
         switchRapatTab('notula');
@@ -2246,6 +2501,7 @@
       }
     } finally {
       isProcessingAiNotulen = false;
+      rapatAudioState.activeJobId = '';
       if (btnAi) {
         btnAi.disabled = false;
         btnAi.classList.remove('opacity-70', 'cursor-wait');
@@ -2494,11 +2750,19 @@
     var elAudioUrl = document.getElementById('rapatFieldAudioUrl');
     if (elAudioUrl) elAudioUrl.value = rapatData.audio_rapat_url || '';
     if (rapatData.audio_rapat_url) {
+      var exDriveAudioId = extractDriveFileIdFromUrl_(rapatData.audio_rapat_url);
+      rapatAudioState.driveFileId = exDriveAudioId;
+      rapatAudioState.driveUrl = String(rapatData.audio_rapat_url || '').trim();
+      if (exDriveAudioId) {
+        rapatAudioState.fileName = 'Arsip Rekaman Google Drive';
+      }
       var prevBox = document.getElementById('rapatAudioPreviewBox');
       var infoEl = document.getElementById('rapatAudioFileInfo');
       var plEl = document.getElementById('rapatAudioPlayer');
+      var btnClearEl = document.getElementById('btnRapatClearAudio');
       if (prevBox) prevBox.classList.remove('hidden');
       if (plEl) plEl.classList.add('hidden');
+      if (btnClearEl) btnClearEl.classList.remove('hidden');
       if (infoEl) infoEl.innerText = 'Arsip Rekaman Google Drive';
       setAudioDriveStatusBadge_('Arsip Drive Tersimpan', 'saved');
     } else {
