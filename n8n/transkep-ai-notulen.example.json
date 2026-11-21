@@ -209,7 +209,10 @@
           "name": "Google Service Account account"
         }
       },
-      "continueOnFail": true
+      "continueOnFail": true,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
     },
     {
       "parameters": {
@@ -345,7 +348,10 @@
           "name": "Google Gemini(PaLM) Api account"
         }
       },
-      "continueOnFail": true
+      "continueOnFail": true,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000
     },
     {
       "parameters": {
@@ -396,7 +402,10 @@
         2120,
         220
       ],
-      "continueOnFail": true
+      "continueOnFail": true,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 4000
     },
     {
       "parameters": {
@@ -667,7 +676,10 @@
         4460,
         220
       ],
-      "continueOnFail": true
+      "continueOnFail": true,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000
     },
     {
       "parameters": {
@@ -717,7 +729,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const ctx = $('Validasi & Siapkan Prompt Notulen (Code)').first().json || {};\nconst inp = $input.first();\nconst binData = (inp && inp.binary && inp.binary.data) ? inp.binary.data : null;\nconst dlErr = (inp && inp.json && inp.json.error) ? String(inp.json.error.message || inp.json.error) : '';\nconst hasBin = Boolean(!dlErr && binData && (binData.data || binData.id || binData.mimeType || binData.fileName));\n\nconst rawJobId = String(ctx.job_id || ('JOB_' + Date.now()));\nconst safeJobId = rawJobId.replace(/[^A-Za-z0-9_-]/g, '').slice(0, 48) || ('JOB_' + Date.now());\n\nconst rawName = String((binData && binData.fileName) || ctx.audioFileName || 'rekaman.m4a').trim();\nconst extMatch = rawName.match(/\\.([A-Za-z0-9]{1,8})$/);\nconst rawExt = extMatch ? extMatch[1].toLowerCase() : 'm4a';\nconst safeExt = /^(mp3|m4a|mp4|wav|ogg|oga|webm|aac|flac|opus)$/.test(rawExt) ? rawExt : 'm4a';\n\nreturn [\n  {\n    json: {\n      safeJobId,\n      safeExt,\n      hasBin,\n      dlErr,\n      n8nInputPath: '/home/node/.n8n-files/' + safeJobId + '/in.' + safeExt,\n      n8nChunkGlob: '/home/node/.n8n-files/' + safeJobId + '/part_*.mp3',\n      ffmpegInputPath: '/audio-tmp/' + safeJobId + '/in.' + safeExt,\n      ffmpegOutputPattern: '/audio-tmp/' + safeJobId + '/part_%03d.mp3',\n      ffmpegWorkDir: '/audio-tmp/' + safeJobId,\n    },\n    binary: (inp && inp.binary) ? inp.binary : {},\n  },\n];"
+        "jsCode": "const ctx = $('Validasi & Siapkan Prompt Notulen (Code)').first().json || {};\nconst inp = $input.first();\nconst binData = (inp && inp.binary && inp.binary.data) ? inp.binary.data : null;\nconst dlErr = (inp && inp.json && inp.json.error) ? String(inp.json.error.message || inp.json.error) : '';\nconst hasBin = Boolean(!dlErr && binData && (binData.data || binData.id || binData.mimeType || binData.fileName));\nconst errorMessage = !hasBin\n  ? (dlErr\n      ? ('Gagal mengunduh audio dari Google Drive (Service Account, setelah 3x percobaan): ' + dlErr)\n      : 'Gagal mengunduh audio dari Google Drive (Service Account): file binary audio kosong atau tidak terbaca.')\n  : '';\n\nconst rawJobId = String(ctx.job_id || ('JOB_' + Date.now()));\nconst safeJobId = rawJobId.replace(/[^A-Za-z0-9_-]/g, '').slice(0, 48) || ('JOB_' + Date.now());\n\nconst rawName = String((binData && binData.fileName) || ctx.audioFileName || 'rekaman.m4a').trim();\nconst extMatch = rawName.match(/\\.([A-Za-z0-9]{1,8})$/);\nconst rawExt = extMatch ? extMatch[1].toLowerCase() : 'm4a';\nconst safeExt = /^(mp3|m4a|mp4|wav|ogg|oga|webm|aac|flac|opus)$/.test(rawExt) ? rawExt : 'm4a';\n\nreturn [\n  {\n    json: {\n      safeJobId,\n      safeExt,\n      hasBin,\n      dlErr,\n      errorMessage,\n      n8nInputPath: '/home/node/.n8n-files/' + safeJobId + '/in.' + safeExt,\n      n8nChunkGlob: '/home/node/.n8n-files/' + safeJobId + '/part_*.mp3',\n      ffmpegInputPath: '/audio-tmp/' + safeJobId + '/in.' + safeExt,\n      ffmpegOutputPattern: '/audio-tmp/' + safeJobId + '/part_%03d.mp3',\n      ffmpegWorkDir: '/audio-tmp/' + safeJobId,\n    },\n    binary: (inp && inp.binary) ? inp.binary : {},\n  },\n];"
       },
       "id": "b1a7c4d0-19b2-4e8a-91d4-882011000034",
       "name": "Siapkan Direktori Kerja Audio (Code)",
@@ -725,6 +737,26 @@
       "typeVersion": 2,
       "position": [
         820,
+        40
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.hasBin }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "b1a7c4d0-19b2-4e8a-91d4-882011000052",
+      "name": "Download Drive Berhasil? (IF)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        1000,
         40
       ]
     },
@@ -738,7 +770,7 @@
       "type": "n8n-nodes-base.ssh",
       "typeVersion": 1,
       "position": [
-        1040,
+        1200,
         40
       ],
       "credentials": {
@@ -758,7 +790,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1260,
+        1400,
         40
       ]
     },
@@ -778,7 +810,7 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 1,
       "position": [
-        1480,
+        1600,
         40
       ]
     },
@@ -1452,7 +1484,7 @@
       "main": [
         [
           {
-            "node": "SSH Buat Folder Audio",
+            "node": "Download Drive Berhasil? (IF)",
             "type": "main",
             "index": 0
           }
@@ -1673,6 +1705,24 @@
           }
         ]
       ]
+    },
+    "Download Drive Berhasil? (IF)": {
+      "main": [
+        [
+          {
+            "node": "SSH Buat Folder Audio",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Siapkan Callback Error Upload (Code)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": false,
@@ -1680,7 +1730,7 @@
     "executionOrder": "v1",
     "binaryMode": "separate"
   },
-  "versionId": "c918e3b2-7f41-4a0d-b91e-34c509876006",
+  "versionId": "c918e3b2-7f41-4a0d-b91e-34c509876007",
   "meta": {
     "instanceId": "<GANTI_N8N_INSTANCE_ID>"
   },

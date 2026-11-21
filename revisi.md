@@ -6973,6 +6973,25 @@ Menyempurnakan kenyamanan penggunaan Workspace Rapat serta mengotomatiskan kerap
    - **Jalur Cepat (< 4 MB / Teks):** `Panggil Gemini Multimodal API (HTTP)` ditingkatkan ke `models/gemini-4-hydrogen` (`thinkingLevel: "low"`).
 3. **Cleanup Terpadu & Verifikasi:** Node `Cek Kebutuhan Cleanup (Code)` menghapus direktori sementara `/audio-tmp/<safeJobId>` serta file sementara Gemini Files API secara aman. Diuji penuh pada [`tests/verify_n8n_ai_assistant.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/tests/verify_n8n_ai_assistant.js) & [`tests/verify_fase3a.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/tests/verify_fase3a.js) (`npm test`: all 6 suites pass).
 
+---
+
+## REVISI TAHAP 147D: HARDENING AUTO-RETRY TRANSFER AUDIO BESAR & SHORT-CIRCUIT DOWNLOAD DRIVE (`v3.8.82`)
+**Status:** `[SELESAI & TERVERIFIKASI]`
+
+### 1. Akar Masalah
+- Pada Eksekusi n8n `#135` (`25.161s | 151KB`), node `Download Audio dari Google Drive` mengalami putus aliran sesaat (`stream has been aborted`) ketika mengunduh rekaman 73,46 MB tepat setelah container restart.
+- Karena sebelumnya node tersebut memakai `continueOnFail: true` tanpa `retryOnFail`, kegagalan unduhan tidak diulang dan tetap meneruskan alur kosong ke `SSH Buat Folder Audio` dan fallback Gemini Files API sebelum akhirnya melapor balik ke TRANSKEP.
+
+### 2. Rincian Perbaikan ([`n8n/transkep-ai-notulen.example.json`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/n8n/transkep-ai-notulen.example.json) & Lokal, 52 Node)
+1. **Auto-Retry 3x pada Seluruh Node Transfer & Callback Kritis:**
+   - `Download Audio dari Google Drive`: `retryOnFail: true`, `maxTries: 3`, `waitBetweenTries: 5000`, `continueOnFail: true`.
+   - `Start Gemini Files Resumable Session (HTTP)`: `retryOnFail: true`, `maxTries: 3`, `waitBetweenTries: 3000`, `continueOnFail: true`.
+   - `Upload Binary ke Gemini Files API (HTTP)`: `retryOnFail: true`, `maxTries: 3`, `waitBetweenTries: 4000`, `continueOnFail: true`.
+   - `Kirim Hasil ke Callback GAS (HTTP)`: `retryOnFail: true`, `maxTries: 3`, `waitBetweenTries: 3000`, `continueOnFail: true`.
+2. **Short-Circuit Bersih `Download Drive Berhasil? (IF)`:**
+   - Menambahkan pengecekan `errorMessage` pada `Siapkan Direktori Kerja Audio (Code)` dan node IF baru `Download Drive Berhasil? (IF)`. Bila 3x percobaan unduh Google Drive tetap gagal (`hasBin === false`), alur langsung mengirim pesan error ke `Siapkan Callback Error Upload (Code)` tanpa membuang eksekusi SSH maupun panggilan Gemini Files API.
+3. **Verifikasi:** Uji topologi 52 node dan simulasi VM gagal unduh Drive (`stream has been aborted`) ditambahkan pada [`tests/verify_n8n_ai_assistant.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/tests/verify_n8n_ai_assistant.js).
+
 
 
 

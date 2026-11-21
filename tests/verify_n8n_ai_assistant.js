@@ -543,7 +543,7 @@ function validateNotulenWorkflowTopology(wf, rawText, label) {
       new vm.Script(`(async function(){\n${n.parameters.jsCode}\n})()`, { filename: `${label}:${n.name}` });
     }
   }
-  assert.strictEqual(wf.nodes.length, 51, `${label}: expected 51 nodes`);
+  assert.strictEqual(wf.nodes.length, 52, `${label}: expected 52 nodes`);
 
   for (const [srcName, connGroups] of Object.entries(wf.connections || {})) {
     assert(byName.has(srcName), `${label}: missing connection source ${srcName}`);
@@ -613,6 +613,39 @@ function validateNotulenWorkflowTopology(wf, rawText, label) {
 
   const ifNode = byName.get('Otorisasi Webhook Valid? (IF)');
   assert(ifNode && wf.connections['Otorisasi Webhook Valid? (IF)'].main.length === 2, `${label}: Auth IF node must have 2 branches`);
+
+  for (const retryNodeName of [
+    'Download Audio dari Google Drive',
+    'Start Gemini Files Resumable Session (HTTP)',
+    'Upload Binary ke Gemini Files API (HTTP)',
+    'Kirim Hasil ke Callback GAS (HTTP)',
+  ]) {
+    const rn = byName.get(retryNodeName);
+    assert(rn, `${label}: missing retry-hardened node ${retryNodeName}`);
+    assert.strictEqual(rn.retryOnFail, true, `${label}: ${retryNodeName} must enable retryOnFail`);
+    assert(rn.maxTries >= 3, `${label}: ${retryNodeName} must set maxTries >= 3`);
+    assert(
+      rn.waitBetweenTries > 0 && rn.waitBetweenTries <= 5000,
+      `${label}: ${retryNodeName} waitBetweenTries must be within 1..5000 ms`
+    );
+    assert.strictEqual(rn.continueOnFail, true, `${label}: ${retryNodeName} must keep continueOnFail: true`);
+  }
+
+  const dlIf = byName.get('Download Drive Berhasil? (IF)');
+  assert(dlIf && dlIf.type === 'n8n-nodes-base.if', `${label}: missing Download Drive Berhasil? (IF)`);
+  assert.strictEqual(
+    wf.connections['Siapkan Direktori Kerja Audio (Code)'].main[0][0].node,
+    'Download Drive Berhasil? (IF)',
+    `${label}: Siapkan Direktori Kerja Audio (Code) must connect to Download Drive Berhasil? (IF)`
+  );
+  const dlConns = wf.connections['Download Drive Berhasil? (IF)'].main;
+  assert.strictEqual(dlConns.length, 2, `${label}: Download Drive Berhasil? (IF) must have 2 branches`);
+  assert.strictEqual(dlConns[0][0].node, 'SSH Buat Folder Audio', `${label}: Download OK branch must route to SSH Buat Folder Audio`);
+  assert.strictEqual(
+    dlConns[1][0].node,
+    'Siapkan Callback Error Upload (Code)',
+    `${label}: Download failed branch must short-circuit to Siapkan Callback Error Upload (Code)`
+  );
 }
 
 validateNotulenWorkflowTopology(notulenExWf, notulenExRaw, 'transkep-ai-notulen.example.json');
@@ -1228,6 +1261,33 @@ async function runNotulenBehaviorSuite(wf, expectedSecret, wfLabel) {
   assert.strictEqual(cleanupFilesFallback.hasTempDisk, false);
   assert.strictEqual(cleanupFilesFallback.hasGeminiFile, true);
   assert.strictEqual(cleanupFilesFallback.geminiFileName, 'files/gem-clean-1');
+
+  // Drive download stream abort short-circuit (Tahap 147D)
+  const dlAbortDirOut = runCodeNode(wf, 'Siapkan Direktori Kerja Audio (Code)', {
+    inputJson: { error: { message: 'stream has been aborted' } },
+    nodeMap: { 'Validasi & Siapkan Prompt Notulen (Code)': big150MbOut },
+  })[0].json;
+  assert.strictEqual(dlAbortDirOut.hasBin, false, `${wfLabel}: Drive error must produce hasBin: false`);
+  assert(
+    dlAbortDirOut.errorMessage.includes('stream has been aborted'),
+    `${wfLabel}: Drive error must propagate errorMessage for short-circuit callback`
+  );
+
+  const dlAbortCbOut = runCodeNode(wf, 'Siapkan Callback Error Upload (Code)', {
+    inputJson: dlAbortDirOut,
+    nodeMap: { 'Validasi & Siapkan Prompt Notulen (Code)': big150MbOut },
+    strictNodes: true,
+  })[0].json;
+  assert.strictEqual(dlAbortCbOut.callbackPayload.status, 'error');
+  assert(dlAbortCbOut.callbackPayload.message.includes('stream has been aborted'));
+
+  const cleanupAfterAbort = runCodeNode(wf, 'Cek Kebutuhan Cleanup (Code)', {
+    inputJson: {},
+    nodeMap: { 'Siapkan Direktori Kerja Audio (Code)': dlAbortDirOut },
+    strictNodes: true,
+  })[0].json;
+  assert.strictEqual(cleanupAfterAbort.hasTempDisk, false, `${wfLabel}: short-circuited Drive abort must skip SSH disk cleanup`);
+  assert.strictEqual(cleanupAfterAbort.hasGeminiFile, false, `${wfLabel}: short-circuited Drive abort must have no Gemini file to delete`);
 }
 
 (async () => {
