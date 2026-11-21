@@ -801,7 +801,7 @@ for (const n8nPath of n8nNotulenPaths) {
   }
 }
 const exNotulenRaw = fs.readFileSync('n8n/transkep-ai-notulen.example.json', 'utf8');
-for (const secretPat of ['TRANSKEP_WA_BOT_2026', 'AKfycb', 'ekWDS9nBCNqDspRg', '9ed8b316a1d5192e09dbfab4b713922f8ffb7a2b9191d04fdcc83d4167a6cebd', 'BEGIN PRIVATE KEY']) {
+for (const secretPat of ['TRANSKEP_WA_BOT_2026', 'AKfycb', 'ekWDS9nBCNqDspRg', 'YWZ8dADUWtnM4zyx', '9ed8b316a1d5192e09dbfab4b713922f8ffb7a2b9191d04fdcc83d4167a6cebd', 'BEGIN PRIVATE KEY']) {
   assert(!exNotulenRaw.includes(secretPat), `transkep-ai-notulen.example.json leaked secret: ${secretPat}`);
 }
 assert(exNotulenRaw.includes('n8n-nodes-base.googleDrive') &&

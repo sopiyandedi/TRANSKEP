@@ -6954,6 +6954,25 @@ Menyempurnakan kenyamanan penggunaan Workspace Rapat serta mengotomatiskan kerap
 7. **Subfolder Drive Bertingkat `Tahun / Bulan / Judul Rapat` ([`eoffice/rapat.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/rapat.js), [`code.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/code.js), [`api_router.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/api_router.js), [`modules/eoffice/eoffice_data.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/eoffice_data.js)):** Menambahkan `resolveRapatFolderParts_`, dukungan magic bytes audio di `validateUploadedFile_`, kedalaman ancestor 5 di `collectDriveAncestorMeta_`, serta RPC `uploadAudioRapat` agar foto & rekaman suara tersimpan rapi dalam folder `Arsip Foto Rapat TRANSKEP / <Tahun> / <Bulan> / <Judul Rapat>`.
 8. **PWA & Pengujian:** Bump PWA **`v3.8.79`** ([`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) & [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js)), perluasan uji audio & dataset XSS di [`tests/verify_fase3a.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/tests/verify_fase3a.js), serta suite penuh Tahap 145 di [`tests/verify_fase3b.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/tests/verify_fase3b.js).
 
+---
+
+## REVISI TAHAP 147C: PIPELINE AUDIO PERCAKAPAN MANUSIA, SPLIT 15 MENIT & FORMASI GEMINI 4 ROUND-ROBIN (`v3.8.82`)
+**Status:** `[SELESAI & TERVERIFIKASI]`
+
+### 1. Akar Masalah
+- File rekaman rapat panjang (>1 jam, mis. 73,46 MB `.m4a` = ~151.000 token audio) mengalami HTTP `503 Service unavailable` dan timeout koneksi ketika dikirim 1 file utuh sekaligus ke satu model Gemini.
+- Selain itu pada n8n 2.x (`n8nio/n8n:latest`), node `Read/Write Files from Disk` terkunci ke `~/.n8n-files` (`/home/node/.n8n-files`) oleh `N8N_RESTRICT_FILE_ACCESS_TO`.
+
+### 2. Rincian Perubahan ([`n8n/transkep-ai-notulen.example.json`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/n8n/transkep-ai-notulen.example.json) & Lokal, 51 Node)
+1. **Konversi Percakapan Manusia & Split 15 Menit via Docker `ffmpeg-api`:**
+   - Audio dari Google Drive ditulis oleh n8n ke direktori aman sandbox n8n 2.x (`/home/node/.n8n-files/<safeJobId>/in.<ext>` yang dibagikan dengan container `ffmpeg-api` di `/audio-tmp/<safeJobId>`), dikompres ke **MP3 Mono 16 kHz 24 kbps** disertai filter `dynaudnorm,silenceremove=stop_periods=-1:stop_duration=2:stop_threshold=-50dB`, dan dipotong otomatis menjadi segmen **900 detik (15 menit)** (`part_%03d.mp3`).
+   - File dibaca ulang oleh `Baca Klip MP3 dari Disk` dan diubah menjadi base64 `inline_data` lewat `this.helpers.getBinaryDataBuffer(origIdx, 'data')` (tahan `binaryMode: "separate"`).
+2. **Formasi Round-Robin Gemini 4 (`thinkingLevel: "low"`, `maxOutputTokens: 32768`, Tanpa `temperature`):**
+   - **Pass 1 Klip Berurutan (`batchSize: 1`):** Klip ganjil memakai `models/gemini-4-hydrogen`, klip genap memakai `models/gemini-4-argon`; klip yang gagal otomatis di-failover ke model lawannya (`Failover Klip ke Model Cadangan`) dan disatukan kembali secara kronologis tanpa memangkas pokok bahasan rapat.
+   - **Pass 2 Smart Merge:** Menggunakan `models/gemini-4-neon` (`thinkingLevel: "low"`) untuk memadukan seluruh segmen Pass 1 + Draf Tab 3 Operator + kalkulator hari kerja SKB 2026–2027 (dan tetap memiliki fallback otomatis penuh ke jalur Gemini Files API apabila SSH/`ffmpeg-api` belum dimount).
+   - **Jalur Cepat (< 4 MB / Teks):** `Panggil Gemini Multimodal API (HTTP)` ditingkatkan ke `models/gemini-4-hydrogen` (`thinkingLevel: "low"`).
+3. **Cleanup Terpadu & Verifikasi:** Node `Cek Kebutuhan Cleanup (Code)` menghapus direktori sementara `/audio-tmp/<safeJobId>` serta file sementara Gemini Files API secara aman. Diuji penuh pada [`tests/verify_n8n_ai_assistant.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/tests/verify_n8n_ai_assistant.js) & [`tests/verify_fase3a.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/tests/verify_fase3a.js) (`npm test`: all 6 suites pass).
+
 
 
 

@@ -16,23 +16,46 @@ const hasLive = fs.existsSync(livePath);
 const liveRaw = hasLive ? fs.readFileSync(livePath, 'utf8') : null;
 const liveWf = hasLive ? JSON.parse(liveRaw) : null;
 
-// Helper to run any n8n Code node inside an isolated vm context
-function runCodeNode(wf, nodeName, opts = {}) {
-  const node = wf.nodes.find((n) => n.name === nodeName);
-  assert(node && node.parameters && typeof node.parameters.jsCode === 'string', `Missing Code node: ${nodeName}`);
-
+// Helper to build shared VM sandbox for n8n Code nodes
+function buildCodeSandbox(opts = {}) {
   const inputJson = opts.inputJson !== undefined ? opts.inputJson : {};
   const inputBinary = opts.inputBinary;
+  const inputAll = opts.inputAll;
   const nodeMap = opts.nodeMap || {};
   const nodeBinaryMap = opts.nodeBinaryMap || {};
+  const nodeAllMap = opts.nodeAllMap || {};
   const staticData = opts.staticData || {};
 
-  const sandbox = {
+  const defaultAll = Array.isArray(inputAll)
+    ? inputAll
+    : [inputBinary !== undefined ? { json: inputJson, binary: inputBinary } : { json: inputJson }];
+
+  const getBinaryDataBuffer = opts.getBinaryDataBuffer || (async (itemIndex, propName) => {
+    const entry = defaultAll[itemIndex];
+    const bin = entry && entry.binary && entry.binary[propName];
+    if (!bin) throw new Error(`Missing binary[${propName}] at index ${itemIndex}`);
+    if (bin._buffer) return bin._buffer;
+    if (typeof bin.data === 'string') return Buffer.from(bin.data, 'base64');
+    return Buffer.alloc(0);
+  });
+
+  return {
     $input: {
-      first: () => (inputBinary !== undefined ? { json: inputJson, binary: inputBinary } : { json: inputJson }),
-      all: () => [inputBinary !== undefined ? { json: inputJson, binary: inputBinary } : { json: inputJson }],
+      first: () => defaultAll[0] || { json: {} },
+      all: () => defaultAll,
     },
     $: (refName) => {
+      if (opts.strictNodes && !(refName in nodeMap) && !(refName in nodeAllMap) && !(refName in nodeBinaryMap)) {
+        throw new Error(`Node '${refName}' has not been executed`);
+      }
+      if (Array.isArray(nodeAllMap[refName])) {
+        const list = nodeAllMap[refName];
+        return {
+          first: () => list[0] || { json: {} },
+          item: list[0] || { json: {} },
+          all: () => list,
+        };
+      }
       const val = nodeMap[refName] || {};
       const binVal = nodeBinaryMap[refName];
       const itemObj = binVal !== undefined ? { json: val, binary: binVal } : { json: val };
@@ -46,6 +69,10 @@ function runCodeNode(wf, nodeName, opts = {}) {
       if (scope === 'global') return staticData;
       return {};
     },
+    helpers: {
+      getBinaryDataBuffer,
+    },
+    Buffer,
     Intl,
     Date,
     String,
@@ -57,10 +84,26 @@ function runCodeNode(wf, nodeName, opts = {}) {
     Math,
     RegExp,
   };
+}
 
-  const wrappedCode = `(function() {\n${node.parameters.jsCode}\n})()`;
+// Helper to run any sync n8n Code node inside an isolated vm context
+function runCodeNode(wf, nodeName, opts = {}) {
+  const node = wf.nodes.find((n) => n.name === nodeName);
+  assert(node && node.parameters && typeof node.parameters.jsCode === 'string', `Missing Code node: ${nodeName}`);
+  const sandbox = buildCodeSandbox(opts);
+  const wrappedCode = `(function() {\n${node.parameters.jsCode}\n}).call({ helpers: helpers })`;
   const script = new vm.Script(wrappedCode, { filename: `${nodeName}.vm.js` });
   return script.runInNewContext(sandbox);
+}
+
+// Helper to run any async n8n Code node (using top-level await + this.helpers)
+async function runCodeNodeAsync(wf, nodeName, opts = {}) {
+  const node = wf.nodes.find((n) => n.name === nodeName);
+  assert(node && node.parameters && typeof node.parameters.jsCode === 'string', `Missing Code node: ${nodeName}`);
+  const sandbox = buildCodeSandbox(opts);
+  const wrappedCode = `(async function() {\n${node.parameters.jsCode}\n}).call({ helpers: helpers })`;
+  const script = new vm.Script(wrappedCode, { filename: `${nodeName}.async.vm.js` });
+  return await script.runInNewContext(sandbox);
 }
 
 // 1. Validate Workflow Topology, Expressions, Naming & Model Configuration
@@ -497,10 +540,10 @@ function validateNotulenWorkflowTopology(wf, rawText, label) {
     byId.set(n.id, n);
     byName.set(n.name, n);
     if (n.type === 'n8n-nodes-base.code') {
-      new vm.Script(`(function(){\n${n.parameters.jsCode}\n})()`, { filename: `${label}:${n.name}` });
+      new vm.Script(`(async function(){\n${n.parameters.jsCode}\n})()`, { filename: `${label}:${n.name}` });
     }
   }
-  assert.strictEqual(wf.nodes.length, 33, `${label}: expected 33 nodes`);
+  assert.strictEqual(wf.nodes.length, 51, `${label}: expected 51 nodes`);
 
   for (const [srcName, connGroups] of Object.entries(wf.connections || {})) {
     assert(byName.has(srcName), `${label}: missing connection source ${srcName}`);
@@ -518,7 +561,7 @@ function validateNotulenWorkflowTopology(wf, rawText, label) {
   assert.strictEqual(webhookNode.parameters.responseMode, 'responseNode', `${label}: webhook must use responseNode`);
 
   const geminiHttp = byName.get('Panggil Gemini Multimodal API (HTTP)');
-  assert(geminiHttp && String(geminiHttp.parameters.url).includes('models/gemini-3.8-flash:generateContent'), `${label}: HTTP node must invoke models/gemini-3.8-flash`);
+  assert(geminiHttp && String(geminiHttp.parameters.url).includes('models/gemini-4-hydrogen:generateContent'), `${label}: sync HTTP node must invoke models/gemini-4-hydrogen`);
   assert.strictEqual(geminiHttp.parameters.authentication, 'predefinedCredentialType', `${label}: Gemini HTTP node must use predefinedCredentialType`);
   assert.strictEqual(geminiHttp.parameters.nodeCredentialType, 'googlePalmApi', `${label}: Gemini HTTP node must bind googlePalmApi credential`);
   assert(geminiHttp.credentials && geminiHttp.credentials.googlePalmApi && geminiHttp.credentials.googlePalmApi.id, `${label}: Gemini HTTP node missing googlePalmApi credentials`);
@@ -526,24 +569,55 @@ function validateNotulenWorkflowTopology(wf, rawText, label) {
 
   const fileUriHttp = byName.get('Panggil Gemini FileURI API (HTTP)');
   assert(
-    fileUriHttp && String(fileUriHttp.parameters.url).includes('models/gemini-3.5-flash-lite:generateContent'),
-    `${label}: Pass 1 FileURI HTTP node must use models/gemini-3.5-flash-lite:generateContent`
+    fileUriHttp && String(fileUriHttp.parameters.url).includes('models/gemini-4-hydrogen:generateContent'),
+    `${label}: Pass 1 FileURI HTTP node must use models/gemini-4-hydrogen:generateContent`
   );
   assert.strictEqual(fileUriHttp.parameters.options.timeout, 180000, `${label}: Pass 1 FileURI timeout must be 180000 ms`);
 
+  const pass1ClipHttp = byName.get('Panggil Gemini Pass 1 Klip (HTTP)');
+  assert(
+    pass1ClipHttp && String(pass1ClipHttp.parameters.url).includes('primaryModelUrl'),
+    `${label}: Pass 1 Klip HTTP node must bind $json.primaryModelUrl`
+  );
+  assert.strictEqual(pass1ClipHttp.parameters.options.batching.batch.batchSize, 1, `${label}: Pass 1 Klip must set batchSize: 1`);
+  assert.strictEqual(pass1ClipHttp.continueOnFail, true);
+
+  const failoverClipHttp = byName.get('Failover Klip ke Model Cadangan (HTTP)');
+  assert(
+    failoverClipHttp && String(failoverClipHttp.parameters.url).includes('failoverModelUrl'),
+    `${label}: Failover Klip HTTP node must bind $json.failoverModelUrl`
+  );
+  assert.strictEqual(failoverClipHttp.parameters.options.batching.batch.batchSize, 1, `${label}: Failover Klip must set batchSize: 1`);
+  assert.strictEqual(failoverClipHttp.continueOnFail, true);
+
   const pass2Http = byName.get('Panggil Gemini Pass 2 Editor Notulis (HTTP)');
   assert(
-    pass2Http && String(pass2Http.parameters.url).includes('pass2ModelUrl'),
-    `${label}: Pass 2 HTTP node must bind dynamic $json.pass2ModelUrl`
+    pass2Http && String(pass2Http.parameters.url).includes('pass2ModelUrl') && String(pass2Http.parameters.url).includes('models/gemini-4-neon:generateContent'),
+    `${label}: Pass 2 HTTP node must bind dynamic $json.pass2ModelUrl defaulting to models/gemini-4-neon`
   );
   assert.strictEqual(pass2Http.parameters.options.timeout, 180000, `${label}: Pass 2 timeout must be 180000 ms`);
+
+  for (const sshName of ['SSH Buat Folder Audio', 'SSH FFmpeg Kompres & Potong 15 Menit', 'SSH Bersihkan Audio Sementara']) {
+    const sshNode = byName.get(sshName);
+    assert(sshNode && sshNode.type === 'n8n-nodes-base.ssh', `${label}: missing SSH node ${sshName}`);
+    assert.strictEqual(sshNode.parameters.cwd, '={{ "" }}', `${label}: ${sshName} cwd must evaluate to empty string`);
+    assert.strictEqual(sshNode.continueOnFail, true, `${label}: ${sshName} must set continueOnFail: true`);
+    assert(sshNode.credentials && sshNode.credentials.sshPassword && sshNode.credentials.sshPassword.id, `${label}: ${sshName} missing sshPassword credentials`);
+    assert(!String(sshNode.parameters.command).includes('"'), `${label}: ${sshName} command must avoid double quotes for Windows OpenSSH`);
+  }
+
+  const writeDisk = byName.get('Simpan Audio ke Disk');
+  assert(writeDisk && writeDisk.type === 'n8n-nodes-base.readWriteFile' && writeDisk.parameters.operation === 'write', `${label}: missing Simpan Audio ke Disk`);
+  const readDisk = byName.get('Baca Klip MP3 dari Disk');
+  assert(readDisk && readDisk.type === 'n8n-nodes-base.readWriteFile' && readDisk.parameters.operation === 'read', `${label}: missing Baca Klip MP3 dari Disk`);
 
   const ifNode = byName.get('Otorisasi Webhook Valid? (IF)');
   assert(ifNode && wf.connections['Otorisasi Webhook Valid? (IF)'].main.length === 2, `${label}: Auth IF node must have 2 branches`);
 }
 
 validateNotulenWorkflowTopology(notulenExWf, notulenExRaw, 'transkep-ai-notulen.example.json');
-for (const ph of ['<GANTI_TRANSKEP_WEBHOOK_KEY>', '<GANTI_GEMINI_CREDENTIAL_ID>', '<GANTI_N8N_INSTANCE_ID>', '<GANTI_WORKFLOW_ID>', '<GANTI_GAS_DEPLOYMENT_ID>', '<GANTI_GOOGLE_SERVICE_ACCOUNT_CREDENTIAL_ID>']) {
+assert(!notulenExRaw.includes('YWZ8dADUWtnM4zyx'), 'Notulen example leaked SSH credential id');
+for (const ph of ['<GANTI_TRANSKEP_WEBHOOK_KEY>', '<GANTI_GEMINI_CREDENTIAL_ID>', '<GANTI_SSH_CREDENTIAL_ID>', '<GANTI_N8N_INSTANCE_ID>', '<GANTI_WORKFLOW_ID>', '<GANTI_GAS_DEPLOYMENT_ID>', '<GANTI_GOOGLE_SERVICE_ACCOUNT_CREDENTIAL_ID>']) {
   assert(notulenExRaw.includes(ph), `Notulen example missing placeholder: ${ph}`);
 }
 
@@ -559,11 +633,13 @@ if (hasNotulenLive) {
 }
 
 // VM simulations for Notulen workflow Code nodes (both example & live)
-function runNotulenBehaviorSuite(wf, expectedSecret, wfLabel) {
+async function runNotulenBehaviorSuite(wf, expectedSecret, wfLabel) {
   const manualOut = runCodeNode(wf, 'Validasi & Siapkan Prompt Notulen (Code)', { inputJson: {} })[0].json;
   assert.strictEqual(manualOut.isAuthorized, true, `${wfLabel}: Manual execution must be authorized`);
   assert.strictEqual(manualOut.isManualTest, true);
   assert.strictEqual(manualOut.geminiRequestBody.generationConfig.responseMimeType, 'application/json');
+  assert.strictEqual(manualOut.geminiRequestBody.generationConfig.thinkingConfig.thinkingLevel, 'low');
+  assert.strictEqual(manualOut.geminiRequestBody.generationConfig.temperature, undefined);
 
   const unauthOut = runCodeNode(wf, 'Validasi & Siapkan Prompt Notulen (Code)', {
     inputJson: { body: { secret_key: 'WRONG', id_rapat: 'RPT-1', agenda: 'Tes' } },
@@ -925,12 +1001,14 @@ function runNotulenBehaviorSuite(wf, expectedSecret, wfLabel) {
   })[0].json;
   assert.strictEqual(pass1FailPrep.pass1FailedMessage, '', `${wfLabel}: Pass 1 failure must allow Pass 2 audio fallback instead of aborting`);
   assert.strictEqual(pass1FailPrep.useAudioFallbackInPass2, true);
-  assert.strictEqual(pass1FailPrep.pass2ModelName, 'models/gemini-3.8-flash', `${wfLabel}: Pass 2 failover must switch to cross-model gemini-3.8-flash`);
+  assert.strictEqual(pass1FailPrep.pass2ModelName, 'models/gemini-4-argon', `${wfLabel}: Pass 2 failover must switch to cross-model gemini-4-argon`);
   assert.strictEqual(
     pass1FailPrep.pass2ModelUrl,
-    'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent',
-    `${wfLabel}: Pass 2 failover URL must target gemini-3.8-flash`
+    'https://generativelanguage.googleapis.com/v1beta/models/gemini-4-argon:generateContent',
+    `${wfLabel}: Pass 2 failover URL must target gemini-4-argon`
   );
+  assert.strictEqual(pass1FailPrep.geminiPass2RequestBody.generationConfig.thinkingConfig.thinkingLevel, 'low');
+  assert.strictEqual(pass1FailPrep.geminiPass2RequestBody.generationConfig.temperature, undefined);
   assert.strictEqual(pass1FailPrep.geminiPass2RequestBody.contents[0].parts[0].file_data.file_uri, 'https://gemini/gem-rec');
 
   const pass1OkPrep = runCodeNode(wf, 'Siapkan Payload Pass 2 Smart Merge (Code)', {
@@ -942,10 +1020,10 @@ function runNotulenBehaviorSuite(wf, expectedSecret, wfLabel) {
       'Siapkan Payload Gemini FileURI (Code)': { fileName: 'files/gem-147', fileUri: 'https://gemini/gem-147', pollFailedMessage: '' },
     },
   })[0].json;
-  assert.strictEqual(pass1OkPrep.pass2ModelName, 'models/gemini-3.5-flash-lite', `${wfLabel}: Normal Pass 2 Smart Merge must use fast gemini-3.5-flash-lite`);
+  assert.strictEqual(pass1OkPrep.pass2ModelName, 'models/gemini-4-neon', `${wfLabel}: Normal Pass 2 Smart Merge must use gemini-4-neon`);
   assert.strictEqual(
     pass1OkPrep.pass2ModelUrl,
-    'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent'
+    'https://generativelanguage.googleapis.com/v1beta/models/gemini-4-neon:generateContent'
   );
   const salvagedPass1Cb = runCodeNode(wf, 'Parse & Siapkan Callback Async (Code)', {
     inputJson: { error: { message: '503 Model Overloaded' } },
@@ -973,14 +1051,195 @@ function runNotulenBehaviorSuite(wf, expectedSecret, wfLabel) {
   })[0].json;
   assert.strictEqual(sseCb.callbackPayload.status, 'success', `${wfLabel}: SSE data: stream chunks must parse cleanly`);
   assert.strictEqual(sseCb.callbackPayload.data.pengarahan_umum, 'Dari SSE Stream');
+
+  // Opsi B Pipeline: Sanitization, binary re-attach, 15m split Round-Robin Gemini 4, failover splice & cleanup
+  const maliciousCtx = { ...big150MbOut, job_id: '../../etc; rm -rf /', audioFileName: 'Rapat.m4a;evil' };
+  const dirSetupOut = runCodeNode(wf, 'Siapkan Direktori Kerja Audio (Code)', {
+    inputJson: {},
+    inputBinary: { data: { id: 'fs-dl-1', fileName: 'Rapat.m4a', mimeType: 'audio/mp4' } },
+    nodeMap: { 'Validasi & Siapkan Prompt Notulen (Code)': maliciousCtx },
+  })[0];
+  assert(!/[./;\s]/.test(dirSetupOut.json.safeJobId), `${wfLabel}: safeJobId must strip traversal/shell chars`);
+  assert.strictEqual(dirSetupOut.json.safeExt, 'm4a');
+  assert.strictEqual(dirSetupOut.json.hasBin, true);
+  assert(dirSetupOut.json.n8nInputPath.startsWith('/home/node/.n8n-files/'), `${wfLabel}: must stay inside n8n 2.x default ~/.n8n-files sandbox`);
+  assert(dirSetupOut.json.ffmpegOutputPattern.startsWith('/audio-tmp/'));
+
+  const reattachOk = runCodeNode(wf, 'Re-Attach Binary Untuk Simpan Disk (Code)', {
+    inputJson: { code: 0, stdout: '', stderr: '' },
+    nodeMap: { 'Siapkan Direktori Kerja Audio (Code)': dirSetupOut.json },
+    nodeBinaryMap: { 'Download Audio dari Google Drive': { data: { id: 'fs-dl-1', mimeType: 'audio/mp4' } } },
+  })[0];
+  assert.strictEqual(reattachOk.json.diskReady, true);
+  assert.strictEqual(reattachOk.binary.data.id, 'fs-dl-1');
+
+  const reattachSshFail = runCodeNode(wf, 'Re-Attach Binary Untuk Simpan Disk (Code)', {
+    inputJson: { error: { message: 'SSH offline' } },
+    nodeMap: { 'Siapkan Direktori Kerja Audio (Code)': dirSetupOut.json },
+    nodeBinaryMap: { 'Download Audio dari Google Drive': { data: { id: 'fs-dl-1', mimeType: 'audio/mp4' } } },
+  })[0];
+  assert.strictEqual(reattachSshFail.json.diskReady, false);
+
+  // Zero-chunk fallback must recover Drive binary and keep chunksAvailable: false
+  const zeroChunkFallback = await runCodeNodeAsync(wf, 'Siapkan Payload Klip Round-Robin (Code)', {
+    inputAll: [{ json: {} }],
+    nodeMap: {
+      'Validasi & Siapkan Prompt Notulen (Code)': big150MbOut,
+      'Siapkan Direktori Kerja Audio (Code)': dirSetupOut.json,
+    },
+    nodeBinaryMap: { 'Download Audio dari Google Drive': { data: { id: 'orig-drv', mimeType: 'audio/mp4' } } },
+  });
+  assert.strictEqual(zeroChunkFallback[0].json.chunksAvailable, false);
+  assert.strictEqual(zeroChunkFallback[0].binary.data.id, 'orig-drv');
+
+  // Out-of-order 4 binaryMode:separate chunks resolved via getBinaryDataBuffer -> sorted & Round-Robin assigned
+  const unsortedChunks = [
+    { json: {}, binary: { data: { id: 'bin-2', fileName: 'part_002.mp3', mimeType: 'audio/mpeg', _buffer: Buffer.from('SEG2') } } },
+    { json: {}, binary: { data: { id: 'bin-0', fileName: 'part_000.mp3', mimeType: 'audio/mpeg', _buffer: Buffer.from('SEG0') } } },
+    { json: {}, binary: { data: { id: 'bin-3', fileName: 'part_003.mp3', mimeType: 'audio/mpeg', _buffer: Buffer.from('SEG3') } } },
+    { json: {}, binary: { data: { id: 'bin-1', fileName: 'part_001.mp3', mimeType: 'audio/mpeg', _buffer: Buffer.from('SEG1') } } },
+  ];
+  const clipPayloads = await runCodeNodeAsync(wf, 'Siapkan Payload Klip Round-Robin (Code)', {
+    inputAll: unsortedChunks,
+    nodeMap: {
+      'Validasi & Siapkan Prompt Notulen (Code)': big150MbOut,
+      'Siapkan Direktori Kerja Audio (Code)': dirSetupOut.json,
+    },
+  });
+  assert.strictEqual(clipPayloads.length, 4, `${wfLabel}: expected 4 chunk payloads`);
+  assert.deepStrictEqual(
+    Array.from(clipPayloads, (c) => c.json.fileName),
+    ['part_000.mp3', 'part_001.mp3', 'part_002.mp3', 'part_003.mp3'],
+    `${wfLabel}: chunks must be sorted chronologically`
+  );
+  assert.strictEqual(clipPayloads[0].json.primaryModelName, 'models/gemini-4-hydrogen');
+  assert.strictEqual(clipPayloads[1].json.primaryModelName, 'models/gemini-4-argon');
+  assert.strictEqual(clipPayloads[2].json.primaryModelName, 'models/gemini-4-hydrogen');
+  assert.strictEqual(clipPayloads[3].json.primaryModelName, 'models/gemini-4-argon');
+  assert.strictEqual(
+    Buffer.from(clipPayloads[1].json.chunkGeminiRequestBody.contents[0].parts[0].inline_data.data, 'base64').toString('utf8'),
+    'SEG1',
+    `${wfLabel}: getBinaryDataBuffer index must map to unsorted origIdx before sorting`
+  );
+  assert.strictEqual(clipPayloads[0].json.chunkGeminiRequestBody.generationConfig.thinkingConfig.thinkingLevel, 'low');
+  assert.strictEqual(clipPayloads[0].json.chunkGeminiRequestBody.generationConfig.maxOutputTokens, 32768);
+  assert.strictEqual(clipPayloads[0].json.chunkGeminiRequestBody.generationConfig.temperature, undefined);
+
+  // Evaluate 4 clips: Case A (all succeed, strictNodes: true without failover nodes)
+  const makeGeminiOk = (speakerName, uraianText) => ({
+    json: {
+      candidates: [{
+        content: {
+          parts: [{
+            text: JSON.stringify({
+              pengarahan_umum: 'Arahan rapat',
+              kesimpulan: 'Laksanakan',
+              transkrip_ringkas: speakerName + ' berbicara.',
+              pembahasan: [{ pembicara_nama: speakerName, items: [{ uraian: uraianText, tindak_lanjut: 'Tindak', target_kategori_waktu: 'JANGKA_PENDEK', penanggung_jawab: 'Panitera', selesai_kategori_waktu: 'JANGKA_PENDEK' }] }],
+            }),
+          }],
+        },
+      }],
+    },
+  });
+
+  const evalAllOk = runCodeNode(wf, 'Evaluasi Hasil Klip & Cek Failover (Code)', {
+    inputAll: [
+      makeGeminiOk('Pembicara A', 'Bahasan 1'),
+      makeGeminiOk('Pembicara B', 'Bahasan 2'),
+      makeGeminiOk('Pembicara C', 'Bahasan 3'),
+      makeGeminiOk('Pembicara D', 'Bahasan 4'),
+    ],
+    nodeAllMap: { 'Siapkan Payload Klip Round-Robin (Code)': clipPayloads },
+  })[0].json;
+  assert.strictEqual(evalAllOk.hasFailedClips, false);
+  const mergedAllOk = runCodeNode(wf, 'Gabungkan Semua Klip Untuk Pass 2 (Code)', {
+    inputAll: [{ json: evalAllOk }],
+    nodeMap: { 'Evaluasi Hasil Klip & Cek Failover (Code)': evalAllOk },
+    strictNodes: true,
+  })[0].json;
+  assert.strictEqual(mergedAllOk.fromChunkPipeline, true);
+  assert.strictEqual(mergedAllOk.chunkSalvagedObj.pembahasan.length, 4, `${wfLabel}: must preserve all 4 speakers across chunks`);
+  assert.strictEqual(mergedAllOk.chunkSoftError, '');
+
+  // Evaluate 4 clips: Case B (Clip #1 fails 503 on Argon -> Failover on Hydrogen recovers chronologically!)
+  const evalWithFail = runCodeNode(wf, 'Evaluasi Hasil Klip & Cek Failover (Code)', {
+    inputAll: [
+      makeGeminiOk('Pembicara A', 'Bahasan 1'),
+      { json: { error: { message: '503 High Demand' } } },
+      makeGeminiOk('Pembicara C', 'Bahasan 3'),
+      makeGeminiOk('Pembicara D', 'Bahasan 4'),
+    ],
+    nodeAllMap: { 'Siapkan Payload Klip Round-Robin (Code)': clipPayloads },
+  })[0].json;
+  assert.strictEqual(evalWithFail.hasFailedClips, true);
+  assert.strictEqual(evalWithFail.failedClips.length, 1);
+
+  const splitFailItems = runCodeNode(wf, 'Pecah Klip Gagal Untuk Failover (Code)', {
+    inputJson: evalWithFail,
+  });
+  assert.strictEqual(splitFailItems.length, 1);
+  assert.strictEqual(splitFailItems[0].json.failoverModelName, 'models/gemini-4-hydrogen');
+
+  const mergedRecovered = runCodeNode(wf, 'Gabungkan Semua Klip Untuk Pass 2 (Code)', {
+    inputAll: [makeGeminiOk('Pembicara B Pulih', 'Bahasan 2 Pulih')],
+    nodeMap: { 'Evaluasi Hasil Klip & Cek Failover (Code)': evalWithFail },
+    nodeAllMap: { 'Pecah Klip Gagal Untuk Failover (Code)': splitFailItems },
+    strictNodes: true,
+  })[0].json;
+  assert.strictEqual(mergedRecovered.chunkStats.okCount, 4);
+  assert.deepStrictEqual(
+    Array.from(mergedRecovered.chunkSalvagedObj.pembahasan, (p) => p.pembicara_nama),
+    ['Pembicara A', 'Pembicara B Pulih', 'Pembicara C', 'Pembicara D'],
+    `${wfLabel}: failover clip must splice back in strict chronological order`
+  );
+
+  // Pass 2 Smart Merge directly from Opsi B chunk pipeline (strictNodes: true, no Files API nodes executed!)
+  const pass2FromChunks = runCodeNode(wf, 'Siapkan Payload Pass 2 Smart Merge (Code)', {
+    inputJson: mergedRecovered,
+    nodeMap: { 'Validasi & Siapkan Prompt Notulen (Code)': big150MbOut },
+    strictNodes: true,
+  })[0].json;
+  assert.strictEqual(pass2FromChunks.fromChunkPipeline, true);
+  assert.strictEqual(pass2FromChunks.useAudioFallbackInPass2, false);
+  assert.strictEqual(pass2FromChunks.pass2ModelName, 'models/gemini-4-neon');
+  assert(pass2FromChunks.geminiPass2RequestBody.contents[0].parts[0].text.includes('SEGMEN 2/4'));
+  assert.strictEqual(pass2FromChunks.geminiPass2RequestBody.generationConfig.thinkingConfig.thinkingLevel, 'low');
+
+  // Cleanup node safety with strictNodes: true across both paths
+  const cleanupDiskOnly = runCodeNode(wf, 'Cek Kebutuhan Cleanup (Code)', {
+    inputJson: {},
+    nodeMap: {
+      'Siapkan Direktori Kerja Audio (Code)': dirSetupOut.json,
+      'Re-Attach Binary Untuk Simpan Disk (Code)': { sshOk: true },
+    },
+    strictNodes: true,
+  })[0].json;
+  assert.strictEqual(cleanupDiskOnly.hasTempDisk, true);
+  assert.strictEqual(cleanupDiskOnly.hasGeminiFile, false);
+
+  const cleanupFilesFallback = runCodeNode(wf, 'Cek Kebutuhan Cleanup (Code)', {
+    inputJson: {},
+    nodeMap: {
+      'Cek Upload & Siapkan Gemini FileURI (Code)': { fileName: 'files/gem-clean-1' },
+    },
+    strictNodes: true,
+  })[0].json;
+  assert.strictEqual(cleanupFilesFallback.hasTempDisk, false);
+  assert.strictEqual(cleanupFilesFallback.hasGeminiFile, true);
+  assert.strictEqual(cleanupFilesFallback.geminiFileName, 'files/gem-clean-1');
 }
 
-runNotulenBehaviorSuite(notulenExWf, '<GANTI_TRANSKEP_WEBHOOK_KEY>', 'notulen-example');
-if (hasNotulenLive) {
-  const prepNode = notulenLiveWf.nodes.find((n) => n.name === 'Validasi & Siapkan Prompt Notulen (Code)');
-  const secretMatch = prepNode.parameters.jsCode.match(/expectedSecret\s*=\s*'([^']+)'/);
-  assert(secretMatch && secretMatch[1], 'Live transkep-ai-notulen.json missing expectedSecret');
-  runNotulenBehaviorSuite(notulenLiveWf, secretMatch[1], 'notulen-live');
-}
-
-console.log(`[PASS] Transkep AI Notulen Rapat workflow topology, multimodal Gemini payload & JSON normalizer verified (${hasNotulenLive ? 'example + live local' : 'example CI'}).`);
+(async () => {
+  await runNotulenBehaviorSuite(notulenExWf, '<GANTI_TRANSKEP_WEBHOOK_KEY>', 'notulen-example');
+  if (hasNotulenLive) {
+    const prepNode = notulenLiveWf.nodes.find((n) => n.name === 'Validasi & Siapkan Prompt Notulen (Code)');
+    const secretMatch = prepNode.parameters.jsCode.match(/expectedSecret\s*=\s*'([^']+)'/);
+    assert(secretMatch && secretMatch[1], 'Live transkep-ai-notulen.json missing expectedSecret');
+    await runNotulenBehaviorSuite(notulenLiveWf, secretMatch[1], 'notulen-live');
+  }
+  console.log(`[PASS] Transkep AI Notulen Rapat workflow topology, multimodal Gemini payload & JSON normalizer verified (${hasNotulenLive ? 'example + live local' : 'example CI'}).`);
+})().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});
