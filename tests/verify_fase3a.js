@@ -781,7 +781,11 @@ assert(gasRapat146Src.includes('2 * 1024 * 1024 * 1024') &&
 'eoffice/rapat.js must enforce 2 GB cap and constantTimeEquals_ on callbackAiNotulenJobFromExternal_');
 
 // Verify n8n blueprint (sanitized + zero secret leaks + valid graph wiring) & local n8n JSON
-for (const n8nPath of ['n8n/transkep-ai-notulen.example.json', 'n8n/transkep-ai-notulen.json']) {
+const n8nNotulenPaths = ['n8n/transkep-ai-notulen.example.json'];
+if (fs.existsSync('n8n/transkep-ai-notulen.json')) {
+  n8nNotulenPaths.push('n8n/transkep-ai-notulen.json');
+}
+for (const n8nPath of n8nNotulenPaths) {
   const rawN8n = fs.readFileSync(n8nPath, 'utf8');
   assert(!rawN8n.includes('BEGIN PRIVATE KEY'), `${n8nPath} must NEVER contain private keys`);
   const wf = JSON.parse(rawN8n);
