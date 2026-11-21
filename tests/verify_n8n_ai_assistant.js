@@ -524,6 +524,20 @@ function validateNotulenWorkflowTopology(wf, rawText, label) {
   assert(geminiHttp.credentials && geminiHttp.credentials.googlePalmApi && geminiHttp.credentials.googlePalmApi.id, `${label}: Gemini HTTP node missing googlePalmApi credentials`);
   assert.strictEqual(geminiHttp.continueOnFail, true, `${label}: Gemini HTTP node must set continueOnFail: true`);
 
+  const fileUriHttp = byName.get('Panggil Gemini FileURI API (HTTP)');
+  assert(
+    fileUriHttp && String(fileUriHttp.parameters.url).includes('models/gemini-3.5-flash-lite:generateContent'),
+    `${label}: Pass 1 FileURI HTTP node must use models/gemini-3.5-flash-lite:generateContent`
+  );
+  assert.strictEqual(fileUriHttp.parameters.options.timeout, 180000, `${label}: Pass 1 FileURI timeout must be 180000 ms`);
+
+  const pass2Http = byName.get('Panggil Gemini Pass 2 Editor Notulis (HTTP)');
+  assert(
+    pass2Http && String(pass2Http.parameters.url).includes('pass2ModelUrl'),
+    `${label}: Pass 2 HTTP node must bind dynamic $json.pass2ModelUrl`
+  );
+  assert.strictEqual(pass2Http.parameters.options.timeout, 180000, `${label}: Pass 2 timeout must be 180000 ms`);
+
   const ifNode = byName.get('Otorisasi Webhook Valid? (IF)');
   assert(ifNode && wf.connections['Otorisasi Webhook Valid? (IF)'].main.length === 2, `${label}: Auth IF node must have 2 branches`);
 }
@@ -653,7 +667,7 @@ function runNotulenBehaviorSuite(wf, expectedSecret, wfLabel) {
       file: {
         name: 'files/gemini-audio-146',
         uri: 'https://generativelanguage.googleapis.com/v1beta/files/gemini-audio-146',
-        state: 'PROCESSING',
+        state: 'ACTIVE',
         mimeType: 'audio/mp4',
       },
     },
@@ -664,7 +678,24 @@ function runNotulenBehaviorSuite(wf, expectedSecret, wfLabel) {
     },
   })[0].json;
   assert.strictEqual(upCheckOut.uploadOk, true);
-  assert.strictEqual(upCheckOut.fileState, 'PROCESSING');
+  assert.strictEqual(upCheckOut.fileState, 'PROCESSING', `${wfLabel}: >10 MB audio must force initial PROCESSING wait cycle even when Files API responds ACTIVE`);
+
+  const smallUpCheckOut = runCodeNode(wf, 'Cek Upload & Siapkan Gemini FileURI (Code)', {
+    inputJson: {
+      file: {
+        name: 'files/gemini-audio-small',
+        uri: 'https://generativelanguage.googleapis.com/v1beta/files/gemini-audio-small',
+        state: 'ACTIVE',
+        mimeType: 'audio/mp4',
+      },
+    },
+    nodeMap: {
+      'Validasi & Siapkan Prompt Notulen (Code)': { ...asyncDriveOut, audioSizeBytes: 5000000 },
+      'Start Gemini Files Resumable Session (HTTP)': { statusCode: 200, headers: { 'x-goog-upload-url': 'https://upload' } },
+      'Download Audio dari Google Drive': { ok: true },
+    },
+  })[0].json;
+  assert.strictEqual(smallUpCheckOut.fileState, 'ACTIVE', `${wfLabel}: <=10 MB audio stays ACTIVE immediately`);
 
   const payloadFileUriOut = runCodeNode(wf, 'Siapkan Payload Gemini FileURI (Code)', {
     inputJson: {
@@ -743,8 +774,24 @@ function runNotulenBehaviorSuite(wf, expectedSecret, wfLabel) {
       },
     },
   })[0].json;
-  assert.strictEqual(big150MbOut.needsFfmpeg, true, `${wfLabel}: >20 MB audio must trigger needsFfmpeg: true`);
-  assert.strictEqual(asyncDriveOut.needsFfmpeg, true, `${wfLabel}: 77 MB audio (>20 MB) must trigger FFmpeg compression`);
+  const wav30MbOut = runCodeNode(wf, 'Validasi & Siapkan Prompt Notulen (Code)', {
+    inputJson: {
+      body: {
+        secret_key: expectedSecret,
+        event: 'AI_NOTULEN_RAPAT_ASYNC',
+        async_mode: true,
+        job_id: 'AINOT-TEST-30WAV',
+        id_rapat: 'RPT-2026-WAV',
+        audio_drive_file_id: '1DriveAudio30MbWav',
+        audio_file_name: 'Rapat.wav',
+        audio_mime_type: 'audio/wav',
+        audio_size_bytes: 30000000,
+      },
+    },
+  })[0].json;
+  assert.strictEqual(big150MbOut.needsFfmpeg, true, `${wfLabel}: >100 MB compressed audio must trigger needsFfmpeg: true`);
+  assert.strictEqual(asyncDriveOut.needsFfmpeg, false, `${wfLabel}: 77 MB .m4a (<=100 MB) must skip redundant FFmpeg re-encode`);
+  assert.strictEqual(wav30MbOut.needsFfmpeg, true, `${wfLabel}: uncompressed WAV >20 MB must trigger needsFfmpeg: true`);
   assert.strictEqual(small15MbOut.needsFfmpeg, false, `${wfLabel}: <=20 MB audio (15 MB) must bypass FFmpeg`);
   assert.strictEqual(big150MbOut.tgl_rapat_iso, '2026-03-17');
 
@@ -878,6 +925,12 @@ function runNotulenBehaviorSuite(wf, expectedSecret, wfLabel) {
   })[0].json;
   assert.strictEqual(pass1FailPrep.pass1FailedMessage, '', `${wfLabel}: Pass 1 failure must allow Pass 2 audio fallback instead of aborting`);
   assert.strictEqual(pass1FailPrep.useAudioFallbackInPass2, true);
+  assert.strictEqual(pass1FailPrep.pass2ModelName, 'models/gemini-3.8-flash', `${wfLabel}: Pass 2 failover must switch to cross-model gemini-3.8-flash`);
+  assert.strictEqual(
+    pass1FailPrep.pass2ModelUrl,
+    'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent',
+    `${wfLabel}: Pass 2 failover URL must target gemini-3.8-flash`
+  );
   assert.strictEqual(pass1FailPrep.geminiPass2RequestBody.contents[0].parts[0].file_data.file_uri, 'https://gemini/gem-rec');
 
   const pass1OkPrep = runCodeNode(wf, 'Siapkan Payload Pass 2 Smart Merge (Code)', {
@@ -889,6 +942,11 @@ function runNotulenBehaviorSuite(wf, expectedSecret, wfLabel) {
       'Siapkan Payload Gemini FileURI (Code)': { fileName: 'files/gem-147', fileUri: 'https://gemini/gem-147', pollFailedMessage: '' },
     },
   })[0].json;
+  assert.strictEqual(pass1OkPrep.pass2ModelName, 'models/gemini-3.5-flash-lite', `${wfLabel}: Normal Pass 2 Smart Merge must use fast gemini-3.5-flash-lite`);
+  assert.strictEqual(
+    pass1OkPrep.pass2ModelUrl,
+    'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent'
+  );
   const salvagedPass1Cb = runCodeNode(wf, 'Parse & Siapkan Callback Async (Code)', {
     inputJson: { error: { message: '503 Model Overloaded' } },
     nodeMap: {
@@ -898,6 +956,23 @@ function runNotulenBehaviorSuite(wf, expectedSecret, wfLabel) {
   })[0].json;
   assert.strictEqual(salvagedPass1Cb.callbackPayload.status, 'success', `${wfLabel}: Pass 2 failure must salvage Pass 1 Notula JSON`);
   assert.strictEqual(salvagedPass1Cb.callbackPayload.data.pengarahan_umum, 'Dari Pass 1');
+
+  const sseCb = runCodeNode(wf, 'Parse & Siapkan Callback Async (Code)', {
+    inputJson: {
+      data: [
+        'data: ' + JSON.stringify({ candidates: [{ content: { parts: [{ thought: true, text: 'Berpikir...' }] } }] }),
+        'data: ' + JSON.stringify({ candidates: [{ content: { parts: [{ text: '{"pengarahan_umum":"Dari SSE ' }] } }] }),
+        'data: ' + JSON.stringify({ candidates: [{ content: { parts: [{ text: 'Stream","kesimpulan":"Mantap","pembahasan":[]}' }] } }] }),
+        'data: [DONE]'
+      ].join('\n'),
+    },
+    nodeMap: {
+      'Validasi & Siapkan Prompt Notulen (Code)': big150MbOut,
+      'Siapkan Payload Pass 2 Smart Merge (Code)': pass1OkPrep,
+    },
+  })[0].json;
+  assert.strictEqual(sseCb.callbackPayload.status, 'success', `${wfLabel}: SSE data: stream chunks must parse cleanly`);
+  assert.strictEqual(sseCb.callbackPayload.data.pengarahan_umum, 'Dari SSE Stream');
 }
 
 runNotulenBehaviorSuite(notulenExWf, '<GANTI_TRANSKEP_WEBHOOK_KEY>', 'notulen-example');
