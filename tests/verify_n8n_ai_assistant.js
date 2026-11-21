@@ -728,9 +728,32 @@ function runNotulenBehaviorSuite(wf, expectedSecret, wfLabel) {
       },
     },
   })[0].json;
-  assert.strictEqual(big150MbOut.needsFfmpeg, true, `${wfLabel}: >100 MB audio must trigger needsFfmpeg: true`);
-  assert.strictEqual(asyncDriveOut.needsFfmpeg, false, `${wfLabel}: 77 MB audio must bypass FFmpeg`);
+  const small15MbOut = runCodeNode(wf, 'Validasi & Siapkan Prompt Notulen (Code)', {
+    inputJson: {
+      body: {
+        secret_key: expectedSecret,
+        event: 'AI_NOTULEN_RAPAT_ASYNC',
+        async_mode: true,
+        job_id: 'AINOT-TEST-15M',
+        id_rapat: 'RPT-2026-15M',
+        audio_drive_file_id: '1DriveAudio15Mb',
+        audio_file_name: 'Rapat_Singkat.m4a',
+        audio_mime_type: 'audio/mp4',
+        audio_size_bytes: 15000000,
+      },
+    },
+  })[0].json;
+  assert.strictEqual(big150MbOut.needsFfmpeg, true, `${wfLabel}: >20 MB audio must trigger needsFfmpeg: true`);
+  assert.strictEqual(asyncDriveOut.needsFfmpeg, true, `${wfLabel}: 77 MB audio (>20 MB) must trigger FFmpeg compression`);
+  assert.strictEqual(small15MbOut.needsFfmpeg, false, `${wfLabel}: <=20 MB audio (15 MB) must bypass FFmpeg`);
   assert.strictEqual(big150MbOut.tgl_rapat_iso, '2026-03-17');
+
+  const ffmpegSepOk = runCodeNode(wf, 'Evaluasi Hasil FFmpeg & Siapkan Binary (Code)', {
+    inputJson: {},
+    inputBinary: { data: { id: 'fs-bin-147', mimeType: 'audio/mpeg' } },
+    nodeMap: { 'Validasi & Siapkan Prompt Notulen (Code)': big150MbOut },
+  })[0];
+  assert.strictEqual(ffmpegSepOk.json.ffmpegUsed, true, `${wfLabel}: binaryMode separate (.id) must count as valid FFmpeg binary`);
 
   const ffmpegOk = runCodeNode(wf, 'Evaluasi Hasil FFmpeg & Siapkan Binary (Code)', {
     inputJson: {},
@@ -820,6 +843,61 @@ function runNotulenBehaviorSuite(wf, expectedSecret, wfLabel) {
   assert.strictEqual(cb147Out.callbackPayload.data.pembahasan[0].items[0].target, '2026-03-17', `${wfLabel}: HARI_RAPAT must stay on meeting date`);
   assert.strictEqual(cb147Out.callbackPayload.data.pembahasan[0].items[1].target, '2026-03-31', `${wfLabel}: 2026-03-17 + 5 workdays must skip Lebaran 2026 SKB`);
   assert.strictEqual(cb147Out.callbackPayload.data.pembahasan[0].items[1].tanggal_penyelesaian, '2026-04-15', `${wfLabel}: 2026-03-17 + 15 workdays must skip Lebaran & Wafat Yesus Kristus SKB`);
+
+  // Self-Healing Hotfix v3.8.82: Multi-part thinking output + Pass 1/2 mutual recovery
+  const thinkingPass2 = runCodeNode(wf, 'Parse & Siapkan Callback Async (Code)', {
+    inputJson: {
+      candidates: [{
+        content: {
+          parts: [
+            { thought: true, text: 'Menganalisis pembicara rapat...' },
+            { text: '{"pengarahan_umum":"Arahan Thinking OK","kesimpulan":"Mantap","pembahasan":[]}' },
+          ],
+        },
+      }],
+    },
+    nodeMap: {
+      'Validasi & Siapkan Prompt Notulen (Code)': big150MbOut,
+      'Siapkan Payload Pass 2 Smart Merge (Code)': pass2PrepOut,
+    },
+  })[0].json;
+  assert.strictEqual(thinkingPass2.callbackPayload.status, 'success');
+  assert.strictEqual(thinkingPass2.callbackPayload.data.pengarahan_umum, 'Arahan Thinking OK');
+
+  const pass1FailPrep = runCodeNode(wf, 'Siapkan Payload Pass 2 Smart Merge (Code)', {
+    inputJson: { error: { message: '503 Service Unavailable' } },
+    nodeMap: {
+      'Validasi & Siapkan Prompt Notulen (Code)': big150MbOut,
+      'Siapkan Payload Gemini FileURI (Code)': {
+        fileName: 'files/gem-rec',
+        fileUri: 'https://gemini/gem-rec',
+        fileMime: 'audio/mpeg',
+        pollFailedMessage: '',
+      },
+    },
+  })[0].json;
+  assert.strictEqual(pass1FailPrep.pass1FailedMessage, '', `${wfLabel}: Pass 1 failure must allow Pass 2 audio fallback instead of aborting`);
+  assert.strictEqual(pass1FailPrep.useAudioFallbackInPass2, true);
+  assert.strictEqual(pass1FailPrep.geminiPass2RequestBody.contents[0].parts[0].file_data.file_uri, 'https://gemini/gem-rec');
+
+  const pass1OkPrep = runCodeNode(wf, 'Siapkan Payload Pass 2 Smart Merge (Code)', {
+    inputJson: {
+      candidates: [{ content: { parts: [{ text: JSON.stringify({ pengarahan_umum: 'Dari Pass 1', kesimpulan: 'OK', pembahasan: [] }) }] } }],
+    },
+    nodeMap: {
+      'Validasi & Siapkan Prompt Notulen (Code)': big150MbOut,
+      'Siapkan Payload Gemini FileURI (Code)': { fileName: 'files/gem-147', fileUri: 'https://gemini/gem-147', pollFailedMessage: '' },
+    },
+  })[0].json;
+  const salvagedPass1Cb = runCodeNode(wf, 'Parse & Siapkan Callback Async (Code)', {
+    inputJson: { error: { message: '503 Model Overloaded' } },
+    nodeMap: {
+      'Validasi & Siapkan Prompt Notulen (Code)': big150MbOut,
+      'Siapkan Payload Pass 2 Smart Merge (Code)': pass1OkPrep,
+    },
+  })[0].json;
+  assert.strictEqual(salvagedPass1Cb.callbackPayload.status, 'success', `${wfLabel}: Pass 2 failure must salvage Pass 1 Notula JSON`);
+  assert.strictEqual(salvagedPass1Cb.callbackPayload.data.pengarahan_umum, 'Dari Pass 1');
 }
 
 runNotulenBehaviorSuite(notulenExWf, '<GANTI_TRANSKEP_WEBHOOK_KEY>', 'notulen-example');

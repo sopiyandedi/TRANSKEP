@@ -1708,7 +1708,7 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
     assert(fs.readFileSync('modules/eoffice/eoffice_data.js', 'utf8').includes('async requestAiNotulenRapat('), 'eoffice_data.js must define requestAiNotulenRapat');
     assert(fs.readFileSync('index.html', 'utf8').includes("media-src 'self' data: blob:;"), 'index.html CSP must permit self/data/blob media-src for audio player');
     const viewEoffice140 = fs.readFileSync('modules/eoffice/view_eoffice.html', 'utf8');
-    for (const elId of ['btnRapatProcessAiNotulen', 'btnRapatRecordAudio', 'btnRapatAiModeMerge', 'btnRapatAiModeReplace', 'btnRapatUndoAiNotulen', 'rapatTab3AiUndoBar', 'rapatInputAudioFile', 'rapatFieldAudioUrl']) {
+    for (const elId of ['btnRapatProcessAiNotulen', 'btnRapatRecordAudio', 'btnRapatAiModeMerge', 'btnRapatAiModeReplace', 'btnRapatUndoAiNotulen', 'rapatTab3AiUndoBar', 'rapatAiErrorBox', 'rapatInputAudioFile', 'rapatFieldAudioUrl']) {
       assert(viewEoffice140.includes(`id="${elId}"`), `view_eoffice.html missing AI Notulis element #${elId}`);
     }
     assert(viewEoffice140.includes('type="hidden" id="rapatFieldAiTranscript"'), 'rapatFieldAiTranscript must be a hidden input in Tab 4 UI');

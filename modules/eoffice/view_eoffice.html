@@ -1454,7 +1454,7 @@
                   <i class="fa-solid fa-file-audio text-indigo-400"></i>
                   <span>Seret &amp; Lepas File Rekaman Audio di Sini (atau klik untuk pilih file)</span>
                 </div>
-                <div class="text-[10px] text-slate-500">Mendukung .mp3, .m4a, .wav, .ogg, .webm, .aac, .flac (<b class="text-indigo-300">Maks. 2 GB</b> &bull; File &gt; 100 MB otomatis dikompres FFmpeg) &bull; Otomatis terarsip di Drive (Tahun / Bulan / Judul Rapat)</div>
+                <div class="text-[10px] text-slate-500">Mendukung .mp3, .m4a, .wav, .ogg, .webm, .aac, .flac (<b class="text-indigo-300">Maks. 2 GB</b> &bull; File &gt; 20 MB otomatis dikompres FFmpeg) &bull; Otomatis terarsip di Drive (Tahun / Bulan / Judul Rapat)</div>
               </div>
 
               <div class="flex flex-wrap items-center gap-2">
@@ -1526,6 +1526,14 @@
                   <i class="fa-solid fa-rotate-left"></i>
                   <span>Batalkan Hasil AI Terakhir</span>
                 </button>
+              </div>
+
+              <div id="rapatAiErrorBox" class="hidden p-3 rounded-xl bg-rose-500/10 border border-rose-500/35 text-[11px] text-rose-200 flex items-start gap-2.5">
+                <i class="fa-solid fa-circle-exclamation text-rose-400 mt-0.5 shrink-0"></i>
+                <div class="space-y-0.5 min-w-0">
+                  <div class="font-bold text-rose-300">Kendala Proses AI Notulis</div>
+                  <div id="rapatAiErrorText" class="text-[10px] text-rose-200/90 break-words leading-relaxed"></div>
+                </div>
               </div>
             </div>
           </div>

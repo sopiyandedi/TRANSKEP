@@ -774,17 +774,28 @@ function putAiNotulenJobCache_(jobId, jobObj) {
   const cache = CacheService.getScriptCache();
   let clone = JSON.parse(JSON.stringify(jobObj || {}));
   let serialized = JSON.stringify(clone);
-  if (serialized.length > 90000 && clone.data) {
-    if (typeof clone.data.transkrip_ringkas === 'string' && clone.data.transkrip_ringkas.length > 15000) {
-      clone.data.transkrip_ringkas = clone.data.transkrip_ringkas.slice(0, 15000) + '\n... [ringkasan dipangkas agar muat cache]';
+  if (serialized.length > 85000 && clone.data) {
+    if (typeof clone.data.transkrip_ringkas === 'string' && clone.data.transkrip_ringkas.length > 8000) {
+      clone.data.transkrip_ringkas = clone.data.transkrip_ringkas.slice(0, 8000) + '\n... [ringkasan dipangkas agar muat cache]';
       serialized = JSON.stringify(clone);
     }
-    if (serialized.length > 90000 && typeof clone.data.transkrip_ringkas === 'string') {
-      clone.data.transkrip_ringkas = clone.data.transkrip_ringkas.slice(0, 2000);
+    if (serialized.length > 85000 && typeof clone.data.transkrip_ringkas === 'string') {
+      clone.data.transkrip_ringkas = clone.data.transkrip_ringkas.slice(0, 1000);
       serialized = JSON.stringify(clone);
     }
   }
-  cache.put('ai_notulen_job_' + jobId, serialized, 3600);
+  try {
+    cache.put('ai_notulen_job_' + jobId, serialized, 3600);
+  } catch (ePut) {
+    if (clone.data) {
+      clone.data.transkrip_ringkas = '';
+      if (Array.isArray(clone.data.pembahasan) && clone.data.pembahasan.length > 20) {
+        clone.data.pembahasan = clone.data.pembahasan.slice(0, 20);
+      }
+      serialized = JSON.stringify(clone);
+    }
+    cache.put('ai_notulen_job_' + jobId, serialized, 3600);
+  }
 }
 
 /**

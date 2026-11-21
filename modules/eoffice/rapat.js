@@ -2064,6 +2064,17 @@
     }
   }
 
+  function setRapatAiErrorBanner_(msg) {
+    var box = document.getElementById('rapatAiErrorBox');
+    var txt = document.getElementById('rapatAiErrorText');
+    var clean = String(msg || '').trim();
+    if (txt) txt.innerText = clean;
+    if (box && box.classList) {
+      if (clean) box.classList.remove('hidden');
+      else box.classList.add('hidden');
+    }
+  }
+
   window.clearRapatAudioSelection = function (keepUrlField) {
     if (rapatAudioState.recording && rapatAudioState.recorder) {
       try { rapatAudioState.recorder.stop(); } catch (e) {}
@@ -2092,6 +2103,7 @@
       var urlEl = document.getElementById('rapatFieldAudioUrl');
       if (urlEl) urlEl.value = '';
     }
+    setRapatAiErrorBanner_('');
     updateAudioUploadProgressUi_(false, 0, '');
     updateRapatAudioPreviewUi_();
   };
@@ -2604,6 +2616,7 @@
     var token = localStorage.getItem('transkep_session_token') || '';
 
     isProcessingAiNotulen = true;
+    setRapatAiErrorBanner_('');
     var btnAi = document.getElementById('btnRapatProcessAiNotulen');
     var origAiHtml = btnAi ? btnAi.innerHTML : '';
     var badge = document.getElementById('rapatAiStatusBadge');
@@ -2728,15 +2741,19 @@
           );
         }
       } else {
+        var failMsg = (res && res.message) ? String(res.message) : 'Gagal mengekstrak notula rapat.';
         if (badge) badge.innerText = 'Gagal Proses AI';
+        setRapatAiErrorBanner_(failMsg);
         if (typeof showNotify === 'function') {
-          showNotify('AI Notulis Gagal', (res && res.message) ? res.message : 'Gagal mengekstrak notula rapat.', 'error');
+          showNotify('AI Notulis Gagal', failMsg, 'error');
         }
       }
     } catch (err) {
+      var errText = err.message || err.toString();
       if (badge) badge.innerText = 'Kendala Koneksi AI';
+      setRapatAiErrorBanner_(errText);
       if (typeof showNotify === 'function') {
-        showNotify('Error AI Notulis', err.message || err.toString(), 'error');
+        showNotify('Error AI Notulis', errText, 'error');
       }
     } finally {
       isProcessingAiNotulen = false;
@@ -3013,6 +3030,7 @@
 
     rapatAiUndoSnapshot = null;
     updateRapatAiUndoUi_();
+    setRapatAiErrorBanner_('');
     if (typeof window.setRapatAiMode === 'function') window.setRapatAiMode('merge');
     var topAiBadgeInit = document.getElementById('rapatAiStatusBadge');
     if (topAiBadgeInit) {
