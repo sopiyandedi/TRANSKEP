@@ -2418,6 +2418,114 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
     assert.strictEqual(createdDriveTree145.length, 4, 'Both Foto & Audio must reuse the same 4-level Drive folder tree without duplicating folders');
 
     console.log('[PASS] Tahap 145 Rapat UX polish, Tab 2 multi-check Enter, Drag&Drop & Drive Year/Month/Title subfolders verified.');
+
+    // Tahap 148: Jalur Kilat Gemini Notebook PRO di Tab 4 + Auto-Fill Tab 3 tanpa memicu async Drive audio
+    const viewEoffice148 = fs.readFileSync('modules/eoffice/view_eoffice.html', 'utf8');
+    for (const nbId of ['rapatFieldNotebookNotes', 'btnRapatCopyNotebookPrompt', 'btnRapatClearNotebookNotes', 'rapatNotebookModeBadge']) {
+      assert(viewEoffice148.includes(`id="${nbId}"`), `view_eoffice.html missing Tahap 148 Notebook element #${nbId}`);
+    }
+    const mkCls148 = () => ({ _s: new Set(['hidden']), add(c) { this._s.add(c); }, remove(c) { this._s.delete(c); }, contains(c) { return this._s.has(c); } });
+    const dom148 = {
+      rapatFieldIdRapat: { value: 'RPT-NB-148' },
+      rapatFieldAgenda: { value: 'Bedah Berkas Perkara Peradilan Agama' },
+      rapatFieldHariTanggal: { value: 'Sabtu, 21 November 2026' },
+      rapatFieldTglRapatIso: { value: '2026-11-21' },
+      rapatFieldTempat: { value: 'Ruang Rapat Pimpinan PA Indramayu' },
+      rapatFieldPemimpin: { value: 'Ketua PTA Bandung' },
+      rapatFieldNotulis: { value: 'Notulis Rapat' },
+      rapatFieldPengarahanUmum: { value: '' },
+      rapatFieldKesimpulan: { value: '' },
+      rapatFieldDasarNotula: { value: '' },
+      rapatFieldAiTranscript: { value: '' },
+      rapatFieldNotebookNotes: { value: 'Ketua PTA Bandung: Setiap penanganan perkara wajib diuji dengan Konstruksi Sistem Berpikiran Hukum 64 65.' },
+      rapatFieldAudioUrl: { value: 'https://drive.google.com/file/d/1DriveArchivedAudio148/view' },
+      rapatNotebookModeBadge: { classList: mkCls148() },
+      btnRapatClearNotebookNotes: { classList: mkCls148() },
+      btnRapatProcessAiNotulen: { disabled: false, innerHTML: 'Proses AI Notulis', classList: mkCls148() },
+      rapatAiStatusBadge: { innerText: 'Siap AI Notulis' },
+      rapatAiErrorBox: { classList: mkCls148() },
+      rapatAiErrorText: { innerText: '' },
+      rapatTab3AiUndoBar: { classList: mkCls148() },
+      btnRapatUndoAiNotulen: { classList: mkCls148() },
+      rapatPembahasanListContainer: { innerHTML: '' },
+      rapatCountPembicara: { innerText: '0' },
+      rapatTujuanListContainer: { innerHTML: '' },
+      rapatCountTujuan: { innerText: '0' },
+      rapatTabPanel_undangan: { classList: mkCls148() },
+      rapatTabPanel_peserta: { classList: mkCls148() },
+      rapatTabPanel_notula: { classList: mkCls148() },
+      rapatTabPanel_media: { classList: mkCls148() },
+      rapatTabBtn_undangan: { classList: mkCls148() },
+      rapatTabBtn_peserta: { classList: mkCls148() },
+      rapatTabBtn_notula: { classList: mkCls148() },
+      rapatTabBtn_media: { classList: mkCls148() }
+    };
+    let capturedNbReq = null;
+    const vm148 = {
+      console, Date, Math, Array, Object, String, Number, Boolean, JSON, Error, RegExp, parseInt, Promise,
+      localStorage: { getItem: (k) => (k === 'transkep_active_nip' ? '198001012005011001' : 'tok-148'), setItem: () => {} },
+      document: {
+        getElementById: (id) => {
+          if (!dom148[id]) {
+            dom148[id] = { id, value: '', innerText: '', innerHTML: '', className: '', classList: mkCls148() };
+          }
+          return dom148[id];
+        }
+      },
+      vueState: { usersList: [{ nip: '197901012003011008', nama: 'Atasan Satu', jabatan: 'Ketua', role: 'Pegawai' }] },
+      showNotify: () => {},
+      EofficeDataService: {
+        requestAiNotulenRapat: async (payload) => {
+          capturedNbReq = JSON.parse(JSON.stringify(payload));
+          return {
+            status: 'success',
+            data: {
+              pengarahan_umum: 'Arahan dari Notebook PRO.',
+              kesimpulan: 'Tim IT PA menindaklanjuti sistem otomasi redaksional.',
+              transkrip_ringkas: 'Ringkasan rapat bedah berkas.',
+              pembahasan: [{
+                pembicara_nama: 'Atasan Satu',
+                items: [{
+                  uraian: 'Penguatan Konstruksi Sistem Berpikiran Hukum.',
+                  tindak_lanjut: 'Uji Yuridis, Filosofis, Sosiologis.',
+                  target: '2026-11-23',
+                  penanggung_jawab: 'Hakim & Kepaniteraan',
+                  tanggal_penyelesaian: '2026-11-27'
+                }]
+              }]
+            }
+          };
+        }
+      },
+      window: {}
+    };
+    vm148.window = vm148;
+    vm.createContext(vm148);
+    vm.runInContext(fs.readFileSync('modules/eoffice/rapat.js', 'utf8'), vm148, { filename: 'modules/eoffice/rapat.js' });
+    vm148.selectTujuanPegawai('197901012003011008');
+
+    const nbPrompt = vm148.buildRapatNotebookPrompt();
+    assert(nbPrompt.includes('Bedah Berkas Perkara Peradilan Agama') && nbPrompt.includes('Atasan Satu (Ketua)'),
+      'buildRapatNotebookPrompt must include Agenda and invited participants');
+
+    vm148.syncRapatNotebookNotesUi();
+    assert(!dom148.rapatNotebookModeBadge.classList.contains('hidden'), 'Filling Notebook notes must show mode badge');
+    assert.strictEqual(dom148.rapatAiStatusBadge.innerText, 'Siap Jalur Kilat Notebook');
+
+    await vm148.processAiNotulenRapat();
+    assert(capturedNbReq, 'processAiNotulenRapat must send payload to EofficeDataService');
+    assert.strictEqual(capturedNbReq.async_mode, false, 'Notebook text mode must bypass async Drive pipeline');
+    assert.strictEqual(capturedNbReq.audio_drive_file_id, '', 'Notebook text mode must clear audio_drive_file_id so n8n uses fast text path');
+    assert.strictEqual(capturedNbReq.audio_data, '', 'Notebook text mode must clear inline audio_data');
+    assert(capturedNbReq.transcript_text.includes('Konstruksi Sistem Berpikiran Hukum'), 'Notebook text must travel in transcript_text');
+    assert.strictEqual(dom148.rapatFieldPengarahanUmum.value, 'Arahan dari Notebook PRO.');
+    assert.strictEqual(dom148.rapatFieldAiTranscript.value, 'Ringkasan rapat bedah berkas.');
+    assert(dom148.rapatPembahasanListContainer.innerHTML.includes('Uji Yuridis, Filosofis, Sosiologis.'));
+
+    vm148.clearRapatNotebookNotes();
+    assert.strictEqual(dom148.rapatFieldNotebookNotes.value, '');
+    assert(dom148.rapatNotebookModeBadge.classList.contains('hidden'), 'clearRapatNotebookNotes must hide mode badge');
+    console.log('[PASS] Tahap 148 Tab 4 Jalur Kilat Gemini Notebook PRO prompt builder, sync routing & auto-fill Tab 3 verified.');
   } finally {
     browserSandbox.TranskepAPI.call = origApiCall;
     browserSandbox.TranskepFirebase.getDb = origGetDb;

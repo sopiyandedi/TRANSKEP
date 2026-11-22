@@ -2597,16 +2597,131 @@
     return parsed;
   };
 
+  window.syncRapatNotebookNotesUi = function () {
+    var nbEl = document.getElementById('rapatFieldNotebookNotes');
+    var hasNb = Boolean(nbEl && String(nbEl.value || '').trim());
+    var modeBadge = document.getElementById('rapatNotebookModeBadge');
+    var clearBtn = document.getElementById('btnRapatClearNotebookNotes');
+    var topBadge = document.getElementById('rapatAiStatusBadge');
+
+    if (modeBadge && modeBadge.classList) {
+      if (hasNb) modeBadge.classList.remove('hidden');
+      else modeBadge.classList.add('hidden');
+    }
+    if (clearBtn && clearBtn.classList) {
+      if (hasNb) clearBtn.classList.remove('hidden');
+      else clearBtn.classList.add('hidden');
+    }
+    if (topBadge && !rapatAudioState.recording) {
+      if (hasNb) {
+        topBadge.innerText = 'Siap Jalur Kilat Notebook';
+      } else if (rapatAudioState.driveFileId) {
+        topBadge.innerText = 'Siap Analisa AI (Drive OK)';
+      } else if (rapatAudioState.dataUri || rapatAudioState.objectUrl) {
+        topBadge.innerText = 'Audio Siap Analisa AI';
+      } else {
+        topBadge.innerText = 'Siap AI Notulis';
+      }
+    }
+  };
+
+  window.clearRapatNotebookNotes = function () {
+    var nbEl = document.getElementById('rapatFieldNotebookNotes');
+    if (nbEl) nbEl.value = '';
+    if (typeof window.syncRapatNotebookNotesUi === 'function') {
+      window.syncRapatNotebookNotesUi();
+    }
+  };
+
+  window.buildRapatNotebookPrompt = function () {
+    var agendaTitle = ((document.getElementById('rapatFieldAgenda') || {}).value || 'Rapat Kedinasan PA Indramayu').trim();
+    var hariTanggalVal = ((document.getElementById('rapatFieldHariTanggal') || {}).value || '-').trim();
+    var tempatVal = ((document.getElementById('rapatFieldTempat') || {}).value || '-').trim();
+    var pemimpinVal = ((document.getElementById('rapatFieldPemimpin') || {}).value || '-').trim();
+    var notulisVal = ((document.getElementById('rapatFieldNotulis') || {}).value || '-').trim();
+
+    var pesertaLines = (Array.isArray(tujuanUndanganList) ? tujuanUndanganList : [])
+      .slice(0, 50)
+      .map(function (p, idx) {
+        if (typeof p === 'string') return (idx + 1) + '. ' + p;
+        return (idx + 1) + '. ' + String(p.nama || '-') + (p.jabatan ? ' (' + p.jabatan + ')' : '');
+      })
+      .join('\n');
+
+    return [
+      'Susun rangkuman lengkap notula rapat kedinasan Pengadilan Agama Indramayu dari seluruh sumber audio/dokumen pada notebook ini secara kronologis dan detail (JANGAN memangkas topik atau poin rapat, dan JANGAN menyertakan angka sitasi seperti [1] atau 64 65).',
+      '',
+      '=== IDENTITAS RAPAT ===',
+      'Agenda: ' + agendaTitle,
+      'Hari/Tanggal: ' + hariTanggalVal,
+      'Tempat: ' + tempatVal,
+      'Pimpinan Rapat: ' + pemimpinVal,
+      'Notulis: ' + notulisVal,
+      pesertaLines ? ('Daftar Peserta Resmi:\n' + pesertaLines) : '',
+      '',
+      '=== FORMAT OUTPUT YANG DIMINTA ===',
+      '1. DASAR RAPAT: (jika disebutkan di rekaman/sumber).',
+      '2. PENGARAHAN UMUM PIMPINAN: Rangkuman arahan pembuka/utama pimpinan rapat dalam Bahasa Indonesia kedinasan yang rapi.',
+      '3. PEMBAHASAN PER PEMBICARA (urut dari pembicara pertama sampai terakhir, pisahkan jelas per pembicara):',
+      '   Nama Pembicara (Jabatan — bila ragu tulis "Pembicara #N (Belum Teridentifikasi — Bidang ...)"):',
+      '   - Uraian Pokok Bahasan / Laporan:',
+      '   - Tindak Lanjut / Keputusan:',
+      '   - Target Waktu (sebutkan tanggal eksplisit bila disebut, atau sifatnya: rutin harian / jangka pendek / menengah / proyek sarana):',
+      '   - Penanggung Jawab:',
+      '   - Tanggal Penyelesaian:',
+      '4. KESIMPULAN AKHIR RAPAT: Ringkasan keputusan akhir rapat.'
+    ].filter(function (part) { return part !== ''; }).join('\n');
+  };
+
+  window.copyRapatNotebookPrompt = async function () {
+    var promptText = window.buildRapatNotebookPrompt();
+    var copied = false;
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+        await navigator.clipboard.writeText(promptText);
+        copied = true;
+      }
+    } catch (eClip) {
+      copied = false;
+    }
+    if (!copied && typeof document !== 'undefined' && typeof document.createElement === 'function' && document.body) {
+      try {
+        var ta = document.createElement('textarea');
+        ta.value = promptText;
+        ta.setAttribute('readonly', '');
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        copied = Boolean(typeof document.execCommand === 'function' && document.execCommand('copy'));
+        document.body.removeChild(ta);
+      } catch (eFallbackCopy) {
+        copied = false;
+      }
+    }
+    if (typeof showNotify === 'function') {
+      if (copied) {
+        showNotify('Prompt Notebook Disalin', 'Tempel di Gemini Notebook PRO, salin hasilnya, lalu tempel ke kotak Jalur Kilat di Tab 4 ini.', 'success');
+      } else {
+        showNotify('Salin Manual', 'Browser membatasi clipboard otomatis; silakan tempel hasil Gemini Notebook langsung ke kotak teks.', 'warning');
+      }
+    }
+    return promptText;
+  };
+
   window.processAiNotulenRapat = async function () {
     if (isProcessingAiNotulen) return;
     var transEl = document.getElementById('rapatFieldAiTranscript');
     var transcriptText = transEl ? String(transEl.value || '').trim() : '';
+    var nbEl = document.getElementById('rapatFieldNotebookNotes');
+    var notebookText = nbEl ? String(nbEl.value || '').trim() : '';
+    var useNotebookTextMode = Boolean(notebookText);
     var hasAudioReady = Boolean(rapatAudioState.dataUri || rapatAudioState.driveFileId || rapatAudioState.uploading);
     var existingDraftInfo = collectExistingTab3DraftForAi_();
 
-    if (!hasAudioReady && !transcriptText && !existingDraftInfo.hasContent) {
+    if (!useNotebookTextMode && !hasAudioReady && !transcriptText && !existingDraftInfo.hasContent) {
       if (typeof showNotify === 'function') {
-        showNotify('Input Belum Ada', 'Pilih/rekam audio rapat atau isi catatan rapat di Tab 3 terlebih dahulu.', 'warning');
+        showNotify('Input Belum Ada', 'Tempel hasil Gemini Notebook PRO, pilih/rekam audio rapat, atau isi draf di Tab 3 terlebih dahulu.', 'warning');
       }
       return;
     }
@@ -2623,26 +2738,32 @@
     if (btnAi) {
       btnAi.disabled = true;
       btnAi.classList.add('opacity-70', 'cursor-wait');
-      btnAi.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> <span>Memproses AI...</span>';
+      btnAi.innerHTML = useNotebookTextMode
+        ? '<i class="fa-solid fa-circle-notch fa-spin"></i> <span>Memetakan Teks Notebook ke Tab 3...</span>'
+        : '<i class="fa-solid fa-circle-notch fa-spin"></i> <span>Memproses AI...</span>';
     }
-    if (badge) badge.innerText = 'Pass 1/2 Gemini AI...';
+    if (badge) badge.innerText = useNotebookTextMode ? 'Jalur Kilat Gemini...' : 'Pass 1/2 Gemini AI...';
 
     try {
-      if (rapatAudioState.uploading && rapatAudioState.uploadPromise) {
-        if (btnAi) btnAi.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> <span>Menunggu unggah Drive selesai...</span>';
-        if (badge) badge.innerText = 'Menunggu Upload Drive...';
-        await rapatAudioState.uploadPromise;
-      }
+      if (!useNotebookTextMode) {
+        if (rapatAudioState.uploading && rapatAudioState.uploadPromise) {
+          if (btnAi) btnAi.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> <span>Menunggu unggah Drive selesai...</span>';
+          if (badge) badge.innerText = 'Menunggu Upload Drive...';
+          await rapatAudioState.uploadPromise;
+        }
 
-      if (rapatAudioState.isLargeFile && !rapatAudioState.driveFileId) {
-        throw new Error(rapatAudioState.uploadError || 'Rekaman besar belum selesai diunggah ke Google Drive. Pastikan unggah Drive berhasil sebelum Proses AI Notulis.');
+        if (rapatAudioState.isLargeFile && !rapatAudioState.driveFileId) {
+          throw new Error(rapatAudioState.uploadError || 'Rekaman besar belum selesai diunggah ke Google Drive. Pastikan unggah Drive berhasil sebelum Proses AI Notulis.');
+        }
       }
 
       if (!window.EofficeDataService || typeof window.EofficeDataService.requestAiNotulenRapat !== 'function') {
         throw new Error('Layanan EofficeDataService.requestAiNotulenRapat belum siap.');
       }
 
-      var useAsyncDriveAudio = Boolean(rapatAudioState.driveFileId && (!rapatAudioState.dataUri || rapatAudioState.isLargeFile));
+      var useAsyncDriveAudio = useNotebookTextMode
+        ? false
+        : Boolean(rapatAudioState.driveFileId && (!rapatAudioState.dataUri || rapatAudioState.isLargeFile));
       var hariTanggalVal = ((document.getElementById('rapatFieldHariTanggal') || {}).value || '').trim();
       var tglRapatIsoVal = ((document.getElementById('rapatFieldTglRapatIso') || {}).value || '').trim() || parseRapatIsoDateFe_(hariTanggalVal);
       var aiPayload = {
@@ -2654,24 +2775,30 @@
         pemimpin: ((document.getElementById('rapatFieldPemimpin') || {}).value || '').trim(),
         notulis: ((document.getElementById('rapatFieldNotulis') || {}).value || '').trim(),
         peserta_list: tujuanUndanganList.slice(0, 50),
-        transcript_text: transcriptText,
+        transcript_text: useNotebookTextMode ? notebookText : transcriptText,
         ai_mode: rapatAiMode,
         existing_draft: existingDraftInfo.payload,
-        audio_data: useAsyncDriveAudio ? '' : (rapatAudioState.dataUri || ''),
-        audio_drive_file_id: useAsyncDriveAudio ? rapatAudioState.driveFileId : '',
-        audio_file_name: rapatAudioState.fileName || '',
-        audio_mime_type: rapatAudioState.mimeType || '',
-        audio_size_bytes: Number(rapatAudioState.sizeBytes || 0),
+        audio_data: useNotebookTextMode ? '' : (useAsyncDriveAudio ? '' : (rapatAudioState.dataUri || '')),
+        audio_drive_file_id: useNotebookTextMode ? '' : (useAsyncDriveAudio ? rapatAudioState.driveFileId : ''),
+        audio_file_name: useNotebookTextMode ? '' : (rapatAudioState.fileName || ''),
+        audio_mime_type: useNotebookTextMode ? '' : (rapatAudioState.mimeType || ''),
+        audio_size_bytes: useNotebookTextMode ? 0 : Number(rapatAudioState.sizeBytes || 0),
         async_mode: useAsyncDriveAudio,
-        allow_text_fallback: Boolean(transcriptText)
+        allow_text_fallback: useNotebookTextMode ? true : Boolean(transcriptText)
       };
 
       if (btnAi) {
-        btnAi.innerHTML = useAsyncDriveAudio
-          ? '<i class="fa-solid fa-circle-notch fa-spin"></i> <span>Mengirim audio Drive ke n8n...</span>'
-          : '<i class="fa-solid fa-circle-notch fa-spin"></i> <span>Memproses AI...</span>';
+        btnAi.innerHTML = useNotebookTextMode
+          ? '<i class="fa-solid fa-circle-notch fa-spin"></i> <span>Memetakan Teks Notebook ke Tab 3...</span>'
+          : (useAsyncDriveAudio
+              ? '<i class="fa-solid fa-circle-notch fa-spin"></i> <span>Mengirim audio Drive ke n8n...</span>'
+              : '<i class="fa-solid fa-circle-notch fa-spin"></i> <span>Memproses AI...</span>');
       }
-      if (badge) badge.innerText = useAsyncDriveAudio ? 'Mengirim ke n8n...' : 'Pass 1/2 Gemini AI...';
+      if (badge) {
+        badge.innerText = useNotebookTextMode
+          ? 'Jalur Kilat Gemini...'
+          : (useAsyncDriveAudio ? 'Mengirim ke n8n...' : 'Pass 1/2 Gemini AI...');
+      }
 
       var res = await window.EofficeDataService.requestAiNotulenRapat(aiPayload, adminNip, token);
 
@@ -2728,11 +2855,11 @@
 
       if (res && res.status === 'success' && res.data) {
         var applied = window.applyAiNotulenToForm(res.data, {
-          overwriteTranscript: !transcriptText,
+          overwriteTranscript: Boolean(useNotebookTextMode || !transcriptText),
           aiMode: rapatAiMode
         });
         switchRapatTab('notula');
-        if (badge) badge.innerText = 'Draf AI Terisi (Siap Tinjau)';
+        if (badge) badge.innerText = useNotebookTextMode ? 'Notula Notebook Terisi (Siap Tinjau)' : 'Draf AI Terisi (Siap Tinjau)';
         if (typeof showNotify === 'function') {
           showNotify(
             'AI Notulis Selesai — Harap Tinjau',
@@ -3027,6 +3154,11 @@
 
     var elAiTrans = document.getElementById('rapatFieldAiTranscript');
     if (elAiTrans) elAiTrans.value = rapatData.ai_transcript || '';
+    var elNbNotes = document.getElementById('rapatFieldNotebookNotes');
+    if (elNbNotes) elNbNotes.value = '';
+    if (typeof window.syncRapatNotebookNotesUi === 'function') {
+      window.syncRapatNotebookNotesUi();
+    }
 
     rapatAiUndoSnapshot = null;
     updateRapatAiUndoUi_();

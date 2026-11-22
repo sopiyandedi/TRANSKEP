@@ -6992,6 +6992,29 @@ Menyempurnakan kenyamanan penggunaan Workspace Rapat serta mengotomatiskan kerap
    - Menambahkan pengecekan `errorMessage` pada `Siapkan Direktori Kerja Audio (Code)` dan node IF baru `Download Drive Berhasil? (IF)`. Bila 3x percobaan unduh Google Drive tetap gagal (`hasBin === false`), alur langsung mengirim pesan error ke `Siapkan Callback Error Upload (Code)` tanpa membuang eksekusi SSH maupun panggilan Gemini Files API.
 3. **Verifikasi:** Uji topologi 52 node dan simulasi VM gagal unduh Drive (`stream has been aborted`) ditambahkan pada [`tests/verify_n8n_ai_assistant.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/tests/verify_n8n_ai_assistant.js).
 
+---
+
+## REVISI TAHAP 148: FORMASI GEMINI FREE TIER TERBUKTI (10 MENIT SPLIT) & JALUR KILAT GEMINI NOTEBOOK PRO TAB 4 (`v3.8.83`)
+**Status:** `[SELESAI & TERVERIFIKASI]`
+
+### 1. Akar Masalah
+- Berdasarkan metrik penggunaan Google AI Studio pada project `Transkep` (`Free tier`), model **`gemini-4-argon`** dan **`gemini-4-neon`** kuota Free Tier-nya `0` (ditolak `429 TooManyRequests`), sedangkan **`gemini-4-hydrogen`** kerap terkena antrean padat (`503 Service unavailable`) dan timeout pada segmen audio 15 menit.
+- Sementara itu, dua model yang 100% terbukti aktif dan stabil di project `Transkep` pengguna adalah **`gemini-3.5-flash-lite`** dan **`gemini-3.8-flash`**.
+- Di sisi lain, pengguna berlangganan **Gemini Notebook PRO** dan menginginkan jalur kilat untuk langsung menempel hasil rangkuman Notebook ke 1 kotak di Tab 4 TRANSKEP agar otomatis terpecah ke Pengarahan Umum, semua Pembicara (5 Kolom Tab 3), dan target waktu SKB 2026–2027 dalam hitungan detik.
+
+### 2. Rincian Implementasi
+1. **Workflow n8n Free-Tier Proven Formation ([`n8n/transkep-ai-notulen.example.json`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/n8n/transkep-ai-notulen.example.json) & Lokal, 52 Node, `versionId: c918e3b2-7f41-4a0d-b91e-34c509876008`):**
+   - Mengganti node FFmpeg menjadi `SSH FFmpeg Kompres & Potong 10 Menit` dengan `-segment_time 600` (10 menit per klip MP3 Mono 16 kHz 24 kbps).
+   - Mengganti formasi Round-Robin Pass 1 Klip menjadi **`models/gemini-3.5-flash-lite`** (klip ganjil) ↔ **`models/gemini-3.8-flash`** (klip genap) dengan `thinkingLevel: 'low'`, timeout `240000 ms`, dan jeda `batchInterval: 5000 ms` (`6000 ms` di failover).
+   - Mengarahkan `Panggil Gemini FileURI API (HTTP)` ke `models/gemini-3.5-flash-lite`, `Siapkan Payload Pass 2 Smart Merge (Code)` & `Panggil Gemini Pass 2 Editor Notulis (HTTP)` ke **`models/gemini-3.8-flash`**, serta `Panggil Gemini Multimodal API (HTTP)` (jalur sync teks/Notebook) ke **`models/gemini-3.8-flash`** (`retryOnFail: true`, `maxTries: 2`, timeout `180000 ms`).
+   - Memperkaya prompt `Validasi & Siapkan Prompt Notulen (Code)` agar memproses seluruh pembicara/pokok bahasan teks Notebook secara lengkap sekaligus membersihkan angka sitasi tempelan (seperti `64 65`), serta menaikkan batas sub-item per pembicara di normalizer n8n dari `15` ke `25`.
+2. **UI & Controller "Jalur Kilat Gemini Notebook PRO" di Tab 4 ([`modules/eoffice/view_eoffice.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/view_eoffice.html) & [`modules/eoffice/rapat.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/rapat.js)):**
+   - Menambahkan kartu `#rapatNotebookQuickBox` lengkap dengan tombol **`Salin Prompt Notebook`** (`#btnRapatCopyNotebookPrompt` -> `copyRapatNotebookPrompt()`), tombol **`Bersihkan`** (`#btnRapatClearNotebookNotes`), badge status `#rapatNotebookModeBadge`, dan `<textarea id="rapatFieldNotebookNotes">`.
+   - Memperbarui `processAiNotulenRapat()` agar bila `#rapatFieldNotebookNotes` terisi, sistem langsung melewati unduh audio Drive & mengirim teks ke jalur sync kilat (`async_mode: false`, `audio_drive_file_id: ''`, ~5–10 detik), lalu mengisi Pengarahan Umum, seluruh Pembicara 5 kolom Tab 3, dan SKB 2026–2027 (arsip audio Drive tetap tersimpan aman). Menambahkan reset `#rapatFieldNotebookNotes` di `openRapatModalForm()`.
+3. **PWA & Uji Regresi Otomatis:**
+   - Sinkronisasi versi PWA 3 titik ke **`v3.8.83`** pada [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) & [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js).
+   - Memperbarui [`tests/verify_n8n_ai_assistant.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/tests/verify_n8n_ai_assistant.js) & [`tests/verify_fase3b.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/tests/verify_fase3b.js) untuk memverifikasi topologi 52 node Free-Tier 10 menit dan alur end-to-end UI Jalur Kilat Notebook PRO.
+
 
 
 

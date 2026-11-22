@@ -561,25 +561,29 @@ function validateNotulenWorkflowTopology(wf, rawText, label) {
   assert.strictEqual(webhookNode.parameters.responseMode, 'responseNode', `${label}: webhook must use responseNode`);
 
   const geminiHttp = byName.get('Panggil Gemini Multimodal API (HTTP)');
-  assert(geminiHttp && String(geminiHttp.parameters.url).includes('models/gemini-4-hydrogen:generateContent'), `${label}: sync HTTP node must invoke models/gemini-4-hydrogen`);
+  assert(geminiHttp && String(geminiHttp.parameters.url).includes('models/gemini-3.8-flash:generateContent'), `${label}: sync HTTP node must invoke models/gemini-3.8-flash`);
   assert.strictEqual(geminiHttp.parameters.authentication, 'predefinedCredentialType', `${label}: Gemini HTTP node must use predefinedCredentialType`);
   assert.strictEqual(geminiHttp.parameters.nodeCredentialType, 'googlePalmApi', `${label}: Gemini HTTP node must bind googlePalmApi credential`);
   assert(geminiHttp.credentials && geminiHttp.credentials.googlePalmApi && geminiHttp.credentials.googlePalmApi.id, `${label}: Gemini HTTP node missing googlePalmApi credentials`);
+  assert.strictEqual(geminiHttp.parameters.options.timeout, 180000, `${label}: sync HTTP timeout must be 180000 ms`);
+  assert.strictEqual(geminiHttp.retryOnFail, true, `${label}: sync HTTP node must set retryOnFail: true`);
   assert.strictEqual(geminiHttp.continueOnFail, true, `${label}: Gemini HTTP node must set continueOnFail: true`);
 
   const fileUriHttp = byName.get('Panggil Gemini FileURI API (HTTP)');
   assert(
-    fileUriHttp && String(fileUriHttp.parameters.url).includes('models/gemini-4-hydrogen:generateContent'),
-    `${label}: Pass 1 FileURI HTTP node must use models/gemini-4-hydrogen:generateContent`
+    fileUriHttp && String(fileUriHttp.parameters.url).includes('models/gemini-3.5-flash-lite:generateContent'),
+    `${label}: Pass 1 FileURI HTTP node must use models/gemini-3.5-flash-lite:generateContent`
   );
-  assert.strictEqual(fileUriHttp.parameters.options.timeout, 180000, `${label}: Pass 1 FileURI timeout must be 180000 ms`);
+  assert.strictEqual(fileUriHttp.parameters.options.timeout, 240000, `${label}: Pass 1 FileURI timeout must be 240000 ms`);
 
   const pass1ClipHttp = byName.get('Panggil Gemini Pass 1 Klip (HTTP)');
   assert(
     pass1ClipHttp && String(pass1ClipHttp.parameters.url).includes('primaryModelUrl'),
     `${label}: Pass 1 Klip HTTP node must bind $json.primaryModelUrl`
   );
+  assert.strictEqual(pass1ClipHttp.parameters.options.timeout, 240000, `${label}: Pass 1 Klip timeout must be 240000 ms`);
   assert.strictEqual(pass1ClipHttp.parameters.options.batching.batch.batchSize, 1, `${label}: Pass 1 Klip must set batchSize: 1`);
+  assert.strictEqual(pass1ClipHttp.parameters.options.batching.batch.batchInterval, 5000, `${label}: Pass 1 Klip must set batchInterval: 5000`);
   assert.strictEqual(pass1ClipHttp.continueOnFail, true);
 
   const failoverClipHttp = byName.get('Failover Klip ke Model Cadangan (HTTP)');
@@ -587,17 +591,19 @@ function validateNotulenWorkflowTopology(wf, rawText, label) {
     failoverClipHttp && String(failoverClipHttp.parameters.url).includes('failoverModelUrl'),
     `${label}: Failover Klip HTTP node must bind $json.failoverModelUrl`
   );
+  assert.strictEqual(failoverClipHttp.parameters.options.timeout, 240000, `${label}: Failover Klip timeout must be 240000 ms`);
   assert.strictEqual(failoverClipHttp.parameters.options.batching.batch.batchSize, 1, `${label}: Failover Klip must set batchSize: 1`);
+  assert.strictEqual(failoverClipHttp.parameters.options.batching.batch.batchInterval, 6000, `${label}: Failover Klip must set batchInterval: 6000`);
   assert.strictEqual(failoverClipHttp.continueOnFail, true);
 
   const pass2Http = byName.get('Panggil Gemini Pass 2 Editor Notulis (HTTP)');
   assert(
-    pass2Http && String(pass2Http.parameters.url).includes('pass2ModelUrl') && String(pass2Http.parameters.url).includes('models/gemini-4-neon:generateContent'),
-    `${label}: Pass 2 HTTP node must bind dynamic $json.pass2ModelUrl defaulting to models/gemini-4-neon`
+    pass2Http && String(pass2Http.parameters.url).includes('pass2ModelUrl') && String(pass2Http.parameters.url).includes('models/gemini-3.8-flash:generateContent'),
+    `${label}: Pass 2 HTTP node must bind dynamic $json.pass2ModelUrl defaulting to models/gemini-3.8-flash`
   );
-  assert.strictEqual(pass2Http.parameters.options.timeout, 180000, `${label}: Pass 2 timeout must be 180000 ms`);
+  assert.strictEqual(pass2Http.parameters.options.timeout, 240000, `${label}: Pass 2 timeout must be 240000 ms`);
 
-  for (const sshName of ['SSH Buat Folder Audio', 'SSH FFmpeg Kompres & Potong 15 Menit', 'SSH Bersihkan Audio Sementara']) {
+  for (const sshName of ['SSH Buat Folder Audio', 'SSH FFmpeg Kompres & Potong 10 Menit', 'SSH Bersihkan Audio Sementara']) {
     const sshNode = byName.get(sshName);
     assert(sshNode && sshNode.type === 'n8n-nodes-base.ssh', `${label}: missing SSH node ${sshName}`);
     assert.strictEqual(sshNode.parameters.cwd, '={{ "" }}', `${label}: ${sshName} cwd must evaluate to empty string`);
@@ -605,6 +611,8 @@ function validateNotulenWorkflowTopology(wf, rawText, label) {
     assert(sshNode.credentials && sshNode.credentials.sshPassword && sshNode.credentials.sshPassword.id, `${label}: ${sshName} missing sshPassword credentials`);
     assert(!String(sshNode.parameters.command).includes('"'), `${label}: ${sshName} command must avoid double quotes for Windows OpenSSH`);
   }
+  const ffmpegSplitNode = byName.get('SSH FFmpeg Kompres & Potong 10 Menit');
+  assert(String(ffmpegSplitNode.parameters.command).includes('-segment_time 600'), `${label}: FFmpeg command must segment into 600s (10-min) clips`);
 
   const writeDisk = byName.get('Simpan Audio ke Disk');
   assert(writeDisk && writeDisk.type === 'n8n-nodes-base.readWriteFile' && writeDisk.parameters.operation === 'write', `${label}: missing Simpan Audio ke Disk`);
@@ -1034,11 +1042,11 @@ async function runNotulenBehaviorSuite(wf, expectedSecret, wfLabel) {
   })[0].json;
   assert.strictEqual(pass1FailPrep.pass1FailedMessage, '', `${wfLabel}: Pass 1 failure must allow Pass 2 audio fallback instead of aborting`);
   assert.strictEqual(pass1FailPrep.useAudioFallbackInPass2, true);
-  assert.strictEqual(pass1FailPrep.pass2ModelName, 'models/gemini-4-argon', `${wfLabel}: Pass 2 failover must switch to cross-model gemini-4-argon`);
+  assert.strictEqual(pass1FailPrep.pass2ModelName, 'models/gemini-3.8-flash', `${wfLabel}: Pass 2 failover must switch to cross-model gemini-3.8-flash`);
   assert.strictEqual(
     pass1FailPrep.pass2ModelUrl,
-    'https://generativelanguage.googleapis.com/v1beta/models/gemini-4-argon:generateContent',
-    `${wfLabel}: Pass 2 failover URL must target gemini-4-argon`
+    'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent',
+    `${wfLabel}: Pass 2 failover URL must target gemini-3.8-flash`
   );
   assert.strictEqual(pass1FailPrep.geminiPass2RequestBody.generationConfig.thinkingConfig.thinkingLevel, 'low');
   assert.strictEqual(pass1FailPrep.geminiPass2RequestBody.generationConfig.temperature, undefined);
@@ -1053,10 +1061,10 @@ async function runNotulenBehaviorSuite(wf, expectedSecret, wfLabel) {
       'Siapkan Payload Gemini FileURI (Code)': { fileName: 'files/gem-147', fileUri: 'https://gemini/gem-147', pollFailedMessage: '' },
     },
   })[0].json;
-  assert.strictEqual(pass1OkPrep.pass2ModelName, 'models/gemini-4-neon', `${wfLabel}: Normal Pass 2 Smart Merge must use gemini-4-neon`);
+  assert.strictEqual(pass1OkPrep.pass2ModelName, 'models/gemini-3.8-flash', `${wfLabel}: Normal Pass 2 Smart Merge must use gemini-3.8-flash`);
   assert.strictEqual(
     pass1OkPrep.pass2ModelUrl,
-    'https://generativelanguage.googleapis.com/v1beta/models/gemini-4-neon:generateContent'
+    'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent'
   );
   const salvagedPass1Cb = runCodeNode(wf, 'Parse & Siapkan Callback Async (Code)', {
     inputJson: { error: { message: '503 Model Overloaded' } },
@@ -1085,7 +1093,29 @@ async function runNotulenBehaviorSuite(wf, expectedSecret, wfLabel) {
   assert.strictEqual(sseCb.callbackPayload.status, 'success', `${wfLabel}: SSE data: stream chunks must parse cleanly`);
   assert.strictEqual(sseCb.callbackPayload.data.pengarahan_umum, 'Dari SSE Stream');
 
-  // Opsi B Pipeline: Sanitization, binary re-attach, 15m split Round-Robin Gemini 4, failover splice & cleanup
+  // Notebook PRO text-only fast sync mode (Tahap 148)
+  const notebookSyncOut = runCodeNode(wf, 'Validasi & Siapkan Prompt Notulen (Code)', {
+    inputJson: {
+      body: {
+        secret_key: expectedSecret,
+        id_rapat: 'RPT-NB-148',
+        agenda: 'Bedah Berkas Perkara Peradilan Agama',
+        transcript_text: 'Ketua PTA Bandung: Uji Yuridis, Filosofis, Sosiologis 64 65.',
+      },
+    },
+  })[0].json;
+  assert.strictEqual(notebookSyncOut.isAuthorized, true);
+  assert.strictEqual(notebookSyncOut.isAsyncDriveAudio, false, `${wfLabel}: Notebook text mode must use sync path`);
+  assert(
+    notebookSyncOut.cleanPrompt.includes('=== HASIL RINGKASAN / TRANSKRIP RAPAT (MIS. GEMINI NOTEBOOK) ==='),
+    `${wfLabel}: Notebook text prompt must label pasted Notebook summary clearly`
+  );
+  assert(
+    notebookSyncOut.fullSystemPrompt.includes('BERSIHKAN SITASI TEMPELAN'),
+    `${wfLabel}: System prompt must strip pasted Notebook citation numbers`
+  );
+
+  // Opsi B Pipeline: Sanitization, binary re-attach, 10m split Free-Tier Round-Robin, failover splice & cleanup
   const maliciousCtx = { ...big150MbOut, job_id: '../../etc; rm -rf /', audioFileName: 'Rapat.m4a;evil' };
   const dirSetupOut = runCodeNode(wf, 'Siapkan Direktori Kerja Audio (Code)', {
     inputJson: {},
@@ -1125,7 +1155,7 @@ async function runNotulenBehaviorSuite(wf, expectedSecret, wfLabel) {
   assert.strictEqual(zeroChunkFallback[0].json.chunksAvailable, false);
   assert.strictEqual(zeroChunkFallback[0].binary.data.id, 'orig-drv');
 
-  // Out-of-order 4 binaryMode:separate chunks resolved via getBinaryDataBuffer -> sorted & Round-Robin assigned
+  // Out-of-order 4 binaryMode:separate chunks resolved via getBinaryDataBuffer -> sorted & 10m Free-Tier Round-Robin assigned
   const unsortedChunks = [
     { json: {}, binary: { data: { id: 'bin-2', fileName: 'part_002.mp3', mimeType: 'audio/mpeg', _buffer: Buffer.from('SEG2') } } },
     { json: {}, binary: { data: { id: 'bin-0', fileName: 'part_000.mp3', mimeType: 'audio/mpeg', _buffer: Buffer.from('SEG0') } } },
@@ -1145,10 +1175,11 @@ async function runNotulenBehaviorSuite(wf, expectedSecret, wfLabel) {
     ['part_000.mp3', 'part_001.mp3', 'part_002.mp3', 'part_003.mp3'],
     `${wfLabel}: chunks must be sorted chronologically`
   );
-  assert.strictEqual(clipPayloads[0].json.primaryModelName, 'models/gemini-4-hydrogen');
-  assert.strictEqual(clipPayloads[1].json.primaryModelName, 'models/gemini-4-argon');
-  assert.strictEqual(clipPayloads[2].json.primaryModelName, 'models/gemini-4-hydrogen');
-  assert.strictEqual(clipPayloads[3].json.primaryModelName, 'models/gemini-4-argon');
+  assert(clipPayloads[1].json.timeWindowLabel.includes('00:10–00:20'), `${wfLabel}: chunks must reflect 10-minute step windows`);
+  assert.strictEqual(clipPayloads[0].json.primaryModelName, 'models/gemini-3.5-flash-lite');
+  assert.strictEqual(clipPayloads[1].json.primaryModelName, 'models/gemini-3.8-flash');
+  assert.strictEqual(clipPayloads[2].json.primaryModelName, 'models/gemini-3.5-flash-lite');
+  assert.strictEqual(clipPayloads[3].json.primaryModelName, 'models/gemini-3.8-flash');
   assert.strictEqual(
     Buffer.from(clipPayloads[1].json.chunkGeminiRequestBody.contents[0].parts[0].inline_data.data, 'base64').toString('utf8'),
     'SEG1',
@@ -1195,7 +1226,7 @@ async function runNotulenBehaviorSuite(wf, expectedSecret, wfLabel) {
   assert.strictEqual(mergedAllOk.chunkSalvagedObj.pembahasan.length, 4, `${wfLabel}: must preserve all 4 speakers across chunks`);
   assert.strictEqual(mergedAllOk.chunkSoftError, '');
 
-  // Evaluate 4 clips: Case B (Clip #1 fails 503 on Argon -> Failover on Hydrogen recovers chronologically!)
+  // Evaluate 4 clips: Case B (Clip #1 fails 503 on 3.8-flash -> Failover on 3.5-flash-lite recovers chronologically!)
   const evalWithFail = runCodeNode(wf, 'Evaluasi Hasil Klip & Cek Failover (Code)', {
     inputAll: [
       makeGeminiOk('Pembicara A', 'Bahasan 1'),
@@ -1212,7 +1243,7 @@ async function runNotulenBehaviorSuite(wf, expectedSecret, wfLabel) {
     inputJson: evalWithFail,
   });
   assert.strictEqual(splitFailItems.length, 1);
-  assert.strictEqual(splitFailItems[0].json.failoverModelName, 'models/gemini-4-hydrogen');
+  assert.strictEqual(splitFailItems[0].json.failoverModelName, 'models/gemini-3.5-flash-lite');
 
   const mergedRecovered = runCodeNode(wf, 'Gabungkan Semua Klip Untuk Pass 2 (Code)', {
     inputAll: [makeGeminiOk('Pembicara B Pulih', 'Bahasan 2 Pulih')],
@@ -1235,7 +1266,7 @@ async function runNotulenBehaviorSuite(wf, expectedSecret, wfLabel) {
   })[0].json;
   assert.strictEqual(pass2FromChunks.fromChunkPipeline, true);
   assert.strictEqual(pass2FromChunks.useAudioFallbackInPass2, false);
-  assert.strictEqual(pass2FromChunks.pass2ModelName, 'models/gemini-4-neon');
+  assert.strictEqual(pass2FromChunks.pass2ModelName, 'models/gemini-3.8-flash');
   assert(pass2FromChunks.geminiPass2RequestBody.contents[0].parts[0].text.includes('SEGMEN 2/4'));
   assert.strictEqual(pass2FromChunks.geminiPass2RequestBody.generationConfig.thinkingConfig.thinkingLevel, 'low');
 
