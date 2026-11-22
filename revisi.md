@@ -7035,6 +7035,24 @@ Menyempurnakan kenyamanan penggunaan Workspace Rapat serta mengotomatiskan kerap
    - Bump 3-titik PWA **`v3.8.84`** ([`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) & [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js)).
    - Penambahan skenario uji di [`tests/verify_fase3b.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/tests/verify_fase3b.js) & [`tests/verify_n8n_ai_assistant.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/tests/verify_n8n_ai_assistant.js).
 
+---
+
+## REVISI TAHAP 149B & 150: STABILISASI ANTI-503 (`gemini-3.5-flash-lite` PRIMARY), TIMEOUT 120s & JAMINAN PEMBUKA NATURAL (`v3.8.86`)
+**Status:** `[SELESAI & TERVERIFIKASI]`
+
+### 1. Akar Masalah
+- Node `Panggil Gemini Multimodal API (HTTP)` (Sync/Notebook), klip genap Pass 1, dan Pass 2 sebelumnya memanggil **`models/gemini-3.8-flash`**, yang mengalami **`503 UNAVAILABLE (high demand)`** pada Google AI Studio Free Tier sehingga memicu hilangnya pembicara segmen tengah (Panitera & Hj. Jamilah) serta memicu `allow_text_fallback` di mode Notebook yang mengisi Tab 3 dengan teks mentah.
+- Di sisi frontend, [`core/api.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/core/api.js) sebelumnya memutus fetch pada `30s` (`v3.8.85` menaikkan ke `120s` untuk `generateAiNotulenRapat`).
+
+### 2. Rincian Implementasi
+1. **Workflow n8n Anti-503 (`52` Node, [`n8n/transkep-ai-notulen.example.json`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/n8n/transkep-ai-notulen.example.json) & Lokal, `versionId: e102a5d4-9f63-4c2f-b13a-56e71aa98210`):**
+   - Mengubah seluruh klip utama di `Siapkan Payload Klip Round-Robin (Code)`, node Sync `Panggil Gemini Multimodal API (HTTP)`, dan Pass 2 (`Siapkan Payload Pass 2 Smart Merge (Code)` / `Panggil Gemini Pass 2 Editor Notulis (HTTP)`) ke **`models/gemini-3.5-flash-lite`** sebagai model utama Free Tier (`retryOnFail: true`, `maxTries: 3`, jeda `5000 ms`), dengan failover klip silang ke `models/gemini-3.8-flash`.
+   - Menambahkan instruksi 1 paragraf pembuka natural (*Assalamualaikum, Wr. Wb.* → *Basmalah*) ke `clipSystemPrompt` Pass 1 dan pengaman `ensureNaturalPengarahan` di `Parse & Siapkan Callback Async (Code)` bila `pengarahan_umum` kosong.
+2. **Error Surfacing Bersih Mode Notebook ([`modules/eoffice/rapat.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/rapat.js)):**
+   - Mengubah `allow_text_fallback` menjadi `false` saat `useNotebookTextMode` aktif di `processAiNotulenRapat()` agar kendala server/503 tampil jujur pada `#rapatAiErrorBox` tanpa mencemari Tab 3 dengan fallback teks mentah.
+3. **PWA & Uji Regresi (`v3.8.86`):**
+   - Bump 3-titik PWA **`v3.8.86`** ([`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) & [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js)), beserta pembaruan assertion pada [`tests/verify_n8n_ai_assistant.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/tests/verify_n8n_ai_assistant.js) & [`tests/verify_fase3b.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/tests/verify_fase3b.js).
+
 
 
 

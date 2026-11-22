@@ -561,12 +561,13 @@ function validateNotulenWorkflowTopology(wf, rawText, label) {
   assert.strictEqual(webhookNode.parameters.responseMode, 'responseNode', `${label}: webhook must use responseNode`);
 
   const geminiHttp = byName.get('Panggil Gemini Multimodal API (HTTP)');
-  assert(geminiHttp && String(geminiHttp.parameters.url).includes('models/gemini-3.8-flash:generateContent'), `${label}: sync HTTP node must invoke models/gemini-3.8-flash`);
+  assert(geminiHttp && String(geminiHttp.parameters.url).includes('models/gemini-3.5-flash-lite:generateContent'), `${label}: sync HTTP node must invoke models/gemini-3.5-flash-lite`);
   assert.strictEqual(geminiHttp.parameters.authentication, 'predefinedCredentialType', `${label}: Gemini HTTP node must use predefinedCredentialType`);
   assert.strictEqual(geminiHttp.parameters.nodeCredentialType, 'googlePalmApi', `${label}: Gemini HTTP node must bind googlePalmApi credential`);
   assert(geminiHttp.credentials && geminiHttp.credentials.googlePalmApi && geminiHttp.credentials.googlePalmApi.id, `${label}: Gemini HTTP node missing googlePalmApi credentials`);
   assert.strictEqual(geminiHttp.parameters.options.timeout, 180000, `${label}: sync HTTP timeout must be 180000 ms`);
   assert.strictEqual(geminiHttp.retryOnFail, true, `${label}: sync HTTP node must set retryOnFail: true`);
+  assert(geminiHttp.maxTries >= 3, `${label}: sync HTTP node must set maxTries >= 3`);
   assert.strictEqual(geminiHttp.continueOnFail, true, `${label}: Gemini HTTP node must set continueOnFail: true`);
 
   const fileUriHttp = byName.get('Panggil Gemini FileURI API (HTTP)');
@@ -598,9 +599,10 @@ function validateNotulenWorkflowTopology(wf, rawText, label) {
 
   const pass2Http = byName.get('Panggil Gemini Pass 2 Editor Notulis (HTTP)');
   assert(
-    pass2Http && String(pass2Http.parameters.url).includes('pass2ModelUrl') && String(pass2Http.parameters.url).includes('models/gemini-3.8-flash:generateContent'),
-    `${label}: Pass 2 HTTP node must bind dynamic $json.pass2ModelUrl defaulting to models/gemini-3.8-flash`
+    pass2Http && String(pass2Http.parameters.url).includes('pass2ModelUrl') && String(pass2Http.parameters.url).includes('models/gemini-3.5-flash-lite:generateContent'),
+    `${label}: Pass 2 HTTP node must bind dynamic $json.pass2ModelUrl defaulting to models/gemini-3.5-flash-lite`
   );
+  assert(pass2Http.maxTries >= 3, `${label}: Pass 2 HTTP node must set maxTries >= 3`);
   assert.strictEqual(pass2Http.parameters.options.timeout, 240000, `${label}: Pass 2 timeout must be 240000 ms`);
 
   for (const sshName of ['SSH Buat Folder Audio', 'SSH FFmpeg Kompres & Potong 10 Menit', 'SSH Bersihkan Audio Sementara']) {
@@ -1042,11 +1044,11 @@ async function runNotulenBehaviorSuite(wf, expectedSecret, wfLabel) {
   })[0].json;
   assert.strictEqual(pass1FailPrep.pass1FailedMessage, '', `${wfLabel}: Pass 1 failure must allow Pass 2 audio fallback instead of aborting`);
   assert.strictEqual(pass1FailPrep.useAudioFallbackInPass2, true);
-  assert.strictEqual(pass1FailPrep.pass2ModelName, 'models/gemini-3.8-flash', `${wfLabel}: Pass 2 failover must switch to cross-model gemini-3.8-flash`);
+  assert.strictEqual(pass1FailPrep.pass2ModelName, 'models/gemini-3.5-flash-lite', `${wfLabel}: Pass 2 must use anti-503 gemini-3.5-flash-lite`);
   assert.strictEqual(
     pass1FailPrep.pass2ModelUrl,
-    'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent',
-    `${wfLabel}: Pass 2 failover URL must target gemini-3.8-flash`
+    'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent',
+    `${wfLabel}: Pass 2 failover URL must target gemini-3.5-flash-lite`
   );
   assert.strictEqual(pass1FailPrep.geminiPass2RequestBody.generationConfig.thinkingConfig.thinkingLevel, 'low');
   assert.strictEqual(pass1FailPrep.geminiPass2RequestBody.generationConfig.temperature, undefined);
@@ -1061,10 +1063,10 @@ async function runNotulenBehaviorSuite(wf, expectedSecret, wfLabel) {
       'Siapkan Payload Gemini FileURI (Code)': { fileName: 'files/gem-147', fileUri: 'https://gemini/gem-147', pollFailedMessage: '' },
     },
   })[0].json;
-  assert.strictEqual(pass1OkPrep.pass2ModelName, 'models/gemini-3.8-flash', `${wfLabel}: Normal Pass 2 Smart Merge must use gemini-3.8-flash`);
+  assert.strictEqual(pass1OkPrep.pass2ModelName, 'models/gemini-3.5-flash-lite', `${wfLabel}: Normal Pass 2 Smart Merge must use gemini-3.5-flash-lite`);
   assert.strictEqual(
     pass1OkPrep.pass2ModelUrl,
-    'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent'
+    'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent'
   );
   const salvagedPass1Cb = runCodeNode(wf, 'Parse & Siapkan Callback Async (Code)', {
     inputJson: { error: { message: '503 Model Overloaded' } },
@@ -1210,9 +1212,11 @@ async function runNotulenBehaviorSuite(wf, expectedSecret, wfLabel) {
   );
   assert(clipPayloads[1].json.timeWindowLabel.includes('00:10–00:20'), `${wfLabel}: chunks must reflect 10-minute step windows`);
   assert.strictEqual(clipPayloads[0].json.primaryModelName, 'models/gemini-3.5-flash-lite');
-  assert.strictEqual(clipPayloads[1].json.primaryModelName, 'models/gemini-3.8-flash');
+  assert.strictEqual(clipPayloads[1].json.primaryModelName, 'models/gemini-3.5-flash-lite');
   assert.strictEqual(clipPayloads[2].json.primaryModelName, 'models/gemini-3.5-flash-lite');
-  assert.strictEqual(clipPayloads[3].json.primaryModelName, 'models/gemini-3.8-flash');
+  assert.strictEqual(clipPayloads[3].json.primaryModelName, 'models/gemini-3.5-flash-lite');
+  assert.strictEqual(clipPayloads[0].json.failoverModelName, 'models/gemini-3.8-flash');
+  assert.strictEqual(clipPayloads[1].json.failoverModelName, 'models/gemini-3.8-flash');
   assert.strictEqual(
     Buffer.from(clipPayloads[1].json.chunkGeminiRequestBody.contents[0].parts[0].inline_data.data, 'base64').toString('utf8'),
     'SEG1',
@@ -1276,7 +1280,7 @@ async function runNotulenBehaviorSuite(wf, expectedSecret, wfLabel) {
     inputJson: evalWithFail,
   });
   assert.strictEqual(splitFailItems.length, 1);
-  assert.strictEqual(splitFailItems[0].json.failoverModelName, 'models/gemini-3.5-flash-lite');
+  assert.strictEqual(splitFailItems[0].json.failoverModelName, 'models/gemini-3.8-flash');
 
   const mergedRecovered = runCodeNode(wf, 'Gabungkan Semua Klip Untuk Pass 2 (Code)', {
     inputAll: [makeGeminiOk('Pembicara B Pulih', 'Bahasan 2 Pulih')],
@@ -1299,7 +1303,7 @@ async function runNotulenBehaviorSuite(wf, expectedSecret, wfLabel) {
   })[0].json;
   assert.strictEqual(pass2FromChunks.fromChunkPipeline, true);
   assert.strictEqual(pass2FromChunks.useAudioFallbackInPass2, false);
-  assert.strictEqual(pass2FromChunks.pass2ModelName, 'models/gemini-3.8-flash');
+  assert.strictEqual(pass2FromChunks.pass2ModelName, 'models/gemini-3.5-flash-lite');
   assert(pass2FromChunks.geminiPass2RequestBody.contents[0].parts[0].text.includes('SEGMEN 2/4'));
   assert.strictEqual(pass2FromChunks.geminiPass2RequestBody.generationConfig.thinkingConfig.thinkingLevel, 'low');
   assert(
@@ -1385,6 +1389,38 @@ async function runNotulenBehaviorSuite(wf, expectedSecret, wfLabel) {
   })[0].json;
   assert.strictEqual(cleanupAfterAbort.hasTempDisk, false, `${wfLabel}: short-circuited Drive abort must skip SSH disk cleanup`);
   assert.strictEqual(cleanupAfterAbort.hasGeminiFile, false, `${wfLabel}: short-circuited Drive abort must have no Gemini file to delete`);
+
+  // Tahap 150: Pass 1 clip prompt carries natural 1-paragraph opening guide & Async normalizer synthesizes contextual opening if empty
+  assert(
+    clipPayloads[0].json.chunkGeminiRequestBody.system_instruction.parts[0].text.includes('Assalamualaikum, Wr. Wb.') &&
+      clipPayloads[0].json.chunkGeminiRequestBody.system_instruction.parts[0].text.includes('Basmalah'),
+    `${wfLabel}: Pass 1 clip prompt must carry natural 1-paragraph opening guidance`
+  );
+  const emptyPengarahanCb = runCodeNode(wf, 'Parse & Siapkan Callback Async (Code)', {
+    inputJson: {
+      candidates: [{
+        content: {
+          parts: [{
+            text: JSON.stringify({
+              pengarahan_umum: '',
+              kesimpulan: 'Siap dilaksanakan.',
+              pembahasan: [{ pembicara_nama: 'Panitera', items: [{ uraian: 'Upload putusan SIPP tepat waktu.', tindak_lanjut: 'Pantau harian', target_kategori_waktu: 'HARI_RAPAT', penanggung_jawab: 'PP', selesai_kategori_waktu: 'HARI_RAPAT' }] }],
+            }),
+          }],
+        },
+      }],
+    },
+    nodeMap: {
+      'Validasi & Siapkan Prompt Notulen (Code)': big150MbOut,
+      'Siapkan Payload Pass 2 Smart Merge (Code)': pass2FromChunks,
+    },
+  })[0].json;
+  assert(
+    emptyPengarahanCb.callbackPayload.data.pengarahan_umum.includes('Assalamualaikum, Wr. Wb.') &&
+      emptyPengarahanCb.callbackPayload.data.pengarahan_umum.includes('Basmalah') &&
+      emptyPengarahanCb.callbackPayload.data.pengarahan_umum.includes('Upload putusan SIPP tepat waktu'),
+    `${wfLabel}: Empty pengarahan_umum must synthesize natural 1-paragraph contextual opening`
+  );
 }
 
 (async () => {

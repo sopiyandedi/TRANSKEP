@@ -2519,6 +2519,7 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
     assert.strictEqual(capturedNbReq.async_mode, false, 'Notebook text mode must bypass async Drive pipeline');
     assert.strictEqual(capturedNbReq.audio_drive_file_id, '', 'Notebook text mode must clear audio_drive_file_id so n8n uses fast text path');
     assert.strictEqual(capturedNbReq.audio_data, '', 'Notebook text mode must clear inline audio_data');
+    assert.strictEqual(capturedNbReq.allow_text_fallback, false, 'Notebook text mode must disable silent raw-text fallback so 503/errors surface cleanly');
     assert(capturedNbReq.transcript_text.includes('Konstruksi Sistem Berpikiran Hukum'), 'Notebook text must travel in transcript_text');
     assert.strictEqual(dom148.rapatFieldPengarahanUmum.value, 'Arahan dari Notebook PRO.');
     assert.strictEqual(dom148.rapatFieldAiTranscript.value, 'Ringkasan rapat bedah berkas.');

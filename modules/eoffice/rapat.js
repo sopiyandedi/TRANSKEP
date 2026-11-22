@@ -2864,7 +2864,7 @@
         audio_mime_type: useNotebookTextMode ? '' : (rapatAudioState.mimeType || ''),
         audio_size_bytes: useNotebookTextMode ? 0 : Number(rapatAudioState.sizeBytes || 0),
         async_mode: useAsyncDriveAudio,
-        allow_text_fallback: useNotebookTextMode ? true : Boolean(transcriptText)
+        allow_text_fallback: useNotebookTextMode ? false : Boolean(transcriptText)
       };
 
       if (btnAi) {
