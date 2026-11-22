@@ -7015,6 +7015,26 @@ Menyempurnakan kenyamanan penggunaan Workspace Rapat serta mengotomatiskan kerap
    - Sinkronisasi versi PWA 3 titik ke **`v3.8.83`** pada [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) & [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js).
    - Memperbarui [`tests/verify_n8n_ai_assistant.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/tests/verify_n8n_ai_assistant.js) & [`tests/verify_fase3b.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/tests/verify_fase3b.js) untuk memverifikasi topologi 52 node Free-Tier 10 menit dan alur end-to-end UI Jalur Kilat Notebook PRO.
 
+---
+
+## REVISI TAHAP 149: AUTO-GROUP PEMBICARA (1 KARTU PER PEMBICARA), NATURAL 1-PARAGRAF PENGARAHAN UMUM & DEDUPLIKASI KESIMPULAN (`v3.8.84`)
+**Status:** `[SELESAI & TERVERIFIKASI]`
+
+### 1. Akar Masalah
+- Hasil AI Notulis dari potongan audio 10 menit memunculkan pembicara yang sama secara terpisah di beberapa kartu (mis. Ketua di kartu 1, 2, 4, 14; Wakil Ketua di kartu 3, 5, 8, 15).
+- Teks pada **Pengarahan Umum** tersusun seperti beberapa baris poin yang kaku alih-alih 1 paragraf pembuka natural khas notula PA Indramayu, dan **Catatan Kesimpulan** mengalami pengulangan kalimat antar-segmen.
+
+### 2. Rincian Implementasi
+1. **Frontend Auto-Group & Dedupe + Prompt Notebook PRO ([`modules/eoffice/rapat.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/rapat.js)):**
+   - Menambahkan pengelompokan pembicara berdasarkan NIP / nama ternormalisasi beserta deduplikasi `uraian` dan `cleanParagraphDuplicates_` di `applyAiNotulenToForm` — tata letak tabel 5 kolom Tab 3 tetap utuh, dan seluruh bahasan pembicara yang sama otomatis berkumpul menjadi 1 kartu (`items[]` → tercetak bertingkat `a..e` → `1., 2., 3.`).
+   - Memperbarui `buildRapatNotebookPrompt()` agar meminta tepat **1 paragraf pembuka natural** (*Assalamualaikum, Wr. Wb.* → terima kasih & gambaran menyeluruh isi bahasan → ajakan membaca *Basmalah*), **1 blok per pembicara unik**, dan **1 paragraf kesimpulan tanpa pengulangan**.
+2. **n8n Normalizer & Prompt (`52` Node, [`n8n/transkep-ai-notulen.example.json`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/n8n/transkep-ai-notulen.example.json) & Lokal, `versionId: d919f4c3-8e52-4b1e-a02f-45d609987109`):**
+   - Menambahkan `groupPembahasanBySpeaker()` & `dedupeParagraphText()` di `Parse & Normalisasi JSON Notula (Code)` (Sync) dan `Parse & Siapkan Callback Async (Code)` (Async), plus deduplikasi kalimat di `Gabungkan Semua Klip Untuk Pass 2 (Code)`.
+   - Menambahkan instruksi wajib 1 paragraf pembuka natural, 1 paragraf kesimpulan non-repetitif, dan larangan memecah pembicara yang sama di `Validasi & Siapkan Prompt Notulen (Code)` dan `Siapkan Payload Pass 2 Smart Merge (Code)`.
+3. **PWA & Uji Regresi (`v3.8.84`):**
+   - Bump 3-titik PWA **`v3.8.84`** ([`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) & [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js)).
+   - Penambahan skenario uji di [`tests/verify_fase3b.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/tests/verify_fase3b.js) & [`tests/verify_n8n_ai_assistant.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/tests/verify_n8n_ai_assistant.js).
+
 
 
 

@@ -2507,6 +2507,8 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
     const nbPrompt = vm148.buildRapatNotebookPrompt();
     assert(nbPrompt.includes('Bedah Berkas Perkara Peradilan Agama') && nbPrompt.includes('Atasan Satu (Ketua)'),
       'buildRapatNotebookPrompt must include Agenda and invited participants');
+    assert(nbPrompt.includes('Assalamualaikum, Wr. Wb.') && nbPrompt.includes('Basmalah') && nbPrompt.includes('WAJIB digabung 1 blok per pembicara unik'),
+      'buildRapatNotebookPrompt must enforce natural 1-paragraph Pengarahan Umum & unique speaker grouping');
 
     vm148.syncRapatNotebookNotesUi();
     assert(!dom148.rapatNotebookModeBadge.classList.contains('hidden'), 'Filling Notebook notes must show mode badge');
@@ -2522,10 +2524,36 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
     assert.strictEqual(dom148.rapatFieldAiTranscript.value, 'Ringkasan rapat bedah berkas.');
     assert(dom148.rapatPembahasanListContainer.innerHTML.includes('Uji Yuridis, Filosofis, Sosiologis.'));
 
+    // Tahap 149: Auto-group fragmented duplicate speaker cards + dedupe uraian & kesimpulan
+    const groupedStat = vm148.applyAiNotulenToForm({
+      pengarahan_umum: 'Assalamualaikum, Wr. Wb. Terima kasih hadir. Terima kasih hadir. Marilah baca Basmalah.',
+      kesimpulan: 'Disepakati input saksi wajib sebelum sidang. Disepakati input saksi wajib sebelum sidang. Terus monitor SIPP.',
+      pembahasan: [
+        { pembicara_nama: 'Atasan Satu (Ketua)', items: [{ uraian: 'Pembukaan monitoring SIPP.', tindak_lanjut: 'Cek harian', target: '2026-11-20', penanggung_jawab: 'Ketua', tanggal_penyelesaian: '2026-11-20' }] },
+        { pembicara_nama: 'Ikin, S.Ag., M.E. (Wakil Ketua)', uraian: 'Optimalisasi aplikasi monitoring.', tindak_lanjut: 'Evaluasi berkala', target: '2026-11-20', penanggung_jawab: 'Wakil Ketua', tanggal_penyelesaian: '2026-11-20' },
+        { pembicara_nama: 'Atasan Satu', items: [
+          { uraian: 'Pembukaan monitoring SIPP.', tindak_lanjut: 'Cek harian', target: '2026-11-20', penanggung_jawab: 'Ketua', tanggal_penyelesaian: '2026-11-20' },
+          { uraian: 'Pekerjaan data saksi tepat waktu.', tindak_lanjut: 'Monitor input saksi', target: '2026-11-20', penanggung_jawab: 'PP', tanggal_penyelesaian: '2026-11-20' }
+        ] },
+        { pembicara_nama: 'Ikin, S.Ag., M.E. (Wakil Ketua)', items: [{ uraian: 'Penguatan kerja tandem PP.', tindak_lanjut: 'Susun jadwal tandem', target: '2026-11-27', penanggung_jawab: 'Wakil Ketua', tanggal_penyelesaian: '2026-11-27' }] }
+      ]
+    });
+    assert.strictEqual(groupedStat.pembahasanCount, 2, 'Fragmented rows from 2 speakers must group into 2 unique cards');
+    assert.strictEqual(dom148.rapatCountPembicara.innerText, '2');
+    assert.strictEqual(dom148.rapatFieldKesimpulan.value, 'Disepakati input saksi wajib sebelum sidang. Terus monitor SIPP.');
+    assert(dom148.rapatFieldPengarahanUmum.value.startsWith('Assalamualaikum, Wr. Wb. Terima kasih hadir. Marilah baca Basmalah.'));
+    assert(dom148.rapatPembahasanListContainer.innerHTML.includes('Pekerjaan data saksi tepat waktu.'), 'Grouped Ketua card must merge second uraian item');
+    assert(dom148.rapatPembahasanListContainer.innerHTML.includes('Penguatan kerja tandem PP.'), 'Grouped Wakil Ketua card must merge second uraian item');
+    assert.strictEqual(
+      (dom148.rapatPembahasanListContainer.innerHTML.match(/Pembukaan monitoring SIPP\./g) || []).length,
+      1,
+      'Duplicate uraian inside the same grouped speaker card must be deduplicated'
+    );
+
     vm148.clearRapatNotebookNotes();
     assert.strictEqual(dom148.rapatFieldNotebookNotes.value, '');
     assert(dom148.rapatNotebookModeBadge.classList.contains('hidden'), 'clearRapatNotebookNotes must hide mode badge');
-    console.log('[PASS] Tahap 148 Tab 4 Jalur Kilat Gemini Notebook PRO prompt builder, sync routing & auto-fill Tab 3 verified.');
+    console.log('[PASS] Tahap 148 & 149 Tab 4 Jalur Kilat, Speaker Auto-Grouping & Natural Pengarahan Umum verified.');
   } finally {
     browserSandbox.TranskepAPI.call = origApiCall;
     browserSandbox.TranskepFirebase.getDb = origGetDb;

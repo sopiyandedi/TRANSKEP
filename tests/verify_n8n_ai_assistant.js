@@ -1114,6 +1114,39 @@ async function runNotulenBehaviorSuite(wf, expectedSecret, wfLabel) {
     notebookSyncOut.fullSystemPrompt.includes('BERSIHKAN SITASI TEMPELAN'),
     `${wfLabel}: System prompt must strip pasted Notebook citation numbers`
   );
+  assert(
+    notebookSyncOut.fullSystemPrompt.includes('Assalamualaikum, Wr. Wb.') &&
+      notebookSyncOut.fullSystemPrompt.includes('Basmalah') &&
+      notebookSyncOut.fullSystemPrompt.includes('KELOMPOKKAN 1 objek unik'),
+    `${wfLabel}: System prompt must enforce 1-paragraph Pengarahan Umum & 1-object speaker grouping`
+  );
+
+  // Tahap 149: Sync & Async normalizers group duplicate speakers & dedupe repeated sentences
+  const syncGroupedOut = runCodeNode(wf, 'Parse & Normalisasi JSON Notula (Code)', {
+    inputJson: {
+      candidates: [{
+        content: {
+          parts: [{
+            text: JSON.stringify({
+              pengarahan_umum: 'Assalamualaikum, Wr. Wb. Terima kasih hadir. Terima kasih hadir. Marilah baca Basmalah.',
+              kesimpulan: 'Segera tindak lanjuti. Segera tindak lanjuti. Pantau harian.',
+              pembahasan: [
+                { pembicara_nama: 'H. Zulkifli, S.Ag., S.H., M.H. (Ketua)', pembicara_nip: '19700101', items: [{ uraian: 'Poin 1 Ketua', tindak_lanjut: 'TL 1', target_kategori_waktu: 'HARI_RAPAT', penanggung_jawab: 'Ketua', selesai_kategori_waktu: 'HARI_RAPAT' }] },
+                { pembicara_nama: 'Ikin, S.Ag., M.E. (Wakil Ketua)', items: [{ uraian: 'Poin 1 Waka', tindak_lanjut: 'TL Waka', target_kategori_waktu: 'JANGKA_PENDEK', penanggung_jawab: 'Wakil Ketua', selesai_kategori_waktu: 'JANGKA_PENDEK' }] },
+                { pembicara_nama: 'H. Zulkifli, S.Ag., S.H., M.H.', pembicara_nip: '19700101', items: [{ uraian: 'Poin 1 Ketua', tindak_lanjut: 'TL 1', target_kategori_waktu: 'HARI_RAPAT', penanggung_jawab: 'Ketua', selesai_kategori_waktu: 'HARI_RAPAT' }, { uraian: 'Poin 2 Ketua', tindak_lanjut: 'TL 2', target_kategori_waktu: 'HARI_RAPAT', penanggung_jawab: 'PP', selesai_kategori_waktu: 'HARI_RAPAT' }] },
+              ],
+            }),
+          }],
+        },
+      }],
+    },
+    nodeMap: { 'Validasi & Siapkan Prompt Notulen (Code)': notebookSyncOut },
+  })[0].json;
+  assert.strictEqual(syncGroupedOut.status, 'success');
+  assert.strictEqual(syncGroupedOut.data.pembahasan.length, 2, `${wfLabel}: sync normalizer must group fragmented speaker blocks into 2`);
+  assert.strictEqual(syncGroupedOut.data.pembahasan[0].items.length, 2, `${wfLabel}: grouped Ketua must have 2 unique items after dedupe`);
+  assert.strictEqual(syncGroupedOut.data.kesimpulan, 'Segera tindak lanjuti. Pantau harian.');
+  assert.strictEqual(syncGroupedOut.data.pengarahan_umum, 'Assalamualaikum, Wr. Wb. Terima kasih hadir. Marilah baca Basmalah.');
 
   // Opsi B Pipeline: Sanitization, binary re-attach, 10m split Free-Tier Round-Robin, failover splice & cleanup
   const maliciousCtx = { ...big150MbOut, job_id: '../../etc; rm -rf /', audioFileName: 'Rapat.m4a;evil' };
@@ -1269,6 +1302,39 @@ async function runNotulenBehaviorSuite(wf, expectedSecret, wfLabel) {
   assert.strictEqual(pass2FromChunks.pass2ModelName, 'models/gemini-3.8-flash');
   assert(pass2FromChunks.geminiPass2RequestBody.contents[0].parts[0].text.includes('SEGMEN 2/4'));
   assert.strictEqual(pass2FromChunks.geminiPass2RequestBody.generationConfig.thinkingConfig.thinkingLevel, 'low');
+  assert(
+    pass2FromChunks.geminiPass2RequestBody.system_instruction.parts[0].text.includes('TEPAT 1 objek pembicara unik') &&
+      pass2FromChunks.geminiPass2RequestBody.system_instruction.parts[0].text.includes('Assalamualaikum, Wr. Wb.'),
+    `${wfLabel}: Pass 2 system prompt must enforce 1-object speaker grouping & natural 1-paragraph opening`
+  );
+
+  const asyncGroupedCb = runCodeNode(wf, 'Parse & Siapkan Callback Async (Code)', {
+    inputJson: {
+      candidates: [{
+        content: {
+          parts: [{
+            text: JSON.stringify({
+              pengarahan_umum: 'Assalamualaikum, Wr. Wb. Mari tingkatkan kinerja.\nMari tingkatkan kinerja.\nDengan bacaan Basmalah.',
+              kesimpulan: 'Input saksi wajib. Input saksi wajib.',
+              pembahasan: [
+                { pembicara_nama: 'Ketua PA (Ketua)', pembicara_nip: '1970', items: [{ uraian: 'A1', tindak_lanjut: 'B1', target_kategori_waktu: 'HARI_RAPAT', penanggung_jawab: 'Ketua', selesai_kategori_waktu: 'HARI_RAPAT' }] },
+                { pembicara_nama: 'Panitera PA', items: [{ uraian: 'P1', tindak_lanjut: 'TP1', target_kategori_waktu: 'HARI_RAPAT', penanggung_jawab: 'Panitera', selesai_kategori_waktu: 'HARI_RAPAT' }] },
+                { pembicara_nama: 'Ketua PA', pembicara_nip: '1970', items: [{ uraian: 'A2', tindak_lanjut: 'B2', target_kategori_waktu: 'HARI_RAPAT', penanggung_jawab: 'PP', selesai_kategori_waktu: 'HARI_RAPAT' }] },
+              ],
+            }),
+          }],
+        },
+      }],
+    },
+    nodeMap: {
+      'Validasi & Siapkan Prompt Notulen (Code)': big150MbOut,
+      'Siapkan Payload Pass 2 Smart Merge (Code)': pass2FromChunks,
+    },
+  })[0].json;
+  assert.strictEqual(asyncGroupedCb.callbackPayload.data.pembahasan.length, 2, `${wfLabel}: async normalizer must group same speaker into 1 card`);
+  assert.strictEqual(asyncGroupedCb.callbackPayload.data.pembahasan[0].items.length, 2, `${wfLabel}: async grouped Ketua must hold 2 merged items`);
+  assert.strictEqual(asyncGroupedCb.callbackPayload.data.kesimpulan, 'Input saksi wajib.');
+  assert.strictEqual(asyncGroupedCb.callbackPayload.data.pengarahan_umum, 'Assalamualaikum, Wr. Wb. Mari tingkatkan kinerja. Dengan bacaan Basmalah.');
 
   // Cleanup node safety with strictNodes: true across both paths
   const cleanupDiskOnly = runCodeNode(wf, 'Cek Kebutuhan Cleanup (Code)', {

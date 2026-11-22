@@ -2428,11 +2428,31 @@
     var elDasar = document.getElementById('rapatFieldDasarNotula');
     var elTrans = document.getElementById('rapatFieldAiTranscript');
 
+    var cleanParagraphDuplicates_ = function (rawText) {
+      var raw = String(rawText || '').trim();
+      if (!raw) return '';
+      var segments = raw
+        .split(/\r?\n+|(?<=[.!?])\s+/)
+        .map(function (s) { return String(s || '').trim(); })
+        .filter(Boolean);
+      if (segments.length <= 1) return raw;
+      var seenSent = {};
+      var unique = [];
+      segments.forEach(function (seg) {
+        var norm = seg.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+        if (!norm || !seenSent[norm]) {
+          if (norm) seenSent[norm] = true;
+          unique.push(seg);
+        }
+      });
+      return unique.length < segments.length ? unique.join(' ') : raw;
+    };
+
     if (elPengarahan && String(data.pengarahan_umum || '').trim()) {
-      elPengarahan.value = String(data.pengarahan_umum).trim();
+      elPengarahan.value = cleanParagraphDuplicates_(data.pengarahan_umum);
     }
     if (elKesimpulan && String(data.kesimpulan || '').trim()) {
-      elKesimpulan.value = String(data.kesimpulan).trim();
+      elKesimpulan.value = cleanParagraphDuplicates_(data.kesimpulan);
     }
     if (elDasar && String(data.dasar_opsional || '').trim()) {
       if (!String(elDasar.value || '').trim() || options.aiMode === 'replace') {
@@ -2447,46 +2467,106 @@
 
     var rows = Array.isArray(data.pembahasan) ? data.pembahasan : [];
     if (rows.length > 0) {
-      pembahasanRowsList = rows.slice(0, 30).map(function (r, idx) {
+      var groupOrder = [];
+      var groupMap = {};
+
+      rows.slice(0, 60).forEach(function (r, idx) {
         var row = (r && typeof r === 'object') ? r : {};
         var rawSpeaker = String(row.pembicara_nama || row.pembicara || ('Pembicara #' + (idx + 1))).trim();
         var rawNip = String(row.pembicara_nip || '').trim();
         var rawJab = String(row.pembicara_jabatan || '').trim();
         var matched = matchPegawaiForAiSpeaker_(rawSpeaker, rawNip, rawJab);
 
-        var mappedItems = null;
+        var speakerName = (matched && rawSpeaker.indexOf('(') === -1) ? matched.namaDisplay : rawSpeaker;
+        var speakerNip = matched ? matched.nip : rawNip;
+        var speakerJab = matched ? matched.jabatan : rawJab;
+
+        var groupKey = '';
+        if (speakerNip) {
+          groupKey = 'nip:' + speakerNip;
+        } else {
+          var isAnon = /^pembicara\s*#?\d+/i.test(speakerName) || /belum\s+teridentifikasi/i.test(speakerName);
+          var baseName = isAnon ? speakerName : (speakerName.replace(/\([^)]*\)/g, ' ').trim() || speakerName);
+          groupKey = 'name:' + (baseName.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim() || ('idx_' + idx));
+        }
+
+        var incomingSubItems = [];
         if (Array.isArray(row.items) && row.items.length > 0) {
-          mappedItems = row.items.map(function (sub) {
+          row.items.forEach(function (sub) {
             var s = (sub && typeof sub === 'object') ? sub : {};
-            return {
+            incomingSubItems.push({
               uraian: joinAiLines_(s.uraian_text || s.uraian),
               tindak_lanjut: joinAiLines_(s.tindak_lanjut_text || s.tindak_lanjut),
               target: String(s.target || '').trim(),
               penanggung_jawab: String(s.penanggung_jawab || row.penanggung_jawab || '').trim(),
               tanggal_penyelesaian: String(s.tanggal_penyelesaian || '').trim()
-            };
+            });
+          });
+        } else {
+          incomingSubItems.push({
+            uraian: joinAiLines_(row.uraian_text || row.uraian),
+            tindak_lanjut: joinAiLines_(row.tindak_lanjut_text || row.tindak_lanjut),
+            target: String(row.target || '').trim(),
+            penanggung_jawab: String(row.penanggung_jawab || '').trim(),
+            tanggal_penyelesaian: String(row.tanggal_penyelesaian || '').trim()
           });
         }
 
+        if (!groupMap[groupKey]) {
+          groupMap[groupKey] = {
+            pembicara_nama: speakerName,
+            pembicara_nip: speakerNip,
+            pembicara_jabatan: speakerJab,
+            items: [],
+            seenUraian: {}
+          };
+          groupOrder.push(groupKey);
+        } else {
+          if (!groupMap[groupKey].pembicara_jabatan && speakerJab) {
+            groupMap[groupKey].pembicara_jabatan = speakerJab;
+          }
+          if (speakerName.length > groupMap[groupKey].pembicara_nama.length && speakerName.indexOf('(') !== -1) {
+            groupMap[groupKey].pembicara_nama = speakerName;
+          }
+        }
+
+        var grp = groupMap[groupKey];
+        incomingSubItems.forEach(function (subItem) {
+          var normU = String(subItem.uraian || '').toLowerCase().replace(/^[0-9]+[.)]\s*/, '').replace(/\s+/g, ' ').trim();
+          var normT = String(subItem.tindak_lanjut || '').toLowerCase().replace(/^[0-9]+[.)]\s*/, '').replace(/\s+/g, ' ').trim();
+          var dedupeKey = normU ? ('u:' + normU) : (normT ? ('t:' + normT) : '');
+          if (dedupeKey && grp.seenUraian[dedupeKey] !== undefined) {
+            var existingIdx = grp.seenUraian[dedupeKey];
+            var existingItem = grp.items[existingIdx];
+            if (existingItem && !existingItem.tindak_lanjut && subItem.tindak_lanjut) {
+              existingItem.tindak_lanjut = subItem.tindak_lanjut;
+            }
+            if (existingItem && !existingItem.penanggung_jawab && subItem.penanggung_jawab) {
+              existingItem.penanggung_jawab = subItem.penanggung_jawab;
+            }
+            return;
+          }
+          if (dedupeKey) grp.seenUraian[dedupeKey] = grp.items.length;
+          grp.items.push(subItem);
+        });
+      });
+
+      pembahasanRowsList = groupOrder.slice(0, 30).map(function (key) {
+        var grp = groupMap[key];
         return normalizePembahasanRow_({
-          pembicara_nama: (matched && rawSpeaker.indexOf('(') === -1) ? matched.namaDisplay : rawSpeaker,
-          pembicara_nip: matched ? matched.nip : rawNip,
-          pembicara_jabatan: matched ? matched.jabatan : rawJab,
-          uraian: joinAiLines_(row.uraian_text || row.uraian),
-          tindak_lanjut: joinAiLines_(row.tindak_lanjut_text || row.tindak_lanjut),
-          target: String(row.target || '').trim(),
-          penanggung_jawab: String(row.penanggung_jawab || '').trim(),
-          tanggal_penyelesaian: String(row.tanggal_penyelesaian || '').trim(),
-          items: mappedItems
+          pembicara_nama: grp.pembicara_nama,
+          pembicara_nip: grp.pembicara_nip,
+          pembicara_jabatan: grp.pembicara_jabatan,
+          items: grp.items.slice(0, 25)
         });
       });
       renderPembahasanRows_();
     }
 
     return {
-      pembahasanCount: rows.length,
-      hasPengarahan: Boolean(String(data.pengarahan_umum || '').trim()),
-      hasKesimpulan: Boolean(String(data.kesimpulan || '').trim()),
+      pembahasanCount: pembahasanRowsList.length,
+      hasPengarahan: Boolean(elPengarahan && String(elPengarahan.value || '').trim()),
+      hasKesimpulan: Boolean(elKesimpulan && String(elKesimpulan.value || '').trim()),
       hasUndoSnapshot: Boolean(rapatAiUndoSnapshot)
     };
   };
@@ -2661,15 +2741,15 @@
       '',
       '=== FORMAT OUTPUT YANG DIMINTA ===',
       '1. DASAR RAPAT: (jika disebutkan di rekaman/sumber).',
-      '2. PENGARAHAN UMUM PIMPINAN: Rangkuman arahan pembuka/utama pimpinan rapat dalam Bahasa Indonesia kedinasan yang rapi.',
-      '3. PEMBAHASAN PER PEMBICARA (urut dari pembicara pertama sampai terakhir, pisahkan jelas per pembicara):',
+      '2. PENGARAHAN UMUM PIMPINAN: Susun menjadi TEPAT 1 paragraf pembuka yang natural, hangat, mengalir, dan praktis (BUKAN daftar poin terpisah) seperti notula resmi PA Indramayu: mulai dengan salam "Assalamualaikum, Wr. Wb.", ucapan terima kasih kepada Hakim/Pegawai/peserta rapat, gambaran singkat menyeluruh pokok bahasan rapat, harapan peningkatan kinerja, dan tutup kalimat pembuka dengan ajakan membaca Basmalah ("Marilah kita mulai acara rapat ini dengan bacaan Basmalah.").',
+      '3. PEMBAHASAN PER PEMBICARA (WAJIB digabung 1 blok per pembicara unik; jika pembicara yang sama berbicara beberapa kali di menit berbeda, KUMPULKAN semua bahasannya ke dalam 1 blok pembicara tersebut jangan dipecah!):',
       '   Nama Pembicara (Jabatan — bila ragu tulis "Pembicara #N (Belum Teridentifikasi — Bidang ...)"):',
       '   - Uraian Pokok Bahasan / Laporan:',
       '   - Tindak Lanjut / Keputusan:',
       '   - Target Waktu (sebutkan tanggal eksplisit bila disebut, atau sifatnya: rutin harian / jangka pendek / menengah / proyek sarana):',
       '   - Penanggung Jawab:',
       '   - Tanggal Penyelesaian:',
-      '4. KESIMPULAN AKHIR RAPAT: Ringkasan keputusan akhir rapat.'
+      '4. KESIMPULAN AKHIR RAPAT: Ringkas tepat 1 paragraf padat tanpa mengulang kalimat yang sama.'
     ].filter(function (part) { return part !== ''; }).join('\n');
   };
 
