@@ -99,7 +99,8 @@ const TranskepAPI = (function () {
     };
 
     const controller = (typeof AbortController !== 'undefined') ? new AbortController() : null;
-    const timeoutTimer = controller ? setTimeout(() => controller.abort(), CONFIG.timeout || 30000) : null;
+    const effectiveTimeoutMs = (payload.method === 'generateAiNotulenRapat') ? 120000 : (CONFIG.timeout || 30000);
+    const timeoutTimer = controller ? setTimeout(() => controller.abort(), effectiveTimeoutMs) : null;
     if (controller) {
       fetchOptions.signal = controller.signal;
     }
@@ -132,7 +133,8 @@ const TranskepAPI = (function () {
     } catch (err) {
       if (timeoutTimer) clearTimeout(timeoutTimer);
       if (err && err.name === 'AbortError') {
-        throw new Error('Koneksi ke server timeout (30s). Silakan periksa jaringan.');
+        const timeoutSec = Math.round(effectiveTimeoutMs / 1000);
+        throw new Error('Koneksi ke server timeout (' + timeoutSec + 's). Silakan periksa jaringan.');
       }
       console.error('[TranskepAPI Error] Target URL:', CONFIG.apiUrl, err);
       throw err;

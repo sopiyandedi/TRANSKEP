@@ -2553,7 +2553,14 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
     vm148.clearRapatNotebookNotes();
     assert.strictEqual(dom148.rapatFieldNotebookNotes.value, '');
     assert(dom148.rapatNotebookModeBadge.classList.contains('hidden'), 'clearRapatNotebookNotes must hide mode badge');
-    console.log('[PASS] Tahap 148 & 149 Tab 4 Jalur Kilat, Speaker Auto-Grouping & Natural Pengarahan Umum verified.');
+
+    // Tahap 149B: core/api.js extends browser timeout to 120s for generateAiNotulenRapat
+    const apiSrc149b = fs.readFileSync('core/api.js', 'utf8');
+    assert(
+      apiSrc149b.includes("payload.method === 'generateAiNotulenRapat'") && apiSrc149b.includes('120000'),
+      'core/api.js must extend client timeout to 120000ms for generateAiNotulenRapat'
+    );
+    console.log('[PASS] Tahap 148, 149 & 149B Tab 4 Jalur Kilat, Speaker Auto-Grouping, Natural Pengarahan Umum & 120s Timeout verified.');
   } finally {
     browserSandbox.TranskepAPI.call = origApiCall;
     browserSandbox.TranskepFirebase.getDb = origGetDb;
