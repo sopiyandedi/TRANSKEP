@@ -899,7 +899,34 @@ try {
   assert.strictEqual(initOk.status, 'success', 'initAudioDriveUploadSession must succeed for 77 MB M4A');
   assert(initOk.data.upload_url.includes('upload_id=mockSess146'));
   assert.strictEqual(initOk.data.mime_type, 'audio/mp4', 'audio/x-m4a must normalize to audio/mp4');
-  assert.strictEqual(initOk.data.folder_path, 'Arsip Foto Rapat TRANSKEP / 2026 / November / Rapat Panitera Pengganti');
+  assert.strictEqual(initOk.data.folder_path, 'Arsip Foto Rapat TRANSKEP / 2026 / November / 21 Nov - Rapat Panitera Pengganti [146]');
+
+  const init1113 = reqAdminCall('initAudioDriveUploadSession', [{
+    id_rapat: 'RPT-1795142607875',
+    agenda: 'Rapat Monitoring dan Evaluasi Kinerja Bidang Kepaniteraan',
+    tgl_rapat_iso: '2026-11-20',
+    no_urut_surat: '1113',
+    file_name: 'a.m4a',
+    mime_type: 'audio/mp4',
+    file_size: 25000000
+  }, adm.data.nip, adm.token]);
+  const init1114 = reqAdminCall('initAudioDriveUploadSession', [{
+    id_rapat: 'RPT-1795397439551',
+    agenda: 'Rapat Monitoring dan Evaluasi Kinerja Bidang Kepaniteraan',
+    tgl_rapat_iso: '2026-11-20',
+    nomor_undangan: '1114/KPA.W10-A2/HK2.6/XI/2026',
+    file_name: 'b.m4a',
+    mime_type: 'audio/mp4',
+    file_size: 25000000
+  }, adm.data.nip, adm.token]);
+  assert.strictEqual(
+    init1113.data.folder_path,
+    'Arsip Foto Rapat TRANSKEP / 2026 / November / No. 1113 - Rapat Monitoring dan Evaluasi Kinerja Bidang Kepaniteraan'
+  );
+  assert.strictEqual(
+    init1114.data.folder_path,
+    'Arsip Foto Rapat TRANSKEP / 2026 / November / No. 1114 - Rapat Monitoring dan Evaluasi Kinerja Bidang Kepaniteraan'
+  );
   const driveCall146 = fetchLog146.find((x) => x.url.includes('googleapis.com/upload/drive/v3/files'));
   assert(driveCall146 && driveCall146.opts.headers.Origin === 'https://sso.pa-indramayu.go.id', 'Drive Resumable init must forward safe Origin for browser CORS PUT');
 

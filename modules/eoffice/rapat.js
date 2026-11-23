@@ -24,6 +24,7 @@
   var officialDropActiveMap = { pejabatTtd: 0, pemimpin: 0, notulis: 0 };
   var officialDropMatchesMap = { pejabatTtd: [], pemimpin: [], notulis: [] };
   var rapatLastKeyShiftTab = false;
+  var rapatDraftUploadId_ = '';
 
   if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
     document.addEventListener('keydown', function (ev) {
@@ -1675,12 +1676,18 @@
   }
 
   function getRapatDriveFolderContext_() {
+    var existingId = ((document.getElementById('rapatFieldIdRapat') || {}).value || '').trim();
+    if (!existingId && !rapatDraftUploadId_) {
+      rapatDraftUploadId_ = 'RPT-' + Date.now();
+    }
     return {
-      id_rapat: ((document.getElementById('rapatFieldIdRapat') || {}).value || '').trim() || 'RPT',
+      id_rapat: existingId || rapatDraftUploadId_,
       agenda: ((document.getElementById('rapatFieldAgenda') || {}).value || '').trim(),
       hari_tanggal: ((document.getElementById('rapatFieldHariTanggal') || {}).value || '').trim(),
       tgl_surat: ((document.getElementById('rapatFieldTglSuratIso') || {}).value || '').trim(),
-      tgl_rapat_iso: ((document.getElementById('rapatFieldTglRapatIso') || {}).value || '').trim()
+      tgl_rapat_iso: ((document.getElementById('rapatFieldTglRapatIso') || {}).value || '').trim(),
+      no_urut_surat: ((document.getElementById('rapatFieldNoUrutSurat') || {}).value || '').trim(),
+      nomor_undangan: ((document.getElementById('rapatFieldNomorUndangan') || {}).value || '').trim()
     };
   }
 
@@ -1794,6 +1801,8 @@
             hari_tanggal: folderCtx.hari_tanggal,
             tgl_surat: folderCtx.tgl_surat,
             tgl_rapat_iso: folderCtx.tgl_rapat_iso,
+            no_urut_surat: folderCtx.no_urut_surat,
+            nomor_undangan: folderCtx.nomor_undangan,
             file_data: compressed.dataUri,
             file_name: entry.file_name,
             mime_type: compressed.mimeType || 'image/jpeg'
@@ -2188,6 +2197,8 @@
             hari_tanggal: folderCtx.hari_tanggal,
             tgl_surat: folderCtx.tgl_surat,
             tgl_rapat_iso: folderCtx.tgl_rapat_iso,
+            no_urut_surat: folderCtx.no_urut_surat,
+            nomor_undangan: folderCtx.nomor_undangan,
             file_data: dataUri,
             file_name: fileName || 'rekaman_rapat.webm',
             mime_type: mimeType || 'audio/webm'
@@ -3004,6 +3015,7 @@
     var modal = document.getElementById('modalAgendaRapat');
     if (!modal) return;
 
+    rapatDraftUploadId_ = '';
     rapatData = rapatData || {};
     var incomingId = String(rapatData.id_rapat || rapatData.id || '').trim();
     if (incomingId && window.vmEoffice && Array.isArray(window.vmEoffice.rawRapatList)) {

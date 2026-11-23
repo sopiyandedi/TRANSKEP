@@ -2403,7 +2403,7 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
       mime_type: 'image/jpeg'
     }, '198001012005011001', 'tok');
     assert.strictEqual(upFoto145.status, 'success');
-    assert.strictEqual(upFoto145.data.folder_path, 'Arsip Foto Rapat TRANSKEP / 2026 / Desember / Rapat Evaluasi Akhir Tahun');
+    assert.strictEqual(upFoto145.data.folder_path, 'Arsip Foto Rapat TRANSKEP / 2026 / Desember / 05 Des - Rapat Evaluasi Akhir Tahun [DES-01]');
 
     const upAudio145 = gasRapatVm145.uploadAudioRapat({
       id_rapat: 'RPT-DES-01',
@@ -2414,8 +2414,72 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
       mime_type: 'audio/webm'
     }, '198001012005011001', 'tok');
     assert.strictEqual(upAudio145.status, 'success');
-    assert.strictEqual(upAudio145.data.folder_path, 'Arsip Foto Rapat TRANSKEP / 2026 / Desember / Rapat Evaluasi Akhir Tahun');
+    assert.strictEqual(upAudio145.data.folder_path, 'Arsip Foto Rapat TRANSKEP / 2026 / Desember / 05 Des - Rapat Evaluasi Akhir Tahun [DES-01]');
     assert.strictEqual(createdDriveTree145.length, 4, 'Both Foto & Audio must reuse the same 4-level Drive folder tree without duplicating folders');
+
+    // Tahap 151: Distinct meetings with identical agenda must isolate Drive subfolders by letter number or unique ID
+    const upSameTitle1113 = gasRapatVm145.uploadFotoRapat({
+      id_rapat: 'RPT-1795142607875',
+      agenda: 'Rapat Monitoring dan Evaluasi Kinerja Bidang Kepaniteraan',
+      hari_tanggal: 'Jumat, 20 November 2026',
+      no_urut_surat: '1113',
+      file_data: 'AQID',
+      file_name: 'foto1113.jpg',
+      mime_type: 'image/jpeg'
+    }, '198001012005011001', 'tok');
+    const upSameTitle1114 = gasRapatVm145.uploadFotoRapat({
+      id_rapat: 'RPT-1795397439551',
+      agenda: 'Rapat Monitoring dan Evaluasi Kinerja Bidang Kepaniteraan',
+      hari_tanggal: 'Jumat, 20 November 2026',
+      nomor_undangan: '1114/KPA.W10-A2/HK2.6/XI/2026',
+      file_data: 'AQID',
+      file_name: 'foto1114.jpg',
+      mime_type: 'image/jpeg'
+    }, '198001012005011001', 'tok');
+    assert.strictEqual(
+      upSameTitle1113.data.folder_path,
+      'Arsip Foto Rapat TRANSKEP / 2026 / November / No. 1113 - Rapat Monitoring dan Evaluasi Kinerja Bidang Kepaniteraan'
+    );
+    assert.strictEqual(
+      upSameTitle1114.data.folder_path,
+      'Arsip Foto Rapat TRANSKEP / 2026 / November / No. 1114 - Rapat Monitoring dan Evaluasi Kinerja Bidang Kepaniteraan'
+    );
+
+    const upDraftA = gasRapatVm145.uploadFotoRapat({
+      id_rapat: 'RPT-1795142607875',
+      agenda: 'Rapat Monitoring dan Evaluasi Kinerja Bidang Kepaniteraan',
+      tgl_rapat_iso: '2026-11-20',
+      file_data: 'AQID',
+      file_name: 'draftA.jpg',
+      mime_type: 'image/jpeg'
+    }, '198001012005011001', 'tok');
+    const upDraftB = gasRapatVm145.uploadFotoRapat({
+      id_rapat: 'RPT-1795397439551',
+      agenda: 'Rapat Monitoring dan Evaluasi Kinerja Bidang Kepaniteraan',
+      tgl_rapat_iso: '2026-11-20',
+      file_data: 'AQID',
+      file_name: 'draftB.jpg',
+      mime_type: 'image/jpeg'
+    }, '198001012005011001', 'tok');
+    assert.strictEqual(
+      upDraftA.data.folder_path,
+      'Arsip Foto Rapat TRANSKEP / 2026 / November / 20 Nov - Rapat Monitoring dan Evaluasi Kinerja Bidang Kepaniteraan [7875]'
+    );
+    assert.strictEqual(
+      upDraftB.data.folder_path,
+      'Arsip Foto Rapat TRANSKEP / 2026 / November / 20 Nov - Rapat Monitoring dan Evaluasi Kinerja Bidang Kepaniteraan [9551]'
+    );
+
+    const feRapat151Src = fs.readFileSync('modules/eoffice/rapat.js', 'utf8');
+    const feData151Src = fs.readFileSync('modules/eoffice/eoffice_data.js', 'utf8');
+    assert(
+      feRapat151Src.includes('no_urut_surat: folderCtx.no_urut_surat') &&
+        feRapat151Src.includes('nomor_undangan: folderCtx.nomor_undangan') &&
+        feRapat151Src.includes("document.getElementById('rapatFieldNoUrutSurat')") &&
+        feData151Src.includes("no_urut_surat: ctx.no_urut_surat || ''") &&
+        feData151Src.includes("nomor_undangan: ctx.nomor_undangan || ''"),
+      'Frontend rapat.js & eoffice_data.js must forward no_urut_surat and nomor_undangan to Drive folder resolution'
+    );
 
     console.log('[PASS] Tahap 145 Rapat UX polish, Tab 2 multi-check Enter, Drag&Drop & Drive Year/Month/Title subfolders verified.');
 

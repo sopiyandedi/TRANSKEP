@@ -69,6 +69,7 @@ function resolveRapatFolderParts_(payload) {
 
   let year = '';
   let month = '';
+  let day = '';
 
   const parseIsoParts = function (isoVal) {
     const m = String(isoVal || '').trim().match(/^(\d{4})-(\d{2})-(\d{2})/);
@@ -77,6 +78,7 @@ function resolveRapatFolderParts_(payload) {
     if (monIdx < 0 || monIdx >= 12) return false;
     year = m[1];
     month = BULAN_INDO[monIdx];
+    day = m[3];
     return true;
   };
 
@@ -84,6 +86,7 @@ function resolveRapatFolderParts_(payload) {
     const hariTgl = String(p.hari_tanggal || '').trim();
     const htLow = hariTgl.toLowerCase();
     const yMatch = hariTgl.match(/\b(19\d{2}|20\d{2})\b/);
+    const dMatch = htLow.match(/\b(\d{1,2})\s+(?:januari|februari|maret|april|mei|juni|juli|agustus|september|oktober|november|nopember|desember)\b/);
     let foundMon = '';
     for (let i = 0; i < BULAN_INDO.length; i++) {
       if (htLow.indexOf(BULAN_INDO[i].toLowerCase()) !== -1) {
@@ -97,18 +100,42 @@ function resolveRapatFolderParts_(payload) {
     if (yMatch && foundMon) {
       year = yMatch[1];
       month = foundMon;
+      if (dMatch) day = String(parseInt(dMatch[1], 10)).padStart(2, '0');
     } else if (!parseIsoParts(p.tgl_surat)) {
       const todayIso = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'yyyy-MM-dd');
       parseIsoParts(todayIso);
       if (yMatch && !year) year = yMatch[1];
       if (foundMon) month = foundMon;
+      if (dMatch) day = String(parseInt(dMatch[1], 10)).padStart(2, '0');
     }
   }
 
   if (!year) year = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'yyyy');
   if (!month) month = BULAN_INDO[0];
 
+  const extractValidNoUrut = function (rawVal) {
+    const clean = String(rawVal || '').trim();
+    if (!clean || /^\.{2,}$/.test(clean) || clean === '-' || clean.toLowerCase() === 'auto') return '';
+    return /^[a-zA-Z0-9][a-zA-Z0-9.-]{0,19}$/.test(clean) ? clean : '';
+  };
+
+  let noUrutClean = extractValidNoUrut(p.no_urut_surat);
+  if (!noUrutClean && p.nomor_undangan) {
+    const nomMatch = String(p.nomor_undangan || '').trim().match(/^([^/\s]+)\s*\//);
+    if (nomMatch) noUrutClean = extractValidNoUrut(nomMatch[1]);
+  }
+
   const safePrefix = String(p.id_rapat || '').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 40);
+  let idSuffix = '';
+  if (safePrefix && safePrefix.toUpperCase() !== 'RPT' && safePrefix.toUpperCase() !== 'RPT-DRAFT') {
+    const longNum = safePrefix.match(/(\d{6,})$/);
+    if (longNum) {
+      idSuffix = longNum[1].slice(-4);
+    } else {
+      idSuffix = safePrefix.replace(/^RPT[-_]?/i, '').slice(0, 12) || safePrefix.slice(0, 12);
+    }
+  }
+
   const cleanTitle = String(p.agenda || '')
     .replace(/[\/\\:*?"<>|\r\n\t]+/g, ' ')
     .replace(/\s+/g, ' ')
@@ -116,10 +143,27 @@ function resolveRapatFolderParts_(payload) {
     .slice(0, 80)
     .trim();
 
+  const baseTitle = cleanTitle || safePrefix || 'Rapat Tanpa Judul';
+  let finalTitle = baseTitle;
+  if (noUrutClean) {
+    finalTitle = ('No. ' + noUrutClean + ' - ' + (cleanTitle || baseTitle)).slice(0, 100).trim();
+  } else if (cleanTitle && idSuffix) {
+    const dayPrefix = day ? (day + ' ' + month.slice(0, 3) + ' - ') : '';
+    const tagSuffix = ' [' + idSuffix + ']';
+    const maxBodyLen = Math.max(20, 100 - dayPrefix.length - tagSuffix.length);
+    finalTitle = dayPrefix + cleanTitle.slice(0, maxBodyLen).trim() + tagSuffix;
+  } else if (cleanTitle && day) {
+    finalTitle = (day + ' ' + month.slice(0, 3) + ' - ' + cleanTitle).slice(0, 100).trim();
+  } else {
+    finalTitle = baseTitle.slice(0, 100).trim();
+  }
+
   return {
     year: year,
     month: month,
-    title: cleanTitle || safePrefix || 'Rapat Tanpa Judul'
+    day: day,
+    no_urut: noUrutClean,
+    title: finalTitle
   };
 }
 

@@ -7053,6 +7053,19 @@ Menyempurnakan kenyamanan penggunaan Workspace Rapat serta mengotomatiskan kerap
 3. **PWA & Uji Regresi (`v3.8.86`):**
    - Bump 3-titik PWA **`v3.8.86`** ([`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) & [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js)), beserta pembaruan assertion pada [`tests/verify_n8n_ai_assistant.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/tests/verify_n8n_ai_assistant.js) & [`tests/verify_fase3b.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/tests/verify_fase3b.js).
 
+---
+
+## REVISI TAHAP 151: ISOLASI FOLDER GOOGLE DRIVE PER NOMOR SURAT / ID RAPAT (`v3.8.87`)
+**Status:** `[SELESAI & TERVERIFIKASI]`
+
+### 1. Akar Masalah
+- Fungsi `resolveRapatFolderParts_` di [`eoffice/rapat.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/rapat.js) sebelumnya hanya menamai subfolder level ke-4 berdasarkan `Agenda / Judul Rapat` semata tanpa membawa nomor surat maupun ID rapat. Akibatnya, dua rapat berbeda dengan agenda identik pada bulan yang sama (mis. rapat No. `1113` dan `1114`) tergabung ke dalam 1 folder Google Drive yang sama.
+
+### 2. Rincian Implementasi
+1. **Backend GAS ([`eoffice/rapat.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/eoffice/rapat.js)):** Memperbarui `resolveRapatFolderParts_` untuk mengekstrak `day` (`DD`) dan nomor urut valid dari `no_urut_surat` / awalan `nomor_undangan` (`No. <NoUrut> - <Agenda>`), atau fallback `<DD Bul> - <Agenda> [<ID>]` bila belum memiliki nomor surat (dipakai bersama oleh `uploadFotoRapat`, `uploadAudioRapat`, dan `initAudioDriveUploadSession`).
+2. **Frontend ([`modules/eoffice/rapat.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/rapat.js) & [`modules/eoffice/eoffice_data.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/eoffice_data.js)):** Memperbarui `getRapatDriveFolderContext_` (dengan `rapatDraftUploadId_` di memori agar rapat baru yang belum disimpan tetap terisolasi tanpa mengubah `#rapatFieldIdRapat`) dan meneruskan `no_urut_surat` & `nomor_undangan` di upload foto, audio kecil, maupun resumable audio.
+3. **PWA & Uji Regresi (`v3.8.87`):** Bump PWA **`v3.8.87`** ([`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) & [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js)) serta pengujian isolasi folder Drive pada [`tests/verify_fase3a.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/tests/verify_fase3a.js) & [`tests/verify_fase3b.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/tests/verify_fase3b.js).
+
 
 
 

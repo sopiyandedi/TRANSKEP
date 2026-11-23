@@ -1317,6 +1317,8 @@ const EofficeDataService = {
       hari_tanggal: ctx.hari_tanggal || '',
       tgl_surat: ctx.tgl_surat || '',
       tgl_rapat_iso: ctx.tgl_rapat_iso || '',
+      no_urut_surat: ctx.no_urut_surat || '',
+      nomor_undangan: ctx.nomor_undangan || '',
       file_name: fileName,
       mime_type: rawMime,
       file_size: file.size,
