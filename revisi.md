@@ -7092,6 +7092,19 @@ Menyempurnakan kenyamanan penggunaan Workspace Rapat serta mengotomatiskan kerap
 2. **Engine Cetak ([`modules/permohonan/cetak/cetak_st.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/permohonan/cetak/cetak_st.js)):** Memperluas kapasitas halaman terakhir hingga `5` peserta (sehingga `5–9` orang otomatis tercetak 2 lembar) dan halaman lanjutan tengah (`10+` peserta) hingga `6` orang (atau `5` jika sisa tepat `6` agar minimal 1 peserta tetap menemani `Untuk`–TTD) memakai counter urut `runningGlobalIndex`.
 3. **PWA & Uji Regresi (`v3.8.90`):** Bump 3-titik PWA **`v3.8.90`** ([`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) & [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js)) serta memperluas uji regresi di [`tests/verify_fase3b.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/tests/verify_fase3b.js) untuk 4, 5, 8, 9, 10, & 15 peserta.
 
+---
+
+## REVISI TAHAP 153: TOMBOL TUNGGAL `DOWNLOAD PERSETUJUAN` CUTI DISETUJUI NON-ADMIN (`v3.8.91`)
+**Status:** `[SELESAI & TERVERIFIKASI]`
+
+### 1. Akar Masalah
+- Pada [`modules/permohonan/cuti.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/permohonan/cuti.js) dan [`modules/permohonan/view_permohonan.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/permohonan/view_permohonan.html), seluruh peran yang memiliki cuti berstatus `Disetujui` sebelumnya langsung menerima tombol dropdown `[ ≡ ▾ ]` berisi 2 opsi (`Cetak Permohonan` dan `Download Persetujuan`). Pegawai non-Admin seharusnya langsung menerima **1 tombol `Download Persetujuan`** saja, sementara dropdown 2 opsi dipertahankan khusus untuk peran `Admin`.
+
+### 2. Rincian Implementasi
+1. **Controller Riwayat Cuti ([`modules/permohonan/cuti.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/permohonan/cuti.js)):** Memperbarui `formattedLogs()` agar saat `status === 'Disetujui'` dan `userObj.role !== 'Admin'`, `hasDropdown = false` dan langsung merender 1 tombol `Download Persetujuan` (`actionType: 'unduhSignedCuti'`), sedangkan khusus `Admin` tetap mempertahankan `hasDropdown = true` (dropdown 2 opsi).
+2. **Tabel Rekapitulasi Global ([`modules/permohonan/view_permohonan.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/permohonan/view_permohonan.html)):** Menambahkan `v-else-if="s && s.user && String(s.user.role || '').trim() === 'Admin'"` pada `.dropdown-rekap-container` serta tombol `v-else` langsung `@click="execUnduhSignedCuti(log.id)"` (`Download Persetujuan`) untuk non-Admin.
+3. **PWA & Uji Regresi (`v3.8.91`):** Bump 3-titik PWA **`v3.8.91`** ([`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) & [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js)) serta uji runtime & markup di [`tests/verify_fase3b.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/tests/verify_fase3b.js).
+
 
 
 

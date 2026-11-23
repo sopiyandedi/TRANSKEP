@@ -528,10 +528,21 @@
                           pejabatDot = log.status_pejabat === 'Disetujui' ? 'text-emerald-500' : (log.status_pejabat === 'Ditolak' ? 'text-rose-500' : 'text-amber-500');
                           
                           const sNorm = String(log.status || '').trim().toLowerCase();
+                          const isRoleAdmin = String((userObj && userObj.role) || '').trim() === 'Admin';
                           hasDropdown = false;
                           if (log.jenis !== 'Dinas Luar') {
                               if (sNorm === 'disetujui') {
-                                  hasDropdown = true; // TAHAP 43: 1 Tombol Ikon Compact mengeluarkan 2 opsi (Cetak & Unduh TTE)
+                                  if (isRoleAdmin) {
+                                      hasDropdown = true; // Khusus Role Admin: tetap 1 tombol dropdown 2 opsi (Cetak Permohonan & Download Persetujuan)
+                                  } else {
+                                      actions.push({
+                                          actionType: 'unduhSignedCuti',
+                                          icon: 'fa-download',
+                                          text: 'Download Persetujuan',
+                                          css: 'px-2.5 py-1.5 bg-emerald-500/15 hover:bg-emerald-600 text-emerald-400 hover:text-white border border-emerald-500/30 hover:border-emerald-500 rounded-lg transition shadow-md shadow-emerald-950/30 text-xs font-semibold flex items-center justify-center gap-1',
+                                          tooltip: 'Download Persetujuan (PDF ber-TTE digital resmi)'
+                                      });
+                                  }
                               } else {
                                   actions.push({ actionType: 'cetakCuti', icon: 'fa-print', text: '', css: 'p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 rounded-lg transition shadow-md shadow-slate-900/30 text-xs', tooltip: 'Cetak Formulir' });
                               }

@@ -2772,6 +2772,108 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
     assert(mid15.includes('Pegawai Peserta 10') && !tail15.includes('Pegawai Peserta 10'), '15 peserta: peserta 10 must be in middle page');
     assert(tail15.includes('Pegawai Peserta 11') && tail15.includes('Pegawai Peserta 15') && tail15.includes('15.'), '15 peserta: peserta 11-15 must be in final overflow page with sequential numbering');
     console.log('[PASS] Tahap 152 & 152B ST Print Layout (4, 5, 8, 9, 10, & 15 peserta page-flow) verified.');
+
+    // Tahap 153: Tombol aksi Cuti Disetujui (Non-Admin -> 1 tombol Download Persetujuan; Admin -> tetap dropdown 2 opsi)
+    const viewPermRaw153 = fs.readFileSync('modules/permohonan/view_permohonan.html', 'utf8');
+    assert(
+      viewPermRaw153.includes("v-else-if=\"s && s.user && String(s.user.role || '').trim() === 'Admin'\"") &&
+      viewPermRaw153.includes('@click="execUnduhSignedCuti(log.id)"'),
+      'view_permohonan.html Rekapitulasi Global must gate 2-option dropdown strictly to Admin and render direct Download Persetujuan for non-Admin'
+    );
+
+    const cutiDomListeners = [];
+    const cutiVueOpts = {};
+    const cutiState = {
+      user: { nip: '199002022015012002', nama: 'Pegawai A', role: 'Pegawai' },
+      usersList: [
+        { nip: '199002022015012002', nama: 'Pegawai A', role: 'Pegawai' },
+        { nip: '197901012003011008', nama: 'Atasan Satu', role: 'Atasan Langsung' },
+        { nip: '198001012005011001', nama: 'Admin Satu', role: 'Admin' }
+      ],
+      cutiLogs: [
+        {
+          id: 'CUTI-ACC-1',
+          nip: '199002022015012002',
+          jenis: 'Tahunan',
+          tgl_mulai: '2026-11-16',
+          tgl_selesai: '2026-11-16',
+          sisa_cuti: 1,
+          atasan_nip: '197901012003011008',
+          pejabat_nip: '198001012005011001',
+          status_atasan: 'Disetujui',
+          status_pejabat: 'Disetujui',
+          status: 'Disetujui'
+        },
+        {
+          id: 'CUTI-WAIT-1',
+          nip: '199002022015012002',
+          jenis: 'Tahunan',
+          tgl_mulai: '2026-11-24',
+          tgl_selesai: '2026-11-24',
+          sisa_cuti: 1,
+          atasan_nip: '197901012003011008',
+          pejabat_nip: '198001012005011001',
+          status_atasan: 'Menunggu',
+          status_pejabat: 'Menunggu',
+          status: 'Menunggu'
+        }
+      ],
+      ikLogs: [],
+      ipLogs: [],
+      wfhLogs: []
+    };
+    const cutiSandbox = {
+      console, Date, Math, Array, Object, String, Number, Boolean, JSON, Error, RegExp, parseInt, Promise,
+      setTimeout: () => 0,
+      localStorage: { getItem: () => '', setItem: () => {} },
+      state: cutiState,
+      vueState: cutiState,
+      hitungHariKerjaCuti: () => ({ durasi: 1, invalidOrder: false }),
+      updateBadgePermohonan: () => {},
+      document: {
+        addEventListener: (ev, cb) => { if (ev === 'DOMContentLoaded') cutiDomListeners.push(cb); },
+        querySelectorAll: () => [],
+        getElementById: () => ({ classList: { add() {}, remove() {}, contains: () => false }, style: {} })
+      },
+      Vue: {
+        createApp: (opt) => ({
+          mount: (sel) => {
+            cutiVueOpts[sel] = opt;
+            return { s: cutiState, openModal: () => {}, closeModal: () => {}, openCancelModal: () => {} };
+          }
+        })
+      },
+      window: {}
+    };
+    cutiSandbox.window = cutiSandbox;
+    vm.createContext(cutiSandbox);
+    vm.runInContext(fs.readFileSync('modules/permohonan/cuti.js', 'utf8'), cutiSandbox, { filename: 'modules/permohonan/cuti.js' });
+    cutiDomListeners.forEach((cb) => cb());
+    assert(cutiVueOpts['#vue-riwayat-permohonan'], 'cuti.js must mount #vue-riwayat-permohonan');
+
+    const evalRiwayatForRole = (roleName) => {
+      cutiState.user.role = roleName;
+      return cutiVueOpts['#vue-riwayat-permohonan'].computed.formattedLogs.call({ s: cutiState });
+    };
+
+    for (const nonAdminRole of ['Pegawai', 'Atasan Langsung', 'Pejabat Berwenang', 'Operator']) {
+      const rowsNonAdmin = evalRiwayatForRole(nonAdminRole);
+      const rowAcc = rowsNonAdmin.find((r) => r.id === 'CUTI-ACC-1');
+      const rowWait = rowsNonAdmin.find((r) => r.id === 'CUTI-WAIT-1');
+      assert(rowAcc && rowWait, `Role ${nonAdminRole} must receive both Cuti rows`);
+      assert.strictEqual(rowAcc.hasDropdown, false, `Role ${nonAdminRole}: approved Cuti must not show 2-option dropdown`);
+      assert.strictEqual(rowAcc.actions.length, 1, `Role ${nonAdminRole}: approved Cuti must show exactly 1 button`);
+      assert.strictEqual(rowAcc.actions[0].actionType, 'unduhSignedCuti', `Role ${nonAdminRole}: single button must trigger unduhSignedCuti`);
+      assert.strictEqual(rowAcc.actions[0].text, 'Download Persetujuan', `Role ${nonAdminRole}: single button label must be Download Persetujuan`);
+      assert.strictEqual(rowWait.hasDropdown, false);
+      assert.deepStrictEqual(Array.from(rowWait.actions.map((a) => a.actionType)), ['cetakCuti', 'editCuti', 'batalCuti'], 'Menunggu Cuti actions must stay unchanged');
+    }
+
+    const rowsAdmin = evalRiwayatForRole('Admin');
+    const adminAcc = rowsAdmin.find((r) => r.id === 'CUTI-ACC-1');
+    assert.strictEqual(adminAcc.hasDropdown, true, 'Role Admin: approved Cuti must retain 2-option dropdown');
+    assert.strictEqual(adminAcc.actions.length, 0, 'Role Admin: approved Cuti dropdown must not duplicate direct button');
+    console.log('[PASS] Tahap 153 Cuti Approved Action (Non-Admin single Download Persetujuan vs Admin 2-option dropdown) verified.');
   } finally {
     browserSandbox.TranskepAPI.call = origApiCall;
     browserSandbox.TranskepFirebase.getDb = origGetDb;
