@@ -2633,8 +2633,9 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
     assert(stTplMatch, 'cetak_st.html must wrap content in #template-cetak-st-container');
     assert(
       cetakStHtmlRaw.includes('.st-peserta-lanjutan-page') &&
+      cetakStHtmlRaw.includes('.st-overflow-compact-5') &&
       /\.st-layout-multi\.st-has-overflow-peserta\s+\.st-section-sisa[\s\S]*?page-break-before:\s*auto\s*!important[\s\S]*?break-inside:\s*avoid/.test(cetakStHtmlRaw),
-      'cetak_st.html CSS must allow st-section-sisa to stay on page 2 after overflow participants without breaking inside'
+      'cetak_st.html CSS must include st-overflow-compact-5 and allow st-section-sisa to stay on page 2 after overflow participants'
     );
 
     let capturedStPrintHtml = '';
@@ -2737,12 +2738,40 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
     assert(res8.bodyHtml.includes('Pegawai Peserta 8'), '8 peserta must include peserta 8');
 
     const res9 = runPrintStCase(9);
-    assert.strictEqual(res9.wrapperClass, 'st-layout-multi st-has-overflow-peserta', '9 peserta (last chunk len 1) must not use compact mode');
+    assert.strictEqual(res9.wrapperClass, 'st-layout-multi st-has-overflow-peserta st-overflow-compact-5', '9 peserta must fit into page 2 using st-overflow-compact-5');
     const lanjutanMatches9 = res9.bodyHtml.match(/<div class="st-peserta-lanjutan-page[^"]*">/g) || [];
-    assert.strictEqual(lanjutanMatches9.length, 2, '9 peserta must render 2 overflow blocks (5-8 and 9)');
-    assert(!lanjutanMatches9[0].includes('st-peserta-lanjutan-last'), 'First overflow block (5-8) must not have last class');
-    assert(lanjutanMatches9[1].includes('st-peserta-lanjutan-last'), 'Second overflow block (9) must carry st-peserta-lanjutan-last');
-    console.log('[PASS] Tahap 152 ST Print Layout (4, 5, 8, & 9 peserta page-flow without blank page 2) verified.');
+    assert.strictEqual(lanjutanMatches9.length, 1, '9 peserta must render exactly 1 overflow block (peserta 5-9 on page 2)');
+    assert(lanjutanMatches9[0].includes('st-peserta-lanjutan-last'), '9 peserta overflow block must carry st-peserta-lanjutan-last');
+    const idxOverflow9 = res9.bodyHtml.indexOf('<div class="st-peserta-lanjutan-page');
+    const idxSisa9 = res9.bodyHtml.indexOf('<div class="st-section-sisa">');
+    assert(idxOverflow9 > 0 && idxSisa9 > idxOverflow9, '9 peserta overflow block must precede st-section-sisa');
+    const page2Part9 = res9.bodyHtml.slice(idxOverflow9, idxSisa9);
+    assert(!page2Part9.includes('Pegawai Peserta 4'), '9 peserta: Pegawai Peserta 4 must stay on page 1');
+    for (let idx = 5; idx <= 9; idx++) {
+      assert(page2Part9.includes(`Pegawai Peserta ${idx}`), `9 peserta: Pegawai Peserta ${idx} must be on page 2`);
+      assert(page2Part9.includes(`${idx}.`), `9 peserta: numbering ${idx}. must appear on page 2`);
+    }
+
+    const res10 = runPrintStCase(10);
+    assert.strictEqual(res10.wrapperClass, 'st-layout-multi st-has-overflow-peserta', '10 peserta (chunks 4 | 5 | 1) must keep last chunk len 1 without compact mode');
+    const lanjutanMatches10 = res10.bodyHtml.match(/<div class="st-peserta-lanjutan-page[^"]*">/g) || [];
+    assert.strictEqual(lanjutanMatches10.length, 2, '10 peserta must render 2 overflow blocks (5-9 and 10)');
+    assert(!lanjutanMatches10[0].includes('st-peserta-lanjutan-last'), '10 peserta middle block (5-9) must not carry last class');
+    assert(lanjutanMatches10[1].includes('st-peserta-lanjutan-last'), '10 peserta final block (10) must carry last class');
+    assert(res10.bodyHtml.includes('10.') && res10.bodyHtml.includes('Pegawai Peserta 10'), '10 peserta must render numbering 10.');
+
+    const res15 = runPrintStCase(15);
+    assert.strictEqual(res15.wrapperClass, 'st-layout-multi st-has-overflow-peserta st-overflow-compact-5', '15 peserta (chunks 4 | 6 | 5) must activate st-overflow-compact-5');
+    const lanjutanMatches15 = res15.bodyHtml.match(/<div class="st-peserta-lanjutan-page[^"]*">/g) || [];
+    assert.strictEqual(lanjutanMatches15.length, 2, '15 peserta must render 2 overflow blocks (5-10 and 11-15)');
+    assert(!lanjutanMatches15[0].includes('st-peserta-lanjutan-last'), '15 peserta middle block (5-10) must not carry last class');
+    assert(lanjutanMatches15[1].includes('st-peserta-lanjutan-last'), '15 peserta final block (11-15) must carry last class');
+    const idxLast15 = res15.bodyHtml.indexOf('st-peserta-lanjutan-last');
+    const mid15 = res15.bodyHtml.slice(res15.bodyHtml.indexOf('<div class="st-peserta-lanjutan-page'), idxLast15);
+    const tail15 = res15.bodyHtml.slice(idxLast15, res15.bodyHtml.indexOf('<div class="st-section-sisa">'));
+    assert(mid15.includes('Pegawai Peserta 10') && !tail15.includes('Pegawai Peserta 10'), '15 peserta: peserta 10 must be in middle page');
+    assert(tail15.includes('Pegawai Peserta 11') && tail15.includes('Pegawai Peserta 15') && tail15.includes('15.'), '15 peserta: peserta 11-15 must be in final overflow page with sequential numbering');
+    console.log('[PASS] Tahap 152 & 152B ST Print Layout (4, 5, 8, 9, 10, & 15 peserta page-flow) verified.');
   } finally {
     browserSandbox.TranskepAPI.call = origApiCall;
     browserSandbox.TranskepFirebase.getDb = origGetDb;

@@ -7079,6 +7079,19 @@ Menyempurnakan kenyamanan penggunaan Workspace Rapat serta mengotomatiskan kerap
 2. **Engine Cetak ([`modules/permohonan/cetak/cetak_st.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/permohonan/cetak/cetak_st.js)):** Memfaktorkan `buildPesertaItemHtml(p, globalIndex)`, menahan peserta 1–4 pada tabel `Kepada` Halaman 1, membagi peserta ke-5 dst. per 4 orang ke blok lanjutan `{{peserta_lanjutan_html}}`, dan menjaga format `1–4` peserta 100% tidak berubah.
 3. **PWA & Uji Regresi (`v3.8.88`):** Bump 3-titik PWA **`v3.8.88`** ([`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) & [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js)) serta pengujian skenario 4, 5, 8, dan 9 peserta di [`tests/verify_fase3b.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/tests/verify_fase3b.js).
 
+---
+
+## REVISI TAHAP 152B: KALIBRASI CETAK ST 9 ORANG JADI 2 LEMBAR & 10+ SEIMBANG (`v3.8.89`)
+**Status:** `[SELESAI & TERVERIFIKASI]`
+
+### 1. Akar Masalah
+- Pada `v3.8.88`, pembagian halaman lanjutan masih dipatok per 4 peserta sehingga ST **9 peserta** memisahkan peserta ke-9 sendirian ke Halaman 3 bersama blok `Untuk` s.d. TTD, padahal setelah peserta ke-5–8 di Halaman 2 masih tersisa ~45% bidang kosong kertas A4.
+
+### 2. Rincian Implementasi
+1. **Template Cetak ([`modules/permohonan/cetak/cetak_st.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/permohonan/cetak/cetak_st.html)):** Menambahkan aturan `.st-layout-multi.st-overflow-compact-5` (`padding-top: 10mm`, `.peserta-item` `7px`, `.peserta-table td` `2px 0`, `.tabel-untuk td` `2.5px 0`, jarak penutup `8px/6px`, TTD `18px`, font tetap `11pt`) agar 5 peserta lanjutan + `Untuk`–TTD muat utuh pada Halaman 2 tanpa menyentuh `1–8` peserta.
+2. **Engine Cetak ([`modules/permohonan/cetak/cetak_st.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/permohonan/cetak/cetak_st.js)):** Memperluas kapasitas halaman terakhir hingga `5` peserta (sehingga `5–9` orang otomatis tercetak 2 lembar) dan halaman lanjutan tengah (`10+` peserta) hingga `6` orang (atau `5` jika sisa tepat `6` agar minimal 1 peserta tetap menemani `Untuk`–TTD) memakai counter urut `runningGlobalIndex`.
+3. **PWA & Uji Regresi (`v3.8.89`):** Bump 3-titik PWA **`v3.8.89`** ([`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) & [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js)) serta memperluas uji regresi di [`tests/verify_fase3b.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/tests/verify_fase3b.js) untuk 4, 5, 8, 9, 10, & 15 peserta.
+
 
 
 

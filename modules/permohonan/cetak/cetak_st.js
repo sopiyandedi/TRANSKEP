@@ -122,11 +122,24 @@ function formatTanggalRentang(start, end) {
         } else if (totalPeserta === 4) {
             layoutClass = "st-layout-multi";
         } else {
-            for (var i = 4; i < totalPeserta; i += 4) {
-                overflowChunks.push(listPeserta.slice(i, i + 4));
+            var rem = listPeserta.slice(4);
+            var remIdx = 0;
+            while (remIdx < rem.length) {
+                var left = rem.length - remIdx;
+                if (left <= 5) {
+                    overflowChunks.push(rem.slice(remIdx));
+                    break;
+                }
+                // Halaman lanjutan tengah: maksimal 6 orang; bila sisa tepat 6 ambil 5 agar minimal 1 peserta menemani blok Untuk s.d. TTD
+                var take = (left === 6) ? 5 : 6;
+                overflowChunks.push(rem.slice(remIdx, remIdx + take));
+                remIdx += take;
             }
             var lastChunkLen = overflowChunks.length > 0 ? overflowChunks[overflowChunks.length - 1].length : 0;
-            layoutClass = "st-layout-multi st-has-overflow-peserta" + (lastChunkLen >= 4 ? " st-overflow-compact" : "");
+            var compactClass = (lastChunkLen >= 5)
+                ? " st-overflow-compact-5"
+                : (lastChunkLen === 4 ? " st-overflow-compact" : "");
+            layoutClass = "st-layout-multi st-has-overflow-peserta" + compactClass;
         }
 
         // FIX: Logika Chunking & Page Break Dinamis
@@ -140,6 +153,7 @@ function formatTanggalRentang(start, end) {
 
         var pesertaLanjutanHTML = "";
         if (overflowChunks.length > 0) {
+            var runningGlobalIndex = 4;
             for (var c = 0; c < overflowChunks.length; c++) {
                 var isLastOverflowChunk = (c === overflowChunks.length - 1);
                 var pageClasses = "st-peserta-lanjutan-page" + (isLastOverflowChunk ? " st-peserta-lanjutan-last" : "");
@@ -151,8 +165,8 @@ function formatTanggalRentang(start, end) {
                             '<td class="col-value">' +
                                 '<div class="chunk-container">';
                 for (var k = 0; k < overflowChunks[c].length; k++) {
-                    var globalIndex = 4 + (c * 4) + k;
-                    pesertaLanjutanHTML += buildPesertaItemHtml(overflowChunks[c][k], globalIndex);
+                    pesertaLanjutanHTML += buildPesertaItemHtml(overflowChunks[c][k], runningGlobalIndex);
+                    runningGlobalIndex++;
                 }
                 pesertaLanjutanHTML += '</div></td></tr></table></div>';
             }
