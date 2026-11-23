@@ -2626,6 +2626,123 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
       'core/api.js must extend client timeout to 120000ms for generateAiNotulenRapat'
     );
     console.log('[PASS] Tahap 148, 149 & 149B Tab 4 Jalur Kilat, Speaker Auto-Grouping, Natural Pengarahan Umum & 120s Timeout verified.');
+
+    // Tahap 152: Verifikasi layout cetak Surat Tugas (ST) 4, 5, 8, & 9 peserta
+    const cetakStHtmlRaw = fs.readFileSync('modules/permohonan/cetak/cetak_st.html', 'utf8');
+    const stTplMatch = cetakStHtmlRaw.match(/<div id="template-cetak-st-container"[^>]*>([\s\S]*)<\/div>\s*$/);
+    assert(stTplMatch, 'cetak_st.html must wrap content in #template-cetak-st-container');
+    assert(
+      cetakStHtmlRaw.includes('.st-peserta-lanjutan-page') &&
+      /\.st-layout-multi\.st-has-overflow-peserta\s+\.st-section-sisa[\s\S]*?page-break-before:\s*auto\s*!important[\s\S]*?break-inside:\s*avoid/.test(cetakStHtmlRaw),
+      'cetak_st.html CSS must allow st-section-sisa to stay on page 2 after overflow participants without breaking inside'
+    );
+
+    let capturedStPrintHtml = '';
+    const stSandbox = {
+      console, Date, Math, Array, Object, String, Number, Boolean, JSON, Error, RegExp, parseInt,
+      setTimeout: () => 0,
+      showLoading: () => {},
+      hideLoading: () => {},
+      showNotify: () => {},
+      formatNamaBersih: (n) => String(n || '').split(',')[0].trim(),
+      formatDateIndoCetak: (d) => String(d || '23 November 2026'),
+      state: {
+        usersList: [{ nip: '197001011995031001', nama: 'H. Zulkifli, S.Ag., S.H., M.H.', jabatan: 'Ketua' }]
+      },
+      document: {
+        getElementById: (id) => (id === 'template-cetak-st-container' ? { innerHTML: stTplMatch[1] } : null),
+        createElement: (tag) => {
+          assert.strictEqual(tag, 'iframe');
+          return {
+            style: {},
+            contentWindow: {
+              document: {
+                open: () => {},
+                write: (html) => { capturedStPrintHtml = html; },
+                close: () => {}
+              },
+              focus: () => {},
+              print: () => {}
+            }
+          };
+        },
+        body: {
+          appendChild: () => {},
+          contains: () => false,
+          removeChild: () => {}
+        }
+      }
+    };
+    vm.createContext(stSandbox);
+    vm.runInContext(fs.readFileSync('modules/permohonan/cetak/cetak_st.js', 'utf8'), stSandbox, { filename: 'modules/permohonan/cetak/cetak_st.js' });
+
+    const runPrintStCase = (count) => {
+      const peserta = [];
+      for (let idx = 1; idx <= count; idx++) {
+        peserta.push({
+          nama: `Pegawai Peserta ${idx}`,
+          nip: `19800101200501100${idx}`,
+          pangkat: 'Penata Tingkat I (III/d)',
+          jabatan: `Jabatan ${idx}`
+        });
+      }
+      capturedStPrintHtml = '';
+      stSandbox.printSuratTugas(`ST-${count}`, {
+        nomor: `100/KPA.W10-A2/ST.DL1.10/XI/2026`,
+        pejabat_ttd: '197001011995031001',
+        menimbang: 'Bahwa perlu mengikuti bimtek.',
+        dasar: '1. Undang-Undang Nomor 3 Tahun 2009.',
+        peserta: JSON.stringify(peserta),
+        tujuan: 'Mengikuti Bimbingan Teknis',
+        tgl_mulai: '2026-11-24',
+        tgl_selesai: '2026-11-24',
+        jam: '08:00 s.d. 16:00 WIB',
+        tempat: 'Aula PTA Bandung',
+        waktu: '2026-11-23 09:00:00',
+        data_ekstra: JSON.stringify({ paragraf_biaya: 'Biaya dibebankan pada DIPA.' })
+      });
+      const wrapMatch = capturedStPrintHtml.match(/<div class="st-wrapper ([^"]*)">([\s\S]*)$/);
+      assert(wrapMatch, `Rendered ST HTML for ${count} peserta must contain .st-wrapper`);
+      return { wrapperClass: wrapMatch[1], bodyHtml: wrapMatch[2], fullHtml: capturedStPrintHtml };
+    };
+
+    const res4 = runPrintStCase(4);
+    assert.strictEqual(res4.wrapperClass, 'st-layout-multi', '4 peserta must keep exact st-layout-multi class');
+    assert(!res4.bodyHtml.includes('st-peserta-lanjutan-page'), '4 peserta must not emit overflow participant page');
+    for (let idx = 1; idx <= 4; idx++) {
+      assert(res4.bodyHtml.includes(`Pegawai Peserta ${idx}`), `4 peserta must render Pegawai Peserta ${idx}`);
+    }
+
+    const res5 = runPrintStCase(5);
+    assert.strictEqual(res5.wrapperClass, 'st-layout-multi st-has-overflow-peserta', '5 peserta must set overflow class without compact mode');
+    assert(!res5.bodyHtml.includes('page-break-after: always'), '5+ peserta must not inject inline td page-break-after');
+    const lanjutanMatches5 = res5.bodyHtml.match(/<div class="st-peserta-lanjutan-page[^"]*">/g) || [];
+    assert.strictEqual(lanjutanMatches5.length, 1, '5 peserta must render exactly 1 overflow participant block');
+    assert(lanjutanMatches5[0].includes('st-peserta-lanjutan-last'), 'Single overflow page for 5 peserta must carry st-peserta-lanjutan-last');
+    const idxOverflow5 = res5.bodyHtml.indexOf('<div class="st-peserta-lanjutan-page');
+    const idxSisa5 = res5.bodyHtml.indexOf('<div class="st-section-sisa">');
+    assert(idxOverflow5 > 0 && idxSisa5 > idxOverflow5, '5 peserta overflow block must precede st-section-sisa');
+    const page1Part5 = res5.bodyHtml.slice(0, idxOverflow5);
+    const page2Part5 = res5.bodyHtml.slice(idxOverflow5, idxSisa5);
+    for (let idx = 1; idx <= 4; idx++) {
+      assert(page1Part5.includes(`Pegawai Peserta ${idx}`), `5 peserta: Pegawai Peserta ${idx} must remain on page 1`);
+      assert(!page2Part5.includes(`Pegawai Peserta ${idx}`), `5 peserta: Pegawai Peserta ${idx} must not appear on page 2`);
+    }
+    assert(page2Part5.includes('Pegawai Peserta 5') && !page1Part5.includes('Pegawai Peserta 5'), '5 peserta: Pegawai Peserta 5 must move to page 2');
+
+    const res8 = runPrintStCase(8);
+    assert.strictEqual(res8.wrapperClass, 'st-layout-multi st-has-overflow-peserta st-overflow-compact', '8 peserta must enable st-overflow-compact');
+    const lanjutanMatches8 = res8.bodyHtml.match(/<div class="st-peserta-lanjutan-page[^"]*">/g) || [];
+    assert.strictEqual(lanjutanMatches8.length, 1, '8 peserta must render 1 overflow block (peserta 5-8)');
+    assert(res8.bodyHtml.includes('Pegawai Peserta 8'), '8 peserta must include peserta 8');
+
+    const res9 = runPrintStCase(9);
+    assert.strictEqual(res9.wrapperClass, 'st-layout-multi st-has-overflow-peserta', '9 peserta (last chunk len 1) must not use compact mode');
+    const lanjutanMatches9 = res9.bodyHtml.match(/<div class="st-peserta-lanjutan-page[^"]*">/g) || [];
+    assert.strictEqual(lanjutanMatches9.length, 2, '9 peserta must render 2 overflow blocks (5-8 and 9)');
+    assert(!lanjutanMatches9[0].includes('st-peserta-lanjutan-last'), 'First overflow block (5-8) must not have last class');
+    assert(lanjutanMatches9[1].includes('st-peserta-lanjutan-last'), 'Second overflow block (9) must carry st-peserta-lanjutan-last');
+    console.log('[PASS] Tahap 152 ST Print Layout (4, 5, 8, & 9 peserta page-flow without blank page 2) verified.');
   } finally {
     browserSandbox.TranskepAPI.call = origApiCall;
     browserSandbox.TranskepFirebase.getDb = origGetDb;

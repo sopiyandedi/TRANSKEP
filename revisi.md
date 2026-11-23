@@ -7066,6 +7066,19 @@ Menyempurnakan kenyamanan penggunaan Workspace Rapat serta mengotomatiskan kerap
 2. **Frontend ([`modules/eoffice/rapat.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/rapat.js) & [`modules/eoffice/eoffice_data.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/eoffice/eoffice_data.js)):** Memperbarui `getRapatDriveFolderContext_` (dengan `rapatDraftUploadId_` di memori agar rapat baru yang belum disimpan tetap terisolasi tanpa mengubah `#rapatFieldIdRapat`) dan meneruskan `no_urut_surat` & `nomor_undangan` di upload foto, audio kecil, maupun resumable audio.
 3. **PWA & Uji Regresi (`v3.8.87`):** Bump PWA **`v3.8.87`** ([`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) & [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js)) serta pengujian isolasi folder Drive pada [`tests/verify_fase3a.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/tests/verify_fase3a.js) & [`tests/verify_fase3b.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/tests/verify_fase3b.js).
 
+---
+
+## REVISI TAHAP 152: PERBAIKAN TATA LETAK CETAK ST ≥ 5 ORANG (`v3.8.88`)
+**Status:** `[SELESAI & TERVERIFIKASI]`
+
+### 1. Akar Masalah
+- Seluruh Surat Tugas dengan `>= 4` peserta sebelumnya memakai class tunggal `.st-layout-multi` yang memaksa `.st-section-sisa` (`Untuk`, jadwal, anggaran, penutup, dan titi mangsa TTD) berpindah halaman (`page-break-before: always`), sementara peserta ke-5 ditempatkan via `page-break-after: always` di dalam `<tr><td>`. Akibatnya, pada ST 5 peserta, orang ke-5 jatuh ke Halaman 2 dalam kondisi kosong melompong dan `Untuk` s.d. TTD tertendang ke Halaman 3.
+
+### 2. Rincian Implementasi
+1. **Template Cetak ([`modules/permohonan/cetak/cetak_st.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/permohonan/cetak/cetak_st.html)):** Menambahkan placeholder `{{peserta_lanjutan_html}}`, kelas `.st-peserta-lanjutan-page` (`page-break-before: always; padding-top: 15mm`), pembebasan page break `.st-layout-multi.st-has-overflow-peserta .st-section-sisa` (`page-break-before: auto !important; break-inside: avoid`), serta penyesuaian rapat `.st-overflow-compact` bila chunk terakhir memuat 4 orang.
+2. **Engine Cetak ([`modules/permohonan/cetak/cetak_st.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/permohonan/cetak/cetak_st.js)):** Memfaktorkan `buildPesertaItemHtml(p, globalIndex)`, menahan peserta 1–4 pada tabel `Kepada` Halaman 1, membagi peserta ke-5 dst. per 4 orang ke blok lanjutan `{{peserta_lanjutan_html}}`, dan menjaga format `1–4` peserta 100% tidak berubah.
+3. **PWA & Uji Regresi (`v3.8.88`):** Bump 3-titik PWA **`v3.8.88`** ([`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) & [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js)) serta pengujian skenario 4, 5, 8, dan 9 peserta di [`tests/verify_fase3b.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/tests/verify_fase3b.js).
+
 
 
 

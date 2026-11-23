@@ -73,110 +73,88 @@ function formatTanggalRentang(start, end) {
         }
         
         var totalPeserta = listPeserta.length;
+
+        function buildPesertaItemHtml(p, globalIndex) {
+            var showNum = totalPeserta > 1;
+            var colNumTag = showNum ? '<td class="p-col-num">' + (globalIndex + 1) + '.</td>' : '';
+            var colEmptyTag = showNum ? '<td class="p-col-num"></td>' : '';
+            var paddingNama = (totalPeserta === 1) ? ' style="width: 25%;"' : '';
+
+            return '<div class="peserta-item">' +
+                      '<table class="peserta-table">' +
+                         '<tr>' +
+                            colNumTag +
+                            '<td class="p-col-label"' + paddingNama + '>N a m a</td>' +
+                            '<td class="p-col-colon">:</td>' +
+                            '<td class="p-col-value"><b>' + p.nama + '</b></td>' +
+                         '</tr>' +
+                         '<tr>' +
+                            colEmptyTag +
+                            '<td class="p-col-label">N I P</td>' +
+                            '<td class="p-col-colon">:</td>' +
+                            '<td class="p-col-value">' + p.nip + '</td>' +
+                         '</tr>' +
+                         '<tr>' +
+                            colEmptyTag +
+                            '<td class="p-col-label">Pangkat/Golongan</td>' +
+                            '<td class="p-col-colon">:</td>' +
+                            '<td class="p-col-value">' + (p.pangkat || '-') + '</td>' +
+                         '</tr>' +
+                         '<tr>' +
+                            colEmptyTag +
+                            '<td class="p-col-label">J a b a t a n</td>' +
+                            '<td class="p-col-colon">:</td>' +
+                            '<td class="p-col-value">' + (p.jabatan || '-') + '</td>' +
+                         '</tr>' +
+                      '</table>' +
+                   '</div>';
+        }
         
         // FIX: Penentuan Class Layout Dinamis untuk Spacing CSS A4
         var layoutClass = "st-layout-normal";
+        var overflowChunks = [];
         if (totalPeserta === 1) {
             layoutClass = "st-layout-single";
         } else if (totalPeserta === 2) {
             layoutClass = "st-layout-double";
         } else if (totalPeserta === 3) {
             layoutClass = "st-layout-normal";
-        } else {
+        } else if (totalPeserta === 4) {
             layoutClass = "st-layout-multi";
+        } else {
+            for (var i = 4; i < totalPeserta; i += 4) {
+                overflowChunks.push(listPeserta.slice(i, i + 4));
+            }
+            var lastChunkLen = overflowChunks.length > 0 ? overflowChunks[overflowChunks.length - 1].length : 0;
+            layoutClass = "st-layout-multi st-has-overflow-peserta" + (lastChunkLen >= 4 ? " st-overflow-compact" : "");
         }
 
         // FIX: Logika Chunking & Page Break Dinamis
-        // 1-4 orang: Seluruh peserta diletakkan di Halaman 1 tanpa pemotongan page-break.
-        // >4 orang: Pemotongan dinamis per 4 orang.
-        var trHTML = "";
-        if (totalPeserta <= 4) {
-            trHTML += '<div class="chunk-container">';
-            for (var j = 0; j < listPeserta.length; j++) {
-                var p = listPeserta[j];
-                var colNumTag = (totalPeserta > 1) ? '<td class="p-col-num">' + (j + 1) + '.</td>' : '';
-                var colEmptyTag = (totalPeserta > 1) ? '<td class="p-col-num"></td>' : '';
-                var paddingNama = (totalPeserta === 1) ? ' style="width: 25%;"' : '';
-                
-                trHTML += '<div class="peserta-item">' +
-                             '<table class="peserta-table">' +
-                                '<tr>' +
-                                   colNumTag +
-                                   '<td class="p-col-label"' + paddingNama + '>N a m a</td>' +
-                                   '<td class="p-col-colon">:</td>' +
-                                   '<td class="p-col-value"><b>' + p.nama + '</b></td>' +
-                                '</tr>' +
-                                '<tr>' +
-                                   colEmptyTag +
-                                   '<td class="p-col-label">N I P</td>' +
-                                   '<td class="p-col-colon">:</td>' +
-                                   '<td class="p-col-value">' + p.nip + '</td>' +
-                                '</tr>' +
-                                '<tr>' +
-                                   colEmptyTag +
-                                   '<td class="p-col-label">Pangkat/Golongan</td>' +
-                                   '<td class="p-col-colon">:</td>' +
-                                   '<td class="p-col-value">' + (p.pangkat || '-') + '</td>' +
-                                '</tr>' +
-                                '<tr>' +
-                                   colEmptyTag +
-                                   '<td class="p-col-label">J a b a t a n</td>' +
-                                   '<td class="p-col-colon">:</td>' +
-                                   '<td class="p-col-value">' + (p.jabatan || '-') + '</td>' +
-                                '</tr>' +
-                             '</table>' +
-                          '</div>';
-            }
-            trHTML += '</div>';
-        } else {
-            var chunks = [];
-            for (var i = 0; i < totalPeserta; i += 4) {
-                chunks.push(listPeserta.slice(i, i + 4));
-            }
+        // Halaman 1 memuat 1-4 peserta; peserta ke-5 dst. dipindah ke blok halaman lanjutan agar menyatu dengan "Untuk" s.d. TTD.
+        var page1Peserta = listPeserta.slice(0, 4);
+        var trHTML = '<div class="chunk-container">';
+        for (var j = 0; j < page1Peserta.length; j++) {
+            trHTML += buildPesertaItemHtml(page1Peserta[j], j);
+        }
+        trHTML += '</div>';
 
-            for (var c = 0; c < chunks.length; c++) {
-                var isLastChunk = (c === chunks.length - 1);
-                var pageBreakStyle = isLastChunk ? "" : "page-break-after: always; padding-bottom: 20px;";
-                
-                trHTML += '<div class="chunk-container" style="' + pageBreakStyle + '">';
-                
-                for (var j = 0; j < chunks[c].length; j++) {
-                    var p = chunks[c][j];
-                    var globalIndex = (c * 4) + j;
-                    var colNumTag = '<td class="p-col-num">' + (globalIndex + 1) + '.</td>';
-                    var colEmptyTag = '<td class="p-col-num"></td>';
-                    
-                    trHTML += '<div class="peserta-item">' +
-                                 '<table class="peserta-table">' +
-                                    '<tr>' +
-                                       colNumTag +
-                                       '<td class="p-col-label">N a m a</td>' +
-                                       '<td class="p-col-colon">:</td>' +
-                                       '<td class="p-col-value"><b>' + p.nama + '</b></td>' +
-                                    '</tr>' +
-                                    '<tr>' +
-                                       colEmptyTag +
-                                       '<td class="p-col-label">N I P</td>' +
-                                       '<td class="p-col-colon">:</td>' +
-                                       '<td class="p-col-value">' + p.nip + '</td>' +
-                                    '</tr>' +
-                                    '<tr>' +
-                                       colEmptyTag +
-                                       '<td class="p-col-label">Pangkat/Golongan</td>' +
-                                       '<td class="p-col-colon">:</td>' +
-                                       '<td class="p-col-value">' + (p.pangkat || '-') + '</td>' +
-                                    '</tr>' +
-                                    '<tr>' +
-                                       colEmptyTag +
-                                       '<td class="p-col-label">J a b a t a n</td>' +
-                                       '<td class="p-col-colon">:</td>' +
-                                       '<td class="p-col-value">' + (p.jabatan || '-') + '</td>' +
-                                    '</tr>' +
-                                 '</table>' +
-                              '</div>';
+        var pesertaLanjutanHTML = "";
+        if (overflowChunks.length > 0) {
+            for (var c = 0; c < overflowChunks.length; c++) {
+                var isLastOverflowChunk = (c === overflowChunks.length - 1);
+                var pageClasses = "st-peserta-lanjutan-page" + (isLastOverflowChunk ? " st-peserta-lanjutan-last" : "");
+                pesertaLanjutanHTML += '<div class="' + pageClasses + '">' +
+                    '<table class="st-content-table">' +
+                        '<tr class="baris-kepada">' +
+                            '<td class="col-label"></td>' +
+                            '<td class="col-colon"></td>' +
+                            '<td class="col-value">' +
+                                '<div class="chunk-container">';
+                for (var k = 0; k < overflowChunks[c].length; k++) {
+                    var globalIndex = 4 + (c * 4) + k;
+                    pesertaLanjutanHTML += buildPesertaItemHtml(overflowChunks[c][k], globalIndex);
                 }
-                
-                trHTML += '</div>';
+                pesertaLanjutanHTML += '</div></td></tr></table></div>';
             }
         }
 
@@ -204,6 +182,7 @@ function formatTanggalRentang(start, end) {
             "{{menimbang}}": formatTeksRapi(stDataObj.menimbang),
             "{{dasar}}": formatTeksRapi(stDataObj.dasar),
             "{{baris_peserta_html}}": trHTML,
+            "{{peserta_lanjutan_html}}": pesertaLanjutanHTML,
             "{{tujuan}}": stDataObj.tujuan.replace(/\n/g, "<br>"),
             "{{hari_kegiatan}}": hariKegiatan,
             "{{tanggal_kegiatan}}": formatTanggalRentang(stDataObj.tgl_mulai, stDataObj.tgl_selesai),

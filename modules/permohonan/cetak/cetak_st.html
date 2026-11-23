@@ -370,6 +370,40 @@
 
     /* === END TAG KHUSUS ST 4 ORANG === */
 
+    /* === START TAG KHUSUS ST 5 ORANG ATAU LEBIH (Overflow Peserta di Halaman 2+) === */
+    .st-peserta-lanjutan-page {
+      page-break-before: always !important;
+      break-before: page !important;
+      padding-top: 15mm !important;
+    }
+
+    .st-peserta-lanjutan-page .peserta-item {
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+
+    .st-layout-multi.st-has-overflow-peserta .st-section-sisa {
+      page-break-before: auto !important;
+      break-before: auto !important;
+      padding-top: 0 !important;
+      margin-top: 4px !important;
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+
+    .st-layout-multi.st-overflow-compact .st-peserta-lanjutan-last .peserta-item {
+      margin-bottom: 10px !important;
+    }
+
+    .st-layout-multi.st-overflow-compact .st-peserta-lanjutan-last .peserta-table td {
+      padding: 3px 0 !important;
+    }
+
+    .st-layout-multi.st-overflow-compact .st-section-sisa .st-ttd-container {
+      margin-top: 22px !important;
+    }
+    /* === END TAG KHUSUS ST 5 ORANG ATAU LEBIH === */
+
 
     .p-col-num { width: 5%; }
     .p-col-label { width: 25%; }
@@ -425,6 +459,8 @@
         </td>
       </tr>
     </table>
+
+    {{peserta_lanjutan_html}}
 
     <div class="st-section-sisa">
       <table class="st-content-table">
