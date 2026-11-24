@@ -2695,11 +2695,11 @@ function renderGlobalHeader() {
     viewContainer.insertBefore(headerDiv, viewContainer.firstChild);
 
     headerDiv.innerHTML = `
-      <div class="glass p-6 rounded-[24px] border border-slate-800/60 bg-slate-900/50 flex flex-col md:flex-row items-center justify-between gap-4 shadow-xl relative overflow-hidden">
+      <div class="glass py-4 px-6 rounded-[24px] border border-slate-800/60 bg-slate-900/50 flex flex-col md:flex-row items-center justify-between gap-4 shadow-xl relative overflow-hidden">
          <div class="absolute inset-0 bg-gradient-to-r from-indigo-500/5 to-transparent pointer-events-none"></div>
          <div class="flex items-center gap-5 w-full md:w-auto relative z-10">
             
-            <div class="w-20 h-20 md:w-[88px] md:h-[88px] rounded-2xl flex items-center justify-center text-white text-3xl font-black shadow-lg shadow-indigo-500/30 shrink-0 border border-indigo-400/30 bg-gradient-to-br from-indigo-500 to-purple-600 relative overflow-hidden group">
+            <div class="w-20 h-24 md:w-[88px] md:h-[104px] rounded-2xl flex items-center justify-center text-white text-3xl font-black shadow-lg shadow-indigo-500/30 shrink-0 border border-indigo-400/30 bg-gradient-to-br from-indigo-500 to-purple-600 relative overflow-hidden group">
                <img v-if="userAvatar" :src="userAvatar" :alt="currentUser ? currentUser.nama : 'Foto Pegawai'" class="w-full h-full object-cover object-top relative z-10">
                <template v-else>
                   <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
