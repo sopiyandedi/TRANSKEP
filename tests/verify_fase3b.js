@@ -2874,6 +2874,48 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
     assert.strictEqual(adminAcc.hasDropdown, true, 'Role Admin: approved Cuti must retain 2-option dropdown');
     assert.strictEqual(adminAcc.actions.length, 0, 'Role Admin: approved Cuti dropdown must not duplicate direct button');
     console.log('[PASS] Tahap 153 Cuti Approved Action (Non-Admin single Download Persetujuan vs Admin 2-option dropdown) verified.');
+
+    // Tahap 154: Verifikasi Keamanan Avatar Pegawai (Admin/Operator Only Write, Data URI guard & NIP matching)
+    assert(
+      rulesSrc.includes('match /user_avatars/{nip}') &&
+      rulesSrc.includes('allow get: if isAdminOrOperator() || (isAuthenticated() && uid() == nip);') &&
+      rulesSrc.includes('allow create, update: if isAdminOrOperator()'),
+      'firestore.rules must restrict user_avatars create/update/list/delete to Admin/Operator and allow employee get own avatar'
+    );
+    const firebaseSrc154 = fs.readFileSync('core/firebase.js', 'utf8');
+    assert(
+      firebaseSrc154.includes('USER_AVATARS_COLLECTION') &&
+      firebaseSrc154.includes('saveUserAvatarToFirestore') &&
+      firebaseSrc154.includes('getFirestoreUserAvatar(') &&
+      firebaseSrc154.includes('getFirestoreUserAvatars()'),
+      'core/firebase.js must expose user_avatars CRUD and readers'
+    );
+    const coreSrc154 = fs.readFileSync('core/core.js', 'utf8');
+    const mobileNavSrc154 = fs.readFileSync('core/view_mobile_nav.html', 'utf8');
+    assert(
+      coreSrc154.includes('getSafeAvatarDataUri') &&
+      coreSrc154.includes('syncActiveUserAvatarFromFirestore') &&
+      coreSrc154.includes('userAvatar') &&
+      mobileNavSrc154.includes('userAvatar'),
+      'core/core.js & core/view_mobile_nav.html must render cached/Firestore userAvatar safely'
+    );
+    const validSampleUri = 'data:image/jpeg;base64,' + 'A'.repeat(40);
+    assert.strictEqual(browserSandbox.getSafeAvatarDataUri(validSampleUri), validSampleUri, 'getSafeAvatarDataUri must accept valid JPEG data URI');
+    assert.strictEqual(browserSandbox.getSafeAvatarDataUri('javascript:alert(1)'), '', 'getSafeAvatarDataUri must reject javascript: URI');
+    assert.strictEqual(browserSandbox.getSafeAvatarDataUri('https://evil.example/a.png'), '', 'getSafeAvatarDataUri must reject external URL');
+    assert.strictEqual(browserSandbox.getSafeAvatarDataUri('data:image/svg+xml;base64,PHN2Zz4='), '', 'getSafeAvatarDataUri must reject SVG data URI');
+
+    const pegawaiHtml154 = fs.readFileSync('modules/pegawai/view_pegawai.html', 'utf8');
+    const pegawaiJs154 = fs.readFileSync('modules/pegawai/pegawai.js', 'utf8');
+    assert(
+      pegawaiHtml154.includes('openBulkFotoModal') &&
+      pegawaiHtml154.includes('showModalBulkFoto') &&
+      pegawaiHtml154.includes('singleAvatarInput') &&
+      pegawaiJs154.includes('compressPegawaiAvatarFile') &&
+      pegawaiJs154.includes('extractNipAndMatchUser'),
+      'Kelola Pegawai must support bulk NIP matching + compression and single avatar editing'
+    );
+    console.log('[PASS] Tahap 154 Employee Profile Avatars (Firestore Rules, XSS URI Guard & Bulk NIP Upload) verified.');
   } finally {
     browserSandbox.TranskepAPI.call = origApiCall;
     browserSandbox.TranskepFirebase.getDb = origGetDb;

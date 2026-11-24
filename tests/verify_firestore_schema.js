@@ -84,7 +84,8 @@ const specs = {
   eoffice_kgb: extractValidatorSpec('isValidEofficeKgb'),
   eoffice_rapat: extractValidatorSpec('isValidEofficeRapat'),
   surat_tugas_documents: extractValidatorSpec('isValidSuratTugas'),
-  security_incidents: extractValidatorSpec('isValidSecurityIncident')
+  security_incidents: extractValidatorSpec('isValidSecurityIncident'),
+  user_avatars: extractValidatorSpec('isValidUserAvatar')
 };
 
 const validatorNamesBySpec = [
@@ -99,7 +100,8 @@ const validatorNamesBySpec = [
   ['eoffice_kgb', 'isValidEofficeKgb'],
   ['eoffice_rapat', 'isValidEofficeRapat'],
   ['surat_tugas_documents', 'isValidSuratTugas'],
-  ['security_incidents', 'isValidSecurityIncident']
+  ['security_incidents', 'isValidSecurityIncident'],
+  ['user_avatars', 'isValidUserAvatar']
 ];
 let maxEstimatedExpr = 0;
 let rapatEstimatedExpr = 0;
@@ -253,8 +255,14 @@ assert(TF && typeof TF === 'object', 'TranskepFirebase failed to load');
   });
   await TF.saveRapatToFirestore({ id: 'RPT-1', status: 'Selesai' });
   await TF.saveSuratTugasToFirestore({ id: 'ST-1', status: 'DISETUJUI', peserta: [] });
+  await TF.saveUserAvatarToFirestore('199002022015012002', 'data:image/jpeg;base64,' + 'A'.repeat(40), {
+    mime_type: 'image/jpeg',
+    size_bytes: 63,
+    width: 240,
+    height: 240
+  });
 
-  assert.strictEqual(capturedWrites.length, 15, `Expected 15 captured writes from core/firebase.js, got ${capturedWrites.length}`);
+  assert.strictEqual(capturedWrites.length, 16, `Expected 16 captured writes from core/firebase.js, got ${capturedWrites.length}`);
 
   for (const w of capturedWrites) {
     const spec = specs[w.colName];

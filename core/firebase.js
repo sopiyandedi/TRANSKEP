@@ -1828,6 +1828,123 @@ const TranskepFirebase = {
     return { status: 'success', id: docId, data: payload, message: 'Surat Tugas berhasil disimpan di Cloud Firestore.' };
   },
 
+  // ==========================================
+  // OPERASI AVATAR FOTO PROFIL PEGAWAI (TAHAP 154)
+  // ==========================================
+  USER_AVATARS_COLLECTION: 'user_avatars',
+  USER_AVATARS_ALLOWED_FIELDS: [
+    'nip', 'photo_data_uri', 'mime_type', 'size_bytes', 'width', 'height',
+    'updated_by', 'updated_at', 'created_at'
+  ],
+
+  isValidAvatarDataUri(uri) {
+    const s = String(uri || '').trim();
+    return s.length >= 30 && s.length <= 150000 && /^data:image\/(jpeg|jpg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(s);
+  },
+
+  /**
+   * Menyimpan / Memperbarui Foto Profil Pegawai terkompresi (khusus Admin/Operator) ke Cloud Firestore
+   */
+  async saveUserAvatarToFirestore(nip, photoDataUri, meta = {}) {
+    const db = this.getDb();
+    if (!db) throw new Error("Cloud Firestore belum siap terhubung.");
+    await this._waitAuthForWrite('saveUserAvatarToFirestore');
+
+    const cleanNip = this._normNip(nip);
+    if (!cleanNip || cleanNip.length < 5) throw new Error("NIP pegawai tidak valid.");
+    const cleanUri = String(photoDataUri || '').trim();
+    if (!this.isValidAvatarDataUri(cleanUri)) {
+      throw new Error("Format/ukuran foto profil tidak valid (maks. 150 KB Data URI gambar).");
+    }
+
+    const caller = this.getCallerIdentity();
+    const serverTs = this._serverTimestamp();
+    const payload = {
+      nip: cleanNip,
+      photo_data_uri: cleanUri,
+      mime_type: String((meta && meta.mime_type) || 'image/jpeg'),
+      size_bytes: Number((meta && meta.size_bytes) || cleanUri.length),
+      width: Number((meta && meta.width) || 240),
+      height: Number((meta && meta.height) || 240),
+      updated_by: caller.nip || String((meta && meta.updated_by) || ''),
+      updated_at: serverTs,
+      created_at: serverTs
+    };
+
+    await this._writeDocWithDiagnostics(db, this.USER_AVATARS_COLLECTION, cleanNip, payload, this.USER_AVATARS_ALLOWED_FIELDS, { adminOnly: true });
+    return { status: 'success', nip: cleanNip, data: payload };
+  },
+
+  /**
+   * Menghapus Foto Profil Pegawai (khusus Admin/Operator) dari Cloud Firestore
+   */
+  async deleteUserAvatarFromFirestore(nip) {
+    const db = this.getDb();
+    if (!db) throw new Error("Cloud Firestore belum siap terhubung.");
+    await this._waitAuthForWrite('deleteUserAvatarFromFirestore');
+    const cleanNip = this._normNip(nip);
+    if (!cleanNip) throw new Error("NIP pegawai wajib diisi.");
+    await db.collection(this.USER_AVATARS_COLLECTION).doc(cleanNip).delete();
+    return { status: 'success', nip: cleanNip };
+  },
+
+  /**
+   * Mengambil 1 Dokumen Foto Profil Pegawai berdasarkan NIP (User sendiri atau Admin/Operator)
+   */
+  async getFirestoreUserAvatar(nip) {
+    const db = this.getDb();
+    if (!db || !(await this._ensureAuthForRead(false))) return null;
+    const cleanNip = this._normNip(nip);
+    if (!cleanNip) return null;
+    const snap = await db.collection(this.USER_AVATARS_COLLECTION).doc(cleanNip).get();
+    return (snap && snap.exists) ? snap.data() : null;
+  },
+
+  /**
+   * Mengambil Seluruh Map Foto Profil Pegawai (Khusus Admin/Operator untuk Direktori Pegawai)
+   */
+  async getFirestoreUserAvatars() {
+    const db = this.getDb();
+    if (!db || !(await this._ensureAuthForRead(true))) return {};
+    const snapshot = await db.collection(this.USER_AVATARS_COLLECTION).get();
+    const map = {};
+    snapshot.forEach(doc => {
+      const d = doc.data();
+      const k = this._normNip((d && d.nip) || doc.id);
+      if (k && d && this.isValidAvatarDataUri(d.photo_data_uri)) {
+        map[k] = d;
+      }
+    });
+    return map;
+  },
+
+  /**
+   * Memasang Realtime Listener Koleksi Foto Profil Pegawai (Khusus Admin/Operator)
+   */
+  subscribeFirestoreUserAvatars(callback) {
+    const db = this.getDb();
+    if (!db) return null;
+    return this._whenAuthGatedSnapshot(() => {
+      if (!this.getCallerIdentity().isAdmin) return null;
+      return db.collection(this.USER_AVATARS_COLLECTION).onSnapshot(
+        (snapshot) => {
+          const map = {};
+          snapshot.forEach(doc => {
+            const d = doc.data();
+            const k = this._normNip((d && d.nip) || doc.id);
+            if (k && d && this.isValidAvatarDataUri(d.photo_data_uri)) {
+              map[k] = d;
+            }
+          });
+          if (typeof callback === 'function') callback(map);
+        },
+        (error) => {
+          console.warn("⚠️ [TRANSKEP Firebase] Error listener user_avatars:", error && error.message ? error.message : error);
+        }
+      );
+    });
+  },
+
   /**
    * Menghapus Dokumen Surat Tugas dari Cloud Firestore secara Instan
    */

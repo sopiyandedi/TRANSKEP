@@ -216,6 +216,19 @@ rules_version = '2';
 //   - detail: string (required, 1..1000)
 //   - timestamp: timestamp (required, == request.time)
 //
+// Collection: user_avatars
+// Document ID: {nip} (employee NIP, matches field `nip`, 5..30)
+// Fields:
+//   - nip: string (required, 5..30, == docId)
+//   - photo_data_uri: string (required, 30..150000, data:image/(jpeg|jpg|png|webp);base64,...)
+//   - mime_type: string (optional, in ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'])
+//   - size_bytes: int (optional, 1..150000)
+//   - width: int (optional, 32..512)
+//   - height: int (optional, 32..512)
+//   - updated_by: string (optional, <=30)
+//   - updated_at: timestamp (required)
+//   - created_at: timestamp (optional)
+//
 // =============================================================================
 
 service cloud.firestore {
@@ -734,6 +747,22 @@ service cloud.firestore {
              data.timestamp is timestamp && data.timestamp == request.time;
     }
 
+    function isValidUserAvatar(data, nip) {
+      let allowed = ['nip', 'photo_data_uri', 'mime_type', 'size_bytes', 'width', 'height', 'updated_by', 'updated_at', 'created_at'];
+      return hasOnlyAllowedFields(allowed) &&
+             hasRequiredFields(['nip', 'photo_data_uri', 'updated_at']) &&
+             data.nip is string && data.nip == nip && data.nip.size() >= 5 && data.nip.size() <= 30 &&
+             data.photo_data_uri is string && data.photo_data_uri.size() >= 30 && data.photo_data_uri.size() <= 150000 &&
+             data.photo_data_uri.matches('^data:image/(jpeg|jpg|png|webp);base64,[A-Za-z0-9+/=]+$') &&
+             (!('mime_type' in data) || (data.mime_type is string && data.mime_type in ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'])) &&
+             (!('size_bytes' in data) || (data.size_bytes is int && data.size_bytes > 0 && data.size_bytes <= 150000)) &&
+             (!('width' in data) || (data.width is int && data.width >= 32 && data.width <= 512)) &&
+             (!('height' in data) || (data.height is int && data.height >= 32 && data.height <= 512)) &&
+             (!('updated_by' in data) || (data.updated_by is string && data.updated_by.size() <= 30)) &&
+             isValidTimestamp(data.updated_at) &&
+             (!('created_at' in data) || isValidTimestamp(data.created_at));
+    }
+
     // =========================================================================
     // Collection Rules
     // =========================================================================
@@ -942,6 +971,16 @@ service cloud.firestore {
       allow read: if isAdmin();
       allow create: if isValidSecurityIncident(request.resource.data);
       allow update, delete: if false;
+    }
+
+    // 13. User Avatars - Employee may read own avatar; Admin/Operator may read,
+    //     list, create, update, and delete employee avatars.
+    match /user_avatars/{nip} {
+      allow get: if isAdminOrOperator() || (isAuthenticated() && uid() == nip);
+      allow list: if isAdminOrOperator();
+      allow create, update: if isAdminOrOperator() &&
+                               isValidUserAvatar(request.resource.data, nip);
+      allow delete: if isAdminOrOperator();
     }
 
     // =========================================================================

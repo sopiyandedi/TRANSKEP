@@ -1436,6 +1436,9 @@ function handleLogout() {
   window.vueState.currentMenu = 'dashboard';
   window.vueState.user = null;
   if (typeof state !== 'undefined') state.user = null;
+  window._syncedAvatarNipInSession = '';
+  if (window.vmGlobalHeader) window.vmGlobalHeader.userAvatar = '';
+  if (window.vmMobileNav) window.vmMobileNav.userAvatar = '';
   window.vueState.rendered = {};
   window.vueState.isBgSyncDone = false;
   initNavigationAccess();
@@ -2592,8 +2595,81 @@ window.openChangePasswordModal = function (oldPass, isMandatory) {
 };
 
 // =========================================================
-// KOMPONEN: GLOBAL HEADER PROFIL
+// KOMPONEN: AVATAR FOTO PROFIL PEGAWAI (TAHAP 154) & HEADER PROFIL
 // =========================================================
+window.getSafeAvatarDataUri = function (uri) {
+  const s = String(uri || '').trim();
+  if (s.length >= 30 && s.length <= 150000 && /^data:image\/(jpeg|jpg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(s)) {
+    return s;
+  }
+  return '';
+};
+
+window.getCachedUserAvatar = function (nip) {
+  const cleanNip = String(nip || '').replace(/[^0-9]/g, '');
+  if (!cleanNip || typeof localStorage === 'undefined') return '';
+  try {
+    return window.getSafeAvatarDataUri(localStorage.getItem('transkep_user_avatar_' + cleanNip) || '');
+  } catch (e) {
+    return '';
+  }
+};
+
+window.applyAvatarToActiveHeaders_ = function (cleanNip, safeUri) {
+  const activeNip = String((state && state.user && state.user.nip) || (typeof localStorage !== 'undefined' ? localStorage.getItem('transkep_active_nip') : '') || '').replace(/[^0-9]/g, '');
+  if (cleanNip && activeNip && cleanNip !== activeNip) return;
+
+  if (window.vmGlobalHeader) {
+    window.vmGlobalHeader.userAvatar = safeUri;
+  }
+  if (window.vmMobileNav) {
+    window.vmMobileNav.userAvatar = safeUri;
+  }
+  if (!window.vmMobileNav && typeof document !== 'undefined') {
+    const avatarEl = document.getElementById('mobile-avatar');
+    if (avatarEl && safeUri) {
+      avatarEl.innerHTML = '';
+      const img = document.createElement('img');
+      img.src = safeUri;
+      img.alt = (state && state.user && state.user.nama) ? String(state.user.nama) : 'Foto';
+      img.className = 'w-full h-full object-cover object-top';
+      avatarEl.appendChild(img);
+    }
+  }
+};
+
+window.setCachedUserAvatar = function (nip, dataUri) {
+  const cleanNip = String(nip || '').replace(/[^0-9]/g, '');
+  if (!cleanNip) return '';
+  const safeUri = window.getSafeAvatarDataUri(dataUri);
+  try {
+    if (typeof localStorage !== 'undefined') {
+      if (safeUri) localStorage.setItem('transkep_user_avatar_' + cleanNip, safeUri);
+      else localStorage.removeItem('transkep_user_avatar_' + cleanNip);
+    }
+  } catch (e) {}
+  window.applyAvatarToActiveHeaders_(cleanNip, safeUri);
+  return safeUri;
+};
+
+window._syncedAvatarNipInSession = '';
+window.syncActiveUserAvatarFromFirestore = function (nip) {
+  const cleanNip = String(nip || '').replace(/[^0-9]/g, '');
+  if (!cleanNip || window._syncedAvatarNipInSession === cleanNip) return;
+  if (typeof window.TranskepFirebase === 'undefined' || typeof window.TranskepFirebase.getFirestoreUserAvatar !== 'function') return;
+  window._syncedAvatarNipInSession = cleanNip;
+  window.TranskepFirebase.getFirestoreUserAvatar(cleanNip)
+    .then(doc => {
+      const freshUri = doc ? window.getSafeAvatarDataUri(doc.photo_data_uri) : '';
+      if (freshUri !== window.getCachedUserAvatar(cleanNip)) {
+        window.setCachedUserAvatar(cleanNip, freshUri);
+      }
+    })
+    .catch(() => {
+      window._syncedAvatarNipInSession = '';
+    });
+};
+
 function renderGlobalHeader() {
   if (!state.user) {
     try {
@@ -2608,6 +2684,7 @@ function renderGlobalHeader() {
   const viewContainer = document.getElementById('view-container');
   if (!viewContainer) return;
 
+  const initialAvatar = window.getCachedUserAvatar(state.user.nip);
   let headerDiv = document.getElementById('global-profile-header');
 
   if (!headerDiv) {
@@ -2623,8 +2700,11 @@ function renderGlobalHeader() {
          <div class="flex items-center gap-5 w-full md:w-auto relative z-10">
             
             <div class="w-16 h-16 rounded-2xl flex items-center justify-center text-white text-2xl font-black shadow-lg shadow-indigo-500/30 shrink-0 border border-indigo-400/30 bg-gradient-to-br from-indigo-500 to-purple-600 relative overflow-hidden group">
-               <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
-               <span class="relative z-10 drop-shadow-md tracking-wider">{{ userInitials }}</span>
+               <img v-if="userAvatar" :src="userAvatar" :alt="currentUser ? currentUser.nama : 'Foto Pegawai'" class="w-full h-full object-cover object-top relative z-10">
+               <template v-else>
+                  <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+                  <span class="relative z-10 drop-shadow-md tracking-wider">{{ userInitials }}</span>
+               </template>
             </div>
 
             <div class="flex-1">
@@ -2655,7 +2735,7 @@ function renderGlobalHeader() {
 
     window.vmGlobalHeader = Vue.createApp({
       data() {
-        return { currentUser: state.user };
+        return { currentUser: state.user, userAvatar: initialAvatar };
       },
       computed: {
         userInitials() {
@@ -2679,9 +2759,12 @@ function renderGlobalHeader() {
   } else {
     if (window.vmGlobalHeader) {
       window.vmGlobalHeader.currentUser = state.user;
+      window.vmGlobalHeader.userAvatar = initialAvatar;
     }
     headerDiv.removeAttribute('v-cloak');
   }
+
+  window.syncActiveUserAvatarFromFirestore(state.user.nip);
 
   // Sinkronisasi Bar Atas Mobile (Sticky Header HP)
   if (typeof updateMobileProfileUI === 'function') {
@@ -2710,12 +2793,24 @@ window.updateMobileProfileUI = function () {
   let words = cleanName.split(' ');
   let initials = (words[0] ? words[0].charAt(0).toUpperCase() : '') + (words[1] ? words[1].charAt(0).toUpperCase() : '');
   if (!initials) initials = 'ID';
+  const cachedAvatar = window.getCachedUserAvatar(user.nip);
 
   const avatarEl = document.getElementById('mobile-avatar');
   const nameEl = document.getElementById('mobile-user-name');
   const roleEl = document.getElementById('mobile-user-role');
 
-  if (avatarEl) avatarEl.textContent = initials;
+  if (avatarEl && !window.vmMobileNav) {
+    if (cachedAvatar) {
+      avatarEl.innerHTML = '';
+      const img = document.createElement('img');
+      img.src = cachedAvatar;
+      img.alt = cleanName;
+      img.className = 'w-full h-full object-cover object-top';
+      avatarEl.appendChild(img);
+    } else {
+      avatarEl.textContent = initials;
+    }
+  }
   if (nameEl) nameEl.textContent = cleanName;
   if (roleEl) roleEl.textContent = user.jabatan || 'Pegawai';
 
@@ -2728,7 +2823,7 @@ window.updateMobileProfileUI = function () {
       const { createApp } = Vue;
       window.vmMobileNav = createApp({
         data() {
-          return { currentUser: user };
+          return { currentUser: user, userAvatar: cachedAvatar };
         },
         computed: {
           cleanName() {
@@ -2750,6 +2845,7 @@ window.updateMobileProfileUI = function () {
     }
   } else if (window.vmMobileNav) {
     window.vmMobileNav.currentUser = user;
+    window.vmMobileNav.userAvatar = cachedAvatar;
     topBar.removeAttribute('v-cloak');
   }
 

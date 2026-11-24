@@ -9,8 +9,9 @@
     
     <!-- Profil Singkat & Info Pegawai -->
     <div class="flex items-center gap-2.5 overflow-hidden cursor-pointer shrink" onclick="switchMenu('dashboard')">
-        <div id="mobile-avatar" class="w-9 h-9 rounded-xl flex items-center justify-center text-white text-xs font-black shadow-md border border-indigo-400/30 bg-gradient-to-br from-indigo-500 to-purple-600 shrink-0">
-            {{ userInitials }}
+        <div id="mobile-avatar" class="w-9 h-9 rounded-xl flex items-center justify-center text-white text-xs font-black shadow-md border border-indigo-400/30 bg-gradient-to-br from-indigo-500 to-purple-600 shrink-0 overflow-hidden">
+            <img v-if="userAvatar" :src="userAvatar" :alt="cleanName" class="w-full h-full object-cover object-top">
+            <span v-else>{{ userInitials }}</span>
         </div>
         <div class="flex flex-col min-w-0">
             <h2 id="mobile-user-name" class="text-xs font-bold text-slate-200 truncate leading-tight">{{ cleanName }}</h2>

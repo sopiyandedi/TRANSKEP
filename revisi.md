@@ -7105,6 +7105,21 @@ Menyempurnakan kenyamanan penggunaan Workspace Rapat serta mengotomatiskan kerap
 2. **Tabel Rekapitulasi Global ([`modules/permohonan/view_permohonan.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/permohonan/view_permohonan.html)):** Menambahkan `v-else-if="s && s.user && String(s.user.role || '').trim() === 'Admin'"` pada `.dropdown-rekap-container` serta tombol `v-else` langsung `@click="execUnduhSignedCuti(log.id)"` (`Download Persetujuan`) untuk non-Admin.
 3. **PWA & Uji Regresi (`v3.8.91`):** Bump 3-titik PWA **`v3.8.91`** ([`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) & [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js)) serta uji runtime & markup di [`tests/verify_fase3b.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/tests/verify_fase3b.js).
 
+---
+
+## REVISI TAHAP 154: FOTO PROFIL PEGAWAI DI HEADER & UPLOAD MASSAL NIP (`v3.8.92`)
+**Status:** `[SELESAI & TERVERIFIKASI]`
+
+### 1. Rancangan & Kebutuhan
+- Mengganti kotak inisial huruf profil di header desktop & mobile dengan foto pegawai masing-masing yang disimpan ringan ke Cloud Firestore (`user_avatars/{nip}`).
+- Pegawai biasa dilarang mengubah fotonya sendiri; hanya **Admin / Operator** yang berwenang mengunggah atau menghapus foto melalui menu **Kelola Pegawai** (baik satuan di Modal Edit maupun **Upload Massal Drag & Drop** berbasis kecocokan NIP nama file) dengan pemotongan & kompresi otomatis `240×240 px`.
+
+### 2. Rincian Implementasi
+1. **Firestore Rules ([`firestore.rules`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/firestore.rules)):** Menambahkan koleksi `user_avatars/{nip}` (`isValidUserAvatar`, `allow get` pemilik NIP/Admin/Operator, `allow list/create/update/delete` khusus Admin/Operator).
+2. **Firebase & Header UI ([`core/firebase.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/core/firebase.js), [`core/core.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/core/core.js), [`core/view_mobile_nav.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/core/view_mobile_nav.html)):** Menambahkan CRUD & sync avatar ber-auth-gate, validasi Data URI raster (`getSafeAvatarDataUri`), cache `localStorage` per NIP, serta rendering foto (`object-cover object-top`) dengan fallback inisial di `#global-profile-header` dan `#mobile-avatar`.
+3. **Upload Satuan & Massal ([`modules/pegawai/view_pegawai.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/pegawai/view_pegawai.html), [`modules/pegawai/pegawai.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/pegawai/pegawai.js)):** Menambahkan kompresor Canvas `240×240 px` (top-biased square crop `12%`), pencocokan NIP otomatis dari nama file, modal upload massal dengan progress bar, slot foto di Modal Edit Pegawai, dan thumbnail di tabel Direktori.
+4. **PWA & Uji Regresi (`v3.8.92`):** Bump 3-titik PWA **`v3.8.92`** ([`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) & [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js)) serta uji schema & keamanan di [`tests/verify_firestore_schema.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/tests/verify_firestore_schema.js) & [`tests/verify_fase3b.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/tests/verify_fase3b.js).
+
 
 
 
