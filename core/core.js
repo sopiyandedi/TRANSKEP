@@ -2453,6 +2453,21 @@ function updateThemeIcon() {
       btnTheme.title = 'Beralih ke Mode Terang';
     }
   }
+
+  const desktopIcon = document.getElementById('desktop-theme-icon');
+  if (desktopIcon) {
+    desktopIcon.className = isLight ? 'fa-solid fa-moon text-lg' : 'fa-solid fa-sun text-lg';
+  }
+  const btnDesktop = document.getElementById('btn-theme-desktop');
+  if (btnDesktop) {
+    if (isLight) {
+      btnDesktop.className = 'w-12 h-12 shrink-0 flex items-center justify-center bg-indigo-500/10 hover:bg-indigo-500 border border-indigo-500/20 hover:border-indigo-500 text-indigo-400 hover:text-white rounded-xl transition-all duration-300 shadow-lg shadow-indigo-500/10';
+      btnDesktop.title = 'Beralih ke Mode Gelap';
+    } else {
+      btnDesktop.className = 'w-12 h-12 shrink-0 flex items-center justify-center bg-amber-500/10 hover:bg-amber-500 border border-amber-500/20 hover:border-amber-500 text-amber-400 hover:text-white rounded-xl transition-all duration-300 shadow-lg shadow-amber-500/10';
+      btnDesktop.title = 'Beralih ke Mode Terang';
+    }
+  }
 }
 
 function toggleThemeMode() {
@@ -2722,6 +2737,9 @@ function renderGlobalHeader() {
                <button @click="openMobileSidebar" title="Buka Menu" class="lg:hidden w-12 h-12 shrink-0 flex items-center justify-center bg-indigo-500/10 hover:bg-indigo-500 border border-indigo-500/20 hover:border-indigo-500 text-indigo-400 hover:text-white rounded-xl transition-all duration-300 shadow-lg shadow-indigo-500/10">
                   <i class="fa-solid fa-bars-staggered text-lg"></i>
                </button>
+               <button id="btn-theme-desktop" @click="toggleTheme" title="Beralih Mode Terang / Gelap" class="w-12 h-12 shrink-0 flex items-center justify-center bg-amber-500/10 hover:bg-amber-500 border border-amber-500/20 hover:border-amber-500 text-amber-400 hover:text-white rounded-xl transition-all duration-300 shadow-lg shadow-amber-500/10">
+                  <i id="desktop-theme-icon" class="fa-solid fa-sun text-lg"></i>
+               </button>
                <button @click="openChangePassword" title="Ganti Kata Sandi" class="w-12 h-12 shrink-0 flex items-center justify-center bg-purple-500/10 hover:bg-purple-500 border border-purple-500/20 hover:border-purple-500 text-purple-400 hover:text-white rounded-xl transition-all duration-300 shadow-lg shadow-purple-500/10">
                   <i class="fa-solid fa-key text-lg"></i>
                </button>
@@ -2750,6 +2768,7 @@ function renderGlobalHeader() {
       },
       methods: {
         openMobileSidebar() { if (window.openMobileSidebar) window.openMobileSidebar(); },
+        toggleTheme() { if (window.toggleThemeMode) window.toggleThemeMode(); },
         openChangePassword() { if (window.openChangePasswordModal) window.openChangePasswordModal(); },
         logout() { if (window.handleLogout) window.handleLogout(); }
       }
@@ -2769,6 +2788,9 @@ function renderGlobalHeader() {
   // Sinkronisasi Bar Atas Mobile (Sticky Header HP)
   if (typeof updateMobileProfileUI === 'function') {
     updateMobileProfileUI();
+  }
+  if (typeof updateThemeIcon === 'function') {
+    updateThemeIcon();
   }
 }
 
