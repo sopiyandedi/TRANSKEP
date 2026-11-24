@@ -1,10 +1,10 @@
 // =========================================================================
 // FILE: sw.js (TRANSKEP Progressive Web App Service Worker)
 // DESKRIPSI: Offline Asset Caching, Fast Load & Network Pass-Through
-// ENGINE: TRANSKEP PWA Engine v1.0.0 (Build: v3.8.92 - Employee Avatar Photos Firestore)
+// ENGINE: TRANSKEP PWA Engine v1.0.0 (Build: v3.8.93 - Larger Dashboard Profile Avatar Frame)
 // =========================================================================
 
-const CACHE_NAME = 'transkep-v3.8.92';
+const CACHE_NAME = 'transkep-v3.8.93';
 
 // Daftar aset inti yang di-cache saat Service Worker dipasang (Install)
 const PRECACHE_ASSETS = [
