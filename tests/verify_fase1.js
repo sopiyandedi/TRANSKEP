@@ -125,11 +125,11 @@ function fromSignedBytes(arr) {
 const sandbox = {
   console,
   Math, Date, JSON, String, Number, Boolean, Array, Object, Error, RegExp, parseInt, parseFloat, isNaN, encodeURIComponent,
-  Logger: { log: () => {} },
+  Logger: { log: () => { } },
   SpreadsheetApp: {
     getActiveSpreadsheet: () => mockSS,
     openById: () => mockSS,
-    flush: () => {}
+    flush: () => { }
   },
   PropertiesService: {
     getScriptProperties: () => ({
@@ -149,7 +149,7 @@ const sandbox = {
     })
   },
   LockService: {
-    getScriptLock: () => ({ tryLock: () => true, waitLock: () => {}, releaseLock: () => {} })
+    getScriptLock: () => ({ tryLock: () => true, waitLock: () => { }, releaseLock: () => { } })
   },
   ContentService: {
     MimeType: { JSON: 'application/json' },
@@ -228,7 +228,7 @@ assert.strictEqual(sandbox.cekOtorisasiAdmin('198001012005011001', 'forged'), fa
 assert.strictEqual(sandbox.cekOtorisasiAdminOrOperator('198001012005011001', null), false, 'Null token must fail');
 
 // Forged v2 token signed with wrong secret
-const fakePayloadB64 = Buffer.from(JSON.stringify({ n: '198001012005011001', r: 'Admin', exp: Math.floor(Date.now()/1000) + 3600, jti: '1234' })).toString('base64url');
+const fakePayloadB64 = Buffer.from(JSON.stringify({ n: '198001012005011001', r: 'Admin', exp: Math.floor(Date.now() / 1000) + 3600, jti: '1234' })).toString('base64url');
 assert.strictEqual(sandbox.cekOtorisasi('198001012005011001', 'v2.' + fakePayloadB64 + '.deadbeef'), false, 'Invalid HMAC sig must fail');
 
 // B. Valid Login + Auto-Upgrade Plaintext -> SHA256$ + ENC$ -> SHA256$
@@ -291,6 +291,9 @@ const chOk = sandbox.changeMyPassword('199002022015012002', 'pegawaiPass123', 'n
 assert.strictEqual(chOk.status, 'success', 'Valid changeMyPassword should succeed');
 assert(String(userRows[2][5]).startsWith('SHA256$'), 'changeMyPassword must store SHA256$ hash');
 assert.strictEqual(sandbox.verifyLogin('199002022015012002', 'newPegawai2026!').status, 'success');
+assert(chOk.token && chOk.token !== pegLogin2.token, 'changeMyPassword must return rotated session token');
+assert.strictEqual(sandbox.cekOtorisasi('199002022015012002', pegLogin2.token), false, 'Old token must be revoked after changeMyPassword');
+pegLogin2.token = chOk.token;
 
 // Request password reset queues pending SHA256$ token & no temp_pass leak in getBulkData
 const rstRes = sandbox.requestPasswordReset('081311112222');
@@ -490,7 +493,7 @@ mockFetchResponder = (url, opts) => {
 
 const feSandbox = {
   console,
-  localStorage: { getItem: () => '', setItem: () => {} },
+  localStorage: { getItem: () => '', setItem: () => { } },
   TranskepFirebase: {
     isReady: () => true,
     saveKgbToFirestore: async (doc) => { fakeFsKgbStore[doc.id_kgb] = Object.assign({}, doc); return doc; },

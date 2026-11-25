@@ -2532,34 +2532,60 @@ document.addEventListener("DOMContentLoaded", () => {
         },
         submitPassword() {
           if (this.isSubmittingPass) return;
-          if (this.formPass.new !== this.formPass.confirm) {
+          const newPass = String(this.formPass.new || '');
+          const confirmPass = String(this.formPass.confirm || '');
+          const oldPass = String(this.formPass.old || '');
+          const nip = (this.currentUser && this.currentUser.nip) || localStorage.getItem('transkep_active_nip') || '';
+          const cleanNip = String(nip).replace(/['"\s]/g, '').trim();
+
+          if (newPass !== confirmPass) {
             showNotify("Validasi Gagal", "Konfirmasi sandi baru tidak sama.", "error");
             return;
           }
-          if (this.formPass.new.length < 5) {
-            showNotify("Sandi Terlalu Pendek", "Gunakan minimal 5 karakter.", "warning");
+          if (newPass.length < 8) {
+            showNotify("Sandi Terlalu Pendek", "Kata sandi baru minimal terdiri dari 8 karakter.", "warning");
             return;
           }
-          if (this.formPass.old === this.formPass.new) {
+          if (!/[A-Za-z]/.test(newPass) || !/[0-9]/.test(newPass)) {
+            showNotify("Kombinasi Sandi Lemah", "Kata sandi baru wajib mengandung kombinasi huruf dan angka.", "warning");
+            return;
+          }
+          if (oldPass && oldPass === newPass) {
             showNotify("Perhatian", "Sandi baru tidak boleh sama persis dengan sandi lama.", "warning");
+            return;
+          }
+          if (cleanNip.length >= 6 && newPass.toLowerCase().includes(cleanNip.toLowerCase())) {
+            showNotify("Sandi Tidak Aman", "Kata sandi baru tidak boleh sama dengan atau memuat NIP Anda.", "warning");
+            return;
+          }
+          const weakSet = ['12345678', '123456789', '1234567890', 'password', 'password1', 'password123', 'qwerty123', 'admin123', 'admin1234', 'transkep', 'transkep123', 'pegawai123'];
+          if (weakSet.includes(newPass.trim().toLowerCase())) {
+            showNotify("Sandi Terlalu Umum", "Gunakan kombinasi kata sandi yang lebih unik dan tidak mudah ditebak.", "warning");
             return;
           }
 
           this.isSubmittingPass = true;
           showLoading("Mencocokkan kredensial di database...");
 
-          const nip = (this.currentUser && this.currentUser.nip) || localStorage.getItem('transkep_active_nip');
           const token = localStorage.getItem('transkep_session_token');
+          const role = (this.currentUser && this.currentUser.role) || localStorage.getItem('transkep_user_role') || 'Pegawai';
 
           google.script.run
             .withSuccessHandler((res) => {
               this.isSubmittingPass = false;
               hideLoading();
               if (res && res.status === 'success') {
+                if (res.token) {
+                  if (typeof SessionIntegrityGuard !== 'undefined' && typeof SessionIntegrityGuard.sealSession === 'function') {
+                    SessionIntegrityGuard.sealSession(nip, role, res.token);
+                  } else {
+                    localStorage.setItem('transkep_session_token', res.token);
+                  }
+                }
                 this.showModalPassword = false;
                 this.isMandatory = false;
                 localStorage.removeItem('transkep_force_change_password');
-                showNotify("Keamanan Diperbarui", "Sandi Anda telah berhasil diubah.", "success");
+                showNotify("Keamanan Diperbarui", "Sandi Anda berhasil diubah. Semua sesi di perangkat lain telah otomatis dikeluarkan.", "success");
                 this.formPass = { old: '', new: '', confirm: '' };
               } else {
                 showNotify("Ditolak Server", res ? res.message : "Gagal mengubah kata sandi", "error");
@@ -2570,7 +2596,7 @@ document.addEventListener("DOMContentLoaded", () => {
               hideLoading();
               showNotify("Error Jaringan", "Tidak dapat terhubung ke server: " + (err.message || ''), "error");
             })
-            .changeMyPassword(nip, this.formPass.old, this.formPass.new, token);
+            .changeMyPassword(nip, oldPass, newPass, token);
         }
       }
     }).mount('#vue-global-modals');

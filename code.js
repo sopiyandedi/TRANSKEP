@@ -37,9 +37,75 @@ var _cachedSessionSecret_ = null;
 var SESSION_TOKEN_TTL_SEC_ = 28800; // 8 jam masa berlaku token
 var SESSION_CACHE_TTL_SEC_ = 21600; // 6 jam batas maksimal CacheService GAS
 var REVOKED_JTIS_PROP_KEY_ = 'TRANSKEP_REVOKED_JTIS';
+var USER_SESSION_EPOCH_PROP_KEY_ = 'TRANSKEP_USER_SESSION_EPOCHS';
 
 function normalizeNipKey_(val) {
   return String(val === null || val === undefined ? '' : val).replace(/['"\s]/g, '').trim();
+}
+
+function getUserSessionEpoch_(nip) {
+  const cleanNip = normalizeNipKey_(nip);
+  if (!cleanNip) return 0;
+
+  try {
+    const cached = CacheService.getScriptCache().get('sess_epoch_' + cleanNip);
+    if (cached) {
+      const parsedEpoch = parseInt(cached, 10);
+      if (!isNaN(parsedEpoch) && parsedEpoch > 0) return parsedEpoch;
+    }
+  } catch (e) {}
+
+  try {
+    const raw = PropertiesService.getScriptProperties().getProperty(USER_SESSION_EPOCH_PROP_KEY_);
+    if (!raw) return 0;
+    const map = JSON.parse(raw);
+    if (map && typeof map === 'object' && map[cleanNip]) {
+      const propEpoch = parseInt(map[cleanNip], 10) || 0;
+      if (propEpoch > 0) {
+        try {
+          CacheService.getScriptCache().put('sess_epoch_' + cleanNip, String(propEpoch), SESSION_CACHE_TTL_SEC_);
+        } catch (eC) {}
+        return propEpoch;
+      }
+    }
+  } catch (e) {}
+
+  return 0;
+}
+
+function setUserSessionEpoch_(nip, epochSec) {
+  const cleanNip = normalizeNipKey_(nip);
+  const val = Math.floor(Number(epochSec) || 0);
+  if (!cleanNip || val <= 0) return 0;
+
+  try {
+    CacheService.getScriptCache().put('sess_epoch_' + cleanNip, String(val), SESSION_CACHE_TTL_SEC_);
+  } catch (e) {}
+
+  try {
+    const props = PropertiesService.getScriptProperties();
+    const raw = props.getProperty(USER_SESSION_EPOCH_PROP_KEY_);
+    let map = {};
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) map = parsed;
+    }
+    const nowSec = Math.floor(Date.now() / 1000);
+    const maxAge = SESSION_TOKEN_TTL_SEC_ + 3600;
+    const pruned = {};
+    const keys = Object.keys(map);
+    for (let i = 0; i < keys.length; i++) {
+      const k = keys[i];
+      const ep = parseInt(map[k], 10) || 0;
+      if (ep > 0 && (nowSec - ep) <= maxAge) {
+        pruned[k] = ep;
+      }
+    }
+    pruned[cleanNip] = val;
+    props.setProperty(USER_SESSION_EPOCH_PROP_KEY_, JSON.stringify(pruned));
+  } catch (e) {}
+
+  return val;
 }
 
 function constantTimeEquals_(a, b) {
@@ -79,15 +145,18 @@ function getSessionSecret_() {
   return secret;
 }
 
-function signSessionToken_(nip, role) {
+function signSessionToken_(nip, role, customIatSec) {
   const cleanNip = normalizeNipKey_(nip);
   const nowSec = Math.floor(Date.now() / 1000);
+  const minEpoch = getUserSessionEpoch_(cleanNip);
+  const baseIat = Math.max(nowSec, minEpoch);
+  const iatSec = (Number(customIatSec) > baseIat) ? Math.floor(Number(customIatSec)) : baseIat;
   const jti = Utilities.getUuid().replace(/-/g, '').substring(0, 16);
   const payloadObj = {
     n: cleanNip,
     r: String(role || ''),
-    iat: nowSec,
-    exp: nowSec + SESSION_TOKEN_TTL_SEC_,
+    iat: iatSec,
+    exp: iatSec + SESSION_TOKEN_TTL_SEC_,
     jti: jti
   };
   const payloadB64 = Utilities.base64EncodeWebSafe(JSON.stringify(payloadObj)).replace(/=+$/, '');
@@ -194,6 +263,8 @@ function getVerifiedSession_(nip, clientToken) {
   const payload = parseAndVerifySignedToken_(clientToken);
   if (!payload || normalizeNipKey_(payload.n) !== cleanNip) return null;
   if (isJtiRevoked_(payload.jti)) return null;
+  const minEpoch = getUserSessionEpoch_(cleanNip);
+  if (minEpoch > 0 && Number(payload.iat || 0) < minEpoch) return null;
 
   const cache = CacheService.getScriptCache();
   try {
@@ -1419,17 +1490,17 @@ function logoutSession(nip, clientToken) {
 // 7. Gateway Otomatisasi WhatsApp (n8n + WAHA Gateway) - TRANSKEP Enterprise Engine v3.0
 function getGatewayConfig_() {
   const props = PropertiesService.getScriptProperties();
-  const rawUrl = props.getProperty('N8N_WEBHOOK_URL') || props.getProperty('WAHA_BASE_URL') || 'https://supernova-endpoint-unsubtly.ngrok-free.dev/webhook/transkep-gateway';
-  
-  let endpoint = rawUrl.trim().replace(/\/+$/, '');
-  if (!endpoint.includes('/webhook') && !endpoint.includes('/api/')) {
+  const rawUrl = props.getProperty('N8N_WEBHOOK_URL') || props.getProperty('WAHA_BASE_URL') || '';
+
+  let endpoint = String(rawUrl || '').trim().replace(/\/+$/, '');
+  if (endpoint && !endpoint.includes('/webhook') && !endpoint.includes('/api/')) {
     endpoint += '/webhook/transkep-gateway';
   }
-  
+
   return {
     endpoint: endpoint,
-    apiKey: props.getProperty('WAHA_API_KEY') || '192167ce5e0147dcb4eaaaff7eccfc18',
-    session: props.getProperty('WAHA_SESSION') || 'default'
+    apiKey: String(props.getProperty('WAHA_API_KEY') || '').trim(),
+    session: String(props.getProperty('WAHA_SESSION') || 'default').trim() || 'default'
   };
 }
 
@@ -1459,6 +1530,9 @@ function sendWhatsAppMessage_(rawPhone, text, metaPayload) {
     }
     
     const config = getGatewayConfig_();
+    if (!config.endpoint) {
+      return { status: 'error', message: 'Endpoint WA Gateway (N8N_WEBHOOK_URL) belum dikonfigurasi di Script Properties.' };
+    }
     
     // Payload terpadu untuk n8n Gateway
     const payload = {
@@ -1478,8 +1552,7 @@ function sendWhatsAppMessage_(rawPhone, text, metaPayload) {
       method: 'post',
       contentType: 'application/json',
       headers: {
-        'X-Api-Key': config.apiKey,
-        'ngrok-skip-browser-warning': 'true'
+        'X-Api-Key': config.apiKey
       },
       payload: JSON.stringify(payload),
       muteHttpExceptions: true
@@ -2168,11 +2241,13 @@ function getResetPasswordQueue(adminNip, clientToken) {
 // Fungsi Pengujian & Trigger Otorisasi Satu Kali (Wajib Tanpa Try-Catch agar Google memunculkan dialog Otorisasi)
 function mintaIzinUrlFetch() {
   const cfg = getGatewayConfig_();
-  const baseUrl = String(cfg.url || '').replace(/\/webhook.*$/i, '').replace(/\/api.*$/i, '').replace(/\/+$/, '');
+  if (!cfg.endpoint) {
+    throw new Error('Endpoint WA Gateway (N8N_WEBHOOK_URL) belum dikonfigurasi di Script Properties.');
+  }
+  const baseUrl = String(cfg.endpoint || '').replace(/\/webhook.*$/i, '').replace(/\/api.*$/i, '').replace(/\/+$/, '');
   const res = UrlFetchApp.fetch(baseUrl + "/api/sessions", {
     headers: {
-      'X-Api-Key': cfg.apiKey,
-      'ngrok-skip-browser-warning': 'true'
+      'X-Api-Key': cfg.apiKey
     }
   });
   Logger.log("Koneksi Berhasil: " + res.getContentText());
@@ -2227,23 +2302,61 @@ function markResetAsDone(reqId, adminNip, clientToken) {
 
 
 // ==========================================
-// TRANSKEP FASE 2: FUNGSI GANTI KATA SANDI (AMAN)
+// TRANSKEP FASE 2 + TAHAP 155: VALIDASI SANDI KUAT & GANTI SANDI AMAN
 // ==========================================
+var WEAK_PASSWORDS_MAP_ = {
+  '12345678': true,
+  '123456789': true,
+  '1234567890': true,
+  'password': true,
+  'password1': true,
+  'password123': true,
+  'qwerty123': true,
+  'admin123': true,
+  'admin1234': true,
+  'transkep': true,
+  'transkep123': true,
+  'pegawai123': true
+};
+
+function validateStrongPassword_(newPass, nip, oldPass) {
+  if (typeof newPass !== 'string' || newPass.length < 8) {
+    return { valid: false, message: 'Kata sandi baru minimal terdiri dari 8 karakter.' };
+  }
+  if (!/[A-Za-z]/.test(newPass) || !/[0-9]/.test(newPass)) {
+    return { valid: false, message: 'Kata sandi baru wajib mengandung kombinasi huruf dan angka.' };
+  }
+  if (oldPass !== undefined && oldPass !== null && String(oldPass) !== '' && newPass === String(oldPass)) {
+    return { valid: false, message: 'Kata sandi baru tidak boleh sama dengan kata sandi lama.' };
+  }
+  const cleanNip = normalizeNipKey_(nip);
+  if (cleanNip.length >= 6 && newPass.toLowerCase().indexOf(cleanNip.toLowerCase()) !== -1) {
+    return { valid: false, message: 'Kata sandi baru tidak boleh sama dengan atau memuat NIP Anda.' };
+  }
+  if (WEAK_PASSWORDS_MAP_[newPass.trim().toLowerCase()]) {
+    return { valid: false, message: 'Kata sandi terlalu umum dan mudah ditebak. Gunakan kombinasi yang lebih unik.' };
+  }
+  return { valid: true };
+}
+
 function changeMyPassword(nip, oldPass, newPass, clientToken) {
   try {
     // 1. Validasi Token Sesi (Mencegah Bypass)
-    if (!cekOtorisasi(nip, clientToken)) {
-        return { status: 'error', message: 'Akses Ditolak: Sesi tidak valid atau kedaluwarsa. Silakan login ulang.' };
+    const sess = getVerifiedSession_(nip, clientToken);
+    if (!sess) {
+      return { status: 'error', message: 'Akses Ditolak: Sesi tidak valid atau kedaluwarsa. Silakan login ulang.' };
     }
-    if (!newPass || String(newPass).length < 5) {
-        return { status: 'error', message: 'Kata sandi baru minimal terdiri dari 5 karakter.' };
+    const cleanTargetNip = normalizeNipKey_(sess.nip || nip);
+
+    const pwdCheck = validateStrongPassword_(newPass, cleanTargetNip, oldPass);
+    if (!pwdCheck.valid) {
+      return { status: 'error', message: pwdCheck.message };
     }
 
     // 2. Gunakan koneksi database terpusat
     const ss = getDB();
     const sheet = ss.getSheetByName('user_data');
     const data = readUserSheetDecrypted_(sheet);
-    const cleanTargetNip = normalizeNipKey_(nip);
 
     // 3. Cari pegawai dan verifikasi sandi lama
     for (let i = 1; i < data.length; i++) {
@@ -2260,8 +2373,23 @@ function changeMyPassword(nip, oldPass, newPass, clientToken) {
           cache.remove("force_reset_" + cleanTargetNip);
           cache.remove("force_reset_" + nip);
         } catch(e) {}
+
+        // 5. Cabut sesi saat ini + naikkan Session Epoch agar semua perangkat lain otomatis terputus
+        revokeSessionToken_(clientToken);
+        const epochSec = Math.floor(Date.now() / 1000) + 1;
+        setUserSessionEpoch_(cleanTargetNip, epochSec);
+        const liveRole = String(data[i][3] || sess.role || '');
+        const newSess = signSessionToken_(cleanTargetNip, liveRole, epochSec);
+        try {
+          CacheService.getScriptCache().put(
+            'sess_' + newSess.jti,
+            JSON.stringify({ nip: cleanTargetNip, role: liveRole }),
+            SESSION_CACHE_TTL_SEC_
+          );
+        } catch (eNewSess) {}
+
         bumpDataVersion();
-        return { status: 'success' };
+        return { status: 'success', token: newSess.token };
       }
     }
     return { status: 'error', message: 'Data pengguna tidak ditemukan di sistem.' };

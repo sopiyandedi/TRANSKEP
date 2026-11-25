@@ -91,11 +91,14 @@
           <div class="pt-2 border-t border-slate-800">
              <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 text-purple-400">Kata Sandi Baru</label>
              <div class="relative">
-                <input :type="showNewPass ? 'text' : 'password'" v-model="formPass.new" required placeholder="Buat Sandi Baru" class="w-full pl-4 pr-10 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-purple-500">
+                <input :type="showNewPass ? 'text' : 'password'" v-model="formPass.new" required minlength="8" placeholder="Min. 8 karakter (huruf & angka)" class="w-full pl-4 pr-10 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-purple-500">
                 <button type="button" @click="showNewPass = !showNewPass" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-purple-400 focus:outline-none">
                    <i :class="showNewPass ? 'fa-solid fa-eye' : 'fa-solid fa-eye-slash'" class="text-xs"></i>
                 </button>
              </div>
+             <p class="mt-1.5 text-[10px] text-slate-400 leading-relaxed">
+                Minimal 8 karakter, kombinasi huruf &amp; angka (bukan NIP). Sesi di perangkat lain akan otomatis keluar.
+             </p>
           </div>
 
           <div>

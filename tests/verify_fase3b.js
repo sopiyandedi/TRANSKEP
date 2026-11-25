@@ -2916,6 +2916,279 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
       'Kelola Pegawai must support bulk NIP matching + compression and single avatar editing'
     );
     console.log('[PASS] Tahap 154 Employee Profile Avatars (Firestore Rules, XSS URI Guard & Bulk NIP Upload) verified.');
+
+    // Tahap 155: Strong Password, Session Epoch Revocation, Gateway Clean & 7-Day Combined Backup
+    const codeSrc155 = fs.readFileSync('code.js', 'utf8');
+    assert(!codeSrc155.includes('ngrok-free.dev'), 'code.js must not contain legacy ngrok-free.dev fallback');
+    assert(!codeSrc155.includes('192167ce5e0147dcb4eaaaff7eccfc18'), 'code.js must not contain legacy hardcoded WAHA API key');
+
+    const prevHookUrl = propsStore.N8N_WEBHOOK_URL;
+    const prevWahaBase = propsStore.WAHA_BASE_URL;
+    const prevWahaKey = propsStore.WAHA_API_KEY;
+    delete propsStore.N8N_WEBHOOK_URL;
+    delete propsStore.WAHA_BASE_URL;
+    delete propsStore.WAHA_API_KEY;
+    try {
+      const emptyCfg = gasSandbox.getGatewayConfig_();
+      assert.strictEqual(emptyCfg.endpoint, '', 'getGatewayConfig_ must return empty endpoint when unconfigured');
+      assert.strictEqual(emptyCfg.apiKey, '', 'getGatewayConfig_ must return empty apiKey when unconfigured');
+      const noCfgSend = gasSandbox.sendWhatsAppMessage_('081234567890', 'Tes kosong');
+      assert.strictEqual(noCfgSend.status, 'error', 'sendWhatsAppMessage_ must reject missing endpoint cleanly');
+    } finally {
+      if (prevHookUrl !== undefined) propsStore.N8N_WEBHOOK_URL = prevHookUrl;
+      if (prevWahaBase !== undefined) propsStore.WAHA_BASE_URL = prevWahaBase;
+      if (prevWahaKey !== undefined) propsStore.WAHA_API_KEY = prevWahaKey;
+    }
+
+    const coreSrc155 = fs.readFileSync('core/core.js', 'utf8');
+    const modalSrc155 = fs.readFileSync('core/view_global_modals.html', 'utf8');
+    assert(
+      coreSrc155.includes('newPass.length < 8') &&
+      coreSrc155.includes('SessionIntegrityGuard.sealSession') &&
+      modalSrc155.includes('minlength="8"'),
+      'Frontend password modal and core.js must enforce >=8 chars and reseal rotated token'
+    );
+
+    // Password policy + multi-device Session Epoch Revocation test on Pegawai B
+    const pegBDev1 = gasSandbox.verifyLogin(pegB.data.nip, 'pegBPass123');
+    const pegBDev2 = gasSandbox.verifyLogin(pegB.data.nip, 'pegBPass123');
+    assert.strictEqual(pegBDev1.status, 'success');
+    assert.strictEqual(pegBDev2.status, 'success');
+    assert.strictEqual(gasSandbox.cekOtorisasi(pegB.data.nip, pegBDev1.token), true);
+    assert.strictEqual(gasSandbox.cekOtorisasi(pegB.data.nip, pegBDev2.token), true);
+
+    for (const weakPwd of ['Abc123!', 'Abcdefgh', '12345678', '1234567890', 'password123', 'Peg' + pegB.data.nip + '9', 'pegBPass123']) {
+      const badPwdRes = gasSandbox.changeMyPassword(pegB.data.nip, 'pegBPass123', weakPwd, pegBDev1.token);
+      assert.strictEqual(badPwdRes.status, 'error', `Weak/invalid password must be rejected: ${weakPwd}`);
+    }
+
+    const strongOk = gasSandbox.changeMyPassword(pegB.data.nip, 'pegBPass123', 'AmanBaru2026!', pegBDev1.token);
+    assert.strictEqual(strongOk.status, 'success', 'Strong password change must succeed');
+    assert(strongOk.token && strongOk.token !== pegBDev1.token, 'changeMyPassword must mint fresh replacement token');
+    assert.strictEqual(gasSandbox.cekOtorisasi(pegB.data.nip, pegBDev1.token), false, 'Old token (dev1) must be revoked immediately');
+    assert.strictEqual(gasSandbox.cekOtorisasi(pegB.data.nip, pegBDev2.token), false, 'Sibling token (dev2) must be revoked immediately by Session Epoch');
+    assert.strictEqual(gasSandbox.cekOtorisasi(pegB.data.nip, strongOk.token), true, 'New rotated token must stay valid');
+    gasSandbox.CacheService.getScriptCache().remove('sess_epoch_' + pegB.data.nip);
+    assert.strictEqual(gasSandbox.cekOtorisasi(pegB.data.nip, pegBDev2.token), false, 'Sibling token must stay rejected even after cache eviction');
+    const pegBRelogin = gasSandbox.verifyLogin(pegB.data.nip, 'AmanBaru2026!');
+    assert.strictEqual(pegBRelogin.status, 'success', 'Immediate re-login after changeMyPassword must succeed');
+    assert.strictEqual(gasSandbox.cekOtorisasi(pegB.data.nip, pegBRelogin.token), true, 'Token from immediate re-login must pass epoch check');
+
+    // Router must NOT expose scheduled backup entry points
+    const routerSrc155 = fs.readFileSync('api_router.js', 'utf8');
+    assert(
+      !routerSrc155.includes('jalankanBackupHarianTerjadwal') &&
+      !routerSrc155.includes('pasangTriggerBackupHarian'),
+      'api_router.js allowlists must never expose backup trigger functions'
+    );
+
+    // Combined Sheets + 11 Core Firestore Collections 7-day backup & cleanup & dry-run restore
+    assert.strictEqual(gasSandbox.BACKUP_RETENTION_DAYS_, 7, 'Backup retention must be 7 days');
+    const expectedCoreCols = [
+      'sk_documents', 'sop_documents', 'jobdes_documents', 'jobdes_usulan',
+      'master_kinerja', 'pkp_documents', 'pck_documents', 'pck_rekapitulasi',
+      'eoffice_kgb', 'eoffice_rapat', 'surat_tugas_documents'
+    ];
+    assert.deepStrictEqual(Array.from(gasSandbox.BACKUP_FIRESTORE_COLLECTIONS_), expectedCoreCols);
+    assert(!expectedCoreCols.includes('user_avatars') && !expectedCoreCols.includes('security_incidents') && !expectedCoreCols.includes('audit_logs'));
+
+    const origDriveApp155 = gasSandbox.DriveApp;
+    const origUrlFetch155 = gasSandbox.UrlFetchApp;
+    const origScriptApp155 = gasSandbox.ScriptApp;
+    const prevDbId155 = propsStore.TRANSKEP_DB_ID;
+    const prevSa155 = propsStore.FIREBASE_SERVICE_ACCOUNT_JSON;
+    const patchCalls155 = [];
+
+    try {
+      const { privateKey: bkPrivKey } = crypto.generateKeyPairSync('rsa', {
+        modulusLength: 2048,
+        privateKeyEncoding: { type: 'pkcs8', format: 'pem' }
+      });
+      propsStore.TRANSKEP_DB_ID = 'db-sheet-main-155';
+      propsStore.FIREBASE_SERVICE_ACCOUNT_JSON = JSON.stringify({
+        project_id: 'transkep-314c0',
+        client_email: 'backup-sa@transkep-314c0.iam.gserviceaccount.com',
+        private_key: bkPrivKey
+      });
+      gasSandbox.CacheService.getScriptCache().remove('transkep_fs_sa_token_v1');
+
+      const nowMs = Date.now();
+      const dayMs = 24 * 60 * 60 * 1000;
+      const oldSubFolder = { name: '2026-11-10', created: new Date(nowMs - 10 * dayMs), trashed: false, getName: () => '2026-11-10', getDateCreated: () => oldSubFolder.created, setTrashed: (v) => { oldSubFolder.trashed = v; } };
+      const recentSubFolder = { name: '2026-11-21', created: new Date(nowMs - 4 * dayMs), trashed: false, getName: () => '2026-11-21', getDateCreated: () => recentSubFolder.created, setTrashed: (v) => { recentSubFolder.trashed = v; } };
+      const oldRootFile = { name: '[BACKUP] TRANSKEP_DB_10-11-2026', created: new Date(nowMs - 10 * dayMs), trashed: false, getName: () => '[BACKUP] TRANSKEP_DB_10-11-2026', getDateCreated: () => oldRootFile.created, setTrashed: (v) => { oldRootFile.trashed = v; } };
+      const recentRootFile = { name: '[BACKUP] TRANSKEP_DB_23-11-2026', created: new Date(nowMs - 2 * dayMs), trashed: false, getName: () => '[BACKUP] TRANSKEP_DB_23-11-2026', getDateCreated: () => recentRootFile.created, setTrashed: (v) => { recentRootFile.trashed = v; } };
+
+      const rootSubs = [oldSubFolder, recentSubFolder];
+      const rootFiles = [oldRootFile, recentRootFile];
+      const subFoldersByName = {};
+      const mockFilesById = {};
+
+      const makeSubFolderObj = (name) => {
+        const files = [];
+        const obj = {
+          _files: files,
+          getName: () => name,
+          getDateCreated: () => new Date(nowMs),
+          setTrashed: () => { },
+          getFiles: () => { let i = 0; return { hasNext: () => i < files.length, next: () => files[i++] }; },
+          getFilesByName: (n) => { const m = files.filter((f) => f.getName() === n); let i = 0; return { hasNext: () => i < m.length, next: () => m[i++] }; },
+          createFile: (blob) => {
+            const id = 'fs-json-' + (files.length + 1);
+            const fObj = {
+              _trashed: false,
+              getId: () => id,
+              getName: () => blob.getName(),
+              setTrashed: (v) => { fObj._trashed = v; },
+              getBlob: () => makeMockBlob(blob.getDataAsString(), 'application/json', blob.getName())
+            };
+            files.push(fObj);
+            mockFilesById[id] = fObj;
+            return fObj;
+          }
+        };
+        subFoldersByName[name] = obj;
+        rootSubs.push(obj);
+        return obj;
+      };
+
+      const rootBackupFolder = {
+        getName: () => 'TRANSKEP BACKUPS',
+        getFolders: () => { let i = 0; return { hasNext: () => i < rootSubs.length, next: () => rootSubs[i++] }; },
+        getFoldersByName: (n) => { const m = subFoldersByName[n] ? [subFoldersByName[n]] : []; let i = 0; return { hasNext: () => i < m.length, next: () => m[i++] }; },
+        createFolder: (n) => makeSubFolderObj(n),
+        getFiles: () => { let i = 0; return { hasNext: () => i < rootFiles.length, next: () => rootFiles[i++] }; }
+      };
+
+      mockFilesById['db-sheet-main-155'] = {
+        getId: () => 'db-sheet-main-155',
+        makeCopy: (copyName, destFolder) => {
+          const cf = {
+            _trashed: false,
+            getId: () => 'copy-' + copyName,
+            getName: () => copyName,
+            setTrashed: (v) => { cf._trashed = v; }
+          };
+          destFolder._files.push(cf);
+          return cf;
+        }
+      };
+
+      gasSandbox.DriveApp = {
+        getFoldersByName: (name) => ({ hasNext: () => name === 'TRANSKEP BACKUPS', next: () => rootBackupFolder }),
+        createFolder: () => rootBackupFolder,
+        getFileById: (id) => {
+          if (!mockFilesById[id]) throw new Error('Mock file not found: ' + id);
+          return mockFilesById[id];
+        }
+      };
+
+      gasSandbox.UrlFetchApp = {
+        fetch: (url, opts) => {
+          const method = String((opts && opts.method) || 'get').toLowerCase();
+          if (url.includes('oauth2.googleapis.com/token')) {
+            return { getResponseCode: () => 200, getContentText: () => JSON.stringify({ access_token: 'mock-backup-sa-token', expires_in: 3600 }) };
+          }
+          if (method === 'patch') {
+            patchCalls155.push({ url, opts });
+            return { getResponseCode: () => 200, getContentText: () => '{}' };
+          }
+          if (url.includes('/documents/pkp_documents')) {
+            if (!url.includes('pageToken=page2')) {
+              return {
+                getResponseCode: () => 200,
+                getContentText: () => JSON.stringify({
+                  documents: [{ name: 'projects/transkep-314c0/databases/(default)/documents/pkp_documents/PKP-1', fields: { status: { stringValue: 'Final' } } }],
+                  nextPageToken: 'page2'
+                })
+              };
+            }
+            return {
+              getResponseCode: () => 200,
+              getContentText: () => JSON.stringify({
+                documents: [{ name: 'projects/transkep-314c0/databases/(default)/documents/pkp_documents/PKP-2', fields: { status: { stringValue: 'Draft' } } }]
+              })
+            };
+          }
+          const colMatch = url.match(/\/documents\/([^?]+)/);
+          const colName = colMatch ? decodeURIComponent(colMatch[1]) : 'unknown';
+          return {
+            getResponseCode: () => 200,
+            getContentText: () => JSON.stringify({
+              documents: [{ name: `projects/transkep-314c0/databases/(default)/documents/${colName}/DOC-1`, fields: { id: { stringValue: 'DOC-1' } } }]
+            })
+          };
+        }
+      };
+
+      const deletedTriggers = [];
+      const createdTriggers = [];
+      gasSandbox.ScriptApp = {
+        getProjectTriggers: () => [
+          { getHandlerFunction: () => 'runDailyBackup_', _id: 't1' },
+          { getHandlerFunction: () => 'otherTrigger', _id: 't2' }
+        ],
+        deleteTrigger: (t) => deletedTriggers.push(t.getHandlerFunction()),
+        newTrigger: (fnName) => ({
+          timeBased: () => ({
+            atHour: (hr) => ({
+              everyDays: (days) => ({
+                inTimezone: (tz) => ({
+                  create: () => createdTriggers.push({ fnName, hr, days, tz })
+                })
+              })
+            })
+          })
+        })
+      };
+
+      const trigRes = gasSandbox.pasangTriggerBackupHarian();
+      assert.strictEqual(trigRes.status, 'success');
+      assert.deepStrictEqual(deletedTriggers, ['runDailyBackup_']);
+      assert.deepStrictEqual(createdTriggers, [{ fnName: 'jalankanBackupHarianTerjadwal', hr: 1, days: 1, tz: 'Asia/Jakarta' }]);
+
+      const bkRes = gasSandbox.jalankanBackupHarianTerjadwal();
+      assert.strictEqual(bkRes.status, 'success', 'Combined daily backup must succeed: ' + (bkRes && bkRes.message));
+      assert.strictEqual(bkRes.firestoreErrors.length, 0);
+      assert.strictEqual(bkRes.firestoreDocs, 12, '10 collections x 1 + pkp_documents paginated 2 = 12 docs');
+      assert.strictEqual(oldSubFolder.trashed, true, '>7-day backup subfolder must be trashed');
+      assert.strictEqual(oldRootFile.trashed, true, '>7-day legacy root backup file must be trashed');
+      assert.strictEqual(recentSubFolder.trashed, false, '<=7-day backup subfolder must be retained');
+      assert.strictEqual(recentRootFile.trashed, false, '<=7-day recent root backup file must be retained');
+
+      const todayFolder = subFoldersByName[bkRes.dateFolder];
+      const jsonFile = todayFolder._files.find((f) => f.getName() === bkRes.firestoreFile);
+      const sheetsCopyFile = todayFolder._files.find((f) => f.getName() === bkRes.sheetsFile);
+      assert(jsonFile && sheetsCopyFile, 'Both Sheets copy and Firestore JSON must be saved in today subfolder');
+
+      const exportedObj = JSON.parse(jsonFile.getBlob().getDataAsString());
+      assert.strictEqual(exportedObj.total_documents, 12);
+      assert.strictEqual(exportedObj.collections.pkp_documents.length, 2, 'Paginated collection must merge pages');
+      assert(!exportedObj.collections.user_avatars && !exportedObj.collections.security_incidents && !exportedObj.collections.audit_logs);
+
+      // Verify restoreFirestoreBackup_ dryRun filters disallowed collections & executes 0 PATCHes
+      exportedObj.collections.user_avatars = [{ name: 'projects/transkep-314c0/databases/(default)/documents/user_avatars/1980', fields: {} }];
+      mockFilesById['json-tamper-test'] = {
+        getBlob: () => makeMockBlob(JSON.stringify(exportedObj), 'application/json', 'tamper.json')
+      };
+      const dryRestore = gasSandbox.restoreFirestoreBackup_('json-tamper-test', true);
+      assert.strictEqual(dryRestore.status, 'success');
+      assert.strictEqual(dryRestore.dryRun, true);
+      assert.strictEqual(dryRestore.restoredCount, 12);
+      assert.strictEqual(dryRestore.skippedCount, 1, 'Excluded/disallowed collection docs must be skipped');
+      assert.strictEqual(patchCalls155.length, 0, 'Dry-run restore must make 0 Firestore PATCH calls');
+    } finally {
+      gasSandbox.DriveApp = origDriveApp155;
+      gasSandbox.UrlFetchApp = origUrlFetch155;
+      gasSandbox.ScriptApp = origScriptApp155;
+      gasSandbox.CacheService.getScriptCache().remove('transkep_fs_sa_token_v1');
+      if (prevDbId155 !== undefined) propsStore.TRANSKEP_DB_ID = prevDbId155;
+      else delete propsStore.TRANSKEP_DB_ID;
+      if (prevSa155 !== undefined) propsStore.FIREBASE_SERVICE_ACCOUNT_JSON = prevSa155;
+      else delete propsStore.FIREBASE_SERVICE_ACCOUNT_JSON;
+    }
+
+    console.log('[PASS] Tahap 155 Security Hardening (Strong Password, Session Epoch, Gateway Clean & 7-Day Backup) verified.');
   } finally {
     browserSandbox.TranskepAPI.call = origApiCall;
     browserSandbox.TranskepFirebase.getDb = origGetDb;
