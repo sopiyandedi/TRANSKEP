@@ -147,7 +147,7 @@
 
   <!-- TRANSKEP: Auto-Bust PWA Cache & Stale Service Worker Guard -->
   <script>
-    window.APP_BUILD_VER = '3.8.96';
+    window.APP_BUILD_VER = '3.8.97';
     (async function () {
       const CURRENT_APP_BUILD = 'transkep-v' + window.APP_BUILD_VER;
       if (localStorage.getItem('transkep_active_build') !== CURRENT_APP_BUILD) {
@@ -420,6 +420,7 @@
   <!-- 3. SLOT GLOBAL MODALS (VUE ENGINE)                        -->
   <!-- ========================================================= -->
   <div id="slot-global-modals"></div>
+  <div id="slot-aktivitas"></div>
   <div id="slot-magic-approval"></div>
 
   <!-- ========================================================= -->
@@ -446,6 +447,7 @@
         { slot: 'slot-referensi', file: 'modules/referensi/view_referensi.html' },
         { slot: 'slot-mobile-nav', file: 'core/view_mobile_nav.html' },
         { slot: 'slot-global-modals', file: 'core/view_global_modals.html' },
+        { slot: 'slot-aktivitas', file: 'modules/aktivitas/view_aktivitas.html' },
         { slot: 'slot-magic-approval', file: 'modules/permohonan/view_magic_approval.html' }
       ];
 
@@ -517,6 +519,7 @@
         'modules/eoffice/kgb.js',
         'modules/eoffice/rapat.js',
         'modules/pegawai/pegawai.js',
+        'modules/aktivitas/aktivitas.js',
         'modules/referensi/referensi.js'
       ];
 
@@ -540,7 +543,7 @@
       ];
 
       try {
-        const APP_BUILD_VER = window.APP_BUILD_VER || '3.8.96';
+        const APP_BUILD_VER = window.APP_BUILD_VER || '3.8.97';
         console.log('🔄 [TRANSKEP Loader] Memuat komponen tampilan views/ secara paralel...');
         await Promise.all(VIEW_SLOTS.map(async item => {
           const res = await fetch(item.file + '?v=' + APP_BUILD_VER, { cache: 'no-cache' });

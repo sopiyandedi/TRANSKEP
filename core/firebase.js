@@ -310,6 +310,81 @@ const TranskepFirebase = {
   },
 
   // ==========================================
+  // OPERASI AUDIT LOG AKTIVITAS & INSIDEN KEAMANAN (ADMIN ONLY READ)
+  // ==========================================
+  AUDIT_LOGS_COLLECTION: 'audit_logs',
+  SECURITY_INCIDENTS_COLLECTION: 'security_incidents',
+
+  isStrictAdminCaller() {
+    const id = this.getCallerIdentity();
+    return ['admin', 'super admin', 'administrator'].includes(String((id && id.role) || '').trim().toLowerCase());
+  },
+
+  async logAuditActivity(entry) {
+    try {
+      const db = this.getDb();
+      if (!db || !this._authReady || !entry || typeof entry !== 'object') return false;
+      const caller = this.getCallerIdentity();
+      const actorNip = String(entry.actor_nip || caller.nip || '').replace(/['"\s]/g, '').trim();
+      if (!actorNip) return false;
+
+      const uObj = (typeof state !== 'undefined' && state.user) ? state.user : null;
+      const actorNama = String(entry.actor_nama || (uObj && uObj.nama) || '').trim().slice(0, 150);
+      const actorRole = String(entry.actor_role || (uObj && uObj.role) || caller.role || '').trim().slice(0, 150);
+
+      const allowedKat = { LOGIN: true, PEGAWAI: true, CUTI: true, DOKUMEN: true, KEAMANAN: true, SISTEM: true };
+      const katRaw = String(entry.kategori || 'SISTEM').trim().toUpperCase();
+      const kategori = allowedKat[katRaw] ? katRaw : 'SISTEM';
+      const sevRaw = String(entry.severity || 'info').trim().toLowerCase();
+      const severity = (sevRaw === 'warning' || sevRaw === 'critical') ? sevRaw : 'info';
+      const docId = 'AUD-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
+      const waktu = new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }).slice(0, 150);
+
+      await db.collection(this.AUDIT_LOGS_COLLECTION).doc(docId).set({
+        id: docId,
+        waktu: waktu,
+        actor_nip: actorNip.slice(0, 50),
+        actor_nama: actorNama,
+        actor_role: actorRole,
+        kategori: kategori,
+        aksi: String(entry.aksi || 'AKSI_SISTEM').trim().slice(0, 100),
+        target: String(entry.target || '').trim().slice(0, 150),
+        detail: String(entry.detail || '').trim().slice(0, 1000),
+        sumber: 'client',
+        severity: severity,
+        timestamp: this._serverTimestamp()
+      });
+      return true;
+    } catch (e) {
+      return false;
+    }
+  },
+
+  async getFirestoreAuditLogs(limitCount = 250) {
+    const db = this.getDb();
+    if (!db || !(await this._ensureAuthForRead(true)) || !this.isStrictAdminCaller()) return [];
+    const maxDocs = Math.min(500, Math.max(10, Number(limitCount) || 250));
+    const snapshot = await db.collection(this.AUDIT_LOGS_COLLECTION).orderBy('timestamp', 'desc').limit(maxDocs).get();
+    const list = [];
+    snapshot.forEach(doc => {
+      list.push(Object.assign({ id: doc.id }, doc.data()));
+    });
+    return list;
+  },
+
+  async getFirestoreSecurityIncidents(limitCount = 150) {
+    const db = this.getDb();
+    if (!db || !(await this._ensureAuthForRead(true)) || !this.isStrictAdminCaller()) return [];
+    const maxDocs = Math.min(500, Math.max(10, Number(limitCount) || 150));
+    const snapshot = await db.collection(this.SECURITY_INCIDENTS_COLLECTION).orderBy('timestamp', 'desc').limit(maxDocs).get();
+    const list = [];
+    snapshot.forEach(doc => {
+      list.push(Object.assign({ id: doc.id }, doc.data()));
+    });
+    return list;
+  },
+
+  // ==========================================
   // OPERASI DOKUMEN SURAT KEPUTUS (SK)
   // ==========================================
   SK_COLLECTION: 'sk_documents',
@@ -355,6 +430,7 @@ const TranskepFirebase = {
     }
 
     await this._writeDocWithDiagnostics(db, this.SK_COLLECTION, docId, payload, this.SK_ALLOWED_FIELDS);
+    this.logAuditActivity({ kategori: 'DOKUMEN', aksi: 'SIMPAN_SK', target: docId, detail: 'Menyimpan/memperbarui SK: ' + payload.judul_sk });
     return { status: 'success', id: docId, data: payload };
   },
 
@@ -365,7 +441,9 @@ const TranskepFirebase = {
     const db = this.getDb();
     if (!db) throw new Error("Cloud Firestore belum siap terhubung.");
     await this._waitAuthForWrite('deleteSkFromFirestore');
-    await db.collection(this.SK_COLLECTION).doc(String(docId).trim()).delete();
+    const cleanId = String(docId).trim();
+    await db.collection(this.SK_COLLECTION).doc(cleanId).delete();
+    this.logAuditActivity({ kategori: 'DOKUMEN', aksi: 'HAPUS_SK', target: cleanId, detail: 'Menghapus dokumen SK ' + cleanId, severity: 'warning' });
     return { status: 'success', message: 'Dokumen SK berhasil dihapus dari Cloud Firestore.' };
   },
 
@@ -727,6 +805,7 @@ const TranskepFirebase = {
     }
 
     await this._writeDocWithDiagnostics(db, this.SOP_COLLECTION, docId, payload, this.SOP_ALLOWED_FIELDS);
+    this.logAuditActivity({ kategori: 'DOKUMEN', aksi: 'SIMPAN_SOP', target: docId, detail: 'Menyimpan/memperbarui SOP: ' + payload.judul_sop });
     return { status: 'success', id: docId, data: payload, message: 'Dokumen SOP berhasil disimpan di Cloud Firestore.' };
   },
 
@@ -739,6 +818,7 @@ const TranskepFirebase = {
     await this._waitAuthForWrite('deleteSopFromFirestore');
     const cleanId = String(docId).trim();
     await db.collection(this.SOP_COLLECTION).doc(cleanId).delete();
+    this.logAuditActivity({ kategori: 'DOKUMEN', aksi: 'HAPUS_SOP', target: cleanId, detail: 'Menghapus dokumen SOP ' + cleanId, severity: 'warning' });
     return { status: 'success', message: 'Dokumen SOP berhasil dihapus dari Cloud Firestore.' };
   },
 
@@ -1594,6 +1674,7 @@ const TranskepFirebase = {
     }
 
     await this._writeDocWithDiagnostics(db, this.EOFFICE_KGB_COLLECTION, docId, payload, this.EOFFICE_KGB_ALLOWED_FIELDS);
+    this.logAuditActivity({ kategori: 'DOKUMEN', aksi: 'SIMPAN_KGB', target: docId, detail: 'Menyimpan dokumen KGB: ' + (payload.nama_pegawai || payload.nip) });
     return { status: 'success', id: docId, data: payload };
   },
 
@@ -1604,7 +1685,9 @@ const TranskepFirebase = {
     const db = this.getDb();
     if (!db) throw new Error("Cloud Firestore belum siap terhubung.");
     await this._waitAuthForWrite('deleteKgbFromFirestore');
-    await db.collection(this.EOFFICE_KGB_COLLECTION).doc(String(docId).trim()).delete();
+    const cleanId = String(docId).trim();
+    await db.collection(this.EOFFICE_KGB_COLLECTION).doc(cleanId).delete();
+    this.logAuditActivity({ kategori: 'DOKUMEN', aksi: 'HAPUS_KGB', target: cleanId, detail: 'Menghapus dokumen KGB ' + cleanId, severity: 'warning' });
     return { status: 'success', message: 'Data KGB berhasil dihapus dari Cloud Firestore.' };
   },
 
@@ -1725,6 +1808,7 @@ const TranskepFirebase = {
     }
 
     await this._writeDocWithDiagnostics(db, this.EOFFICE_RAPAT_COLLECTION, docId, payload, this.EOFFICE_RAPAT_ALLOWED_FIELDS);
+    this.logAuditActivity({ kategori: 'DOKUMEN', aksi: 'SIMPAN_RAPAT', target: docId, detail: 'Menyimpan paket rapat: ' + (payload.agenda || docId) });
     return { status: 'success', id: docId, data: payload };
   },
 
@@ -1735,7 +1819,9 @@ const TranskepFirebase = {
     const db = this.getDb();
     if (!db) throw new Error("Cloud Firestore belum siap terhubung.");
     await this._waitAuthForWrite('deleteRapatFromFirestore');
-    await db.collection(this.EOFFICE_RAPAT_COLLECTION).doc(String(docId).trim()).delete();
+    const cleanId = String(docId).trim();
+    await db.collection(this.EOFFICE_RAPAT_COLLECTION).doc(cleanId).delete();
+    this.logAuditActivity({ kategori: 'DOKUMEN', aksi: 'HAPUS_RAPAT', target: cleanId, detail: 'Menghapus paket rapat ' + cleanId, severity: 'warning' });
     return { status: 'success', message: 'Data Rapat berhasil dihapus dari Cloud Firestore.' };
   },
 
@@ -1872,6 +1958,7 @@ const TranskepFirebase = {
     };
 
     await this._writeDocWithDiagnostics(db, this.USER_AVATARS_COLLECTION, cleanNip, payload, this.USER_AVATARS_ALLOWED_FIELDS, { adminOnly: true });
+    this.logAuditActivity({ kategori: 'PEGAWAI', aksi: 'UPLOAD_FOTO_PEGAWAI', target: cleanNip, detail: 'Memperbarui foto profil pegawai NIP ' + cleanNip });
     return { status: 'success', nip: cleanNip, data: payload };
   },
 
@@ -1885,6 +1972,7 @@ const TranskepFirebase = {
     const cleanNip = this._normNip(nip);
     if (!cleanNip) throw new Error("NIP pegawai wajib diisi.");
     await db.collection(this.USER_AVATARS_COLLECTION).doc(cleanNip).delete();
+    this.logAuditActivity({ kategori: 'PEGAWAI', aksi: 'HAPUS_FOTO_PEGAWAI', target: cleanNip, detail: 'Menghapus foto profil pegawai NIP ' + cleanNip, severity: 'warning' });
     return { status: 'success', nip: cleanNip };
   },
 

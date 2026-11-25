@@ -73,6 +73,18 @@ function updateCutiStatus(id, decision, notes, userNip, bypassMode, clientToken)
       sheetCuti.getRange(rowIndex, 13).setValue(sf(finalNotes));
 
       if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush();
+      if (typeof logAuditEventServer_ === 'function') {
+        logAuditEventServer_({
+          actor_nip: cleanCallerNip,
+          actor_nama: namaPenyetuju,
+          actor_role: isAdmin ? 'Admin' : (isOperator ? 'Operator' : 'Pejabat'),
+          kategori: 'CUTI',
+          aksi: isBypassPejabat ? 'BYPASS_CUTI' : (decision === 'Disetujui' ? 'SETUJUI_CUTI' : 'TOLAK_CUTI'),
+          target: String(id || ''),
+          detail: 'Usulan pembatalan cuti NIP ' + norm(nip) + ' -> ' + decision + (isBypassPejabat ? ' (via Bypass)' : ''),
+          severity: isBypassPejabat ? 'warning' : 'info'
+        });
+      }
       return { status: 'success', message: `Usulan Pembatalan telah di-${decision.toLowerCase()}.` };
     }
 
@@ -152,6 +164,20 @@ function updateCutiStatus(id, decision, notes, userNip, bypassMode, clientToken)
       }
     }
     if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush();
+    if (typeof logAuditEventServer_ === 'function') {
+      const isBypassAny = Boolean(isBypassAtasan || isBypassPejabat);
+      const auditAksi = isBypassAny ? 'BYPASS_CUTI' : (decision === 'Disetujui' ? 'SETUJUI_CUTI' : 'TOLAK_CUTI');
+      logAuditEventServer_({
+        actor_nip: cleanCallerNip,
+        actor_nama: namaPenyetuju,
+        actor_role: isAdmin ? 'Admin' : (isOperator ? 'Operator' : (isPejabat ? 'Pejabat Berwenang' : 'Atasan Langsung')),
+        kategori: 'CUTI',
+        aksi: auditAksi,
+        target: String(id || ''),
+        detail: 'Keputusan cuti (' + jenis + ') NIP ' + norm(nip) + ': ' + decision + ' -> status ' + finalStatus + (isBypassAny ? ' (Bypass ' + String(bypassMode || '') + ')' : ''),
+        severity: isBypassAny ? 'warning' : 'info'
+      });
+    }
     return { status: 'success', message: `Berkas berhasil ${decision.toLowerCase()}.` };
   } catch (err) { return { status: 'error', message: err.toString() }; }
 }

@@ -85,7 +85,8 @@ const specs = {
   eoffice_rapat: extractValidatorSpec('isValidEofficeRapat'),
   surat_tugas_documents: extractValidatorSpec('isValidSuratTugas'),
   security_incidents: extractValidatorSpec('isValidSecurityIncident'),
-  user_avatars: extractValidatorSpec('isValidUserAvatar')
+  user_avatars: extractValidatorSpec('isValidUserAvatar'),
+  audit_logs: extractValidatorSpec('isValidAuditLog')
 };
 
 const validatorNamesBySpec = [
@@ -101,7 +102,8 @@ const validatorNamesBySpec = [
   ['eoffice_rapat', 'isValidEofficeRapat'],
   ['surat_tugas_documents', 'isValidSuratTugas'],
   ['security_incidents', 'isValidSecurityIncident'],
-  ['user_avatars', 'isValidUserAvatar']
+  ['user_avatars', 'isValidUserAvatar'],
+  ['audit_logs', 'isValidAuditLog']
 ];
 let maxEstimatedExpr = 0;
 let rapatEstimatedExpr = 0;
@@ -264,6 +266,16 @@ assert(TF && typeof TF === 'object', 'TranskepFirebase failed to load');
 
   assert.strictEqual(capturedWrites.length, 16, `Expected 16 captured writes from core/firebase.js, got ${capturedWrites.length}`);
 
+  TF._authReady = true;
+  await TF.logAuditActivity({
+    kategori: 'SISTEM',
+    aksi: 'UJI_SKEMA_AUDIT',
+    target: 'audit_logs',
+    detail: 'Verifikasi kompatibilitas skema audit_logs terhadap firestore.rules'
+  });
+  TF._authReady = false;
+  assert.strictEqual(capturedWrites.length, 17, 'logAuditActivity must emit schema-valid write to audit_logs when _authReady=true');
+
   for (const w of capturedWrites) {
     const spec = specs[w.colName];
     assert(spec, `No firestore.rules validator spec registered for ${w.colName}`);
@@ -342,7 +354,7 @@ assert(TF && typeof TF === 'object', 'TranskepFirebase failed to load');
   assert(getterMatches.length >= 9, `Expected >= 9 getFirestore* getters in core/firebase.js, found ${getterMatches.length}`);
   for (const [, name, body] of getterMatches) {
     assert(body.includes('_ensureAuthForRead('), `${name} must call this._ensureAuthForRead(...)`);
-    const needsAdmin = /Rekapitulasi|Kgbs|Rapats/.test(name);
+    const needsAdmin = /Rekapitulasi|Kgbs|Rapats|AuditLogs|SecurityIncidents/.test(name);
     if (needsAdmin) {
       assert(body.includes('_ensureAuthForRead(true)'), `${name} must enforce _ensureAuthForRead(true)`);
     }

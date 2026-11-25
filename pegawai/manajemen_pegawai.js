@@ -44,6 +44,16 @@ function addUser(payload, adminNip, clientToken) {
     sheet.getRange(lastRow, 16).setNumberFormat('@');
     
     if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush();
+    if (typeof logAuditEventServer_ === 'function') {
+      logAuditEventServer_({
+        actor_nip: adminNip,
+        kategori: 'PEGAWAI',
+        aksi: 'TAMBAH_PEGAWAI',
+        target: String(payload.nip || ''),
+        detail: 'Menambahkan pegawai ' + String(payload.nama || '-') + ' (Role: ' + String(payload.role || 'Pegawai') + ')',
+        severity: 'info'
+      });
+    }
     return { status: 'success', message: 'Data pegawai baru berhasil ditambahkan dan dienkripsi.' };
   } catch (err) {
     return { status: 'error', message: err.toString() };
@@ -102,6 +112,16 @@ function updateUser(payload, adminNip, clientToken) {
     sheet.getRange(rowIndex, 26).setValue(sfVal(payload.jenis_jabatan || "Fungsional Umum"));
     
     if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush();
+    if (typeof logAuditEventServer_ === 'function') {
+      logAuditEventServer_({
+        actor_nip: adminNip,
+        kategori: 'PEGAWAI',
+        aksi: 'EDIT_PEGAWAI',
+        target: String(payload.nip || targetOriginalNip),
+        detail: 'Memperbarui data pegawai ' + String(payload.nama || '-') + ' (Role: ' + String(payload.role || 'Pegawai') + ')',
+        severity: 'info'
+      });
+    }
     return { status: 'success', message: 'Data profil pegawai berhasil diperbarui dan dienkripsi.' };
   } catch (err) {
     return { status: 'error', message: err.toString() };
@@ -119,9 +139,11 @@ function deleteUser(nip, adminNip, clientToken) {
     const data = readUserSheetDecrypted_(sheet);
     
     let rowIndex = -1;
+    let deletedNama = '';
     for (let i = 1; i < data.length; i++) {
       if (String(data[i][0]) === String(nip)) {
         rowIndex = i + 1;
+        deletedNama = String(data[i][1] || '');
         break;
       }
     }
@@ -130,6 +152,16 @@ function deleteUser(nip, adminNip, clientToken) {
     
     sheet.deleteRow(rowIndex);
     if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush();
+    if (typeof logAuditEventServer_ === 'function') {
+      logAuditEventServer_({
+        actor_nip: adminNip,
+        kategori: 'PEGAWAI',
+        aksi: 'HAPUS_PEGAWAI',
+        target: String(nip || ''),
+        detail: 'Menghapus permanen pegawai ' + (deletedNama || '-') + ' (NIP: ' + String(nip || '') + ')',
+        severity: 'warning'
+      });
+    }
     return { status: 'success', message: 'Data pegawai berhasil dihapus permanen.' };
   } catch (err) {
     return { status: 'error', message: err.toString() };
@@ -203,6 +235,17 @@ function importBulkUsers(jsonArray, adminNip, clientToken) {
     });
     
     if (typeof bumpDataVersion === "function") bumpDataVersion(); else SpreadsheetApp.flush();
+    if (typeof logAuditEventServer_ === 'function') {
+      const rowCnt = Array.isArray(jsonArray) ? jsonArray.length : 0;
+      logAuditEventServer_({
+        actor_nip: adminNip,
+        kategori: 'PEGAWAI',
+        aksi: 'IMPORT_PEGAWAI',
+        target: 'Massal (' + rowCnt + ' baris)',
+        detail: 'Sinkronisasi / impor massal ' + rowCnt + ' data pegawai dari Excel.',
+        severity: 'info'
+      });
+    }
     return { status: 'success', message: 'Import/Sinkronisasi excel ke database berhasil diproses dan dienkripsi.' };
   } catch(e) {
     return { status: 'error', message: e.toString() };

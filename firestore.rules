@@ -229,6 +229,22 @@ rules_version = '2';
 //   - updated_at: timestamp (required)
 //   - created_at: timestamp (optional)
 //
+// Collection: audit_logs
+// Document ID: {docId} (auto-generated via .add() or custom ID)
+// Fields:
+//   - id: string (optional, <=150)
+//   - waktu: string (optional, <=150)
+//   - actor_nip: string (required, 1..50, == uid() for non-admin)
+//   - actor_nama: string (optional, <=150)
+//   - actor_role: string (optional, <=150)
+//   - kategori: string (required, in ['LOGIN', 'PEGAWAI', 'CUTI', 'DOKUMEN', 'KEAMANAN', 'SISTEM'])
+//   - aksi: string (required, 1..100)
+//   - target: string (optional, <=150)
+//   - detail: string (optional, <=1000)
+//   - sumber: string (optional, in ['server', 'client'])
+//   - severity: string (optional, in ['info', 'warning', 'critical'])
+//   - timestamp: timestamp (required)
+//
 // =============================================================================
 
 service cloud.firestore {
@@ -763,6 +779,24 @@ service cloud.firestore {
              (!('created_at' in data) || isValidTimestamp(data.created_at));
     }
 
+    function isValidAuditLog(data) {
+      let allowed = ['id', 'waktu', 'actor_nip', 'actor_nama', 'actor_role', 'kategori', 'aksi', 'target', 'detail', 'sumber', 'severity', 'timestamp'];
+      return hasRequiredFields(['actor_nip', 'kategori', 'aksi', 'timestamp']) &&
+             hasOnlyAllowedFields(allowed) &&
+             data.actor_nip is string && data.actor_nip.size() >= 1 && data.actor_nip.size() <= 50 &&
+             data.kategori is string && data.kategori in ['LOGIN', 'PEGAWAI', 'CUTI', 'DOKUMEN', 'KEAMANAN', 'SISTEM'] &&
+             data.aksi is string && data.aksi.size() >= 1 && data.aksi.size() <= 100 &&
+             (!('severity' in data) || (data.severity is string && data.severity in ['info', 'warning', 'critical'])) &&
+             (!('sumber' in data) || (data.sumber is string && data.sumber in ['server', 'client'])) &&
+             isValidOptionalString(data, 'id', 0, 150) &&
+             isValidOptionalString(data, 'waktu', 0, 150) &&
+             isValidOptionalString(data, 'actor_nama', 0, 150) &&
+             isValidOptionalString(data, 'actor_role', 0, 150) &&
+             isValidOptionalString(data, 'target', 0, 150) &&
+             isValidOptionalString(data, 'detail', 0, 1000) &&
+             isValidTimestamp(data.timestamp);
+    }
+
     // =========================================================================
     // Collection Rules
     // =========================================================================
@@ -981,6 +1015,17 @@ service cloud.firestore {
       allow create, update: if isAdminOrOperator() &&
                                isValidUserAvatar(request.resource.data, nip);
       allow delete: if isAdminOrOperator();
+    }
+
+    // 14. Centralized Audit Logs - Admin-only read; authenticated users may
+    //     append their own log (actor_nip == uid()) or Admin may append any log;
+    //     strictly immutable append-only (no update/delete).
+    match /audit_logs/{docId} {
+      allow read: if isAdmin();
+      allow create: if isAuthenticated() &&
+                       isValidAuditLog(request.resource.data) &&
+                       (isAdmin() || request.resource.data.actor_nip == uid());
+      allow update, delete: if false;
     }
 
     // =========================================================================

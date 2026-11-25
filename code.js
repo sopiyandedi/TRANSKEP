@@ -1478,8 +1478,21 @@ function pulihkanSaldoCutiServer_(sheetUser, rowIndex, jenis, historyStr) {
 // 6. Revokasi Sesi Server-Side (CWE-613)
 function logoutSession(nip, clientToken) {
   try {
+    let callerSess = null;
     if (clientToken) {
+      callerSess = getVerifiedSession_(nip, clientToken);
       revokeSessionToken_(clientToken);
+    }
+    if (typeof logAuditEventServer_ === 'function') {
+      logAuditEventServer_({
+        actor_nip: (callerSess && callerSess.nip) || nip,
+        actor_role: (callerSess && callerSess.role) || '',
+        kategori: 'LOGIN',
+        aksi: 'LOGOUT',
+        target: normalizeNipKey_(nip),
+        detail: 'Pengguna keluar dari sesi portal TRANSKEP.',
+        severity: 'info'
+      });
     }
     return { status: 'success' };
   } catch (e) {
@@ -1586,6 +1599,16 @@ function verifyLogin(nip, pass) {
 
     const loginRlKey = 'login_' + cleanInputNip;
     if (checkRateLimitBlocked_(loginRlKey, 5)) {
+      if (typeof logAuditEventServer_ === 'function') {
+        logAuditEventServer_({
+          actor_nip: cleanInputNip,
+          kategori: 'KEAMANAN',
+          aksi: 'LOGIN_TERKUNCI',
+          target: cleanInputNip,
+          detail: 'Percobaan login ditolak karena akun terkunci sementara (5x gagal).',
+          severity: 'critical'
+        });
+      }
       return {
         status: 'error',
         message: 'Terlalu banyak percobaan login gagal. Akun dikunci sementara selama 10 menit demi keamanan.'
@@ -1648,11 +1671,36 @@ function verifyLogin(nip, pass) {
             } catch(e) {}
           }
           const fbToken = (typeof mintFirebaseCustomToken_ === 'function') ? mintFirebaseCustomToken_(user.nip, user.role) : null;
+          if (typeof logAuditEventServer_ === 'function') {
+            logAuditEventServer_({
+              actor_nip: cleanUserNip,
+              actor_nama: String(user.nama || ''),
+              actor_role: String(user.role || ''),
+              kategori: 'LOGIN',
+              aksi: 'LOGIN_BERHASIL',
+              target: cleanUserNip,
+              detail: isTempPass ? 'Berhasil masuk menggunakan kata sandi sementara.' : 'Berhasil masuk ke portal TRANSKEP.',
+              severity: 'info'
+            });
+          }
           return { status: 'success', data: user, token: sess.token, must_change_password: isTempPass, firebase_custom_token: fbToken };
         }
       }
     }
-    recordRateLimitHit_(loginRlKey, 5, 600, 600);
+    const failCnt = recordRateLimitHit_(loginRlKey, 5, 600, 600);
+    if (typeof logAuditEventServer_ === 'function') {
+      const isNowLocked = failCnt >= 5;
+      logAuditEventServer_({
+        actor_nip: cleanInputNip,
+        kategori: 'KEAMANAN',
+        aksi: isNowLocked ? 'LOGIN_TERKUNCI' : 'LOGIN_GAGAL',
+        target: cleanInputNip,
+        detail: isNowLocked
+          ? 'Gagal login ke-5 berturut-turut; akun dikunci sementara 10 menit.'
+          : ('Percobaan login gagal ke-' + failCnt + ' (NIP atau sandi salah).'),
+        severity: isNowLocked ? 'critical' : 'warning'
+      });
+    }
     return { status: 'error', message: 'NIP atau Sandi tidak valid' };
   } catch (e) { return { status: 'error', message: e.toString() }; }
 }
@@ -2164,8 +2212,23 @@ function requestPasswordReset(no_wa) {
       password_baru: tempPass
     });
 
+    const isWaDelivered = Boolean(waResult && waResult.status === 'success');
+    if (typeof logAuditEventServer_ === 'function') {
+      logAuditEventServer_({
+        actor_nip: normalizeNipKey_(userFound.nip),
+        actor_nama: String(userFound.nama || ''),
+        kategori: 'KEAMANAN',
+        aksi: 'RESET_SANDI_WA',
+        target: normalizeNipKey_(userFound.nip),
+        detail: isWaDelivered
+          ? 'Permintaan lupa kata sandi diproses dan dikirim ke WhatsApp pegawai.'
+          : 'Permintaan lupa kata sandi dicatat ke antrean Admin (WA gateway offline/gagal).',
+        severity: 'warning'
+      });
+    }
+
     // 3. Evaluasi Hasil Kirim WAHA
-    if (waResult && waResult.status === 'success') {
+    if (isWaDelivered) {
       // Jika berhasil kirim WA otomatis: bersihkan antrean lama di log_reset_pass untuk user ini
       try {
         let logSheet = ss.getSheetByName('log_reset_pass');
@@ -2389,6 +2452,18 @@ function changeMyPassword(nip, oldPass, newPass, clientToken) {
         } catch (eNewSess) {}
 
         bumpDataVersion();
+        if (typeof logAuditEventServer_ === 'function') {
+          logAuditEventServer_({
+            actor_nip: cleanTargetNip,
+            actor_nama: String(data[i][1] || ''),
+            actor_role: liveRole,
+            kategori: 'KEAMANAN',
+            aksi: 'GANTI_SANDI',
+            target: cleanTargetNip,
+            detail: 'Pegawai berhasil memperbarui kata sandi & memutus semua sesi lama.',
+            severity: 'info'
+          });
+        }
         return { status: 'success', token: newSess.token };
       }
     }
@@ -2802,6 +2877,62 @@ function firestoreRestPatch_(collectionName, docId, fieldMap) {
   } catch (e) {
     Logger.log('⚠️ [firestoreRestPatch_] ' + e.toString());
     return { ok: false, statusCode: 0, error: e.toString() };
+  }
+}
+
+/**
+ * Pencatat Audit Aktivitas Server-Side (Non-Blocking & Fail-Safe -> Firestore audit_logs)
+ * Hanya menulis ke Firestore REST apabila FIREBASE_SERVICE_ACCOUNT_JSON sudah terkonfigurasi.
+ */
+function logAuditEventServer_(entry) {
+  try {
+    if (!entry || typeof entry !== 'object') return false;
+    if (typeof parseFirebaseServiceAccount_ !== 'function' || !parseFirebaseServiceAccount_()) {
+      return false;
+    }
+
+    const allowedKat = { LOGIN: true, PEGAWAI: true, CUTI: true, DOKUMEN: true, KEAMANAN: true, SISTEM: true };
+    const allowedSev = { info: true, warning: true, critical: true };
+    const cleanStr = (v, maxLen, fb) => {
+      const s = String(v === undefined || v === null ? (fb || '') : v).trim();
+      return maxLen > 0 ? s.slice(0, maxLen) : s;
+    };
+
+    const kategoriRaw = cleanStr(entry.kategori, 20, 'SISTEM').toUpperCase();
+    const kategori = allowedKat[kategoriRaw] ? kategoriRaw : 'SISTEM';
+    const sevRaw = cleanStr(entry.severity, 20, 'info').toLowerCase();
+    const severity = allowedSev[sevRaw] ? sevRaw : 'info';
+    const actorNip = (typeof normalizeNipKey_ === 'function' ? normalizeNipKey_(entry.actor_nip) : cleanStr(entry.actor_nip, 50)) || 'SYSTEM';
+    const aksi = cleanStr(entry.aksi, 100, 'AKSI_SISTEM');
+    if (!aksi) return false;
+
+    const now = new Date();
+    let waktu = '';
+    try {
+      waktu = Utilities.formatDate(now, 'Asia/Jakarta', 'dd/MM/yyyy HH:mm:ss');
+    } catch (eFmt) {
+      waktu = now.toISOString();
+    }
+    const uidPart = Utilities.getUuid().replace(/-/g, '').slice(0, 8);
+    const docId = 'AUD-' + now.getTime() + '-' + uidPart;
+
+    const res = firestoreRestPatch_('audit_logs', docId, {
+      id: docId,
+      waktu: cleanStr(waktu, 50),
+      actor_nip: cleanStr(actorNip, 50),
+      actor_nama: cleanStr(entry.actor_nama, 150),
+      actor_role: cleanStr(entry.actor_role, 100),
+      kategori: kategori,
+      aksi: aksi,
+      target: cleanStr(entry.target, 150),
+      detail: cleanStr(entry.detail, 1000),
+      sumber: 'server',
+      severity: severity,
+      timestamp: { __timestamp: true }
+    });
+    return Boolean(res && res.ok);
+  } catch (e) {
+    return false;
   }
 }
 

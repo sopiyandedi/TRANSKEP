@@ -1,0 +1,241 @@
+  <!-- ========================================================= -->
+  <!-- MODAL LOG AKTIVITAS & MONITORING KEAMANAN (KHUSUS ADMIN) -->
+  <!-- ========================================================= -->
+  <div id="vue-modal-aktivitas" v-cloak>
+    <div v-if="showModal" id="modalAktivitasOverlay" @click.self="closeModal"
+      class="fixed inset-0 z-[9995] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-3 md:p-6 animate-fade-in">
+      <div class="glass border border-slate-800 bg-slate-900/95 rounded-3xl w-full max-w-5xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+
+        <!-- Header Modal -->
+        <div class="flex flex-wrap items-center justify-between gap-3 px-5 py-4 border-b border-slate-800/80 bg-slate-900/90 shrink-0">
+          <div class="flex items-center gap-3 min-w-0">
+            <div class="w-11 h-11 rounded-2xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400 text-lg shrink-0 shadow-lg shadow-cyan-500/10">
+              <i class="fa-solid fa-clock-rotate-left"></i>
+            </div>
+            <div class="min-w-0">
+              <h3 class="text-base md:text-lg font-bold text-white tracking-wide flex items-center gap-2 flex-wrap">
+                <span>Log Aktivitas &amp; Monitoring Keamanan</span>
+                <span class="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-full bg-cyan-500/15 border border-cyan-500/30 text-cyan-400">Khusus Admin</span>
+              </h3>
+              <p class="text-[11px] md:text-xs text-slate-400 mt-0.5">Rekam jejak login, perubahan data pegawai, persetujuan cuti, dokumen &amp; insiden keamanan.</p>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-2 shrink-0">
+            <button type="button" @click="refreshData" :disabled="isLoading"
+              class="px-3 py-2 bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-slate-200 rounded-xl text-xs font-bold transition flex items-center gap-1.5 disabled:opacity-50"
+              title="Muat Ulang Data Terbaru">
+              <i :class="isLoading ? 'fa-solid fa-rotate fa-spin text-cyan-400' : 'fa-solid fa-rotate text-cyan-400'"></i>
+              <span class="hidden sm:inline">Refresh</span>
+            </button>
+            <button type="button" @click="exportExcel" :disabled="activeRows.length === 0"
+              class="px-3 py-2 bg-emerald-500/10 hover:bg-emerald-600 border border-emerald-500/30 text-emerald-400 hover:text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 disabled:opacity-40"
+              title="Unduh Log ke Excel (.xlsx)">
+              <i class="fa-solid fa-file-excel"></i>
+              <span class="hidden sm:inline">Export Excel</span>
+            </button>
+            <button type="button" @click="closeModal"
+              class="w-9 h-9 flex items-center justify-center rounded-xl bg-slate-800/80 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 border border-slate-700/60 transition"
+              title="Tutup">
+              <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Body Scrollable Area -->
+        <div class="p-4 md:p-5 space-y-4 overflow-y-auto custom-scrollbar flex-1">
+
+          <!-- 4 Kartu Ringkasan -->
+          <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <div class="bg-slate-950/70 border border-slate-800/80 rounded-2xl p-3.5 shadow-inner">
+              <p class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Aktivitas Hari Ini</p>
+              <div class="flex items-baseline justify-between mt-1.5">
+                <p class="text-2xl font-black text-white">{{ summaryStats.todayTotal }}</p>
+                <i class="fa-solid fa-bolt text-cyan-400 text-sm"></i>
+              </div>
+            </div>
+            <div class="bg-slate-950/70 border border-emerald-500/20 rounded-2xl p-3.5 shadow-inner">
+              <p class="text-[10px] font-bold uppercase tracking-wider text-emerald-400">Login Berhasil Hari Ini</p>
+              <div class="flex items-baseline justify-between mt-1.5">
+                <p class="text-2xl font-black text-emerald-400">{{ summaryStats.todayLogins }}</p>
+                <i class="fa-solid fa-right-to-bracket text-emerald-400 text-sm"></i>
+              </div>
+            </div>
+            <div class="bg-slate-950/70 border border-indigo-500/20 rounded-2xl p-3.5 shadow-inner">
+              <p class="text-[10px] font-bold uppercase tracking-wider text-indigo-400">Aksi Sensitif / Data</p>
+              <div class="flex items-baseline justify-between mt-1.5">
+                <p class="text-2xl font-black text-indigo-400">{{ summaryStats.sensitiveActions }}</p>
+                <i class="fa-solid fa-user-shield text-indigo-400 text-sm"></i>
+              </div>
+            </div>
+            <div class="bg-slate-950/70 border border-rose-500/20 rounded-2xl p-3.5 shadow-inner">
+              <p class="text-[10px] font-bold uppercase tracking-wider text-rose-400">Peringatan &amp; Insiden</p>
+              <div class="flex items-baseline justify-between mt-1.5">
+                <p class="text-2xl font-black text-rose-400">{{ summaryStats.securityAlerts }}</p>
+                <i class="fa-solid fa-triangle-exclamation text-rose-400 text-sm"></i>
+              </div>
+            </div>
+          </div>
+
+          <!-- Bar Tab & Filter -->
+          <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3 bg-slate-950/50 border border-slate-800/70 p-3 rounded-2xl">
+            <div class="flex items-center gap-2 shrink-0">
+              <button type="button" @click="activeTab = 'audit'"
+                :class="activeTab === 'audit' ? 'bg-cyan-600 text-white shadow-lg shadow-cyan-600/20' : 'bg-slate-800/70 text-slate-400 hover:text-slate-200'"
+                class="px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2">
+                <i class="fa-solid fa-list-check"></i>
+                <span>Aktivitas Sistem ({{ filteredAuditLogs.length }})</span>
+              </button>
+              <button type="button" @click="activeTab = 'incidents'"
+                :class="activeTab === 'incidents' ? 'bg-rose-600 text-white shadow-lg shadow-rose-600/20' : 'bg-slate-800/70 text-slate-400 hover:text-slate-200'"
+                class="px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2">
+                <i class="fa-solid fa-shield-virus"></i>
+                <span>Insiden Keamanan ({{ filteredIncidents.length }})</span>
+              </button>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-2 flex-1 justify-end">
+              <div class="relative flex-1 min-w-[200px] max-w-xs">
+                <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs"></i>
+                <input type="text" v-model.trim="searchQuery" placeholder="Cari nama, NIP, aksi, atau detail..."
+                  class="w-full pl-8 pr-3 py-2 bg-slate-900 border border-slate-700/70 rounded-xl text-xs text-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-500">
+              </div>
+
+              <select v-if="activeTab === 'audit'" v-model="filterKategori"
+                class="px-3 py-2 bg-slate-900 border border-slate-700/70 rounded-xl text-xs text-slate-200 font-semibold focus:outline-none focus:ring-2 focus:ring-cyan-500">
+                <option value="ALL">Semua Kategori</option>
+                <option value="LOGIN">LOGIN</option>
+                <option value="PEGAWAI">PEGAWAI</option>
+                <option value="CUTI">CUTI</option>
+                <option value="DOKUMEN">DOKUMEN</option>
+                <option value="KEAMANAN">KEAMANAN</option>
+                <option value="SISTEM">SISTEM</option>
+              </select>
+
+              <select v-model="filterRange"
+                class="px-3 py-2 bg-slate-900 border border-slate-700/70 rounded-xl text-xs text-slate-200 font-semibold focus:outline-none focus:ring-2 focus:ring-cyan-500">
+                <option value="today">Hari Ini</option>
+                <option value="7d">7 Hari Terakhir</option>
+                <option value="30d">30 Hari Terakhir</option>
+                <option value="all">Semua</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Status Loading / Error -->
+          <div v-if="isLoading" class="py-12 text-center text-slate-400">
+            <i class="fa-solid fa-circle-notch fa-spin text-2xl text-cyan-400 mb-2"></i>
+            <p class="text-xs font-semibold tracking-wide">Memuat log aktivitas dari Cloud Firestore...</p>
+          </div>
+
+          <div v-else-if="loadError" class="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-3">
+            <i class="fa-solid fa-circle-exclamation text-base"></i>
+            <span>{{ loadError }}</span>
+          </div>
+
+          <!-- TAB 1: TABEL AKTIVITAS SISTEM -->
+          <div v-else-if="activeTab === 'audit'" class="rounded-2xl border border-slate-800/80 bg-slate-950/60 overflow-hidden">
+            <div v-if="filteredAuditLogs.length === 0" class="py-12 text-center text-slate-400 text-xs">
+              <i class="fa-regular fa-folder-open text-2xl mb-2 opacity-60"></i>
+              <p>Belum ada catatan aktivitas yang cocok dengan filter saat ini.</p>
+            </div>
+            <div v-else class="overflow-x-auto">
+              <table class="w-full text-left border-collapse">
+                <thead>
+                  <tr class="border-b border-slate-800/80 bg-slate-900/80 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    <th class="py-3 px-4 whitespace-nowrap">Waktu (WIB)</th>
+                    <th class="py-3 px-4">Pelaku &amp; Peran</th>
+                    <th class="py-3 px-4">Kategori &amp; Aksi</th>
+                    <th class="py-3 px-4">Target &amp; Detail</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-800/60 text-xs">
+                  <tr v-for="row in filteredAuditLogs" :key="row.id || (row.waktu + '-' + row.aksi)" class="hover:bg-slate-800/30 transition align-top">
+                    <td class="py-3 px-4 whitespace-nowrap">
+                      <div class="font-mono font-semibold text-slate-200">{{ formatRowTime(row) }}</div>
+                      <span class="inline-block mt-1 px-1.5 py-0.5 text-[9px] font-bold uppercase rounded bg-slate-800 text-slate-400 border border-slate-700/60">
+                        {{ row.sumber === 'server' ? 'Server GAS' : 'Browser' }}
+                      </span>
+                    </td>
+                    <td class="py-3 px-4">
+                      <div class="font-bold text-white leading-snug">{{ resolveActorName(row) }}</div>
+                      <div class="text-[11px] font-mono text-slate-400 mt-0.5">{{ row.actor_nip || '-' }}</div>
+                      <span v-if="row.actor_role" class="inline-block mt-1 px-2 py-0.5 text-[9px] font-bold rounded-full bg-indigo-500/15 text-indigo-300 border border-indigo-500/25">
+                        {{ row.actor_role }}
+                      </span>
+                    </td>
+                    <td class="py-3 px-4">
+                      <div class="flex flex-wrap items-center gap-1.5">
+                        <span :class="categoryBadgeClass(row.kategori)" class="px-2 py-0.5 text-[10px] font-bold uppercase rounded-full border">
+                          {{ row.kategori || 'SISTEM' }}
+                        </span>
+                        <span :class="severityDotClass(row.severity)" class="px-2 py-0.5 text-[10px] font-bold rounded-full border">
+                          {{ row.aksi }}
+                        </span>
+                      </div>
+                    </td>
+                    <td class="py-3 px-4 max-w-md">
+                      <div v-if="row.target" class="text-[11px] font-mono text-cyan-300 font-semibold break-all mb-0.5">
+                        Target: {{ row.target }}
+                      </div>
+                      <div class="text-slate-300 leading-relaxed break-words">
+                        {{ row.detail || '-' }}
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- TAB 2: TABEL INSIDEN KEAMANAN -->
+          <div v-else class="rounded-2xl border border-slate-800/80 bg-slate-950/60 overflow-hidden">
+            <div v-if="filteredIncidents.length === 0" class="py-12 text-center text-slate-400 text-xs">
+              <i class="fa-solid fa-shield-check text-2xl mb-2 text-emerald-400 opacity-75"></i>
+              <p>Tidak ada catatan insiden keamanan pada rentang waktu ini.</p>
+            </div>
+            <div v-else class="overflow-x-auto">
+              <table class="w-full text-left border-collapse">
+                <thead>
+                  <tr class="border-b border-slate-800/80 bg-slate-900/80 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    <th class="py-3 px-4 whitespace-nowrap">Waktu (WIB)</th>
+                    <th class="py-3 px-4">Jenis Pelanggaran &amp; NIP</th>
+                    <th class="py-3 px-4">Detail Insiden</th>
+                    <th class="py-3 px-4">Browser / URL</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-800/60 text-xs">
+                  <tr v-for="inc in filteredIncidents" :key="inc.id || (inc.waktu + '-' + inc.jenis_pelanggaran)" class="hover:bg-slate-800/30 transition align-top">
+                    <td class="py-3 px-4 whitespace-nowrap font-mono font-semibold text-slate-200">
+                      {{ formatRowTime(inc) }}
+                    </td>
+                    <td class="py-3 px-4">
+                      <span class="inline-block px-2 py-0.5 text-[10px] font-bold uppercase rounded-full bg-rose-500/15 text-rose-400 border border-rose-500/30">
+                        {{ inc.jenis_pelanggaran || 'INSIDEN' }}
+                      </span>
+                      <div class="text-[11px] font-mono text-slate-400 mt-1">NIP: {{ inc.nip || 'SECURITY_SYSTEM' }}</div>
+                    </td>
+                    <td class="py-3 px-4 max-w-md text-slate-200 leading-relaxed break-words">
+                      {{ inc.detail || '-' }}
+                    </td>
+                    <td class="py-3 px-4 max-w-xs text-[11px] text-slate-400 break-all">
+                      <div>{{ inc.url || '-' }}</div>
+                      <div class="mt-1 text-[10px] text-slate-500">{{ inc.userAgent || '-' }}</div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Footer Info -->
+        <div class="px-5 py-3 border-t border-slate-800/80 bg-slate-900/90 flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-400 shrink-0">
+          <span>Jejak audit terkunci permanen (tidak dapat diubah atau dihapus dari browser).</span>
+          <span v-if="lastSyncedAt" class="font-mono">Terakhir dimuat: {{ lastSyncedAt }}</span>
+        </div>
+
+      </div>
+    </div>
+  </div>

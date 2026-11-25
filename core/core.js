@@ -2763,6 +2763,9 @@ function renderGlobalHeader() {
                <button @click="openMobileSidebar" title="Buka Menu" class="lg:hidden w-12 h-12 shrink-0 flex items-center justify-center bg-indigo-500/10 hover:bg-indigo-500 border border-indigo-500/20 hover:border-indigo-500 text-indigo-400 hover:text-white rounded-xl transition-all duration-300 shadow-lg shadow-indigo-500/10">
                   <i class="fa-solid fa-bars-staggered text-lg"></i>
                </button>
+               <button id="btn-audit-log-desktop" v-if="isStrictAdmin" @click="openAktivitasModal" title="Log Aktivitas & Keamanan (Admin)" class="w-12 h-12 shrink-0 flex items-center justify-center bg-cyan-500/10 hover:bg-cyan-500 border border-cyan-500/25 hover:border-cyan-500 text-cyan-400 hover:text-white rounded-xl transition-all duration-300 shadow-lg shadow-cyan-500/10">
+                  <i class="fa-solid fa-clock-rotate-left text-lg"></i>
+               </button>
                <button id="btn-theme-desktop" @click="toggleTheme" title="Beralih Mode Terang / Gelap" class="w-12 h-12 shrink-0 flex items-center justify-center bg-amber-500/10 hover:bg-amber-500 border border-amber-500/20 hover:border-amber-500 text-amber-400 hover:text-white rounded-xl transition-all duration-300 shadow-lg shadow-amber-500/10">
                   <i id="desktop-theme-icon" class="fa-solid fa-sun text-lg"></i>
                </button>
@@ -2782,6 +2785,10 @@ function renderGlobalHeader() {
         return { currentUser: state.user, userAvatar: initialAvatar };
       },
       computed: {
+        isStrictAdmin() {
+          const r = String((this.currentUser && this.currentUser.role) || '').trim().toLowerCase();
+          return ['admin', 'super admin', 'administrator'].includes(r);
+        },
         userInitials() {
           if (!this.currentUser) return "ID";
           let cleanName = this.currentUser.nama.split(',')[0].replace(/\b(Drs|Dr|H|Hj)\b\.?\s*/gi, '').trim();
@@ -2794,6 +2801,7 @@ function renderGlobalHeader() {
       },
       methods: {
         openMobileSidebar() { if (window.openMobileSidebar) window.openMobileSidebar(); },
+        openAktivitasModal() { if (window.openModalAktivitas) window.openModalAktivitas(); },
         toggleTheme() { if (window.toggleThemeMode) window.toggleThemeMode(); },
         openChangePassword() { if (window.openChangePasswordModal) window.openChangePasswordModal(); },
         logout() { if (window.handleLogout) window.handleLogout(); }
@@ -2874,6 +2882,10 @@ window.updateMobileProfileUI = function () {
           return { currentUser: user, userAvatar: cachedAvatar };
         },
         computed: {
+          isStrictAdmin() {
+            const r = String((this.currentUser && this.currentUser.role) || '').trim().toLowerCase();
+            return ['admin', 'super admin', 'administrator'].includes(r);
+          },
           cleanName() {
             if (!this.currentUser || !this.currentUser.nama) return "Pegawai";
             return this.currentUser.nama.split(',')[0].replace(/\b(Drs|Dr|H|Hj)\b\.?\s*/gi, '').trim();

@@ -911,7 +911,7 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
     await browserSandbox.TranskepFirebase.authenticateWithCustomToken('jwt-adm', { nip: '198001012005011001', role: 'Admin' });
     let writtenNonMerge = null;
     browserSandbox.TranskepFirebase.getDb = () => ({
-      collection: () => ({
+      collection: (colName) => ({
         doc: () => ({
           get: async () => ({
             exists: true,
@@ -928,7 +928,9 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
               err.code = 'permission-denied';
               throw err;
             }
-            writtenNonMerge = data;
+            if (colName === 'eoffice_kgb') {
+              writtenNonMerge = data;
+            }
           }
         })
       })
@@ -3189,6 +3191,207 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
     }
 
     console.log('[PASS] Tahap 155 Security Hardening (Strong Password, Session Epoch, Gateway Clean & 7-Day Backup) verified.');
+
+    // Tahap 156: Admin-only Activity Log Modal, Strict Admin Firestore Readers & Fail-Safe Server Audit Hooks
+    const rulesSrc156 = fs.readFileSync('firestore.rules', 'utf8');
+    assert(
+      rulesSrc156.includes('function isValidAuditLog(data)') &&
+      rulesSrc156.includes('match /audit_logs/{docId}') &&
+      rulesSrc156.includes('allow read: if isAdmin();') &&
+      rulesSrc156.includes('allow update, delete: if false;'),
+      'firestore.rules must define immutable audit_logs readable only by strict Admin'
+    );
+
+    const coreSrc156 = fs.readFileSync('core/core.js', 'utf8');
+    const mobileNavSrc156 = fs.readFileSync('core/view_mobile_nav.html', 'utf8');
+    const indexSrc156 = fs.readFileSync('index.html', 'utf8');
+    const swSrc156 = fs.readFileSync('sw.js', 'utf8');
+    assert(
+      coreSrc156.includes('id="btn-audit-log-desktop" v-if="isStrictAdmin"') &&
+      coreSrc156.includes('openAktivitasModal()') &&
+      mobileNavSrc156.includes('id="btn-audit-log-mobile" v-if="isStrictAdmin"') &&
+      indexSrc156.includes('slot-aktivitas') &&
+      indexSrc156.includes('modules/aktivitas/view_aktivitas.html') &&
+      indexSrc156.includes('modules/aktivitas/aktivitas.js') &&
+      swSrc156.includes('./modules/aktivitas/view_aktivitas.html') &&
+      swSrc156.includes('./modules/aktivitas/aktivitas.js'),
+      'Header buttons, loader slots, and precache assets must register Tahap 156 aktivitas modal'
+    );
+
+    const aktivitasHtml156 = fs.readFileSync('modules/aktivitas/view_aktivitas.html', 'utf8');
+    assert(
+      aktivitasHtml156.includes('id="vue-modal-aktivitas"') &&
+      aktivitasHtml156.includes('id="modalAktivitasOverlay"') &&
+      aktivitasHtml156.includes('Export Excel'),
+      'modules/aktivitas/view_aktivitas.html must expose modal container and export UI'
+    );
+
+    // Server logAuditEventServer_ fail-safe test (missing SA + 500 error + valid PATCH)
+    const origUrlFetch156 = gasSandbox.UrlFetchApp;
+    const prevSa156 = propsStore.FIREBASE_SERVICE_ACCOUNT_JSON;
+    const auditPatchCalls156 = [];
+    try {
+      delete propsStore.FIREBASE_SERVICE_ACCOUNT_JSON;
+      assert.strictEqual(gasSandbox.logAuditEventServer_({ actor_nip: '1980', kategori: 'LOGIN', aksi: 'LOGIN_BERHASIL' }), false);
+
+      const { privateKey: audPrivKey } = crypto.generateKeyPairSync('rsa', {
+        modulusLength: 2048,
+        privateKeyEncoding: { type: 'pkcs8', format: 'pem' }
+      });
+      propsStore.FIREBASE_SERVICE_ACCOUNT_JSON = JSON.stringify({
+        project_id: 'transkep-314c0',
+        client_email: 'audit-sa@transkep-314c0.iam.gserviceaccount.com',
+        private_key: audPrivKey
+      });
+      gasSandbox.CacheService.getScriptCache().remove('transkep_fs_sa_token_v1');
+
+      gasSandbox.UrlFetchApp = {
+        fetch: (url, opts) => {
+          if (url.includes('oauth2.googleapis.com/token')) {
+            return { getResponseCode: () => 200, getContentText: () => JSON.stringify({ access_token: 'mock-audit-tok', expires_in: 3600 }) };
+          }
+          auditPatchCalls156.push({ url, opts });
+          if (auditPatchCalls156.length === 1) {
+            return { getResponseCode: () => 500, getContentText: () => '{"error":"simulated"}' };
+          }
+          return { getResponseCode: () => 200, getContentText: () => '{}' };
+        }
+      };
+
+      // HTTP 500 must NOT throw
+      const failLogRes = gasSandbox.logAuditEventServer_({ actor_nip: '198001012005011001', kategori: 'PEGAWAI', aksi: 'EDIT_PEGAWAI' });
+      assert.strictEqual(failLogRes, false, 'Failed Firestore REST log write must swallow errors safely');
+
+      const okLogRes = gasSandbox.logAuditEventServer_({
+        actor_nip: '198001012005011001',
+        actor_nama: 'Admin Satu',
+        actor_role: 'Admin',
+        kategori: 'PEGAWAI',
+        aksi: 'TAMBAH_PEGAWAI',
+        target: '199002022015012002',
+        detail: 'Tambah pegawai test',
+        severity: 'info'
+      });
+      assert.strictEqual(okLogRes, true, 'logAuditEventServer_ must return true when PATCH succeeds');
+      const sentAuditBody = JSON.parse(auditPatchCalls156[1].opts.payload);
+      assert.strictEqual(sentAuditBody.fields.sumber.stringValue, 'server');
+      assert.strictEqual(sentAuditBody.fields.kategori.stringValue, 'PEGAWAI');
+      assert.strictEqual(sentAuditBody.fields.aksi.stringValue, 'TAMBAH_PEGAWAI');
+    } finally {
+      gasSandbox.UrlFetchApp = origUrlFetch156;
+      gasSandbox.CacheService.getScriptCache().remove('transkep_fs_sa_token_v1');
+      if (prevSa156 !== undefined) propsStore.FIREBASE_SERVICE_ACCOUNT_JSON = prevSa156;
+      else delete propsStore.FIREBASE_SERVICE_ACCOUNT_JSON;
+    }
+
+    // Strict Admin-only Firestore audit & incident readers (Operator MUST be rejected!)
+    const mockAuditSnapRows = [
+      { id: 'AUD-1', data: () => ({ id: 'AUD-1', actor_nip: '198001012005011001', actor_nama: 'Admin Satu', actor_role: 'Admin', kategori: 'PEGAWAI', aksi: 'TAMBAH_PEGAWAI', target: '1990', detail: 'Tambah pegawai', severity: 'info', waktu: '25/11/2026 10:00:00', timestamp: new Date().toISOString() }) },
+      { id: 'AUD-2', data: () => ({ id: 'AUD-2', actor_nip: '199002022015012002', actor_nama: 'Pegawai A', actor_role: 'Pegawai', kategori: 'LOGIN', aksi: 'LOGIN_BERHASIL', target: '199002022015012002', detail: 'Login sukses', severity: 'info', waktu: '25/11/2026 09:00:00', timestamp: new Date().toISOString() }) }
+    ];
+    const mockIncSnapRows = [
+      { id: 'INC-1', data: () => ({ jenis_pelanggaran: 'RATE_LIMIT_LOCKOUT', nip: '1990', detail: 'Login gagal 3x', waktu: '25/11/2026 08:30:00', timestamp: new Date().toISOString() }) }
+    ];
+    const auditQueriesHit = [];
+    browserSandbox.TranskepFirebase.getDb = () => ({
+      collection: (col) => ({
+        orderBy: () => ({
+          limit: () => ({
+            get: async () => {
+              auditQueriesHit.push(col);
+              return col === 'audit_logs' ? mockAuditSnapRows : mockIncSnapRows;
+            }
+          })
+        })
+      })
+    });
+
+    await browserSandbox.TranskepFirebase.authenticateWithCustomToken('jwt-op', { nip: '199103032016011003', role: 'Operator' });
+    browserSandbox.TranskepFirebase._authNip = '199103032016011003';
+    browserSandbox.TranskepFirebase._authRole = 'Operator';
+    assert.strictEqual(browserSandbox.TranskepFirebase.isStrictAdminCaller(), false, 'Operator must NOT pass isStrictAdminCaller');
+    assert.deepStrictEqual(Array.from(await browserSandbox.TranskepFirebase.getFirestoreAuditLogs(50)), [], 'Operator must get empty audit_logs');
+    assert.deepStrictEqual(Array.from(await browserSandbox.TranskepFirebase.getFirestoreSecurityIncidents(50)), [], 'Operator must get empty security_incidents');
+    assert.strictEqual(auditQueriesHit.length, 0, 'Non-Admin must be blocked before hitting Firestore collection');
+
+    await browserSandbox.TranskepFirebase.authenticateWithCustomToken('jwt-adm', { nip: '198001012005011001', role: 'Admin' });
+    browserSandbox.TranskepFirebase._authNip = '198001012005011001';
+    browserSandbox.TranskepFirebase._authRole = 'Admin';
+    assert.strictEqual(browserSandbox.TranskepFirebase.isStrictAdminCaller(), true);
+    const admAuditList = Array.from(await browserSandbox.TranskepFirebase.getFirestoreAuditLogs(50)).map((x) => Object.assign({}, x));
+    const admIncList = Array.from(await browserSandbox.TranskepFirebase.getFirestoreSecurityIncidents(50)).map((x) => Object.assign({}, x));
+    assert.strictEqual(admAuditList.length, 2);
+    assert.strictEqual(admIncList.length, 1);
+
+    // UI VM behavioral test for modules/aktivitas/aktivitas.js
+    const aktDomListeners = [];
+    const aktNotifyCalls = [];
+    const aktXlsxWrites = [];
+    const aktState = {
+      user: { nip: '199103032016011003', nama: 'Operator Satu', role: 'Operator' },
+      usersList: [{ nip: '198001012005011001', nama: 'Admin Satu' }]
+    };
+    const aktSandbox = {
+      console, Date, Math, Array, Object, String, Number, Boolean, JSON, Error, RegExp, Promise,
+      localStorage: { getItem: (k) => (k === 'transkep_user_role' ? aktState.user.role : '') },
+      state: aktState,
+      showNotify: (t, m, tp) => aktNotifyCalls.push({ t, m, tp }),
+      TranskepFirebase: {
+        getFirestoreAuditLogs: async () => admAuditList,
+        getFirestoreSecurityIncidents: async () => admIncList
+      },
+      XLSX: {
+        utils: {
+          json_to_sheet: (r) => r,
+          book_new: () => ({}),
+          book_append_sheet: () => {}
+        },
+        writeFile: (_wb, name) => aktXlsxWrites.push(name)
+      },
+      document: {
+        addEventListener: (ev, cb) => { if (ev === 'DOMContentLoaded') aktDomListeners.push(cb); },
+        getElementById: (id) => (id === 'vue-modal-aktivitas' ? { id } : null)
+      },
+      Vue: {
+        createApp: (opt) => ({
+          mount: () => {
+            const inst = Object.assign({}, opt.data());
+            Object.keys(opt.computed || {}).forEach((k) => {
+              Object.defineProperty(inst, k, { get: () => opt.computed[k].call(inst) });
+            });
+            Object.keys(opt.methods || {}).forEach((k) => {
+              inst[k] = opt.methods[k].bind(inst);
+            });
+            return inst;
+          }
+        })
+      },
+      window: {}
+    };
+    aktSandbox.window = aktSandbox;
+    vm.createContext(aktSandbox);
+    vm.runInContext(fs.readFileSync('modules/aktivitas/aktivitas.js', 'utf8'), aktSandbox, { filename: 'modules/aktivitas/aktivitas.js' });
+    aktDomListeners.forEach((cb) => cb());
+    assert(aktSandbox.vmAktivitasModal, 'aktivitas.js must mount window.vmAktivitasModal');
+
+    // Operator denied opening modal
+    aktSandbox.openModalAktivitas();
+    assert.strictEqual(aktSandbox.vmAktivitasModal.showModal, false, 'Operator must be blocked from opening Log Aktivitas modal');
+    assert(aktNotifyCalls.some((n) => n.tp === 'error'), 'Blocked non-Admin must receive error notification');
+
+    // Admin opens modal, loads logs, filters, and exports Excel
+    aktState.user.role = 'Admin';
+    aktSandbox.openModalAktivitas();
+    await new Promise((r) => setTimeout(r, 15));
+    assert.strictEqual(aktSandbox.vmAktivitasModal.showModal, true, 'Strict Admin must open Log Aktivitas modal');
+    assert.strictEqual(aktSandbox.vmAktivitasModal.auditLogs.length, 2);
+    assert.strictEqual(aktSandbox.vmAktivitasModal.securityIncidents.length, 1);
+    aktSandbox.vmAktivitasModal.filterKategori = 'PEGAWAI';
+    assert.strictEqual(aktSandbox.vmAktivitasModal.filteredAuditLogs.length, 1);
+    aktSandbox.vmAktivitasModal.exportExcel();
+    assert.strictEqual(aktXlsxWrites.length, 1);
+    assert(aktXlsxWrites[0].startsWith('TRANSKEP_Aktivitas_Sistem_'));
+    console.log('[PASS] Tahap 156 Admin-only Activity Log Modal, Strict Admin Firestore & Fail-Safe Server Audit verified.');
   } finally {
     browserSandbox.TranskepAPI.call = origApiCall;
     browserSandbox.TranskepFirebase.getDb = origGetDb;
