@@ -219,6 +219,7 @@ const SessionIntegrityGuard = {
   },
 
   sealSession(nip, role, token) {
+    const prevInternal = _isInternalAuthAction;
     _isInternalAuthAction = true;
     try {
       const cleanNip = String(nip || '').trim();
@@ -241,7 +242,7 @@ const SessionIntegrityGuard = {
       }
       return sig;
     } finally {
-      _isInternalAuthAction = false;
+      _isInternalAuthAction = prevInternal;
     }
   },
 
@@ -708,7 +709,7 @@ function toggleAppVisibility(isLoggedIn, animate) {
     }
 
     if (typeof resetLoginFormUI === 'function') {
-      resetLoginFormUI();
+      resetLoginFormUI({ clearValues: false });
     }
 
     if (animate && loginSec && appCont) {
@@ -1136,7 +1137,8 @@ try {
   LoginRateLimiter.init();
 } catch (e) {}
 
-function resetLoginFormUI() {
+function resetLoginFormUI(options) {
+  const shouldClear = Boolean(options && options.clearValues);
   window._isLoggingIn = false;
   if (typeof LoginRateLimiter !== 'undefined' && LoginRateLimiter.isLocked()) {
     LoginRateLimiter.startCountdown();
@@ -1152,7 +1154,9 @@ function resetLoginFormUI() {
   const passInput = document.getElementById('loginPass');
   if (passInput) {
     passInput.disabled = false;
-    passInput.value = '';
+    if (shouldClear) {
+      passInput.value = '';
+    }
   }
   const nipInput = document.getElementById('loginNip');
   const rememberCheckbox = document.getElementById('rememberMe');
@@ -1164,12 +1168,16 @@ function resetLoginFormUI() {
   }
 
   if (nipInput) {
-    if (isRemembered && rememberedNip) {
+    if (shouldClear) {
+      if (isRemembered && rememberedNip) {
+        nipInput.value = rememberedNip;
+        if (passInput) setTimeout(() => passInput.focus(), 150);
+      } else {
+        nipInput.value = '';
+        setTimeout(() => nipInput.focus(), 150);
+      }
+    } else if (isRemembered && rememberedNip && !nipInput.value) {
       nipInput.value = rememberedNip;
-      if (passInput) setTimeout(() => passInput.focus(), 150);
-    } else {
-      nipInput.value = '';
-      setTimeout(() => nipInput.focus(), 150);
     }
   }
 }
@@ -1445,7 +1453,7 @@ function handleLogout() {
 
   // Reset status tombol login ke 'Masuk Aplikasi' & pulihkan NIP jika Ingatkan Saya aktif
   if (typeof resetLoginFormUI === 'function') {
-    resetLoginFormUI();
+    resetLoginFormUI({ clearValues: true });
   }
 
   toggleAppVisibility(false);
@@ -1637,7 +1645,8 @@ window.updateSyncStatus = function(status) {
 
 let gSyncWatchdog = null;
 
-function syncAllServerData(silent, forceRefresh) {
+function syncAllServerData(silent, forceRefresh, retryAttempt) {
+  const attempt = Number(retryAttempt) || 0;
   if (gSyncWatchdog) clearTimeout(gSyncWatchdog);
   // Safe Fallback Watchdog Timer (8 detik): menjamin layar tidak pernah terjebak loading
   gSyncWatchdog = setTimeout(() => {
@@ -1646,7 +1655,7 @@ function syncAllServerData(silent, forceRefresh) {
   }, 8000);
 
   const isSilent = (silent === true);
-  if (!isSilent) showLoading("Menyelaraskan data sistem kepegawaian...");
+  if (!isSilent && attempt === 0) showLoading("Menyelaraskan data sistem kepegawaian...");
   if (typeof updateSyncStatus === 'function') updateSyncStatus('syncing');
   const loginNip = localStorage.getItem('transkep_active_nip');
   const sessionToken = localStorage.getItem('transkep_session_token');
@@ -1756,40 +1765,54 @@ function syncAllServerData(silent, forceRefresh) {
       }
 
     } else {
-      if (gSyncWatchdog) { clearTimeout(gSyncWatchdog); gSyncWatchdog = null; }
-      hideLoading();
-      if (!isSilent) {
-        showNotify("Gagal Sinkronisasi", response ? response.message : "Data bermasalah", "error");
+      const errMsgLow = String((response && response.message) || '').toLowerCase();
+      const isExpiredSess = Boolean(
+        response && (
+          response.message === 'Invalid session' ||
+          response.status === 'unauthorized' ||
+          response.code === 401 ||
+          errMsgLow.includes('sesi kedaluwarsa') ||
+          errMsgLow.includes('sesi tidak valid') ||
+          errMsgLow.includes('silakan login ulang')
+        )
+      );
+      if (isExpiredSess) {
+        if (gSyncWatchdog) { clearTimeout(gSyncWatchdog); gSyncWatchdog = null; }
+        hideLoading();
+        if (typeof showNotify === 'function') {
+          showNotify("Sesi Berakhir", response.message || "Sesi login Anda telah kedaluwarsa. Silakan login ulang.", "warning");
+        }
         handleLogout();
+      } else if (attempt < 1) {
+        console.warn('⚠️ [Sync] Respon awal server bermasalah, mencoba sinkronisasi ulang 1x...', response && response.message);
+        setTimeout(() => {
+          syncAllServerData(isSilent, forceRefresh, attempt + 1);
+        }, 1200);
+        return;
       } else {
-        const errMsgLow = String((response && response.message) || '').toLowerCase();
-        const isExpiredSess = Boolean(
-          response && (
-            response.message === 'Invalid session' ||
-            response.status === 'unauthorized' ||
-            response.code === 401 ||
-            errMsgLow.includes('sesi kedaluwarsa') ||
-            errMsgLow.includes('sesi tidak valid') ||
-            errMsgLow.includes('silakan login ulang')
-          )
-        );
-        if (isExpiredSess) {
-          if (typeof showNotify === 'function') {
-            showNotify("Sesi Berakhir", response.message || "Sesi login Anda telah kedaluwarsa. Silakan login ulang.", "warning");
-          }
-          handleLogout();
+        if (gSyncWatchdog) { clearTimeout(gSyncWatchdog); gSyncWatchdog = null; }
+        hideLoading();
+        if (typeof updateSyncStatus === 'function') updateSyncStatus('offline');
+        if (!isSilent && typeof showNotify === 'function') {
+          showNotify("Gagal Sinkronisasi", (response && response.message) ? response.message : "Data bermasalah. Silakan muat ulang halaman.", "error");
         }
       }
     }
   };
 
   const handleFailure = function (error) {
+    if (attempt < 1) {
+      console.warn('⚠️ [Sync] Koneksi awal ke server gagal, mencoba sinkronisasi ulang 1x...', error && error.message);
+      setTimeout(() => {
+        syncAllServerData(isSilent, forceRefresh, attempt + 1);
+      }, 1200);
+      return;
+    }
     if (gSyncWatchdog) { clearTimeout(gSyncWatchdog); gSyncWatchdog = null; }
     hideLoading();
     if (typeof updateSyncStatus === 'function') updateSyncStatus('offline');
-    if (!isSilent) {
-      showNotify("Terputus dari Server", (error && error.message) ? error.message : "Gagal sinkronisasi", "error");
-      handleLogout();
+    if (!isSilent && typeof showNotify === 'function') {
+      showNotify("Terputus dari Server", ((error && error.message) ? error.message : "Gagal sinkronisasi") + ". Silakan muat ulang halaman.", "error");
     }
   };
 

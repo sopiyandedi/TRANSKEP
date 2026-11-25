@@ -48,28 +48,28 @@
           <!-- 4 Kartu Ringkasan -->
           <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
             <div class="bg-slate-950/70 border border-slate-800/80 rounded-2xl p-3.5 shadow-inner">
-              <p class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Aktivitas Hari Ini</p>
+              <p class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Aktivitas ({{ rangeLabel }})</p>
               <div class="flex items-baseline justify-between mt-1.5">
                 <p class="text-2xl font-black text-white">{{ summaryStats.todayTotal }}</p>
                 <i class="fa-solid fa-bolt text-cyan-400 text-sm"></i>
               </div>
             </div>
             <div class="bg-slate-950/70 border border-emerald-500/20 rounded-2xl p-3.5 shadow-inner">
-              <p class="text-[10px] font-bold uppercase tracking-wider text-emerald-400">Login Berhasil Hari Ini</p>
+              <p class="text-[10px] font-bold uppercase tracking-wider text-emerald-400">Login Berhasil ({{ rangeLabel }})</p>
               <div class="flex items-baseline justify-between mt-1.5">
                 <p class="text-2xl font-black text-emerald-400">{{ summaryStats.todayLogins }}</p>
                 <i class="fa-solid fa-right-to-bracket text-emerald-400 text-sm"></i>
               </div>
             </div>
             <div class="bg-slate-950/70 border border-indigo-500/20 rounded-2xl p-3.5 shadow-inner">
-              <p class="text-[10px] font-bold uppercase tracking-wider text-indigo-400">Aksi Sensitif / Data</p>
+              <p class="text-[10px] font-bold uppercase tracking-wider text-indigo-400">Aksi Sensitif ({{ rangeLabel }})</p>
               <div class="flex items-baseline justify-between mt-1.5">
                 <p class="text-2xl font-black text-indigo-400">{{ summaryStats.sensitiveActions }}</p>
                 <i class="fa-solid fa-user-shield text-indigo-400 text-sm"></i>
               </div>
             </div>
             <div class="bg-slate-950/70 border border-rose-500/20 rounded-2xl p-3.5 shadow-inner">
-              <p class="text-[10px] font-bold uppercase tracking-wider text-rose-400">Peringatan &amp; Insiden</p>
+              <p class="text-[10px] font-bold uppercase tracking-wider text-rose-400">Peringatan &amp; Insiden ({{ rangeLabel }})</p>
               <div class="flex items-baseline justify-between mt-1.5">
                 <p class="text-2xl font-black text-rose-400">{{ summaryStats.securityAlerts }}</p>
                 <i class="fa-solid fa-triangle-exclamation text-rose-400 text-sm"></i>

@@ -72,24 +72,28 @@
         };
       },
       computed: {
+        rangeLabel() {
+          if (this.filterRange === 'today') return 'Hari Ini';
+          if (this.filterRange === '7d') return '7 Hari';
+          if (this.filterRange === '30d') return '30 Hari';
+          return 'Semua';
+        },
         summaryStats() {
-          const todayStart = getWibTodayBounds().startMs;
-          let todayTotal = 0;
-          let todayLogins = 0;
+          let totalCount = 0;
+          let loginCount = 0;
           let sensitiveActions = 0;
           let warnCount = 0;
+          let incCount = 0;
 
           for (let i = 0; i < this.auditLogs.length; i++) {
             const r = this.auditLogs[i];
-            const ms = resolveTimestampMs(r);
-            if (ms >= todayStart) {
-              todayTotal++;
-              if (String(r.kategori || '').toUpperCase() === 'LOGIN' && String(r.aksi || '').toUpperCase() === 'LOGIN_BERHASIL') {
-                todayLogins++;
-              }
-            }
+            if (!this.isWithinSelectedRange(r)) continue;
+            totalCount++;
             const kat = String(r.kategori || '').toUpperCase();
             const aks = String(r.aksi || '').toUpperCase();
+            if (kat === 'LOGIN' && aks === 'LOGIN_BERHASIL') {
+              loginCount++;
+            }
             if (kat === 'PEGAWAI' || kat === 'CUTI' || kat === 'DOKUMEN' || aks === 'GANTI_SANDI' || aks === 'RESET_SANDI_WA') {
               sensitiveActions++;
             }
@@ -99,11 +103,17 @@
             }
           }
 
+          for (let j = 0; j < this.securityIncidents.length; j++) {
+            if (this.isWithinSelectedRange(this.securityIncidents[j])) {
+              incCount++;
+            }
+          }
+
           return {
-            todayTotal,
-            todayLogins,
+            todayTotal: totalCount,
+            todayLogins: loginCount,
             sensitiveActions,
-            securityAlerts: warnCount + this.securityIncidents.length
+            securityAlerts: warnCount + incCount
           };
         },
         filteredAuditLogs() {
@@ -117,21 +127,25 @@
         }
       },
       methods: {
-        filterList(list, isAudit) {
-          const q = String(this.searchQuery || '').trim().toLowerCase();
-          const kat = String(this.filterKategori || 'ALL').toUpperCase();
+        isWithinSelectedRange(row) {
           const range = this.filterRange;
+          if (!range || range === 'all') return true;
           const nowMs = Date.now();
           let minMs = 0;
           if (range === 'today') minMs = getWibTodayBounds().startMs;
           else if (range === '7d') minMs = nowMs - (7 * 86400000);
           else if (range === '30d') minMs = nowMs - (30 * 86400000);
+          if (minMs <= 0) return true;
+          const rowMs = resolveTimestampMs(row);
+          if (!rowMs) return false;
+          return rowMs >= minMs;
+        },
+        filterList(list, isAudit) {
+          const q = String(this.searchQuery || '').trim().toLowerCase();
+          const kat = String(this.filterKategori || 'ALL').toUpperCase();
 
           return (Array.isArray(list) ? list : []).filter((row) => {
-            if (minMs > 0) {
-              const rowMs = resolveTimestampMs(row);
-              if (rowMs > 0 && rowMs < minMs) return false;
-            }
+            if (!this.isWithinSelectedRange(row)) return false;
             if (isAudit && kat !== 'ALL') {
               if (String(row.kategori || '').toUpperCase() !== kat) return false;
             }

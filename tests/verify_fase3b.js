@@ -1554,7 +1554,7 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
     };
     const rapatVm = {
       console, Date, Math, Array, Object, String, Number, Boolean, JSON,
-      localStorage: { getItem: () => '', setItem: () => {} },
+      localStorage: { getItem: () => '', setItem: () => { } },
       document: { getElementById: (id) => rapatDom[id] || null },
       window: {}
     };
@@ -1801,12 +1801,12 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
     };
     const aiVm140 = {
       console, Date, Math, Array, Object, String, Number, Boolean, JSON,
-      localStorage: { getItem: () => '', setItem: () => {} },
+      localStorage: { getItem: () => '', setItem: () => { } },
       document: { getElementById: (id) => aiDom140[id] || null },
       vueState: {
         usersList: [{ nip: '197901012003011008', nama: 'Atasan Satu', jabatan: 'Panitera', role: 'Pegawai' }]
       },
-      showNotify: () => {},
+      showNotify: () => { },
       window: {}
     };
     aiVm140.window = aiVm140;
@@ -1857,7 +1857,7 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
     const rapatPollVm = {
       console,
       setTimeout: (fn) => { rapatTimers.push(fn); return rapatTimers.length; },
-      localStorage: { getItem: () => '', setItem: () => {} },
+      localStorage: { getItem: () => '', setItem: () => { } },
       showNotify: (title, msg, type) => { rapatPollToasts.push({ title, msg, type }); },
       vmEoffice: {
         rawKgbList: [],
@@ -1939,7 +1939,7 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
     };
     const rapatLockVm142 = {
       console, Date, Math, Array, Object, String, Number, Boolean, JSON, Promise,
-      localStorage: { getItem: () => '', setItem: () => {} },
+      localStorage: { getItem: () => '', setItem: () => { } },
       document: { getElementById: (id) => domRapat142[id] || null },
       vueState: { user: { nip: '198001012005011001', role: 'Admin' }, usersList: [] },
       EofficeDataService: {
@@ -1950,7 +1950,7 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
       },
       showLoading: () => { rapatLoadingCount += 1; },
       hideLoading: () => { rapatHideLoadingCount += 1; },
-      showNotify: () => {},
+      showNotify: () => { },
       window: {}
     };
     rapatLockVm142.window = rapatLockVm142;
@@ -1992,7 +1992,7 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
     const kgbLockVm142 = {
       console, Date, Math, Array, Object, String, Number, Boolean, JSON, Promise, RegExp, parseInt, parseFloat, isNaN,
       setTimeout: (fn) => fn(),
-      localStorage: { getItem: () => '', setItem: () => {} },
+      localStorage: { getItem: () => '', setItem: () => { } },
       document: { getElementById: getKgbEl142 },
       vueState: { user: { nip: '198001012005011001', role: 'Admin' }, usersList: [] },
       EofficeDataService: {
@@ -2003,7 +2003,7 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
       },
       showLoading: () => { kgbLoadingCount += 1; },
       hideLoading: () => { kgbHideLoadingCount += 1; },
-      showNotify: () => {},
+      showNotify: () => { },
       window: {}
     };
     kgbLockVm142.window = kgbLockVm142;
@@ -2107,7 +2107,7 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
     };
     const rapatUxVm143 = {
       console, Date, Math, Array, Object, String, Number, Boolean, JSON, Set, Map, RegExp, parseInt, parseFloat, isNaN, setTimeout, clearTimeout,
-      localStorage: { getItem: () => '', setItem: () => {} },
+      localStorage: { getItem: () => '', setItem: () => { } },
       document: {
         getElementById: (id) => ensureDom143(id),
         addEventListener: (evName, fn) => { if (evName === 'keydown') capturedKeydown143 = fn; }
@@ -2118,7 +2118,7 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
           { nip: '197601012001011002', nama: 'Ikin, S.Ag., M.E.', jabatan: 'Wakil Ketua', role: 'Pegawai' }
         ]
       },
-      showNotify: () => {},
+      showNotify: () => { },
       window: {}
     };
     rapatUxVm143.window = rapatUxVm143;
@@ -2131,14 +2131,14 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
     assert(!ensureDom143('rapatTujuanSearchDropdown').classList.contains('hidden') &&
       ensureDom143('rapatTujuanSearchDropdown').innerHTML.includes('Agus Salim, S.Ag.'),
       'Tab 2 searchable must show matching employee dropdown');
-    rapatUxVm143.handleTujuanSearchKeydown({ key: 'Enter', preventDefault() {} });
+    rapatUxVm143.handleTujuanSearchKeydown({ key: 'Enter', preventDefault() { } });
     assert.strictEqual(ensureDom143('rapatCustomTujuanInput').value, '', 'Enter on Tab 2 searchable must clear input');
     assert.strictEqual(ensureDom143('rapatCountPeserta').innerText, '1');
     assert(ensureDom143('rapatTujuanOrderedContainer').innerHTML.includes('Agus Salim, S.Ag. (Sekretaris)'));
     rapatUxVm143.selectTujuanPegawai('197501012000011001');
     assert.strictEqual(ensureDom143('rapatCountPeserta').innerText, '1', 'Tab 2 searchable must prevent duplicate employee NIP');
     ensureDom143('rapatCustomTujuanInput').value = 'Tim Penilai PIPK';
-    rapatUxVm143.handleTujuanSearchKeydown({ key: 'Enter', preventDefault() {} });
+    rapatUxVm143.handleTujuanSearchKeydown({ key: 'Enter', preventDefault() { } });
     assert.strictEqual(ensureDom143('rapatCountPeserta').innerText, '2');
     assert(ensureDom143('rapatTujuanOrderedContainer').innerHTML.includes('Tim Penilai PIPK'));
 
@@ -2151,7 +2151,7 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
       'Tab 3 must render date inputs and Tab sentinel');
     ensureDom143('rapatSpeakerSearch_0').value = 'Agus';
     rapatUxVm143.filterPembahasanSpeakerDrop(0, 'Agus');
-    rapatUxVm143.handlePembahasanSpeakerKeydown({ key: 'Enter', preventDefault() {} }, 0);
+    rapatUxVm143.handlePembahasanSpeakerKeydown({ key: 'Enter', preventDefault() { } }, 0);
     assert.strictEqual(ensureDom143('rapatSpeakerSearch_0').value, 'Agus Salim, S.Ag. (Sekretaris)',
       'Enter on Tab 3 speaker search must pick top match');
 
@@ -2217,7 +2217,7 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
 
     ensureDom143('rapatPejabatTtdSearch').value = 'Ikin';
     rapatUxVm143.filterOfficialSearchDrop('pejabatTtd', 'Ikin');
-    rapatUxVm143.handleOfficialSearchKeydown({ key: 'Enter', preventDefault() {} }, 'pejabatTtd');
+    rapatUxVm143.handleOfficialSearchKeydown({ key: 'Enter', preventDefault() { } }, 'pejabatTtd');
     assert.strictEqual(ensureDom143('rapatPejabatTtdSearch').value, 'Ikin, S.Ag., M.E. (Wakil Ketua)');
     assert.strictEqual(ensureDom143('rapatFieldPejabatTtdNip').value, '197601012001011002');
     assert.strictEqual(ensureDom143('rapatFieldKodePejabat').value, 'WKPA.W10-A2');
@@ -2232,14 +2232,14 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
 
     ensureDom143('rapatPemimpinSearch').value = 'Ikin';
     rapatUxVm143.filterOfficialSearchDrop('pemimpin', 'Ikin');
-    rapatUxVm143.handleOfficialSearchKeydown({ key: 'Enter', preventDefault() {} }, 'pemimpin');
+    rapatUxVm143.handleOfficialSearchKeydown({ key: 'Enter', preventDefault() { } }, 'pemimpin');
     assert.strictEqual(ensureDom143('rapatPemimpinSearch').value, 'Ikin, S.Ag., M.E. (Wakil Ketua)');
     assert.strictEqual(ensureDom143('rapatFieldPemimpinNip').value, '197601012001011002');
     assert.strictEqual(ensureDom143('rapatFieldPemimpin').value, 'Wakil Ketua');
 
     ensureDom143('rapatNotulisSearch').value = 'Agus';
     rapatUxVm143.filterOfficialSearchDrop('notulis', 'Agus');
-    rapatUxVm143.handleOfficialSearchKeydown({ key: 'Enter', preventDefault() {} }, 'notulis');
+    rapatUxVm143.handleOfficialSearchKeydown({ key: 'Enter', preventDefault() { } }, 'notulis');
     assert.strictEqual(ensureDom143('rapatNotulisSearch').value, 'Agus Salim, S.Ag. (Sekretaris)');
     assert.strictEqual(ensureDom143('rapatFieldNotulisNip').value, '197501012000011001');
     assert.strictEqual(ensureDom143('rapatFieldNotulis').value, 'Agus Salim, S.Ag.');
@@ -2270,18 +2270,18 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
           className: '',
           scrollTop: 0,
           classList: mkCls(),
-          focus: () => {},
-          scrollIntoView: () => {}
+          focus: () => { },
+          scrollIntoView: () => { }
         };
       }
       return dom145[id];
     };
     const rapatVm145 = {
       console, Date, Math, Array, Object, String, Number, Boolean, JSON, Set, Map, RegExp, parseInt, parseFloat, isNaN, setTimeout, clearTimeout,
-      localStorage: { getItem: () => '', setItem: () => {} },
+      localStorage: { getItem: () => '', setItem: () => { } },
       document: {
         getElementById: (id) => ensureDom145(id),
-        addEventListener: () => {}
+        addEventListener: () => { }
       },
       vueState: {
         usersList: [
@@ -2290,7 +2290,7 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
           { nip: '198701012012011003', nama: 'Sari, S.Kom.', jabatan: 'Kasubbag', role: 'Pegawai' }
         ]
       },
-      showNotify: () => {},
+      showNotify: () => { },
       window: {}
     };
     rapatVm145.window = rapatVm145;
@@ -2326,7 +2326,7 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
       'Tab 2 dropdown must show multi-select header');
     rapatVm145.toggleTujuanDropCheck('198501012010011001');
     rapatVm145.toggleTujuanDropCheck('198601012011011002');
-    rapatVm145.handleTujuanSearchKeydown({ key: 'Enter', preventDefault() {} });
+    rapatVm145.handleTujuanSearchKeydown({ key: 'Enter', preventDefault() { } });
     assert.strictEqual(ensureDom145('rapatCountPeserta').innerText, '2', 'Enter after checking 2 items must insert both');
     const orderedHtml145 = ensureDom145('rapatTujuanOrderedContainer').innerHTML;
     assert(orderedHtml145.includes('Rina, S.H. (Panitera Pengganti)') && orderedHtml145.includes('Dedi, S.Sy. (Panitera Pengganti)'));
@@ -2348,7 +2348,7 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
         getName: () => name,
         getUrl: () => 'https://drive.google.com/drive/folders/fld_' + encodeURIComponent(depthPath),
         isTrashed: () => false,
-        setSharing: () => {},
+        setSharing: () => { },
         getFoldersByName: (sub) => {
           const hit = children[sub] ? [children[sub]] : [];
           let i = 0;
@@ -2365,7 +2365,7 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
           return {
             getId: () => 'file_' + createdDriveTree145.length,
             getName: () => blob.name,
-            setSharing: () => {},
+            setSharing: () => { },
             _path: fPath
           };
         }
@@ -2374,7 +2374,7 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
     };
     const driveRoot145 = mkMockFolder145('ROOT', '');
     const gasRapatVm145 = {
-      console, Date, Math, Array, Object, String, Number, Boolean, JSON, RegExp, parseInt, Logger: { log: () => {} },
+      console, Date, Math, Array, Object, String, Number, Boolean, JSON, RegExp, parseInt, Logger: { log: () => { } },
       DriveApp: {
         Access: { PRIVATE: 'PRIVATE' },
         Permission: { NONE: 'NONE' },
@@ -2386,7 +2386,7 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
         newBlob: (bytes, mime, name) => ({ bytes, mime, name })
       },
       cekOtorisasiAdmin: () => true,
-      setPrivateDriveSharing_: () => {},
+      setPrivateDriveSharing_: () => { },
       validateUploadedFile_: (b64, name, mime, opts) => ({
         bytes: Buffer.from(b64, 'base64'),
         blobMimeType: mime,
@@ -2476,10 +2476,10 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
     const feData151Src = fs.readFileSync('modules/eoffice/eoffice_data.js', 'utf8');
     assert(
       feRapat151Src.includes('no_urut_surat: folderCtx.no_urut_surat') &&
-        feRapat151Src.includes('nomor_undangan: folderCtx.nomor_undangan') &&
-        feRapat151Src.includes("document.getElementById('rapatFieldNoUrutSurat')") &&
-        feData151Src.includes("no_urut_surat: ctx.no_urut_surat || ''") &&
-        feData151Src.includes("nomor_undangan: ctx.nomor_undangan || ''"),
+      feRapat151Src.includes('nomor_undangan: folderCtx.nomor_undangan') &&
+      feRapat151Src.includes("document.getElementById('rapatFieldNoUrutSurat')") &&
+      feData151Src.includes("no_urut_surat: ctx.no_urut_surat || ''") &&
+      feData151Src.includes("nomor_undangan: ctx.nomor_undangan || ''"),
       'Frontend rapat.js & eoffice_data.js must forward no_urut_surat and nomor_undangan to Drive folder resolution'
     );
 
@@ -2529,7 +2529,7 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
     let capturedNbReq = null;
     const vm148 = {
       console, Date, Math, Array, Object, String, Number, Boolean, JSON, Error, RegExp, parseInt, Promise,
-      localStorage: { getItem: (k) => (k === 'transkep_active_nip' ? '198001012005011001' : 'tok-148'), setItem: () => {} },
+      localStorage: { getItem: (k) => (k === 'transkep_active_nip' ? '198001012005011001' : 'tok-148'), setItem: () => { } },
       document: {
         getElementById: (id) => {
           if (!dom148[id]) {
@@ -2539,7 +2539,7 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
         }
       },
       vueState: { usersList: [{ nip: '197901012003011008', nama: 'Atasan Satu', jabatan: 'Ketua', role: 'Pegawai' }] },
-      showNotify: () => {},
+      showNotify: () => { },
       EofficeDataService: {
         requestAiNotulenRapat: async (payload) => {
           capturedNbReq = JSON.parse(JSON.stringify(payload));
@@ -2598,10 +2598,12 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
       pembahasan: [
         { pembicara_nama: 'Atasan Satu (Ketua)', items: [{ uraian: 'Pembukaan monitoring SIPP.', tindak_lanjut: 'Cek harian', target: '2026-11-20', penanggung_jawab: 'Ketua', tanggal_penyelesaian: '2026-11-20' }] },
         { pembicara_nama: 'Ikin, S.Ag., M.E. (Wakil Ketua)', uraian: 'Optimalisasi aplikasi monitoring.', tindak_lanjut: 'Evaluasi berkala', target: '2026-11-20', penanggung_jawab: 'Wakil Ketua', tanggal_penyelesaian: '2026-11-20' },
-        { pembicara_nama: 'Atasan Satu', items: [
-          { uraian: 'Pembukaan monitoring SIPP.', tindak_lanjut: 'Cek harian', target: '2026-11-20', penanggung_jawab: 'Ketua', tanggal_penyelesaian: '2026-11-20' },
-          { uraian: 'Pekerjaan data saksi tepat waktu.', tindak_lanjut: 'Monitor input saksi', target: '2026-11-20', penanggung_jawab: 'PP', tanggal_penyelesaian: '2026-11-20' }
-        ] },
+        {
+          pembicara_nama: 'Atasan Satu', items: [
+            { uraian: 'Pembukaan monitoring SIPP.', tindak_lanjut: 'Cek harian', target: '2026-11-20', penanggung_jawab: 'Ketua', tanggal_penyelesaian: '2026-11-20' },
+            { uraian: 'Pekerjaan data saksi tepat waktu.', tindak_lanjut: 'Monitor input saksi', target: '2026-11-20', penanggung_jawab: 'PP', tanggal_penyelesaian: '2026-11-20' }
+          ]
+        },
         { pembicara_nama: 'Ikin, S.Ag., M.E. (Wakil Ketua)', items: [{ uraian: 'Penguatan kerja tandem PP.', tindak_lanjut: 'Susun jadwal tandem', target: '2026-11-27', penanggung_jawab: 'Wakil Ketua', tanggal_penyelesaian: '2026-11-27' }] }
       ]
     });
@@ -2644,9 +2646,9 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
     const stSandbox = {
       console, Date, Math, Array, Object, String, Number, Boolean, JSON, Error, RegExp, parseInt,
       setTimeout: () => 0,
-      showLoading: () => {},
-      hideLoading: () => {},
-      showNotify: () => {},
+      showLoading: () => { },
+      hideLoading: () => { },
+      showNotify: () => { },
       formatNamaBersih: (n) => String(n || '').split(',')[0].trim(),
       formatDateIndoCetak: (d) => String(d || '23 November 2026'),
       state: {
@@ -2660,19 +2662,19 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
             style: {},
             contentWindow: {
               document: {
-                open: () => {},
+                open: () => { },
                 write: (html) => { capturedStPrintHtml = html; },
-                close: () => {}
+                close: () => { }
               },
-              focus: () => {},
-              print: () => {}
+              focus: () => { },
+              print: () => { }
             }
           };
         },
         body: {
-          appendChild: () => {},
+          appendChild: () => { },
           contains: () => false,
-          removeChild: () => {}
+          removeChild: () => { }
         }
       }
     };
@@ -2827,21 +2829,21 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
     const cutiSandbox = {
       console, Date, Math, Array, Object, String, Number, Boolean, JSON, Error, RegExp, parseInt, Promise,
       setTimeout: () => 0,
-      localStorage: { getItem: () => '', setItem: () => {} },
+      localStorage: { getItem: () => '', setItem: () => { } },
       state: cutiState,
       vueState: cutiState,
       hitungHariKerjaCuti: () => ({ durasi: 1, invalidOrder: false }),
-      updateBadgePermohonan: () => {},
+      updateBadgePermohonan: () => { },
       document: {
         addEventListener: (ev, cb) => { if (ev === 'DOMContentLoaded') cutiDomListeners.push(cb); },
         querySelectorAll: () => [],
-        getElementById: () => ({ classList: { add() {}, remove() {}, contains: () => false }, style: {} })
+        getElementById: () => ({ classList: { add() { }, remove() { }, contains: () => false }, style: {} })
       },
       Vue: {
         createApp: (opt) => ({
           mount: (sel) => {
             cutiVueOpts[sel] = opt;
-            return { s: cutiState, openModal: () => {}, closeModal: () => {}, openCancelModal: () => {} };
+            return { s: cutiState, openModal: () => { }, closeModal: () => { }, openCancelModal: () => { } };
           }
         })
       },
@@ -3344,7 +3346,7 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
         utils: {
           json_to_sheet: (r) => r,
           book_new: () => ({}),
-          book_append_sheet: () => {}
+          book_append_sheet: () => { }
         },
         writeFile: (_wb, name) => aktXlsxWrites.push(name)
       },
@@ -3392,6 +3394,90 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
     assert.strictEqual(aktXlsxWrites.length, 1);
     assert(aktXlsxWrites[0].startsWith('TRANSKEP_Aktivitas_Sistem_'));
     console.log('[PASS] Tahap 156 Admin-only Activity Log Modal, Strict Admin Firestore & Fail-Safe Server Audit verified.');
+
+    // Tahap 157: Autofill Login Attributes, Preserve Autofill in resetLoginFormUI, 1x Sync Retry & KPI Filter Sync
+    const loginHtml157 = fs.readFileSync('core/view_login.html', 'utf8');
+    assert(
+      loginHtml157.includes('<form id="loginForm" onsubmit="handleLogin(event); return false;" autocomplete="on"') &&
+      loginHtml157.includes('id="loginNip" name="username" required autocomplete="username"') &&
+      loginHtml157.includes('id="loginPass" name="password" required autocomplete="current-password"') &&
+      !loginHtml157.includes('autocomplete="new-password"'),
+      'core/view_login.html must use standard browser autofill attributes'
+    );
+
+    const coreSrc157 = fs.readFileSync('core/core.js', 'utf8');
+    assert(
+      coreSrc157.includes('const prevInternal = _isInternalAuthAction;') &&
+      coreSrc157.includes('resetLoginFormUI({ clearValues: false });') &&
+      coreSrc157.includes('resetLoginFormUI({ clearValues: true });') &&
+      coreSrc157.includes('function syncAllServerData(silent, forceRefresh, retryAttempt)'),
+      'core/core.js must preserve nested internal lock in sealSession, clearValues flag, and syncAllServerData retry'
+    );
+
+    // 1. resetLoginFormUI preserves autofilled values unless clearValues=true
+    const nipInput157 = browserSandbox.document.getElementById('loginNip');
+    const passInput157 = browserSandbox.document.getElementById('loginPass');
+    const remChk157 = browserSandbox.document.getElementById('rememberMe');
+    nipInput157.value = '198001012005011001';
+    passInput157.value = 'SavedBrowserPass2026!';
+    remChk157.checked = false;
+    browserSandbox.resetLoginFormUI({ clearValues: false });
+    assert.strictEqual(passInput157.value, 'SavedBrowserPass2026!', 'resetLoginFormUI({ clearValues: false }) must preserve autofilled password');
+    assert.strictEqual(nipInput157.value, '198001012005011001', 'resetLoginFormUI({ clearValues: false }) must preserve autofilled NIP');
+    browserSandbox.resetLoginFormUI({ clearValues: true });
+    assert.strictEqual(passInput157.value, '', 'resetLoginFormUI({ clearValues: true }) must clear password on logout');
+
+    // 2. syncAllServerData performs 1x retry on transient network error and does NOT logout user
+    const origSetTimeout157 = browserSandbox.setTimeout;
+    const origClearTimeout157 = browserSandbox.clearTimeout;
+    const origDocEl157 = browserSandbox.document.documentElement;
+    const retryTimers157 = [];
+    let getBulkCalls157 = 0;
+    try {
+      browserSandbox.document.documentElement = { classList: { add() { }, remove() { } } };
+      browserSandbox.SessionIntegrityGuard.sealSession('198001012005011001', 'Admin', 'tok-157-sync');
+      browserSandbox.setTimeout = (fn, ms) => {
+        if (ms === 1200) retryTimers157.push(fn);
+        return retryTimers157.length;
+      };
+      browserSandbox.clearTimeout = () => { };
+      browserSandbox.TranskepAPI.call = async (method) => {
+        if (method === 'getBulkData') {
+          getBulkCalls157++;
+          throw new Error('Cold start timeout');
+        }
+        return { status: 'error' };
+      };
+
+      browserSandbox.syncAllServerData(false, true, 0);
+      await new Promise((r) => origSetTimeout157(r, 20));
+      assert.strictEqual(getBulkCalls157, 1);
+      assert.strictEqual(retryTimers157.length, 1, 'Transient sync failure must schedule 1x retry');
+      assert.strictEqual(browserSandbox.localStorage.getItem('transkep_session_token'), 'tok-157-sync', 'User session must NOT be wiped before retry');
+
+      // Run retry which also transiently fails -> still no handleLogout!
+      retryTimers157[0]();
+      await new Promise((r) => origSetTimeout157(r, 20));
+      assert.strictEqual(getBulkCalls157, 2);
+      assert.strictEqual(retryTimers157.length, 1, 'Retry must stop after 1x attempt (no infinite loop)');
+      assert.strictEqual(browserSandbox.localStorage.getItem('transkep_session_token'), 'tok-157-sync', 'Transient sync failure must NOT force handleLogout');
+    } finally {
+      browserSandbox.setTimeout = origSetTimeout157;
+      browserSandbox.clearTimeout = origClearTimeout157;
+      browserSandbox.document.documentElement = origDocEl157;
+      browserSandbox.SessionIntegrityGuard.resetSession();
+    }
+
+    // 3. Activity modal summaryStats.securityAlerts respects filterRange (Today=0 vs All=1 for old incidents)
+    aktSandbox.vmAktivitasModal.auditLogs = [];
+    aktSandbox.vmAktivitasModal.securityIncidents = [
+      { id: 'INC-OLD-157', jenis_pelanggaran: 'RATE_LIMIT_LOCKOUT', timestamp: new Date(Date.now() - 10 * 86400000).toISOString() }
+    ];
+    aktSandbox.vmAktivitasModal.filterRange = 'today';
+    assert.strictEqual(aktSandbox.vmAktivitasModal.summaryStats.securityAlerts, 0, 'Today filter must exclude 10-day-old incident from summary card');
+    aktSandbox.vmAktivitasModal.filterRange = 'all';
+    assert.strictEqual(aktSandbox.vmAktivitasModal.summaryStats.securityAlerts, 1, 'All filter must count historical incident in summary card');
+    console.log('[PASS] Tahap 157 Autofill Attributes, Reset Preservation, 1x Sync Retry & Activity KPI Range Sync verified.');
   } finally {
     browserSandbox.TranskepAPI.call = origApiCall;
     browserSandbox.TranskepFirebase.getDb = origGetDb;
