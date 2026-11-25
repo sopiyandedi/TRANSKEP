@@ -143,34 +143,12 @@ window.SkBuilderMixin = {
     },
 
     parseIndoDateToIso(dateStr) {
+      if (window.SkDocParser && typeof window.SkDocParser.parseIndoDateToIso === 'function') {
+        return window.SkDocParser.parseIndoDateToIso(dateStr);
+      }
       if (!dateStr) return '';
       const clean = String(dateStr).trim();
       if (/^\d{4}-\d{2}-\d{2}$/.test(clean)) return clean;
-      const monthMap = {
-        januari: '01', jan: '01',
-        februari: '02', pebruari: '02', feb: '02',
-        maret: '03', mar: '03',
-        april: '04', apr: '04',
-        mei: '05', may: '05',
-        juni: '06', jun: '06',
-        juli: '07', jul: '07',
-        agustus: '08', aug: '08', agu: '08',
-        september: '09', sep: '09', sept: '09',
-        oktober: '10', oct: '10', okt: '10',
-        november: '11', nopember: '11', nov: '11',
-        desember: '12', dec: '12', des: '12'
-      };
-      const m = clean.match(/(\d{1,2})\s*[-\/\s]\s*([a-zA-Z]+)\s*[-\/\s]\s*(\d{4})/);
-      if (m) {
-        const dd = String(m[1]).padStart(2, '0');
-        const mm = monthMap[m[2].toLowerCase()];
-        const yyyy = m[3];
-        if (mm) return `${yyyy}-${mm}-${dd}`;
-      }
-      const mSlash = clean.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-      if (mSlash) {
-        return `${mSlash[3]}-${String(mSlash[2]).padStart(2, '0')}-${String(mSlash[1]).padStart(2, '0')}`;
-      }
       return '';
     },
 
@@ -598,33 +576,10 @@ window.SkBuilderMixin = {
     },
 
     extractLegacyDocStream(arrayBuffer) {
-      const bytes = new Uint8Array(arrayBuffer);
-      let raw = '';
-      for (let i = 0; i < bytes.length; i++) {
-        raw += String.fromCharCode(bytes[i]);
+      if (window.SkDocParser && typeof window.SkDocParser.extractLegacyDocStream === 'function') {
+        return window.SkDocParser.extractLegacyDocStream(arrayBuffer);
       }
-
-      let startIdx = -1;
-      const bjbjIdx = raw.indexOf('bjbj');
-      if (bjbjIdx !== -1) {
-        const afterFib = raw.slice(bjbjIdx + 100);
-        const matchStart = afterFib.search(/(KETUA|SEKRETARIS|KEPUTUSAN|PENGADILAN\s+AGAMA|MAHKAMAH\s+AGUNG)/i);
-        if (matchStart !== -1) {
-          startIdx = bjbjIdx + 100 + matchStart;
-        }
-      }
-      if (startIdx === -1) {
-        startIdx = raw.search(/(KEPUTUSAN\s+(KETUA|SEKRETARIS)|KETUA\s+PENGADILAN\s+AGAMA)/i);
-      }
-      if (startIdx === -1) return '';
-
-      let slice = raw.slice(startIdx);
-      const nullRun = slice.indexOf('\x00\x00\x00\x00');
-      if (nullRun !== -1) {
-        slice = slice.slice(0, nullRun);
-      }
-
-      return slice.replace(/[\x00-\x06\x08\x0B\x0C\x0E-\x1F]/g, '');
+      return '';
     },
 
     formatDiktumSublist(lines) {
@@ -674,193 +629,17 @@ window.SkBuilderMixin = {
     },
 
     autoMatchPegawaiRow(row) {
-      if (!row) return row;
       const uList = (this.globalState && Array.isArray(this.globalState.usersList)) ? this.globalState.usersList : [];
-      if (uList.length === 0) return row;
-
-      const rawNama = String(row.nama || '').trim();
-      const rawJabDinas = String(row.jabatan_dinas || '').trim();
-
-      // 1. Cek jika ada NIP 18 digit di dalam teks nama
-      const nipMatch = rawNama.match(/\b(19\d{16}|20\d{16})\b/);
-      if (nipMatch) {
-        const byNip = uList.find(u => String(u.nip).trim() === nipMatch[1]);
-        if (byNip) {
-          row.nip = byNip.nip;
-          row.nama = byNip.nama;
-          if (!row.jabatan_dinas || row.jabatan_dinas === '-') row.jabatan_dinas = byNip.jabatan || '-';
-          return row;
-        }
+      if (window.SkDocParser && typeof window.SkDocParser.autoMatchPegawaiRow === 'function') {
+        return window.SkDocParser.autoMatchPegawaiRow(row, uList);
       }
-
-      // 2. Pencocokan Nama Pegawai (jika bukan 'noname')
-      if (rawNama && rawNama.toLowerCase() !== 'noname' && rawNama !== '-') {
-        const normTarget = rawNama.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
-        let matchedUser = uList.find(u => (u.nama || '').toLowerCase().trim() === rawNama.toLowerCase());
-        if (!matchedUser) {
-          // Strip gelar umum dan cocokkan kata inti nama
-          const stripTitles = s => String(s || '')
-            .replace(/\b(drs|dra|dr|ir|h|hj|sh|mh|sag|ssi|sip|se|st|skom|amd|ab|mm|mpd|ma|shi|mhi|ak|ca)\b\.?/gi, ' ')
-            .replace(/[^a-zA-Z\s]/g, ' ')
-            .replace(/\s+/g, ' ')
-            .trim()
-            .toLowerCase();
-          const targetCore = stripTitles(rawNama);
-          if (targetCore.length >= 3) {
-            matchedUser = uList.find(u => {
-              const uCore = stripTitles(u.nama);
-              return uCore && (uCore === targetCore || uCore.includes(targetCore) || targetCore.includes(uCore));
-            });
-          }
-        }
-        if (matchedUser) {
-          row.nip = matchedUser.nip;
-          row.nama = matchedUser.nama;
-          if (!row.jabatan_dinas || row.jabatan_dinas === '-') row.jabatan_dinas = matchedUser.jabatan || '-';
-          return row;
-        }
-      }
-
-      // 3. Jika nama masih 'noname' atau kosong, coba cocokkan dari Jabatan Dalam Dinas yang spesifik (misal: Wakil Ketua, Panitera, Sekretaris)
-      if ((!rawNama || rawNama.toLowerCase() === 'noname') && rawJabDinas) {
-        const jabLower = rawJabDinas.toLowerCase().trim();
-        const candidates = uList.filter(u => {
-          const uJab = (u.jabatan || '').toLowerCase().trim();
-          if (!uJab) return false;
-          if (jabLower === 'wakil ketua') return uJab === 'wakil ketua';
-          if (jabLower === 'ketua') return uJab === 'ketua';
-          if (jabLower === 'panitera') return uJab === 'panitera';
-          if (jabLower === 'sekretaris') return uJab === 'sekretaris';
-          return uJab === jabLower;
-        });
-        if (candidates.length === 1) {
-          row.nip = candidates[0].nip;
-          row.nama = candidates[0].nama;
-        }
-      }
-
       return row;
     },
 
     parseHtmlTablesForLampiran(htmlText) {
-      if (!htmlText || typeof DOMParser === 'undefined') return null;
-      try {
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(htmlText, 'text/html');
-        const tables = Array.from(doc.querySelectorAll('table'));
-        for (const tbl of tables) {
-          const trs = Array.from(tbl.querySelectorAll('tr'));
-          if (trs.length < 2) continue;
-
-          // Cari baris header yang memiliki kata 'nama' dan ('jabatan' atau 'kedudukan' atau 'tim' atau 'peran')
-          let headerRowIdx = -1;
-          let headerCells = [];
-          for (let r = 0; r < Math.min(3, trs.length); r++) {
-            const cells = Array.from(trs[r].querySelectorAll('th, td')).map(c => (c.textContent || '').replace(/\s+/g, ' ').trim());
-            const joined = cells.join(' ').toLowerCase();
-            if (joined.includes('nama') && (joined.includes('jabatan') || joined.includes('kedudukan') || joined.includes('tim') || joined.includes('peran'))) {
-              headerRowIdx = r;
-              headerCells = cells;
-              break;
-            }
-          }
-          if (headerRowIdx === -1) continue;
-
-          // Petakan indeks kolom secara adaptif
-          let idxNo = -1, idxNama = -1, idxDinas = -1, idxTim = -1, idxExtra = -1;
-          const headersObj = {
-            no: 'No',
-            nama: 'Nama',
-            jabatan_dinas: 'Jabatan Dalam Dinas',
-            jabatan_tim: 'Jabatan Tim',
-            extra: 'Keterangan'
-          };
-
-          headerCells.forEach((hText, cIdx) => {
-            const hLow = hText.toLowerCase();
-            if (idxNo === -1 && /^(no|nomor|urut)\b/.test(hLow)) {
-              idxNo = cIdx;
-              headersObj.no = hText || 'No';
-            } else if (idxNama === -1 && hLow.includes('nama')) {
-              idxNama = cIdx;
-              headersObj.nama = hText || 'Nama';
-            } else if (idxTim === -1 && (hLow.includes('tim') || hLow.includes('kedudukan') || hLow.includes('peran') || hLow.includes('penugasan'))) {
-              idxTim = cIdx;
-              headersObj.jabatan_tim = hText || 'Jabatan Tim';
-            } else if (idxDinas === -1 && (hLow.includes('dinas') || hLow.includes('jabatan') || hLow.includes('pangkat') || hLow.includes('struktural'))) {
-              idxDinas = cIdx;
-              headersObj.jabatan_dinas = hText || 'Jabatan Dalam Dinas';
-            } else if (idxExtra === -1) {
-              idxExtra = cIdx;
-              headersObj.extra = hText || 'Keterangan';
-            }
-          });
-
-          // Fallback jika ada 2 kolom 'jabatan' dan belum terpetakan
-          if (idxNama !== -1 && idxDinas === -1 && idxTim === -1 && headerCells.length >= 4) {
-            idxDinas = 2;
-            idxTim = 3;
-          } else if (idxNama !== -1 && idxTim !== -1 && idxDinas === -1 && headerCells.length >= 3) {
-            idxDinas = headerCells.findIndex((_, i) => i !== idxNo && i !== idxNama && i !== idxTim);
-          }
-
-          const extractedRows = [];
-          let lastJabatanTim = 'Anggota';
-
-          for (let r = headerRowIdx + 1; r < trs.length; r++) {
-            const tdEls = Array.from(trs[r].querySelectorAll('td, th'));
-            if (tdEls.length < 2) continue;
-
-            // Cek apakah di dalam sel terdapat multi-paragraf (beberapa baris pegawai digabung dalam 1 sel Word)
-            const getCellLines = (colIdx) => {
-              if (colIdx < 0 || colIdx >= tdEls.length) return [''];
-              const cell = tdEls[colIdx];
-              const pList = Array.from(cell.querySelectorAll('p, li'));
-              if (pList.length > 1) {
-                return pList.map(p => (p.textContent || '').replace(/\s+/g, ' ').trim()).filter(Boolean);
-              }
-              return [(cell.textContent || '').replace(/\s+/g, ' ').trim()];
-            };
-
-            const namaLines = getCellLines(idxNama !== -1 ? idxNama : 1);
-            const dinasLines = getCellLines(idxDinas !== -1 ? idxDinas : 2);
-            const timLines = getCellLines(idxTim !== -1 ? idxTim : 3);
-            const extraLines = idxExtra !== -1 ? getCellLines(idxExtra) : [''];
-
-            const maxSubRows = Math.max(namaLines.length, dinasLines.length);
-            for (let s = 0; s < maxSubRows; s++) {
-              const nm = namaLines[s] !== undefined ? namaLines[s] : (namaLines[0] || '');
-              const dn = dinasLines[s] !== undefined ? dinasLines[s] : (dinasLines[0] || '');
-              let tm = timLines[s] !== undefined ? timLines[s] : (timLines[0] || '');
-              const ex = extraLines[s] !== undefined ? extraLines[s] : (extraLines[0] || '');
-
-              if (tm) lastJabatanTim = tm;
-              else tm = lastJabatanTim;
-
-              if (nm || dn) {
-                const rowObj = {
-                  nama: nm,
-                  nip: '',
-                  jabatan_dinas: dn,
-                  jabatan_tim: tm || 'Anggota',
-                  extra: ex
-                };
-                this.autoMatchPegawaiRow(rowObj);
-                extractedRows.push(rowObj);
-              }
-            }
-          }
-
-          if (extractedRows.length > 0) {
-            return {
-              headers: headersObj,
-              show_extra: idxExtra !== -1,
-              rows: extractedRows
-            };
-          }
-        }
-      } catch (e) {
-        console.warn("[Smart SK] HTML Table parse warning:", e);
+      const uList = (this.globalState && Array.isArray(this.globalState.usersList)) ? this.globalState.usersList : [];
+      if (window.SkDocParser && typeof window.SkDocParser.parseHtmlTablesForLampiran === 'function') {
+        return window.SkDocParser.parseHtmlTablesForLampiran(htmlText, uList);
       }
       return null;
     },

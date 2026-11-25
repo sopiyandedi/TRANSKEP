@@ -107,7 +107,11 @@ const SkDataService = {
         link_drive: safeLink,
         status: payload.status || "Aktif",
         versi_aktif: Number(payload.versi_aktif) || 1,
-        members: Array.isArray(payload.members) ? payload.members : [],
+        members: Array.isArray(payload.members)
+          ? payload.members
+              .map(m => ({ nip: String(m.nip || '').trim(), peran: String(m.peran || 'Anggota').trim() || 'Anggota' }))
+              .filter(m => m.nip)
+          : [],
         naskah_utama: payload.naskah_utama !== undefined ? payload.naskah_utama : null,
         lampiran: Array.isArray(payload.lampiran) ? payload.lampiran : [],
         template_gdoc_id: payload.template_gdoc_id || '',

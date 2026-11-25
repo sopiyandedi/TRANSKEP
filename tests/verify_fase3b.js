@@ -3478,6 +3478,245 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
     aktSandbox.vmAktivitasModal.filterRange = 'all';
     assert.strictEqual(aktSandbox.vmAktivitasModal.summaryStats.securityAlerts, 1, 'All filter must count historical incident in summary card');
     console.log('[PASS] Tahap 157 Autofill Attributes, Reset Preservation, 1x Sync Retry & Activity KPI Range Sync verified.');
+
+    // =========================================================================
+    // TAHAP 158: SMART DROP PDF/WORD AUTO-FILL & PROTEKSI PDF ANTI-EDIT
+    // =========================================================================
+    const repoRoot158 = process.cwd();
+    const SkDocParser = require(path.join(repoRoot158, 'modules/sk/sk_doc_parser.js'));
+
+    // 1. Parser Metadata & Tanggal Indonesia
+    assert.strictEqual(SkDocParser.parseIndoDateToIso('10 Agustus 2026'), '2026-08-10');
+    const sampleSkText = [
+      'KEPUTUSAN SEKRETARIS PENGADILAN AGAMA INDRAMAYU',
+      'Nomor : 643/SEK.KPA.W10-A2/SK.PL1.2.3/VIII/2026',
+      'TENTANG',
+      'TIM PANITIA PENJUALAN LELANG BARANG MILIK NEGARA',
+      'Membaca : -',
+      'Menimbang : a. bahwa untuk kelancaran...',
+      'Ditetapkan di : Indramayu',
+      'Pada tanggal : 10 Agustus 2026'
+    ].join('\n');
+    const meta158 = SkDocParser.extractCoreSkMetadata(sampleSkText, 'dummy.pdf');
+    assert.strictEqual(meta158.no_sk, '643/SEK.KPA.W10-A2/SK.PL1.2.3/VIII/2026');
+    assert.strictEqual(meta158.judul_sk, 'TIM PANITIA PENJUALAN LELANG BARANG MILIK NEGARA');
+    assert.strictEqual(meta158.tgl_sk, '2026-08-10');
+
+    // 2. Rekonstruksi Baris & Tabel Lampiran dari Koordinat X/Y PDF.js
+    const users158 = [
+      { nip: '198001012005011001', nama: 'Agus Salim, S.H.I.', jabatan: 'Sekretaris', role: 'User' },
+      { nip: '198502022010011002', nama: 'Erlendi Maulid, S.E., S.H.', jabatan: 'Kepala Sub Bagian Umum dan Keuangan', role: 'User' },
+      { nip: '199203032019032003', nama: 'Tutwuri Handayani, S.Ak.', jabatan: 'Operator - Penata Layanan Operasional', role: 'User' }
+    ];
+    const mkItem = (x, y, str, width = 60) => ({ str, transform: [1, 0, 0, 1, x, y], width });
+    const pdfRowsPage = SkDocParser.groupPdfTextItemsToRows([
+      // Header tabel
+      mkItem(40, 700, 'No', 18),
+      mkItem(80, 700, 'Nama', 50),
+      mkItem(230, 700, 'Jabatan Dalam Dinas', 95),
+      mkItem(410, 700, 'Jabatan Tim', 75),
+      // Baris 1: cocok nama persis + jabatan dinas 2 baris
+      mkItem(40, 670, '1', 12),
+      mkItem(80, 670, 'Agus Salim, S.H.I.', 90),
+      mkItem(230, 670, 'Sekretaris', 60),
+      mkItem(410, 670, 'Pemohon', 50),
+      // Baris 2: cocok NIP di bawah nama + word-wrap jabatan dinas tanpa nomor baru
+      mkItem(40, 640, '2', 12),
+      mkItem(80, 640, 'Erlendi Maulid', 85),
+      mkItem(230, 640, 'Kepala Sub Bagian', 85),
+      mkItem(410, 640, 'Penjual', 45),
+      mkItem(80, 626, 'NIP. 198502022010011002', 95),
+      mkItem(230, 626, 'Umum dan Keuangan', 90),
+      // Baris 3: peran kosong mewarisi peran atau default, plus baris ke-4 tidak cocok (perlu cek kuning)
+      mkItem(40, 595, '3', 12),
+      mkItem(80, 595, 'Tutwuri Handayani, S.Ak.', 105),
+      mkItem(230, 595, 'Operator', 55),
+      mkItem(410, 595, 'Anggota', 45),
+      mkItem(40, 565, '4', 12),
+      mkItem(80, 565, 'Pihak Eksternal KPKNL', 100),
+      mkItem(230, 565, 'Pejabat Lelang', 70),
+      // Blok TTD di bawah tabel (harus berhenti, tidak ikut jadi anggota)
+      mkItem(360, 480, 'KETUA PENGADILAN AGAMA INDRAMAYU', 160)
+    ]);
+    const extractedMembers158 = SkDocParser.extractLampiranMembersFromPdfPages([pdfRowsPage], users158);
+    assert.strictEqual(extractedMembers158.length, 4, 'Harus mengekstrak tepat 4 baris tim tanpa menelan blok TTD');
+    assert.strictEqual(extractedMembers158[0].nip, '198001012005011001');
+    assert.strictEqual(extractedMembers158[1].nip, '198502022010011002');
+    assert.ok(extractedMembers158[1].jabatan_dinas.includes('Umum dan Keuangan'), 'Word-wrap jabatan dinas harus digabung');
+    const split158 = SkDocParser.splitMatchedMembersForForm(extractedMembers158);
+    assert.strictEqual(split158.matched.length, 3, '3 pegawai harus masuk daftar cocok Hijau');
+    assert.strictEqual(split158.unmatched.length, 1, '1 nama luar harus ditandai Kuning perlu cek Admin');
+    assert.strictEqual(split158.unmatched[0].source_nama, 'Pihak Eksternal KPKNL');
+
+    // 3. Proteksi PDF PKCS#7 & Pengaman Tidak Merusak TTE BSrE Eksisting
+    const signerCtx158 = vm.createContext({
+      console,
+      Uint8Array,
+      Array,
+      Object,
+      Date,
+      String,
+      Number,
+      Math,
+      RegExp,
+      Error,
+      Promise,
+      Buffer,
+      atob: (s) => Buffer.from(s, 'base64').toString('binary'),
+      btoa: (s) => Buffer.from(s, 'binary').toString('base64'),
+      SkDocParser
+    });
+    signerCtx158.window = signerCtx158;
+    signerCtx158.self = signerCtx158;
+    vm.runInContext(fs.readFileSync(path.join(repoRoot158, 'vendor/pdf-lib.min.js'), 'utf8'), signerCtx158);
+    vm.runInContext(fs.readFileSync(path.join(repoRoot158, 'vendor/forge.min.js'), 'utf8'), signerCtx158);
+    vm.runInContext(fs.readFileSync(path.join(repoRoot158, 'core/pdf_signer.js'), 'utf8'), signerCtx158);
+
+    const blankPdfDoc = await signerCtx158.PDFLib.PDFDocument.create();
+    blankPdfDoc.addPage([595, 842]).drawText('SK Uji Coba PA Indramayu');
+    const plainPdfBytes = await blankPdfDoc.save({ useObjectStreams: false });
+    assert.strictEqual(SkDocParser.detectEmbeddedPdfSignature(plainPdfBytes).isExternalOrSigned, false);
+
+    const sealedRes158 = await signerCtx158.TranskepPdfSigner.protectAndSealPdf(plainPdfBytes, {
+      flatten: false,
+      seal: true,
+      noSk: '643/SEK/VIII/2026',
+      judulSk: 'SK Lelang BMN'
+    });
+    assert.strictEqual(sealedRes158.signed, true);
+    assert.strictEqual(sealedRes158.skippedExistingSig, false);
+    const sealedStr158 = Buffer.from(sealedRes158.bytes).toString('latin1');
+    assert.ok(sealedStr158.includes('/Type /Sig'), 'PDF tersegel harus memiliki /Type /Sig');
+    assert.ok(sealedStr158.includes('/SubFilter /adbe.pkcs7.detached'), 'PDF tersegel harus memakai PKCS#7 detached');
+    assert.ok(!sealedStr158.includes('/ByteRange [ 0 1000000000'), 'Placeholder ByteRange harus terganti offset aktual');
+
+    const recheckSig158 = await signerCtx158.TranskepPdfSigner.protectAndSealPdf(sealedRes158.bytes, {
+      flatten: true,
+      seal: true
+    });
+    assert.strictEqual(recheckSig158.skippedExistingSig, true, 'PDF yang sudah bertanda tangan digital harus dilewati agar TTE asli tidak rusak');
+
+    // 4. Uji Mode Modal Daftarkan SK Baru vs Ubah Data SK & PWA Assets
+    const skModalCtx158 = vm.createContext({
+      console,
+      window: null,
+      document: { addEventListener: (ev, fn) => { if (ev === 'DOMContentLoaded') skModalCtx158._domCb = fn; } },
+      localStorage: { getItem: () => 'tok-admin' },
+      state: { usersList: users158, skList: [], skAckList: [] },
+      vueState: {
+        user: { nip: '198001012005011001', nama: 'Agus Salim, S.H.I.', role: 'Admin' },
+        usersList: users158,
+        skList: [],
+        skAckList: []
+      },
+      SkDocParser,
+      SkBuilderMixin: {},
+      showNotify: (t, m, tp) => { skModalCtx158._lastNotify = { t, m, tp }; },
+      Vue: {
+        createApp: (opts) => ({
+          mount: () => {
+            const inst = {
+              ...(opts.data ? opts.data() : {}),
+              ...(opts.methods || {}),
+              $refs: {}
+            };
+            Object.entries(opts.computed || {}).forEach(([k, fn]) => {
+              Object.defineProperty(inst, k, { get: () => fn.call(inst), configurable: true });
+            });
+            skModalCtx158._vm = inst;
+            return inst;
+          }
+        })
+      }
+    });
+    skModalCtx158.window = skModalCtx158;
+    vm.runInContext(fs.readFileSync(path.join(repoRoot158, 'modules/sk/sk.js'), 'utf8'), skModalCtx158);
+    if (skModalCtx158._domCb) skModalCtx158._domCb();
+    const vmSk158 = skModalCtx158._vm;
+    assert.ok(vmSk158, 'vmSkApp harus terinisialisasi');
+
+    // Simulasi mode 'add' -> pj_sk harus kosong wajib pilih manual
+    vmSk158.openSkFormModal('add');
+    assert.strictEqual(vmSk158.formSk.pj_sk, '', 'Mode Daftarkan SK Baru harus mengosongkan pj_sk agar Admin memilih manual');
+
+    // Simulasi parsing di mode 'add'
+    vmSk158.SkDataService = {
+      validateAndReadPdf: async (f) => ({ base64: Buffer.from(plainPdfBytes).toString('base64'), file: f })
+    };
+    skModalCtx158.SkDataService = vmSk158.SkDataService;
+    SkDocParser.parsePdfFile = async () => ({
+      sourceType: 'pdf',
+      numPages: 1,
+      hasReadableText: true,
+      sigInfo: { isExternalOrSigned: false, isBsre: false },
+      no_sk: '643/SEK/VIII/2026',
+      judul_sk: 'SK BARU DARI PDF',
+      tgl_sk: '2026-08-10',
+      members: extractedMembers158
+    });
+    const fakePdfFile = {
+      name: 'SK_Baru.pdf',
+      type: 'application/pdf',
+      size: plainPdfBytes.length,
+      arrayBuffer: async () => plainPdfBytes.buffer.slice(plainPdfBytes.byteOffset, plainPdfBytes.byteOffset + plainPdfBytes.byteLength)
+    };
+    await vmSk158.processSkFiles([fakePdfFile]);
+    assert.strictEqual(vmSk158.formSk.judul_sk, 'SK BARU DARI PDF');
+    assert.strictEqual(vmSk158.formSk.no_sk, '643/SEK/VIII/2026');
+    assert.strictEqual(vmSk158.formSk.tgl_sk, '2026-08-10');
+    assert.strictEqual(vmSk158.formSk.pj_sk, '', 'Auto-fill di Daftarkan SK Baru tidak boleh menimpa pj_sk');
+    assert.strictEqual(vmSk158.tempMembers.length, 3);
+    assert.strictEqual(vmSk158.skUnmatchedMembers.length, 1);
+    assert.strictEqual(vmSk158.skProtectAntiEdit, true);
+
+    // Simulasi mode 'edit' -> mempertahankan judul, nomor, tanggal, PJ lama & menyediakan konfirmasi 1-klik anggota
+    vmSk158.firestoreSks = [{
+      id: 'SK-OLD-158',
+      judul_sk: 'SK LAMA TETAP',
+      no_sk: '111/KPA/I/2026',
+      tgl_sk: '2026-01-05',
+      pj_sk: 'PJ. Manajemen',
+      link_drive: 'https://drive.google.com/file/d/old/view',
+      members: [{ nip: '198001012005011001', peran: 'Ketua' }]
+    }];
+    vmSk158.openSkFormModal('edit', 'SK-OLD-158');
+    // Override computed groupedSkData read simply for VM instance without Vue reactivity proxy
+    vmSk158.formSk = {
+      id: 'SK-OLD-158',
+      tgl_input: '2026-01-05',
+      judul_sk: 'SK LAMA TETAP',
+      pj_sk: 'PJ. Manajemen',
+      link_drive: 'https://drive.google.com/file/d/old/view',
+      no_sk: '111/KPA/I/2026',
+      tgl_sk: '2026-01-05'
+    };
+    vmSk158.tempMembers = [{ nip: '198001012005011001', peran: 'Ketua' }];
+    await vmSk158.processSkFiles([fakePdfFile]);
+    assert.strictEqual(vmSk158.formSk.judul_sk, 'SK LAMA TETAP', 'Mode Edit wajib mempertahankan judul lama');
+    assert.strictEqual(vmSk158.formSk.no_sk, '111/KPA/I/2026', 'Mode Edit wajib mempertahankan nomor SK lama');
+    assert.strictEqual(vmSk158.formSk.tgl_sk, '2026-01-05', 'Mode Edit wajib mempertahankan tanggal SK lama');
+    assert.strictEqual(vmSk158.formSk.pj_sk, 'PJ. Manajemen', 'Mode Edit wajib mempertahankan PJ SK lama');
+    assert.ok(vmSk158.skPendingEditMembers, 'Harus menawarkan konfirmasi 1-klik ganti anggota bila sebelumnya sudah ada anggota');
+    assert.strictEqual(vmSk158.tempMembers.length, 1, 'Anggota lama belum boleh tertimpa sebelum konfirmasi Admin');
+    vmSk158.applyPendingEditMembers();
+    assert.strictEqual(vmSk158.tempMembers.length, 3, 'Setelah konfirmasi, anggota harus ter-update dari dokumen');
+    assert.strictEqual(vmSk158.skUnmatchedMembers.length, 1);
+
+    // 5. Cek PWA Cache & Index Script v3.8.99 + UI View Markup
+    const idxHtml158 = fs.readFileSync(path.join(repoRoot158, 'index.html'), 'utf8');
+    const swJs158 = fs.readFileSync(path.join(repoRoot158, 'sw.js'), 'utf8');
+    const viewSk158 = fs.readFileSync(path.join(repoRoot158, 'modules/sk/view_sk.html'), 'utf8');
+    assert.ok(idxHtml158.includes("APP_BUILD_VER = '3.8.99'"));
+    assert.ok(idxHtml158.includes('vendor/pdf.min.js'));
+    assert.ok(idxHtml158.includes('modules/sk/sk_doc_parser.js'));
+    assert.ok(swJs158.includes("CACHE_NAME = 'transkep-v3.8.99'"));
+    assert.ok(swJs158.includes('./vendor/pdf.min.js'));
+    assert.ok(swJs158.includes('./vendor/pdf.worker.min.js'));
+    assert.ok(swJs158.includes('./modules/sk/sk_doc_parser.js'));
+    assert.ok(viewSk158.includes('skProtectAntiEdit'));
+    assert.ok(viewSk158.includes('skUnmatchedMembers'));
+    assert.ok(viewSk158.includes('skPendingEditMembers'));
+    console.log('[PASS] Tahap 158 Smart Drop PDF/Word Auto-Fill, Anti-Edit Seal & SK Form Modes verified.');
   } finally {
     browserSandbox.TranskepAPI.call = origApiCall;
     browserSandbox.TranskepFirebase.getDb = origGetDb;

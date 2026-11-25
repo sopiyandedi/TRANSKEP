@@ -65,9 +65,10 @@
     integrity="sha384-Ke0FJhH7LyRqDxZ0wt+/OXV38yfQVu7g9VPEEGjYmB4RVOY/ta04uecRhsMwT7V3"
     crossorigin="anonymous"></script>
 
-  <!-- PDF-Lib & Node-Forge (Digital Signature PAdES Engine) -->
+  <!-- PDF-Lib, Node-Forge & PDF.js (Digital Signature & Local PDF Reader) -->
   <script src="vendor/pdf-lib.min.js"></script>
   <script src="vendor/forge.min.js"></script>
+  <script src="vendor/pdf.min.js"></script>
 
   <!-- Google Fonts: Plus Jakarta Sans -->
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&display=swap"
@@ -147,7 +148,7 @@
 
   <!-- TRANSKEP: Auto-Bust PWA Cache & Stale Service Worker Guard -->
   <script>
-    window.APP_BUILD_VER = '3.8.98';
+    window.APP_BUILD_VER = '3.8.99';
     (async function () {
       const CURRENT_APP_BUILD = 'transkep-v' + window.APP_BUILD_VER;
       if (localStorage.getItem('transkep_active_build') !== CURRENT_APP_BUILD) {
@@ -490,6 +491,7 @@
         'modules/pkp/pkp_data.js',
         'modules/jobdes/jobdes_data.js',
         'modules/sk/sk_data.js',
+        'modules/sk/sk_doc_parser.js',
         'modules/sop/sop_data.js',
         'modules/kinerja/kinerja_data.js',
         'modules/eoffice/tabel_gaji_pp5_2024.js',
@@ -543,7 +545,7 @@
       ];
 
       try {
-        const APP_BUILD_VER = window.APP_BUILD_VER || '3.8.98';
+        const APP_BUILD_VER = window.APP_BUILD_VER || '3.8.99';
         console.log('🔄 [TRANSKEP Loader] Memuat komponen tampilan views/ secara paralel...');
         await Promise.all(VIEW_SLOTS.map(async item => {
           const res = await fetch(item.file + '?v=' + APP_BUILD_VER, { cache: 'no-cache' });

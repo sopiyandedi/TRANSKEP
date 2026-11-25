@@ -1322,6 +1322,222 @@ ${absXrefOffset}
         const notify = global.showNotify || alert;
         notify('Gagal TTE Digital', err.message || 'Terjadi kesalahan sistem saat membuat PDF.', 'error');
       }
+    },
+
+    /**
+     * Mengubah Data URI Base64 (mis. hasil canvas.toDataURL) menjadi Uint8Array tanpa fetch() agar lolos CSP.
+     */
+    dataUrlToUint8Array(dataUrl) {
+      const b64 = String(dataUrl || '').split(',')[1] || '';
+      const bin = atob(b64);
+      const out = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) {
+        out[i] = bin.charCodeAt(i);
+      }
+      return out;
+    },
+
+    /**
+     * Mengubah Uint8Array menjadi string Base64 murni untuk upload Google Drive via GAS.
+     */
+    uint8ToBase64(bytes) {
+      const arr = (bytes instanceof Uint8Array) ? bytes : new Uint8Array(bytes);
+      let bin = '';
+      const CHUNK = 8192;
+      for (let i = 0; i < arr.length; i += CHUNK) {
+        bin += String.fromCharCode.apply(null, arr.subarray(i, Math.min(i + CHUNK, arr.length)));
+      }
+      return btoa(bin);
+    },
+
+    /**
+     * Melindungi PDF SK (Flatten halaman menjadi gambar menyatu via PDF.js + Segel Kriptografis PKCS#7).
+     * Otomatis melewati proses apabila PDF sudah membawa tanda tangan digital resmi (mis. BSrE).
+     * @param {Uint8Array|ArrayBuffer} pdfBytes
+     * @param {Object} options { flatten, seal, signerUser, noSk, judulSk }
+     * @returns {Promise<{bytes: Uint8Array, flattened: boolean, signed: boolean, skippedExistingSig: boolean, numPages: number}>}
+     */
+    async protectAndSealPdf(pdfBytes, options = {}) {
+      if (!this.isReady()) {
+        throw new Error('Pustaka pdf-lib atau forge belum siap.');
+      }
+      const PDFLib = global.PDFLib;
+      const { PDFDocument, PDFName, PDFNumber, PDFHexString, PDFString, StandardFonts, rgb } = PDFLib;
+
+      const inputBytes = (pdfBytes instanceof Uint8Array) ? pdfBytes : new Uint8Array(pdfBytes);
+
+      // Pengaman wajib: jangan ubah/timpa PDF yang sudah membawa tanda tangan digital (mis. TTE BSrE)
+      if (global.SkDocParser && typeof global.SkDocParser.detectEmbeddedPdfSignature === 'function') {
+        const sigCheck = global.SkDocParser.detectEmbeddedPdfSignature(inputBytes);
+        if (sigCheck && sigCheck.isExternalOrSigned) {
+          return {
+            bytes: inputBytes,
+            flattened: false,
+            signed: false,
+            skippedExistingSig: true,
+            numPages: 0
+          };
+        }
+      }
+
+      const wantFlatten = options.flatten !== false;
+      const wantSeal = options.seal !== false;
+
+      let pdfDoc = null;
+      let didFlatten = false;
+      let numPages = 0;
+
+      if (wantFlatten) {
+        if (typeof global.pdfjsLib === 'undefined' || typeof document === 'undefined') {
+          throw new Error('Pembaca PDF (pdf.js) atau Canvas browser belum tersedia untuk proses Flatten.');
+        }
+        if (global.pdfjsLib.GlobalWorkerOptions && !global.pdfjsLib.GlobalWorkerOptions.workerSrc) {
+          global.pdfjsLib.GlobalWorkerOptions.workerSrc = 'vendor/pdf.worker.min.js';
+        }
+
+        const loadingTask = global.pdfjsLib.getDocument({ data: inputBytes.slice(0) });
+        const srcPdf = await loadingTask.promise;
+        numPages = srcPdf.numPages || 0;
+
+        // Skala dan kompresi JPEG adaptif agar multi-halaman tetap tajam dan hemat ukuran (< 10 MB)
+        const renderScale = numPages <= 6 ? 2.0 : (numPages <= 15 ? 1.65 : 1.4);
+        const jpegQuality = numPages <= 6 ? 0.88 : (numPages <= 15 ? 0.80 : 0.72);
+
+        pdfDoc = await PDFDocument.create();
+        for (let p = 1; p <= numPages; p++) {
+          const srcPage = await srcPdf.getPage(p);
+          const origVp = srcPage.getViewport({ scale: 1 });
+          const hiResVp = srcPage.getViewport({ scale: renderScale });
+
+          const canvas = document.createElement('canvas');
+          canvas.width = Math.max(1, Math.round(hiResVp.width));
+          canvas.height = Math.max(1, Math.round(hiResVp.height));
+          const ctx = canvas.getContext('2d');
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+          await srcPage.render({ canvasContext: ctx, viewport: hiResVp }).promise;
+          const jpgDataUrl = canvas.toDataURL('image/jpeg', jpegQuality);
+          const jpgBytes = this.dataUrlToUint8Array(jpgDataUrl);
+          const jpgImage = await pdfDoc.embedJpg(jpgBytes);
+
+          const outPage = pdfDoc.addPage([origVp.width, origVp.height]);
+          outPage.drawImage(jpgImage, {
+            x: 0,
+            y: 0,
+            width: origVp.width,
+            height: origVp.height
+          });
+        }
+        didFlatten = true;
+      } else {
+        pdfDoc = await PDFDocument.load(inputBytes);
+        numPages = pdfDoc.getPageCount();
+      }
+
+      const pages = pdfDoc.getPages();
+      if (pages.length === 0) {
+        throw new Error('Dokumen PDF tidak memiliki halaman yang valid.');
+      }
+      const lastPage = pages[pages.length - 1];
+
+      // Tambahkan jejak segel teks sangat halus di tepi paling bawah halaman terakhir bila di-flatten
+      if (didFlatten) {
+        try {
+          const footerFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
+          const cleanNoSk = String(options.noSk || '-').replace(/[^\x20-\x7E]/g, ' ').trim();
+          const sealLine = `Diarsipkan & disegel digital oleh TRANSKEP PA Indramayu | No. SK: ${cleanNoSk}`;
+          lastPage.drawText(sealLine.slice(0, 110), {
+            x: 24,
+            y: 8,
+            size: 6.5,
+            font: footerFont,
+            color: rgb(0.38, 0.42, 0.48)
+          });
+        } catch (eFooter) {}
+      }
+
+      if (!wantSeal) {
+        const plainBytes = await pdfDoc.save({ useObjectStreams: false });
+        return {
+          bytes: plainBytes,
+          flattened: didFlatten,
+          signed: false,
+          skippedExistingSig: false,
+          numPages
+        };
+      }
+
+      // Suntikkan kamus AcroForm + Widget Signature1 untuk segel PKCS#7 Detached
+      const signerUser = options.signerUser || {
+        nama: 'Arsip Digital TRANSKEP PA Indramayu',
+        nip: '-',
+        jabatan: 'Administrator Sistem Kepegawaian'
+      };
+      const certObj = this.generateCertificate(signerUser);
+
+      const byteRangeArray = pdfDoc.context.obj([
+        PDFNumber.of(0),
+        PDFNumber.of(1000000000),
+        PDFNumber.of(1000000000),
+        PDFNumber.of(1000000000)
+      ]);
+      const dummyContents = PDFHexString.of('0'.repeat(this.SIGNATURE_SLOT_SIZE));
+      const cleanJudul = String(options.judulSk || 'Surat Keputusan PA Indramayu').replace(/[^\x20-\x7E]/g, ' ').slice(0, 80);
+
+      const sigDict = pdfDoc.context.obj({
+        Type: 'Sig',
+        Filter: 'Adobe.PPKLite',
+        SubFilter: 'adbe.pkcs7.detached',
+        ByteRange: byteRangeArray,
+        Contents: dummyContents,
+        Reason: PDFString.of(`Segel Integritas Arsip SK TRANSKEP: ${cleanJudul}`),
+        M: PDFString.of(`D:${new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14)}+07'00'`),
+        Name: PDFString.of(String(signerUser.nama || 'TRANSKEP PA Indramayu').replace(/[^\x20-\x7E]/g, ' ')),
+        Location: PDFString.of('Indramayu')
+      });
+      const sigDictRef = pdfDoc.context.register(sigDict);
+
+      const widgetDict = pdfDoc.context.obj({
+        Type: 'Annot',
+        Subtype: 'Widget',
+        FT: 'Sig',
+        Rect: [0, 0, 0, 0],
+        V: sigDictRef,
+        T: PDFString.of('TranskepSeal1'),
+        F: 132,
+        P: lastPage.ref
+      });
+      const widgetRef = pdfDoc.context.register(widgetDict);
+
+      // Pertahankan annot yang mungkin sudah ada pada halaman apabila tidak di-flatten
+      const existingAnnots = lastPage.node.lookup(PDFName.of('Annots'));
+      if (existingAnnots && typeof existingAnnots.asArray === 'function') {
+        existingAnnots.push(widgetRef);
+      } else {
+        lastPage.node.set(PDFName.of('Annots'), pdfDoc.context.obj([widgetRef]));
+      }
+
+      const acroFormDict = pdfDoc.context.obj({
+        Fields: [widgetRef],
+        SigFlags: 3
+      });
+      pdfDoc.catalog.set(PDFName.of('AcroForm'), acroFormDict);
+
+      const rawDocBytes = await pdfDoc.save({ useObjectStreams: false });
+      const signedBytes = this.signPdfBytes(rawDocBytes, certObj, {
+        reason: `Segel Integritas Arsip SK TRANSKEP: ${cleanJudul}`,
+        location: 'Indramayu',
+        signerName: String(signerUser.nama || 'TRANSKEP PA Indramayu').replace(/[^\x20-\x7E]/g, ' ')
+      });
+
+      return {
+        bytes: signedBytes,
+        flattened: didFlatten,
+        signed: true,
+        skippedExistingSig: false,
+        numPages
+      };
     }
   };
 

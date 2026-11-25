@@ -124,15 +124,24 @@ document.addEventListener("DOMContentLoaded", () => {
                 showModalSkForm: false,
                 modalSkMode: 'add',
                 formSk: {
-                    id: '', tgl_input: '', judul_sk: '', pj_sk: 'PJ. Kesekretariatan',
+                    id: '', tgl_input: '', judul_sk: '', pj_sk: '',
                     link_drive: '', no_sk: '', tgl_sk: ''
                 },
                 tempMembers: [],
                 skSearchMemberInput: '',
 
-                // TRANSKEP: State untuk Upload File PDF, Drag-Drop & Pintasan Folder Drive
+                // TRANSKEP: State Upload PDF/Word Smart Dual-Drop, Kunci Anti-Edit & Tanda Cek Admin
                 skSelectedFile: null,
                 skFileDataBase64: null,
+                skFileRawBytes: null,
+                skParsedWordFile: null,
+                skIsParsingDoc: false,
+                skProtectAntiEdit: true,
+                skHasEmbeddedSig: false,
+                skIsBsreSig: false,
+                skParseNotice: null,
+                skUnmatchedMembers: [],
+                skPendingEditMembers: null,
                 isUploading: false,
                 isDraggingSk: false,
                 isOpeningDriveSk: false,
@@ -386,18 +395,27 @@ document.addEventListener("DOMContentLoaded", () => {
                 
                 this.skSelectedFile = null;
                 this.skFileDataBase64 = null;
+                this.skFileRawBytes = null;
+                this.skParsedWordFile = null;
+                this.skIsParsingDoc = false;
+                this.skProtectAntiEdit = true;
+                this.skHasEmbeddedSig = false;
+                this.skIsBsreSig = false;
+                this.skParseNotice = null;
+                this.skUnmatchedMembers = [];
+                this.skPendingEditMembers = null;
                 this.isUploading = false;
                 this.isDraggingSk = false;
                 if(this.$refs.skFileInput) this.$refs.skFileInput.value = '';
                 
                 if(mode === 'add') {
-                    this.formSk = { id: '', tgl_input: '', judul_sk: '', pj_sk: 'PJ. Kesekretariatan', link_drive: '', no_sk: '', tgl_sk: '' };
+                    this.formSk = { id: '', tgl_input: '', judul_sk: '', pj_sk: '', link_drive: '', no_sk: '', tgl_sk: '' };
                     this.tempMembers = [];
                 } else {
                     const sk = this.groupedSkData.find(s => s.id === id);
                     if(sk) {
                         this.formSk = {
-                            id: sk.id, tgl_input: sk.tgl_input, judul_sk: sk.judul_sk, pj_sk: sk.pj_sk,
+                            id: sk.id, tgl_input: sk.tgl_input, judul_sk: sk.judul_sk, pj_sk: sk.pj_sk || '',
                             link_drive: sk.link_drive, no_sk: sk.no_sk !== '-' ? sk.no_sk : "", tgl_sk: sk.tgl_sk !== '-' ? sk.tgl_sk : ""
                         };
                         this.tempMembers = JSON.parse(JSON.stringify(sk.members)); 
@@ -405,27 +423,173 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
                 this.showModalSkForm = true;
             },
-            async processSkFile(file, inputEl = null) {
-                if (!file) return;
+            async processSkFiles(fileList, inputEl = null) {
+                const files = Array.from(fileList || []).filter(Boolean);
+                if (files.length === 0) return;
+
+                let pdfFile = null;
+                let wordFile = null;
+                for (let i = 0; i < files.length; i++) {
+                    const f = files[i];
+                    const nm = (f.name || '').toLowerCase();
+                    if (!pdfFile && (f.type === 'application/pdf' || nm.endsWith('.pdf'))) {
+                        pdfFile = f;
+                    } else if (!wordFile && (nm.endsWith('.docx') || nm.endsWith('.doc'))) {
+                        wordFile = f;
+                    }
+                }
+
+                if (!pdfFile && !wordFile) {
+                    if (inputEl) inputEl.value = '';
+                    if (window.showNotify) window.showNotify("Format Tidak Didukung", "Silakan unggah file .PDF (hasil Save As PDF) atau Word (.docx / .doc).", "warning");
+                    return;
+                }
+
+                this.skIsParsingDoc = true;
+                this.skParseNotice = null;
+                this.skPendingEditMembers = null;
+
                 try {
-                    const result = await window.SkDataService.validateAndReadPdf(file);
-                    this.skFileDataBase64 = result.base64;
-                    this.skSelectedFile = result.file;
+                    const usersList = (this.globalState && Array.isArray(this.globalState.usersList)) ? this.globalState.usersList : [];
+                    let pdfBuffer = null;
+
+                    if (pdfFile) {
+                        const resPdf = await window.SkDataService.validateAndReadPdf(pdfFile);
+                        this.skFileDataBase64 = resPdf.base64;
+                        this.skSelectedFile = resPdf.file;
+                        pdfBuffer = await pdfFile.arrayBuffer();
+                        this.skFileRawBytes = new Uint8Array(pdfBuffer);
+
+                        if (window.SkDocParser && typeof window.SkDocParser.detectEmbeddedPdfSignature === 'function') {
+                            const sigInfo = window.SkDocParser.detectEmbeddedPdfSignature(this.skFileRawBytes);
+                            this.skHasEmbeddedSig = !!(sigInfo && sigInfo.isExternalOrSigned);
+                            this.skIsBsreSig = !!(sigInfo && sigInfo.isBsre);
+                            this.skProtectAntiEdit = !this.skHasEmbeddedSig;
+                        } else {
+                            this.skHasEmbeddedSig = false;
+                            this.skIsBsreSig = false;
+                            this.skProtectAntiEdit = true;
+                        }
+                    }
+
+                    let parsed = null;
+                    let sourceLabel = '';
+                    if (wordFile) {
+                        if (wordFile.size > 15 * 1024 * 1024) {
+                            throw new Error("Ukuran file Word maksimal 15 MB.");
+                        }
+                        this.skParsedWordFile = wordFile;
+                        const wordBuf = await wordFile.arrayBuffer();
+                        if (window.SkDocParser && typeof window.SkDocParser.parseWordFile === 'function') {
+                            parsed = await window.SkDocParser.parseWordFile(wordBuf, wordFile.name, usersList);
+                            sourceLabel = pdfFile ? `Word (${wordFile.name}) + PDF` : `Word (${wordFile.name})`;
+                        }
+                    } else if (pdfFile && pdfBuffer) {
+                        if (window.SkDocParser && typeof window.SkDocParser.parsePdfFile === 'function') {
+                            parsed = await window.SkDocParser.parsePdfFile(pdfBuffer, pdfFile.name, usersList);
+                            sourceLabel = `PDF (${pdfFile.name})`;
+                        }
+                    }
+
+                    if (parsed) {
+                        if (this.modalSkMode === 'add') {
+                            if (parsed.judul_sk) this.formSk.judul_sk = parsed.judul_sk;
+                            if (parsed.no_sk) this.formSk.no_sk = parsed.no_sk;
+                            if (parsed.tgl_sk) this.formSk.tgl_sk = parsed.tgl_sk;
+                            // PJ SK sengaja dibiarkan manual dipilih Admin pada modal Daftarkan SK Baru
+                        } else {
+                            // Ubah Data SK: pertahankan Judul, Nomor, Tanggal, & PJ sebelumnya (isi hanya jika sebelumnya kosong)
+                            if (!String(this.formSk.judul_sk || '').trim() && parsed.judul_sk) this.formSk.judul_sk = parsed.judul_sk;
+                            if (!String(this.formSk.no_sk || '').trim() && parsed.no_sk) this.formSk.no_sk = parsed.no_sk;
+                            if (!String(this.formSk.tgl_sk || '').trim() && parsed.tgl_sk) this.formSk.tgl_sk = parsed.tgl_sk;
+                        }
+
+                        const splitRes = (window.SkDocParser && typeof window.SkDocParser.splitMatchedMembersForForm === 'function')
+                            ? window.SkDocParser.splitMatchedMembersForForm(parsed.members)
+                            : { matched: [], unmatched: [] };
+
+                        if (this.modalSkMode === 'edit' && this.tempMembers.length > 0 && (splitRes.matched.length > 0 || splitRes.unmatched.length > 0)) {
+                            this.skPendingEditMembers = {
+                                matched: splitRes.matched,
+                                unmatched: splitRes.unmatched,
+                                sourceLabel
+                            };
+                        } else if (splitRes.matched.length > 0 || splitRes.unmatched.length > 0) {
+                            this.tempMembers = splitRes.matched;
+                            this.skUnmatchedMembers = splitRes.unmatched;
+                        }
+
+                        if (!parsed.hasReadableText && parsed.sourceType === 'pdf') {
+                            this.skParseNotice = {
+                                tone: 'warning',
+                                title: 'PDF Terdeteksi Tanpa Lapisan Teks (Scan / Print-to-PDF)',
+                                detail: 'File PDF berhasil dilampirkan dan siap dikunci anti-edit, namun teksnya tidak bisa dibaca otomatis. Silakan isi kolom & pilih anggota manual (atau seret file Word .docx bersamaan).'
+                            };
+                        } else if (wordFile && !pdfFile) {
+                            this.skParseNotice = {
+                                tone: 'info',
+                                title: `Data Otomatis Terisi dari ${sourceLabel}`,
+                                detail: `Terbaca ${splitRes.matched.length} anggota cocok` +
+                                        (splitRes.unmatched.length > 0 ? ` (${splitRes.unmatched.length} perlu cek Admin)` : '') +
+                                        '. Untuk mengunggah arsip ke Google Drive, seret juga file PDF hasil Save As PDF dari MS Word.'
+                            };
+                        } else {
+                            this.skParseNotice = {
+                                tone: splitRes.unmatched.length > 0 ? 'warning' : 'success',
+                                title: `Auto-Fill Selesai dari ${sourceLabel}`,
+                                detail: (this.modalSkMode === 'add'
+                                          ? 'Judul, Nomor, Tanggal & Anggota terisi otomatis (PJ SK pilih manual). '
+                                          : 'Judul, Nomor, Tanggal & PJ lama dipertahankan. ') +
+                                        `Cocok: ${splitRes.matched.length} pegawai` +
+                                        (splitRes.unmatched.length > 0 ? `, Perlu dicek Admin: ${splitRes.unmatched.length} baris.` : '.')
+                            };
+                        }
+                    }
                 } catch (err) {
                     if (inputEl) inputEl.value = '';
-                    this.skSelectedFile = null;
-                    this.skFileDataBase64 = null;
-                    if (window.showNotify) window.showNotify("Pemeriksaan Berkas", err.message, "warning");
+                    if (!this.skSelectedFile) {
+                        this.skFileDataBase64 = null;
+                        this.skFileRawBytes = null;
+                    }
+                    if (window.showNotify) window.showNotify("Pemeriksaan Berkas", err.message || err.toString(), "warning");
+                } finally {
+                    this.skIsParsingDoc = false;
                 }
             },
             handleSkFileSelect(event) {
-                const file = event.target.files[0];
-                this.processSkFile(file, event.target);
+                this.processSkFiles(event.target && event.target.files, event.target);
             },
             handleSkFileDrop(event) {
                 this.isDraggingSk = false;
-                const file = event.dataTransfer && event.dataTransfer.files ? event.dataTransfer.files[0] : null;
-                this.processSkFile(file, this.$refs.skFileInput);
+                const files = event.dataTransfer && event.dataTransfer.files ? event.dataTransfer.files : [];
+                this.processSkFiles(files, this.$refs.skFileInput);
+            },
+            resolveUnmatchedMember(uid, selectedNip) {
+                const idx = this.skUnmatchedMembers.findIndex(u => u.uid === uid);
+                if (idx === -1 || !selectedNip) return;
+                const item = this.skUnmatchedMembers[idx];
+                const cleanNip = String(selectedNip).trim();
+                if (!this.tempMembers.some(m => String(m.nip) === cleanNip)) {
+                    this.tempMembers.push({
+                        nip: cleanNip,
+                        peran: item.peran || 'Anggota',
+                        _matchLabel: 'Dipilih Admin'
+                    });
+                }
+                this.skUnmatchedMembers.splice(idx, 1);
+            },
+            dismissUnmatchedMember(uid) {
+                this.skUnmatchedMembers = this.skUnmatchedMembers.filter(u => u.uid !== uid);
+            },
+            applyPendingEditMembers() {
+                if (!this.skPendingEditMembers) return;
+                this.tempMembers = JSON.parse(JSON.stringify(this.skPendingEditMembers.matched || []));
+                this.skUnmatchedMembers = JSON.parse(JSON.stringify(this.skPendingEditMembers.unmatched || []));
+                this.skPendingEditMembers = null;
+                if (window.showNotify) window.showNotify("Anggota Diperbarui", "Daftar anggota tim diperbarui dari dokumen.", "success");
+            },
+            dismissPendingEditMembers() {
+                this.skPendingEditMembers = null;
             },
             handleAddMemberChange() {
                 if(!this.skSearchMemberInput) return;
@@ -471,25 +635,55 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
                 
                 if (this.modalSkMode === 'add' && !this.skFileDataBase64) {
-                    if(window.showNotify) window.showNotify("Dokumen Kosong", "Mohon unggah file dokumen (PDF) SK terlebih dahulu.", "warning");
+                    if(window.showNotify) window.showNotify("Dokumen Kosong", "Mohon unggah file dokumen (.PDF) SK terlebih dahulu (bisa gunakan hasil Save As PDF dari MS Word).", "warning");
                     return;
                 }
-                
-                const payload = { 
-                    ...this.formSk, 
-                    members: this.tempMembers,
-                    fileBase64: this.skFileDataBase64,
-                    fileName: this.skSelectedFile ? this.skSelectedFile.name : null
-                };
-                
-                const token = localStorage.getItem('transkep_session_token');
-                
-                this.isUploading = true;
-                if(window.showNotify && this.skFileDataBase64) {
-                    window.showNotify("Mengunggah File...", "Mohon jangan tutup jendela ini hingga proses upload ke Google Drive selesai.", "success");
+
+                if (this.skPendingEditMembers && window.showNotify) {
+                    window.showNotify("Info Anggota", "Daftar anggota lama tetap dipertahankan saat menyimpan.", "info");
                 }
-                
+
+                const cleanMembers = (this.tempMembers || [])
+                    .map(m => ({ nip: String(m.nip || '').trim(), peran: String(m.peran || 'Anggota').trim() || 'Anggota' }))
+                    .filter(m => m.nip);
+
+                const token = localStorage.getItem('transkep_session_token');
+                this.isUploading = true;
+
                 try {
+                    let finalBase64 = this.skFileDataBase64;
+                    if (finalBase64 && this.skFileRawBytes && this.skProtectAntiEdit && !this.skHasEmbeddedSig) {
+                        if (window.TranskepPdfSigner && typeof window.TranskepPdfSigner.protectAndSealPdf === 'function' && window.TranskepPdfSigner.isReady()) {
+                            if (window.showNotify) {
+                                window.showNotify("Mengunci & Menyegel PDF...", "Sedang mem-flatten halaman & membubuhkan segel PKCS#7 anti-edit sebelum unggah ke Drive...", "info");
+                            }
+                            const protectedRes = await window.TranskepPdfSigner.protectAndSealPdf(this.skFileRawBytes, {
+                                flatten: true,
+                                seal: true,
+                                signerUser: (this.globalState && this.globalState.user) ? this.globalState.user : null,
+                                noSk: this.formSk.no_sk,
+                                judulSk: this.formSk.judul_sk
+                            });
+                            if (protectedRes && protectedRes.bytes && protectedRes.bytes.length > 0) {
+                                if (protectedRes.bytes.length > 14.5 * 1024 * 1024) {
+                                    throw new Error("Ukuran PDF hasil flatten melebihi batas unggah 14.5 MB. Silakan perkecil dokumen terlebih dahulu.");
+                                }
+                                finalBase64 = window.TranskepPdfSigner.uint8ToBase64(protectedRes.bytes);
+                            }
+                        }
+                    }
+
+                    const payload = { 
+                        ...this.formSk, 
+                        members: cleanMembers,
+                        fileBase64: finalBase64,
+                        fileName: this.skSelectedFile ? this.skSelectedFile.name : null
+                    };
+
+                    if(window.showNotify && finalBase64) {
+                        window.showNotify("Mengunggah File...", "Mohon jangan tutup jendela ini hingga proses upload ke Google Drive selesai.", "success");
+                    }
+
                     const isEdit = (this.modalSkMode === 'edit' && !!payload.id);
                     const existingSk = isEdit ? (this.groupedSkData || []).find(s => String(s.id) === String(payload.id)) : null;
                     const docId = isEdit ? String(payload.id).trim() : ('SK-' + Date.now());
@@ -515,7 +709,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         naskah_utama: (existingSk && existingSk.naskah_utama) ? existingSk.naskah_utama : null,
                         lampiran: (existingSk && Array.isArray(existingSk.lampiran)) ? existingSk.lampiran : [],
                         template_gdoc_id: (existingSk && existingSk.template_gdoc_id) || '',
-                        members: this.tempMembers || [],
+                        members: cleanMembers,
                         revisi_history: revHistory
                     };
 
