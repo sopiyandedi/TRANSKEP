@@ -1,10 +1,10 @@
 // =========================================================================
 // FILE: sw.js (TRANSKEP Progressive Web App Service Worker)
 // DESKRIPSI: Offline Asset Caching, Fast Load & Network Pass-Through
-// ENGINE: TRANSKEP PWA Engine v1.0.0 (Build: v3.8.99 - Tahap 158: Smart Drop PDF/Word SK Auto-Fill & Anti-Edit PDF)
+// ENGINE: TRANSKEP PWA Engine v1.0.0 (Build: v3.9.0 - Tahap 159: Smart Drop PDF/Word Auto-Fill & Anti-Edit PDF pada SOP)
 // =========================================================================
 
-const CACHE_NAME = 'transkep-v3.8.99';
+const CACHE_NAME = 'transkep-v3.9.0';
 
 // Daftar aset inti yang di-cache saat Service Worker dipasang (Install)
 const PRECACHE_ASSETS = [

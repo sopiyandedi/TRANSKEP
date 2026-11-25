@@ -238,38 +238,77 @@
                     <div>
                        <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Kategori (Penanggung Jawab)</label>
                        <select v-model="formSop.kategori_pj" required class="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all appearance-none cursor-pointer">
+                          <option value="" disabled>-- Pilih Penanggung Jawab --</option>
                           <option value="PJ. Manajemen">PJ. Manajemen</option>
                           <option value="PJ. Kepaniteraan">PJ. Kepaniteraan</option>
                           <option value="PJ. Kesekretariatan">PJ. Kesekretariatan</option>
                        </select>
                     </div>
   
-                    <!-- FIX: File Upload Drive Auto-Folder + Drag & Drop (Tinggi sejajar h-[46px]) -->
+                    <!-- Smart Dual-Drop PDF/Word Auto-Fill + Google Drive Auto-Folder -->
                     <div>
-                       <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Dokumen SOP (PDF) <span v-if="modalSopMode === 'add'" class="text-[9px] text-slate-500 italic font-normal normal-case tracking-normal ml-1">*folder otomatis di google drive</span></label>
+                       <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">
+                         Dokumen SOP (PDF / Word Auto-Fill)
+                         <span v-if="modalSopMode === 'add'" class="text-[9px] text-slate-500 italic font-normal normal-case tracking-normal ml-1">*bisa tarik PDF atau Word+PDF</span>
+                       </label>
                        <div class="relative" @dragover.prevent="isDraggingSop = true" @dragleave.prevent="isDraggingSop = false" @drop.prevent="handleSopFileDrop">
-                          <input type="file" ref="sopFileInput" accept=".pdf" @change="handleSopFileSelect" class="hidden" id="sopFileUpload">
+                          <input type="file" ref="sopFileInput" accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" multiple @change="handleSopFileSelect" class="hidden" id="sopFileUpload">
                           
-                          <div v-if="!isDraggingSop && modalSopMode === 'edit' && !sopSelectedFile && formSop.link_drive" class="w-full h-[46px] px-4 bg-slate-950 border border-slate-800 rounded-xl flex items-center justify-between transition group">
+                          <div v-if="!isDraggingSop && !sopIsParsingDoc && modalSopMode === 'edit' && !sopSelectedFile && !sopParsedWordFile && formSop.link_drive" class="w-full h-[46px] px-4 bg-slate-950 border border-slate-800 rounded-xl flex items-center justify-between transition group">
                              <div class="flex items-center gap-2 overflow-hidden mr-2">
                                 <i class="fa-solid fa-file-pdf text-rose-400 text-xs"></i>
-                                <span class="text-xs text-emerald-400 font-bold truncate tracking-wide">Dokumen Terlampir.</span>
+                                <span class="text-xs text-emerald-400 font-bold truncate tracking-wide">Dokumen Terlampir (atau seret file baru ke sini)</span>
                              </div>
-                             <button type="button" @click="$refs.sopFileInput.click()" class="shrink-0 px-3 py-1.5 bg-slate-800 hover:bg-indigo-500 text-slate-300 hover:text-white rounded-lg text-[10px] font-bold transition">Ganti Dokumen Baru</button>
+                             <button type="button" @click="$refs.sopFileInput.click()" class="shrink-0 px-3 py-1.5 bg-slate-800 hover:bg-indigo-500 text-slate-300 hover:text-white rounded-lg text-[10px] font-bold transition">Ganti Dokumen</button>
                           </div>
 
-                          <div v-else class="w-full h-[46px] px-4 rounded-xl flex items-center justify-between border border-dashed transition cursor-pointer group" :class="isDraggingSop ? 'bg-indigo-950/40 border-indigo-400 shadow-[0_0_15px_rgba(99,102,241,0.3)]' : 'bg-slate-950 border-slate-700 hover:border-indigo-500'" @click="$refs.sopFileInput.click()">
+                          <div v-else class="w-full min-h-[46px] px-4 py-2 rounded-xl flex items-center justify-between border border-dashed transition cursor-pointer group" :class="isDraggingSop ? 'bg-indigo-950/40 border-indigo-400 shadow-[0_0_15px_rgba(99,102,241,0.3)]' : 'bg-slate-950 border-slate-700 hover:border-indigo-500'" @click="$refs.sopFileInput.click()">
                              <div class="flex items-center gap-2 overflow-hidden mr-2">
-                                <i class="fa-solid" :class="isDraggingSop ? 'fa-cloud-arrow-up text-indigo-400 text-xs animate-bounce' : (sopSelectedFile ? 'fa-file-pdf text-rose-400 text-xs' : 'fa-file-pdf text-slate-500 text-xs')"></i>
-                                <span class="text-xs truncate font-medium" :class="isDraggingSop ? 'text-indigo-300 font-bold' : (sopSelectedFile ? 'text-indigo-300' : 'text-slate-400')">
-                                   {{ isDraggingSop ? 'Lepaskan file PDF di sini...' : (sopSelectedFile ? sopSelectedFile.name : 'Pilih / seret PDF (Maks 10MB)...') }}
+                                <i v-if="sopIsParsingDoc" class="fa-solid fa-circle-notch fa-spin text-indigo-400 text-xs"></i>
+                                <i v-else class="fa-solid" :class="isDraggingSop ? 'fa-cloud-arrow-up text-indigo-400 text-xs animate-bounce' : (sopSelectedFile ? 'fa-file-pdf text-rose-400 text-xs' : (sopParsedWordFile ? 'fa-file-word text-blue-400 text-xs' : 'fa-file-arrow-up text-slate-400 text-xs'))"></i>
+                                <span class="text-xs truncate font-medium" :class="isDraggingSop ? 'text-indigo-300 font-bold' : ((sopSelectedFile || sopParsedWordFile) ? 'text-indigo-300' : 'text-slate-400')">
+                                   {{ sopIsParsingDoc ? 'Membaca isi dokumen SOP...' : (isDraggingSop ? 'Lepaskan PDF / Word di sini...' : (sopSelectedFile ? sopSelectedFile.name : (sopParsedWordFile ? sopParsedWordFile.name + ' (data terisi)' : 'Seret PDF (Save As PDF) / Word + PDF...'))) }}
                                 </span>
-                                <span v-if="sopSelectedFile && !isDraggingSop" class="shrink-0 text-[9px] font-mono text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
+                                <span v-if="sopSelectedFile && !isDraggingSop && !sopIsParsingDoc" class="shrink-0 text-[9px] font-mono text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
                                    {{ formatFileSize(sopSelectedFile.size) }}
                                 </span>
                              </div>
                              <button type="button" class="shrink-0 px-3 py-1.5 bg-indigo-500/10 group-hover:bg-indigo-500/20 text-indigo-400 rounded-lg text-[10px] font-bold transition">Jelajahi</button>
                           </div>
+                       </div>
+                    </div>
+
+                    <!-- Status Auto-Fill & Sakelar Proteksi PDF SOP -->
+                    <div v-if="sopParseNotice || sopSelectedFile" class="md:col-span-2 space-y-2.5">
+                       <div v-if="sopParseNotice" class="p-3 rounded-2xl border flex items-start gap-2.5 text-xs"
+                            :class="sopParseNotice.tone === 'warning' ? 'bg-amber-950/30 border-amber-500/40 text-amber-200' : (sopParseNotice.tone === 'info' ? 'bg-blue-950/30 border-blue-500/40 text-blue-200' : 'bg-emerald-950/30 border-emerald-500/40 text-emerald-200')">
+                         <i class="fa-solid mt-0.5 shrink-0"
+                            :class="sopParseNotice.tone === 'warning' ? 'fa-triangle-exclamation text-amber-400' : (sopParseNotice.tone === 'info' ? 'fa-circle-info text-blue-400' : 'fa-wand-magic-sparkles text-emerald-400')"></i>
+                         <div class="flex-1 min-w-0">
+                           <div class="font-bold leading-snug">{{ sopParseNotice.title }}</div>
+                           <div class="text-[11px] opacity-90 mt-0.5 leading-relaxed">{{ sopParseNotice.detail }}</div>
+                         </div>
+                       </div>
+
+                       <div v-if="sopSelectedFile" class="p-3 rounded-2xl border transition flex items-center justify-between gap-3"
+                            :class="sopHasEmbeddedSig ? 'bg-emerald-950/20 border-emerald-500/30' : 'bg-slate-950/80 border-slate-800'">
+                         <label class="flex items-start gap-2.5 cursor-pointer flex-1 min-w-0">
+                           <input type="checkbox" v-model="sopProtectAntiEdit" :disabled="sopHasEmbeddedSig"
+                                  class="mt-0.5 w-4 h-4 rounded border-slate-600 bg-slate-950 text-indigo-500 focus:ring-indigo-500 disabled:opacity-50">
+                           <div class="min-w-0">
+                             <div class="font-bold text-slate-200 text-xs flex items-center gap-2 flex-wrap">
+                               <span>Kunci PDF Anti-Edit (Flatten Halaman + Segel PKCS#7 TRANSKEP)</span>
+                               <span v-if="sopHasEmbeddedSig" class="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px]">
+                                 TTE Bawaan Terdeteksi — Dipertahankan Asli
+                               </span>
+                             </div>
+                             <div class="text-[10px] text-slate-400 mt-0.5 leading-relaxed">
+                               {{ sopHasEmbeddedSig
+                                 ? 'File PDF SOP ini sudah memiliki tanda tangan digital resmi/bawaan, sehingga tidak dimodifikasi agar segel aslinya tetap sah.'
+                                 : 'Menyatukan teks, TTD, dan stempel basah ke gambar halaman HD lalu membubuhkan segel kriptografis PKCS#7 sebelum diunggah ke Drive & Flipbook.' }}
+                             </div>
+                           </div>
+                         </label>
                        </div>
                     </div>
   
@@ -296,7 +335,56 @@
   
                  <!-- Multi-Select Pegawai Dinamis -->
                  <div class="pt-4 border-t border-slate-800">
-                    <label class="block text-[11px] font-bold text-indigo-400 uppercase tracking-widest mb-4">Susunan Pelaksana & Pihak Terkait</label>
+                    <div class="flex items-center justify-between gap-2 mb-4 flex-wrap">
+                      <label class="block text-[11px] font-bold text-indigo-400 uppercase tracking-widest">Susunan Pelaksana & Pihak Terkait ({{ sopPelaksanaTerpilih.length }})</label>
+                      <span v-if="sopUnmatchedPelaksana.length > 0" class="px-2 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 text-[10px] font-bold">
+                        <i class="fa-solid fa-triangle-exclamation mr-1"></i>{{ sopUnmatchedPelaksana.length }} Pelaksana Perlu Dicek Admin
+                      </span>
+                    </div>
+
+                    <!-- Konfirmasi 1-Klik Pelaksana saat Edit SOP -->
+                    <div v-if="sopPendingEditPelaksana" class="mb-4 p-3.5 bg-amber-950/30 border border-amber-500/40 rounded-2xl space-y-2.5">
+                      <div class="flex items-start gap-2.5">
+                        <i class="fa-solid fa-users-gear text-amber-400 mt-0.5"></i>
+                        <div class="text-xs text-amber-100 leading-relaxed">
+                          <span class="font-bold">Terdeteksi {{ sopPendingEditPelaksana.matched.length }} pelaksana cocok</span>
+                          <span v-if="sopPendingEditPelaksana.unmatched.length > 0"> (+ {{ sopPendingEditPelaksana.unmatched.length }} perlu cek)</span>
+                          dari {{ sopPendingEditPelaksana.sourceLabel }}. Data Judul, Nomor, Tanggal, & Kategori PJ tetap dipertahankan. Perbarui daftar pelaksana dari file ini?
+                        </div>
+                      </div>
+                      <div class="flex items-center gap-2 flex-wrap">
+                        <button type="button" @click="applyPendingEditPelaksana" class="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl text-[11px] transition">
+                          <i class="fa-solid fa-rotate mr-1"></i>Ganti Pelaksana dari Dokumen
+                        </button>
+                        <button type="button" @click="dismissPendingEditPelaksana" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold rounded-xl text-[11px] transition">
+                          Pertahankan Pelaksana Lama
+                        </button>
+                      </div>
+                    </div>
+
+                    <!-- Panel Peringatan Kuning: Pelaksana Belum Cocok Otomatis -->
+                    <div v-if="sopUnmatchedPelaksana.length > 0" class="mb-4 p-3.5 bg-amber-950/25 border border-amber-500/40 rounded-2xl space-y-2.5">
+                      <div class="text-[11px] text-amber-200 font-bold flex items-center gap-1.5">
+                        <i class="fa-solid fa-circle-exclamation text-amber-400"></i>
+                        <span>Pelaksana Berikut Belum Cocok Otomatis dengan Database Pegawai / Grup — Pilih Manual atau Abaikan:</span>
+                      </div>
+                      <div v-for="uItem in sopUnmatchedPelaksana" :key="uItem.uid" class="p-2.5 bg-slate-950/80 border border-amber-500/30 rounded-xl flex flex-col sm:flex-row sm:items-center gap-2">
+                        <div class="flex-1 min-w-0">
+                          <div class="text-xs font-bold text-amber-200 truncate">{{ uItem.source_nama }}</div>
+                          <div class="text-[10px] text-slate-400 truncate">{{ uItem.source_jabatan }} • Peran: <span class="text-amber-300 font-semibold">{{ uItem.peran }}</span></div>
+                        </div>
+                        <div class="flex items-center gap-1.5 shrink-0">
+                          <select v-model="uItem.selectedNip" @change="resolveUnmatchedPelaksana(uItem.uid, uItem.selectedNip)" class="max-w-[220px] px-2 py-1.5 bg-slate-900 border border-amber-500/40 rounded-lg text-[11px] text-slate-200 focus:outline-none focus:ring-1 focus:ring-amber-400">
+                            <option value="">-- Pilih Pegawai / Grup --</option>
+                            <option v-for="(tag, key) in groupTagsOptions" :key="key" :value="key">[GRUP] {{ tag.label }}</option>
+                            <option v-for="u in globalState.usersList" :key="u.nip" :value="u.nip">{{ u.nama }}</option>
+                          </select>
+                          <button type="button" @click="dismissUnmatchedPelaksana(uItem.uid)" class="px-2 py-1.5 bg-slate-800 hover:bg-rose-600 text-slate-300 hover:text-white rounded-lg text-[10px] font-bold transition" title="Abaikan baris ini">
+                            <i class="fa-solid fa-xmark"></i>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
                     
                     <div class="flex items-center gap-3 mb-4 bg-slate-900/50 p-3 rounded-xl border border-slate-800">
                       <div class="relative flex-1">
@@ -321,7 +409,12 @@
                                 <i v-else class="fa-solid fa-user"></i>
                             </div>
                             <div class="flex-1 min-w-0">
-                              <div class="font-bold text-slate-200 text-xs truncate">{{ getMemberNameDisplay(p.nip) }}</div>
+                              <div class="font-bold text-slate-200 text-xs truncate flex items-center gap-1.5">
+                                <span class="truncate">{{ getMemberNameDisplay(p.nip) }}</span>
+                                <span v-if="p._matchLabel" class="shrink-0 px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 text-[9px] font-semibold">
+                                  <i class="fa-solid fa-check mr-0.5"></i>{{ p._matchLabel }}
+                                </span>
+                              </div>
                               <div class="text-[9px] text-slate-500 truncate">{{ getMemberJabatanDisplay(p.nip) }}</div>
                             </div>
                             <div class="w-1/3 shrink-0">

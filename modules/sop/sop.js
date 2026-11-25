@@ -22,16 +22,25 @@ document.addEventListener("DOMContentLoaded", () => {
                 showModalSop: false,
                 modalSopMode: 'add',
                 formSop: {
-                    id: '', judul_sop: '', kategori_pj: 'PJ. Kesekretariatan',
+                    id: '', judul_sop: '', kategori_pj: '',
                     nomor_sop: '', tanggal_pembuatan: '', tanggal_revisi: '',
                     tanggal_efektif: '', link_drive: ''
                 },
                 sopPelaksanaTerpilih: [],
                 sopPegawaiSearchInput: '',
 
-                // TRANSKEP: State untuk Upload File PDF SOP, Drag-Drop & Pintasan Folder Drive
+                // TRANSKEP: State Upload PDF/Word Smart Dual-Drop, Kunci Anti-Edit & Tanda Cek Admin SOP
                 sopSelectedFile: null,
                 sopFileDataBase64: null,
+                sopFileRawBytes: null,
+                sopParsedWordFile: null,
+                sopIsParsingDoc: false,
+                sopProtectAntiEdit: true,
+                sopHasEmbeddedSig: false,
+                sopIsBsreSig: false,
+                sopParseNotice: null,
+                sopUnmatchedPelaksana: [],
+                sopPendingEditPelaksana: null,
                 isUploadingSop: false,
                 isDraggingSop: false,
                 isOpeningDriveSop: false,
@@ -272,7 +281,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 else return (bytes / 1048576).toFixed(2) + ' MB';
             },
 
-            // FIX: Reset input file sebelum buka modal SOP
+            // FIX: Reset input file & status auto-fill sebelum buka modal SOP
             openModalSop(mode, id = null) {
                 this.modalSopMode = mode;
                 this.sopPelaksanaTerpilih = [];
@@ -280,56 +289,225 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 this.sopSelectedFile = null;
                 this.sopFileDataBase64 = null;
+                this.sopFileRawBytes = null;
+                this.sopParsedWordFile = null;
+                this.sopIsParsingDoc = false;
+                this.sopProtectAntiEdit = true;
+                this.sopHasEmbeddedSig = false;
+                this.sopIsBsreSig = false;
+                this.sopParseNotice = null;
+                this.sopUnmatchedPelaksana = [];
+                this.sopPendingEditPelaksana = null;
                 this.isUploadingSop = false;
                 this.isDraggingSop = false;
                 if (this.$refs.sopFileInput) this.$refs.sopFileInput.value = '';
 
                 if (mode === 'add') {
                     this.formSop = {
-                        id: '', judul_sop: '', kategori_pj: 'PJ. Kesekretariatan',
+                        id: '', judul_sop: '', kategori_pj: '',
                         nomor_sop: '', tanggal_pembuatan: '', tanggal_revisi: '',
                         tanggal_efektif: '', link_drive: ''
                     };
                 } else if (mode === 'edit') {
-                    const sop = this.globalState.sopList.find(s => s.id === id);
+                    const sourceList = (Array.isArray(this.unifiedSopList) && this.unifiedSopList.length > 0)
+                        ? this.unifiedSopList
+                        : (this.globalState.sopList || []);
+                    const sop = sourceList.find(s => String(s.id) === String(id));
                     if (sop) {
                         this.formSop = {
-                            id: sop.id, judul_sop: sop.judul_sop, kategori_pj: sop.kategori_pj,
+                            id: sop.id, judul_sop: sop.judul_sop, kategori_pj: sop.kategori_pj || '',
                             nomor_sop: sop.nomor_sop, link_drive: sop.link_drive,
                             tanggal_pembuatan: this.formatDateForInput(sop.tanggal_pembuatan),
                             tanggal_revisi: this.formatDateForInput(sop.tanggal_revisi !== '-' ? sop.tanggal_revisi : ''),
                             tanggal_efektif: this.formatDateForInput(sop.tanggal_efektif)
                         };
-                        try { this.sopPelaksanaTerpilih = JSON.parse(sop.pelaksana_json || '[]'); } catch(e) {}
+                        try {
+                            const rawPel = Array.isArray(sop.pelaksana) ? sop.pelaksana : JSON.parse(sop.pelaksana_json || '[]');
+                            this.sopPelaksanaTerpilih = Array.isArray(rawPel) ? JSON.parse(JSON.stringify(rawPel)) : [];
+                        } catch(e) {}
                     }
                 }
                 this.showModalSop = true;
             },
 
-            // TRANSKEP: Fungsi terpusat validasi dan konversi File PDF SOP ke Base64
-            async processSopFile(file, inputEl = null) {
-                if (!file) return;
+            // TRANSKEP: Smart Dual-Drop PDF/Word Auto-Fill SOP & Deteksi Segel Digital
+            async processSopFiles(fileList, inputEl = null) {
+                const files = Array.from(fileList || []).filter(Boolean);
+                if (files.length === 0) return;
+
+                let pdfFile = null;
+                let wordFile = null;
+                for (let i = 0; i < files.length; i++) {
+                    const f = files[i];
+                    const nm = (f.name || '').toLowerCase();
+                    if (!pdfFile && (f.type === 'application/pdf' || nm.endsWith('.pdf'))) {
+                        pdfFile = f;
+                    } else if (!wordFile && (nm.endsWith('.docx') || nm.endsWith('.doc'))) {
+                        wordFile = f;
+                    }
+                }
+
+                if (!pdfFile && !wordFile) {
+                    if (inputEl) inputEl.value = '';
+                    if (window.showNotify) window.showNotify("Format Tidak Didukung", "Silakan unggah file .PDF (hasil Save As PDF) atau Word (.docx / .doc).", "warning");
+                    return;
+                }
+
+                this.sopIsParsingDoc = true;
+                this.sopParseNotice = null;
+                this.sopPendingEditPelaksana = null;
+
                 try {
-                    const result = await window.SopDataService.validateAndReadPdf(file);
-                    this.sopFileDataBase64 = result.base64;
-                    this.sopSelectedFile = result.file;
+                    const usersList = (this.globalState && Array.isArray(this.globalState.usersList)) ? this.globalState.usersList : [];
+                    let pdfBuffer = null;
+
+                    if (pdfFile) {
+                        const resPdf = await window.SopDataService.validateAndReadPdf(pdfFile);
+                        this.sopFileDataBase64 = resPdf.base64;
+                        this.sopSelectedFile = resPdf.file;
+                        pdfBuffer = await pdfFile.arrayBuffer();
+                        this.sopFileRawBytes = new Uint8Array(pdfBuffer);
+
+                        if (window.SkDocParser && typeof window.SkDocParser.detectEmbeddedPdfSignature === 'function') {
+                            const sigInfo = window.SkDocParser.detectEmbeddedPdfSignature(this.sopFileRawBytes);
+                            this.sopHasEmbeddedSig = !!(sigInfo && sigInfo.isExternalOrSigned);
+                            this.sopIsBsreSig = !!(sigInfo && sigInfo.isBsre);
+                            this.sopProtectAntiEdit = !this.sopHasEmbeddedSig;
+                        } else {
+                            this.sopHasEmbeddedSig = false;
+                            this.sopIsBsreSig = false;
+                            this.sopProtectAntiEdit = true;
+                        }
+                    }
+
+                    let parsed = null;
+                    let sourceLabel = '';
+                    if (wordFile) {
+                        if (wordFile.size > 15 * 1024 * 1024) {
+                            throw new Error("Ukuran file Word maksimal 15 MB.");
+                        }
+                        this.sopParsedWordFile = wordFile;
+                        const wordBuf = await wordFile.arrayBuffer();
+                        if (window.SkDocParser && typeof window.SkDocParser.parseSopWordFile === 'function') {
+                            parsed = await window.SkDocParser.parseSopWordFile(wordBuf, wordFile.name, usersList);
+                            sourceLabel = pdfFile ? `Word (${wordFile.name}) + PDF` : `Word (${wordFile.name})`;
+                        }
+                    } else if (pdfFile && pdfBuffer) {
+                        if (window.SkDocParser && typeof window.SkDocParser.parseSopPdfFile === 'function') {
+                            parsed = await window.SkDocParser.parseSopPdfFile(pdfBuffer, pdfFile.name, usersList);
+                            sourceLabel = `PDF (${pdfFile.name})`;
+                        }
+                    }
+
+                    if (parsed) {
+                        if (this.modalSopMode === 'add') {
+                            if (parsed.judul_sop) this.formSop.judul_sop = parsed.judul_sop;
+                            if (parsed.nomor_sop) this.formSop.nomor_sop = parsed.nomor_sop;
+                            if (parsed.tanggal_pembuatan) this.formSop.tanggal_pembuatan = parsed.tanggal_pembuatan;
+                            if (parsed.tanggal_revisi) this.formSop.tanggal_revisi = parsed.tanggal_revisi;
+                            if (parsed.tanggal_efektif) this.formSop.tanggal_efektif = parsed.tanggal_efektif;
+                            // kategori_pj sengaja dibiarkan manual dipilih Admin
+                        } else {
+                            // Edit SOP: pertahankan metadata lama (isi hanya bila kolom sebelumnya kosong)
+                            if (!String(this.formSop.judul_sop || '').trim() && parsed.judul_sop) this.formSop.judul_sop = parsed.judul_sop;
+                            if (!String(this.formSop.nomor_sop || '').trim() && parsed.nomor_sop) this.formSop.nomor_sop = parsed.nomor_sop;
+                            if (!String(this.formSop.tanggal_pembuatan || '').trim() && parsed.tanggal_pembuatan) this.formSop.tanggal_pembuatan = parsed.tanggal_pembuatan;
+                            if (!String(this.formSop.tanggal_revisi || '').trim() && parsed.tanggal_revisi) this.formSop.tanggal_revisi = parsed.tanggal_revisi;
+                            if (!String(this.formSop.tanggal_efektif || '').trim() && parsed.tanggal_efektif) this.formSop.tanggal_efektif = parsed.tanggal_efektif;
+                        }
+
+                        const splitRes = (window.SkDocParser && typeof window.SkDocParser.splitMatchedMembersForForm === 'function')
+                            ? window.SkDocParser.splitMatchedMembersForForm(parsed.members)
+                            : { matched: [], unmatched: [] };
+
+                        if (this.modalSopMode === 'edit' && this.sopPelaksanaTerpilih.length > 0 && (splitRes.matched.length > 0 || splitRes.unmatched.length > 0)) {
+                            this.sopPendingEditPelaksana = {
+                                matched: splitRes.matched,
+                                unmatched: splitRes.unmatched,
+                                sourceLabel
+                            };
+                        } else if (splitRes.matched.length > 0 || splitRes.unmatched.length > 0) {
+                            this.sopPelaksanaTerpilih = splitRes.matched;
+                            this.sopUnmatchedPelaksana = splitRes.unmatched;
+                        }
+
+                        if (!parsed.hasReadableText && parsed.sourceType === 'pdf') {
+                            this.sopParseNotice = {
+                                tone: 'warning',
+                                title: 'PDF Terdeteksi Tanpa Lapisan Teks (Scan / Print-to-PDF)',
+                                detail: 'File PDF berhasil dilampirkan dan siap dikunci anti-edit, namun teksnya tidak bisa dibaca otomatis. Silakan isi kolom & pilih pelaksana manual (atau seret file Word .docx bersamaan).'
+                            };
+                        } else if (wordFile && !pdfFile) {
+                            this.sopParseNotice = {
+                                tone: 'info',
+                                title: `Data SOP Otomatis Terisi dari ${sourceLabel}`,
+                                detail: `Terbaca ${splitRes.matched.length} pelaksana cocok` +
+                                        (splitRes.unmatched.length > 0 ? ` (${splitRes.unmatched.length} perlu cek Admin)` : '') +
+                                        '. Untuk mengunggah arsip ke Google Drive, seret juga file PDF hasil Save As PDF dari MS Word.'
+                            };
+                        } else {
+                            this.sopParseNotice = {
+                                tone: splitRes.unmatched.length > 0 ? 'warning' : 'success',
+                                title: `Auto-Fill SOP Selesai dari ${sourceLabel}`,
+                                detail: (this.modalSopMode === 'add'
+                                          ? 'Judul, Nomor SOP, Tanggal & Pelaksana terisi otomatis (Kategori PJ pilih manual). '
+                                          : 'Judul, Nomor, Tanggal & Kategori PJ lama dipertahankan. ') +
+                                        `Cocok: ${splitRes.matched.length} pelaksana` +
+                                        (splitRes.unmatched.length > 0 ? `, Perlu dicek Admin: ${splitRes.unmatched.length} baris.` : '.')
+                            };
+                        }
+                    }
                 } catch (err) {
                     if (inputEl) inputEl.value = '';
-                    this.sopSelectedFile = null;
-                    this.sopFileDataBase64 = null;
-                    if (window.showNotify) window.showNotify("Pemeriksaan Berkas", err.message, "warning");
+                    if (!this.sopSelectedFile) {
+                        this.sopFileDataBase64 = null;
+                        this.sopFileRawBytes = null;
+                    }
+                    if (window.showNotify) window.showNotify("Pemeriksaan Berkas", err.message || err.toString(), "warning");
+                } finally {
+                    this.sopIsParsingDoc = false;
                 }
             },
 
             handleSopFileSelect(event) {
-                const file = event.target.files[0];
-                this.processSopFile(file, event.target);
+                this.processSopFiles(event.target && event.target.files, event.target);
             },
 
             handleSopFileDrop(event) {
                 this.isDraggingSop = false;
-                const file = event.dataTransfer && event.dataTransfer.files ? event.dataTransfer.files[0] : null;
-                this.processSopFile(file, this.$refs.sopFileInput);
+                const files = event.dataTransfer && event.dataTransfer.files ? event.dataTransfer.files : [];
+                this.processSopFiles(files, this.$refs.sopFileInput);
+            },
+
+            resolveUnmatchedPelaksana(uid, selectedNip) {
+                const idx = this.sopUnmatchedPelaksana.findIndex(u => u.uid === uid);
+                if (idx === -1 || !selectedNip) return;
+                const item = this.sopUnmatchedPelaksana[idx];
+                const cleanNip = String(selectedNip).trim();
+                if (!this.sopPelaksanaTerpilih.some(p => String(p.nip) === cleanNip)) {
+                    this.sopPelaksanaTerpilih.push({
+                        nip: cleanNip,
+                        peran: item.peran || 'Pelaksana',
+                        _matchLabel: cleanNip.startsWith('[TAG:') ? 'Grup Dipilih Admin' : 'Dipilih Admin'
+                    });
+                }
+                this.sopUnmatchedPelaksana.splice(idx, 1);
+            },
+
+            dismissUnmatchedPelaksana(uid) {
+                this.sopUnmatchedPelaksana = this.sopUnmatchedPelaksana.filter(u => u.uid !== uid);
+            },
+
+            applyPendingEditPelaksana() {
+                if (!this.sopPendingEditPelaksana) return;
+                this.sopPelaksanaTerpilih = JSON.parse(JSON.stringify(this.sopPendingEditPelaksana.matched || []));
+                this.sopUnmatchedPelaksana = JSON.parse(JSON.stringify(this.sopPendingEditPelaksana.unmatched || []));
+                this.sopPendingEditPelaksana = null;
+                if (window.showNotify) window.showNotify("Pelaksana Diperbarui", "Daftar pelaksana SOP diperbarui dari dokumen.", "success");
+            },
+
+            dismissPendingEditPelaksana() {
+                this.sopPendingEditPelaksana = null;
             },
 
             handleAddPegawaiSopChange() {
@@ -371,30 +549,57 @@ document.addEventListener("DOMContentLoaded", () => {
             },
             async saveSopSubmit() {
                 if (this.isUploadingSop) return;
-                if (!this.formSop.judul_sop || !this.formSop.nomor_sop || !this.formSop.tanggal_pembuatan || !this.formSop.tanggal_efektif) {
-                    if(window.showNotify) window.showNotify("Data Belum Lengkap", "Mohon lengkapi Judul, Nomor SOP, Tanggal Pembuatan, dan Tanggal Efektif.", "warning");
+                if (!this.formSop.judul_sop || !this.formSop.kategori_pj || !this.formSop.nomor_sop || !this.formSop.tanggal_pembuatan || !this.formSop.tanggal_efektif) {
+                    if(window.showNotify) window.showNotify("Data Belum Lengkap", "Mohon lengkapi Judul, Kategori PJ, Nomor SOP, Tanggal Pembuatan, dan Tanggal Efektif.", "warning");
                     return;
                 }
 
                 if (this.modalSopMode === 'add' && !this.sopFileDataBase64) {
-                    if(window.showNotify) window.showNotify("Dokumen Kosong", "Mohon unggah file dokumen (PDF) SOP terlebih dahulu.", "warning");
+                    if(window.showNotify) window.showNotify("Dokumen Kosong", "Mohon unggah file dokumen (.PDF) SOP terlebih dahulu (bisa gunakan hasil Save As PDF dari Word).", "warning");
                     return;
                 }
 
-                const payload = {
-                    ...this.formSop,
-                    pelaksana: this.sopPelaksanaTerpilih,
-                    fileBase64: this.sopFileDataBase64,
-                    fileName: this.sopSelectedFile ? this.sopSelectedFile.name : null
-                };
-                const token = localStorage.getItem('transkep_session_token');
+                const cleanPelaksana = (this.sopPelaksanaTerpilih || [])
+                    .map(p => ({ nip: String(p.nip || '').trim(), peran: String(p.peran || 'Pelaksana').trim() || 'Pelaksana' }))
+                    .filter(p => p.nip);
 
+                const token = localStorage.getItem('transkep_session_token');
                 this.isUploadingSop = true;
-                if(window.showNotify && this.sopFileDataBase64) {
-                    window.showNotify("Mengunggah File...", "Mohon jangan tutup jendela ini hingga proses upload ke Google Drive selesai.", "success");
-                }
 
                 try {
+                    let finalBase64 = this.sopFileDataBase64;
+                    if (finalBase64 && this.sopFileRawBytes && this.sopProtectAntiEdit && !this.sopHasEmbeddedSig) {
+                        if (window.TranskepPdfSigner && typeof window.TranskepPdfSigner.protectAndSealPdf === 'function' && window.TranskepPdfSigner.isReady()) {
+                            if (window.showNotify) {
+                                window.showNotify("Mengunci & Menyegel PDF SOP...", "Sedang mem-flatten halaman & membubuhkan segel PKCS#7 anti-edit sebelum unggah ke Drive...", "info");
+                            }
+                            const protectedRes = await window.TranskepPdfSigner.protectAndSealPdf(this.sopFileRawBytes, {
+                                flatten: true,
+                                seal: true,
+                                signerUser: (this.globalState && this.globalState.user) ? this.globalState.user : null,
+                                noSk: this.formSop.nomor_sop,
+                                judulSk: this.formSop.judul_sop
+                            });
+                            if (protectedRes && protectedRes.bytes && protectedRes.bytes.length > 0) {
+                                if (protectedRes.bytes.length > 14.5 * 1024 * 1024) {
+                                    throw new Error("Ukuran PDF hasil flatten melebihi batas unggah 14.5 MB. Silakan perkecil dokumen terlebih dahulu.");
+                                }
+                                finalBase64 = window.TranskepPdfSigner.uint8ToBase64(protectedRes.bytes);
+                            }
+                        }
+                    }
+
+                    const payload = {
+                        ...this.formSop,
+                        pelaksana: cleanPelaksana,
+                        fileBase64: finalBase64,
+                        fileName: this.sopSelectedFile ? this.sopSelectedFile.name : null
+                    };
+
+                    if(window.showNotify && finalBase64) {
+                        window.showNotify("Mengunggah File...", "Mohon jangan tutup jendela ini hingga proses upload ke Google Drive selesai.", "success");
+                    }
+
                     const res = await window.SopDataService.saveSop(payload, this.globalState.user.nip, token);
                     this.isUploadingSop = false;
                     if(res && res.status === 'success') {

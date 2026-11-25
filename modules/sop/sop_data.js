@@ -102,8 +102,15 @@ const SopDataService = {
       const docId = payload.id || ('SOP-' + Date.now());
       const rawUrl = String(driveUrl || '').trim();
       const safeUrl = (!rawUrl || rawUrl === '-' || rawUrl === '#') ? '-' : (/^https?:\/\//i.test(rawUrl) ? rawUrl : '-');
+      const cleanPelaksana = Array.isArray(payload.pelaksana)
+        ? payload.pelaksana
+            .map(p => ({ nip: String(p.nip || '').trim(), peran: String(p.peran || 'Pelaksana').trim() || 'Pelaksana' }))
+            .filter(p => p.nip)
+        : [];
       const firestorePayload = {
         ...payload,
+        pelaksana: cleanPelaksana,
+        pelaksana_json: JSON.stringify(cleanPelaksana),
         id: docId,
         link_drive: safeUrl,
         is_firebase: true

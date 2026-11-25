@@ -3702,14 +3702,12 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
     assert.strictEqual(vmSk158.tempMembers.length, 3, 'Setelah konfirmasi, anggota harus ter-update dari dokumen');
     assert.strictEqual(vmSk158.skUnmatchedMembers.length, 1);
 
-    // 5. Cek PWA Cache & Index Script v3.8.99 + UI View Markup
+    // 5. Cek PWA Cache & Index Script + UI View Markup SK
     const idxHtml158 = fs.readFileSync(path.join(repoRoot158, 'index.html'), 'utf8');
     const swJs158 = fs.readFileSync(path.join(repoRoot158, 'sw.js'), 'utf8');
     const viewSk158 = fs.readFileSync(path.join(repoRoot158, 'modules/sk/view_sk.html'), 'utf8');
-    assert.ok(idxHtml158.includes("APP_BUILD_VER = '3.8.99'"));
     assert.ok(idxHtml158.includes('vendor/pdf.min.js'));
     assert.ok(idxHtml158.includes('modules/sk/sk_doc_parser.js'));
-    assert.ok(swJs158.includes("CACHE_NAME = 'transkep-v3.8.99'"));
     assert.ok(swJs158.includes('./vendor/pdf.min.js'));
     assert.ok(swJs158.includes('./vendor/pdf.worker.min.js'));
     assert.ok(swJs158.includes('./modules/sk/sk_doc_parser.js'));
@@ -3717,6 +3715,145 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
     assert.ok(viewSk158.includes('skUnmatchedMembers'));
     assert.ok(viewSk158.includes('skPendingEditMembers'));
     console.log('[PASS] Tahap 158 Smart Drop PDF/Word Auto-Fill, Anti-Edit Seal & SK Form Modes verified.');
+
+    // =========================================================================
+    // TAHAP 159: SMART DROP PDF/WORD AUTO-FILL & PROTEKSI PDF ANTI-EDIT MODUL SOP
+    // =========================================================================
+    const sampleSopText = [
+      'PENGADILAN AGAMA INDRAMAYU',
+      'NOMOR SOP : SOP/AP/01',
+      'TANGGAL PEMBUATAN : 02 Maret 2018',
+      'TANGGAL REVISI : -',
+      'TANGGAL EFEKTIF : 08 April 2026',
+      'NAMA SOP : PROSEDUR PELAYANAN INFORMASI PUBLIK'
+    ].join('\n');
+    const sopMeta159 = SkDocParser.extractCoreSopMetadata(sampleSopText, 'sop_info.pdf');
+    assert.strictEqual(sopMeta159.nomor_sop, 'SOP/AP/01');
+    assert.strictEqual(sopMeta159.tanggal_pembuatan, '2018-03-02');
+    assert.strictEqual(sopMeta159.tanggal_revisi, '');
+    assert.strictEqual(sopMeta159.tanggal_efektif, '2026-04-08');
+    assert.strictEqual(sopMeta159.judul_sop, 'SOP PROSEDUR PELAYANAN INFORMASI PUBLIK');
+
+    const sopUsers159 = [
+      { nip: '198001012005011001', nama: 'Agus Salim, S.H.I.', jabatan: 'Sekretaris', role: 'User' },
+      { nip: '197904042006041002', nama: 'H. Ahmad Fauzi, S.H.', jabatan: 'Panitera', role: 'User' },
+      { nip: '198505052010011003', nama: 'Budi Santoso, S.H.', jabatan: 'Hakim', role: 'User' }
+    ];
+    const sopFlowRows159 = SkDocParser.groupPdfTextItemsToRows([
+      mkItem(40, 650, 'No', 18),
+      mkItem(80, 650, 'Kegiatan', 70),
+      mkItem(230, 650, 'Pelaksana', 70),
+      mkItem(430, 650, 'Mutu Baku', 75),
+      mkItem(175, 628, 'Sekretaris', 55),
+      mkItem(245, 628, 'Panitera', 50),
+      mkItem(310, 628, 'Hakim', 45),
+      mkItem(370, 628, 'Kasir', 40)
+    ]);
+    const extractedSopActors159 = SkDocParser.extractSopPelaksanaFromPdfPages([sopFlowRows159], sampleSopText, sopUsers159);
+    const sopSplit159 = SkDocParser.splitMatchedMembersForForm(extractedSopActors159);
+    assert.strictEqual(sopSplit159.matched.length, 3, 'Sekretaris, Panitera, dan Hakim harus terdeteksi otomatis');
+    assert.ok(sopSplit159.matched.some(m => m.nip === '198001012005011001' && m._matchLabel === 'Jabatan Cocok'));
+    assert.ok(sopSplit159.matched.some(m => m.nip === '197904042006041002' && m._matchLabel === 'Jabatan Cocok'));
+    assert.ok(sopSplit159.matched.some(m => m.nip === '[TAG:HAKIM]' && m._matchLabel === 'Grup Cocok'));
+    assert.strictEqual(sopSplit159.unmatched.length, 1, 'Kasir harus masuk panel kuning perlu cek Admin');
+    assert.strictEqual(sopSplit159.unmatched[0].source_nama, 'Kasir');
+
+    // Simulasi vmSopApp modal 'add' vs 'edit'
+    const sopModalCtx159 = vm.createContext({
+      console,
+      window: null,
+      document: { addEventListener: (ev, fn) => { if (ev === 'DOMContentLoaded') sopModalCtx159._domCb = fn; } },
+      localStorage: { getItem: () => 'tok-admin' },
+      state: { usersList: sopUsers159, sopList: [], sopAckList: [] },
+      vueState: {
+        user: { nip: '198001012005011001', nama: 'Agus Salim, S.H.I.', role: 'Admin' },
+        usersList: sopUsers159,
+        sopList: [],
+        sopAckList: []
+      },
+      SkDocParser,
+      GROUP_TAGS: { '[TAG:HAKIM]': { label: 'Kelompok Hakim', keywords: ['hakim'] } },
+      showNotify: (t, m, tp) => { sopModalCtx159._lastNotify = { t, m, tp }; },
+      Vue: {
+        createApp: (opts) => ({
+          mount: () => {
+            const inst = {
+              ...(opts.data ? opts.data() : {}),
+              ...(opts.methods || {}),
+              $refs: {}
+            };
+            Object.entries(opts.computed || {}).forEach(([k, fn]) => {
+              Object.defineProperty(inst, k, { get: () => fn.call(inst), configurable: true });
+            });
+            sopModalCtx159._vm = inst;
+            return inst;
+          }
+        })
+      }
+    });
+    sopModalCtx159.window = sopModalCtx159;
+    vm.runInContext(fs.readFileSync(path.join(repoRoot158, 'modules/sop/sop.js'), 'utf8'), sopModalCtx159);
+    if (sopModalCtx159._domCb) sopModalCtx159._domCb();
+    const vmSop159 = sopModalCtx159._vm;
+    assert.ok(vmSop159, 'vmSopApp harus terinisialisasi');
+
+    vmSop159.SopDataService = {
+      validateAndReadPdf: async (f) => ({ base64: Buffer.from(plainPdfBytes).toString('base64'), file: f })
+    };
+    sopModalCtx159.SopDataService = vmSop159.SopDataService;
+    SkDocParser.parseSopPdfFile = async () => ({
+      sourceType: 'pdf',
+      numPages: 1,
+      hasReadableText: true,
+      sigInfo: { isExternalOrSigned: false, isBsre: false },
+      ...sopMeta159,
+      members: extractedSopActors159
+    });
+
+    // Mode Add SOP -> kategori_pj wajib manual kosong & metadata+pelaksana terisi
+    vmSop159.openModalSop('add');
+    assert.strictEqual(vmSop159.formSop.kategori_pj, '', 'Mode Daftarkan SOP Baru harus mengosongkan kategori_pj');
+    await vmSop159.processSopFiles([fakePdfFile]);
+    assert.strictEqual(vmSop159.formSop.judul_sop, 'SOP PROSEDUR PELAYANAN INFORMASI PUBLIK');
+    assert.strictEqual(vmSop159.formSop.nomor_sop, 'SOP/AP/01');
+    assert.strictEqual(vmSop159.formSop.tanggal_pembuatan, '2018-03-02');
+    assert.strictEqual(vmSop159.formSop.tanggal_efektif, '2026-04-08');
+    assert.strictEqual(vmSop159.formSop.kategori_pj, '', 'Auto-fill SOP baru tidak boleh menimpa kategori_pj');
+    assert.strictEqual(vmSop159.sopPelaksanaTerpilih.length, 3);
+    assert.strictEqual(vmSop159.sopUnmatchedPelaksana.length, 1);
+    assert.strictEqual(vmSop159.sopProtectAntiEdit, true);
+
+    // Mode Edit SOP -> metadata lama dipertahankan & konfirmasi 1-klik pelaksana muncul
+    vmSop159.firestoreSops = [{
+      id: 'SOP-OLD-159',
+      judul_sop: 'SOP LAMA TETAP',
+      kategori_pj: 'PJ. Kepaniteraan',
+      nomor_sop: 'SOP/OLD/99',
+      tanggal_pembuatan: '2020-01-10',
+      tanggal_revisi: '-',
+      tanggal_efektif: '2026-01-15',
+      link_drive: 'https://drive.google.com/file/d/old-sop/view',
+      pelaksana_json: JSON.stringify([{ nip: '198001012005011001', peran: 'Sekretaris' }])
+    }];
+    vmSop159.openModalSop('edit', 'SOP-OLD-159');
+    await vmSop159.processSopFiles([fakePdfFile]);
+    assert.strictEqual(vmSop159.formSop.judul_sop, 'SOP LAMA TETAP', 'Edit SOP harus mempertahankan judul lama');
+    assert.strictEqual(vmSop159.formSop.kategori_pj, 'PJ. Kepaniteraan', 'Edit SOP harus mempertahankan kategori PJ lama');
+    assert.strictEqual(vmSop159.formSop.nomor_sop, 'SOP/OLD/99', 'Edit SOP harus mempertahankan nomor SOP lama');
+    assert.strictEqual(vmSop159.formSop.tanggal_pembuatan, '2020-01-10', 'Edit SOP harus mempertahankan tanggal pembuatan lama');
+    assert.strictEqual(vmSop159.formSop.tanggal_efektif, '2026-01-15', 'Edit SOP harus mempertahankan tanggal efektif lama');
+    assert.ok(vmSop159.sopPendingEditPelaksana, 'Harus menawarkan konfirmasi 1-klik ganti pelaksana saat Edit SOP');
+    vmSop159.applyPendingEditPelaksana();
+    assert.strictEqual(vmSop159.sopPelaksanaTerpilih.length, 3);
+    assert.strictEqual(vmSop159.sopUnmatchedPelaksana.length, 1);
+
+    const viewSop159 = fs.readFileSync(path.join(repoRoot158, 'modules/sop/view_sop.html'), 'utf8');
+    assert.ok(idxHtml158.includes("APP_BUILD_VER = '3.9.0'"));
+    assert.ok(swJs158.includes("CACHE_NAME = 'transkep-v3.9.0'"));
+    assert.ok(viewSop159.includes('sopProtectAntiEdit'));
+    assert.ok(viewSop159.includes('sopUnmatchedPelaksana'));
+    assert.ok(viewSop159.includes('sopPendingEditPelaksana'));
+    console.log('[PASS] Tahap 159 SOP Smart Drop PDF/Word Auto-Fill, Anti-Edit Seal & Edit Mode verified.');
   } finally {
     browserSandbox.TranskepAPI.call = origApiCall;
     browserSandbox.TranskepFirebase.getDb = origGetDb;

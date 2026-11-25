@@ -44,9 +44,13 @@
       if (mm) return `${yyyy}-${mm}-${dd}`;
     }
 
-    const mSlash = clean.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-    if (mSlash) {
-      return `${mSlash[3]}-${String(mSlash[2]).padStart(2, '0')}-${String(mSlash[1]).padStart(2, '0')}`;
+    const mNumeric = clean.match(/\b(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})\b/);
+    if (mNumeric) {
+      const dd = parseInt(mNumeric[1], 10);
+      const mm = parseInt(mNumeric[2], 10);
+      if (mm >= 1 && mm <= 12 && dd >= 1 && dd <= 31) {
+        return `${mNumeric[3]}-${String(mm).padStart(2, '0')}-${String(dd).padStart(2, '0')}`;
+      }
     }
     return '';
   }
@@ -761,6 +765,409 @@
     return { matched, unmatched };
   }
 
+  // =========================================================================
+  // EKSTRAKTOR KHUSUS DOKUMEN SOP (Standar AP / PermenPAN-RB)
+  // =========================================================================
+
+  const SOP_NOISE_ACTORS = /^(no|nomor|kegiatan|uraian|aktivitas|mutu\s*baku|kelengkapan|waktu|output|ket|keterangan|pelaksana|pihak\s*terkait|disahkan\s*oleh|dasar\s*hukum|kualifikasi|keterkaitan|peralatan|peringatan|pencatatan|-|\d+)$/i;
+
+  function normalizeJabatanText(s) {
+    return String(s || '')
+      .toLowerCase()
+      .replace(/\bkasubbag\b/g, 'kepala sub bagian')
+      .replace(/\bpanmud\b/g, 'panitera muda')
+      .replace(/\bptip\b/g, 'perencanaan ti dan pelaporan')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  /**
+   * Mencocokkan label pelaksana SOP (Nama, NIP, Jabatan tunggal, atau Kelompok Grup).
+   */
+  function matchSopActor(actorLabel, roleDesc, usersList) {
+    const label = String(actorLabel || '').replace(/\s+/g, ' ').trim();
+    const roleText = String(roleDesc || '').replace(/\s+/g, ' ').trim();
+    const low = label.toLowerCase();
+    const uList = Array.isArray(usersList) ? usersList : [];
+
+    // 1. Cek Kelompok / Tag Grup TRANSKEP
+    let groupTag = '';
+    if (/(?:semua|seluruh)\s+(?:pegawai|aparatur)/i.test(low)) {
+      groupTag = '[TAG:SEMUA_PEGAWAI]';
+    } else if (/^(?:kelompok\s+)?hakim\b/i.test(low) && !/hakim\s+pengawas/i.test(low)) {
+      groupTag = '[TAG:HAKIM]';
+    } else if (/^(?:kelompok|bagian)?\s*kepaniteraan\b/i.test(low)) {
+      groupTag = '[TAG:KEPANITERAAN]';
+    } else if (/^(?:kelompok|bagian)?\s*kesekretariatan\b/i.test(low)) {
+      groupTag = '[TAG:KESEKRETARIATAN]';
+    }
+
+    if (groupTag) {
+      return {
+        nip: groupTag,
+        nama: label,
+        jabatan_dinas: 'Kelompok Jabatan',
+        jabatan_tim: roleText || 'Sesuai Tupoksi',
+        source_nama: label,
+        source_jabatan_dinas: 'Kelompok Jabatan',
+        match_status: 'matched',
+        match_label: 'Grup Cocok'
+      };
+    }
+
+    // 2. Cek kecocokan Nama / NIP pegawai
+    const rowObj = {
+      nama: label,
+      nip: '',
+      jabatan_dinas: label,
+      jabatan_tim: roleText || label || 'Pelaksana'
+    };
+    autoMatchPegawaiRow(rowObj, uList);
+    if (rowObj.match_status === 'matched') {
+      return rowObj;
+    }
+
+    // 3. Cek kecocokan Jabatan Struktural/Fungsional tunggal di usersList
+    const normActor = normalizeJabatanText(label);
+    if (normActor.length >= 4 && uList.length > 0) {
+      const nonAdminUsers = uList.filter(u => String(u.role || '').toLowerCase() !== 'admin');
+      const exactJabMatches = nonAdminUsers.filter(u => normalizeJabatanText(u.jabatan) === normActor);
+      const uniqueMatches = exactJabMatches.length > 0
+        ? exactJabMatches
+        : nonAdminUsers.filter(u => {
+            const uj = normalizeJabatanText(u.jabatan);
+            return uj && (uj === normActor || (normActor.length >= 8 && uj.includes(normActor)));
+          });
+
+      if (uniqueMatches.length === 1) {
+        const u = uniqueMatches[0];
+        return {
+          nip: u.nip,
+          nama: u.nama,
+          jabatan_dinas: u.jabatan || label,
+          jabatan_tim: roleText || label || 'Pelaksana',
+          source_nama: label,
+          source_jabatan_dinas: u.jabatan || label,
+          match_status: 'matched',
+          match_label: 'Jabatan Cocok'
+        };
+      }
+    }
+
+    return rowObj;
+  }
+
+  /**
+   * Mengekstrak metadata utama dokumen SOP: Judul, Nomor SOP, Tanggal Pembuatan, Tanggal Revisi, Tanggal Efektif.
+   */
+  function extractCoreSopMetadata(fullPlainText, fileName) {
+    const normPlain = String(fullPlainText || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/\x07+/g, '\t');
+
+    const cleanVal = (raw) => String(raw || '')
+      .replace(/^[:\t\s]+/, '')
+      .split(/\t/)[0]
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    let nomorSop = '';
+    const mNomor = normPlain.match(/(?:NOMOR\s+SOP|NO\.?\s*SOP)\s*[:\t]*([^\n\r]+)/i);
+    if (mNomor && mNomor[1]) {
+      const cand = cleanVal(mNomor[1]).replace(/\s+(?:TANGGAL\s+PEMBUATAN|TANGGAL\s+REVISI|TANGGAL\s+EFEKTIF).*$/i, '').trim();
+      if (cand && cand !== '-' && !/^\.{3,}$/.test(cand)) {
+        nomorSop = cand;
+      }
+    }
+    if (!nomorSop) {
+      const mCode = normPlain.match(/\b(SOP\/[A-Z0-9._\/-]+)\b/i);
+      if (mCode) nomorSop = mCode[1].trim();
+    }
+
+    let tanggalPembuatan = '';
+    const mBuat = normPlain.match(/TANGGAL\s+PEMBUATAN\s*[:\t]*([^\n\r]+)/i);
+    if (mBuat && mBuat[1]) {
+      tanggalPembuatan = parseIndoDateToIso(cleanVal(mBuat[1]));
+    }
+
+    let tanggalRevisi = '';
+    const mRev = normPlain.match(/TANGGAL\s+REVISI\s*[:\t]*([^\n\r]+)/i);
+    if (mRev && mRev[1]) {
+      const valRev = cleanVal(mRev[1]);
+      if (valRev && valRev !== '-') {
+        tanggalRevisi = parseIndoDateToIso(valRev);
+      }
+    }
+
+    let tanggalEfektif = '';
+    const mEfektif = normPlain.match(/TANGGAL\s+EFEKTIF\s*[:\t]*([^\n\r]+)/i);
+    if (mEfektif && mEfektif[1]) {
+      tanggalEfektif = parseIndoDateToIso(cleanVal(mEfektif[1]));
+    }
+
+    let judulSop = '';
+    const mNama = normPlain.match(/(?:NAMA\s+SOP|JUDUL\s+(?:DOKUMEN\s+)?SOP)\s*[:\t]*\n?([^\n\r]+(?:\n(?!(?:DASAR|KUALIFIKASI|KETERKAITAN|PERALATAN|PERINGATAN|PENCATATAN|NOMOR|TANGGAL|DISAHKAN)\b)[^\n\r]+)?)/i);
+    if (mNama && mNama[1]) {
+      const candJudul = mNama[1]
+        .replace(/^[:\t\s]+/, '')
+        .split(/\n+/)
+        .map(s => cleanVal(s))
+        .filter(s => s && !/^(?:NOMOR\s+SOP|TANGGAL\s+)/i.test(s))
+        .join(' ')
+        .replace(/\.(pdf|docx?)$/i, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+      if (candJudul && candJudul !== '-' && candJudul.length >= 4) {
+        judulSop = /^sop\b/i.test(candJudul) ? candJudul : ('SOP ' + candJudul);
+      }
+    }
+    if (!judulSop) {
+      const mLineSop = normPlain.match(/(?:^|\n)\s*((?:SOP|STANDAR\s+OPERASIONAL\s+PROSEDUR)\s+[A-Z0-9][^\n\r]{4,120})/i);
+      if (mLineSop && mLineSop[1] && !/^(?:NOMOR\s+SOP)/i.test(mLineSop[1].trim())) {
+        judulSop = mLineSop[1].replace(/\s+/g, ' ').trim();
+      } else if (fileName) {
+        judulSop = String(fileName).replace(/\.(pdf|docx?)$/i, '').replace(/[_]+/g, ' ').trim();
+      }
+    }
+
+    return {
+      judul_sop: judulSop,
+      nomor_sop: nomorSop,
+      tanggal_pembuatan: tanggalPembuatan,
+      tanggal_revisi: tanggalRevisi,
+      tanggal_efektif: tanggalEfektif
+    };
+  }
+
+  /**
+   * Mengekstrak daftar pelaksana dari HTML Word SOP (tabel flowchart PermenPAN atau tabel daftar pelaksana).
+   */
+  function extractSopPelaksanaFromHtml(htmlText, usersList) {
+    if (!htmlText || typeof DOMParser === 'undefined') return [];
+    const foundLabels = [];
+    const seen = new Set();
+    const pushActor = (txt, role) => {
+      const clean = String(txt || '').replace(/\s+/g, ' ').trim();
+      if (!clean || clean.length < 3 || SOP_NOISE_ACTORS.test(clean)) return;
+      const key = clean.toLowerCase();
+      if (seen.has(key)) return;
+      seen.add(key);
+      foundLabels.push({ label: clean, role: role || 'Pelaksana' });
+    };
+
+    try {
+      const doc = new DOMParser().parseFromString(htmlText, 'text/html');
+      const tables = Array.from(doc.querySelectorAll('table'));
+      for (const tbl of tables) {
+        const trs = Array.from(tbl.querySelectorAll('tr'));
+        if (trs.length < 2) continue;
+
+        // Pola A: Tabel Flowchart SOP (baris 0 memuat sel "Pelaksana", baris 1 berisi subkolom Jabatan/Pelaksana)
+        for (let r = 0; r < Math.min(3, trs.length - 1); r++) {
+          const cellsTop = Array.from(trs[r].querySelectorAll('th, td'));
+          const pelIdx = cellsTop.findIndex(c => /pelaksana/i.test((c.textContent || '').trim()));
+          if (pelIdx !== -1) {
+            const pelCell = cellsTop[pelIdx];
+            const colspan = Math.max(1, parseInt(pelCell.getAttribute('colspan') || '1', 10));
+            let colOffset = 0;
+            for (let k = 0; k < pelIdx; k++) {
+              colOffset += Math.max(1, parseInt(cellsTop[k].getAttribute('colspan') || '1', 10));
+            }
+            // Hitung jumlah kolom sebelum Pelaksana di baris berikutnya (karena sel No/Kegiatan sering rowspan=2)
+            const subCells = Array.from(trs[r + 1].querySelectorAll('th, td'));
+            if (colspan > 1 && subCells.length >= colspan) {
+              for (let s = 0; s < colspan && s < subCells.length; s++) {
+                const subTxt = (subCells[s].textContent || '').replace(/\s+/g, ' ').trim();
+                pushActor(subTxt, subTxt);
+              }
+            } else {
+              // Bila tidak ada colspan eksplisit, ambil sel antara kolom Kegiatan s.d. Kelengkapan/Mutu Baku
+              subCells.forEach((sc, sIdx) => {
+                const subTxt = (sc.textContent || '').replace(/\s+/g, ' ').trim();
+                if (!SOP_NOISE_ACTORS.test(subTxt) && sIdx >= Math.max(0, pelIdx - colOffset)) {
+                  pushActor(subTxt, subTxt);
+                }
+              });
+            }
+          }
+        }
+      }
+
+      // Pola B: Jika belum ketemu di header flowchart, cek tabel Nama/Jabatan/Pelaksana vertikal (memakai helper Lampiran)
+      if (foundLabels.length === 0) {
+        const tblVert = parseHtmlTablesForLampiran(htmlText, usersList);
+        if (tblVert && Array.isArray(tblVert.rows) && tblVert.rows.length > 0) {
+          return tblVert.rows;
+        }
+      }
+    } catch (e) {
+      console.warn('[SkDocParser] SOP HTML Pelaksana parse warning:', e);
+    }
+
+    return foundLabels.map(it => matchSopActor(it.label, it.role, usersList));
+  }
+
+  /**
+   * Mengekstrak daftar pelaksana SOP dari baris koordinat X/Y halaman PDF (Save As PDF).
+   */
+  function extractSopPelaksanaFromPdfPages(pagesRows, fullPlainText, usersList) {
+    const foundLabels = [];
+    const seen = new Set();
+    const pushActor = (txt, role) => {
+      const clean = String(txt || '').replace(/\s+/g, ' ').trim();
+      if (!clean || clean.length < 3 || SOP_NOISE_ACTORS.test(clean)) return;
+      const key = clean.toLowerCase();
+      if (seen.has(key)) return;
+      seen.add(key);
+      foundLabels.push({ label: clean, role: role || 'Pelaksana' });
+    };
+
+    // 1. Cari header flowchart PDF ("Pelaksana" pada baris header, lalu sub-header jabatan tepat di bawahnya)
+    for (let pIdx = 0; pIdx < (pagesRows || []).length; pIdx++) {
+      const rows = pagesRows[pIdx] || [];
+      for (let rIdx = 0; rIdx < rows.length - 1; rIdx++) {
+        const row = rows[rIdx];
+        const low = row.text.toLowerCase();
+        if (low.includes('pelaksana') && (low.includes('kegiatan') || low.includes('no') || low.includes('mutu'))) {
+          const kegTok = row.tokens.find(t => /kegiatan|aktivitas|uraian/i.test(t.text));
+          const pelTok = row.tokens.find(t => /pelaksana/i.test(t.text));
+          const mutuTok = row.tokens.find(t => /mutu|kelengkapan|waktu|output|ket/i.test(t.text));
+
+          const minX = kegTok ? (kegTok.endX + 10) : (pelTok ? pelTok.x - 90 : 120);
+          const maxX = mutuTok ? (mutuTok.x - 8) : Infinity;
+
+          // Periksa hingga 2 baris tepat di bawah baris header "Pelaksana"
+          for (let subOffset = 1; subOffset <= 2 && (rIdx + subOffset) < rows.length; subOffset++) {
+            const subRow = rows[rIdx + subOffset];
+            const subLow = subRow.text.toLowerCase();
+            if (/^1\b/.test(subLow) && subRow.tokens.length <= 2) break;
+            const candidateTokens = subRow.tokens.filter(tk => tk.x >= minX && tk.x < maxX);
+            if (candidateTokens.length > 0 && candidateTokens.some(tk => !SOP_NOISE_ACTORS.test(tk.text))) {
+              // Gabungkan token sangat dekat (jarak <= 10pt) dalam 1 kotak kolom pelaksana yang sama
+              const colChips = [];
+              candidateTokens.forEach(tk => {
+                const prev = colChips[colChips.length - 1];
+                if (prev && (tk.x - prev.endX) <= 10) {
+                  prev.text += ' ' + tk.text;
+                  prev.endX = Math.max(prev.endX, tk.endX);
+                } else {
+                  colChips.push({ x: tk.x, endX: tk.endX, text: tk.text });
+                }
+              });
+              colChips.forEach(ch => pushActor(ch.text, ch.text));
+              break;
+            }
+          }
+          if (foundLabels.length > 0) break;
+        }
+      }
+      if (foundLabels.length > 0) break;
+    }
+
+    // 2. Fallback: cek apakah SOP memakai format tabel vertikal Nama/Jabatan
+    if (foundLabels.length === 0) {
+      const vertRows = extractLampiranMembersFromPdfPages(pagesRows, usersList);
+      if (vertRows && vertRows.length > 0) {
+        return vertRows;
+      }
+    }
+
+    // 3. Fallback: cek daftar teks "Pelaksana : A, B, C" atau "Pihak Terkait : A, B"
+    if (foundLabels.length === 0 && fullPlainText) {
+      const mList = String(fullPlainText).match(/(?:Pelaksana|Pihak\s+Terkait)\s*[:\t]+([^\n\r]+)/i);
+      if (mList && mList[1]) {
+        mList[1].split(/[,;•]+/).forEach(part => pushActor(part, part));
+      }
+    }
+
+    return foundLabels.map(it => matchSopActor(it.label, it.role, usersList));
+  }
+
+  /**
+   * Ekstraksi penuh file PDF SOP (Save As PDF dari MS Word) via PDF.js.
+   */
+  async function parseSopPdfFile(arrayBuffer, fileName, usersList) {
+    if (typeof global.pdfjsLib === 'undefined') {
+      throw new Error('Pustaka pembaca PDF (pdf.js) belum dimuat.');
+    }
+    configurePdfJsWorker();
+
+    const sigInfo = detectEmbeddedPdfSignature(arrayBuffer);
+    const bytesCopy = new Uint8Array(arrayBuffer).slice(0);
+    const loadingTask = global.pdfjsLib.getDocument({ data: bytesCopy });
+    const pdfDoc = await loadingTask.promise;
+
+    const pagesRows = [];
+    const pageTexts = [];
+    for (let p = 1; p <= pdfDoc.numPages; p++) {
+      const page = await pdfDoc.getPage(p);
+      const tc = await page.getTextContent();
+      const rows = groupPdfTextItemsToRows(tc.items || []);
+      pagesRows.push(rows);
+      pageTexts.push(rows.map(r => r.text).join('\n'));
+    }
+
+    const fullText = pageTexts.join('\n');
+    const hasReadableText = fullText.replace(/\s+/g, '').length >= 40;
+    const meta = extractCoreSopMetadata(fullText, fileName);
+    const members = hasReadableText ? extractSopPelaksanaFromPdfPages(pagesRows, fullText, usersList) : [];
+
+    return {
+      sourceType: 'pdf',
+      numPages: pdfDoc.numPages,
+      hasReadableText,
+      sigInfo,
+      ...meta,
+      members
+    };
+  }
+
+  /**
+   * Ekstraksi penuh file Word SOP (.docx / .doc) via Mammoth.js / OLE binary stream.
+   */
+  async function parseSopWordFile(arrayBuffer, fileName, usersList) {
+    const uint8 = new Uint8Array(arrayBuffer);
+    const isDocxZip = uint8.length >= 2 && uint8[0] === 0x50 && uint8[1] === 0x4B;
+    const isDocOle = uint8.length >= 4 && uint8[0] === 0xD0 && uint8[1] === 0xCF && uint8[2] === 0x11 && uint8[3] === 0xE0;
+
+    let rawText = '';
+    let htmlText = '';
+    if (isDocxZip) {
+      if (typeof global.mammoth === 'undefined') {
+        throw new Error('Pustaka pembaca Word (Mammoth.js) belum termuat.');
+      }
+      const [txtRes, htmlRes] = await Promise.all([
+        global.mammoth.extractRawText({ arrayBuffer }),
+        global.mammoth.convertToHtml({ arrayBuffer })
+      ]);
+      rawText = txtRes.value || '';
+      htmlText = htmlRes.value || '';
+    } else if (isDocOle) {
+      rawText = extractLegacyDocStream(arrayBuffer);
+    } else {
+      throw new Error('Format berkas Word tidak dikenali (pastikan .docx atau .doc yang valid).');
+    }
+
+    const meta = extractCoreSopMetadata(rawText, fileName);
+    let members = htmlText ? extractSopPelaksanaFromHtml(htmlText, usersList) : [];
+    if (members.length === 0) {
+      const mList = rawText.match(/(?:Pelaksana|Pihak\s+Terkait)\s*[:\t]+([^\n\r]+)/i);
+      if (mList && mList[1]) {
+        members = mList[1].split(/[,;•]+/)
+          .map(p => p.trim())
+          .filter(p => p.length >= 3 && !SOP_NOISE_ACTORS.test(p))
+          .map(p => matchSopActor(p, p, usersList));
+      }
+    }
+
+    return {
+      sourceType: isDocxZip ? 'docx' : 'doc',
+      hasReadableText: rawText.trim().length >= 20,
+      rawText,
+      htmlText,
+      ...meta,
+      members
+    };
+  }
+
   const SkDocParser = {
     parseIndoDateToIso,
     extractLegacyDocStream,
@@ -774,7 +1181,13 @@
     configurePdfJsWorker,
     parsePdfFile,
     parseWordFile,
-    splitMatchedMembersForForm
+    splitMatchedMembersForForm,
+    matchSopActor,
+    extractCoreSopMetadata,
+    extractSopPelaksanaFromHtml,
+    extractSopPelaksanaFromPdfPages,
+    parseSopPdfFile,
+    parseSopWordFile
   };
 
   global.SkDocParser = SkDocParser;
