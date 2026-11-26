@@ -7185,3 +7185,22 @@ Berbeda dengan SK (yang memuat `TENTANG`, 1 tanggal penetapan, dan tabel `Nama P
 | **4** | [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html)<br>[`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js)<br>[`tests/verify_fase3b.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/tests/verify_fase3b.js) | - Bump 3-titik PWA ke **`v3.9.0`**. *(Catatan: `vendor/pdf.min.js`, `vendor/pdf.worker.min.js`, dan `sk_doc_parser.js` sudah terpasang sejak Tahap 158)*.<br>- Menambahkan pengujian unit & VM untuk parser SOP, mode `add` vs `edit`, pencocokan pelaksana jabatan/grup, serta sakelar proteksi PDF SOP, lalu memverifikasi penuh `npm test`. |
 
 > **Status Implementasi:** Diterapkan penuh pada PWA **`v3.9.0`** ([`modules/sk/sk_doc_parser.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/sk/sk_doc_parser.js), [`modules/sop/view_sop.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/sop/view_sop.html), [`modules/sop/sop.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/sop/sop.js), [`modules/sop/sop_data.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/sop/sop_data.js)), menggunakan ulang mesin [`core/pdf_signer.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/core/pdf_signer.js), serta lulus pengujian regresi `npm test`.
+
+
+---
+
+## REVISI TAHAP 160: PENYESUAIAN BINGKAI PASFOTO VERTIKAL HEADER PROFIL (`v3.9.1`)
+**Status:** `[SELESAI & TERVERIFIKASI]`
+
+### 1. Akar Masalah
+1. Pada [`core/core.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/core/core.js#L2766), bingkai foto profil di `#global-profile-header` sebelumnya memakai `w-20 h-24 md:w-[88px] md:h-[104px]` (~`5:6`), sedikit lebih pendek dari pasfoto vertikal (`~188×257` / `0.731`).
+2. Pada [`modules/pegawai/pegawai.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/pegawai/pegawai.js#L417-L445) (`compressPegawaiAvatarFile`), setiap foto sebelumnya dipotong menjadi **persegi `240×240 px`**, membuang ~30% area bawah baju (papan nama dan kedua saku dada) sebelum disimpan ke `user_avatars`.
+
+### 2. Rincian Implementasi (Pilihan 2 — UI Kelola Pegawai Tidak Diubah)
+| No | File Target | Rincian Perubahan |
+| :---: | :--- | :--- |
+| **1** | [`core/core.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/core/core.js#L2766-L2767) | - Mengubah bingkai `#global-profile-header` menjadi `w-[76px] h-[104px] md:w-[82px] md:h-[112px]` (rasio `0.732`, tinggi hanya `+8px`, lebar `-6px`) dengan `object-cover object-top`, sehingga pasfoto vertikal dari atas kepala hingga bawah kedua saku tampil utuh tanpa mengubah layout [`modules/pegawai/view_pegawai.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/pegawai/view_pegawai.html) (`Kelola Pegawai`) maupun `#mobile-avatar`. |
+| **2** | [`modules/pegawai/pegawai.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/modules/pegawai/pegawai.js)<br>[`core/firebase.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/core/firebase.js) | - Memperbarui `compressPegawaiAvatarFile` ke dimensi **`240×328 px`** (rasio `0.732` tanpa memotong bahu/saku baju pada pasfoto vertikal) serta menyelaraskan metadata `height: 328` di single-edit, bulk-upload, dan `saveUserAvatarToFirestore` (sah terhadap batas `<= 512 px` pada `firestore.rules`). |
+| **3** | [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html)<br>[`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js)<br>[`tests/verify_fase3b.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/tests/verify_fase3b.js) | - Bump 3-titik PWA ke **`v3.9.1`** serta menambah verifikasi di [`tests/verify_fase3b.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/tests/verify_fase3b.js) dan `npm test`. |
+
+> **Status Implementasi:** Diterapkan pada PWA **`v3.9.1`** dan lulus `npm test`. Foto profil yang sebelumnya tersimpan sebagai persegi `240×240` cukup di-upload ulang 1x di *Kelola Pegawai* agar bagian saku bawah ikut tampil penuh.

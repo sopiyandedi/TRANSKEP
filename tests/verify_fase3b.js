@@ -3848,12 +3848,23 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
     assert.strictEqual(vmSop159.sopUnmatchedPelaksana.length, 1);
 
     const viewSop159 = fs.readFileSync(path.join(repoRoot158, 'modules/sop/view_sop.html'), 'utf8');
-    assert.ok(idxHtml158.includes("APP_BUILD_VER = '3.9.0'"));
-    assert.ok(swJs158.includes("CACHE_NAME = 'transkep-v3.9.0'"));
     assert.ok(viewSop159.includes('sopProtectAntiEdit'));
     assert.ok(viewSop159.includes('sopUnmatchedPelaksana'));
     assert.ok(viewSop159.includes('sopPendingEditPelaksana'));
     console.log('[PASS] Tahap 159 SOP Smart Drop PDF/Word Auto-Fill, Anti-Edit Seal & Edit Mode verified.');
+
+    // =========================================================================
+    // TAHAP 160: BINGKAI PASFOTO VERTIKAL HEADER PROFIL (82x112 & 240x328)
+    // =========================================================================
+    const core160 = fs.readFileSync(path.join(repoRoot158, 'core/core.js'), 'utf8');
+    const pegawaiJs160 = fs.readFileSync(path.join(repoRoot158, 'modules/pegawai/pegawai.js'), 'utf8');
+    const firebaseJs160 = fs.readFileSync(path.join(repoRoot158, 'core/firebase.js'), 'utf8');
+    assert.ok(idxHtml158.includes("APP_BUILD_VER = '3.9.1'"));
+    assert.ok(swJs158.includes("CACHE_NAME = 'transkep-v3.9.1'"));
+    assert.ok(core160.includes('w-[76px] h-[104px] md:w-[82px] md:h-[112px]'), 'Header profil harus memakai bingkai pasfoto 3:4 (82x112)');
+    assert.ok(pegawaiJs160.includes('const targetW = 240;') && pegawaiJs160.includes('const targetH = 328;'), 'Kompresor avatar harus menyimpan pasfoto vertikal 240x328');
+    assert.ok(firebaseJs160.includes('Number((meta && meta.height) || 328)'), 'Fallback tinggi avatar Firestore harus 328');
+    console.log('[PASS] Tahap 160 Vertical Passport Header Avatar Frame (82x112 & 240x328) verified.');
   } finally {
     browserSandbox.TranskepAPI.call = origApiCall;
     browserSandbox.TranskepFirebase.getDb = origGetDb;

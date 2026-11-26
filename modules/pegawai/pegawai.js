@@ -29,6 +29,8 @@
           bulkUploadProgress: { done: 0, total: 0 },
           isDraggingBulkFoto: false,
           formAvatarPreview: "",
+          formAvatarWidth: 240,
+          formAvatarHeight: 328,
           formAvatarRemoved: false,
           formAvatarChanged: false,
           hierarkiJabatan: [
@@ -164,6 +166,8 @@
           this.modalPegMode = mode;
           this.formAvatarChanged = false;
           this.formAvatarRemoved = false;
+          this.formAvatarWidth = 240;
+          this.formAvatarHeight = 328;
           if (mode === 'edit' && user) {
             this.formPegawai = { ...user, originalNip: user.nip };
             if (this.formPegawai.pass && String(this.formPegawai.pass).startsWith('SHA256$')) {
@@ -219,7 +223,7 @@
                 this.avatarsMap = nextMap;
                 if (typeof window.setCachedUserAvatar === 'function') window.setCachedUserAvatar(targetNipClean, '');
               } else if (avatarChanged && avatarUri && typeof window.TranskepFirebase.saveUserAvatarToFirestore === 'function') {
-                await window.TranskepFirebase.saveUserAvatarToFirestore(targetNipClean, avatarUri, { mime_type: 'image/jpeg', size_bytes: avatarUri.length, width: 240, height: 240 });
+                await window.TranskepFirebase.saveUserAvatarToFirestore(targetNipClean, avatarUri, { mime_type: 'image/jpeg', size_bytes: avatarUri.length, width: this.formAvatarWidth || 240, height: this.formAvatarHeight || 328 });
                 this.avatarsMap = { ...this.avatarsMap, [targetNipClean]: { nip: targetNipClean, photo_data_uri: avatarUri } };
                 if (typeof window.setCachedUserAvatar === 'function') window.setCachedUserAvatar(targetNipClean, avatarUri);
               }
@@ -414,25 +418,38 @@
               const img = new Image();
               img.onerror = () => reject(new Error('Gambar tidak valid atau rusak.'));
               img.onload = () => {
-                const targetSize = 240;
+                const targetW = 240;
+                const targetH = 328; // Rasio pasfoto vertikal (~0.732, identik 188x257 agar dada & saku tidak terpotong)
+                const targetRatio = targetW / targetH;
                 const imgW = img.naturalWidth || img.width;
                 const imgH = img.naturalHeight || img.height;
-                const side = Math.min(imgW, imgH);
-                const sx = Math.max(0, Math.round((imgW - side) / 2));
-                const sy = imgH > imgW ? Math.max(0, Math.round((imgH - side) * 0.12)) : Math.max(0, Math.round((imgH - side) / 2));
+                const imgRatio = imgW / Math.max(1, imgH);
+                let cropW = imgW;
+                let cropH = imgH;
+                let sx = 0;
+                let sy = 0;
+                if (imgRatio > targetRatio) {
+                  cropH = imgH;
+                  cropW = Math.min(imgW, Math.round(imgH * targetRatio));
+                  sx = Math.max(0, Math.round((imgW - cropW) / 2));
+                } else {
+                  cropW = imgW;
+                  cropH = Math.min(imgH, Math.round(imgW / targetRatio));
+                  sy = Math.max(0, Math.round((imgH - cropH) * 0.12));
+                }
                 const canvas = document.createElement('canvas');
-                canvas.width = targetSize;
-                canvas.height = targetSize;
+                canvas.width = targetW;
+                canvas.height = targetH;
                 const ctx = canvas.getContext('2d');
                 ctx.fillStyle = '#ffffff';
-                ctx.fillRect(0, 0, targetSize, targetSize);
-                ctx.drawImage(img, sx, sy, side, side, 0, 0, targetSize, targetSize);
+                ctx.fillRect(0, 0, targetW, targetH);
+                ctx.drawImage(img, sx, sy, cropW, cropH, 0, 0, targetW, targetH);
                 let outUri = canvas.toDataURL('image/jpeg', 0.82);
                 if (outUri.length > 90000) {
                   outUri = canvas.toDataURL('image/jpeg', 0.72);
                 }
                 const byteEstimate = Math.round((outUri.split(',')[1] || '').length * 0.75);
-                resolve({ dataUri: outUri, width: targetSize, height: targetSize, sizeBytes: byteEstimate, sizeKb: Math.max(1, Math.round(byteEstimate / 1024)) });
+                resolve({ dataUri: outUri, width: targetW, height: targetH, sizeBytes: byteEstimate, sizeKb: Math.max(1, Math.round(byteEstimate / 1024)) });
               };
               img.src = ev.target.result;
             };
@@ -472,6 +489,8 @@
           try {
             const res = await this.compressPegawaiAvatarFile(file);
             this.formAvatarPreview = res.dataUri;
+            this.formAvatarWidth = res.width;
+            this.formAvatarHeight = res.height;
             this.formAvatarChanged = true;
             this.formAvatarRemoved = false;
           } catch (err) {
@@ -559,7 +578,7 @@
                 mime_type: 'image/jpeg',
                 size_bytes: item.sizeBytes || item.dataUri.length,
                 width: item.width || 240,
-                height: item.height || 240
+                height: item.height || 328
               });
               item.uploaded = true;
               this.avatarsMap = { ...this.avatarsMap, [cleanNip]: { nip: cleanNip, photo_data_uri: item.dataUri } };

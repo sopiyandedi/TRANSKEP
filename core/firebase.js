@@ -1951,7 +1951,7 @@ const TranskepFirebase = {
       mime_type: String((meta && meta.mime_type) || 'image/jpeg'),
       size_bytes: Number((meta && meta.size_bytes) || cleanUri.length),
       width: Number((meta && meta.width) || 240),
-      height: Number((meta && meta.height) || 240),
+      height: Number((meta && meta.height) || 328),
       updated_by: caller.nip || String((meta && meta.updated_by) || ''),
       updated_at: serverTs,
       created_at: serverTs
