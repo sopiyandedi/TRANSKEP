@@ -2763,8 +2763,8 @@ function renderGlobalHeader() {
          <div class="absolute inset-0 bg-gradient-to-r from-indigo-500/5 to-transparent pointer-events-none"></div>
          <div class="flex items-center gap-5 w-full md:w-auto relative z-10">
             
-            <div class="w-[76px] h-[104px] md:w-[82px] md:h-[112px] rounded-2xl flex items-center justify-center text-white text-3xl font-black shadow-lg shadow-indigo-500/30 shrink-0 border border-indigo-400/30 bg-gradient-to-br from-indigo-500 to-purple-600 relative overflow-hidden group">
-               <img v-if="userAvatar" :src="userAvatar" :alt="currentUser ? currentUser.nama : 'Foto Pegawai'" class="w-full h-full object-cover object-top relative z-10">
+            <div class="w-[70px] h-[96px] md:w-[76px] md:h-[104px] rounded-xl flex items-center justify-center text-white text-3xl font-black shrink-0 relative overflow-hidden group transition-all" :class="userAvatar ? 'p-[2px] bg-slate-900/90 border border-slate-400/25 shadow-md shadow-black/40' : 'shadow-lg shadow-indigo-500/30 border border-indigo-400/30 bg-gradient-to-br from-indigo-500 to-purple-600'">
+               <img v-if="userAvatar" :src="userAvatar" :alt="currentUser ? currentUser.nama : 'Foto Pegawai'" class="w-full h-full object-cover object-top rounded-[10px] relative z-10">
                <template v-else>
                   <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
                   <span class="relative z-10 drop-shadow-md tracking-wider">{{ userInitials }}</span>

@@ -7204,3 +7204,15 @@ Berbeda dengan SK (yang memuat `TENTANG`, 1 tanggal penetapan, dan tabel `Nama P
 | **3** | [`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html)<br>[`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js)<br>[`tests/verify_fase3b.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/tests/verify_fase3b.js) | - Bump 3-titik PWA ke **`v3.9.1`** serta menambah verifikasi di [`tests/verify_fase3b.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/tests/verify_fase3b.js) dan `npm test`. |
 
 > **Status Implementasi:** Diterapkan pada PWA **`v3.9.1`** dan lulus `npm test`. Foto profil yang sebelumnya tersimpan sebagai persegi `240×240` cukup di-upload ulang 1x di *Kelola Pegawai* agar bagian saku bawah ikut tampil penuh.
+
+
+---
+
+## REVISI TAHAP 161: PEMOLESAN BINGKAI PASFOTO HEADER PROFIL (`76×104 px`, MAT NETRAL `rounded-xl`) (`v3.9.2`)
+**Status:** `[SELESAI & TERVERIFIKASI]`
+
+- **Perbaikan Visual di [`core/core.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/core/core.js#L2766-L2767):**
+  1. Menyelaraskan proporsi bingkai menjadi `w-[70px] h-[96px] md:w-[76px] md:h-[104px]` (`0.731` — rasio pasfoto tetap utuh sampai bawah saku dada, tetapi tingginya sejajar rapat `104 px` dengan blok teks Nama/NIP di kanan).
+  2. Mengurangi kelengkungan sudut dari `rounded-2xl` menjadi `rounded-xl` + `rounded-[10px]` pada gambar agar sudut bawah baju/lengan tidak terpotong bulat.
+  3. Memisahkan styling foto vs inisial huruf: saat foto aktif, bingkai menggunakan inner mat netral tipis `p-[2px] bg-slate-900/90 border border-slate-400/25 shadow-md shadow-black/40` tanpa pendar ungu (`shadow-indigo-500/30`), sementara gradien ungu tetap khusus mode inisial huruf.
+- **PWA & Uji Regresi:** Bump 3-titik **`v3.9.2`** ([`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) & [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js)) serta verifikasi di [`tests/verify_fase3b.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/tests/verify_fase3b.js) dan `npm test`.
