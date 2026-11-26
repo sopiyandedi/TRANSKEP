@@ -3854,18 +3854,18 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
     console.log('[PASS] Tahap 159 SOP Smart Drop PDF/Word Auto-Fill, Anti-Edit Seal & Edit Mode verified.');
 
     // =========================================================================
-    // TAHAP 160 & 161: BINGKAI PASFOTO VERTIKAL HEADER PROFIL (76x104 & 240x328)
+    // TAHAP 160-162: BINGKAI PASFOTO VERTIKAL HEADER PROFIL (88x112 & 240x328)
     // =========================================================================
     const core160 = fs.readFileSync(path.join(repoRoot158, 'core/core.js'), 'utf8');
     const pegawaiJs160 = fs.readFileSync(path.join(repoRoot158, 'modules/pegawai/pegawai.js'), 'utf8');
     const firebaseJs160 = fs.readFileSync(path.join(repoRoot158, 'core/firebase.js'), 'utf8');
-    assert.ok(idxHtml158.includes("APP_BUILD_VER = '3.9.2'"));
-    assert.ok(swJs158.includes("CACHE_NAME = 'transkep-v3.9.2'"));
-    assert.ok(core160.includes('w-[70px] h-[96px] md:w-[76px] md:h-[104px]'), 'Header profil harus memakai bingkai pasfoto proporsional 76x104 (rasio 0.731)');
+    assert.ok(idxHtml158.includes("APP_BUILD_VER = '3.9.3'"));
+    assert.ok(swJs158.includes("CACHE_NAME = 'transkep-v3.9.3'"));
+    assert.ok(core160.includes('w-[80px] h-[102px] md:w-[88px] md:h-[112px]'), 'Header profil harus memakai bingkai pasfoto seimbang 88x112');
     assert.ok(core160.includes('rounded-[10px]') && core160.includes('p-[2px]'), 'Foto profil harus memiliki inner mat frame netral tanpa neon glow ungu');
     assert.ok(pegawaiJs160.includes('const targetW = 240;') && pegawaiJs160.includes('const targetH = 328;'), 'Kompresor avatar harus menyimpan pasfoto vertikal 240x328');
     assert.ok(firebaseJs160.includes('Number((meta && meta.height) || 328)'), 'Fallback tinggi avatar Firestore harus 328');
-    console.log('[PASS] Tahap 160 & 161 Polished Vertical Passport Header Avatar Frame (76x104 & 240x328) verified.');
+    console.log('[PASS] Tahap 160-162 Balanced Vertical Passport Header Avatar Frame (88x112 & 240x328) verified.');
   } finally {
     browserSandbox.TranskepAPI.call = origApiCall;
     browserSandbox.TranskepFirebase.getDb = origGetDb;

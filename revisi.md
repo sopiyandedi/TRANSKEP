@@ -7216,3 +7216,12 @@ Berbeda dengan SK (yang memuat `TENTANG`, 1 tanggal penetapan, dan tabel `Nama P
   2. Mengurangi kelengkungan sudut dari `rounded-2xl` menjadi `rounded-xl` + `rounded-[10px]` pada gambar agar sudut bawah baju/lengan tidak terpotong bulat.
   3. Memisahkan styling foto vs inisial huruf: saat foto aktif, bingkai menggunakan inner mat netral tipis `p-[2px] bg-slate-900/90 border border-slate-400/25 shadow-md shadow-black/40` tanpa pendar ungu (`shadow-indigo-500/30`), sementara gradien ungu tetap khusus mode inisial huruf.
 - **PWA & Uji Regresi:** Bump 3-titik **`v3.9.2`** ([`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) & [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js)) serta verifikasi di [`tests/verify_fase3b.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/tests/verify_fase3b.js) dan `npm test`.
+
+
+---
+
+## REVISI TAHAP 162: PENYESUAIAN LEBAR SEIMBANG BINGKAI PASFOTO HEADER PROFIL (`88×112 px`) (`v3.9.3`)
+**Status:** `[SELESAI & TERVERIFIKASI]`
+
+- **Perbaikan di [`core/core.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/core/core.js#L2766):** Memperlebar kembali bingkai `#global-profile-header` menjadi **`w-[80px] h-[102px] md:w-[88px] md:h-[112px]`** (`88 px` selebar bingkai original, namun tetap mempertahankan proporsi tinggi `112 px`, `rounded-xl`, `p-[2px]` mat netral, & `rounded-[10px]`) agar seimbang di sebelah tipografi judul nama sekaligus menampilkan pasfoto `240×328 px` secara penuh sampai kedua saku dada.
+- **PWA & Uji Regresi:** Bump 3-titik **`v3.9.3`** ([`index.html`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/index.html) & [`sw.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/sw.js)) serta verifikasi di [`tests/verify_fase3b.js`](file:///c:/Users/user/.gemini/antigravity-ide/projek/TRANSKEP/tests/verify_fase3b.js) dan `npm test`.
