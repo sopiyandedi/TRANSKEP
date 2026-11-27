@@ -77,12 +77,110 @@
     { no: 25, hari_mode: 'Sn', tgl_senin: '2026-12-21', tgl_jumat: '', pembina: 'H. Zulkifli, S.Ag., S.H., M.H.', pemimpin: 'Gerald Dwi Anggara', doa: 'Dra. Hj. Sunaeah, M.H.', nilai_ma: 'Hamdan Nahari, S. Ag.', budaya_malu: 'Daryatno, A.Md.', mc: 'Putri L. E., A.Md., Akt.' }
   ];
 
+  function stripLeadingTitles(str) {
+    let cur = String(str || '').toLowerCase().trim();
+    const rx = /^(?:drs|dra|dr|ir|prof|h|hj|kh|ust|r\.?\s*a|r)\.?\s+/i;
+    for (let i = 0; i < 5; i++) {
+      const next = cur.replace(rx, '').trim();
+      if (next === cur) break;
+      cur = next;
+    }
+    return cur;
+  }
+
+  function normNameTokens(name) {
+    let base = String(name || '').split(',')[0] || '';
+    base = stripLeadingTitles(base);
+    base = base.replace(/\./g, ' ').replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+    return base ? base.split(' ').filter(Boolean) : [];
+  }
+
   function normNameKey(name) {
-    return String(name || '')
-      .toLowerCase()
-      .replace(/^(drs\.?|dra\.?|ir\.?|dr\.?|h\.?|hj\.?|k\.?)\s+/g, '')
-      .replace(/,.*$/, '')
-      .replace(/[^a-z0-9]/g, '');
+    return normNameTokens(name).join('');
+  }
+
+  function isFuzzyNameMatch(nameA, nameB) {
+    const kA = normNameKey(nameA);
+    const kB = normNameKey(nameB);
+    if (!kA || !kB) return false;
+    if (kA === kB) return true;
+    const tA = normNameTokens(nameA);
+    const tB = normNameTokens(nameB);
+    if (!tA.length || !tB.length) return false;
+    const shorter = tA.length <= tB.length ? tA : tB;
+    const longer = tA.length <= tB.length ? tB : tA;
+    let matched = 0;
+    for (let i = 0; i < shorter.length; i++) {
+      const sTok = shorter[i];
+      const ok = longer.some(lTok => lTok === sTok || (sTok.length === 1 && lTok.startsWith(sTok)) || (lTok.length === 1 && sTok.startsWith(lTok)));
+      if (ok) matched++;
+    }
+    if (matched === shorter.length && (shorter.length >= 2 || (shorter[0].length >= 5 && longer.length === 1))) return true;
+    return false;
+  }
+
+  function prepareLogoCanvas(img, stripWhite) {
+    if (!img || !img.width || !img.height || typeof document === 'undefined') return null;
+    try {
+      const c = document.createElement('canvas');
+      c.width = img.width;
+      c.height = img.height;
+      const cx = c.getContext('2d');
+      cx.drawImage(img, 0, 0);
+      const id = cx.getImageData(0, 0, c.width, c.height);
+      const d = id.data;
+      const w = c.width, h = c.height;
+
+      const cornerA = d[3];
+      const cornerMax = Math.max(d[0], d[1], d[2]);
+      const cornerMin = Math.min(d[0], d[1], d[2]);
+      if (stripWhite && cornerA >= 20 && cornerMin >= 210 && (cornerMax - cornerMin) <= 28) {
+        const visited = new Uint8Array(w * h);
+        const q = [];
+        const pushSeed = (idx) => { if (!visited[idx]) { visited[idx] = 1; q.push(idx); } };
+        for (let x = 0; x < w; x++) { pushSeed(x); pushSeed((h - 1) * w + x); }
+        for (let y = 0; y < h; y++) { pushSeed(y * w); pushSeed(y * w + (w - 1)); }
+        for (let head = 0; head < q.length; head++) {
+          const idx = q[head];
+          const p = idx * 4;
+          const r = d[p], g = d[p + 1], b = d[p + 2];
+          const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+          if (mn >= 212 && (mx - mn) <= 28) {
+            d[p + 3] = 0;
+            const x = idx % w, y = (idx - x) / w;
+            if (x > 0) pushSeed(idx - 1);
+            if (x + 1 < w) pushSeed(idx + 1);
+            if (y > 0) pushSeed(idx - w);
+            if (y + 1 < h) pushSeed(idx + w);
+          }
+        }
+        cx.putImageData(id, 0, 0);
+      }
+
+      let minX = w, minY = h, maxX = -1, maxY = -1;
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          if (d[(y * w + x) * 4 + 3] > 18) {
+            if (x < minX) minX = x;
+            if (y < minY) minY = y;
+            if (x > maxX) maxX = x;
+            if (y > maxY) maxY = y;
+          }
+        }
+      }
+      if (maxX >= minX && maxY >= minY) {
+        const cw = maxX - minX + 1;
+        const ch = maxY - minY + 1;
+        const out = document.createElement('canvas');
+        out.width = cw;
+        out.height = ch;
+        out.getContext('2d').drawImage(c, minX, minY, cw, ch, 0, 0, cw, ch);
+        return out;
+      }
+      return c;
+    } catch (e) {
+      return img;
+    }
   }
 
   function parseYmd(rawVal) {
@@ -459,6 +557,11 @@
           });
         },
 
+        async syncAvatarsNow() {
+          await this.loadFromFirestore();
+          this.$nextTick(() => this.refreshPosterCanvas());
+        },
+
         closeModal() {
           this.showModal = false;
         },
@@ -495,9 +598,13 @@
               TranskepFirebase.getFirestoreUserAvatars().catch(() => ({})),
               TranskepFirebase.getFirestoreSuratTugas ? TranskepFirebase.getFirestoreSuratTugas().catch(() => []) : Promise.resolve([])
             ]);
-            if (avatars && typeof avatars === 'object') {
-              this.asnAvatarMap = avatars;
-            }
+            const mergedAvatars = Object.assign(
+              {},
+              (typeof window !== 'undefined' && window.vmPegawai && window.vmPegawai.avatarsMap) ? window.vmPegawai.avatarsMap : {},
+              (avatars && typeof avatars === 'object') ? avatars : {}
+            );
+            this.asnAvatarMap = mergedAvatars;
+            if (this.activeTab === 'poster') this.$nextTick(() => this.refreshPosterCanvas());
             if (Array.isArray(stDocs) && stDocs.length > 0) {
               this.stListCache = stDocs;
             }
@@ -906,18 +1013,49 @@
           this.$nextTick(() => this.refreshPosterCanvas());
         },
 
-        resolveOfficerPhotoUri(name, explicitNip) {
+        findMatchingSatpam(name) {
           const key = normNameKey(name);
-          if (key && this.satpamPhotoByNormName[key]) return this.satpamPhotoByNormName[key];
-          const nip = String(explicitNip || this.userNipByNormName[key] || '').replace(/['"\s]/g, '').trim();
-          if (nip && this.asnAvatarMap && this.asnAvatarMap[nip] && this.asnAvatarMap[nip].photo_data_uri) {
-            return this.asnAvatarMap[nip].photo_data_uri;
+          if (key && this.satpamPhotoByNormName[key]) return { photo_data_uri: this.satpamPhotoByNormName[key] };
+          return (this.satpamList || []).find(sp => isFuzzyNameMatch(name, sp.nama) || isFuzzyNameMatch(name, sp.panggilan)) || null;
+        },
+
+        findMatchingAsnUser(name, explicitNip) {
+          const cleanExp = String(explicitNip || '').replace(/['"\s]/g, '').trim();
+          const users = (typeof state !== 'undefined' && Array.isArray(state.users)) ? state.users : [];
+          if (cleanExp) {
+            const byNip = users.find(u => String(u.nip || '').replace(/['"\s]/g, '').trim() === cleanExp);
+            if (byNip) return byNip;
           }
-          if (nip && typeof state !== 'undefined' && Array.isArray(state.users)) {
-            const u = state.users.find(x => String(x.nip || '').replace(/['"\s]/g, '').trim() === nip);
-            if (u && u.photo_data_uri) return u.photo_data_uri;
+          const key = normNameKey(name);
+          const nipExact = this.userNipByNormName[key];
+          if (nipExact) {
+            const u = users.find(x => String(x.nip || '').replace(/['"\s]/g, '').trim() === nipExact);
+            if (u) return u;
           }
-          return '';
+          return users.find(u => isFuzzyNameMatch(name, u.nama)) || null;
+        },
+
+        getOfficerPhotoDiagnostic(name, explicitNip) {
+          const sp = this.findMatchingSatpam(name);
+          if (sp && sp.photo_data_uri) {
+            return { uri: sp.photo_data_uri, status: 'ok', source: 'Satpam' };
+          }
+          const u = this.findMatchingAsnUser(name, explicitNip);
+          const nip = u ? String(u.nip || '').replace(/['"\s]/g, '').trim() : String(explicitNip || '').replace(/['"\s]/g, '').trim();
+          if (nip) {
+            const fromMap = (this.asnAvatarMap && this.asnAvatarMap[nip] && this.asnAvatarMap[nip].photo_data_uri) || '';
+            const fromPeg = (typeof window !== 'undefined' && window.vmPegawai && window.vmPegawai.avatarsMap && window.vmPegawai.avatarsMap[nip] && window.vmPegawai.avatarsMap[nip].photo_data_uri) || '';
+            const fromLs = (typeof window !== 'undefined' && typeof window.getCachedUserAvatar === 'function') ? window.getCachedUserAvatar(nip) : '';
+            const fromUser = u ? (u.photo_data_uri || u.foto_url || u.foto || '') : '';
+            const uri = fromMap || fromPeg || fromLs || fromUser || '';
+            if (uri) return { uri, status: 'ok', source: 'Pegawai', nip };
+            return { uri: '', status: 'no_photo', source: 'Belum Upload', nip, matchedName: u ? u.nama : '' };
+          }
+          return { uri: '', status: 'unmatched', source: 'Nama Tdk Cocok' };
+        },
+
+        resolveOfficerPhotoUri(name, explicitNip) {
+          return this.getOfficerPhotoDiagnostic(name, explicitNip).uri;
         },
 
         async refreshPosterCanvas() {
@@ -931,8 +1069,12 @@
           const H = 1350;
           const eff = (this.selectedEvaluation && this.selectedEvaluation.effective) ? this.selectedEvaluation.effective : row;
 
-          // Preload semua gambar paralel
-          const logoPromise = loadImageAsset('img/logo_pengadilan.png');
+          // Preload semua gambar & logo resmi paralel
+          const logoPromise = loadImageAsset('img/Logo_PA_Imy.png');
+          const wbkPromise = loadImageAsset('img/Logo_WBK.png');
+          const berakhlakPromise = loadImageAsset('img/berakhlak.png');
+          const banggaPromise = loadImageAsset('img/bangga%20Melayani%20Bangsa.png');
+          const socialPromise = loadImageAsset('img/alamat%20media%20sosial.png');
           const bgPromise = loadImageAsset(this.settingsDoc.bg_gedung_uri || 'img/gedung_pa.png');
           const photoPromises = ROLE_META.map(rm => {
             const oName = eff[rm.key] || '';
@@ -940,7 +1082,9 @@
             return loadImageAsset(uri);
           });
 
-          const [logoImg, bgImg, ...officerImgs] = await Promise.all([logoPromise, bgPromise, ...photoPromises]);
+          const [logoImg, wbkImg, berakhlakImg, banggaImg, socialImg, bgImg, ...officerImgs] = await Promise.all([
+            logoPromise, wbkPromise, berakhlakPromise, banggaPromise, socialPromise, bgPromise, ...photoPromises
+          ]);
           if (token !== this.renderNonce) return;
 
           // 1. Langit & Latar Belakang
@@ -982,23 +1126,32 @@
             ctx.restore();
           }
 
-          // 2. Logo PA Indramayu + WBK Badge + Header SK
+          // 2. Logo PA Indramayu Berwarna + Logo WBK Asli + Header SK
+          let nextX = 38;
           if (logoImg) {
-            const lh = 148;
+            const lh = 152;
             const lw = Math.round((logoImg.width / Math.max(1, logoImg.height)) * lh);
-            ctx.drawImage(logoImg, 36, 30, lw, lh);
-            drawWbkEmblem(ctx, 36 + lw + 78, 104, 62);
+            ctx.drawImage(logoImg, nextX, 26, lw, lh);
+            nextX += lw + 16;
+          }
+          if (wbkImg) {
+            const wh = 138;
+            const ww = Math.round((wbkImg.width / Math.max(1, wbkImg.height)) * wh);
+            ctx.drawImage(wbkImg, nextX, 33, ww, wh);
+            nextX += ww + 20;
           } else {
-            drawWbkEmblem(ctx, 130, 104, 62);
+            drawWbkEmblem(ctx, nextX + 64, 102, 62);
+            nextX += 148;
           }
 
+          const skTextX = Math.max(340, nextX);
           ctx.save();
           ctx.fillStyle = '#175c32';
           ctx.font = '700 21px "Plus Jakarta Sans", sans-serif';
           ctx.textAlign = 'left';
-          ctx.fillText('Lampiran Surat Keputusan Ketua Pengadilan Agama Indramayu', 385, 62);
-          ctx.fillText('Nomor   : ' + (this.currentYearDoc.nomor_sk || '-'), 385, 92);
-          ctx.fillText('Tanggal : ' + (this.currentYearDoc.tanggal_sk || '-'), 385, 122);
+          ctx.fillText('Lampiran Surat Keputusan Ketua Pengadilan Agama Indramayu', skTextX, 64, W - skTextX - 32);
+          ctx.fillText('Nomor   : ' + (this.currentYearDoc.nomor_sk || '-'), skTextX, 96, W - skTextX - 32);
+          ctx.fillText('Tanggal : ' + (this.currentYearDoc.tanggal_sk || '-'), skTextX, 128, W - skTextX - 32);
           ctx.restore();
 
           // 3. Judul Besar PETUGAS APEL + Hari Tanggal
@@ -1067,35 +1220,42 @@
             ctx.restore();
           });
 
-          // 6. SMART BerAKHLAK & Footer Bar
+          // 6. Logo Resmi BerAKHLAK & Bangga Melayani Bangsa (Tanpa SMART) + Footer Sosial Media
           ctx.save();
-          ctx.fillStyle = '#1f2937';
-          ctx.font = '900 42px "Plus Jakarta Sans", sans-serif';
-          ctx.textAlign = 'left';
-          ctx.fillText('SMART', 64, 1216);
-          ctx.font = '800 11px "Plus Jakarta Sans", sans-serif';
-          ctx.fillText('SANTUN MANDIRI AKUNTABEL RAPI TRANSPARAN', 64, 1236);
+          const cleanBer = prepareLogoCanvas(berakhlakImg, true);
+          if (cleanBer && cleanBer.width && cleanBer.height) {
+            const maxBH = 84;
+            const maxBW = 360;
+            const sc = Math.min(maxBW / cleanBer.width, maxBH / cleanBer.height);
+            const bw = Math.round(cleanBer.width * sc);
+            const bh = Math.round(cleanBer.height * sc);
+            ctx.drawImage(cleanBer, 56, 1272 - bh - 6, bw, bh);
+          }
 
-          ctx.fillStyle = '#0f172a';
-          ctx.font = '900 34px "Plus Jakarta Sans", sans-serif';
-          ctx.fillText('Ber', 345, 1214);
-          ctx.fillStyle = '#dc2626';
-          ctx.fillText('AKHLAK', 404, 1214);
-          ctx.fillStyle = '#334155';
-          ctx.font = '700 10px "Plus Jakarta Sans", sans-serif';
-          ctx.fillText('Berorientasi Pelayanan Akuntabel Kompeten Harmonis Loyal Adaptif Kolaboratif', 345, 1234, 340);
-
-          ctx.textAlign = 'right';
-          ctx.fillStyle = '#dc2626';
-          ctx.font = '900 22px "Plus Jakarta Sans", sans-serif';
-          ctx.fillText('bangga melayani bangsa', W - 52, 1222);
+          const cleanBangga = prepareLogoCanvas(banggaImg, true);
+          if (cleanBangga && cleanBangga.width && cleanBangga.height) {
+            const maxGH = 104;
+            const maxGW = 210;
+            const sc = Math.min(maxGW / cleanBangga.width, maxGH / cleanBangga.height);
+            const gw = Math.round(cleanBangga.width * sc);
+            const gh = Math.round(cleanBangga.height * sc);
+            ctx.drawImage(cleanBangga, W - 56 - gw, 1278 - gh - 4, gw, gh);
+          }
 
           ctx.fillStyle = '#c6df6b';
           ctx.fillRect(0, 1292, W, 58);
-          ctx.textAlign = 'center';
-          ctx.fillStyle = '#1e3a1e';
-          ctx.font = '700 18px "Plus Jakarta Sans", sans-serif';
-          ctx.fillText('fb: Pengadilan Agama Indramayu   |   ig: @paindramayu   |   yt: paindramayu   |   pa-indramayu.go.id   |   x: @paindramayu_', W / 2, 1327);
+          const cleanSoc = prepareLogoCanvas(socialImg, true);
+          if (cleanSoc && cleanSoc.width && cleanSoc.height) {
+            const sc = Math.min(960 / cleanSoc.width, 34 / cleanSoc.height);
+            const sw = Math.round(cleanSoc.width * sc);
+            const sh = Math.round(cleanSoc.height * sc);
+            ctx.drawImage(cleanSoc, Math.round((W - sw) / 2), Math.round(1292 + (58 - sh) / 2), sw, sh);
+          } else {
+            ctx.textAlign = 'center';
+            ctx.fillStyle = '#1e3a1e';
+            ctx.font = '700 18px "Plus Jakarta Sans", sans-serif';
+            ctx.fillText('fb: Pengadilan Agama Indramayu   |   ig: @paindramayu   |   yt: paindramayu   |   pa-indramayu.go.id   |   x: @paindramayu_', W / 2, 1327);
+          }
           ctx.restore();
         },
 

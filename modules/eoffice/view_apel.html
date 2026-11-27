@@ -335,10 +335,30 @@
               </div>
 
               <div v-if="selectedRow" class="grid grid-cols-1 gap-1.5 text-xs bg-slate-900/60 rounded-xl p-3 border border-white/5">
+                <div class="flex items-center justify-between pb-1 border-b border-white/10">
+                  <span class="text-[10px] text-slate-400 font-bold uppercase">Daftar Petugas &amp; Status Foto</span>
+                  <button @click="syncAvatarsNow()" class="text-[10px] text-sky-400 hover:text-sky-300 font-bold">
+                    <i class="fa-solid fa-rotate mr-0.5"></i> Sinkron Foto
+                  </button>
+                </div>
                 <div v-for="rk in [['pembina','Pembina'],['pemimpin','Pemimpin'],['doa','Doa'],['nilai_ma','8 Nilai MA-RI'],['mc','MC / Protokol'],['budaya_malu','10 Budaya Malu']]"
                   :key="rk[0]" class="flex items-center justify-between gap-2 py-0.5 border-b border-white/5 last:border-0">
-                  <span class="text-slate-400 text-[11px]">{{ rk[1] }}</span>
-                  <span class="font-bold text-white text-right">{{ selectedEvaluation.effective[rk[0]] || '-' }}</span>
+                  <span class="text-slate-400 text-[11px] shrink-0">{{ rk[1] }}</span>
+                  <div class="text-right min-w-0">
+                    <div class="font-bold text-white truncate">{{ selectedEvaluation.effective[rk[0]] || '-' }}</div>
+                    <div class="text-[9px]"
+                      :class="getOfficerPhotoDiagnostic(selectedEvaluation.effective[rk[0]], selectedRow[rk[0] + '_nip']).status === 'ok' ? 'text-emerald-400' : 'text-amber-300'">
+                      <span v-if="getOfficerPhotoDiagnostic(selectedEvaluation.effective[rk[0]], selectedRow[rk[0] + '_nip']).status === 'ok'">
+                        ✓ Foto siap ({{ getOfficerPhotoDiagnostic(selectedEvaluation.effective[rk[0]], selectedRow[rk[0] + '_nip']).source }})
+                      </span>
+                      <span v-else-if="getOfficerPhotoDiagnostic(selectedEvaluation.effective[rk[0]], selectedRow[rk[0] + '_nip']).status === 'no_photo'">
+                        ⚠ Belum upload foto di Manajemen Pegawai (NIP cocok)
+                      </span>
+                      <span v-else>
+                        ⚠ Nama belum cocok dgn Data Pegawai / Satpam
+                      </span>
+                    </div>
+                  </div>
                 </div>
               </div>
 
