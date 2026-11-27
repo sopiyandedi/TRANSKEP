@@ -15,6 +15,7 @@ var BACKUP_FIRESTORE_COLLECTIONS_ = [
   'pck_rekapitulasi',
   'eoffice_kgb',
   'eoffice_rapat',
+  'eoffice_apel',
   'surat_tugas_documents'
 ];
 

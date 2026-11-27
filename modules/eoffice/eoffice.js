@@ -700,6 +700,14 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       },
 
+      triggerOpenModalApel() {
+        if (typeof window.openJadwalApelModal === 'function') {
+          window.openJadwalApelModal();
+        } else if (typeof showNotify === 'function') {
+          showNotify("Jadwal Apel", "Memuat modul Jadwal Apel...", "info");
+        }
+      },
+
       triggerOpenModalRapat() {
         if (typeof window.openRapatModalForm === 'function') {
           window.openRapatModalForm();

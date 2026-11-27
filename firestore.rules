@@ -191,6 +191,30 @@ rules_version = '2';
 //     pemimpin, pemimpin_nip, pemimpin_jabatan, notulis, notulis_nip, notulis_jabatan,
 //     peserta_json, pengarahan_umum, pembahasan, kesimpulan, tanggal_input, synced_at
 //
+// Collection: eoffice_apel
+// Document ID: {docId} (4..60, matches `id`, e.g. "APEL-2026", "APEL-SETTINGS", "SATPAM-{id}")
+// Fields:
+//   - id: string (required, 4..60, == docId, immutable)
+//   - doc_type: string (required, in ['tahun', 'satpam', 'settings'], immutable)
+//   - tahun: int (2020..2099) or string (<=10) (optional)
+//   - nomor_sk: string (optional, <=150)
+//   - tanggal_sk: string (optional, <=150)
+//   - jadwal_json: string (optional, <=900000)
+//   - satpam_id: string (optional, <=150)
+//   - nama: string (optional, <=150)
+//   - panggilan: string (optional, <=150)
+//   - jabatan: string (optional, <=150)
+//   - no_wa: string (optional, <=150)
+//   - photo_data_uri: string (optional, '' or data:image/(jpeg|jpg|png|webp);base64,..., <=160000)
+//   - aktif: bool (optional)
+//   - admin_wa: string (optional, <=150)
+//   - jam_kirim: string (optional, <=150)
+//   - bg_gedung_uri: string (optional, '' or data:image/(jpeg|jpg|png|webp);base64,..., <=160000)
+//   - caption_template: string (optional, <=2000)
+//   - updated_by: string (optional, <=40)
+//   - updated_at: timestamp (required)
+//   - created_at: timestamp (optional, immutable if present)
+//
 // Collection: surat_tugas_documents
 // Document ID: {docId} (matches field `id`, e.g. "ST-...")
 // Fields:
@@ -722,6 +746,43 @@ service cloud.firestore {
              isValidOptionalTimestamp(data, 'created_at');
     }
 
+    function isValidApelImageUri(val) {
+      return val is string &&
+             val.size() <= 160000 &&
+             (val == '' || val.matches('^data:image/(jpeg|jpg|png|webp);base64,[A-Za-z0-9+/=]+$'));
+    }
+
+    function isValidEofficeApel(data, docId) {
+      let allowed = [
+        'id', 'doc_type', 'tahun', 'nomor_sk', 'tanggal_sk', 'jadwal_json',
+        'satpam_id', 'nama', 'panggilan', 'jabatan', 'no_wa', 'photo_data_uri',
+        'aktif', 'admin_wa', 'jam_kirim', 'bg_gedung_uri', 'caption_template',
+        'updated_by', 'updated_at', 'created_at'
+      ];
+      return hasRequiredFields(['id', 'doc_type', 'updated_at']) &&
+             hasOnlyAllowedFields(allowed) &&
+             data.id is string && data.id == docId && data.id.size() >= 4 && data.id.size() <= 60 &&
+             data.doc_type is string && data.doc_type in ['tahun', 'satpam', 'settings'] &&
+             (!('tahun' in data) || (data.tahun is int && data.tahun >= 2020 && data.tahun <= 2099) || (data.tahun is string && data.tahun.size() <= 10)) &&
+             (!('nomor_sk' in data) || (data.nomor_sk is string && data.nomor_sk.size() <= 150)) &&
+             (!('tanggal_sk' in data) || (data.tanggal_sk is string && data.tanggal_sk.size() <= 150)) &&
+             (!('jadwal_json' in data) || (data.jadwal_json is string && data.jadwal_json.size() <= 900000)) &&
+             (!('satpam_id' in data) || (data.satpam_id is string && data.satpam_id.size() <= 150)) &&
+             (!('nama' in data) || (data.nama is string && data.nama.size() <= 150)) &&
+             (!('panggilan' in data) || (data.panggilan is string && data.panggilan.size() <= 150)) &&
+             (!('jabatan' in data) || (data.jabatan is string && data.jabatan.size() <= 150)) &&
+             (!('no_wa' in data) || (data.no_wa is string && data.no_wa.size() <= 150)) &&
+             (!('photo_data_uri' in data) || isValidApelImageUri(data.photo_data_uri)) &&
+             (!('aktif' in data) || data.aktif is bool) &&
+             (!('admin_wa' in data) || (data.admin_wa is string && data.admin_wa.size() <= 150)) &&
+             (!('jam_kirim' in data) || (data.jam_kirim is string && data.jam_kirim.size() <= 150)) &&
+             (!('bg_gedung_uri' in data) || isValidApelImageUri(data.bg_gedung_uri)) &&
+             (!('caption_template' in data) || (data.caption_template is string && data.caption_template.size() <= 2000)) &&
+             (!('updated_by' in data) || (data.updated_by is string && data.updated_by.size() <= 40)) &&
+             isValidTimestamp(data.updated_at) &&
+             isValidOptionalTimestamp(data, 'created_at');
+    }
+
     function isValidSuratTugas(data, docId) {
       let allowed = [
         'id', 'waktu', 'nomor', 'menimbang', 'dasar', 'tujuan', 'tempat',
@@ -1026,6 +1087,19 @@ service cloud.firestore {
                        isValidAuditLog(request.resource.data) &&
                        (isAdmin() || request.resource.data.actor_nip == uid());
       allow update, delete: if false;
+    }
+
+    // 15. E-Office Jadwal Apel & Piket Satpam - Authenticated users read;
+    //     Admin/Operator create, update, and delete.
+    match /eoffice_apel/{docId} {
+      allow read: if isAuthenticated();
+      allow create: if isAdminOrOperator() &&
+                       isValidEofficeApel(request.resource.data, docId);
+      allow update: if isAdminOrOperator() &&
+                       isValidEofficeApel(request.resource.data, docId) &&
+                       areImmutableFieldsUnchanged(['id', 'doc_type']) &&
+                       isValidCreatedAtOnUpdate(resource.data, request.resource.data);
+      allow delete: if isAdminOrOperator();
     }
 
     // =========================================================================

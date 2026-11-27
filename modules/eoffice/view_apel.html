@@ -1,0 +1,566 @@
+<!-- ========================================================= -->
+<!-- VIEW MODAL: E-OFFICE JADWAL APEL SENIN PAGI & JUMAT SORE  -->
+<!-- Engine: TRANSKEP Core v3.9.4 (100% Cloud Firestore)        -->
+<!-- ========================================================= -->
+<div id="vue-apel-app" v-cloak>
+  <div v-if="showModal"
+    class="fixed inset-0 z-[105] bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-2 md:p-4 overflow-y-auto">
+    <div
+      class="bg-[#0B0F19] border border-white/15 rounded-2xl w-full max-w-[1440px] max-h-[95vh] flex flex-col shadow-2xl overflow-hidden">
+
+      <!-- HEADER -->
+      <div
+        class="px-4 md:px-6 py-4 bg-gradient-to-r from-slate-900 via-emerald-950/40 to-slate-900 border-b border-white/10 flex flex-wrap items-center justify-between gap-3 shrink-0">
+        <div class="flex items-center gap-3">
+          <div
+            class="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400">
+            <i class="fa-solid fa-flag text-lg"></i>
+          </div>
+          <div>
+            <div class="flex items-center gap-2 flex-wrap">
+              <h2 class="text-base md:text-lg font-extrabold text-white tracking-tight">
+                Jadwal Apel Senin Pagi &amp; Jumat Sore
+              </h2>
+              <span
+                class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                100% Cloud Firestore
+              </span>
+            </div>
+            <p class="text-[11px] text-slate-400">
+              Jadwal Tahunan Multi-Tahun, Data Satpam Terisolasi, Auto-Substitusi Cuti/ST, Poster Canva Engine &amp; Cron n8n Jumat 15:00 WIB
+            </p>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2 flex-wrap">
+          <div class="flex items-center gap-1.5 bg-white/5 border border-white/10 rounded-xl px-2.5 py-1.5">
+            <span class="text-[10px] text-slate-400 font-semibold uppercase">Tahun:</span>
+            <select v-model="selectedYear" @change="onSelectYearChange()"
+              class="bg-transparent text-white text-xs font-bold focus:outline-none cursor-pointer">
+              <option v-for="yr in availableYears" :key="yr" :value="yr" class="bg-slate-900 text-white">
+                {{ yr }}
+              </option>
+            </select>
+            <button v-if="isAdminOrOperator" @click="promptAddYear()" title="Tambah Jadwal Tahun Baru (mis. 2027)"
+              class="ml-1 px-2 py-0.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500 text-emerald-300 hover:text-white text-[10px] font-bold transition">
+              + Tahun
+            </button>
+          </div>
+
+          <button @click="closeModal()"
+            class="w-9 h-9 rounded-xl bg-white/5 hover:bg-rose-500/20 border border-white/10 hover:border-rose-500/40 text-slate-300 hover:text-rose-300 flex items-center justify-center transition">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- TAB NAVIGATION -->
+      <div class="px-4 md:px-6 pt-3 bg-slate-900/50 border-b border-white/10 flex items-center gap-2 overflow-x-auto shrink-0">
+        <button @click="activeTab = 'jadwal'"
+          :class="activeTab === 'jadwal' ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50' : 'text-slate-400 hover:text-white border-transparent hover:bg-white/5'"
+          class="px-3.5 py-2 rounded-t-xl border-b-2 text-xs font-bold whitespace-nowrap transition flex items-center gap-2">
+          <i class="fa-solid fa-table-list"></i>
+          Jadwal Tahunan ({{ activeRows.length }} Minggu)
+        </button>
+
+        <button @click="activeTab = 'poster'; refreshPosterCanvas()"
+          :class="activeTab === 'poster' ? 'bg-sky-500/20 text-sky-300 border-sky-500/50' : 'text-slate-400 hover:text-white border-transparent hover:bg-white/5'"
+          class="px-3.5 py-2 rounded-t-xl border-b-2 text-xs font-bold whitespace-nowrap transition flex items-center gap-2">
+          <i class="fa-solid fa-image"></i>
+          Preview &amp; Render Poster (1080&times;1350)
+        </button>
+
+        <button @click="activeTab = 'satpam'"
+          :class="activeTab === 'satpam' ? 'bg-amber-500/20 text-amber-300 border-amber-500/50' : 'text-slate-400 hover:text-white border-transparent hover:bg-white/5'"
+          class="px-3.5 py-2 rounded-t-xl border-b-2 text-xs font-bold whitespace-nowrap transition flex items-center gap-2">
+          <i class="fa-solid fa-shield-halved"></i>
+          Petugas Satpam / Non-ASN ({{ satpamList.length }})
+        </button>
+
+        <button v-if="isAdminOrOperator" @click="activeTab = 'settings'"
+          :class="activeTab === 'settings' ? 'bg-indigo-500/20 text-indigo-300 border-indigo-500/50' : 'text-slate-400 hover:text-white border-transparent hover:bg-white/5'"
+          class="px-3.5 py-2 rounded-t-xl border-b-2 text-xs font-bold whitespace-nowrap transition flex items-center gap-2">
+          <i class="fa-solid fa-sliders"></i>
+          Pengaturan, Foto Gedung &amp; Otomasi WA
+        </button>
+      </div>
+
+      <!-- BODY -->
+      <div class="flex-1 overflow-y-auto p-4 md:p-6 space-y-4">
+        <div v-show="activeTab === 'jadwal'" class="space-y-4">
+          <div class="grid grid-cols-1 lg:grid-cols-12 gap-3 bg-white/[0.03] border border-white/10 rounded-2xl p-4">
+            <div class="lg:col-span-4">
+              <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                Nomor SK Ketua PA Indramayu ({{ selectedYear }})
+              </label>
+              <input v-model="currentYearDoc.nomor_sk" :readonly="!isAdminOrOperator"
+                placeholder="Contoh: 538/KPA.W10-A2/SK.KP7.1/VI/2026"
+                class="w-full px-3 py-2 rounded-xl bg-slate-900/90 border border-white/10 text-xs text-white focus:border-emerald-500/50 focus:outline-none">
+            </div>
+            <div class="lg:col-span-3">
+              <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                Tanggal SK
+              </label>
+              <input v-model="currentYearDoc.tanggal_sk" :readonly="!isAdminOrOperator"
+                placeholder="Contoh: 4 Juni 2026"
+                class="w-full px-3 py-2 rounded-xl bg-slate-900/90 border border-white/10 text-xs text-white focus:border-emerald-500/50 focus:outline-none">
+            </div>
+            <div class="lg:col-span-5 flex flex-wrap items-end justify-end gap-2">
+              <button v-if="isAdminOrOperator" @click="showGeneratorDrawer = !showGeneratorDrawer"
+                class="px-3 py-2 rounded-xl bg-indigo-500/15 hover:bg-indigo-500 text-indigo-300 hover:text-white border border-indigo-500/30 text-[11px] font-bold transition flex items-center gap-1.5">
+                <i class="fa-solid fa-wand-magic-sparkles"></i> Generate 1 Tahun
+              </button>
+              <button v-if="isAdminOrOperator" @click="showImportModal = true"
+                class="px-3 py-2 rounded-xl bg-amber-500/15 hover:bg-amber-500 text-amber-300 hover:text-white border border-amber-500/30 text-[11px] font-bold transition flex items-center gap-1.5">
+                <i class="fa-solid fa-file-import"></i> Import SK (AI / JSON)
+              </button>
+              <button v-if="isAdminOrOperator" @click="addSingleWeekRow()"
+                class="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/15 text-slate-200 border border-white/10 text-[11px] font-bold transition flex items-center gap-1.5">
+                <i class="fa-solid fa-plus"></i> + Minggu
+              </button>
+              <button @click="openApelDriveFolder()"
+                class="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/15 text-sky-300 border border-sky-500/30 text-[11px] font-bold transition flex items-center gap-1.5">
+                <i class="fa-brands fa-google-drive"></i> Arsip Drive
+              </button>
+              <button v-if="isAdminOrOperator" @click="saveActiveYearToFirestore()" :disabled="isSavingYear"
+                class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-extrabold shadow-lg shadow-emerald-600/20 transition flex items-center gap-1.5 disabled:opacity-50">
+                <i class="fa-solid" :class="isSavingYear ? 'fa-spinner fa-spin' : 'fa-cloud-arrow-up'"></i>
+                Simpan {{ selectedYear }}
+              </button>
+            </div>
+          </div>
+
+          <div v-if="showGeneratorDrawer && isAdminOrOperator"
+            class="bg-indigo-950/30 border border-indigo-500/30 rounded-2xl p-4 space-y-3">
+            <div class="flex items-center justify-between">
+              <div>
+                <h3 class="text-xs font-extrabold text-indigo-300 uppercase tracking-wider">
+                  Generator Rotasi Jadwal Apel 1 Tahun Penuh ({{ selectedYear }})
+                </h3>
+                <p class="text-[11px] text-slate-400">
+                  Otomatis menyusun minggu Senin &amp; Jumat dari tanggal mulai s.d. akhir tahun {{ selectedYear }} dengan rotasi bergilir.
+                </p>
+              </div>
+              <button @click="showGeneratorDrawer = false" class="text-slate-400 hover:text-white text-xs">
+                <i class="fa-solid fa-xmark"></i>
+              </button>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+              <div>
+                <label class="block text-[10px] text-slate-400 font-bold mb-1">Tanggal Mulai</label>
+                <input type="date" v-model="genStartDate"
+                  class="w-full px-3 py-1.5 rounded-lg bg-slate-900 border border-white/10 text-xs text-white">
+              </div>
+              <div>
+                <label class="block text-[10px] text-slate-400 font-bold mb-1">Tanggal Akhir</label>
+                <input type="date" v-model="genEndDate"
+                  class="w-full px-3 py-1.5 rounded-lg bg-slate-900 border border-white/10 text-xs text-white">
+              </div>
+              <div>
+                <label class="block text-[10px] text-slate-400 font-bold mb-1">Mode Timpa</label>
+                <select v-model="genMode"
+                  class="w-full px-3 py-1.5 rounded-lg bg-slate-900 border border-white/10 text-xs text-white">
+                  <option value="replace">Buat Baru / Timpa Tahun {{ selectedYear }}</option>
+                  <option value="append">Tambahkan setelah minggu terakhir</option>
+                </select>
+              </div>
+              <div class="flex items-end gap-2">
+                <button @click="runAnnualRotationGenerator()"
+                  class="w-full px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition">
+                  <i class="fa-solid fa-bolt mr-1"></i> Generate Jadwal {{ selectedYear }}
+                </button>
+              </div>
+            </div>
+            <div class="flex flex-wrap items-center gap-2 pt-1">
+              <button v-if="String(selectedYear) === '2026'" @click="loadBuiltInSeed2026Sem2()"
+                class="px-3 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500 text-emerald-300 hover:text-white border border-emerald-500/30 text-[11px] font-bold transition">
+                <i class="fa-solid fa-table mr-1"></i> Muat Data Asli SK Sem. 2 2026 (25 Minggu: 6 Jul &ndash; 21 Des 2026)
+              </button>
+            </div>
+          </div>
+
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div class="flex items-center gap-2 flex-1 min-w-[220px]">
+              <div class="relative flex-1 max-w-sm">
+                <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs"></i>
+                <input v-model="tableSearch" placeholder="Cari nama petugas / tanggal..."
+                  class="w-full pl-8 pr-3 py-1.5 rounded-xl bg-slate-900/80 border border-white/10 text-xs text-white focus:border-emerald-500/40 focus:outline-none">
+              </div>
+              <span class="text-[11px] text-slate-400">
+                Menampilkan <strong class="text-white">{{ filteredRows.length }}</strong> minggu
+              </span>
+            </div>
+
+            <div class="flex items-center gap-2 text-[11px]">
+              <span class="px-2.5 py-1 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300">
+                <i class="fa-solid fa-triangle-exclamation mr-1"></i>
+                Konflik Cuti/ST aktif tahun ini: <strong>{{ totalYearConflicts }}</strong> petugas (auto-diganti live di Poster &amp; WA)
+              </span>
+            </div>
+          </div>
+          <div v-if="activeRows.length === 0"
+            class="bg-white/[0.02] border border-dashed border-white/15 rounded-2xl p-8 text-center space-y-3">
+            <div class="w-12 h-12 mx-auto rounded-2xl bg-emerald-500/15 text-emerald-400 flex items-center justify-center">
+              <i class="fa-solid fa-calendar-days text-xl"></i>
+            </div>
+            <h3 class="text-sm font-bold text-white">Jadwal Apel Tahun {{ selectedYear }} Belum Diisi</h3>
+            <p class="text-xs text-slate-400 max-w-lg mx-auto">
+              Gunakan tombol <strong>Generate 1 Tahun</strong> (rotasi 52 minggu otomatis) atau <strong>Import SK (AI / JSON)</strong> untuk mengisi jadwal langsung.
+            </p>
+            <div class="flex flex-wrap items-center justify-center gap-2 pt-2" v-if="isAdminOrOperator">
+              <button v-if="String(selectedYear) === '2026'" @click="loadBuiltInSeed2026Sem2()"
+                class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition">
+                Muat Template Resmi Sem. 2 2026 (25 Minggu)
+              </button>
+              <button @click="runAnnualRotationGenerator()"
+                class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition">
+                Generate 52 Minggu ({{ selectedYear }})
+              </button>
+            </div>
+          </div>
+
+          <datalist id="apel-officer-options">
+            <option v-for="opt in combinedOfficerNames" :key="opt" :value="opt"></option>
+          </datalist>
+
+          <div v-if="filteredRows.length > 0" class="border border-white/10 rounded-2xl overflow-x-auto bg-slate-950/60">
+            <table class="w-full text-left border-collapse text-[11px]">
+              <thead>
+                <tr class="bg-slate-900/90 text-slate-300 border-b border-white/10 text-[10px] uppercase tracking-wider">
+                  <th class="p-2.5 text-center w-10">No</th>
+                  <th class="p-2.5 w-24">Hari</th>
+                  <th class="p-2.5 w-32">Tgl Senin</th>
+                  <th class="p-2.5 w-32">Tgl Jumat</th>
+                  <th class="p-2.5 min-w-[165px]">Pembina</th>
+                  <th class="p-2.5 min-w-[155px]">Pemimpin / Komandan</th>
+                  <th class="p-2.5 min-w-[165px]">Pembaca Doa</th>
+                  <th class="p-2.5 min-w-[165px]">8 Nilai MA-RI</th>
+                  <th class="p-2.5 min-w-[165px]">10 Budaya Malu</th>
+                  <th class="p-2.5 min-w-[165px]">MC / Protokol</th>
+                  <th class="p-2.5 text-center w-36">Poster &amp; Aksi</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-white/5">
+                <tr v-for="entry in filteredRows" :key="entry.index"
+                  :class="entry.index === selectedWeekIdx ? 'bg-emerald-500/10' : 'hover:bg-white/[0.025]'"
+                  class="transition">
+                  <td class="p-2 text-center font-bold text-slate-300">
+                    {{ entry.row.no || (entry.index + 1) }}
+                    <div v-if="entry.eval.substitutions.length > 0"
+                      class="mt-1 inline-block px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[9px] font-bold">
+                      Sub {{ entry.eval.substitutions.length }}
+                    </div>
+                  </td>
+                  <td class="p-2">
+                    <select v-model="entry.row.hari_mode" :disabled="!isAdminOrOperator"
+                      class="w-full px-1.5 py-1 rounded-lg bg-slate-900 border border-white/10 text-white text-[11px]">
+                      <option value="Sn & Jm">Sn &amp; Jm</option>
+                      <option value="Sn">Sn saja</option>
+                      <option value="Jm">Jm saja</option>
+                    </select>
+                  </td>
+                  <td class="p-2">
+                    <input type="date" v-model="entry.row.tgl_senin" :readonly="!isAdminOrOperator"
+                      :disabled="entry.row.hari_mode === 'Jm'"
+                      class="w-full px-1.5 py-1 rounded-lg bg-slate-900 border border-white/10 text-white text-[11px] disabled:opacity-40">
+                  </td>
+                  <td class="p-2">
+                    <input type="date" v-model="entry.row.tgl_jumat" :readonly="!isAdminOrOperator"
+                      :disabled="entry.row.hari_mode === 'Sn'"
+                      class="w-full px-1.5 py-1 rounded-lg bg-slate-900 border border-white/10 text-white text-[11px] disabled:opacity-40">
+                  </td>
+                  <td v-for="rk in ['pembina','pemimpin','doa','nilai_ma','budaya_malu','mc']" :key="rk" class="p-1.5">
+                    <input v-model="entry.row[rk]" :readonly="!isAdminOrOperator" list="apel-officer-options"
+                      class="w-full px-2 py-1 rounded-lg bg-slate-900/90 border text-[11px] text-white focus:outline-none"
+                      :class="entry.eval.subMap[rk] ? 'border-amber-500/60 bg-amber-950/20' : 'border-white/10 focus:border-emerald-500/50'">
+                    <div v-if="entry.eval.subMap[rk]" class="mt-0.5 text-[9px] text-amber-300 leading-tight">
+                      <i class="fa-solid fa-right-left mr-0.5"></i>
+                      <strong>{{ entry.eval.subMap[rk].replacement }}</strong> ({{ entry.eval.subMap[rk].reason }})
+                    </div>
+                  </td>
+                  <td class="p-2 text-center">
+                    <div class="flex items-center justify-center gap-1">
+                      <button @click="selectWeekForPoster(entry.index)"
+                        title="Render & Preview Poster (1080x1350)"
+                        class="px-2 py-1 rounded-lg bg-sky-500/20 hover:bg-sky-500 text-sky-300 hover:text-white border border-sky-500/30 text-[10px] font-bold transition">
+                        <i class="fa-solid fa-image mr-0.5"></i> Poster
+                      </button>
+                      <a v-if="entry.row.poster_url" :href="entry.row.poster_url" target="_blank" rel="noopener"
+                        title="Lihat Poster di Drive"
+                        class="px-2 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500 text-emerald-300 hover:text-white border border-emerald-500/30 text-[10px]">
+                        <i class="fa-solid fa-check"></i>
+                      </a>
+                      <button v-if="isAdminOrOperator" @click="removeWeekRow(entry.index)"
+                        title="Hapus Baris Minggu Ini"
+                        class="px-1.5 py-1 rounded-lg bg-rose-500/10 hover:bg-rose-500 text-rose-400 hover:text-white border border-rose-500/20 text-[10px] transition">
+                        <i class="fa-solid fa-trash"></i>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- TAB 2: PREVIEW & RENDER POSTER -->
+        <div v-show="activeTab === 'poster'" class="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+          <div class="lg:col-span-5 space-y-4">
+            <div class="bg-white/[0.03] border border-white/10 rounded-2xl p-4 space-y-3">
+              <div class="flex items-center justify-between">
+                <h3 class="text-xs font-extrabold text-white uppercase tracking-wider">Pilih Minggu Apel</h3>
+                <span class="text-[10px] text-sky-300 font-bold">1080 &times; 1350 px (PNG)</span>
+              </div>
+              <select v-model.number="selectedWeekIdx" @change="refreshPosterCanvas()"
+                class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-white/10 text-xs text-white font-semibold">
+                <option v-for="(r, idx) in activeRows" :key="idx" :value="idx">
+                  Minggu #{{ r.no || (idx + 1) }} &mdash; {{ r.hari_mode || 'Sn & Jm' }} ({{ r.tgl_senin || '-' }} / {{ r.tgl_jumat || '-' }})
+                </option>
+              </select>
+
+              <div v-if="selectedEvaluation.substitutions.length > 0"
+                class="p-3 rounded-xl bg-amber-500/15 border border-amber-500/40 space-y-1">
+                <div class="text-xs font-bold text-amber-300 flex items-center gap-1.5">
+                  <i class="fa-solid fa-user-clock"></i> Auto-Substitusi Aktif (Cuti / Dinas Luar ST)
+                </div>
+                <ul class="text-[11px] text-amber-100 space-y-0.5 pl-4 list-disc">
+                  <li v-for="sub in selectedEvaluation.substitutions" :key="sub.role">
+                    <strong>{{ sub.role_label }}:</strong> {{ sub.original }} ({{ sub.reason }}) &rarr; diganti <strong>{{ sub.replacement }}</strong>
+                  </li>
+                </ul>
+              </div>
+              <div v-else-if="selectedRow"
+                class="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-[11px] text-emerald-300 flex items-center gap-2">
+                <i class="fa-solid fa-circle-check"></i> Seluruh petugas minggu ini aktif (tidak sedang Cuti / ST).
+              </div>
+
+              <div v-if="selectedRow" class="grid grid-cols-1 gap-1.5 text-xs bg-slate-900/60 rounded-xl p-3 border border-white/5">
+                <div v-for="rk in [['pembina','Pembina'],['pemimpin','Pemimpin'],['doa','Doa'],['nilai_ma','8 Nilai MA-RI'],['mc','MC / Protokol'],['budaya_malu','10 Budaya Malu']]"
+                  :key="rk[0]" class="flex items-center justify-between gap-2 py-0.5 border-b border-white/5 last:border-0">
+                  <span class="text-slate-400 text-[11px]">{{ rk[1] }}</span>
+                  <span class="font-bold text-white text-right">{{ selectedEvaluation.effective[rk[0]] || '-' }}</span>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                <button @click="downloadPosterPng()"
+                  class="px-3.5 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold transition flex items-center justify-center gap-2">
+                  <i class="fa-solid fa-download"></i> Download PNG
+                </button>
+                <button v-if="isAdminOrOperator" @click="saveSelectedPosterToDrive()" :disabled="isUploadingPoster || !selectedRow"
+                  class="px-3.5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition flex items-center justify-center gap-2 disabled:opacity-50">
+                  <i class="fa-solid" :class="isUploadingPoster ? 'fa-spinner fa-spin' : 'fa-cloud-arrow-up'"></i>
+                  Simpan ke Drive
+                </button>
+                <button @click="copyWaCaptionToClipboard()"
+                  class="sm:col-span-2 px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/15 text-slate-200 border border-white/10 text-xs font-bold transition flex items-center justify-center gap-2">
+                  <i class="fa-regular fa-copy"></i> Salin Draf Caption WhatsApp
+                </button>
+              </div>
+            </div>
+
+            <div class="bg-white/[0.03] border border-white/10 rounded-2xl p-4 space-y-2">
+              <div class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Preview Teks Pengumuman WA</div>
+              <pre class="whitespace-pre-wrap text-[11px] text-slate-200 font-sans bg-slate-950/80 p-3 rounded-xl border border-white/5">{{ generatedWaCaption }}</pre>
+            </div>
+          </div>
+
+          <div class="lg:col-span-7 flex flex-col items-center">
+            <div class="bg-slate-900 border border-white/15 rounded-2xl p-3 shadow-2xl w-full max-w-[560px]">
+              <canvas id="apel-poster-canvas" width="1080" height="1350"
+                class="w-full h-auto rounded-xl bg-sky-100 block"></canvas>
+            </div>
+          </div>
+        </div>
+        <!-- TAB 3: ROSTER SATPAM / NON-ASN TERISOLASI (S1) -->
+        <div v-show="activeTab === 'satpam'" class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+          <div v-if="isAdminOrOperator" class="lg:col-span-4 bg-white/[0.03] border border-white/10 rounded-2xl p-4 space-y-3 h-fit">
+            <h3 class="text-xs font-extrabold text-amber-300 uppercase tracking-wider">
+              {{ satpamForm.id ? 'Edit Petugas Satpam / Non-ASN' : '+ Tambah Petugas Satpam / Non-ASN' }}
+            </h3>
+            <p class="text-[11px] text-slate-400">
+              Disimpan terisolasi di Cloud Firestore (<code>eoffice_apel/SATPAM-*</code>) agar tidak tercampur modul Cuti/KGB/PKP/PCK.
+            </p>
+            <div>
+              <label class="block text-[10px] text-slate-400 font-bold mb-1">Nama Lengkap *</label>
+              <input v-model="satpamForm.nama" placeholder="Mis. Gerald Dwi Anggara"
+                class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-white/10 text-xs text-white">
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="block text-[10px] text-slate-400 font-bold mb-1">Nama di Poster</label>
+                <input v-model="satpamForm.panggilan" placeholder="Gerald"
+                  class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-white/10 text-xs text-white">
+              </div>
+              <div>
+                <label class="block text-[10px] text-slate-400 font-bold mb-1">Jabatan</label>
+                <input v-model="satpamForm.jabatan" placeholder="Satpam / Komandan"
+                  class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-white/10 text-xs text-white">
+              </div>
+            </div>
+            <div>
+              <label class="block text-[10px] text-slate-400 font-bold mb-1">Nomor WhatsApp</label>
+              <input v-model="satpamForm.no_wa" placeholder="08..."
+                class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-white/10 text-xs text-white">
+            </div>
+            <div>
+              <label class="block text-[10px] text-slate-400 font-bold mb-1">Foto Potret (240&times;328)</label>
+              <div class="flex items-center gap-3">
+                <div class="w-16 h-20 rounded-xl bg-slate-900 border border-white/15 overflow-hidden flex items-center justify-center shrink-0">
+                  <img v-if="satpamForm.photo_data_uri" :src="satpamForm.photo_data_uri" class="w-full h-full object-cover">
+                  <i v-else class="fa-solid fa-user text-slate-600 text-xl"></i>
+                </div>
+                <div class="flex-1 space-y-1.5">
+                  <input type="file" accept="image/*" @change="onSelectSatpamPhoto($event)"
+                    class="block w-full text-[11px] text-slate-300 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-amber-500/20 file:text-amber-300 file:font-bold">
+                  <button v-if="satpamForm.photo_data_uri" @click="satpamForm.photo_data_uri = ''"
+                    class="text-[10px] text-rose-400 hover:underline">Hapus Foto</button>
+                </div>
+              </div>
+            </div>
+            <div class="flex items-center gap-2 pt-1">
+              <input id="satpam-aktif-chk" type="checkbox" v-model="satpamForm.aktif" class="rounded">
+              <label for="satpam-aktif-chk" class="text-xs text-slate-300">Aktif dalam rotasi jadwal apel</label>
+            </div>
+            <div class="flex items-center gap-2 pt-2">
+              <button @click="saveSatpamRecord()" :disabled="isSavingSatpam"
+                class="flex-1 px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold transition disabled:opacity-50">
+                <i class="fa-solid" :class="isSavingSatpam ? 'fa-spinner fa-spin' : 'fa-save'"></i>
+                {{ satpamForm.id ? 'Update Satpam' : 'Simpan Satpam' }}
+              </button>
+              <button v-if="satpamForm.id" @click="resetSatpamForm()"
+                class="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/15 text-slate-300 text-xs font-bold">Batal</button>
+            </div>
+          </div>
+
+          <div :class="isAdminOrOperator ? 'lg:col-span-8' : 'lg:col-span-12'" class="space-y-3">
+            <div v-if="satpamList.length === 0"
+              class="bg-white/[0.02] border border-dashed border-white/15 rounded-2xl p-8 text-center text-xs text-slate-400">
+              Belum ada petugas Satpam / Non-ASN terdaftar. Silakan tambah dari form di sebelah kiri.
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+              <div v-for="sp in satpamList" :key="sp.id"
+                class="bg-white/[0.03] border border-white/10 rounded-2xl p-3 flex items-center gap-3">
+                <div class="w-14 h-[74px] rounded-xl bg-slate-900 border border-white/15 overflow-hidden flex items-center justify-center shrink-0">
+                  <img v-if="sp.photo_data_uri" :src="sp.photo_data_uri" class="w-full h-full object-cover object-top">
+                  <i v-else class="fa-solid fa-user-shield text-slate-600 text-lg"></i>
+                </div>
+                <div class="flex-1 min-w-0">
+                  <div class="text-xs font-bold text-white truncate">{{ sp.nama }}</div>
+                  <div class="text-[10px] text-amber-300 font-semibold truncate">{{ sp.jabatan || 'Satpam' }}</div>
+                  <div class="text-[10px] text-slate-400 truncate">{{ sp.no_wa || 'WA belum diisi' }}</div>
+                  <div class="flex items-center gap-1.5 mt-2" v-if="isAdminOrOperator">
+                    <button @click="editSatpamRecord(sp)"
+                      class="px-2 py-0.5 rounded-lg bg-sky-500/15 hover:bg-sky-500 text-sky-300 hover:text-white text-[10px] font-bold">Edit</button>
+                    <button @click="deleteSatpamRecord(sp)"
+                      class="px-2 py-0.5 rounded-lg bg-rose-500/15 hover:bg-rose-500 text-rose-300 hover:text-white text-[10px] font-bold">Hapus</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB 4: PENGATURAN GEDUNG & OTOMASI WA ADMIN -->
+        <div v-show="activeTab === 'settings' && isAdminOrOperator" class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+          <div class="lg:col-span-6 bg-white/[0.03] border border-white/10 rounded-2xl p-4 space-y-3">
+            <h3 class="text-xs font-extrabold text-indigo-300 uppercase tracking-wider">
+              Pengaturan Cron Jumat 15:00 WIB &amp; Tujuan WA Admin
+            </h3>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="block text-[10px] text-slate-400 font-bold mb-1">Nomor WA Penerima (Admin)</label>
+                <input v-model="settingsDoc.admin_wa" placeholder="62812xxxxxxx"
+                  class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-white/10 text-xs text-white">
+                <p class="text-[10px] text-slate-500 mt-1">n8n hanya mengirim poster ke nomor Admin ini (tidak broadcast grup).</p>
+              </div>
+              <div>
+                <label class="block text-[10px] text-slate-400 font-bold mb-1">Jam Eksekusi Jumat (WIB)</label>
+                <input v-model="settingsDoc.jam_kirim" placeholder="15:00"
+                  class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-white/10 text-xs text-white">
+              </div>
+            </div>
+            <div>
+              <label class="block text-[10px] text-slate-400 font-bold mb-1">URL Webhook Import SK Jadwal n8n</label>
+              <input v-model="localN8nImportUrl" placeholder="https://n8n.domain-anda.com/webhook/transkep-apel-import"
+                class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-white/10 text-xs text-white">
+            </div>
+            <div>
+              <label class="block text-[10px] text-slate-400 font-bold mb-1">Template Catatan Tambahan Caption WA</label>
+              <textarea v-model="settingsDoc.caption_template" rows="3"
+                placeholder="Mohon kehadirannya tepat waktu pukul 07.45 WIB (Senin) / 16.00 WIB (Jumat)."
+                class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-white/10 text-xs text-white"></textarea>
+            </div>
+            <button @click="saveSettingsToFirestore()" :disabled="isSavingSettings"
+              class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition disabled:opacity-50">
+              <i class="fa-solid" :class="isSavingSettings ? 'fa-spinner fa-spin' : 'fa-cloud-arrow-up'"></i>
+              Simpan Pengaturan ke Firestore
+            </button>
+          </div>
+
+          <div class="lg:col-span-6 bg-white/[0.03] border border-white/10 rounded-2xl p-4 space-y-3">
+            <h3 class="text-xs font-extrabold text-sky-300 uppercase tracking-wider">
+              Slot Foto Gedung Kantor PA Indramayu (Background Poster)
+            </h3>
+            <p class="text-[11px] text-slate-400">
+              Upload foto gedung kantor PA Indramayu agar tampil sebagai latar poster Canva. Selama belum diupload, poster memakai ilustrasi gedung bersih.
+            </p>
+            <div class="border border-white/10 rounded-xl overflow-hidden bg-slate-900/80 h-44 flex items-center justify-center">
+              <img v-if="settingsDoc.bg_gedung_uri" :src="settingsDoc.bg_gedung_uri" class="w-full h-full object-cover">
+              <div v-else class="text-center text-slate-500 text-xs space-y-1">
+                <i class="fa-regular fa-building text-2xl"></i>
+                <div>Belum ada foto gedung (menggunakan fallback ilustrasi)</div>
+              </div>
+            </div>
+            <div class="flex items-center gap-2 flex-wrap">
+              <input type="file" accept="image/*" @change="onSelectBuildingPhoto($event)"
+                class="text-[11px] text-slate-300 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-sky-500/20 file:text-sky-300 file:font-bold">
+              <button v-if="settingsDoc.bg_gedung_uri" @click="settingsDoc.bg_gedung_uri = ''"
+                class="px-3 py-1.5 rounded-lg bg-rose-500/15 text-rose-300 text-xs font-bold">Reset Latar</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SUB-MODAL IMPORT SK -->
+  <div v-if="showImportModal && isAdminOrOperator"
+    class="fixed inset-0 z-[115] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-[#0F172A] border border-white/15 rounded-2xl w-full max-w-2xl p-5 space-y-4 shadow-2xl">
+      <div class="flex items-center justify-between border-b border-white/10 pb-3">
+        <h3 class="text-sm font-extrabold text-white">Import Jadwal Apel dari Foto/PDF SK atau JSON</h3>
+        <button @click="showImportModal = false" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="space-y-3 text-xs">
+        <div class="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 space-y-2">
+          <div class="font-bold text-amber-300">Opsi 1: Scan Foto / Screenshot Tabel SK via Gemini AI (Webhook n8n)</div>
+          <input v-model="localN8nImportUrl" placeholder="URL Webhook https://.../webhook/transkep-apel-import"
+            class="w-full px-3 py-1.5 rounded-lg bg-slate-900 border border-white/10 text-xs text-white">
+          <div class="flex flex-wrap items-center gap-2">
+            <input type="file" accept="image/*,application/pdf" @change="onSelectSkImportFile($event)"
+              class="text-[11px] text-slate-300 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-amber-500/20 file:text-amber-300 file:font-bold">
+            <button @click="runAiImportFromFile()" :disabled="isImportingAi || !importFilePayload.base64"
+              class="px-3.5 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold disabled:opacity-50">
+              <i class="fa-solid" :class="isImportingAi ? 'fa-spinner fa-spin' : 'fa-wand-magic-sparkles'"></i>
+              Ekstrak Tabel dengan AI
+            </button>
+          </div>
+        </div>
+        <div class="space-y-1.5">
+          <div class="font-bold text-slate-300">Opsi 2: Tempel Array JSON Jadwal Langsung</div>
+          <textarea v-model="importJsonRaw" rows="5"
+            placeholder='[{"no":1,"hari_mode":"Sn & Jm","tgl_senin":"2026-07-06","tgl_jumat":"2026-07-10","pembina":"...","pemimpin":"...","doa":"...","nilai_ma":"...","budaya_malu":"...","mc":"..."}]'
+            class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-white/10 text-[11px] font-mono text-white"></textarea>
+        </div>
+      </div>
+      <div class="flex items-center justify-end gap-2 pt-2 border-t border-white/10">
+        <button @click="showImportModal = false" class="px-4 py-2 rounded-xl bg-white/5 text-slate-300 text-xs font-bold">Batal</button>
+        <button @click="applyImportedJsonToYear()"
+          class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold">
+          Terapkan ke Jadwal {{ selectedYear }}
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

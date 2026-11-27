@@ -80,6 +80,11 @@ function handleApiGet_(e) {
       return jsonResponse_(updateNomorSuratRapatFromExternal_(params));
     }
 
+    // 9. Dispatch Jadwal Apel Mingguan (n8n Cron Jumat 15:00 WIB)
+    if (action === 'getApelMingguanDispatch') {
+      return jsonResponse_(getApelMingguanDispatch_(params));
+    }
+
     return jsonResponse_({
       status: 'error',
       message: "Aksi GET '" + action + "' tidak dikenali atau memerlukan metode POST."
@@ -237,6 +242,16 @@ function handleApiPost_(payload, e) {
       case 'callbackAiNotulenJob':
         return jsonResponse_(callbackAiNotulenJobFromExternal_(payload));
 
+      // E-Office Jadwal Apel Senin & Jumat
+      case 'getApelMingguanDispatch':
+        return jsonResponse_(getApelMingguanDispatch_(payload));
+
+      case 'saveApelPosterToDrive':
+        return jsonResponse_(saveApelPosterToDrive(payload.data || payload, payload.nip, payload.token));
+
+      case 'getApelDriveFolderUrl':
+        return jsonResponse_(getApelDriveFolderUrl(payload.nip, payload.token));
+
       // Fallback: Hanya izinkan method dalam whitelist RPC resmi
       default:
         return handleRpcCall_(
@@ -347,7 +362,9 @@ var AUTHENTICATED_RPC_METHODS_ = {
   acknowledgeSk: true,
   getSopDriveFolderUrl: true,
   saveSopData: true,
-  acknowledgeSop: true
+  acknowledgeSop: true,
+  getApelDriveFolderUrl: true,
+  saveApelPosterToDrive: true
 };
 
 /**

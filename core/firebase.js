@@ -1346,6 +1346,7 @@ const TranskepFirebase = {
   // ==========================================
   EOFFICE_KGB_COLLECTION: 'eoffice_kgb',
   EOFFICE_RAPAT_COLLECTION: 'eoffice_rapat',
+  EOFFICE_APEL_COLLECTION: 'eoffice_apel',
 
   _normNip(val) {
     return (val === undefined || val === null) ? '' : String(val).replace(/['"\s]/g, '').trim();
@@ -1863,6 +1864,145 @@ const TranskepFirebase = {
   }
 ,
 
+  isValidApelImageUri(uri) {
+    const s = String(uri || '').trim();
+    if (!s) return true;
+    return s.length <= 160000 && /^data:image\/(jpeg|jpg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(s);
+  },
+
+  /**
+   * Menyimpan / Memperbarui Dokumen Jadwal Apel, Data Satpam, atau Pengaturan Apel ke Cloud Firestore
+   */
+  async saveEofficeApelToFirestore(apelData) {
+    const db = this.getDb();
+    if (!db) throw new Error('Cloud Firestore belum siap terhubung.');
+    await this._waitAuthForWrite('saveEofficeApelToFirestore');
+
+    const d = (apelData && typeof apelData === 'object') ? apelData : {};
+    const docId = String(d.id || '').trim();
+    if (!docId || docId.length < 4 || docId.length > 60) {
+      throw new Error('ID dokumen E-Office Apel wajib 4..60 karakter.');
+    }
+    const docType = String(d.doc_type || '').trim();
+    if (['tahun', 'satpam', 'settings'].indexOf(docType) === -1) {
+      throw new Error('doc_type E-Office Apel harus tahun, satpam, atau settings.');
+    }
+
+    const asStr = (v, fbVal = '') => (v === undefined || v === null) ? fbVal : String(v).trim();
+    const caller = this.getCallerIdentity();
+    const serverTs = this._serverTimestamp();
+
+    const payload = {
+      id: docId,
+      doc_type: docType,
+      updated_by: asStr(caller.nip || d.updated_by).slice(0, 40),
+      updated_at: serverTs
+    };
+
+    if (docType === 'tahun') {
+      const yrNum = parseInt(d.tahun, 10);
+      payload.tahun = (!isNaN(yrNum) && yrNum >= 2020 && yrNum <= 2099) ? yrNum : asStr(d.tahun).slice(0, 10);
+      payload.nomor_sk = asStr(d.nomor_sk).slice(0, 150);
+      payload.tanggal_sk = asStr(d.tanggal_sk).slice(0, 150);
+      payload.jadwal_json = typeof d.jadwal_json === 'string'
+        ? d.jadwal_json
+        : JSON.stringify(Array.isArray(d.jadwal_json) ? d.jadwal_json : (Array.isArray(d.jadwal) ? d.jadwal : []));
+      if (payload.jadwal_json.length > 900000) {
+        throw new Error('Ukuran jadwal_json melebihi batas 900 KB Firestore.');
+      }
+    } else if (docType === 'satpam') {
+      payload.satpam_id = asStr(d.satpam_id || docId).slice(0, 150);
+      payload.nama = asStr(d.nama).slice(0, 150);
+      payload.panggilan = asStr(d.panggilan).slice(0, 150);
+      payload.jabatan = asStr(d.jabatan || 'Satpam / PPNPN').slice(0, 150);
+      payload.no_wa = asStr(d.no_wa).slice(0, 150);
+      const photoUri = asStr(d.photo_data_uri);
+      if (!this.isValidApelImageUri(photoUri)) {
+        throw new Error('Foto satpam melebihi 150 KB atau bukan Data URI gambar valid.');
+      }
+      payload.photo_data_uri = photoUri;
+      payload.aktif = (d.aktif === undefined) ? true : Boolean(d.aktif);
+    } else if (docType === 'settings') {
+      payload.admin_wa = asStr(d.admin_wa).slice(0, 150);
+      payload.jam_kirim = asStr(d.jam_kirim || '15:00').slice(0, 150);
+      const bgUri = asStr(d.bg_gedung_uri);
+      if (!this.isValidApelImageUri(bgUri)) {
+        throw new Error('Foto gedung latar melebihi 150 KB atau bukan Data URI gambar valid.');
+      }
+      payload.bg_gedung_uri = bgUri;
+      payload.caption_template = asStr(d.caption_template).slice(0, 2000);
+    }
+
+    if (!this._isFirestoreTimestamp(d.created_at)) {
+      payload.created_at = serverTs;
+    }
+
+    await this._writeDocWithDiagnostics(db, this.EOFFICE_APEL_COLLECTION, docId, payload, this.EOFFICE_APEL_ALLOWED_FIELDS, { adminOnly: true });
+    this.logAuditActivity({
+      kategori: 'DOKUMEN',
+      aksi: 'SIMPAN_EOFFICE_APEL',
+      target: docId,
+      detail: 'Menyimpan data E-Office Apel (' + docType + '): ' + docId
+    });
+    return { status: 'success', id: docId, data: payload };
+  },
+
+  /**
+   * Menghapus Dokumen E-Office Apel (Tahun / Satpam) dari Cloud Firestore
+   */
+  async deleteEofficeApelFromFirestore(docId) {
+    const db = this.getDb();
+    if (!db) throw new Error('Cloud Firestore belum siap terhubung.');
+    await this._waitAuthForWrite('deleteEofficeApelFromFirestore');
+    const cleanId = String(docId || '').trim();
+    if (!cleanId) throw new Error('ID dokumen E-Office Apel wajib diisi.');
+    await db.collection(this.EOFFICE_APEL_COLLECTION).doc(cleanId).delete();
+    this.logAuditActivity({
+      kategori: 'DOKUMEN',
+      aksi: 'HAPUS_EOFFICE_APEL',
+      target: cleanId,
+      detail: 'Menghapus data E-Office Apel ' + cleanId,
+      severity: 'warning'
+    });
+    return { status: 'success', id: cleanId };
+  },
+
+  /**
+   * Mengambil seluruh dokumen E-Office Apel (Jadwal Tahunan, Satpam, Settings) dari Cloud Firestore
+   */
+  async getFirestoreEofficeApels() {
+    const db = this.getDb();
+    if (!db || !(await this._ensureAuthForRead(false))) return [];
+    const snapshot = await db.collection(this.EOFFICE_APEL_COLLECTION).get();
+    const list = [];
+    snapshot.forEach(doc => {
+      list.push(doc.data());
+    });
+    return list;
+  },
+
+  /**
+   * Memasang Realtime Listener untuk koleksi E-Office Apel
+   */
+  subscribeFirestoreEofficeApels(callback) {
+    const db = this.getDb();
+    if (!db) return null;
+    return this._whenAuthGatedSnapshot(() => {
+      return db.collection(this.EOFFICE_APEL_COLLECTION).onSnapshot(
+        (snapshot) => {
+          const list = [];
+          snapshot.forEach(doc => {
+            list.push(doc.data());
+          });
+          if (typeof callback === 'function') callback(list);
+        },
+        (error) => {
+          console.error('❌ [TRANSKEP Firebase] Error listener Firestore E-Office Apel:', error);
+        }
+      );
+    });
+  },
+
   // ==========================================
   // OPERASI MODUL SURAT TUGAS (ST, SPD & PLH) - TAHAP 77
   // ==========================================
@@ -1918,6 +2058,13 @@ const TranskepFirebase = {
   // OPERASI AVATAR FOTO PROFIL PEGAWAI (TAHAP 154)
   // ==========================================
   USER_AVATARS_COLLECTION: 'user_avatars',
+  EOFFICE_APEL_ALLOWED_FIELDS: [
+    'id', 'doc_type', 'tahun', 'nomor_sk', 'tanggal_sk', 'jadwal_json',
+    'satpam_id', 'nama', 'panggilan', 'jabatan', 'no_wa', 'photo_data_uri', 'aktif',
+    'admin_wa', 'jam_kirim', 'bg_gedung_uri', 'caption_template',
+    'updated_by', 'updated_at', 'created_at'
+  ],
+
   USER_AVATARS_ALLOWED_FIELDS: [
     'nip', 'photo_data_uri', 'mime_type', 'size_bytes', 'width', 'height',
     'updated_by', 'updated_at', 'created_at'

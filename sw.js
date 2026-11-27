@@ -1,10 +1,10 @@
 // =========================================================================
 // FILE: sw.js (TRANSKEP Progressive Web App Service Worker)
 // DESKRIPSI: Offline Asset Caching, Fast Load & Network Pass-Through
-// ENGINE: TRANSKEP PWA Engine v1.0.0 (Build: v3.9.3 - Tahap 162: Bingkai Pasfoto Header Profil Seimbang 88x112)
+// ENGINE: TRANSKEP PWA Engine v1.0.0 (Build: v3.9.4 - Tahap 163: Modul E-Office Jadwal Apel (Firestore, Satpam, Canvas 1080x1350, n8n WA))
 // =========================================================================
 
-const CACHE_NAME = 'transkep-v3.9.3';
+const CACHE_NAME = 'transkep-v3.9.4';
 
 // Daftar aset inti yang di-cache saat Service Worker dipasang (Install)
 const PRECACHE_ASSETS = [
@@ -23,6 +23,7 @@ const PRECACHE_ASSETS = [
   './img/logo.png',
   './img/logo_pengadilan.png',
   './img/Logo_PA_Imy.png',
+  './img/gedung_pa.png',
   './core/view_login.html',
   './core/view_sidebar.html',
   './core/view_mobile_nav.html',
@@ -101,6 +102,8 @@ const PRECACHE_ASSETS = [
   './modules/kinerja/kinerja_data.js',
   './modules/kinerja/kinerja.js',
   './modules/eoffice/view_eoffice.html',
+  './modules/eoffice/view_apel.html',
+  './modules/eoffice/apel.js',
   './modules/eoffice/tabel_gaji_pp5_2024.js',
   './modules/eoffice/eoffice_data.js',
   './modules/eoffice/eoffice.js',

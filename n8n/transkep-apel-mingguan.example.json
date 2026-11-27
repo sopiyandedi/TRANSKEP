@@ -1,0 +1,263 @@
+{
+  "name": "Transkep E-Office Jadwal Apel Mingguan (Cron Jumat 15:00 WIB + Import SK)",
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Jakarta"
+  },
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 15 * * 5"
+            }
+          ]
+        }
+      },
+      "id": "a1b2c3d4-0001-4000-8000-000000000001",
+      "name": "Cron Setiap Jumat 15:00 WIB",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [-820, 220]
+    },
+    {
+      "parameters": {},
+      "id": "a1b2c3d4-0001-4000-8000-000000000002",
+      "name": "Tes Manual Cron",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [-820, 400]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://script.google.com/macros/s/<GANTI_DEPLOYMENT_ID_GAS>/exec?api=true",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"action\": \"getApelMingguanDispatch\", \"secret_key\": \"<GANTI_TRANSKEP_WEBHOOK_KEY>\" }",
+        "options": {}
+      },
+      "id": "a1b2c3d4-0001-4000-8000-000000000003",
+      "name": "Ambil Jadwal Apel Minggu Depan (GAS)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-560, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const NL = String.fromCharCode(10);\nconst d = $input.first().json || {};\nif (d.status !== 'success') {\n  return [{ json: { okToSend: false, reason: d.message || 'Dispatch gagal' } }];\n}\nconst rawWa = String((d.settings && d.settings.admin_wa) || '').replace(/[^0-9]/g, '');\nif (!rawWa || rawWa.length < 9) {\n  return [{ json: { okToSend: false, reason: 'Nomor admin_wa belum diatur di E-Office Apel' } }];\n}\nconst normWa = rawWa.startsWith('0') ? ('62' + rawWa.slice(1)) : rawWa;\nconst adminChatId = normWa + '@c.us';\nconst eff = d.effective_petugas || {};\nconst subs = Array.isArray(d.substitutions) ? d.substitutions : [];\nconst fallbackLines = [\n  '*PENGUMUMAN PETUGAS APEL PA INDRAMAYU*',\n  d.label_senin ? ('📅 ' + d.label_senin) : '',\n  d.label_jumat ? ('📅 ' + d.label_jumat) : '',\n  '',\n  '• *Pembina:* ' + (eff.pembina || '-'),\n  '• *Pemimpin / Komandan:* ' + (eff.pemimpin || '-'),\n  '• *Pembaca Doa:* ' + (eff.doa || '-'),\n  '• *8 Nilai MA-RI:* ' + (eff.nilai_ma || '-'),\n  '• *MC / Protokol:* ' + (eff.mc || '-'),\n  '• *10 Budaya Malu:* ' + (eff.budaya_malu || '-')\n].filter(Boolean);\nif (subs.length > 0) {\n  fallbackLines.push('');\n  fallbackLines.push('*Penyesuaian Otomatis (Cuti / ST):*');\n  subs.forEach(s => fallbackLines.push('⚠️ ' + s.role_label + ': ' + s.original + ' (' + s.reason + ') -> *' + s.replacement + '*'));\n}\nif (d.settings && d.settings.caption_template) {\n  fallbackLines.push('');\n  fallbackLines.push(d.settings.caption_template);\n}\nconst fallbackCaption = fallbackLines.join(NL);\nconst geminiRequestBody = {\n  contents: [{\n    role: 'user',\n    parts: [{\n      text: 'Susun pengumuman WhatsApp singkat, rapi, formal-ramah untuk Admin PA Indramayu berdasarkan data jadwal apel berikut. Pertahankan seluruh nama dan tanggal secara persis tanpa mengarang data baru:' + NL + fallbackCaption\n    }]\n  }],\n  generationConfig: { maxOutputTokens: 1024, temperature: 0.2 }\n};\nreturn [{ json: {\n  okToSend: true,\n  adminChatId,\n  fallbackCaption,\n  hasSubstitutions: Boolean(d.has_substitutions),\n  poster_png_base64: String(d.poster_png_base64 || ''),\n  poster_file_url: String(d.poster_file_url || ''),\n  geminiRequestBody\n} }];"
+      },
+      "id": "a1b2c3d4-0001-4000-8000-000000000004",
+      "name": "Cek Status & Siapkan Prompt Gemini",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-300, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            { "value1": "={{ $json.okToSend }}", "value2": true }
+          ]
+        }
+      },
+      "id": "a1b2c3d4-0001-4000-8000-000000000005",
+      "name": "Siap Kirim ke Admin? (IF)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [-60, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googlePalmApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.geminiRequestBody }}",
+        "options": {}
+      },
+      "id": "a1b2c3d4-0001-4000-8000-000000000006",
+      "name": "Gemini Susun Caption WA",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [180, 220]
+    },
+    {
+      "parameters": {
+        "jsCode": "const NL = String.fromCharCode(10);\nconst prev = $('Cek Status & Siapkan Prompt Gemini').first().json;\nconst gRes = $input.first().json || {};\nlet aiText = '';\ntry {\n  aiText = gRes.candidates[0].content.parts.map(p => p.text || '').join('').trim();\n} catch (e) {}\nlet finalCaption = aiText || prev.fallbackCaption;\nif (prev.hasSubstitutions && !prev.poster_png_base64 && prev.poster_file_url) {\n  finalCaption += NL + NL + '🔄 *Catatan:* Terjadi penggantian otomatis petugas (Cuti/ST) setelah poster terakhir disimpan. Buka TRANSKEP -> Jadwal Apel untuk re-download poster terbaru.';\n}\nreturn [{ json: {\n  chatId: prev.adminChatId,\n  finalCaption,\n  hasPoster: Boolean(prev.poster_png_base64),\n  poster_png_base64: prev.poster_png_base64\n} }];"
+      },
+      "id": "a1b2c3d4-0001-4000-8000-000000000007",
+      "name": "Rakitan Payload WAHA",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [420, 220]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            { "value1": "={{ $json.hasPoster }}", "value2": true }
+          ]
+        }
+      },
+      "id": "a1b2c3d4-0001-4000-8000-000000000008",
+      "name": "Poster PNG Tersedia? (IF)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [640, 220]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://waha:3000/api/sendImage",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-Api-Key", "value": "<GANTI_WAHA_API_KEY>" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { session: 'default', chatId: $json.chatId, file: { mimetype: 'image/png', filename: 'jadwal-apel-mingguan.png', data: $json.poster_png_base64 }, caption: $json.finalCaption } }}",
+        "options": {}
+      },
+      "id": "a1b2c3d4-0001-4000-8000-000000000009",
+      "name": "Kirim Gambar Poster ke WA Admin (WAHA)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 120]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://waha:3000/api/sendText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-Api-Key", "value": "<GANTI_WAHA_API_KEY>" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "session", "value": "default" },
+            { "name": "chatId", "value": "={{ $json.chatId }}" },
+            { "name": "text", "value": "={{ $json.finalCaption }}" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a1b2c3d4-0001-4000-8000-000000000010",
+      "name": "Kirim Teks Pengumuman ke WA Admin (WAHA)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 340]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "transkep-apel-import",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "a1b2c3d4-0002-4000-8000-000000000001",
+      "name": "Webhook Import Tabel SK Apel",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [-820, 680],
+      "webhookId": "transkep-apel-import"
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.first().json || {};\nconst body = raw.body || raw;\nconst b64 = String(body.file_base64 || '').trim();\nconst mimeType = String(body.mime_type || 'image/jpeg').trim();\nconst tahun = String(body.tahun || new Date().getFullYear()).trim();\nconst prompt = 'Ekstrak seluruh baris tabel JADWAL APEL SENIN PAGI DAN JUMAT SORE pada lampiran SK ini menjadi JSON object dengan properti rows: array objek {no, hari_mode (\"Sn & Jm\" | \"Sn\" | \"Jm\"), tgl_senin (YYYY-MM-DD tahun ' + tahun + ' atau string kosong jika Jm saja), tgl_jumat (YYYY-MM-DD tahun ' + tahun + ' atau string kosong jika Sn saja), pembina, pemimpin, doa, nilai_ma, budaya_malu, mc}. Kembalikan HANYA JSON valid.';\nconst geminiRequestBody = {\n  contents: [{ role: 'user', parts: [\n    { inline_data: { mime_type: mimeType, data: b64 } },\n    { text: prompt }\n  ]}],\n  generationConfig: { responseMimeType: 'application/json', maxOutputTokens: 16384 }\n};\nreturn [{ json: { geminiRequestBody } }];"
+      },
+      "id": "a1b2c3d4-0002-4000-8000-000000000002",
+      "name": "Siapkan Request Gemini OCR Tabel SK",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-560, 680]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googlePalmApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.geminiRequestBody }}",
+        "options": {}
+      },
+      "id": "a1b2c3d4-0002-4000-8000-000000000003",
+      "name": "Gemini Ekstrak Jadwal Tabel SK",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-300, 680]
+    },
+    {
+      "parameters": {
+        "jsCode": "const gRes = $input.first().json || {};\nlet parsed = { rows: [] };\ntry {\n  const txt = gRes.candidates[0].content.parts.map(p => p.text || '').join('').trim();\n  const obj = JSON.parse(txt);\n  if (Array.isArray(obj)) parsed = { rows: obj };\n  else if (obj && Array.isArray(obj.rows)) parsed = { rows: obj.rows };\n} catch (e) {}\nreturn [{ json: { status: 'success', rows: parsed.rows } }];"
+      },
+      "id": "a1b2c3d4-0002-4000-8000-000000000004",
+      "name": "Normalisasi JSON Hasil OCR",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-40, 680]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "a1b2c3d4-0002-4000-8000-000000000005",
+      "name": "Kirim JSON Hasil Import SK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [220, 680]
+    }
+  ],
+  "connections": {
+    "Cron Setiap Jumat 15:00 WIB": { "main": [[{ "node": "Ambil Jadwal Apel Minggu Depan (GAS)", "type": "main", "index": 0 }]] },
+    "Tes Manual Cron": { "main": [[{ "node": "Ambil Jadwal Apel Minggu Depan (GAS)", "type": "main", "index": 0 }]] },
+    "Ambil Jadwal Apel Minggu Depan (GAS)": { "main": [[{ "node": "Cek Status & Siapkan Prompt Gemini", "type": "main", "index": 0 }]] },
+    "Cek Status & Siapkan Prompt Gemini": { "main": [[{ "node": "Siap Kirim ke Admin? (IF)", "type": "main", "index": 0 }]] },
+    "Siap Kirim ke Admin? (IF)": { "main": [[{ "node": "Gemini Susun Caption WA", "type": "main", "index": 0 }], []] },
+    "Gemini Susun Caption WA": { "main": [[{ "node": "Rakitan Payload WAHA", "type": "main", "index": 0 }]] },
+    "Rakitan Payload WAHA": { "main": [[{ "node": "Poster PNG Tersedia? (IF)", "type": "main", "index": 0 }]] },
+    "Poster PNG Tersedia? (IF)": {
+      "main": [
+        [{ "node": "Kirim Gambar Poster ke WA Admin (WAHA)", "type": "main", "index": 0 }],
+        [{ "node": "Kirim Teks Pengumuman ke WA Admin (WAHA)", "type": "main", "index": 0 }]
+      ]
+    },
+    "Webhook Import Tabel SK Apel": { "main": [[{ "node": "Siapkan Request Gemini OCR Tabel SK", "type": "main", "index": 0 }]] },
+    "Siapkan Request Gemini OCR Tabel SK": { "main": [[{ "node": "Gemini Ekstrak Jadwal Tabel SK", "type": "main", "index": 0 }]] },
+    "Gemini Ekstrak Jadwal Tabel SK": { "main": [[{ "node": "Normalisasi JSON Hasil OCR", "type": "main", "index": 0 }]] },
+    "Normalisasi JSON Hasil OCR": { "main": [[{ "node": "Kirim JSON Hasil Import SK", "type": "main", "index": 0 }]] }
+  }
+}

@@ -38,7 +38,8 @@ const n8nExampleFiles = [
   'n8n/CI CD Docker Github.example.json',
   'n8n/Waha reset Paswors dan Cuti.example.json',
   'n8n/transkep-ai-assistant.example.json',
-  'n8n/transkep-ai-notulen.example.json'
+  'n8n/transkep-ai-notulen.example.json',
+  'n8n/transkep-apel-mingguan.example.json'
 ];
 const leakedPatterns = [
   '192.168.188.10', 'TRANSKEP_WA_BOT_2026', 'AKfycb', "pass: 'admin'", "pass: 'panitera'", "pass: 'sekretaris'",
@@ -100,7 +101,7 @@ console.log(`[PASS] A4 (CDN version pinning, SHA-384 SRI, CSP object-src, PWA v$
 // A2 firestore.rules static checks
 const rulesSrc = fs.readFileSync('firestore.rules', 'utf8');
 assert(rulesSrc.startsWith("rules_version = '2';"), 'firestore.rules must start with rules_version = 2');
-for (const col of ['sk_documents', 'sop_documents', 'jobdes_documents', 'jobdes_usulan', 'master_kinerja', 'pkp_documents', 'pck_documents', 'pck_rekapitulasi', 'eoffice_kgb', 'eoffice_rapat', 'surat_tugas_documents', 'security_incidents', '{document=**}']) {
+for (const col of ['sk_documents', 'sop_documents', 'jobdes_documents', 'jobdes_usulan', 'master_kinerja', 'pkp_documents', 'pck_documents', 'pck_rekapitulasi', 'eoffice_kgb', 'eoffice_rapat', 'eoffice_apel', 'surat_tugas_documents', 'security_incidents', '{document=**}']) {
   assert(rulesSrc.includes(`match /${col}`), `firestore.rules missing match /${col}`);
 }
 assert(/match \/\{document=\*\*\}[\s\S]*allow read, write: if false;/.test(rulesSrc), 'firestore.rules missing catch-all deny');
@@ -2991,7 +2992,7 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
     const expectedCoreCols = [
       'sk_documents', 'sop_documents', 'jobdes_documents', 'jobdes_usulan',
       'master_kinerja', 'pkp_documents', 'pck_documents', 'pck_rekapitulasi',
-      'eoffice_kgb', 'eoffice_rapat', 'surat_tugas_documents'
+      'eoffice_kgb', 'eoffice_rapat', 'eoffice_apel', 'surat_tugas_documents'
     ];
     assert.deepStrictEqual(Array.from(gasSandbox.BACKUP_FIRESTORE_COLLECTIONS_), expectedCoreCols);
     assert(!expectedCoreCols.includes('user_avatars') && !expectedCoreCols.includes('security_incidents') && !expectedCoreCols.includes('audit_logs'));
@@ -3154,7 +3155,7 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
       const bkRes = gasSandbox.jalankanBackupHarianTerjadwal();
       assert.strictEqual(bkRes.status, 'success', 'Combined daily backup must succeed: ' + (bkRes && bkRes.message));
       assert.strictEqual(bkRes.firestoreErrors.length, 0);
-      assert.strictEqual(bkRes.firestoreDocs, 12, '10 collections x 1 + pkp_documents paginated 2 = 12 docs');
+      assert.strictEqual(bkRes.firestoreDocs, 13, '11 collections x 1 + pkp_documents paginated 2 = 13 docs');
       assert.strictEqual(oldSubFolder.trashed, true, '>7-day backup subfolder must be trashed');
       assert.strictEqual(oldRootFile.trashed, true, '>7-day legacy root backup file must be trashed');
       assert.strictEqual(recentSubFolder.trashed, false, '<=7-day backup subfolder must be retained');
@@ -3166,7 +3167,7 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
       assert(jsonFile && sheetsCopyFile, 'Both Sheets copy and Firestore JSON must be saved in today subfolder');
 
       const exportedObj = JSON.parse(jsonFile.getBlob().getDataAsString());
-      assert.strictEqual(exportedObj.total_documents, 12);
+      assert.strictEqual(exportedObj.total_documents, 13);
       assert.strictEqual(exportedObj.collections.pkp_documents.length, 2, 'Paginated collection must merge pages');
       assert(!exportedObj.collections.user_avatars && !exportedObj.collections.security_incidents && !exportedObj.collections.audit_logs);
 
@@ -3178,7 +3179,7 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
       const dryRestore = gasSandbox.restoreFirestoreBackup_('json-tamper-test', true);
       assert.strictEqual(dryRestore.status, 'success');
       assert.strictEqual(dryRestore.dryRun, true);
-      assert.strictEqual(dryRestore.restoredCount, 12);
+      assert.strictEqual(dryRestore.restoredCount, 13);
       assert.strictEqual(dryRestore.skippedCount, 1, 'Excluded/disallowed collection docs must be skipped');
       assert.strictEqual(patchCalls155.length, 0, 'Dry-run restore must make 0 Firestore PATCH calls');
     } finally {
@@ -3859,13 +3860,72 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
     const core160 = fs.readFileSync(path.join(repoRoot158, 'core/core.js'), 'utf8');
     const pegawaiJs160 = fs.readFileSync(path.join(repoRoot158, 'modules/pegawai/pegawai.js'), 'utf8');
     const firebaseJs160 = fs.readFileSync(path.join(repoRoot158, 'core/firebase.js'), 'utf8');
-    assert.ok(idxHtml158.includes("APP_BUILD_VER = '3.9.3'"));
-    assert.ok(swJs158.includes("CACHE_NAME = 'transkep-v3.9.3'"));
+    assert.ok(idxHtml158.includes("APP_BUILD_VER = '3.9.4'"));
+    assert.ok(swJs158.includes("CACHE_NAME = 'transkep-v3.9.4'"));
     assert.ok(core160.includes('w-[80px] h-[102px] md:w-[88px] md:h-[112px]'), 'Header profil harus memakai bingkai pasfoto seimbang 88x112');
     assert.ok(core160.includes('rounded-[10px]') && core160.includes('p-[2px]'), 'Foto profil harus memiliki inner mat frame netral tanpa neon glow ungu');
     assert.ok(pegawaiJs160.includes('const targetW = 240;') && pegawaiJs160.includes('const targetH = 328;'), 'Kompresor avatar harus menyimpan pasfoto vertikal 240x328');
     assert.ok(firebaseJs160.includes('Number((meta && meta.height) || 328)'), 'Fallback tinggi avatar Firestore harus 328');
     console.log('[PASS] Tahap 160-162 Balanced Vertical Passport Header Avatar Frame (88x112 & 240x328) verified.');
+
+    // =========================================================================
+    // TAHAP 163: E-OFFICE JADWAL APEL (FIRESTORE, SATPAM S1, AUTO-SUB, POSTER, N8N)
+    // =========================================================================
+    const backup163 = fs.readFileSync(path.join(repoRoot158, 'backup.js'), 'utf8');
+    assert.ok(backup163.includes("'eoffice_apel'"), 'backup.js harus mencadangkan eoffice_apel');
+    const router163 = fs.readFileSync(path.join(repoRoot158, 'api_router.js'), 'utf8');
+    assert.ok(router163.includes("case 'getApelMingguanDispatch':") && router163.includes('saveApelPosterToDrive'), 'api_router.js wajib expose route Apel');
+    const viewEoffice163 = fs.readFileSync(path.join(repoRoot158, 'modules/eoffice/view_eoffice.html'), 'utf8');
+    assert.ok(viewEoffice163.includes('triggerOpenModalApel()'), 'view_eoffice.html wajib punya tombol Jadwal Apel');
+    const viewApel163 = fs.readFileSync(path.join(repoRoot158, 'modules/eoffice/view_apel.html'), 'utf8');
+    assert.ok(viewApel163.includes('apel-poster-canvas') && viewApel163.includes('width="1080" height="1350"'), 'view_apel.html wajib punya canvas poster 1080x1350');
+    assert.ok(swJs158.includes('./modules/eoffice/view_apel.html') && swJs158.includes('./modules/eoffice/apel.js'), 'sw.js wajib precache modul apel');
+
+    // Uji mesin backend getApelMingguanDispatch_ & auto-substitusi Cuti/ST di VM terisolasi
+    const apelGasSrc = fs.readFileSync(path.join(repoRoot158, 'eoffice/apel.js'), 'utf8');
+    const gasBox163 = {
+      console, Date, Math, JSON, String, Number, Boolean, Array, Object,
+      PropertiesService: { getScriptProperties: () => ({ getProperty: (k) => k === 'TRANSKEP_WEBHOOK_KEY' ? 'TEST_SECRET_163' : '' }) },
+      constantTimeEquals_: (a, b) => a === b,
+      parseFirebaseServiceAccount_: () => ({ project_id: 'transkep-314c0' }),
+      getFirebaseServiceAccessToken_: () => 'mock-token',
+      Utilities: { formatDate: () => '2026-11-20', base64Encode: () => 'FAKEPNG==' },
+      getDB: () => ({
+        getSheetByName: (name) => {
+          if (name === 'user_data') return { getDataRange: () => ({ getDisplayValues: () => [['NIP','Nama'], ['19800101','H. Zulkifli, S.Ag., S.H., M.H.'], ['19900202','Dra. Hj. Sunaeah, M.H.']] }) };
+          if (name === 'cuti_log') return { getDataRange: () => ({ getDisplayValues: () => [['ID','Tgl','NIP','Jenis','Mulai','Selesai','Alasan','Status'], ['CT-1','2026-11-20','19900202','Cuti Tahunan','2026-11-23','2026-11-25','Keluarga','Disetujui']] }) };
+          return null;
+        }
+      }),
+      readUserDataDecrypted_: (sh) => sh.getDataRange().getDisplayValues(),
+      readCutiSheetDecrypted_: (sh) => sh.getDataRange().getDisplayValues(),
+      exportFirestoreCollectionRest_: (col) => {
+        if (col === 'eoffice_apel') {
+          return {
+            documents: [
+              { name: '.../APEL-SETTINGS', fields: { doc_type: { stringValue: 'settings' }, admin_wa: { stringValue: '081234567890' }, jam_kirim: { stringValue: '15:00' } } },
+              { name: '.../APEL-2026', fields: { doc_type: { stringValue: 'tahun' }, tahun: { integerValue: '2026' }, nomor_sk: { stringValue: '538/KPA' }, tanggal_sk: { stringValue: '4 Juni 2026' }, jadwal_json: { stringValue: JSON.stringify([
+                { no: 1, hari_mode: 'Sn & Jm', tgl_senin: '2026-11-23', tgl_jumat: '2026-11-27', pembina: 'H. Zulkifli, S.Ag., S.H., M.H.', pemimpin: 'Gerald Dwi Anggara', doa: 'Dra. Hj. Sunaeah, M.H.', nilai_ma: 'Agung K.', budaya_malu: 'Ahmad Fauzi', mc: 'Widya Aprilianingrum' },
+                { no: 2, hari_mode: 'Sn & Jm', tgl_senin: '2026-11-30', tgl_jumat: '2026-12-04', pembina: 'H. Zulkifli, S.Ag., S.H., M.H.', pemimpin: 'Tarsiman', doa: 'Usman, S.H.', nilai_ma: 'Agung Sugiarto', budaya_malu: 'Arief Ardiansyah', mc: 'Hj. Lizah' }
+              ]) } } }
+            ]
+          };
+        }
+        return { documents: [] };
+      }
+    };
+    vm.createContext(gasBox163);
+    vm.runInContext(apelGasSrc, gasBox163);
+    const dispRes = gasBox163.getApelMingguanDispatch_({ secret_key: 'TEST_SECRET_163', target_date: '2026-11-20' });
+    assert.strictEqual(dispRes.status, 'success', 'getApelMingguanDispatch_ harus sukses');
+    assert.strictEqual(dispRes.tgl_senin, '2026-11-23', 'Jumat 2026-11-20 harus mengambil Senin depan 2026-11-23');
+    assert.strictEqual(dispRes.effective_petugas.doa, 'Usman, S.H.', 'Petugas Doa yang cuti harus otomatis diganti ke petugas minggu berikutnya secara non-destruktif');
+    assert.strictEqual(dispRes.substitutions.length, 1);
+
+    const n8nApel = JSON.parse(fs.readFileSync(path.join(repoRoot158, 'n8n/transkep-apel-mingguan.example.json'), 'utf8'));
+    const cronNode = n8nApel.nodes.find(n => n.type === 'n8n-nodes-base.scheduleTrigger');
+    assert.ok(cronNode && JSON.stringify(cronNode).includes('0 15 * * 5'), 'Cron n8n harus disetel setiap Jumat 15:00 WIB (0 15 * * 5)');
+    console.log('[PASS] Tahap 163 E-Office Jadwal Apel (Firestore, Satpam S1, Auto-Sub, Poster 1080x1350, n8n Cron) verified.');
   } finally {
     browserSandbox.TranskepAPI.call = origApiCall;
     browserSandbox.TranskepFirebase.getDb = origGetDb;

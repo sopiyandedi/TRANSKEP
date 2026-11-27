@@ -83,6 +83,7 @@ const specs = {
   pck_rekapitulasi: extractValidatorSpec('isValidPckRekapitulasi'),
   eoffice_kgb: extractValidatorSpec('isValidEofficeKgb'),
   eoffice_rapat: extractValidatorSpec('isValidEofficeRapat'),
+  eoffice_apel: extractValidatorSpec('isValidEofficeApel'),
   surat_tugas_documents: extractValidatorSpec('isValidSuratTugas'),
   security_incidents: extractValidatorSpec('isValidSecurityIncident'),
   user_avatars: extractValidatorSpec('isValidUserAvatar'),
@@ -100,6 +101,7 @@ const validatorNamesBySpec = [
   ['pck_rekapitulasi', 'isValidPckRekapitulasi'],
   ['eoffice_kgb', 'isValidEofficeKgb'],
   ['eoffice_rapat', 'isValidEofficeRapat'],
+  ['eoffice_apel', 'isValidEofficeApel'],
   ['surat_tugas_documents', 'isValidSuratTugas'],
   ['security_incidents', 'isValidSecurityIncident'],
   ['user_avatars', 'isValidUserAvatar'],
@@ -264,7 +266,11 @@ assert(TF && typeof TF === 'object', 'TranskepFirebase failed to load');
     height: 240
   });
 
-  assert.strictEqual(capturedWrites.length, 16, `Expected 16 captured writes from core/firebase.js, got ${capturedWrites.length}`);
+  await TF.saveEofficeApelToFirestore({ id: 'APEL-2026', doc_type: 'tahun', tahun: 2026, nomor_sk: '538/KPA', tanggal_sk: '4 Juni 2026', jadwal: [{ no: 1, tgl_senin: '2026-07-06' }] });
+  await TF.saveEofficeApelToFirestore({ id: 'SATPAM-01', doc_type: 'satpam', nama: 'Gerald Dwi Anggara', panggilan: 'Gerald', no_wa: '081234567890', photo_data_uri: 'data:image/jpeg;base64,' + 'A'.repeat(40), aktif: true });
+  await TF.saveEofficeApelToFirestore({ id: 'APEL-SETTINGS', doc_type: 'settings', admin_wa: '6281234567890', jam_kirim: '15:00', bg_gedung_uri: '' });
+
+  assert.strictEqual(capturedWrites.length, 19, `Expected 19 captured writes from core/firebase.js, got ${capturedWrites.length}`);
 
   TF._authReady = true;
   await TF.logAuditActivity({
@@ -274,7 +280,7 @@ assert(TF && typeof TF === 'object', 'TranskepFirebase failed to load');
     detail: 'Verifikasi kompatibilitas skema audit_logs terhadap firestore.rules'
   });
   TF._authReady = false;
-  assert.strictEqual(capturedWrites.length, 17, 'logAuditActivity must emit schema-valid write to audit_logs when _authReady=true');
+  assert.strictEqual(capturedWrites.length, 20, 'logAuditActivity must emit schema-valid write to audit_logs when _authReady=true');
 
   for (const w of capturedWrites) {
     const spec = specs[w.colName];

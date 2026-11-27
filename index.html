@@ -148,7 +148,7 @@
 
   <!-- TRANSKEP: Auto-Bust PWA Cache & Stale Service Worker Guard -->
   <script>
-    window.APP_BUILD_VER = '3.9.3';
+    window.APP_BUILD_VER = '3.9.4';
     (async function () {
       const CURRENT_APP_BUILD = 'transkep-v' + window.APP_BUILD_VER;
       if (localStorage.getItem('transkep_active_build') !== CURRENT_APP_BUILD) {
@@ -422,6 +422,7 @@
   <!-- ========================================================= -->
   <div id="slot-global-modals"></div>
   <div id="slot-aktivitas"></div>
+  <div id="slot-eoffice-apel"></div>
   <div id="slot-magic-approval"></div>
 
   <!-- ========================================================= -->
@@ -442,6 +443,7 @@
         { slot: 'slot-sop', file: 'modules/sop/view_sop.html' },
         { slot: 'slot-kinerja', file: 'modules/kinerja/view_kinerja.html' },
         { slot: 'slot-eoffice', file: 'modules/eoffice/view_eoffice.html' },
+        { slot: 'slot-eoffice-apel', file: 'modules/eoffice/view_apel.html' },
         { slot: 'slot-pegawai', file: 'modules/pegawai/view_pegawai.html' },
         { slot: 'slot-modals-izin', file: 'modules/permohonan/view_modals_izin.html' },
         { slot: 'slot-pdf-viewer', file: 'modules/pdf_viewer/view_pdf_viewer.html' },
@@ -520,6 +522,7 @@
         'modules/eoffice/eoffice.js',
         'modules/eoffice/kgb.js',
         'modules/eoffice/rapat.js',
+        'modules/eoffice/apel.js',
         'modules/pegawai/pegawai.js',
         'modules/aktivitas/aktivitas.js',
         'modules/referensi/referensi.js'
@@ -545,7 +548,7 @@
       ];
 
       try {
-        const APP_BUILD_VER = window.APP_BUILD_VER || '3.9.3';
+        const APP_BUILD_VER = window.APP_BUILD_VER || '3.9.4';
         console.log('🔄 [TRANSKEP Loader] Memuat komponen tampilan views/ secara paralel...');
         await Promise.all(VIEW_SLOTS.map(async item => {
           const res = await fetch(item.file + '?v=' + APP_BUILD_VER, { cache: 'no-cache' });
