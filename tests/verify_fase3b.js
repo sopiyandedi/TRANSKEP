@@ -3860,8 +3860,8 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
     const core160 = fs.readFileSync(path.join(repoRoot158, 'core/core.js'), 'utf8');
     const pegawaiJs160 = fs.readFileSync(path.join(repoRoot158, 'modules/pegawai/pegawai.js'), 'utf8');
     const firebaseJs160 = fs.readFileSync(path.join(repoRoot158, 'core/firebase.js'), 'utf8');
-    assert.ok(idxHtml158.includes("APP_BUILD_VER = '3.9.5'"));
-    assert.ok(swJs158.includes("CACHE_NAME = 'transkep-v3.9.5'"));
+    assert.ok(idxHtml158.includes("APP_BUILD_VER = '3.9.6'"));
+    assert.ok(swJs158.includes("CACHE_NAME = 'transkep-v3.9.6'"));
     assert.ok(core160.includes('w-[80px] h-[102px] md:w-[88px] md:h-[112px]'), 'Header profil harus memakai bingkai pasfoto seimbang 88x112');
     assert.ok(core160.includes('rounded-[10px]') && core160.includes('p-[2px]'), 'Foto profil harus memiliki inner mat frame netral tanpa neon glow ungu');
     assert.ok(pegawaiJs160.includes('const targetW = 240;') && pegawaiJs160.includes('const targetH = 328;'), 'Kompresor avatar harus menyimpan pasfoto vertikal 240x328');
@@ -3881,6 +3881,8 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
     const apelJs163 = fs.readFileSync(path.join(repoRoot158, 'modules/eoffice/apel.js'), 'utf8');
     assert.ok(apelJs163.includes('img/Logo_PA_Imy.png') && apelJs163.includes('img/Logo_WBK.png') && apelJs163.includes('img/berakhlak.png'), 'Poster harus memakai logo resmi PA Imy, WBK, dan BerAKHLAK');
     assert.ok(!apelJs163.includes("fillText('SMART'"), 'Logo teks SMART harus dihapus dari poster');
+    assert.ok(apelJs163.includes('usersList') && !apelJs163.includes('state.users.'), 'apel.js wajib membaca state.usersList bukan state.users');
+    assert.ok(viewApel163.includes('toggleFullscreen()') && viewApel163.includes('isFullscreen'), 'Modal apel wajib punya fitur maximize fullscreen');
     assert.ok(viewApel163.includes('apel-poster-canvas') && viewApel163.includes('width="1080" height="1350"'), 'view_apel.html wajib punya canvas poster 1080x1350');
     assert.ok(swJs158.includes('./modules/eoffice/view_apel.html') && swJs158.includes('./modules/eoffice/apel.js'), 'sw.js wajib precache modul apel');
 

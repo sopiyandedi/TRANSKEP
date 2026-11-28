@@ -99,24 +99,62 @@
     return normNameTokens(name).join('');
   }
 
-  function isFuzzyNameMatch(nameA, nameB) {
+  function readGlobalUsersList() {
+    if (typeof window !== 'undefined' && window.vueState && Array.isArray(window.vueState.usersList) && window.vueState.usersList.length > 0) {
+      return window.vueState.usersList;
+    }
+    if (typeof state !== 'undefined' && Array.isArray(state.usersList) && state.usersList.length > 0) {
+      return state.usersList;
+    }
+    if (typeof window !== 'undefined' && window.vmPegawai && Array.isArray(window.vmPegawai.users) && window.vmPegawai.users.length > 0) {
+      return window.vmPegawai.users;
+    }
+    if (typeof localStorage !== 'undefined') {
+      try {
+        const cached = JSON.parse(localStorage.getItem('transkep_users_cache') || '[]');
+        if (Array.isArray(cached) && cached.length > 0) return cached;
+      } catch (e) {}
+    }
+    return [];
+  }
+
+  function scoreFuzzyNameMatch(nameA, nameB) {
     const kA = normNameKey(nameA);
     const kB = normNameKey(nameB);
-    if (!kA || !kB) return false;
-    if (kA === kB) return true;
+    if (!kA || !kB) return 0;
+    if (kA === kB) return 100;
     const tA = normNameTokens(nameA);
     const tB = normNameTokens(nameB);
-    if (!tA.length || !tB.length) return false;
+    if (!tA.length || !tB.length) return 0;
     const shorter = tA.length <= tB.length ? tA : tB;
     const longer = tA.length <= tB.length ? tB : tA;
-    let matched = 0;
+    let exactToks = 0;
+    let initToks = 0;
+    const used = {};
     for (let i = 0; i < shorter.length; i++) {
       const sTok = shorter[i];
-      const ok = longer.some(lTok => lTok === sTok || (sTok.length === 1 && lTok.startsWith(sTok)) || (lTok.length === 1 && sTok.startsWith(lTok)));
-      if (ok) matched++;
+      let hitIdx = longer.findIndex((lTok, j) => !used[j] && lTok === sTok);
+      if (hitIdx !== -1) {
+        used[hitIdx] = true;
+        exactToks++;
+        continue;
+      }
+      if (sTok.length === 1) {
+        hitIdx = longer.findIndex((lTok, j) => !used[j] && lTok.startsWith(sTok));
+        if (hitIdx !== -1) { used[hitIdx] = true; initToks++; continue; }
+      }
+      hitIdx = longer.findIndex((lTok, j) => !used[j] && lTok.length === 1 && sTok.startsWith(lTok));
+      if (hitIdx !== -1) { used[hitIdx] = true; initToks++; }
     }
-    if (matched === shorter.length && (shorter.length >= 2 || (shorter[0].length >= 5 && longer.length === 1))) return true;
-    return false;
+    if (exactToks + initToks === shorter.length) {
+      if (exactToks >= 2 || (exactToks >= 1 && initToks >= 1)) return 60 + exactToks * 10 + initToks * 5;
+      if (shorter.length === 1 && shorter[0].length >= 5) return 55;
+    }
+    return 0;
+  }
+
+  function isFuzzyNameMatch(nameA, nameB) {
+    return scoreFuzzyNameMatch(nameA, nameB) > 0;
   }
 
   function prepareLogoCanvas(img, stripWhite) {
@@ -352,6 +390,8 @@
       data() {
         return {
           showModal: false,
+          isFullscreen: false,
+          asnUsersList: readGlobalUsersList(),
           activeTab: 'jadwal',
           selectedYear: '2026',
           yearDocsMap: {
@@ -450,22 +490,20 @@
             }
           };
           (this.satpamList || []).forEach(s => pushName(s.nama));
-          if (typeof state !== 'undefined' && Array.isArray(state.users)) {
-            state.users.forEach(u => pushName(u.nama));
-          }
+          const allAsn = (this.asnUsersList && this.asnUsersList.length) ? this.asnUsersList : readGlobalUsersList();
+          allAsn.forEach(u => pushName(u.nama));
           Object.values(DEFAULT_POOLS).forEach(arr => arr.forEach(pushName));
           return out.sort();
         },
 
         userNipByNormName() {
           const map = {};
-          if (typeof state !== 'undefined' && Array.isArray(state.users)) {
-            state.users.forEach(u => {
-              const k = normNameKey(u.nama);
-              const nip = String(u.nip || '').replace(/['"\s]/g, '').trim();
-              if (k && nip) map[k] = nip;
-            });
-          }
+          const allAsn = (this.asnUsersList && this.asnUsersList.length) ? this.asnUsersList : readGlobalUsersList();
+          allAsn.forEach(u => {
+            const k = normNameKey(u.nama);
+            const nip = String(u.nip || '').replace(/['"\s]/g, '').trim();
+            if (k && nip) map[k] = nip;
+          });
           return map;
         },
 
@@ -550,6 +588,7 @@
       methods: {
         async open() {
           this.showModal = true;
+          this.asnUsersList = readGlobalUsersList();
           await this.loadFromFirestore();
           this.pickDefaultUpcomingWeek();
           this.$nextTick(() => {
@@ -558,12 +597,17 @@
         },
 
         async syncAvatarsNow() {
+          this.asnUsersList = readGlobalUsersList();
           await this.loadFromFirestore();
           this.$nextTick(() => this.refreshPosterCanvas());
         },
 
         closeModal() {
           this.showModal = false;
+        },
+
+        toggleFullscreen() {
+          this.isFullscreen = !this.isFullscreen;
         },
 
         onSelectYearChange() {
@@ -685,8 +729,9 @@
             if (!y1) return;
             const cNip = String(c.nip || '').replace(/['"\s]/g, '').trim();
             let cNama = c.nama || '';
-            if (!cNama && cNip && typeof state !== 'undefined' && Array.isArray(state.users)) {
-              const uMatch = state.users.find(u => String(u.nip || '').replace(/['"\s]/g, '').trim() === cNip);
+            const allAsnForCuti = (this.asnUsersList && this.asnUsersList.length) ? this.asnUsersList : readGlobalUsersList();
+            if (!cNama && cNip && allAsnForCuti.length > 0) {
+              const uMatch = allAsnForCuti.find(u => String(u.nip || '').replace(/['"\s]/g, '').trim() === cNip);
               if (uMatch) cNama = uMatch.nama;
             }
             dates.forEach(td => {
@@ -1021,7 +1066,7 @@
 
         findMatchingAsnUser(name, explicitNip) {
           const cleanExp = String(explicitNip || '').replace(/['"\s]/g, '').trim();
-          const users = (typeof state !== 'undefined' && Array.isArray(state.users)) ? state.users : [];
+          const users = (this.asnUsersList && this.asnUsersList.length) ? this.asnUsersList : readGlobalUsersList();
           if (cleanExp) {
             const byNip = users.find(u => String(u.nip || '').replace(/['"\s]/g, '').trim() === cleanExp);
             if (byNip) return byNip;
@@ -1032,7 +1077,13 @@
             const u = users.find(x => String(x.nip || '').replace(/['"\s]/g, '').trim() === nipExact);
             if (u) return u;
           }
-          return users.find(u => isFuzzyNameMatch(name, u.nama)) || null;
+          let bestUser = null;
+          let bestScore = 0;
+          users.forEach(u => {
+            const sc = scoreFuzzyNameMatch(name, u.nama);
+            if (sc > bestScore) { bestScore = sc; bestUser = u; }
+          });
+          return bestUser;
         },
 
         getOfficerPhotoDiagnostic(name, explicitNip) {
