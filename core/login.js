@@ -106,3 +106,10 @@ function submitLupaPassword(e) {
     handleFailure(new Error("Koneksi API TranskepAPI / google.script.run tidak tersedia."));
   }
 }
+
+;(function () {
+  if (typeof window !== 'undefined' && typeof document !== 'undefined' && window._pendingLupaSubmit && typeof submitLupaPassword === 'function') {
+    window._pendingLupaSubmit = false;
+    setTimeout(function () { if (!isSubmittingLupaPass) submitLupaPassword(); }, 30);
+  }
+})();

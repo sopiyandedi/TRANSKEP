@@ -86,10 +86,31 @@
   <link rel="stylesheet" href="css/custom.css">
   <link rel="stylesheet" href="css/sk_builder.css">
 
-  <!-- TRANSKEP: Instant Anti-FOUC Session Guard (0ms Auth State Resolution) -->
+  <!-- TRANSKEP: Instant Anti-FOUC Session Guard & Pre-Load Form Submit Protection -->
   <script>
     (function () {
       try {
+        if (window.location && window.location.search && /[?&](username|password|nip)=/i.test(window.location.search) && window.history && typeof window.history.replaceState === 'function') {
+          window.history.replaceState(null, '', window.location.pathname + (window.location.hash || ''));
+        }
+        if (typeof window.handleLogin !== 'function') {
+          window.handleLogin = function (ev) {
+            if (ev && typeof ev.preventDefault === 'function') ev.preventDefault();
+            window._pendingLoginSubmit = true;
+            var btn = document.getElementById('btnLoginSubmit');
+            if (btn && !btn.disabled) {
+              btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin mr-2"></i><span>Menyiapkan Sistem...</span>';
+            }
+            return false;
+          };
+        }
+        if (typeof window.submitLupaPassword !== 'function') {
+          window.submitLupaPassword = function (ev) {
+            if (ev && typeof ev.preventDefault === 'function') ev.preventDefault();
+            window._pendingLupaSubmit = true;
+            return false;
+          };
+        }
         var nip = localStorage.getItem('transkep_active_nip');
         var token = localStorage.getItem('transkep_session_token');
         if (nip && token) {
@@ -148,7 +169,7 @@
 
   <!-- TRANSKEP: Auto-Bust PWA Cache & Stale Service Worker Guard -->
   <script>
-    window.APP_BUILD_VER = '3.9.7';
+    window.APP_BUILD_VER = '3.9.8';
     (async function () {
       const CURRENT_APP_BUILD = 'transkep-v' + window.APP_BUILD_VER;
       if (localStorage.getItem('transkep_active_build') !== CURRENT_APP_BUILD) {
@@ -548,7 +569,7 @@
       ];
 
       try {
-        const APP_BUILD_VER = window.APP_BUILD_VER || '3.9.7';
+        const APP_BUILD_VER = window.APP_BUILD_VER || '3.9.8';
         console.log('🔄 [TRANSKEP Loader] Memuat komponen tampilan views/ secara paralel...');
         await Promise.all(VIEW_SLOTS.map(async item => {
           const res = await fetch(item.file + '?v=' + APP_BUILD_VER, { cache: 'no-cache' });

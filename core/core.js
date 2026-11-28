@@ -3139,3 +3139,10 @@ window.openMagicDriveFile = function (magicToken, title) {
   );
   return renderBlobTabOrDownload_(promise, title || 'Lampiran Cuti');
 };
+
+;(function () {
+  if (typeof window !== 'undefined' && typeof document !== 'undefined' && window._pendingLoginSubmit && typeof handleLogin === 'function') {
+    window._pendingLoginSubmit = false;
+    setTimeout(function () { if (!window._isLoggingIn) handleLogin(); }, 30);
+  }
+})();
