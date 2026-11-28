@@ -149,7 +149,7 @@ const { privateKey, publicKey } = crypto.generateKeyPairSync('rsa', {
   privateKeyEncoding: { type: 'pkcs8', format: 'pem' }
 });
 
-const SKIP_DIRS = new Set(['.git', '.github', '.firebase', 'tests', 'n8n', 'core', 'modules', 'scripts', 'node_modules', 'css', 'img', 'vendor']);
+const SKIP_DIRS = new Set(['.git', '.github', '.firebase', 'tests', 'n8n', 'docker', 'core', 'modules', 'scripts', 'node_modules', 'css', 'img', 'vendor']);
 function walkGasFiles(dir) {
   let out = [];
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -3930,7 +3930,12 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
 
     const n8nApel = JSON.parse(fs.readFileSync(path.join(repoRoot158, 'n8n/transkep-apel-mingguan.example.json'), 'utf8'));
     const cronNode = n8nApel.nodes.find(n => n.type === 'n8n-nodes-base.scheduleTrigger');
-    assert.ok(cronNode && JSON.stringify(cronNode).includes('0 15 * * 5'), 'Cron n8n harus disetel setiap Jumat 15:00 WIB (0 15 * * 5)');
+    assert.ok(cronNode && JSON.stringify(cronNode).includes('0 14 * * 0'), 'Cron n8n harus disetel setiap Minggu 14:00 WIB (0 14 * * 0)');
+    assert.ok(JSON.stringify(n8nApel).includes('http://apel-renderer:3000/render'), 'Workflow n8n harus mendukung auto-render poster PNG via apel-renderer');
+    const dispSunRes = gasBox163.getApelMingguanDispatch_({ secret_key: 'TEST_SECRET_163', target_date: '2026-11-29' });
+    assert.strictEqual(dispSunRes.status, 'success');
+    assert.strictEqual(dispSunRes.tgl_senin, '2026-11-30', 'Hari Minggu 2026-11-29 harus mengambil Senin besok 2026-11-30');
+    assert.ok(dispSunRes.effective_photos && typeof dispSunRes.effective_photos === 'object', 'Dispatch wajib menyertakan effective_photos petugas');
     console.log('[PASS] Tahap 163 E-Office Jadwal Apel (Firestore, Satpam S1, Auto-Sub, Poster 1080x1350, n8n Cron) verified.');
   } finally {
     browserSandbox.TranskepAPI.call = origApiCall;

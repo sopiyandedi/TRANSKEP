@@ -1,0 +1,13 @@
+{
+  "name": "transkep-apel-renderer",
+  "version": "1.0.0",
+  "description": "Headless 1080x1350 Canva Poster Renderer for TRANSKEP E-Office Jadwal Apel",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@napi-rs/canvas": "^0.1.65",
+    "express": "^4.21.1"
+  }
+}

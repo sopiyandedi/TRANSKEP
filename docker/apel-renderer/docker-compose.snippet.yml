@@ -1,0 +1,10 @@
+# Tambahkan blok service di bawah ini ke dalam docker-compose.yml (sejajar dengan service n8n, waha, ffmpeg-api):
+
+  apel-renderer:
+    build: ./apel-renderer
+    container_name: transkep-apel-renderer
+    restart: unless-stopped
+    environment:
+      - PORT=3000
+      - ASSET_BASE_URL=https://sso.pa-indramayu.go.id/img
+    # Pastikan berada pada Docker network yang sama dengan kontainer n8n agar http://apel-renderer:3000 terjangkau

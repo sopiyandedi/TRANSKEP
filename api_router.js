@@ -249,6 +249,9 @@ function handleApiPost_(payload, e) {
       case 'saveApelPosterToDrive':
         return jsonResponse_(saveApelPosterToDrive(payload.data || payload, payload.nip, payload.token));
 
+      case 'saveApelPosterFromN8n':
+        return jsonResponse_(saveApelPosterFromN8n_(payload));
+
       case 'getApelDriveFolderUrl':
         return jsonResponse_(getApelDriveFolderUrl(payload.nip, payload.token));
 

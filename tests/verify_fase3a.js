@@ -42,7 +42,7 @@ console.log('[PASS] Static version bump & view_permohonan.html checks passed.');
 // =========================================================================
 // 2. BUILD MOCK GAS SANDBOX (WITH LOSSLESS BINARY BLOBS)
 // =========================================================================
-const SKIP_DIRS = new Set(['.git', '.github', '.firebase', 'tests', 'n8n', 'core', 'modules', 'scripts', 'node_modules', 'css', 'img', 'vendor']);
+const SKIP_DIRS = new Set(['.git', '.github', '.firebase', 'tests', 'n8n', 'docker', 'core', 'modules', 'scripts', 'node_modules', 'css', 'img', 'vendor']);
 function walkGasFiles(dir) {
   let out = [];
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {

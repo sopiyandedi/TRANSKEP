@@ -7,7 +7,7 @@ const assert = require('assert');
 process.chdir(path.resolve(__dirname, '..'));
 
 // 1. Discover & syntax-check all non-ignored GAS backend .js files
-const SKIP_DIRS = new Set(['.git', '.github', '.firebase', 'tests', 'n8n', 'core', 'modules', 'scripts', 'node_modules', 'css', 'img', 'vendor']);
+const SKIP_DIRS = new Set(['.git', '.github', '.firebase', 'tests', 'n8n', 'docker', 'core', 'modules', 'scripts', 'node_modules', 'css', 'img', 'vendor']);
 function walkGasFiles(dir) {
   let out = [];
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {

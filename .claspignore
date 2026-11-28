@@ -15,6 +15,7 @@ firebase.json
 SECURITY_CHECKLIST.md
 *.example.json
 n8n/**
+docker/**
 tests/**
 n8n_workflow_*.json
 *service-account*.json

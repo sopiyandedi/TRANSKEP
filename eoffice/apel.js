@@ -192,12 +192,57 @@ function formatApelYmdToIndoUpper_(ymd) {
   return parseInt(m[3], 10) + ' ' + mon + ' ' + m[1];
 }
 
+function stripApelTitles_(str) {
+  let cur = String(str || '').toLowerCase().trim();
+  const rx = /^(?:drs|dra|dr|ir|prof|h|hj|kh|ust|r\.?\s*a|r)\.?\s+/i;
+  for (let i = 0; i < 5; i++) {
+    const next = cur.replace(rx, '').trim();
+    if (next === cur) break;
+    cur = next;
+  }
+  return cur;
+}
+
+function normalizeApelTokens_(name) {
+  let base = String(name || '').split(',')[0] || '';
+  base = stripApelTitles_(base);
+  base = base.replace(/\./g, ' ').replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+  return base ? base.split(' ').filter(Boolean) : [];
+}
+
 function normalizeApelNameKey_(name) {
-  return String(name || '')
-    .toLowerCase()
-    .replace(/^(drs\.?|dra\.?|ir\.?|dr\.?|h\.?|hj\.?|k\.?)\s+/g, '')
-    .replace(/,.*$/, '')
-    .replace(/[^a-z0-9]/g, '');
+  return normalizeApelTokens_(name).join('');
+}
+
+function scoreApelNameMatch_(nameA, nameB) {
+  const kA = normalizeApelNameKey_(nameA);
+  const kB = normalizeApelNameKey_(nameB);
+  if (!kA || !kB) return 0;
+  if (kA === kB) return 100;
+  const tA = normalizeApelTokens_(nameA);
+  const tB = normalizeApelTokens_(nameB);
+  if (!tA.length || !tB.length) return 0;
+  const shorter = tA.length <= tB.length ? tA : tB;
+  const longer = tA.length <= tB.length ? tB : tA;
+  let exactToks = 0;
+  let initToks = 0;
+  const used = {};
+  for (let i = 0; i < shorter.length; i++) {
+    const sTok = shorter[i];
+    let hitIdx = longer.findIndex(function (lTok, j) { return !used[j] && lTok === sTok; });
+    if (hitIdx !== -1) { used[hitIdx] = true; exactToks++; continue; }
+    if (sTok.length === 1) {
+      hitIdx = longer.findIndex(function (lTok, j) { return !used[j] && lTok.indexOf(sTok) === 0; });
+      if (hitIdx !== -1) { used[hitIdx] = true; initToks++; continue; }
+    }
+    hitIdx = longer.findIndex(function (lTok, j) { return !used[j] && lTok.length === 1 && sTok.indexOf(lTok) === 0; });
+    if (hitIdx !== -1) { used[hitIdx] = true; initToks++; }
+  }
+  if (exactToks + initToks === shorter.length) {
+    if (exactToks >= 2 || (exactToks >= 1 && initToks >= 1)) return 60 + exactToks * 10 + initToks * 5;
+    if (shorter.length === 1 && shorter[0].length >= 5) return 55;
+  }
+  return 0;
 }
 
 /**
@@ -334,8 +379,97 @@ function getConflictReasonApel_(absentByDate, dateList, nip, nama) {
     if (!b) continue;
     if (cleanNip && b.nips[cleanNip]) return { ymd: ymd, reason: b.nips[cleanNip] };
     if (normName && b.names[normName]) return { ymd: ymd, reason: b.names[normName] };
+    if (nama) {
+      const nameKeys = Object.keys(b.names || {});
+      for (let k = 0; k < nameKeys.length; k++) {
+        if (scoreApelNameMatch_(nama, nameKeys[k]) >= 60) {
+          return { ymd: ymd, reason: b.names[nameKeys[k]] };
+        }
+      }
+    }
   }
   return null;
+}
+
+function getSingleFirestoreAvatarRest_(nip, accessToken, projectId) {
+  const cleanNip = String(nip || '').replace(/['"\s]/g, '').trim();
+  if (!cleanNip || !accessToken) return '';
+  try {
+    const url = 'https://firestore.googleapis.com/v1/projects/' +
+      encodeURIComponent(String(projectId || 'transkep-314c0')) +
+      '/databases/(default)/documents/user_avatars/' +
+      encodeURIComponent(cleanNip);
+    const resp = UrlFetchApp.fetch(url, {
+      method: 'get',
+      headers: { Authorization: 'Bearer ' + accessToken },
+      muteHttpExceptions: true
+    });
+    if (resp.getResponseCode() >= 200 && resp.getResponseCode() < 300) {
+      const parsed = unwrapFirestoreDocApel_(JSON.parse(resp.getContentText() || '{}'));
+      if (parsed && parsed.photo_data_uri) return String(parsed.photo_data_uri);
+    }
+  } catch (e) {}
+  return '';
+}
+
+function collectEffectiveApelPhotos_(effective, row, satpamDocs, accessToken, projectId) {
+  const out = { pembina: '', pemimpin: '', doa: '', nilai_ma: '', mc: '', budaya_malu: '' };
+  let userRows = [];
+  try {
+    const ss = (typeof getDB === 'function') ? getDB() : null;
+    if (ss) {
+      const shUser = ss.getSheetByName('user_data');
+      const uRows = (shUser && typeof readUserDataDecrypted_ === 'function')
+        ? readUserDataDecrypted_(shUser)
+        : (shUser ? shUser.getDataRange().getDisplayValues() : []);
+      for (let i = 1; i < uRows.length; i++) {
+        const uNip = String(uRows[i][0] || '').replace(/['"\s]/g, '').trim();
+        const uNama = String(uRows[i][1] || '').trim();
+        if (uNip && uNama) userRows.push({ nip: uNip, nama: uNama });
+      }
+    }
+  } catch (eU) {}
+
+  const avatarCache = {};
+  Object.keys(out).forEach(function (roleKey) {
+    const targetName = String((effective && effective[roleKey]) || '').trim();
+    if (!targetName) return;
+
+    // 1. Cek Satpam terisolasi dulu
+    let bestSatpam = null;
+    let bestSatpamScore = 0;
+    for (let i = 0; i < (satpamDocs || []).length; i++) {
+      const sp = satpamDocs[i];
+      if (!sp || !sp.photo_data_uri) continue;
+      const sc = Math.max(scoreApelNameMatch_(targetName, sp.nama), scoreApelNameMatch_(targetName, sp.panggilan));
+      if (sc > bestSatpamScore) { bestSatpamScore = sc; bestSatpam = sp; }
+    }
+    if (bestSatpam && bestSatpamScore >= 55) {
+      out[roleKey] = String(bestSatpam.photo_data_uri);
+      return;
+    }
+
+    // 2. Cocokkan ASN -> NIP -> Fetch 1 dokumen Firestore user_avatars/{nip}
+    let matchedNip = (row && String(effective[roleKey] || '') === String(row[roleKey] || '') && row[roleKey + '_nip'])
+      ? String(row[roleKey + '_nip']).replace(/['"\s]/g, '').trim()
+      : '';
+    if (!matchedNip && userRows.length > 0) {
+      let bestUserScore = 0;
+      for (let j = 0; j < userRows.length; j++) {
+        const sc = scoreApelNameMatch_(targetName, userRows[j].nama);
+        if (sc > bestUserScore) { bestUserScore = sc; matchedNip = userRows[j].nip; }
+      }
+      if (bestUserScore < 55) matchedNip = '';
+    }
+    if (matchedNip) {
+      if (!(matchedNip in avatarCache)) {
+        avatarCache[matchedNip] = getSingleFirestoreAvatarRest_(matchedNip, accessToken, projectId);
+      }
+      out[roleKey] = avatarCache[matchedNip] || '';
+    }
+  });
+
+  return out;
 }
 
 /**
@@ -497,6 +631,8 @@ function getApelMingguanDispatch_(params) {
       } catch (eDrive) {}
     }
 
+    const effectivePhotos = collectEffectiveApelPhotos_(effective, row, satpamDocs, accessToken, projectId);
+
     return {
       status: 'success',
       dispatch_date: todayStr,
@@ -524,6 +660,8 @@ function getApelMingguanDispatch_(params) {
         budaya_malu: String(row.budaya_malu || '')
       },
       effective_petugas: effective,
+      effective_photos: effectivePhotos,
+      bg_gedung_uri: String(settingsDoc.bg_gedung_uri || ''),
       substitutions: substitutions,
       has_substitutions: substitutions.length > 0,
       poster_file_id: posterFileId,
@@ -536,5 +674,52 @@ function getApelMingguanDispatch_(params) {
       status: 'error',
       message: 'Gagal menyusun dispatch Apel mingguan: ' + (err && err.message ? err.message : String(err))
     };
+  }
+}
+
+/**
+ * Menyimpan PNG Poster Apel hasil render otomatis n8n (Minggu 14:00 WIB) ke Google Drive privat
+ */
+function saveApelPosterFromN8n_(params) {
+  try {
+    const p = (params && typeof params === 'object') ? params : {};
+    const props = PropertiesService.getScriptProperties();
+    const configuredKey = String(props.getProperty('TRANSKEP_WEBHOOK_KEY') || 'TRANSKEP_WA_BOT_2026').trim();
+    const incomingKey = String(p.secret_key || p.secretKey || '').trim();
+    const isKeyValid = (typeof constantTimeEquals_ === 'function')
+      ? constantTimeEquals_(incomingKey, configuredKey)
+      : (incomingKey && incomingKey === configuredKey);
+    if (!isKeyValid) {
+      return { status: 'error', message: 'Akses Ditolak: secret_key tidak valid.' };
+    }
+    const rawB64 = String(p.png_base64 || '').replace(/^data:image\/[a-zA-Z0-9.+-]+;base64,/i, '').trim();
+    if (!rawB64 || rawB64.length < 100) {
+      return { status: 'error', message: 'Data gambar PNG poster kosong atau tidak valid.' };
+    }
+    const tahun = String(p.tahun || new Date().getFullYear()).replace(/[^0-9]/g, '').slice(0, 4) || String(new Date().getFullYear());
+    const rawName = String(p.file_name || ('Jadwal_Apel_' + (p.tgl_senin || p.week_no || 'Minggu') + '_AUTO.png'))
+      .replace(/[\\/:*?"<>|\r\n\t]+/g, '_')
+      .trim();
+    const fileName = /\.png$/i.test(rawName) ? rawName : (rawName + '.png');
+    const folder = getOrCreateApelPosterFolder_(tahun);
+    if (typeof trashExistingNamedFilesInFolder_ === 'function') {
+      trashExistingNamedFilesInFolder_(folder, fileName);
+    }
+    const bytes = Utilities.base64Decode(rawB64);
+    const blob = Utilities.newBlob(bytes, 'image/png', fileName);
+    const saved = folder.createFile(blob);
+    if (typeof setPrivateDriveSharing_ === 'function') {
+      setPrivateDriveSharing_(saved);
+    }
+    return {
+      status: 'success',
+      file_id: saved.getId(),
+      file_url: saved.getUrl(),
+      folder_url: folder.getUrl(),
+      file_name: saved.getName(),
+      tahun: tahun
+    };
+  } catch (err) {
+    return { status: 'error', message: 'Gagal arsip poster n8n: ' + (err && err.message ? err.message : String(err)) };
   }
 }
