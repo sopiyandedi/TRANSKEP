@@ -172,7 +172,7 @@
       const cornerA = d[3];
       const cornerMax = Math.max(d[0], d[1], d[2]);
       const cornerMin = Math.min(d[0], d[1], d[2]);
-      if (stripWhite && cornerA >= 20 && cornerMin >= 210 && (cornerMax - cornerMin) <= 28) {
+      if (stripWhite && cornerA >= 20 && cornerMin >= 205 && (cornerMax - cornerMin) <= 30) {
         const visited = new Uint8Array(w * h);
         const q = [];
         const pushSeed = (idx) => { if (!visited[idx]) { visited[idx] = 1; q.push(idx); } };
@@ -183,13 +183,17 @@
           const p = idx * 4;
           const r = d[p], g = d[p + 1], b = d[p + 2];
           const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
-          if (mn >= 212 && (mx - mn) <= 28) {
+          if (mn >= 208 && (mx - mn) <= 30) {
             d[p + 3] = 0;
             const x = idx % w, y = (idx - x) / w;
             if (x > 0) pushSeed(idx - 1);
             if (x + 1 < w) pushSeed(idx + 1);
             if (y > 0) pushSeed(idx - w);
             if (y + 1 < h) pushSeed(idx + w);
+          } else if (mn >= 178 && (mx - mn) <= 28) {
+            // Feather edge anti-aliasing instead of harsh jagged cutoff
+            const alphaRatio = Math.max(0, Math.min(1, (208 - mn) / 30));
+            d[p + 3] = Math.round(d[p + 3] * alphaRatio);
           }
         }
         cx.putImageData(id, 0, 0);
@@ -219,6 +223,97 @@
     } catch (e) {
       return img;
     }
+  }
+
+  function drawCrispSocialFooter(ctx, W) {
+    ctx.save();
+    ctx.fillStyle = '#c6df6b';
+    ctx.fillRect(0, 1292, W, 58);
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.35)';
+    ctx.fillRect(0, 1292, W, 2);
+
+    const items = [
+      { kind: 'fb', text: 'Pengadilan Agama Indramayu' },
+      { kind: 'ig', text: '@paindramayu' },
+      { kind: 'yt', text: 'paindramayu' },
+      { kind: 'web', text: 'pa-indramayu.go.id' },
+      { kind: 'x', text: '@paindramayu_' }
+    ];
+
+    ctx.font = '700 17px "Plus Jakarta Sans", sans-serif';
+    ctx.textBaseline = 'middle';
+    const iconSize = 26;
+    const iconGap = 8;
+    const itemGap = 24;
+    const widths = items.map(it => iconSize + iconGap + ctx.measureText(it.text).width);
+    const totalW = widths.reduce((a, b) => a + b, 0) + itemGap * (items.length - 1);
+    let curX = Math.round((W - totalW) / 2);
+    const cy = 1322;
+
+    items.forEach((it, i) => {
+      const ix = curX + iconSize / 2;
+      ctx.save();
+      if (it.kind === 'fb') {
+        ctx.beginPath();
+        ctx.arc(ix, cy, 12, 0, Math.PI * 2);
+        ctx.fillStyle = '#1877f2';
+        ctx.fill();
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '900 17px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('f', ix + 0.5, cy + 1);
+      } else if (it.kind === 'ig') {
+        const gr = ctx.createLinearGradient(curX, cy - 12, curX + 24, cy + 12);
+        gr.addColorStop(0, '#f58529');
+        gr.addColorStop(0.5, '#dd2a7b');
+        gr.addColorStop(1, '#8134af');
+        drawRoundedPill(ctx, curX + 1, cy - 12, 24, 24, 7, gr);
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1.8;
+        ctx.strokeRect(curX + 6, cy - 7, 14, 14);
+        ctx.beginPath();
+        ctx.arc(ix + 0.5, cy, 3.6, 0, Math.PI * 2);
+        ctx.stroke();
+      } else if (it.kind === 'yt') {
+        drawRoundedPill(ctx, curX, cy - 9, 26, 18, 5, '#ff0000');
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.moveTo(curX + 10, cy - 4.5);
+        ctx.lineTo(curX + 10, cy + 4.5);
+        ctx.lineTo(curX + 18, cy);
+        ctx.closePath();
+        ctx.fill();
+      } else if (it.kind === 'web') {
+        ctx.beginPath();
+        ctx.arc(ix, cy, 12, 0, Math.PI * 2);
+        ctx.fillStyle = '#0f172a';
+        ctx.fill();
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1.4;
+        ctx.beginPath();
+        ctx.ellipse(ix, cy, 5.5, 11, 0, 0, Math.PI * 2);
+        ctx.moveTo(ix - 11, cy);
+        ctx.lineTo(ix + 11, cy);
+        ctx.stroke();
+      } else if (it.kind === 'x') {
+        ctx.beginPath();
+        ctx.arc(ix, cy, 12, 0, Math.PI * 2);
+        ctx.fillStyle = '#111827';
+        ctx.fill();
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '800 14px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('X', ix, cy + 0.5);
+      }
+      ctx.restore();
+
+      ctx.fillStyle = '#143018';
+      ctx.font = '700 17px "Plus Jakarta Sans", sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText(it.text, curX + iconSize + iconGap, cy + 0.5);
+      curX += widths[i] + itemGap;
+    });
+    ctx.restore();
   }
 
   function parseYmd(rawVal) {
@@ -1138,90 +1233,94 @@
           ]);
           if (token !== this.renderNonce) return;
 
-          // 1. Langit & Latar Belakang
+          // 1. Langit & Latar Belakang Gedung (Proporsional & Halus)
           const sky = ctx.createLinearGradient(0, 0, 0, H);
-          sky.addColorStop(0, '#c3d8eb');
-          sky.addColorStop(0.55, '#b2cce2');
-          sky.addColorStop(1, '#92b0cb');
+          sky.addColorStop(0, '#c8ddf0');
+          sky.addColorStop(0.58, '#b8d1e8');
+          sky.addColorStop(1, '#a9c5df');
           ctx.fillStyle = sky;
           ctx.fillRect(0, 0, W, H);
 
           if (bgImg) {
             ctx.save();
             const isCustomOpaque = Boolean(this.settingsDoc && this.settingsDoc.bg_gedung_uri);
-            const targetH = isCustomOpaque ? (H * 0.42) : (H * 0.36);
+            const targetH = isCustomOpaque ? (H * 0.42) : (H * 0.38);
             const scale = Math.max(W / bgImg.width, targetH / bgImg.height);
             const dw = bgImg.width * scale;
             const dh = bgImg.height * scale;
-            ctx.globalAlpha = isCustomOpaque ? 0.68 : 0.48;
-            ctx.drawImage(bgImg, (W - dw) / 2, H - 55 - dh, dw, dh);
+            ctx.globalAlpha = isCustomOpaque ? 0.62 : 0.40;
+            ctx.drawImage(bgImg, (W - dw) / 2, H - 58 - dh, dw, dh);
             if (isCustomOpaque) {
-              const fade = ctx.createLinearGradient(0, H - 55 - dh, 0, H - 55 - dh + 150);
-              fade.addColorStop(0, '#adc7de');
-              fade.addColorStop(1, 'rgba(173,199,222,0)');
+              const fadeTop = ctx.createLinearGradient(0, H - 58 - dh, 0, H - 58 - dh + 150);
+              fadeTop.addColorStop(0, '#b5cfe6');
+              fadeTop.addColorStop(1, 'rgba(181,207,230,0)');
               ctx.globalAlpha = 1;
-              ctx.fillStyle = fade;
-              ctx.fillRect(0, H - 55 - dh, W, 150);
+              ctx.fillStyle = fadeTop;
+              ctx.fillRect(0, H - 58 - dh, W, 150);
             }
             ctx.restore();
           } else {
-            // Ilustrasi siluet pilar gedung pengadilan di sudut kiri bawah
             ctx.save();
-            ctx.fillStyle = 'rgba(241,245,249,0.52)';
+            ctx.fillStyle = 'rgba(241,245,249,0.50)';
             ctx.fillRect(0, 1140, 480, 160);
-            ctx.fillStyle = 'rgba(203,213,225,0.65)';
-            ctx.fillRect(0, 1126, 510, 22);
-            for (let col = 0; col < 5; col++) {
-              ctx.fillRect(28 + col * 92, 1148, 34, 150);
-            }
             ctx.restore();
           }
 
-          // 2. Logo PA Indramayu Berwarna + Logo WBK Asli + Header SK
-          let nextX = 38;
+          // Mist lembut di area footer agar BerAKHLAK & Bangga Melayani Bangsa terbaca jernih
+          ctx.save();
+          const mist = ctx.createLinearGradient(0, 1105, 0, 1292);
+          mist.addColorStop(0, 'rgba(202, 223, 241, 0)');
+          mist.addColorStop(0.45, 'rgba(214, 232, 246, 0.78)');
+          mist.addColorStop(1, 'rgba(225, 240, 250, 0.94)');
+          ctx.fillStyle = mist;
+          ctx.fillRect(0, 1105, W, 187);
+          ctx.restore();
+
+          // 2. Logo PA Indramayu Berwarna + Logo WBK (Diperkecil Proporsional) + Header SK
+          let nextX = 48;
           if (logoImg) {
-            const lh = 152;
+            const lh = 142;
             const lw = Math.round((logoImg.width / Math.max(1, logoImg.height)) * lh);
-            ctx.drawImage(logoImg, nextX, 26, lw, lh);
-            nextX += lw + 16;
+            ctx.drawImage(logoImg, nextX, 28, lw, lh);
+            nextX += lw + 18;
           }
           if (wbkImg) {
-            const wh = 138;
+            const wh = 94;
             const ww = Math.round((wbkImg.width / Math.max(1, wbkImg.height)) * wh);
-            ctx.drawImage(wbkImg, nextX, 33, ww, wh);
-            nextX += ww + 20;
+            ctx.drawImage(wbkImg, nextX, 52, ww, wh);
+            nextX += ww + 26;
           } else {
-            drawWbkEmblem(ctx, nextX + 64, 102, 62);
-            nextX += 148;
+            drawWbkEmblem(ctx, nextX + 47, 99, 47);
+            nextX += 116;
           }
 
-          const skTextX = Math.max(340, nextX);
+          const skTextX = Math.max(304, nextX);
           ctx.save();
           ctx.fillStyle = '#175c32';
           ctx.font = '700 21px "Plus Jakarta Sans", sans-serif';
           ctx.textAlign = 'left';
-          ctx.fillText('Lampiran Surat Keputusan Ketua Pengadilan Agama Indramayu', skTextX, 64, W - skTextX - 32);
-          ctx.fillText('Nomor   : ' + (this.currentYearDoc.nomor_sk || '-'), skTextX, 96, W - skTextX - 32);
-          ctx.fillText('Tanggal : ' + (this.currentYearDoc.tanggal_sk || '-'), skTextX, 128, W - skTextX - 32);
+          ctx.fillText('Lampiran Surat Keputusan Ketua Pengadilan Agama Indramayu', skTextX, 68, W - skTextX - 36);
+          ctx.fillText('Nomor   : ' + (this.currentYearDoc.nomor_sk || '-'), skTextX, 99, W - skTextX - 36);
+          ctx.fillText('Tanggal : ' + (this.currentYearDoc.tanggal_sk || '-'), skTextX, 130, W - skTextX - 36);
           ctx.restore();
 
           // 3. Judul Besar PETUGAS APEL + Hari Tanggal
           ctx.save();
           ctx.textAlign = 'center';
-          ctx.font = '900 72px "Plus Jakarta Sans", sans-serif';
+          ctx.font = '900 70px "Plus Jakarta Sans", sans-serif';
           ctx.lineWidth = 10;
           ctx.strokeStyle = '#ffffff';
-          ctx.strokeText('PETUGAS APEL', W / 2, 290);
+          ctx.strokeText('PETUGAS APEL', W / 2, 260);
           ctx.fillStyle = '#206b2e';
-          ctx.fillText('PETUGAS APEL', W / 2, 290);
+          ctx.fillText('PETUGAS APEL', W / 2, 260);
 
-          let curY = 348;
-          ctx.font = '900 40px "Plus Jakarta Sans", sans-serif';
+          let curY = 315;
+          ctx.font = '900 38px "Plus Jakarta Sans", sans-serif';
           ctx.fillStyle = '#135829';
           const hMode = String(row.hari_mode || 'Sn & Jm');
           if (hMode.includes('Sn') && row.tgl_senin) {
             ctx.fillText('SENIN, ' + formatIndoUpper(row.tgl_senin), W / 2, curY);
-            curY += 48;
+            curY += 45;
           }
           if (hMode.includes('Jm') && row.tgl_jumat) {
             ctx.fillText('JUMAT, ' + formatIndoUpper(row.tgl_jumat), W / 2, curY);
@@ -1231,83 +1330,86 @@
           // 4. Pembina Center Block
           const pembinaName = eff.pembina || '-';
           const pembinaInit = pembinaName.split(/\s+/).slice(0, 2).map(w => w[0] || '').join('').toUpperCase();
-          drawCircularPortrait(ctx, 540, 502, 86, officerImgs[0], pembinaInit);
-          drawRoundedPill(ctx, 250, 610, 580, 112, 56, '#d9ea8c');
+          drawCircularPortrait(ctx, 540, 470, 84, officerImgs[0], pembinaInit);
+
+          ctx.save();
+          ctx.shadowColor = 'rgba(15, 45, 25, 0.10)';
+          ctx.shadowBlur = 12;
+          ctx.shadowOffsetY = 4;
+          drawRoundedPill(ctx, 235, 572, 610, 108, 54, '#d9ea8c');
+          ctx.restore();
 
           ctx.save();
           ctx.textAlign = 'center';
           ctx.fillStyle = '#143018';
-          ctx.font = '800 24px "Plus Jakarta Sans", sans-serif';
-          ctx.fillText('PEMBINA', 540, 650);
-          ctx.fillRect(482, 656, 116, 2.5);
-          ctx.font = '700 30px "Plus Jakarta Sans", sans-serif';
-          ctx.fillText(pembinaName, 540, 696, 540);
+          ctx.font = '800 22px "Plus Jakarta Sans", sans-serif';
+          ctx.fillText('PEMBINA', 540, 612);
+          ctx.fillRect(486, 618, 108, 2.5);
+          ctx.font = '700 29px "Plus Jakarta Sans", sans-serif';
+          ctx.fillText(pembinaName, 540, 656, 560);
           ctx.restore();
 
-          // 5. Grid 5 Petugas Lainnya
+          // 5. Grid 5 Petugas Lainnya (Simetris + Celah Tengah 52px, Tidak Berdempetan)
+          // Kolom Kiri : avatar edge = 56, pill x = 92..514 (w=422)
+          // Celah Tengah : 514..566 (52px bersih!)
+          // Kolom Kanan : avatar edge = 566, pill x = 602..1024 (w=422, margin kanan = 56px)
           const slots = [
-            { idx: 1, title: 'PEMIMPIN', name: eff.pemimpin || '-', px: 162, py: 780 },
-            { idx: 2, title: 'DOA', name: eff.doa || '-', px: 598, py: 780 },
-            { idx: 3, title: '8 NILAI MA RI', name: eff.nilai_ma || '-', px: 162, py: 916 },
-            { idx: 4, title: 'MC', name: eff.mc || '-', px: 598, py: 916 },
-            { idx: 5, title: '10 BUDAYA MALU', name: eff.budaya_malu || '-', px: 598, py: 1052 }
+            { idx: 1, title: 'PEMIMPIN', name: eff.pemimpin || '-', px: 92, py: 724 },
+            { idx: 2, title: 'DOA', name: eff.doa || '-', px: 602, py: 724 },
+            { idx: 3, title: '8 NILAI MA RI', name: eff.nilai_ma || '-', px: 92, py: 852 },
+            { idx: 4, title: 'MC', name: eff.mc || '-', px: 602, py: 852 },
+            { idx: 5, title: '10 BUDAYA MALU', name: eff.budaya_malu || '-', px: 602, py: 980 }
           ];
 
           slots.forEach(s => {
-            drawRoundedPill(ctx, s.px, s.py, 412, 92, 46, '#d9ea8c');
+            ctx.save();
+            ctx.shadowColor = 'rgba(15, 45, 25, 0.10)';
+            ctx.shadowBlur = 10;
+            ctx.shadowOffsetY = 3;
+            drawRoundedPill(ctx, s.px, s.py, 422, 92, 46, '#d9ea8c');
+            ctx.restore();
+
             const init = s.name.split(/\s+/).slice(0, 2).map(w => w[0] || '').join('').toUpperCase();
-            drawCircularPortrait(ctx, s.px + 12, s.py + 46, 44, officerImgs[s.idx], init);
+            drawCircularPortrait(ctx, s.px + 10, s.py + 46, 46, officerImgs[s.idx], init);
 
             ctx.save();
             ctx.textAlign = 'center';
             ctx.fillStyle = '#143018';
             ctx.font = '800 18px "Plus Jakarta Sans", sans-serif';
-            const textCenterX = s.px + 225;
+            const textCenterX = s.px + 236;
             ctx.fillText(s.title, textCenterX, s.py + 35);
             const tw = Math.min(180, ctx.measureText(s.title).width);
             ctx.fillRect(textCenterX - tw / 2, s.py + 40, tw, 2);
             ctx.font = '700 22px "Plus Jakarta Sans", sans-serif';
-            ctx.fillText(s.name, textCenterX, s.py + 72, 330);
+            ctx.fillText(s.name, textCenterX, s.py + 72, 332);
             ctx.restore();
           });
 
-          // 6. Logo Resmi BerAKHLAK & Bangga Melayani Bangsa (Tanpa SMART) + Footer Sosial Media
-          ctx.save();
+          // 6. Logo Resmi BerAKHLAK & Bangga Melayani Bangsa (Jernih & Rapi di Zona Mist Footer)
+          const drawLogoBadge = (canvasImg, x, y, maxW, maxH, alignRight) => {
+            if (!canvasImg || !canvasImg.width || !canvasImg.height) return;
+            const sc = Math.min(maxW / canvasImg.width, maxH / canvasImg.height);
+            const lw = Math.round(canvasImg.width * sc);
+            const lh = Math.round(canvasImg.height * sc);
+            const dx = alignRight ? (x - lw) : x;
+            const dy = Math.round(y - lh / 2);
+            ctx.save();
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.72)';
+            ctx.shadowColor = 'rgba(255, 255, 255, 0.9)';
+            ctx.shadowBlur = 16;
+            drawRoundedPill(ctx, dx - 14, dy - 8, lw + 28, lh + 16, 16, 'rgba(255, 255, 255, 0.72)');
+            ctx.restore();
+            ctx.drawImage(canvasImg, dx, dy, lw, lh);
+          };
+
           const cleanBer = prepareLogoCanvas(berakhlakImg, true);
-          if (cleanBer && cleanBer.width && cleanBer.height) {
-            const maxBH = 84;
-            const maxBW = 360;
-            const sc = Math.min(maxBW / cleanBer.width, maxBH / cleanBer.height);
-            const bw = Math.round(cleanBer.width * sc);
-            const bh = Math.round(cleanBer.height * sc);
-            ctx.drawImage(cleanBer, 56, 1272 - bh - 6, bw, bh);
-          }
+          drawLogoBadge(cleanBer, 62, 1218, 340, 76, false);
 
           const cleanBangga = prepareLogoCanvas(banggaImg, true);
-          if (cleanBangga && cleanBangga.width && cleanBangga.height) {
-            const maxGH = 104;
-            const maxGW = 210;
-            const sc = Math.min(maxGW / cleanBangga.width, maxGH / cleanBangga.height);
-            const gw = Math.round(cleanBangga.width * sc);
-            const gh = Math.round(cleanBangga.height * sc);
-            ctx.drawImage(cleanBangga, W - 56 - gw, 1278 - gh - 4, gw, gh);
-          }
+          drawLogoBadge(cleanBangga, W - 62, 1218, 220, 80, true);
 
-          ctx.fillStyle = '#c6df6b';
-          ctx.fillRect(0, 1292, W, 58);
-          const cleanSoc = prepareLogoCanvas(socialImg, true);
-          if (cleanSoc && cleanSoc.width && cleanSoc.height) {
-            const sc = Math.min(960 / cleanSoc.width, 34 / cleanSoc.height);
-            const sw = Math.round(cleanSoc.width * sc);
-            const sh = Math.round(cleanSoc.height * sc);
-            ctx.drawImage(cleanSoc, Math.round((W - sw) / 2), Math.round(1292 + (58 - sh) / 2), sw, sh);
-          } else {
-            ctx.textAlign = 'center';
-            ctx.fillStyle = '#1e3a1e';
-            ctx.font = '700 18px "Plus Jakarta Sans", sans-serif';
-            ctx.fillText('fb: Pengadilan Agama Indramayu   |   ig: @paindramayu   |   yt: paindramayu   |   pa-indramayu.go.id   |   x: @paindramayu_', W / 2, 1327);
-          }
-          ctx.restore();
+          // 7. Bar Media Sosial Tajam & Proporsional
+          drawCrispSocialFooter(ctx, W);
         },
 
         downloadPosterPng() {

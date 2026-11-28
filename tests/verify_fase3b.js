@@ -3860,8 +3860,8 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
     const core160 = fs.readFileSync(path.join(repoRoot158, 'core/core.js'), 'utf8');
     const pegawaiJs160 = fs.readFileSync(path.join(repoRoot158, 'modules/pegawai/pegawai.js'), 'utf8');
     const firebaseJs160 = fs.readFileSync(path.join(repoRoot158, 'core/firebase.js'), 'utf8');
-    assert.ok(idxHtml158.includes("APP_BUILD_VER = '3.9.6'"));
-    assert.ok(swJs158.includes("CACHE_NAME = 'transkep-v3.9.6'"));
+    assert.ok(idxHtml158.includes("APP_BUILD_VER = '3.9.7'"));
+    assert.ok(swJs158.includes("CACHE_NAME = 'transkep-v3.9.7'"));
     assert.ok(core160.includes('w-[80px] h-[102px] md:w-[88px] md:h-[112px]'), 'Header profil harus memakai bingkai pasfoto seimbang 88x112');
     assert.ok(core160.includes('rounded-[10px]') && core160.includes('p-[2px]'), 'Foto profil harus memiliki inner mat frame netral tanpa neon glow ungu');
     assert.ok(pegawaiJs160.includes('const targetW = 240;') && pegawaiJs160.includes('const targetH = 328;'), 'Kompresor avatar harus menyimpan pasfoto vertikal 240x328');
