@@ -409,7 +409,10 @@ document.addEventListener("DOMContentLoaded", () => {
                 if(this.$refs.skFileInput) this.$refs.skFileInput.value = '';
                 
                 if(mode === 'add') {
-                    this.formSk = { id: '', tgl_input: '', judul_sk: '', pj_sk: '', link_drive: '', no_sk: '', tgl_sk: '' };
+                    const defaultPjFromTab = ['PJ. Manajemen', 'PJ. Kepaniteraan', 'PJ. Kesekretariatan'].includes(this.currentSkTab)
+                        ? this.currentSkTab
+                        : '';
+                    this.formSk = { id: '', tgl_input: '', judul_sk: '', pj_sk: defaultPjFromTab, link_drive: '', no_sk: '', tgl_sk: '' };
                     this.tempMembers = [];
                 } else {
                     const sk = this.groupedSkData.find(s => s.id === id);
@@ -538,7 +541,9 @@ document.addEventListener("DOMContentLoaded", () => {
                                 tone: splitRes.unmatched.length > 0 ? 'warning' : 'success',
                                 title: `Auto-Fill Selesai dari ${sourceLabel}`,
                                 detail: (this.modalSkMode === 'add'
-                                          ? 'Judul, Nomor, Tanggal & Anggota terisi otomatis (PJ SK pilih manual). '
+                                          ? (this.formSk.pj_sk
+                                              ? 'Judul, Nomor, Tanggal, PJ & Anggota terisi otomatis. '
+                                              : 'Judul, Nomor, Tanggal & Anggota terisi otomatis (PJ SK pilih manual). ')
                                           : 'Judul, Nomor, Tanggal & PJ lama dipertahankan. ') +
                                         `Cocok: ${splitRes.matched.length} pegawai` +
                                         (splitRes.unmatched.length > 0 ? `, Perlu dicek Admin: ${splitRes.unmatched.length} baris.` : '.')

@@ -3668,8 +3668,18 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
     assert.ok(vmSk158, 'vmSkApp harus terinisialisasi');
 
     // Simulasi mode 'add' -> pj_sk harus kosong wajib pilih manual
+    vmSk158.currentSkTab = 'PJ. Kesekretariatan';
     vmSk158.openSkFormModal('add');
-    assert.strictEqual(vmSk158.formSk.pj_sk, '', 'Mode Daftarkan SK Baru harus mengosongkan pj_sk agar Admin memilih manual');
+    assert.strictEqual(vmSk158.formSk.pj_sk, 'PJ. Kesekretariatan', 'Tab PJ. Kesekretariatan wajib mengisi pj_sk otomatis');
+    vmSk158.currentSkTab = 'PJ. Kepaniteraan';
+    vmSk158.openSkFormModal('add');
+    assert.strictEqual(vmSk158.formSk.pj_sk, 'PJ. Kepaniteraan', 'Tab PJ. Kepaniteraan wajib mengisi pj_sk otomatis');
+    vmSk158.currentSkTab = 'PJ. Manajemen';
+    vmSk158.openSkFormModal('add');
+    assert.strictEqual(vmSk158.formSk.pj_sk, 'PJ. Manajemen', 'Tab PJ. Manajemen wajib mengisi pj_sk otomatis');
+    vmSk158.currentSkTab = 'all';
+    vmSk158.openSkFormModal('add');
+    assert.strictEqual(vmSk158.formSk.pj_sk, '', 'Tab Semua SK harus mengosongkan pj_sk agar Admin memilih manual');
 
     // Simulasi parsing di mode 'add'
     vmSk158.SkDataService = {
@@ -3891,8 +3901,8 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
     const core160 = fs.readFileSync(path.join(repoRoot158, 'core/core.js'), 'utf8');
     const pegawaiJs160 = fs.readFileSync(path.join(repoRoot158, 'modules/pegawai/pegawai.js'), 'utf8');
     const firebaseJs160 = fs.readFileSync(path.join(repoRoot158, 'core/firebase.js'), 'utf8');
-    assert.ok(idxHtml158.includes("APP_BUILD_VER = '3.9.9'"));
-    assert.ok(swJs158.includes("CACHE_NAME = 'transkep-v3.9.9'"));
+    assert.ok(idxHtml158.includes("APP_BUILD_VER = '3.9.10'"));
+    assert.ok(swJs158.includes("CACHE_NAME = 'transkep-v3.9.10'"));
     assert.ok(core160.includes('w-[80px] h-[102px] md:w-[88px] md:h-[112px]'), 'Header profil harus memakai bingkai pasfoto seimbang 88x112');
     assert.ok(core160.includes('rounded-[10px]') && core160.includes('p-[2px]'), 'Foto profil harus memiliki inner mat frame netral tanpa neon glow ungu');
     assert.ok(pegawaiJs160.includes('const targetW = 240;') && pegawaiJs160.includes('const targetH = 328;'), 'Kompresor avatar harus menyimpan pasfoto vertikal 240x328');
