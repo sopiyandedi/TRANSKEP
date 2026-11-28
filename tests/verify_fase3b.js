@@ -3500,8 +3500,7 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
     ].join('\n');
     const meta158 = SkDocParser.extractCoreSkMetadata(sampleSkText, 'dummy.pdf');
     assert.strictEqual(meta158.no_sk, '643/SEK.KPA.W10-A2/SK.PL1.2.3/VIII/2026');
-    assert.strictEqual(meta158.judul_sk, 'TIM PANITIA PENJUALAN LELANG BARANG MILIK NEGARA');
-    assert.strictEqual(meta158.tgl_sk, '2026-08-10');
+    assert.strictEqual(meta158.judul_sk, 'Tim Panitia Penjualan Lelang Barang Milik Negara');
 
     // 2. Rekonstruksi Baris & Tabel Lampiran dari Koordinat X/Y PDF.js
     const users158 = [
@@ -3510,6 +3509,38 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
       { nip: '199203032019032003', nama: 'Tutwuri Handayani, S.Ak.', jabatan: 'Operator - Penata Layanan Operasional', role: 'User' }
     ];
     const mkItem = (x, y, str, width = 60) => ({ str, transform: [1, 0, 0, 1, x, y], width });
+
+    // 1b. Kasus nyata: SK Penunjukan Langsung di Diktum (tanpa Lampiran tabel) + kerning PDF + Pada tanggal terpisah baris
+    const pdfRowsPersuratan = SkDocParser.groupPdfTextItemsToRows([
+      mkItem(120, 760, 'KEPUTUSAN KETUA PENGADILAN AGAMA INDRAMAYU', 260),
+      mkItem(160, 730, 'Nomor :', 35),
+      mkItem(200, 730, '054', 18),
+      mkItem(218.5, 730, '/KPA.', 24),
+      mkItem(243, 730, 'W10-A2', 32),
+      mkItem(275.4, 730, '/SK.OT1.3/I/20', 60),
+      mkItem(335.8, 730, '26', 12),
+      mkItem(250, 705, 'TENTANG', 60),
+      mkItem(90, 680, 'PENUNJUKAN PENGELOLA ADMINISTRASI PERSURATAN DAN KEARSIPAN', 360),
+      mkItem(150, 665, 'PADA PENGADILAN AGAMA INDRAMAYU', 220),
+      mkItem(80, 620, 'Membaca : Keputusan Nomor 001 tanggal 2 Januari 2025', 280),
+      mkItem(80, 560, 'MEMUTUSKAN', 90),
+      mkItem(80, 530, 'Kedua : Menunjuk saudara Ahmad Fauzi, S.Sy. Jabatan Penata Layanan Operasional pada Pengadilan Agama Indramayu, sebagai petugas pengelola administrasi persuratan;', 420),
+      mkItem(280, 260, 'Ditetapkan di : Indramayu', 140),
+      mkItem(280, 244, 'Pada tanggal :', 80),
+      mkItem(365, 238, '2 Januari 2026', 80)
+    ]).map(r => r.text).join('\n');
+    const metaPersuratan = SkDocParser.extractCoreSkMetadata(pdfRowsPersuratan, 'SK_Persuratan.pdf');
+    assert.strictEqual(metaPersuratan.no_sk, '054/KPA.W10-A2/SK.OT1.3/I/2026');
+    assert.strictEqual(metaPersuratan.judul_sk, 'Penunjukan Pengelola Administrasi Persuratan dan Kearsipan');
+    assert.strictEqual(metaPersuratan.tgl_sk, '2026-01-02');
+    const diktumMembers158 = SkDocParser.extractDiktumMembersFromText(pdfRowsPersuratan, [
+      { nip: '199105052020121001', nama: 'Ahmad Fauzi, S.Sy.', jabatan: 'Penata Layanan Operasional', role: 'User' },
+      { nip: '197001011995031001', nama: 'Abdul Rosyid', jabatan: 'Ketua', role: 'Atasan' }
+    ]);
+    assert.strictEqual(diktumMembers158.length, 1, 'Harus mendeteksi tepat Ahmad Fauzi dari diktum tanpa memasukkan Ketua penandatangan');
+    assert.strictEqual(diktumMembers158[0].nip, '199105052020121001');
+    assert.strictEqual(diktumMembers158[0].jabatan_tim, 'Petugas Pengelola Administrasi Persuratan');
+    assert.strictEqual(meta158.tgl_sk, '2026-08-10');
     const pdfRowsPage = SkDocParser.groupPdfTextItemsToRows([
       // Header tabel
       mkItem(40, 700, 'No', 18),
@@ -3860,8 +3891,8 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
     const core160 = fs.readFileSync(path.join(repoRoot158, 'core/core.js'), 'utf8');
     const pegawaiJs160 = fs.readFileSync(path.join(repoRoot158, 'modules/pegawai/pegawai.js'), 'utf8');
     const firebaseJs160 = fs.readFileSync(path.join(repoRoot158, 'core/firebase.js'), 'utf8');
-    assert.ok(idxHtml158.includes("APP_BUILD_VER = '3.9.8'"));
-    assert.ok(swJs158.includes("CACHE_NAME = 'transkep-v3.9.8'"));
+    assert.ok(idxHtml158.includes("APP_BUILD_VER = '3.9.9'"));
+    assert.ok(swJs158.includes("CACHE_NAME = 'transkep-v3.9.9'"));
     assert.ok(core160.includes('w-[80px] h-[102px] md:w-[88px] md:h-[112px]'), 'Header profil harus memakai bingkai pasfoto seimbang 88x112');
     assert.ok(core160.includes('rounded-[10px]') && core160.includes('p-[2px]'), 'Foto profil harus memiliki inner mat frame netral tanpa neon glow ungu');
     assert.ok(pegawaiJs160.includes('const targetW = 240;') && pegawaiJs160.includes('const targetH = 328;'), 'Kompresor avatar harus menyimpan pasfoto vertikal 240x328');

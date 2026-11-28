@@ -23,17 +23,77 @@
   };
 
   function stripTitles(s) {
-    return String(s || '')
-      .replace(/\b(drs|dra|dr|ir|h|hj|sh|mh|sag|ssi|sip|se|st|skom|spd|mpd|skm|mkn|amd|ab|mm|ma|shi|mhi|ak|ca|spsi|mpsi|sthi|mth)\b\.?/gi, ' ')
+    const preCleaned = String(s || '')
+      .replace(/\b(?:S|M|A)\s*\.\s*(?:Sy|Ag|H\.I|H|E|T|Kom|Pd|Sos|Ip|Si|Ak|Psi|Km|Kn|Md|Ab|Tr)\b\.?/gi, ' ')
+      .replace(/\b(drs|dra|dr|ir|prof|kh|ust|h|hj|sh|mh|sag|ssi|ssy|sip|se|st|mt|sak|skom|mkom|spd|mpd|skm|mkn|skep|ns|apt|amd|ab|mm|ma|shi|mhi|ak|ca|spsi|mpsi|sthi|mth)\b\.?/gi, ' ');
+    return preCleaned
       .replace(/[^a-zA-Z\s]/g, ' ')
       .replace(/\s+/g, ' ')
       .trim()
       .toLowerCase();
   }
 
+  const SK_LOWER_WORDS = new Set([
+    'dan', 'di', 'ke', 'dari', 'pada', 'untuk', 'yang', 'atau', 'sebagai',
+    'dalam', 'atas', 'serta', 'tentang', 'oleh', 'terhadap', 'antara', 'dengan', 'guna', 'secara'
+  ]);
+  const SK_UPPER_ACRONYMS = new Set([
+    'TI', 'IT', 'TIK', 'PTSP', 'ZI', 'WBK', 'WBBM', 'SK', 'SOP', 'MA', 'RI',
+    'SIWAS', 'SIPP', 'BMN', 'SAKIP', 'PPID', 'ASN', 'PPPK', 'PNS', 'PA', 'KPA',
+    'PNBP', 'SPBE', 'DIPA', 'ATK', 'UU', 'PP', 'PERMA', 'SEMA', 'SIMARI', 'APM',
+    'SMAP', 'PTWP', 'IKAHI', 'IPASPI', 'DHARMAYUKTI',
+    'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'
+  ]);
+
+  function formatCleanTitleCase(rawText) {
+    const clean = String(rawText || '').replace(/\s+/g, ' ').trim();
+    if (!clean) return '';
+    const tokens = clean.split(' ');
+    return tokens.map((tok, idx) => {
+      const mTok = tok.match(/^([("'`/\[]*)(.*?)([)"'`/\].,;:]*)$/);
+      const lead = mTok ? mTok[1] : '';
+      const core = mTok ? mTok[2] : tok;
+      const trail = mTok ? mTok[3] : '';
+      if (!core) return tok;
+
+      if (core.includes('-') && !/^-+$/.test(core)) {
+        const sub = core.split('-').map((part) => {
+          const up = part.toUpperCase();
+          if (SK_UPPER_ACRONYMS.has(up)) return up;
+          return part.charAt(0).toUpperCase() + part.slice(1).toLowerCase();
+        }).join('-');
+        return lead + sub + trail;
+      }
+
+      const up = core.toUpperCase();
+      const low = core.toLowerCase();
+      if (SK_UPPER_ACRONYMS.has(up)) return lead + up + trail;
+      if (idx > 0 && SK_LOWER_WORDS.has(low) && !lead.includes(':')) {
+        return lead + low + trail;
+      }
+      return lead + low.charAt(0).toUpperCase() + low.slice(1) + trail;
+    }).join(' ').replace(/\s+/g, ' ').trim();
+  }
+
+  function formatCleanSkTitle(rawTitle) {
+    let clean = String(rawTitle || '')
+      .replace(/\.(pdf|docx?)$/i, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (!clean) return '';
+    clean = clean
+      .replace(/(?:\s+(?:pada|di(?:\s+lingkungan)?)\s+)?Pengadilan\s+Agama\s+Indramayu\.?\s*$/i, '')
+      .replace(/[.\s,;:-]+$/, '')
+      .trim();
+    return formatCleanTitleCase(clean);
+  }
+
   function parseIndoDateToIso(dateStr) {
     if (!dateStr) return '';
-    const clean = String(dateStr).trim();
+    const clean = String(dateStr)
+      .replace(/\b(19|20)\s+(\d{2})\b/g, '$1$2')
+      .replace(/\s+/g, ' ')
+      .trim();
     if (/^\d{4}-\d{2}-\d{2}$/.test(clean)) return clean;
 
     const m = clean.match(/(\d{1,2})\s*[-\/\s]\s*([a-zA-Z]+)\s*[-\/\s]\s*(\d{4})/);
@@ -322,7 +382,13 @@
     let noSk = '';
     const noMatch = mainPart.match(/Nomor\s*:\s*([^\n\t]+)/i) || normPlain.match(/Nomor\s*:\s*([^\n\t]+)/i);
     if (noMatch && noMatch[1]) {
-      const cand = noMatch[1].replace(/\s+/g, ' ').trim();
+      const cand = noMatch[1]
+        .replace(/\b(19|20)\s+(\d{2})\b/g, '$1$2')
+        .replace(/\s*\/\s*/g, '/')
+        .replace(/\s*-\s*/g, '-')
+        .replace(/\s*\.\s*/g, '.')
+        .replace(/\s+/g, ' ')
+        .trim();
       if (cand && cand !== '-' && !/^\.{3,}$/.test(cand)) {
         noSk = cand;
         if (/\/SEK\./i.test(noSk) && !/\/KPA\./i.test(noSk)) {
@@ -332,36 +398,58 @@
     }
 
     let judulSk = '';
-    const tentangMatch = mainPart.match(/TENTANG\s*\n+([\s\S]*?)(?=\n\s*(?:KETUA|SEKRETARIS)\s+PENGADILAN\s+AGAMA|\n\s*Membaca\b|\n\s*Menimbang\b|\n\s*Mengingat\b)/i);
+    const tentangMatch = mainPart.match(/TENTANG\s*\n+([\s\S]*?)(?=\n\s*(?:KETUA|SEKRETARIS)\s+PENGADILAN\s+AGAMA|\n\s*Mem(?:b|eb)aca\b|\n\s*Menimbang\b|\n\s*Mengingat\b)/i);
     if (tentangMatch && tentangMatch[1].trim()) {
-      judulSk = tentangMatch[1]
+      const rawJudul = tentangMatch[1]
         .split(/\n+/)
         .map(s => s.trim())
         .filter(Boolean)
-        .join(' ')
-        .replace(/\s+/g, ' ')
-        .replace(/\.(pdf|docx?)$/i, '')
-        .trim();
+        .join(' ');
+      judulSk = formatCleanSkTitle(rawJudul);
     } else if (fileName) {
-      judulSk = String(fileName).replace(/\.(pdf|docx?)$/i, '').replace(/[_]+/g, ' ').trim();
+      judulSk = formatCleanSkTitle(String(fileName).replace(/[_]+/g, ' '));
     }
 
+    const findDateInText = (txt) => {
+      if (!txt) return '';
+      const norm = String(txt)
+        .replace(/[\r\n\t]+/g, ' ')
+        .replace(/\b(19|20)\s+(\d{2})\b/g, '$1$2')
+        .replace(/\s+/g, ' ');
+      return parseIndoDateToIso(norm);
+    };
+
     let tglSkIso = '';
-    const padaTglMatch = mainPart.match(/Pada\s+tanggal\s*[:\t]*([^\n\r]+)/i);
-    if (padaTglMatch && padaTglMatch[1].trim()) {
-      tglSkIso = parseIndoDateToIso(padaTglMatch[1].trim());
+    const tryPadaSlice = (haystack) => {
+      if (!haystack) return '';
+      const rx = /Pada\s+(?:tanggal|tgl\.?)/ig;
+      let m;
+      while ((m = rx.exec(haystack)) !== null) {
+        const hit = findDateInText(haystack.slice(m.index, m.index + 160));
+        if (hit) return hit;
+      }
+      return '';
+    };
+    tglSkIso = tryPadaSlice(mainPart) || tryPadaSlice(normPlain);
+
+    if (!tglSkIso) {
+      const detRx = /Ditetapkan\s+di\b/ig;
+      let dm;
+      while ((dm = detRx.exec(mainPart)) !== null) {
+        const hit = findDateInText(mainPart.slice(Math.max(0, dm.index - 40), dm.index + 200));
+        if (hit) { tglSkIso = hit; break; }
+      }
     }
     if (!tglSkIso && lampiranPart) {
-      const lampTglMatch = lampiranPart.match(/Tanggal\s*[:\t]*([^\n\r]+)/i);
-      if (lampTglMatch && lampTglMatch[1].trim()) {
-        tglSkIso = parseIndoDateToIso(lampTglMatch[1].trim());
+      const lampIdxTgl = lampiranPart.search(/Tanggal\s*[:\t]/i);
+      if (lampIdxTgl !== -1) {
+        tglSkIso = findDateInText(lampiranPart.slice(lampIdxTgl, lampIdxTgl + 120));
       }
     }
     if (!tglSkIso) {
-      const anyPada = normPlain.match(/Pada\s+tanggal\s*[:\t]*([^\n\r]+)/i);
-      if (anyPada && anyPada[1].trim()) {
-        tglSkIso = parseIndoDateToIso(anyPada[1].trim());
-      }
+      const footerAnchor = mainPart.search(/(?:ASLI\s+Keputusan|Kelima\s*:|Keempat\s*:|Ditetapkan\s+di|Tembusan\s*:)/i);
+      const tailSlice = footerAnchor !== -1 ? mainPart.slice(footerAnchor) : mainPart.slice(Math.max(0, mainPart.length - 500));
+      tglSkIso = findDateInText(tailSlice);
     }
 
     return {
@@ -408,13 +496,18 @@
     for (let i = 0; i < items.length; i++) {
       const it = items[i];
       if (!it || !it.str) continue;
-      const text = String(it.str).replace(/\u00a0/g, ' ');
-      if (!text.trim()) continue;
+      const rawText = String(it.str).replace(/\u00a0/g, ' ');
+      if (!rawText.trim()) continue;
       const tr = Array.isArray(it.transform) ? it.transform : [1, 0, 0, 1, 0, 0];
       const x = Number(tr[4]) || 0;
       const y = Number(tr[5]) || 0;
-      const w = Number(it.width) || (text.length * 4);
-      tokens.push({ x, y, endX: x + w, text: text.trim() });
+      const w = Number(it.width) || (rawText.length * 4);
+      tokens.push({
+        x, y, endX: x + w,
+        text: rawText.trim(),
+        leadSpace: /^\s/.test(rawText),
+        trailSpace: /\s$/.test(rawText)
+      });
     }
     if (tokens.length === 0) return [];
 
@@ -446,7 +539,13 @@
         } else {
           const prev = r.tokens[i - 1];
           const gap = cur.x - prev.endX;
-          line += (gap > 14 ? '\t' : ' ') + cur.text;
+          if (gap > 14) {
+            line += '\t' + cur.text;
+          } else if (prev.trailSpace || cur.leadSpace || gap >= 1.35) {
+            line += ' ' + cur.text;
+          } else {
+            line += cur.text;
+          }
         }
       }
       r.text = line.replace(/\s+/g, ' ').trim();
@@ -606,6 +705,102 @@
     return rawEntries.map(r => autoMatchPegawaiRow({ ...r }, usersList));
   }
 
+  /**
+   * Fallback ekstraktor anggota dari teks diktum SK (misal SK penunjukan langsung tanpa tabel Lampiran).
+   */
+  function extractDiktumMembersFromText(fullPlainText, usersList) {
+    const normPlain = String(fullPlainText || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    const uList = Array.isArray(usersList) ? usersList : [];
+
+    const startM = normPlain.search(/(?:MEMUTUSKAN\b|Menetapkan\s*:|(?:Pertama|Kesatu|Kedua)\s*:)/i);
+    let body = startM !== -1 ? normPlain.slice(startM) : normPlain;
+    const stopM = body.search(/\n\s*(?:Ditetapkan\s+di|ASLI\s+Keputusan|Tembusan\s*:)/i);
+    if (stopM !== -1) body = body.slice(0, stopM);
+    if (!body || body.trim().length < 15) return [];
+
+    const clauses = body
+      .replace(/\n+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .split(/(?=\b(?:Pertama|Kesatu|Kedua|Ketiga|Keempat|Kelima|Keenam)\s*:)|;/)
+      .map(c => c.trim())
+      .filter(Boolean);
+
+    const isDirectiveClause = (cl) =>
+      /(?:menunjuk|mengangkat|menetapkan|menugaskan|memerintahkan|mempercayakan|saudara|nip\.?\s*\d)/i.test(cl);
+
+    const extractRoleFromClause = (cl) => {
+      const mRole = cl.match(/\bsebagai\s+([^.;\n]+)/i);
+      if (mRole && mRole[1]) {
+        const cleanR = mRole[1]
+          .replace(/\s+(?:terhitung\s+mulai|sejak\s+tanggal|dengan\s+ketentuan).*$/i, '')
+          .trim();
+        if (cleanR) return formatCleanTitleCase(cleanR);
+      }
+      return 'Petugas / Pengelola';
+    };
+
+    const results = [];
+    const seenKeys = new Set();
+
+    const pushMemberRow = (rowObj) => {
+      autoMatchPegawaiRow(rowObj, uList);
+      const dedupeKey = rowObj.nip
+        ? ('nip:' + rowObj.nip)
+        : ('raw:' + stripTitles(rowObj.source_nama || rowObj.nama));
+      if (!dedupeKey || dedupeKey === 'raw:' || seenKeys.has(dedupeKey)) return;
+      seenKeys.add(dedupeKey);
+      results.push(rowObj);
+    };
+
+    const candidateClauses = clauses.filter(isDirectiveClause);
+    const scanClauses = candidateClauses.length > 0 ? candidateClauses : clauses;
+
+    scanClauses.forEach((clause) => {
+      if (/^\s*(?:Pertama|Kesatu)?\s*:?\s*Mencabut\b/i.test(clause) && !/menunjuk|mengangkat|menugaskan/i.test(clause)) {
+        return;
+      }
+
+      const roleLabel = extractRoleFromClause(clause);
+      const clauseNoTitles = ' ' + stripTitles(clause) + ' ';
+      let matchedInClause = 0;
+
+      const nipMatches = clause.match(/\b(19\d{16}|20\d{16})\b/g) || [];
+      nipMatches.forEach((nip18) => {
+        const u = uList.find(x => String(x.nip || '').trim() === nip18);
+        if (u) {
+          pushMemberRow({ nama: u.nama, nip: u.nip, jabatan_dinas: u.jabatan || '', jabatan_tim: roleLabel });
+          matchedInClause++;
+        }
+      });
+
+      if (uList.length > 0) {
+        uList.forEach((u) => {
+          const core = stripTitles(u.nama);
+          if (!core) return;
+          if (String(u.role || '').toLowerCase() === 'admin' && (core === 'admin' || core === 'administrator')) return;
+          const wordCount = core.split(' ').filter(Boolean).length;
+          if (wordCount === 1 && core.length < 5) return;
+          if (wordCount >= 1 && clauseNoTitles.includes(' ' + core + ' ')) {
+            pushMemberRow({ nama: u.nama, nip: u.nip, jabatan_dinas: u.jabatan || '', jabatan_tim: roleLabel });
+            matchedInClause++;
+          }
+        });
+      }
+
+      if (matchedInClause === 0) {
+        const mName = clause.match(/(?:Menunjuk|Mengangkat|Menugaskan)\s+(?:saudara|sdra\.?|sdri\.?|sdr\.?|bapak|ibu|pegawai)?\s+([A-Z][A-Za-z'.,\s-]{3,80}?)(?=\s+(?:NIP\b|Pangkat\b|Gol\.?|Jabatan\b|Unit\b|pada\s+Pengadilan|sebagai\b)|[;\n]|$)/i);
+        if (mName && mName[1]) {
+          const extractedName = mName[1].replace(/[,\s]+$/, '').trim();
+          if (extractedName && extractedName.length >= 4 && !/^(?:yang\s+namanya|keputusan|ketua|pengadilan)/i.test(extractedName)) {
+            pushMemberRow({ nama: extractedName, nip: '', jabatan_dinas: '', jabatan_tim: roleLabel });
+          }
+        }
+      }
+    });
+
+    return results;
+  }
+
   function configurePdfJsWorker() {
     if (typeof global.pdfjsLib !== 'undefined' && global.pdfjsLib.GlobalWorkerOptions) {
       if (!global.pdfjsLib.GlobalWorkerOptions.workerSrc) {
@@ -643,7 +838,10 @@
     const hasReadableText = cleanTextLen >= 40;
 
     const meta = extractCoreSkMetadata(fullText, fileName);
-    const members = hasReadableText ? extractLampiranMembersFromPdfPages(pagesRows, usersList) : [];
+    let members = hasReadableText ? extractLampiranMembersFromPdfPages(pagesRows, usersList) : [];
+    if (hasReadableText && members.length === 0) {
+      members = extractDiktumMembersFromText(fullText, usersList);
+    }
 
     return {
       sourceType: 'pdf',
@@ -715,6 +913,9 @@
           }
         });
       }
+    }
+    if (members.length === 0 && rawText.trim().length >= 20) {
+      members = extractDiktumMembersFromText(rawText, usersList);
     }
 
     return {
@@ -1174,6 +1375,8 @@
     autoMatchPegawaiRow,
     mapLampiranColumnIndices,
     parseHtmlTablesForLampiran,
+    formatCleanSkTitle,
+    extractDiktumMembersFromText,
     extractCoreSkMetadata,
     detectEmbeddedPdfSignature,
     groupPdfTextItemsToRows,
