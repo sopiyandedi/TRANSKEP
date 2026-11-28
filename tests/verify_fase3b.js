@@ -3898,13 +3898,25 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
       Utilities: { formatDate: () => '2026-11-20', base64Encode: () => 'FAKEPNG==' },
       getDB: () => ({
         getSheetByName: (name) => {
-          if (name === 'user_data') return { getDataRange: () => ({ getDisplayValues: () => [['NIP','Nama'], ['19800101','H. Zulkifli, S.Ag., S.H., M.H.'], ['19900202','Dra. Hj. Sunaeah, M.H.']] }) };
+          if (name === 'user_data') return { getDataRange: () => ({ getDisplayValues: () => [['NIP','Nama'], ['ENC$19800101','H. Zulkifli, S.Ag., S.H., M.H.'], ['ENC$19900202','Dra. Hj. Sunaeah, M.H.'], ['ENC$19770303','Usman, S.H.']] }) };
           if (name === 'cuti_log') return { getDataRange: () => ({ getDisplayValues: () => [['ID','Tgl','NIP','Jenis','Mulai','Selesai','Alasan','Status'], ['CT-1','2026-11-20','19900202','Cuti Tahunan','2026-11-23','2026-11-25','Keluarga','Disetujui']] }) };
           return null;
         }
       }),
-      readUserDataDecrypted_: (sh) => sh.getDataRange().getDisplayValues(),
+      decryptField_: (v) => String(v || '').replace(/^ENC\$/, ''),
+      readUserSheetDecrypted_: (sh) => sh.getDataRange().getDisplayValues().map((r, idx) => idx === 0 ? r : [String(r[0]).replace(/^ENC\$/, ''), r[1]]),
       readCutiSheetDecrypted_: (sh) => sh.getDataRange().getDisplayValues(),
+      UrlFetchApp: {
+        fetch: (url) => {
+          if (String(url).includes('/user_avatars/19800101')) {
+            return { getResponseCode: () => 200, getContentText: () => JSON.stringify({ name: '.../19800101', fields: { photo_data_uri: { stringValue: 'data:image/jpeg;base64,ZULKIFLI_OK' } } }) };
+          }
+          if (String(url).includes('/user_avatars/19770303')) {
+            return { getResponseCode: () => 200, getContentText: () => JSON.stringify({ name: '.../19770303', fields: { photo_data_uri: { stringValue: 'data:image/jpeg;base64,USMAN_OK' } } }) };
+          }
+          return { getResponseCode: () => 404, getContentText: () => '{}' };
+        }
+      },
       exportFirestoreCollectionRest_: (col) => {
         if (col === 'eoffice_apel') {
           return {
@@ -3927,6 +3939,8 @@ vm.runInContext(fs.readFileSync('modules/pdf_viewer/pdf_viewer.js', 'utf8'), bro
     assert.strictEqual(dispRes.tgl_senin, '2026-11-23', 'Jumat 2026-11-20 harus mengambil Senin depan 2026-11-23');
     assert.strictEqual(dispRes.effective_petugas.doa, 'Usman, S.H.', 'Petugas Doa yang cuti harus otomatis diganti ke petugas minggu berikutnya secara non-destruktif');
     assert.strictEqual(dispRes.substitutions.length, 1);
+    assert.strictEqual(dispRes.effective_photos.pembina, 'data:image/jpeg;base64,ZULKIFLI_OK', 'Foto ASN Pembina wajib terambil via readUserSheetDecrypted_ + user_avatars/{nip}');
+    assert.strictEqual(dispRes.effective_photos.doa, 'data:image/jpeg;base64,USMAN_OK', 'Foto pengganti Doa wajib ikut terambil di effective_photos');
 
     const n8nApel = JSON.parse(fs.readFileSync(path.join(repoRoot158, 'n8n/transkep-apel-mingguan.example.json'), 'utf8'));
     const cronNode = n8nApel.nodes.find(n => n.type === 'n8n-nodes-base.scheduleTrigger');

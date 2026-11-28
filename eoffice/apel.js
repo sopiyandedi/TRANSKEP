@@ -278,18 +278,11 @@ function collectAbsentOfficersForApel_(targetDates, accessToken, projectId) {
 
   // Map NIP -> Nama dari sheet user_data agar cuti_log (yang simpan NIP) cocok dengan nama di tabel apel
   const nipToName = {};
+  const decryptedUsers = ss ? loadDecryptedApelUsers_(ss) : [];
+  for (let i = 0; i < decryptedUsers.length; i++) {
+    nipToName[decryptedUsers[i].nip] = decryptedUsers[i].nama;
+  }
   if (ss) {
-    try {
-      const shUser = ss.getSheetByName('user_data');
-      const uRows = (shUser && typeof readUserDataDecrypted_ === 'function')
-        ? readUserDataDecrypted_(shUser)
-        : (shUser ? shUser.getDataRange().getDisplayValues() : []);
-      for (let i = 1; i < uRows.length; i++) {
-        const uNip = String(uRows[i][0] || '').replace(/['"\s]/g, '').trim();
-        const uNama = String(uRows[i][1] || '').trim();
-        if (uNip && uNama) nipToName[uNip] = uNama;
-      }
-    } catch (eU) {}
 
     // 1. Cek Cuti dari sheet cuti_log
     try {
@@ -391,9 +384,41 @@ function getConflictReasonApel_(absentByDate, dateList, nip, nama) {
   return null;
 }
 
+function loadDecryptedApelUsers_(ss) {
+  const out = [];
+  if (!ss) return out;
+  try {
+    const shUser = ss.getSheetByName('user_data');
+    if (!shUser) return out;
+    const uRows = (typeof readUserSheetDecrypted_ === 'function')
+      ? readUserSheetDecrypted_(shUser)
+      : ((typeof readUserDataDecrypted_ === 'function')
+        ? readUserDataDecrypted_(shUser)
+        : shUser.getDataRange().getDisplayValues());
+    if (!uRows || uRows.length <= 1) return out;
+
+    const headers = (uRows[0] || []).map(function (h) {
+      return String(h || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+    });
+    const colNip = headers.indexOf('nip') !== -1 ? headers.indexOf('nip') : 0;
+    const colNama = headers.indexOf('nama') !== -1 ? headers.indexOf('nama') : 1;
+
+    for (let i = 1; i < uRows.length; i++) {
+      let rawNip = String(uRows[i][colNip] || '').trim();
+      if (rawNip.indexOf('ENC$') === 0 && typeof decryptField_ === 'function') {
+        try { rawNip = String(decryptField_(rawNip) || ''); } catch (eDec) {}
+      }
+      const uNip = rawNip.replace(/['"\s]/g, '').trim();
+      const uNama = String(uRows[i][colNama] || '').trim();
+      if (uNip && uNama) out.push({ nip: uNip, nama: uNama });
+    }
+  } catch (eU) {}
+  return out;
+}
+
 function getSingleFirestoreAvatarRest_(nip, accessToken, projectId) {
   const cleanNip = String(nip || '').replace(/['"\s]/g, '').trim();
-  if (!cleanNip || !accessToken) return '';
+  if (!cleanNip || !accessToken || cleanNip.indexOf('ENC$') === 0) return '';
   try {
     const url = 'https://firestore.googleapis.com/v1/projects/' +
       encodeURIComponent(String(projectId || 'transkep-314c0')) +
@@ -412,22 +437,12 @@ function getSingleFirestoreAvatarRest_(nip, accessToken, projectId) {
   return '';
 }
 
-function collectEffectiveApelPhotos_(effective, row, satpamDocs, accessToken, projectId) {
+function collectEffectiveApelPhotos_(effective, effectiveNips, satpamDocs, accessToken, projectId, diagOut) {
   const out = { pembina: '', pemimpin: '', doa: '', nilai_ma: '', mc: '', budaya_malu: '' };
   let userRows = [];
   try {
     const ss = (typeof getDB === 'function') ? getDB() : null;
-    if (ss) {
-      const shUser = ss.getSheetByName('user_data');
-      const uRows = (shUser && typeof readUserDataDecrypted_ === 'function')
-        ? readUserDataDecrypted_(shUser)
-        : (shUser ? shUser.getDataRange().getDisplayValues() : []);
-      for (let i = 1; i < uRows.length; i++) {
-        const uNip = String(uRows[i][0] || '').replace(/['"\s]/g, '').trim();
-        const uNama = String(uRows[i][1] || '').trim();
-        if (uNip && uNama) userRows.push({ nip: uNip, nama: uNama });
-      }
-    }
+    if (ss) userRows = loadDecryptedApelUsers_(ss);
   } catch (eU) {}
 
   const avatarCache = {};
@@ -446,14 +461,16 @@ function collectEffectiveApelPhotos_(effective, row, satpamDocs, accessToken, pr
     }
     if (bestSatpam && bestSatpamScore >= 55) {
       out[roleKey] = String(bestSatpam.photo_data_uri);
+      if (diagOut) diagOut[roleKey] = 'satpam';
       return;
     }
 
-    // 2. Cocokkan ASN -> NIP -> Fetch 1 dokumen Firestore user_avatars/{nip}
-    let matchedNip = (row && String(effective[roleKey] || '') === String(row[roleKey] || '') && row[roleKey + '_nip'])
-      ? String(row[roleKey + '_nip']).replace(/['"\s]/g, '').trim()
+    // 2. Cocokkan ASN -> NIP (gunakan NIP eksplisit efektif atau match dari user_data terdekripsi) -> Fetch user_avatars/{nip}
+    let matchedNip = (effectiveNips && effectiveNips[roleKey])
+      ? String(effectiveNips[roleKey]).replace(/['"\s]/g, '').trim()
       : '';
-    if (!matchedNip && userRows.length > 0) {
+    if ((!matchedNip || matchedNip.indexOf('ENC$') === 0) && userRows.length > 0) {
+      matchedNip = '';
       let bestUserScore = 0;
       for (let j = 0; j < userRows.length; j++) {
         const sc = scoreApelNameMatch_(targetName, userRows[j].nama);
@@ -466,6 +483,9 @@ function collectEffectiveApelPhotos_(effective, row, satpamDocs, accessToken, pr
         avatarCache[matchedNip] = getSingleFirestoreAvatarRest_(matchedNip, accessToken, projectId);
       }
       out[roleKey] = avatarCache[matchedNip] || '';
+      if (diagOut) diagOut[roleKey] = out[roleKey] ? 'avatar_ok' : 'avatar_missing';
+    } else if (diagOut) {
+      diagOut[roleKey] = userRows.length > 0 ? 'name_unmatched' : 'no_user_rows';
     }
   });
 
@@ -584,6 +604,7 @@ function getApelMingguanDispatch_(params) {
     ];
 
     const effective = {};
+    const effectiveNips = {};
     const substitutions = [];
     const usedSubstitutes = {};
 
@@ -591,6 +612,7 @@ function getApelMingguanDispatch_(params) {
       const origName = String(row[rm.key] || '').trim();
       const origNip = String(row[rm.key + '_nip'] || '').trim();
       effective[rm.key] = origName;
+      effectiveNips[rm.key] = origNip;
       if (!origName) return;
 
       const conflict = getConflictReasonApel_(absentByDate, activeDates, origNip, origName);
@@ -606,6 +628,7 @@ function getApelMingguanDispatch_(params) {
         const candConflict = getConflictReasonApel_(absentByDate, activeDates, candNip, candName);
         if (!candConflict) {
           effective[rm.key] = candName;
+          effectiveNips[rm.key] = candNip;
           usedSubstitutes[candNorm] = true;
           substitutions.push({
             role: rm.key,
@@ -631,7 +654,8 @@ function getApelMingguanDispatch_(params) {
       } catch (eDrive) {}
     }
 
-    const effectivePhotos = collectEffectiveApelPhotos_(effective, row, satpamDocs, accessToken, projectId);
+    const photoDiag = {};
+    const effectivePhotos = collectEffectiveApelPhotos_(effective, effectiveNips, satpamDocs, accessToken, projectId, photoDiag);
 
     return {
       status: 'success',
@@ -661,6 +685,7 @@ function getApelMingguanDispatch_(params) {
       },
       effective_petugas: effective,
       effective_photos: effectivePhotos,
+      photo_diag: photoDiag,
       bg_gedung_uri: String(settingsDoc.bg_gedung_uri || ''),
       substitutions: substitutions,
       has_substitutions: substitutions.length > 0,
