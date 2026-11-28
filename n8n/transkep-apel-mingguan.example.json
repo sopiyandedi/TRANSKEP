@@ -20,7 +20,10 @@
       "name": "Cron Setiap Jumat 15:00 WIB",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
-      "position": [-820, 220]
+      "position": [
+        -820,
+        220
+      ]
     },
     {
       "parameters": {},
@@ -28,28 +31,48 @@
       "name": "Tes Manual Cron",
       "type": "n8n-nodes-base.manualTrigger",
       "typeVersion": 1,
-      "position": [-820, 400]
+      "position": [
+        -820,
+        400
+      ]
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "https://script.google.com/macros/s/<GANTI_DEPLOYMENT_ID_GAS>/exec?api=true",
-        "sendHeaders": true,
-        "headerParameters": {
+        "method": "GET",
+        "url": "https://script.google.com/macros/s/<GANTI_DEPLOYMENT_ID_GAS>/exec",
+        "sendQuery": true,
+        "queryParameters": {
           "parameters": [
-            { "name": "Content-Type", "value": "application/json" }
+            {
+              "name": "api",
+              "value": "true"
+            },
+            {
+              "name": "action",
+              "value": "getApelMingguanDispatch"
+            },
+            {
+              "name": "secret_key",
+              "value": "<GANTI_TRANSKEP_WEBHOOK_KEY>"
+            }
           ]
         },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={ \"action\": \"getApelMingguanDispatch\", \"secret_key\": \"<GANTI_TRANSKEP_WEBHOOK_KEY>\" }",
-        "options": {}
+        "options": {
+          "redirect": {
+            "redirect": {
+              "followRedirects": true
+            }
+          }
+        }
       },
       "id": "a1b2c3d4-0001-4000-8000-000000000003",
       "name": "Ambil Jadwal Apel Minggu Depan (GAS)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [-560, 300]
+      "position": [
+        -560,
+        300
+      ]
     },
     {
       "parameters": {
@@ -59,13 +82,19 @@
       "name": "Cek Status & Siapkan Prompt Gemini",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [-300, 300]
+      "position": [
+        -300,
+        300
+      ]
     },
     {
       "parameters": {
         "conditions": {
           "boolean": [
-            { "value1": "={{ $json.okToSend }}", "value2": true }
+            {
+              "value1": "={{ $json.okToSend }}",
+              "value2": true
+            }
           ]
         }
       },
@@ -73,7 +102,10 @@
       "name": "Siap Kirim ke Admin? (IF)",
       "type": "n8n-nodes-base.if",
       "typeVersion": 1,
-      "position": [-60, 300]
+      "position": [
+        -60,
+        300
+      ]
     },
     {
       "parameters": {
@@ -84,7 +116,10 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Content-Type", "value": "application/json" }
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
           ]
         },
         "sendBody": true,
@@ -96,7 +131,10 @@
       "name": "Gemini Susun Caption WA",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [180, 220]
+      "position": [
+        180,
+        220
+      ]
     },
     {
       "parameters": {
@@ -106,13 +144,19 @@
       "name": "Rakitan Payload WAHA",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [420, 220]
+      "position": [
+        420,
+        220
+      ]
     },
     {
       "parameters": {
         "conditions": {
           "boolean": [
-            { "value1": "={{ $json.hasPoster }}", "value2": true }
+            {
+              "value1": "={{ $json.hasPoster }}",
+              "value2": true
+            }
           ]
         }
       },
@@ -120,7 +164,10 @@
       "name": "Poster PNG Tersedia? (IF)",
       "type": "n8n-nodes-base.if",
       "typeVersion": 1,
-      "position": [640, 220]
+      "position": [
+        640,
+        220
+      ]
     },
     {
       "parameters": {
@@ -129,8 +176,14 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "X-Api-Key", "value": "<GANTI_WAHA_API_KEY>" },
-            { "name": "Content-Type", "value": "application/json" }
+            {
+              "name": "X-Api-Key",
+              "value": "<GANTI_WAHA_API_KEY>"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
           ]
         },
         "sendBody": true,
@@ -142,7 +195,10 @@
       "name": "Kirim Gambar Poster ke WA Admin (WAHA)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [900, 120]
+      "position": [
+        900,
+        120
+      ]
     },
     {
       "parameters": {
@@ -151,16 +207,31 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "X-Api-Key", "value": "<GANTI_WAHA_API_KEY>" },
-            { "name": "Content-Type", "value": "application/json" }
+            {
+              "name": "X-Api-Key",
+              "value": "<GANTI_WAHA_API_KEY>"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
           ]
         },
         "sendBody": true,
         "bodyParameters": {
           "parameters": [
-            { "name": "session", "value": "default" },
-            { "name": "chatId", "value": "={{ $json.chatId }}" },
-            { "name": "text", "value": "={{ $json.finalCaption }}" }
+            {
+              "name": "session",
+              "value": "default"
+            },
+            {
+              "name": "chatId",
+              "value": "={{ $json.chatId }}"
+            },
+            {
+              "name": "text",
+              "value": "={{ $json.finalCaption }}"
+            }
           ]
         },
         "options": {}
@@ -169,7 +240,10 @@
       "name": "Kirim Teks Pengumuman ke WA Admin (WAHA)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [900, 340]
+      "position": [
+        900,
+        340
+      ]
     },
     {
       "parameters": {
@@ -182,7 +256,10 @@
       "name": "Webhook Import Tabel SK Apel",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 1,
-      "position": [-820, 680],
+      "position": [
+        -820,
+        680
+      ],
       "webhookId": "transkep-apel-import"
     },
     {
@@ -193,7 +270,10 @@
       "name": "Siapkan Request Gemini OCR Tabel SK",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [-560, 680]
+      "position": [
+        -560,
+        680
+      ]
     },
     {
       "parameters": {
@@ -204,7 +284,10 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Content-Type", "value": "application/json" }
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
           ]
         },
         "sendBody": true,
@@ -216,7 +299,10 @@
       "name": "Gemini Ekstrak Jadwal Tabel SK",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [-300, 680]
+      "position": [
+        -300,
+        680
+      ]
     },
     {
       "parameters": {
@@ -226,7 +312,10 @@
       "name": "Normalisasi JSON Hasil OCR",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [-40, 680]
+      "position": [
+        -40,
+        680
+      ]
     },
     {
       "parameters": {
@@ -238,26 +327,152 @@
       "name": "Kirim JSON Hasil Import SK",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1,
-      "position": [220, 680]
+      "position": [
+        220,
+        680
+      ]
     }
   ],
   "connections": {
-    "Cron Setiap Jumat 15:00 WIB": { "main": [[{ "node": "Ambil Jadwal Apel Minggu Depan (GAS)", "type": "main", "index": 0 }]] },
-    "Tes Manual Cron": { "main": [[{ "node": "Ambil Jadwal Apel Minggu Depan (GAS)", "type": "main", "index": 0 }]] },
-    "Ambil Jadwal Apel Minggu Depan (GAS)": { "main": [[{ "node": "Cek Status & Siapkan Prompt Gemini", "type": "main", "index": 0 }]] },
-    "Cek Status & Siapkan Prompt Gemini": { "main": [[{ "node": "Siap Kirim ke Admin? (IF)", "type": "main", "index": 0 }]] },
-    "Siap Kirim ke Admin? (IF)": { "main": [[{ "node": "Gemini Susun Caption WA", "type": "main", "index": 0 }], []] },
-    "Gemini Susun Caption WA": { "main": [[{ "node": "Rakitan Payload WAHA", "type": "main", "index": 0 }]] },
-    "Rakitan Payload WAHA": { "main": [[{ "node": "Poster PNG Tersedia? (IF)", "type": "main", "index": 0 }]] },
-    "Poster PNG Tersedia? (IF)": {
+    "Cron Setiap Jumat 15:00 WIB": {
       "main": [
-        [{ "node": "Kirim Gambar Poster ke WA Admin (WAHA)", "type": "main", "index": 0 }],
-        [{ "node": "Kirim Teks Pengumuman ke WA Admin (WAHA)", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Ambil Jadwal Apel Minggu Depan (GAS)",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
-    "Webhook Import Tabel SK Apel": { "main": [[{ "node": "Siapkan Request Gemini OCR Tabel SK", "type": "main", "index": 0 }]] },
-    "Siapkan Request Gemini OCR Tabel SK": { "main": [[{ "node": "Gemini Ekstrak Jadwal Tabel SK", "type": "main", "index": 0 }]] },
-    "Gemini Ekstrak Jadwal Tabel SK": { "main": [[{ "node": "Normalisasi JSON Hasil OCR", "type": "main", "index": 0 }]] },
-    "Normalisasi JSON Hasil OCR": { "main": [[{ "node": "Kirim JSON Hasil Import SK", "type": "main", "index": 0 }]] }
+    "Tes Manual Cron": {
+      "main": [
+        [
+          {
+            "node": "Ambil Jadwal Apel Minggu Depan (GAS)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ambil Jadwal Apel Minggu Depan (GAS)": {
+      "main": [
+        [
+          {
+            "node": "Cek Status & Siapkan Prompt Gemini",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cek Status & Siapkan Prompt Gemini": {
+      "main": [
+        [
+          {
+            "node": "Siap Kirim ke Admin? (IF)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Siap Kirim ke Admin? (IF)": {
+      "main": [
+        [
+          {
+            "node": "Gemini Susun Caption WA",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Gemini Susun Caption WA": {
+      "main": [
+        [
+          {
+            "node": "Rakitan Payload WAHA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rakitan Payload WAHA": {
+      "main": [
+        [
+          {
+            "node": "Poster PNG Tersedia? (IF)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Poster PNG Tersedia? (IF)": {
+      "main": [
+        [
+          {
+            "node": "Kirim Gambar Poster ke WA Admin (WAHA)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Kirim Teks Pengumuman ke WA Admin (WAHA)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook Import Tabel SK Apel": {
+      "main": [
+        [
+          {
+            "node": "Siapkan Request Gemini OCR Tabel SK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Siapkan Request Gemini OCR Tabel SK": {
+      "main": [
+        [
+          {
+            "node": "Gemini Ekstrak Jadwal Tabel SK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini Ekstrak Jadwal Tabel SK": {
+      "main": [
+        [
+          {
+            "node": "Normalisasi JSON Hasil OCR",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalisasi JSON Hasil OCR": {
+      "main": [
+        [
+          {
+            "node": "Kirim JSON Hasil Import SK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
   }
 }
